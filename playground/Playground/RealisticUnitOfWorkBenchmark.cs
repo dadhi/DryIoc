@@ -1089,8 +1089,14 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 | BmarkDryIoc_RegisterDelegateWithInjectedDependencies | 2.854 us | 0.0118 us | 0.0111 us |  0.70 |    0.03 | 1.1559 |     - |     - |   5.33 KB |
 |                                      BmarkDryIocMsDi | 3.487 us | 0.0049 us | 0.0041 us |  0.86 |    0.04 | 1.1597 |     - |     - |   5.35 KB |
 
-/
-            */
+
+|                            Method |     Mean |     Error |    StdDev | Ratio |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|---------------------------------- |---------:|----------:|----------:|------:|-------:|------:|------:|----------:|
+| BmarkMicrosoftDependencyInjection | 3.787 us | 0.0473 us | 0.0442 us |  1.00 | 0.9460 |     - |     - |   4.37 KB |
+|                       BmarkDryIoc | 2.631 us | 0.0025 us | 0.0022 us |  0.70 | 1.1559 |     - |     - |   5.33 KB |
+|                   BmarkDryIocMsDi | 3.231 us | 0.0159 us | 0.0149 us |  0.85 | 1.1597 |     - |     - |   5.35 KB |
+
+*/
 
             private IServiceProvider _msDi;
             private IContainer _dryIoc;

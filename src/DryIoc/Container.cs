@@ -9920,12 +9920,17 @@ namespace DryIoc
 
             var itemRef = new ItemRef();
             var m = map;
-            if (Interlocked.CompareExchange(ref map, map.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+            if (Interlocked.CompareExchange(ref map, m.AddOnly(id, itemRef), m) == m)
+                itemRef = map.GetValueOrDefault(id);
+            else
+            {
+                Ref.Swap(ref map, id, itemRef, (i, itRef, x) => x.AddOnly(i, itRef));
+                itemRef = map.GetValueOrDefault(id);
 
-            itemRef = map.GetValueOrDefault(id);
-            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
-                return itemRef.Item;
+                // double-check only here, where it is much more probably that someone concurrently doing things 
+                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                    return itemRef.Item;
+            }
 
             // lock on the ref itself to set its `Item` field
             lock (itemRef)

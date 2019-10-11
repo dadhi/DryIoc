@@ -1227,6 +1227,95 @@ namespace ImTools
             }
         }
 
+        /// Returns a new tree with added or updated value for specified key.
+        [MethodImpl((MethodImplOptions)256)]
+        public ImMap<V> AddOnly(int key, V value) =>
+            Height == 0
+                ? new ImMap<V>(key, value)
+                : key == Key
+                    ? this
+                    : AddOnlyImpl(key, value);
+
+        private ImMap<V> AddOnlyImpl(int key, V value)
+        {
+            if (key < Key)
+            {
+                if (Left.Height == 0)
+                    return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, 2);
+
+                if (Left.Key == key)
+                    return this;
+
+                if (Right.Height == 0)
+                {
+                    if (key < Left.Key)
+                        return new ImMap<V>(Left.Key, Left.Value,
+                            new ImMap<V>(key, value), new ImMap<V>(Key, Value), 2);
+
+                    return new ImMap<V>(key, value,
+                        new ImMap<V>(Left.Key, Left.Value), new ImMap<V>(Key, Value), 2);
+                }
+
+                var newLeft = Left.AddOnlyImpl(key, value);
+                if (ReferenceEquals(newLeft, Left))
+                    return this;
+
+                if (newLeft.Height > Right.Height + 1) // left is longer by 2, rotate left
+                {
+                    var leftLeft = newLeft.Left;
+                    var leftRight = newLeft.Right;
+
+                    if (leftLeft.Height >= leftRight.Height)
+                        return new ImMap<V>(newLeft.Key, newLeft.Value,
+                            leftLeft, new ImMap<V>(Key, Value, leftRight, Right));
+
+                    return new ImMap<V>(leftRight.Key, leftRight.Value,
+                        new ImMap<V>(newLeft.Key, newLeft.Value, leftLeft, leftRight.Left),
+                        new ImMap<V>(Key, Value, leftRight.Right, Right));
+                }
+
+                return new ImMap<V>(Key, Value, newLeft, Right);
+            }
+            else
+            {
+                if (Right.Height == 0)
+                    return new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), 2);
+
+                if (Right.Key == key)
+                    return this;
+
+                if (Left.Height == 0)
+                {
+                    if (key >= Right.Key)
+                        return new ImMap<V>(Right.Key, Right.Value,
+                            new ImMap<V>(Key, Value), new ImMap<V>(key, value), 2);
+
+                    return new ImMap<V>(key, value,
+                        new ImMap<V>(Key, Value), new ImMap<V>(Right.Key, Right.Value), 2);
+                }
+
+                var newRight = Right.AddOnlyImpl(key, value);
+                if (ReferenceEquals(newRight, Right))
+                    return this;
+
+                if (newRight.Height > Left.Height + 1)
+                {
+                    var rightLeft = newRight.Left;
+                    var rightRight = newRight.Right;
+
+                    if (rightRight.Height >= rightLeft.Height)
+                        return new ImMap<V>(newRight.Key, newRight.Value,
+                            new ImMap<V>(Key, Value, Left, rightLeft), rightRight);
+
+                    return new ImMap<V>(rightLeft.Key, rightLeft.Value,
+                        new ImMap<V>(Key, Value, Left, rightLeft.Left),
+                        new ImMap<V>(newRight.Key, newRight.Value, rightLeft.Right, rightRight));
+                }
+
+                return new ImMap<V>(Key, Value, Left, newRight);
+            }
+        }
+
         /// <summary>Returns new tree with added or updated value for specified key.</summary>
         /// <param name="key">Key</param> <param name="value">Value</param>
         /// <param name="updateValue">(optional) Delegate to calculate new value from and old and a new value.</param>
