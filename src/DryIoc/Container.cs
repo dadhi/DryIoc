@@ -9901,12 +9901,21 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
-            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            var itemRef = map.GetValueOrDefault(id);
-            if (itemRef != null && !ReferenceEquals(itemRef.Item, ItemRef.NoItem))
-                return itemRef.Item;
+            var map = _maps[id & MAP_COUNT_SUFFIX_MASK];
+            while (map.Height != 0)
+            {
+                if (map.Key == id)
+                {
+                    var item = map.Value.Item;
+                    if (!ReferenceEquals(item, ItemRef.NoItem))
+                        return item;
+                    // todo: here we may need to lock on the existing item or better to SpinWait because the item is being created right now
+                    break;
+                }
+                map = id < map.Key ? map.Left : map.Right;
+            }
 
-            return TryGetOrAddViaFactoryDelegate(ref map, id, createValue, r, disposalOrder);
+            return TryGetOrAddViaFactoryDelegate(ref _maps[id & MAP_COUNT_SUFFIX_MASK], id, createValue, r, disposalOrder);
         }
 
         internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
