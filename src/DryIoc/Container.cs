@@ -2875,34 +2875,31 @@ namespace DryIoc
             if (itemRef != null && !ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                 return itemRef.Item;
 
-            var disposalOrder = (int)((ConstantExpression)args[4]).Value;
-
-            var lambda = args[3];
-            if (lambda is ConstantExpression factoryDelegate)
-                return scope.TryGetOrAddViaFactoryDelegate(ref map, id, (FactoryDelegate)factoryDelegate.Value, r, disposalOrder);
-
             // add only, keep old item if it already exists
-            itemRef = new ItemRef();
-            var currMap = map;
-            if (Interlocked.CompareExchange(ref map, map.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), currMap) != currMap)
-                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, new ItemRef()), m) != m)
+                Ref.Swap(ref map, id, (i, x) => x.AddOrKeep(i, new ItemRef()));
 
             itemRef = map.GetValueOrDefault(id);
             if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                 return itemRef.Item;
 
+            var lambda = args[3];
             lock (itemRef)
             {
                 if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                     return itemRef.Item;
 
-                if (!TryInterpret(r, ((LambdaExpression)lambda).Body, useFec, out var result))
+                object result;
+                if (lambda is ConstantExpression lambdaConstExpr)
+                    result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
+                else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, useFec, out result))
                     result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
                 itemRef.Item = result;
             }
 
             if (itemRef.Item is IDisposable disposable && !ReferenceEquals(disposable, scope))
-                scope.AddDisposable(disposable, disposalOrder);
+                scope.AddDisposable(disposable, (int)((ConstantExpression)args[4]).Value);
 
             return itemRef.Item;
         }
@@ -9927,19 +9924,15 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            var itemRef = new ItemRef();
             var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, itemRef), m) == m)
-                itemRef = map.GetValueOrDefault(id);
-            else
-            {
-                Ref.Swap(ref map, id, itemRef, (i, itRef, x) => x.AddOrKeep(i, itRef));
-                itemRef = map.GetValueOrDefault(id);
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, new ItemRef()), m) != m)
+                Ref.Swap(ref map, id, (i, x) => x.AddOrKeep(i, new ItemRef()));
 
-                // double-check only here, where it is much more probably that someone concurrently doing things 
-                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
-                    return itemRef.Item;
-            }
+            var itemRef = map.GetValueOrDefault(id);
+
+            // double-check only here, where it is much more probably that someone concurrently doing things 
+            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                return itemRef.Item;
 
             // lock on the ref itself to set its `Item` field
             lock (itemRef)
@@ -10059,6 +10052,7 @@ namespace DryIoc
             return itemRef.Item;
         }
 
+        // todo: experiment with replacing disposable tree with LiveArray
         internal void AddDisposable(IDisposable disposable, int disposalOrder)
         {
             if (disposalOrder == 0)

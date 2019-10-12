@@ -1339,6 +1339,7 @@ namespace ImTools
             if (Height == 0)
                 yield break;
 
+            // todo: Use pool of LiveCountArray for stack!
             var parents = new ImMap<V>[Height];
 
             var node = this;

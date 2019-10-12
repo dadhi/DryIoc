@@ -1,4 +1,3 @@
-using System;
 using NUnit.Framework;
 using RealisticUnitOfWork;
 
@@ -22,7 +21,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            var x = container.PrepareDryIoc_RegisterDelegateWithInjectedDependencies().Measure();
+            var x = container.PrepareDryIoc_RegisterDelegate().Measure();
 
             Assert.IsInstanceOf<R>(x);
         }
@@ -32,12 +31,32 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container().PrepareDryIoc();
             var x1 = container.Measure();
-
             var x2 = container.Measure();
 
             Assert.IsNotNull(x1);
             Assert.IsNotNull(x2);
         }
+
+        [Test]
+        public void OpenScopeAndResolve_third_and_more_times()
+        {
+            var container = _warmContainer;
+
+            for (var i = 0; i < 5; i++)
+            {
+                container.Measure();
+            }
+        }
+
+        private static IContainer SetupAndWarmup()
+        {
+            var container = new Container().PrepareDryIoc();
+            container.Measure();
+            container.Measure();
+            return container;
+        }
+
+        private static readonly IContainer _warmContainer = SetupAndWarmup();
 
         [Test]
         public void OpenScopeAndResolve_with_UseInterpretation()
@@ -54,7 +73,7 @@ namespace DryIoc.IssuesTests
 
     public static class Realistic_unit_of_work_slash_web_controller_example
     {
-        public static IContainer PrepareDryIoc(this IContainer container)
+        public static IContainer PrepareDryIoc_RegisterDelegate(this IContainer container)
         {
             // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
             RegisterDummyPopulation(container);
@@ -146,7 +165,7 @@ namespace DryIoc.IssuesTests
             return container;
         }
 
-        public static IContainer PrepareDryIoc_RegisterDelegateWithInjectedDependencies(this IContainer container)
+        public static IContainer PrepareDryIoc(this IContainer container)
         {
             // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
             RegisterDummyPopulation(container);
