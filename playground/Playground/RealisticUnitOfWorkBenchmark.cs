@@ -14,12 +14,102 @@ namespace PerformanceTests
 {
     public class RealisticUnitOfWorkBenchmark
     {
+        public static IContainer PrepareDryIocWithOpts(bool useInterpretation = false, bool withoutFastExpressionCompiler = false)
+        {
+            var container = !useInterpretation && !withoutFastExpressionCompiler ? new Container() 
+                : useInterpretation ? new Container(rules => rules.WithUseInterpretation())
+                : new Container(rules => rules.WithoutFastExpressionCompiler());
+
+            // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
+            RegisterDummyPopulation(container);
+
+            // register graph for benchmarking starting with scoped R(oot) / Controller
+            container.Register<R>(Reuse.Scoped);
+
+            container.Register<Scoped1>(Reuse.Scoped);
+            container.Register<Scoped2>(Reuse.Scoped);
+
+            container.Register<Trans1>(Reuse.Transient);
+            container.Register<Trans2>(Reuse.Transient);
+
+            container.Register<Single1>(Reuse.Singleton);
+            container.Register<Single2>(Reuse.Singleton);
+
+            container.RegisterDelegate(
+                r => new ScopedFac1(r.Resolve<Scoped1>(), r.Resolve<Scoped3>(), r.Resolve<Single1>(), r.Resolve<SingleObj1>()),
+                Reuse.Scoped);
+            container.RegisterDelegate(
+                r => new ScopedFac2(r.Resolve<Scoped2>(), r.Resolve<Scoped4>(), r.Resolve<Single2>(), r.Resolve<SingleObj2>()),
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj1());
+            container.RegisterInstance(new SingleObj2());
+
+            // level 2
+            container.Register<Scoped3>(Reuse.Scoped);
+            container.Register<Scoped4>(Reuse.Scoped);
+
+            container.Register<Scoped12>(Reuse.Scoped);
+            container.Register<Scoped22>(Reuse.Scoped);
+
+            container.Register<Single12>(Reuse.Singleton);
+            container.Register<Single22>(Reuse.Singleton);
+
+            container.Register<Trans12>(Reuse.Transient);
+            container.Register<Trans22>(Reuse.Transient);
+
+            container.RegisterDelegate(
+                r => new ScopedFac12(r.Resolve<Scoped13>(), r.Resolve<Single1>(), r.Resolve<SingleObj13>()), 
+                Reuse.Scoped);
+            container.RegisterDelegate(
+                r => new ScopedFac22(r.Resolve<Scoped23>(), r.Resolve<Single2>(), r.Resolve<SingleObj23>()), 
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj12());
+            container.RegisterInstance(new SingleObj22());
+
+            // level 3
+            container.Register<Scoped13>(Reuse.Scoped);
+            container.Register<Scoped23>(Reuse.Scoped);
+
+            container.Register<Single13>(Reuse.Singleton);
+            container.Register<Single23>(Reuse.Singleton);
+
+            container.Register<Trans13>(Reuse.Transient);
+            container.Register<Trans23>(Reuse.Transient);
+
+            container.RegisterDelegate(
+                r => new ScopedFac13(r.Resolve<Single1>(), r.Resolve<Scoped14>(), r.Resolve<ScopedFac14>()), 
+                Reuse.Scoped);
+            container.RegisterDelegate(
+                r => new ScopedFac23(r.Resolve<Single2>(), r.Resolve<Scoped24>(), r.Resolve<ScopedFac24>()), 
+                Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj13());
+            container.RegisterInstance(new SingleObj23());
+
+            // level 4
+            container.Register<Scoped14>(Reuse.Scoped);
+            container.Register<Scoped24>(Reuse.Scoped);
+
+            container.Register<Single14>(Reuse.Singleton);
+            container.Register<Single24>(Reuse.Singleton);
+
+            container.Register<Trans14>(Reuse.Transient);
+            container.Register<Trans24>(Reuse.Transient);
+
+            container.RegisterDelegate(r => new ScopedFac14(), Reuse.Scoped);
+            container.RegisterDelegate(r => new ScopedFac24(), Reuse.Scoped);
+
+            container.RegisterInstance(new SingleObj14());
+            container.RegisterInstance(new SingleObj24());
+
+            ResolveDummyPopulation(container);
+            return container;
+        }
+
         public static IContainer PrepareDryIoc()
         {
-            //var container = !useInterpretation && !withoutFastExpressionCompiler ? new Container()
-            //    : useInterpretation ? new Container(rules => rules.WithUseInterpretation())
-            //    : new Container(rules => rules.WithoutFastExpressionCompiler());
-
             var container = new Container();
 
             // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
@@ -879,16 +969,18 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
-|                                               Method |     Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|----------------------------------------------------- |---------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
-|                    BmarkMicrosoftDependencyInjection | 143.5 us | 3.2190 us | 6.0460 us |  1.00 |    0.00 | 18.5547 | 0.2441 |     - |  80.63 KB |
-|                                          BmarkDryIoc | 121.3 us | 0.5245 us | 0.4906 us |  0.83 |    0.05 | 21.1182 | 0.2441 |     - |   97.5 KB |
-| BmarkDryIoc_RegisterDelegateWithInjectedDependencies | 110.6 us | 0.8813 us | 0.7812 us |  0.75 |    0.04 | 18.6768 | 0.4883 |     - |  86.44 KB |
-|                                      BmarkDryIocMsDi | 133.9 us | 1.5022 us | 1.4052 us |  0.91 |    0.06 | 23.1934 |      - |     - | 107.88 KB |
+|                            Method |     Mean |     Error |    StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|---------------------------------- |---------:|----------:|----------:|------:|--------:|-------:|------:|----------:|
+| BmarkMicrosoftDependencyInjection | 140.2 us | 1.3188 us | 1.2336 us |  1.00 | 18.5547 | 0.2441 |     - |  80.63 KB |
+|                       BmarkDryIoc | 105.7 us | 0.3330 us | 0.2952 us |  0.75 | 19.0430 | 0.3662 |     - |  87.88 KB |
+|                   BmarkDryIocMsDi | 141.2 us | 1.5663 us | 1.3079 us |  1.01 | 23.4375 |      - |     - |  109.1 KB |
              */
 
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
+
+            //[Benchmark]
+            //public object BmarkDryIoc_WithoutFastExpressionCompiler() => Measure(PrepareDryIocWithOpts(false, withoutFastExpressionCompiler: true));
 
             [Benchmark]
             public object BmarkDryIoc() => Measure(PrepareDryIoc());
@@ -1080,13 +1172,15 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                       BmarkAutofac | 38.488 us | 0.2379 us | 0.2225 us |  9.94 |    0.12 |      9.7656 |           - |           - |             45.2 KB |
                   BmarkAutofacMsDi | 47.389 us | 0.1995 us | 0.1866 us | 12.24 |    0.11 |     12.5732 |      0.1221 |           - |            58.09 KB |
 
-            ## FEC V3 and multiple improvements
+            ## FEC V3 and multiple improvements, Grace v7.1
 
 |                            Method |     Mean |     Error |    StdDev | Ratio |  Gen 0 | Gen 1 | Gen 2 | Allocated |
 |---------------------------------- |---------:|----------:|----------:|------:|-------:|------:|------:|----------:|
-| BmarkMicrosoftDependencyInjection | 3.791 us | 0.0256 us | 0.0227 us |  1.00 | 0.9460 |     - |     - |   4.37 KB |
-|                       BmarkDryIoc | 2.610 us | 0.0039 us | 0.0035 us |  0.69 | 1.1559 |     - |     - |   5.33 KB |
-|                   BmarkDryIocMsDi | 3.192 us | 0.0160 us | 0.0150 us |  0.84 | 1.1597 |     - |     - |   5.35 KB |
+| BmarkMicrosoftDependencyInjection | 3.894 us | 0.0220 us | 0.0171 us |  1.00 | 0.9460 |     - |     - |   4.37 KB |
+|                       BmarkDryIoc | 2.706 us | 0.0426 us | 0.0398 us |  0.69 | 1.1559 |     - |     - |   5.33 KB |
+|                   BmarkDryIocMsDi | 3.282 us | 0.0267 us | 0.0236 us |  0.84 | 1.1597 |     - |     - |   5.35 KB |
+|                        BmarkGrace | 1.726 us | 0.0239 us | 0.0223 us |  0.44 | 0.6866 |     - |     - |   3.17 KB |
+|                    BmarkGraceMsDi | 2.343 us | 0.0554 us | 0.0593 us |  0.61 | 0.7401 |     - |     - |   3.41 KB |
 
 */
 
@@ -1119,10 +1213,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(_dryIocMsDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkGrace() => Measure(_grace);
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkGraceMsDi() => Measure(_graceMsDi);
 
             //[Benchmark]
