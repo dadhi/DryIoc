@@ -9929,11 +9929,11 @@ namespace DryIoc
 
             var itemRef = new ItemRef();
             var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOnly(id, itemRef), m) == m)
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, itemRef), m) == m)
                 itemRef = map.GetValueOrDefault(id);
             else
             {
-                Ref.Swap(ref map, id, itemRef, (i, itRef, x) => x.AddOnly(i, itRef));
+                Ref.Swap(ref map, id, itemRef, (i, itRef, x) => x.AddOrKeep(i, itRef));
                 itemRef = map.GetValueOrDefault(id);
 
                 // double-check only here, where it is much more probably that someone concurrently doing things 
