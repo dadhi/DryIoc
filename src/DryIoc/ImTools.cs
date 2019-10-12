@@ -1229,14 +1229,14 @@ namespace ImTools
 
         /// Returns a new tree with added or updated value for specified key.
         [MethodImpl((MethodImplOptions)256)]
-        public ImMap<V> AddOnly(int key, V value) =>
+        public ImMap<V> AddOrKeep(int key, V value) =>
             Height == 0
                 ? new ImMap<V>(key, value)
                 : key == Key
                     ? this
-                    : AddOnlyImpl(key, value);
+                    : AddOrKeepImpl(key, value);
 
-        private ImMap<V> AddOnlyImpl(int key, V value)
+        private ImMap<V> AddOrKeepImpl(int key, V value)
         {
             if (key < Key)
             {
@@ -1256,7 +1256,7 @@ namespace ImTools
                         new ImMap<V>(Left.Key, Left.Value), new ImMap<V>(Key, Value), 2);
                 }
 
-                var newLeft = Left.AddOnlyImpl(key, value);
+                var newLeft = Left.AddOrKeepImpl(key, value);
                 if (ReferenceEquals(newLeft, Left))
                     return this;
 
@@ -1294,7 +1294,7 @@ namespace ImTools
                         new ImMap<V>(Key, Value), new ImMap<V>(Right.Key, Right.Value), 2);
                 }
 
-                var newRight = Right.AddOnlyImpl(key, value);
+                var newRight = Right.AddOrKeepImpl(key, value);
                 if (ReferenceEquals(newRight, Right))
                     return this;
 
