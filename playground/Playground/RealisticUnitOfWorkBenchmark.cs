@@ -969,18 +969,17 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
-|                            Method |     Mean |     Error |    StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|---------------------------------- |---------:|----------:|----------:|------:|--------:|-------:|------:|----------:|
-| BmarkMicrosoftDependencyInjection | 140.2 us | 1.3188 us | 1.2336 us |  1.00 | 18.5547 | 0.2441 |     - |  80.63 KB |
-|                       BmarkDryIoc | 105.7 us | 0.3330 us | 0.2952 us |  0.75 | 19.0430 | 0.3662 |     - |  87.88 KB |
-|                   BmarkDryIocMsDi | 141.2 us | 1.5663 us | 1.3079 us |  1.01 | 23.4375 |      - |     - |  109.1 KB |
+|                            Method |        Mean |       Error |      StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |   Gen 2 | Allocated |
+|---------------------------------- |------------:|------------:|------------:|-------:|--------:|---------:|--------:|--------:|----------:|
+| BmarkMicrosoftDependencyInjection |    137.5 us |   1.7400 us |   1.4530 us |   1.00 |    0.00 |  18.5547 |  0.4883 |       - |  80.64 KB |
+|                       BmarkDryIoc |    117.7 us |   2.2876 us |   2.7232 us |   0.85 |    0.02 |  18.6768 |  0.4883 |       - |  86.44 KB |
+|                   BmarkDryIocMsDi |    140.8 us |   0.7857 us |   0.7350 us |   1.02 |    0.01 |  23.1934 |       - |       - | 107.88 KB |
+|                        BmarkGrace | 18,642.4 us | 107.3448 us |  95.1584 us | 135.53 |    1.82 | 156.2500 | 62.5000 |       - | 752.44 KB |
+|                    BmarkGraceMsDi | 21,655.1 us | 122.5632 us | 102.3458 us | 157.47 |    2.18 | 187.5000 | 93.7500 | 31.2500 | 922.18 KB |
              */
 
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
-
-            //[Benchmark]
-            //public object BmarkDryIoc_WithoutFastExpressionCompiler() => Measure(PrepareDryIocWithOpts(false, withoutFastExpressionCompiler: true));
 
             [Benchmark]
             public object BmarkDryIoc() => Measure(PrepareDryIoc());
@@ -988,10 +987,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(PrepareDryIocMsDi());
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkGraceMsDi() => Measure(PrepareGraceMsDi());
 
             //[Benchmark]
