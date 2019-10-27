@@ -937,7 +937,7 @@ namespace ImTools
         public T[] Items;
 
         /// Constructs the thing 
-        public GrowingStack(int capacity)
+        public GrowingStack(int capacity = 4)
         {
             Items = new T[capacity];
             Count = 0;
@@ -1227,7 +1227,7 @@ namespace ImTools
             }
         }
 
-        /// Returns a new tree with added or updated value for specified key.
+        /// Returns a new map with added value for the specified key or the existing map if the key is already in the map.
         [MethodImpl((MethodImplOptions)256)]
         public ImMap<V> AddOrKeep(int key, V value) =>
             Height == 0
