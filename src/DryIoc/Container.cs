@@ -9408,11 +9408,7 @@ namespace DryIoc
                     if (paramIndex != -1)
                     {
                         if (resultImplArgs[paramIndex] == null)
-                        {
                             resultImplArgs[paramIndex] = serviceArg;
-                            if (++resultCount == resultImplArgs.Length)
-                                return true;
-                        }
                         else if (resultImplArgs[paramIndex] != serviceArg)
                             return false; // more than one service type arg is matching with single implementation type parameter
                     }
@@ -10052,7 +10048,7 @@ namespace DryIoc
             return itemRef.Item;
         }
 
-        // todo: experiment with replacing disposable tree with LiveArray
+        // todo: experiment with replacing disposable tree with LiveCountArray
         internal void AddDisposable(IDisposable disposable, int disposalOrder)
         {
             if (disposalOrder == 0)
@@ -12513,12 +12509,26 @@ namespace DryIoc.Messages
     /// Type for an empty response
     public struct EmptyResponse
     {
-        /// Single value
+        /// Single value of empty response
         public static readonly EmptyResponse Value = new EmptyResponse();
 
-        /// Single completed task
+        /// Single completed task for the empty response
         public static readonly Task<EmptyResponse> Task = System.Threading.Tasks.Task.FromResult(Value);
     }
+
+    /// Message extensions
+    public static class MessageExtensions
+    {
+        /// Converts the task to empty response task
+        public static async Task<EmptyResponse> ToEmptyResponse(this Task task)
+        {
+            await task;
+            return EmptyResponse.Value;
+        }
+    }
+
+    /// Message with empty response
+    public interface IMessage : IMessage<EmptyResponse> { }
 
     /// Base message handler
     public interface IMessageHandler<in M, R> where M : IMessage<R>
@@ -12528,7 +12538,7 @@ namespace DryIoc.Messages
     }
 
     /// Base message handler for message with empty response
-    public interface IMessageHandler<in M> : IMessageHandler<M, EmptyResponse> where M : IMessage { }
+    public interface IMessageHandler<in M> : IMessageHandler<M, EmptyResponse> where M : IMessage<EmptyResponse> { }
 
     /// Message handler middleware to handle the message and pass the result to the next middleware
     public interface IMessageMiddleware<in M, R>
@@ -12569,20 +12579,15 @@ namespace DryIoc.Messages
                 .Invoke();
     }
 
-    /// Message with empty response
-    public interface IMessage : IMessage<EmptyResponse> { }
-
     /// Broadcasting type of message handler decorator
-    public class BroadcastMessageHandler<M> : IMessageHandler<M, EmptyResponse>
-        where M : IMessage
+    public class BroadcastMessageHandler<M>: IMessageHandler<M, EmptyResponse>
+        where M : IMessage<EmptyResponse>
     {
         private readonly IEnumerable<IMessageHandler<M, EmptyResponse>> _handlers;
 
         /// Constructs the hub with the handler and optional middlewares
-        public BroadcastMessageHandler(IEnumerable<IMessageHandler<M, EmptyResponse>> handlers)
-        {
+        public BroadcastMessageHandler(IEnumerable<IMessageHandler<M, EmptyResponse>> handlers) => 
             _handlers = handlers;
-        }
 
         /// Composes middlewares with handler
         public async Task<EmptyResponse> Handle(M message, CancellationToken cancellationToken)
@@ -12598,17 +12603,15 @@ namespace DryIoc.Messages
         private readonly IResolver _resolver;
 
         /// Constructs with resolver
-        public MessageMediator(IResolver resolver)
-        {
+        public MessageMediator(IResolver resolver) => 
             _resolver = resolver;
-        }
 
         /// Sends message with response to resolved handlers
         public Task<R> Send<M, R>(M message, CancellationToken cancellationToken) where M : IMessage<R> =>
             _resolver.Resolve<IMessageHandler<M, R>>().Handle(message, cancellationToken);
 
         /// Sends message with empty response to resolved handlers
-        public Task Send<M>(M message, CancellationToken cancellationToken) where M : IMessage =>
+        public Task Send<M>(M message, CancellationToken cancellationToken) where M : IMessage<EmptyResponse> =>
             _resolver.Resolve<IMessageHandler<M, EmptyResponse>>().Handle(message, cancellationToken);
     }
 }
