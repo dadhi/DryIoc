@@ -9061,8 +9061,17 @@ namespace DryIoc
                 else if (!serviceType.IsGeneric())
                     Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
 
-                else if (implType.GetImplementedServiceTypes().IndexOf(serviceType.GetGenericTypeDefinition()) == -1)
-                    Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
+                else
+                {
+                    var serviceTypeGenericDefinition = serviceType.GetGenericTypeDefinition();
+                    var implementedServiceTypes = implType.GetImplementedServiceTypes();
+                    var implServiceTypeIndex = implementedServiceTypes.Length - 1;
+                    while (implServiceTypeIndex != -1 &&
+                           !ReferenceEquals(implementedServiceTypes[implServiceTypeIndex], serviceTypeGenericDefinition))
+                        --implServiceTypeIndex;
+                    if (implServiceTypeIndex == -1)
+                        Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
+                }
             }
 
             return true;
@@ -9404,7 +9413,9 @@ namespace DryIoc
                 var implementedParam = serviceParams[i];
                 if (implementedParam.IsGenericParameter)
                 {
-                    var paramIndex = implParams.IndexOf(implementedParam);
+                    var paramIndex = implParams.Length - 1;
+                    while (paramIndex != -1 && !ReferenceEquals(implParams[paramIndex], implementedParam))
+                        --paramIndex;
                     if (paramIndex != -1)
                     {
                         if (resultImplArgs[paramIndex] == null)
