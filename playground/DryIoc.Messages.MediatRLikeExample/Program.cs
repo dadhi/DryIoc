@@ -4,12 +4,17 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using NUnit.Framework;
 
 namespace DryIoc.Messages.MediatRLikeExample
 {
-    class Program
+    [TestFixture]
+    public class Program
     {
-        static Task Main()
+        public static Task Main() => new Program().Run();
+
+        [Test]
+        public Task Run()
         {
             var container = new Container();
             var writer = new WrappingWriter(Console.Out);
@@ -21,10 +26,12 @@ namespace DryIoc.Messages.MediatRLikeExample
 
         private static void BuildMediator(IContainer container, TextWriter writer)
         {
-            container.RegisterMany(new[] { typeof(Program).GetAssembly() }, Registrator.Interfaces);
             container.RegisterInstance(writer);
+            container.RegisterMany(new[] { typeof(Program).GetAssembly() }, Registrator.Interfaces);
 
-            container.Register(typeof(MiddlewareMessageHandler<,>));
+            //container.Register(typeof(IMessageMiddleware<,>), typeof(ConstrainedRequestPostProcessor<,>)); 
+
+            container.Register(typeof(IMessageHandler<,>), typeof(MiddlewareMessageHandler<,>), setup: Setup.Decorator);
             container.Register(typeof(BroadcastMessageHandler<>));
         }
     }
@@ -86,7 +93,6 @@ namespace DryIoc.Messages.MediatRLikeExample
         where TNotification : Pinged
     {
         private readonly TextWriter _writer;
-
         public ConstrainedPingedHandler(TextWriter writer) => _writer = writer;
 
         public Task<EmptyResponse> Handle(TNotification notification, CancellationToken cancellationToken) => 
@@ -117,40 +123,33 @@ namespace DryIoc.Messages.MediatRLikeExample
         }
     }
 
-    public class ConstrainedRequestPostProcessor<TRequest, TResponse> : IMessageMiddleware<TRequest, TResponse>
-        where TRequest : Ping
-    {
-        private readonly TextWriter _writer;
-
-        public ConstrainedRequestPostProcessor(TextWriter writer) => _writer = writer;
-
-        public Task Process(TRequest request, TResponse response, CancellationToken cancellationToken) => 
-            _writer.WriteLineAsync("- All Done with Ping");
-
-        public async Task<TResponse> Handle(TRequest message, CancellationToken cancellationToken, Func<Task<TResponse>> nextMiddleware)
-        {
-            var result = await nextMiddleware();
-            await _writer.WriteLineAsync("- All Done with Ping");
-            return result;
-        }
-    }
-
     public class GenericHandler : IMessageHandler<IMessage>
     {
         private readonly TextWriter _writer;
-
         public GenericHandler(TextWriter writer) => _writer = writer;
 
-        public Task<EmptyResponse> Handle(IMessage notification, CancellationToken cancellationToken) => 
+        public Task<EmptyResponse> Handle(IMessage notification, CancellationToken cancellationToken) =>
             _writer.WriteLineAsync("Got notified.").ToEmptyResponse();
+    }
+
+    public class GenericRequestPreProcessor<TRequest> : IMessageMiddleware<TRequest, EmptyResponse>
+    {
+        private readonly TextWriter _writer;
+
+        public GenericRequestPreProcessor(TextWriter writer) => _writer = writer;
+
+        public async Task<EmptyResponse> Handle(TRequest message, CancellationToken cancellationToken,
+            Func<Task<EmptyResponse>> nextMiddleware)
+        {
+            await _writer.WriteLineAsync("- Starting Up");
+            return await nextMiddleware();
+        }
     }
 
     public class GenericPipelineBehavior<TRequest, TResponse> : IMessageMiddleware<TRequest, TResponse>
     {
         private readonly TextWriter _writer;
-
-        public GenericPipelineBehavior(TextWriter writer) => 
-            _writer = writer;
+        public GenericPipelineBehavior(TextWriter writer) => _writer = writer;
 
         public async Task<TResponse> Handle(TRequest message, CancellationToken cancellationToken, Func<Task<TResponse>> nextMiddleware)
         {
@@ -174,17 +173,17 @@ namespace DryIoc.Messages.MediatRLikeExample
         }
     }
 
-    public class GenericRequestPreProcessor<TRequest> : IMessageMiddleware<TRequest, EmptyResponse>
+    public class ConstrainedRequestPostProcessor<TRequest, TResponse> : IMessageMiddleware<TRequest, TResponse>
+        where TRequest : Ping
     {
         private readonly TextWriter _writer;
+        public ConstrainedRequestPostProcessor(TextWriter writer) => _writer = writer;
 
-        public GenericRequestPreProcessor(TextWriter writer) => _writer = writer;
-
-        public async Task<EmptyResponse> Handle(TRequest message, CancellationToken cancellationToken,
-            Func<Task<EmptyResponse>> nextMiddleware)
+        public async Task<TResponse> Handle(TRequest message, CancellationToken cancellationToken, Func<Task<TResponse>> nextMiddleware)
         {
-            await _writer.WriteLineAsync("- Starting Up");
-            return await nextMiddleware();
+            var result = await nextMiddleware();
+            await _writer.WriteLineAsync("- All Done with Ping");
+            return result;
         }
     }
 
@@ -199,7 +198,7 @@ namespace DryIoc.Messages.MediatRLikeExample
             var ct = new CancellationToken();
 
             await writer.WriteLineAsync("Sending Ping...");
-            var pingPong = resolver.Resolve<MiddlewareMessageHandler<Ping, Pong>>();
+            var pingPong = resolver.Resolve<IMessageHandler<Ping, Pong>>();
             var pong = await pingPong.Handle(new Ping { Message = "Ping" }, ct);
             await writer.WriteLineAsync("Received: " + pong.Message);
 
@@ -224,7 +223,7 @@ namespace DryIoc.Messages.MediatRLikeExample
             await writer.WriteLineAsync("Sending Jing...");
             try
             {
-                var jing = resolver.Resolve<MiddlewareMessageHandler<Jing, EmptyResponse>>();
+                var jing = resolver.Resolve<IMessageHandler<Jing, EmptyResponse>>();
                 await jing.Handle(new Jing { Message = "Jing" }, ct);
             }
             catch (Exception e)
