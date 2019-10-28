@@ -29,8 +29,6 @@ namespace DryIoc.Messages.MediatRLikeExample
             container.RegisterInstance(writer);
             container.RegisterMany(new[] { typeof(Program).GetAssembly() }, Registrator.Interfaces);
 
-            //container.Register(typeof(IMessageMiddleware<,>), typeof(ConstrainedRequestPostProcessor<,>)); 
-
             container.Register(typeof(IMessageHandler<,>), typeof(MiddlewareMessageHandler<,>), setup: Setup.Decorator);
             container.Register(typeof(BroadcastMessageHandler<>));
         }
@@ -132,14 +130,15 @@ namespace DryIoc.Messages.MediatRLikeExample
             _writer.WriteLineAsync("Got notified.").ToEmptyResponse();
     }
 
-    public class GenericRequestPreProcessor<TRequest> : IMessageMiddleware<TRequest, EmptyResponse>
+    public class GenericRequestPreProcessor<TRequest, TResponse> : IMessageMiddleware<TRequest, TResponse>
+        where TRequest : IMessage<TResponse>
     {
         private readonly TextWriter _writer;
 
         public GenericRequestPreProcessor(TextWriter writer) => _writer = writer;
 
-        public async Task<EmptyResponse> Handle(TRequest message, CancellationToken cancellationToken,
-            Func<Task<EmptyResponse>> nextMiddleware)
+        public int RelativeOrder => -1;
+        public async Task<TResponse> Handle(TRequest message, CancellationToken cancellationToken, Func<Task<TResponse>> nextMiddleware)
         {
             await _writer.WriteLineAsync("- Starting Up");
             return await nextMiddleware();
@@ -150,6 +149,8 @@ namespace DryIoc.Messages.MediatRLikeExample
     {
         private readonly TextWriter _writer;
         public GenericPipelineBehavior(TextWriter writer) => _writer = writer;
+
+        public int RelativeOrder => 3;
 
         public async Task<TResponse> Handle(TRequest message, CancellationToken cancellationToken, Func<Task<TResponse>> nextMiddleware)
         {
@@ -165,6 +166,8 @@ namespace DryIoc.Messages.MediatRLikeExample
         private readonly TextWriter _writer;
         public GenericRequestPostProcessor(TextWriter writer) => _writer = writer;
 
+        public int RelativeOrder => 2;
+
         public async Task<TResponse> Handle(TRequest message, CancellationToken cancellationToken, Func<Task<TResponse>> nextMiddleware)
         {
             var result = await nextMiddleware();
@@ -178,6 +181,8 @@ namespace DryIoc.Messages.MediatRLikeExample
     {
         private readonly TextWriter _writer;
         public ConstrainedRequestPostProcessor(TextWriter writer) => _writer = writer;
+
+        public int RelativeOrder => 1;
 
         public async Task<TResponse> Handle(TRequest message, CancellationToken cancellationToken, Func<Task<TResponse>> nextMiddleware)
         {
