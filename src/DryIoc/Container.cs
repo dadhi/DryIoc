@@ -10163,7 +10163,7 @@ namespace DryIoc
             if (unorderedDisposablesCount != 0)
             {
                 var unorderedDisposablesItems = _unorderedDisposables.Items;
-                for (var i = 0; i < unorderedDisposablesCount; i++)
+                for (var i = unorderedDisposablesCount - 1; i >= 0; i--)
                 {
                     ref var x = ref unorderedDisposablesItems[i];
                     x.Dispose();

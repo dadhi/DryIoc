@@ -52,7 +52,7 @@ namespace DryIoc.IssuesTests
         {
             var container = _warmContainer;
 
-            for (var i = 0; i < 5; i++)
+            for (var i = 0; i < 10; i++)
             {
                 container.Measure();
             }
