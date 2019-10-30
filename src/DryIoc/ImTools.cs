@@ -937,7 +937,7 @@ namespace ImTools
         public T[] Items;
 
         /// Constructs the thing 
-        public GrowingStack(int capacity = 4)
+        public GrowingStack(int capacity)
         {
             Items = new T[capacity];
             Count = 0;
@@ -949,6 +949,14 @@ namespace ImTools
             if (++Count > Items.Length)
                 Items = Expand(Items);
             return ref Items[Count - 1];
+        }
+
+        /// Adds the new item possibly extending the item collection
+        public void PushSlot(T item)
+        {
+            if (++Count > Items.Length)
+                Items = Expand(Items);
+            Items[Count - 1] = item;
         }
 
         /// Pops the item - just moving the counter back

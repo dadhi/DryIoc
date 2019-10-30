@@ -288,7 +288,11 @@ namespace DryIoc
             FactoryDelegate factoryDelegate;
 
             // todo: in v5.0 there should be no check nor the InstanceFactory
-            if (factory is InstanceFactory == false)
+            if (factory is InstanceFactory)
+            {
+                factoryDelegate = factory.GetDelegateOrDefault(request);
+            }
+            else
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
@@ -314,10 +318,6 @@ namespace DryIoc
 
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(useFec, Rules.UseInterpretation);
-            }
-            else
-            {
-                factoryDelegate = factory.GetDelegateOrDefault(request);
             }
 
             if (factoryDelegate == null)
@@ -1757,12 +1757,16 @@ namespace DryIoc
 
                 if (DefaultFactoryCache == null)
                     Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, CacheSlot>[CACHE_SLOT_COUNT], null);
+
                 ref var map = ref DefaultFactoryCache[serviceType.GetHashCode() & CACHE_SLOT_COUNT_MASK];
+                
                 if (map == null)
                     Interlocked.CompareExchange(ref map, ImHashMap<Type, CacheSlot>.Empty, null);
-                var current = map;
+
                 var cacheSlot = new CacheSlot(factory);
-                if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(serviceType, cacheSlot), current) != current)
+
+                var m = map;
+                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(serviceType, cacheSlot), m) != m)
                     Ref.Swap(ref map, serviceType, cacheSlot, (type, slot, x) => x.AddOrUpdate(type, slot));
             }
 
@@ -9821,14 +9825,16 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
-            : this(parent, name, CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
+            : this(parent, name, CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, 
+                new GrowingStack<IDisposable>(4), ImMap<IDisposable>.Empty, int.MaxValue)
         { }
 
-        private Scope(IScope parent, object name, ImMap<ItemRef>[] maps,
-            ImHashMap<Type, FactoryDelegate> instances, ImMap<IDisposable> disposables, int nextDisposalIndex)
+        private Scope(IScope parent, object name, ImMap<ItemRef>[] maps, ImHashMap<Type, FactoryDelegate> instances, 
+            GrowingStack<IDisposable> unorderedDisposables, ImMap<IDisposable> disposables, int nextDisposalIndex)
         {
             Parent = parent;
             Name = name;
+            _unorderedDisposables = unorderedDisposables;
             _disposables = disposables;
             _nextDisposalIndex = nextDisposalIndex;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
@@ -9855,7 +9861,7 @@ namespace DryIoc
                 slotsCopy[i] = _maps[i];
             }
 
-            return new Scope(Parent, Name, slotsCopy, _factories, _disposables, _nextDisposalIndex);
+            return new Scope(Parent, Name, slotsCopy, _factories, _unorderedDisposables, _disposables, _nextDisposalIndex);
         }
 
         /// <inheritdoc />
@@ -9950,10 +9956,19 @@ namespace DryIoc
 
                 // we can simple assign because we are under the lock 
                 itemRef.Item = createValue(r);
+
+                if (disposalOrder == 0 &&
+                    itemRef.Item is IDisposable ud && !ReferenceEquals(ud, this)) 
+                    _unorderedDisposables.PushSlot(ud);
             }
 
-            if (itemRef.Item is IDisposable disposable && !ReferenceEquals(disposable, this))
-                AddDisposable(disposable, disposalOrder);
+            if (disposalOrder != 0 &&
+                itemRef.Item is IDisposable disposable && !ReferenceEquals(disposable, this))
+            {
+                var d = _disposables;
+                if (Interlocked.CompareExchange(ref _disposables, d.AddOrUpdate(disposalOrder, disposable), d) != d)
+                    Ref.Swap(ref _disposables, disposalOrder, disposable, (dispOrder, disp, x) => x.AddOrUpdate(dispOrder, disp));
+            }
 
             return itemRef.Item;
         }
@@ -10144,22 +10159,44 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
                 return;
 
-            var disposables = _disposables;
-            if (!disposables.IsEmpty)
-                foreach (var disposable in disposables.Enumerate())
+            var unorderedDisposablesCount = _unorderedDisposables.Count;
+            if (unorderedDisposablesCount != 0)
+            {
+                var unorderedDisposablesItems = _unorderedDisposables.Items;
+                for (var i = 0; i < unorderedDisposablesCount; i++)
                 {
-                    // Ignoring disposing exception, as it is not important to proceed the disposal of other items
-                    try
-                    {
-                        disposable.Value.Dispose();
-                    }
-                    catch (ContainerException) { throw; }
-                    catch (Exception) { }
+                    ref var x = ref unorderedDisposablesItems[i];
+                    x.Dispose();
+                    x = null;
                 }
+            }
+
+            var disposables = _disposables;
+            if (!disposables.IsEmpty) 
+                SafelyDisposeOrderedDisposables(disposables);
 
             _disposables = ImMap<IDisposable>.Empty;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
             _maps = _emptySlots;
+        }
+
+        private static void SafelyDisposeOrderedDisposables(ImMap<IDisposable> disposables)
+        {
+            foreach (var disposable in disposables.Enumerate())
+            {
+                // Ignoring disposing exception, as it is not important to proceed the disposal of other items
+                try
+                {
+                    disposable.Value.Dispose();
+                }
+                catch (ContainerException)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                }
+            }
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
@@ -10170,10 +10207,10 @@ namespace DryIoc
                 + "}";
 
         private ImHashMap<Type, FactoryDelegate> _factories;
+        private GrowingStack<IDisposable> _unorderedDisposables;
         private ImMap<IDisposable> _disposables;
         private int _nextDisposalIndex;
         private int _disposed;
-
 
         internal const int MAP_COUNT = 16;
         internal const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
@@ -12554,6 +12591,11 @@ namespace DryIoc.Messages
     /// Message handler middleware to handle the message and pass the result to the next middleware
     public interface IMessageMiddleware<in M, R>
     {
+        /// `0` means the default registration order,
+        /// lesser numbers incuding the `-1`, `-2` mean execute as a first,
+        /// bigger numbers mean execute as a last
+        int RelativeOrder { get; }
+
         /// Handles message and passes to the next middleware
         Task<R> Handle(M message, CancellationToken cancellationToken, Func<Task<R>> nextMiddleware);
     }
@@ -12583,11 +12625,16 @@ namespace DryIoc.Messages
         }
 
         /// Composes middlewares with handler
-        public Task<R> Handle(M message, CancellationToken cancellationToken) =>
-            _middlewares.Reverse().Aggregate(
-                new Func<Task<R>>(() => _handler.Handle(message, cancellationToken)),
-                (h, middleware) => () => middleware.Handle(message, cancellationToken, h))
+        public Task<R> Handle(M message, CancellationToken cancellationToken)
+        {
+            return _middlewares
+                .OrderBy(x => x.RelativeOrder)
+                .Reverse()
+                .Aggregate(
+                    new Func<Task<R>>(() => _handler.Handle(message, cancellationToken)),
+                    (f, middleware) => () => middleware.Handle(message, cancellationToken, f))
                 .Invoke();
+        }
     }
 
     /// Broadcasting type of message handler decorator
