@@ -10127,8 +10127,8 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         internal void AddUnorderedDisposable(IDisposable disposable)
         {
-            var d = _unorderedDisposables;
-            if (Interlocked.CompareExchange(ref _unorderedDisposables, d.Prep(disposable), d) != d)
+            var copy = _unorderedDisposables;
+            if (Interlocked.CompareExchange(ref _unorderedDisposables, copy.Prep(disposable), copy) != copy)
                 Ref.Swap(ref _unorderedDisposables, disposable, (d, x) => x.Prep(d));
         }
 
