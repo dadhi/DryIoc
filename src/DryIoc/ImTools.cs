@@ -946,17 +946,17 @@ namespace ImTools
         /// Push the new slot and return the ref to it
         public ref T PushSlot()
         {
-            if (++Count > Items.Length)
+            if (Count >= Items.Length)
                 Items = Expand(Items);
-            return ref Items[Count - 1];
+            return ref Items[Count++];
         }
 
         /// Adds the new item possibly extending the item collection
         public void PushSlot(T item)
         {
-            if (++Count > Items.Length)
+            if (Count >= Items.Length)
                 Items = Expand(Items);
-            Items[Count - 1] = item;
+            Items[Count++] = item;
         }
 
         /// Pops the item - just moving the counter back
@@ -965,9 +965,6 @@ namespace ImTools
         /// Expands the items starting with 2
         private static T[] Expand(T[] items)
         {
-            if (items.Length == 0)
-                return new T[2];
-
             var count = items.Length;
             var newItems = new T[count << 1]; // count x 2
             Array.Copy(items, 0, newItems, 0, count);
@@ -1065,7 +1062,10 @@ namespace ImTools
         {
             if (source.IsEmpty || source.Tail.IsEmpty)
                 return source;
-            return source.To(ImList<T>.Empty, (it, _) => _.Prep(it));
+            var reversed = ImList<T>.Empty;
+            for (; !source.IsEmpty; source = source.Tail)
+                reversed = reversed.Prep(source.Head);
+            return reversed;
         }
 
         /// <summary>Maps the items from the first list to the result list.</summary>
@@ -1073,10 +1073,8 @@ namespace ImTools
         /// <typeparam name="R">result item type.</typeparam>
         /// <param name="source">input list.</param> <param name="map">converter func.</param>
         /// <returns>result list.</returns>
-        public static ImList<R> Map<T, R>(this ImList<T> source, Func<T, R> map)
-        {
-            return source.To(ImList<R>.Empty, (it, _) => _.Prep(map(it))).Reverse();
-        }
+        public static ImList<R> Map<T, R>(this ImList<T> source, Func<T, R> map) => 
+            source.To(ImList<R>.Empty, (it, _) => _.Prep(map(it))).Reverse();
 
         /// <summary>Maps the items from the first list to the result list with item index.</summary>
         /// <typeparam name="T">source item type.</typeparam> 
