@@ -3,7 +3,7 @@
     <TargetFrameworks>net45;netstandard1.0;netstandard2.0</TargetFrameworks>
 
     <Product>DryIoc.Syntax.Autofac</Product>
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionPrefix>2.0.0-preview-01</VersionPrefix>
     <VersionSuffix></VersionSuffix>
 
     <AssemblyName>$(Product)</AssemblyName>
@@ -15,17 +15,14 @@
     <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc Autofac</PackageTags>
     <PackageReleaseNotes>
 <![CDATA[
+v2.0.0:
+- added: .NET STandard 1.0, 2.0 support
+
 v1.0.0:
 - added: Support for DryIoc v4.0
 ]]>
     </PackageReleaseNotes>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Net.Http" />
-  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
