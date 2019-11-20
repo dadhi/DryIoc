@@ -521,11 +521,24 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_dispose_all_singletons_despite_exception_in_first_dispose()
+        public void Unordered_disposal_should_Not_check_for_exceptions()
         {
             IContainer container = new Container();
             container.Register<A>(Reuse.Singleton);
             container.Register<B>(Reuse.Singleton);
+
+            container.Resolve<A>();
+            var b = container.Resolve<B>();
+
+            Assert.Throws<DivideByZeroException>(() => container.Dispose());
+        }
+
+        [Test]
+        public void Ordered_disposal_should_check_for_exceptions()
+        {
+            IContainer container = new Container();
+            container.Register<A>(Reuse.Singleton, setup: Setup.With(disposalOrder: 1));
+            container.Register<B>(Reuse.Singleton, setup: Setup.With(disposalOrder: 2));
 
             container.Resolve<A>();
             var b = container.Resolve<B>();
@@ -847,7 +860,7 @@ namespace DryIoc.UnitTests
         class Go { }
 
         [Test]
-        public void Can_specify_to_dispose_something_earlier()
+        public void Ordered_disposals_should_go_before_unordered()
         {
             var c = new Container();
 

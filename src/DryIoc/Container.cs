@@ -288,7 +288,11 @@ namespace DryIoc
             FactoryDelegate factoryDelegate;
 
             // todo: in v5.0 there should be no check nor the InstanceFactory
-            if (factory is InstanceFactory == false)
+            if (factory is InstanceFactory)
+            {
+                factoryDelegate = factory.GetDelegateOrDefault(request);
+            }
+            else
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
@@ -314,10 +318,6 @@ namespace DryIoc
 
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(useFec, Rules.UseInterpretation);
-            }
-            else
-            {
-                factoryDelegate = factory.GetDelegateOrDefault(request);
             }
 
             if (factoryDelegate == null)
@@ -1757,12 +1757,16 @@ namespace DryIoc
 
                 if (DefaultFactoryCache == null)
                     Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, CacheSlot>[CACHE_SLOT_COUNT], null);
+
                 ref var map = ref DefaultFactoryCache[serviceType.GetHashCode() & CACHE_SLOT_COUNT_MASK];
+                
                 if (map == null)
                     Interlocked.CompareExchange(ref map, ImHashMap<Type, CacheSlot>.Empty, null);
-                var current = map;
+
                 var cacheSlot = new CacheSlot(factory);
-                if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(serviceType, cacheSlot), current) != current)
+
+                var m = map;
+                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(serviceType, cacheSlot), m) != m)
                     Ref.Swap(ref map, serviceType, cacheSlot, (type, slot, x) => x.AddOrUpdate(type, slot));
             }
 
@@ -2557,6 +2561,7 @@ namespace DryIoc
                                 resolver = (IResolverContext)resolverObj;
                             }
 
+                            // todo: we need the overload without disposalOrder
                             if (callMethod == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod)
                             {
                                 result = InterpretGetScopedViaFactoryDelegate(resolver, callArgs, useFec);
@@ -2872,7 +2877,7 @@ namespace DryIoc
             var mapIndex = id & Scope.MAP_COUNT_SUFFIX_MASK;
             ref var map = ref scope._maps[mapIndex];
             var itemRef = map.GetValueOrDefault(id);
-            if (itemRef != null && !ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+            if (itemRef != null && itemRef.Item != ItemRef.NoItem)
                 return itemRef.Item;
 
             // add only, keep old item if it already exists
@@ -2881,25 +2886,35 @@ namespace DryIoc
                 Ref.Swap(ref map, id, (i, x) => x.AddOrKeep(i, new ItemRef()));
 
             itemRef = map.GetValueOrDefault(id);
-            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
-                return itemRef.Item;
-
-            var lambda = args[3];
-            lock (itemRef)
+            if (itemRef.Item == ItemRef.NoItem)
             {
-                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
-                    return itemRef.Item;
+                var lambda = args[3];
+                object result = null;
+                lock (itemRef)
+                {
+                    if (itemRef.Item != ItemRef.NoItem)
+                        return itemRef.Item;
 
-                object result;
-                if (lambda is ConstantExpression lambdaConstExpr)
-                    result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-                else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, useFec, out result))
-                    result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
-                itemRef.Item = result;
+                    if (lambda is ConstantExpression lambdaConstExpr)
+                        result = ((FactoryDelegate) lambdaConstExpr.Value)(r);
+                    else if (!TryInterpret(r, ((LambdaExpression) lambda).Body, useFec, out result))
+                        result = ((LambdaExpression) lambda).Body.CompileToFactoryDelegate(useFec,
+                            ((IContainer) r).Rules.UseInterpretation)(r);
+                    
+                    itemRef.Item = result;
+                }
+
+                if (result is IDisposable disp && disp != scope)
+                {
+                    var disposalOrder = (int)((ConstantExpression)args[4]).Value;
+                    if (disposalOrder == 0)
+                        scope.AddUnorderedDisposable(disp);
+                    else    
+                        scope.AddDisposable(disp, disposalOrder);
+                }
+
+                return itemRef.Item;
             }
-
-            if (itemRef.Item is IDisposable disposable && !ReferenceEquals(disposable, scope))
-                scope.AddDisposable(disposable, (int)((ConstantExpression)args[4]).Value);
 
             return itemRef.Item;
         }
@@ -3712,6 +3727,10 @@ namespace DryIoc
         public static IScope GetCurrentScope(this IResolverContext r, bool throwIfNotFound) =>
             r.CurrentScope ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope, r) : null);
 
+        /// Provides access to the current scope - throws if no current scope 
+        public static IScope GetCurrentScope(this IResolverContext r) =>
+            r.CurrentScope ?? Throw.For<IScope>(Error.NoCurrentScope, r);
+
         /// <summary>Gets current scope matching the <paramref name="name"/></summary>
         public static IScope GetNamedScope(this IResolverContext r, object name, bool throwIfNotFound)
         {
@@ -4078,7 +4097,7 @@ namespace DryIoc
             {
                 // assign valid unique argument names for code generation
                 for (var i = 0; i < argCount; ++i)
-                    argExprs[i] = Parameter(argTypes[i], "_" + argTypes[i].Name + i); // todo: optimize string allocations
+                    argExprs[i] = Parameter(argTypes[i], argTypes[i].Name + "@" + i); // todo: optimize string allocations
 
                 request = request.WithInputArgs(argExprs);
             }
@@ -8413,33 +8432,37 @@ namespace DryIoc
 
                 var itemRef = new ItemRef();
                 var m = map;
-                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(factoryId, itemRef, (oldRef, _) => oldRef), m) != m)
-                    Ref.Swap(ref map, factoryId, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+                if (Interlocked.CompareExchange(ref map, m.AddOrKeep(factoryId, itemRef), m) != m)
+                    Ref.Swap(ref map, factoryId, itemRef, (i, ir, x) => x.AddOrKeep(i, ir));
 
                 itemRef = map.GetValueOrDefault(factoryId);
-                if (ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                if (itemRef.Item == ItemRef.NoItem)
                 {
-                    var isNewItem = false;
+                    object newItem = null;
                     lock (itemRef)
                     {
-                        if (ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                        if (itemRef.Item == ItemRef.NoItem)
                         {
                             var useFec = container.Rules.UseFastExpressionCompiler;
-                            if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, useFec, out var result))
-                                result = serviceExpr.CompileToFactoryDelegate(useFec, container.Rules.UseInterpretation)(container);
+                            if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, useFec, out newItem))
+                                newItem = serviceExpr.CompileToFactoryDelegate(useFec, container.Rules.UseInterpretation)(container);
 
                             if (Setup.WeaklyReferenced)
-                                result = new WeakReference(result);
+                                newItem = new WeakReference(newItem);
                             else if (Setup.PreventDisposal) // todo: we don't need it here because because we just don't need to AddDisposable
-                                result = new HiddenDisposable(result);
+                                newItem = new HiddenDisposable(newItem);
 
-                            itemRef.Item = result;
-                            isNewItem = true;
+                            itemRef.Item = newItem;
                         }
                     }
 
-                    if (isNewItem && itemRef.Item is IDisposable disposable && disposable != this)
-                        scope.AddDisposable(disposable, Setup.DisposalOrder);
+                    if (newItem is IDisposable disp && disp != this)
+                    {
+                        if (Setup.DisposalOrder == 0)
+                            scope.AddUnorderedDisposable(disp);
+                        else
+                            scope.AddDisposable(disp, Setup.DisposalOrder);
+                    }
                 }
 
                 serviceExpr = Constant(itemRef.Item);
@@ -9821,16 +9844,17 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
-            : this(parent, name, CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, ImMap<IDisposable>.Empty, int.MaxValue)
+            : this(parent, name, CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, 
+                ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty)
         { }
 
-        private Scope(IScope parent, object name, ImMap<ItemRef>[] maps,
-            ImHashMap<Type, FactoryDelegate> instances, ImMap<IDisposable> disposables, int nextDisposalIndex)
+        private Scope(IScope parent, object name, ImMap<ItemRef>[] maps, ImHashMap<Type, FactoryDelegate> instances, 
+            ImList<IDisposable> unorderedDisposables, ImMap<IDisposable> disposables)
         {
             Parent = parent;
             Name = name;
+            _unorderedDisposables = unorderedDisposables;
             _disposables = disposables;
-            _nextDisposalIndex = nextDisposalIndex;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
             _maps = maps;
         }
@@ -9849,13 +9873,12 @@ namespace DryIoc
         public IScope Clone()
         {
             var slotsCopy = new ImMap<ItemRef>[MAP_COUNT];
-            for (var i = 0; i < MAP_COUNT; i++)
-            {
-                // todo: we need a way to copy all Refs in the slot - do we?
-                slotsCopy[i] = _maps[i];
-            }
 
-            return new Scope(Parent, Name, slotsCopy, _factories, _disposables, _nextDisposalIndex);
+            // todo: we need a way to copy all Refs in the slot - do we?
+            for (var i = 0; i < MAP_COUNT; i++) 
+                slotsCopy[i] = _maps[i];
+
+            return new Scope(Parent, Name, slotsCopy, _factories, _unorderedDisposables, _disposables);
         }
 
         /// <inheritdoc />
@@ -9891,12 +9914,14 @@ namespace DryIoc
                 if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
                     return itemRef.Item;
 
-                // we can simple assing because we are under the lock 
                 itemRef.Item = createValue();
             }
 
-            if (itemRef.Item is IDisposable disposable && disposable != this)
-                AddDisposable(disposable, disposalOrder);
+            if (itemRef.Item is IDisposable disp && disp != this)
+                if (disposalOrder == 0)
+                    AddUnorderedDisposable(disp);
+                else
+                    AddDisposable(disp, disposalOrder);
 
             return itemRef.Item;
         }
@@ -9905,58 +9930,89 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
-            var map = _maps[id & MAP_COUNT_SUFFIX_MASK];
-            while (map.Height != 0)
-            {
-                if (map.Key == id)
-                {
-                    var item = map.Value.Item;
-                    if (!ReferenceEquals(item, ItemRef.NoItem))
-                        return item;
-                    // todo: here we may need to lock on the existing item or better to SpinWait because the item is being created right now
-                    break;
-                }
-                map = id < map.Key ? map.Left : map.Right;
-            }
-
-            return TryGetOrAddViaFactoryDelegate(ref _maps[id & MAP_COUNT_SUFFIX_MASK], id, createValue, r, disposalOrder);
+            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetValueOrDefault(id);
+            return itemRef != null && !ReferenceEquals(itemRef.Item, ItemRef.NoItem) 
+                ? itemRef.Item
+                : TryGetOrAddViaFactoryDelegate(id, createValue, r, disposalOrder);
         }
 
-        internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
-            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAddViaFactoryDelegate));
+        internal object GetOrAddViaFactoryDelegateExpression(
+            int id, FactoryDelegate createValue, IResolverContext r) =>
+            (GetOrDefault(id) ?? GetOrAddViaFactoryDelegateNoDisposalOrder(id, createValue, r)).Item;
 
-        internal object TryGetOrAddViaFactoryDelegate(ref ImMap<ItemRef> map, 
-            int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
+        internal ItemRef GetOrDefault(int id)
+        {
+            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetValueOrDefault(id);
+            return itemRef == null || ReferenceEquals(itemRef.Item, ItemRef.NoItem) ? null : itemRef;
+        }
+
+        internal static readonly MethodInfo GetOrDefaultMethod =
+            typeof(Scope).GetTypeInfo().GetDeclaredMethod(nameof(Scope.GetOrDefault));
+
+        // todo: WIP try to improve the case where we don't have the disposal order
+        internal ItemRef GetOrAddViaFactoryDelegateNoDisposalOrder(int id, FactoryDelegate createValue, IResolverContext r)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
+            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, new ItemRef()), m) != m)
+                Ref.Swap(ref map, id, (i, x) => x.AddOrKeep(i, new ItemRef()));
+
+            var itemRef = map.GetValueOrDefault(id);
+            if (ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+            {
+                lock (itemRef)
+                {
+                    if (ReferenceEquals(itemRef.Item, ItemRef.NoItem)) 
+                        itemRef.Item = createValue(r);
+                }
+                
+                if (itemRef.Item is IDisposable disp && disp != this)
+                    AddUnorderedDisposable(disp);
+            }
+
+            return itemRef;
+        }
+
+        internal static readonly MethodInfo GetOrAddViaFactoryDelegateNoDisposalOrderMethod =
+            typeof(Scope).GetTypeInfo().GetDeclaredMethod(nameof(Scope.GetOrAddViaFactoryDelegateNoDisposalOrder));
+
+        // todo: split to with and without `disposalOrder`
+        internal object TryGetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var m = map;
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, new ItemRef()), m) != m)
                 Ref.Swap(ref map, id, (i, x) => x.AddOrKeep(i, new ItemRef()));
 
             var itemRef = map.GetValueOrDefault(id);
 
-            // double-check only here, where it is much more probably that someone concurrently doing things 
-            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+            if (itemRef.Item != ItemRef.NoItem)
                 return itemRef.Item;
 
-            // lock on the ref itself to set its `Item` field
             lock (itemRef)
             {
-                // double-check if the item was changed in between (double check locking)
-                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                if (itemRef.Item != ItemRef.NoItem)
                     return itemRef.Item;
-
-                // we can simple assign because we are under the lock 
                 itemRef.Item = createValue(r);
             }
 
-            if (itemRef.Item is IDisposable disposable && !ReferenceEquals(disposable, this))
-                AddDisposable(disposable, disposalOrder);
+            if (itemRef.Item is IDisposable disp && disp != this)
+                if (disposalOrder == 0) 
+                    AddUnorderedDisposable(disp);
+                else
+                    AddDisposable(disp, disposalOrder);
 
             return itemRef.Item;
         }
+
+        internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
+            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAddViaFactoryDelegate));
 
         /// <inheritdoc />
         public object TryGetOrAddWithoutClosure(int id,
@@ -9970,22 +10026,25 @@ namespace DryIoc
 
             var itemRef = new ItemRef();
             var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, itemRef), m) != m)
+                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrKeep(i, ir));
 
             itemRef = map.GetValueOrDefault(id);
-            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+            if (itemRef.Item != ItemRef.NoItem)
                 return itemRef.Item;
 
             lock (itemRef)
             {
-                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                if (itemRef.Item != ItemRef.NoItem)
                     return itemRef.Item;
                 itemRef.Item = createValue(resolveContext, expr, useFec);
             }
 
             if (itemRef.Item is IDisposable disposable && disposable != this)
-                AddDisposable(disposable, disposalOrder);
+                if (disposalOrder == 0)
+                    AddUnorderedDisposable(disposable);
+                else
+                    AddDisposable(disposable, disposalOrder);
 
             return itemRef.Item;
         }
@@ -9998,29 +10057,27 @@ namespace DryIoc
 
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
 
-            // todo: add the AddOrUpdate version returning the existing Value if it exists the sme way as for `ImHashMap`,
-            // so we don't need to `TryFind` later
             var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, new ItemRef()), m) != m)
+                Ref.Swap(ref map, x => x.AddOrKeep(id, new ItemRef()));
 
             var itemRef = map.GetValueOrDefault(id);
-            if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+            if (itemRef.Item != ItemRef.NoItem)
                 return;
 
             // lock on the ref itself to set its `Item` field
             lock (itemRef)
             {
                 // double-check if the item was changed in between (double check locking)
-                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                if (itemRef.Item != ItemRef.NoItem)
                     return;
 
                 // we can simple assign because we are under the lock 
                 itemRef.Item = item;
             }
 
-            if (itemRef.Item is IDisposable disposable && disposable != this)
-                AddDisposable(disposable, NextDisposalIndex());
+            if (item is IDisposable disp && disp != this)
+                AddUnorderedDisposable(disp);
         }
 
         ///[Obsolete("Removing because it is not used")]
@@ -10031,14 +10088,12 @@ namespace DryIoc
 
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
 
-            if (map.TryFind(id, out var itemRef) && !ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+            if (map.TryFind(id, out var itemRef) && itemRef.Item != ItemRef.NoItem)
                 return itemRef.Item;
 
-            // todo: add the AddOrUpdate version returning the existing Value if it exists the sme way as for `ImHashMap`,
-            // so we don't need to `TryFind` later
             var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef(), (oldRef, _) => oldRef));
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, new ItemRef()), m) != m)
+                Ref.Swap(ref map, x => x.AddOrUpdate(id, new ItemRef()));
 
             itemRef = map.GetValueOrDefault(id);
 
@@ -10046,27 +10101,35 @@ namespace DryIoc
             lock (itemRef)
             {
                 // double-check if the item was changed in between (double check locking)
-                if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+                if (itemRef.Item != ItemRef.NoItem)
                     return itemRef.Item;
 
                 // we can simple assign because we are under the lock 
                 itemRef.Item = newItem;
             }
 
-            if (itemRef.Item is IDisposable disposable && disposable != this)
-                AddDisposable(disposable, disposalOrder);
+            if (itemRef.Item is IDisposable disp && disp != this)
+                if (disposalOrder == 0)
+                    AddUnorderedDisposable(disp);
+                else
+                    AddDisposable(disp, disposalOrder);
 
             return itemRef.Item;
         }
 
-        // todo: experiment with replacing disposable tree with LiveCountArray
         internal void AddDisposable(IDisposable disposable, int disposalOrder)
         {
-            if (disposalOrder == 0)
-                disposalOrder = NextDisposalIndex();
             var d = _disposables;
             if (Interlocked.CompareExchange(ref _disposables, d.AddOrUpdate(disposalOrder, disposable), d) != d)
                 Ref.Swap(ref _disposables, disposalOrder, disposable, (dispOrder, disp, x) => x.AddOrUpdate(dispOrder, disp));
+        }
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal void AddUnorderedDisposable(IDisposable disposable)
+        {
+            var d = _unorderedDisposables;
+            if (Interlocked.CompareExchange(ref _unorderedDisposables, d.Prep(disposable), d) != d)
+                Ref.Swap(ref _unorderedDisposables, disposable, (d, x) => x.Prep(d));
         }
 
         /// <inheritdoc />
@@ -10074,7 +10137,7 @@ namespace DryIoc
         public bool TryGet(out object item, int id)
         {
             var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetValueOrDefault(id); 
-            if (itemRef != null && !ReferenceEquals(itemRef.Item, ItemRef.NoItem))
+            if (itemRef != null && itemRef.Item != ItemRef.NoItem)
             {
                 item = itemRef.Item;
                 return true;
@@ -10084,18 +10147,20 @@ namespace DryIoc
             return false;
         }
 
+        // todo: consider adding the overload without `disposalOrder`
         /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalOrder = 0)
         {
             if (item is IDisposable disposable && disposable != this)
-                AddDisposable(disposable, disposalOrder);
+                if (disposalOrder == 0)
+                    AddUnorderedDisposable(disposable);
+                else
+                    AddDisposable(disposable, disposalOrder);
             return item;
         }
 
         internal static readonly MethodInfo TrackDisposableMethod =
             typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.TrackDisposable));
-
-        private int NextDisposalIndex() => Interlocked.Decrement(ref _nextDisposalIndex);
 
         /// Add instance to the small registry via factory
         public void SetUsedInstance(Type type, FactoryDelegate factory)
@@ -10144,22 +10209,35 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
                 return;
 
-            var disposables = _disposables;
-            if (!disposables.IsEmpty)
-                foreach (var disposable in disposables.Enumerate())
-                {
-                    // Ignoring disposing exception, as it is not important to proceed the disposal of other items
-                    try
-                    {
-                        disposable.Value.Dispose();
-                    }
-                    catch (ContainerException) { throw; }
-                    catch (Exception) { }
-                }
+            if (!_disposables.IsEmpty)
+                SafelyDisposeOrderedDisposables(_disposables);
 
+            for (var unordDisp = _unorderedDisposables; !unordDisp.IsEmpty; unordDisp = unordDisp.Tail) 
+                unordDisp.Head.Dispose();
+
+            _unorderedDisposables = ImList<IDisposable>.Empty;
             _disposables = ImMap<IDisposable>.Empty;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
             _maps = _emptySlots;
+        }
+
+        private static void SafelyDisposeOrderedDisposables(ImMap<IDisposable> disposables)
+        {
+            foreach (var disposable in disposables.Enumerate())
+            {
+                // Ignoring disposing exception, as it is not important to proceed the disposal of other items
+                try
+                {
+                    disposable.Value.Dispose();
+                }
+                catch (ContainerException)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                }
+            }
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>
@@ -10170,10 +10248,9 @@ namespace DryIoc
                 + "}";
 
         private ImHashMap<Type, FactoryDelegate> _factories;
+        private ImList<IDisposable> _unorderedDisposables;
         private ImMap<IDisposable> _disposables;
-        private int _nextDisposalIndex;
         private int _disposed;
-
 
         internal const int MAP_COUNT = 16;
         internal const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
@@ -10419,12 +10496,14 @@ namespace DryIoc
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
 
                 if (Name == null)
-                    return Call(GetScopedViaFactoryDelegateMethod, resolverContextParamExpr, 
-                        Constant(request.IfUnresolved == IfUnresolved.Throw), idExpr, factoryDelegateExpr, disposalOrderExpr);
+                {
+                    return Call(GetScopedViaFactoryDelegateMethod, resolverContextParamExpr,
+                        ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
+                }
 
                 return Call(GetNameScopedViaFactoryDelegateMethod, resolverContextParamExpr,
-                    request.Container.GetConstantExpression(Name, typeof(object)), 
-                    Constant(request.IfUnresolved == IfUnresolved.Throw), idExpr, factoryDelegateExpr, disposalOrderExpr);
+                    request.Container.GetConstantExpression(Name, typeof(object)),
+                    ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
             }
         }
 
@@ -10487,6 +10566,10 @@ namespace DryIoc
 
         internal static readonly MethodInfo GetScopedViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedViaFactoryDelegate));
+
+        // todo: idea is to remove `disposalIndex` constant creation
+        //public static object GetScopedViaFactoryDelegate1(IResolverContext r, int id, FactoryDelegate createValue) =>
+        //    r.GetCurrentScope()?.GetOrAddViaFactoryDelegate(id, createValue, r);
 
         /// [Obsolete("Replaced by `GetNameScopedViaFactoryDelegate`")]
         public static object GetNameScoped(IResolverContext r,
@@ -12554,6 +12637,11 @@ namespace DryIoc.Messages
     /// Message handler middleware to handle the message and pass the result to the next middleware
     public interface IMessageMiddleware<in M, R>
     {
+        /// `0` means the default registration order,
+        /// lesser numbers incuding the `-1`, `-2` mean execute as a first,
+        /// bigger numbers mean execute as a last
+        int RelativeOrder { get; }
+
         /// Handles message and passes to the next middleware
         Task<R> Handle(M message, CancellationToken cancellationToken, Func<Task<R>> nextMiddleware);
     }
@@ -12583,11 +12671,16 @@ namespace DryIoc.Messages
         }
 
         /// Composes middlewares with handler
-        public Task<R> Handle(M message, CancellationToken cancellationToken) =>
-            _middlewares.Reverse().Aggregate(
-                new Func<Task<R>>(() => _handler.Handle(message, cancellationToken)),
-                (h, middleware) => () => middleware.Handle(message, cancellationToken, h))
+        public Task<R> Handle(M message, CancellationToken cancellationToken)
+        {
+            return _middlewares
+                .OrderBy(x => x.RelativeOrder)
+                .Reverse()
+                .Aggregate(
+                    new Func<Task<R>>(() => _handler.Handle(message, cancellationToken)),
+                    (f, middleware) => () => middleware.Handle(message, cancellationToken, f))
                 .Invoke();
+        }
     }
 
     /// Broadcasting type of message handler decorator

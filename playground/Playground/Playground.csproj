@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFrameworks Condition="'$(NoSupportForNetCore22)' != 'true'">netcoreapp2.2</TargetFrameworks>
@@ -11,18 +11,17 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Autofac" Version="4.9.2" />
-        <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="4.4.0" />
-        <PackageReference Include="BenchmarkDotNet" Version="0.11.5" />
+        <PackageReference Include="Autofac" Version="4.9.4" />
+        <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="5.0.1" />
+        <PackageReference Include="BenchmarkDotNet" Version="0.12.0" />
         <PackageReference Include="Grace" Version="7.1.0" />
         <PackageReference Include="Grace.DependencyInjection.Extensions" Version="7.0.1" />
-        <PackageReference Include="LightInject" Version="5.5.0" />
+        <PackageReference Include="LightInject" Version="6.2.0" />
         <PackageReference Include="Microsoft.Experimental.Collections" Version="1.0.6-e190117-3" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.0.0" />
-        <PackageReference Include="SimpleInjector" Version="4.6.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.0.1" />
+        <PackageReference Include="SimpleInjector" Version="4.7.1" />
 
-        <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="3.1.0" /><!--Required for Lamar-->
-        <PackageReference Include="Lamar" Version="3.0.3" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="3.3.1" /><!--Required for Lamar-->
     </ItemGroup>
 
     <ItemGroup>

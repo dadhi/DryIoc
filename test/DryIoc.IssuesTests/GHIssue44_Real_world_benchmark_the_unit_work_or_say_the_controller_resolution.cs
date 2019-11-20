@@ -27,6 +27,16 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
+        public void CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve_RegisterDelegateWithInjectedDependencies_InterpretationOnly()
+        {
+            var container = new Container(Rules.Default.WithUseInterpretation());
+
+            var x = container.PrepareDryIoc_RegisterDelegate().Measure();
+
+            Assert.IsInstanceOf<R>(x);
+        }
+
+        [Test]
         public void OpenScopeAndResolve()
         {
             var container = new Container().PrepareDryIoc();
@@ -42,7 +52,7 @@ namespace DryIoc.IssuesTests
         {
             var container = _warmContainer;
 
-            for (var i = 0; i < 5; i++)
+            for (var i = 0; i < 10; i++)
             {
                 container.Measure();
             }
