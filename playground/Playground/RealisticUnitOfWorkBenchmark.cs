@@ -1086,13 +1086,14 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ## FEC V3 and multiple improvements, Grace v7.1
 
-|                            Method |     Mean |     Error |    StdDev | Ratio |  Gen 0 | Gen 1 | Gen 2 | Allocated |
-|---------------------------------- |---------:|----------:|----------:|------:|-------:|------:|------:|----------:|
-| BmarkMicrosoftDependencyInjection | 3.894 us | 0.0220 us | 0.0171 us |  1.00 | 0.9460 |     - |     - |   4.37 KB |
-|                       BmarkDryIoc | 2.706 us | 0.0426 us | 0.0398 us |  0.69 | 1.1559 |     - |     - |   5.33 KB |
-|                   BmarkDryIocMsDi | 3.282 us | 0.0267 us | 0.0236 us |  0.84 | 1.1597 |     - |     - |   5.35 KB |
-|                        BmarkGrace | 1.726 us | 0.0239 us | 0.0223 us |  0.44 | 0.6866 |     - |     - |   3.17 KB |
-|                    BmarkGraceMsDi | 2.343 us | 0.0554 us | 0.0593 us |  0.61 | 0.7401 |     - |     - |   3.41 KB |
+|                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|-------------------------- |----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+|                      MsDi |  3.862 us | 0.0338 us | 0.0300 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
+|                    DryIoc |  1.893 us | 0.0209 us | 0.0195 us |  0.49 |    0.01 | 0.8221 |     - |     - |    3.8 KB |
+|        DryIoc_MsDiAdapter |  2.479 us | 0.0480 us | 0.0493 us |  0.64 |    0.01 | 0.8278 |     - |     - |   3.82 KB |
+| DryIoc_InterpretationOnly | 16.975 us | 0.0473 us | 0.0419 us |  4.40 |    0.04 | 1.3733 |     - |     - |   6.44 KB |
+|                     Grace |  1.722 us | 0.0335 us | 0.0262 us |  0.45 |    0.01 | 0.6866 |     - |     - |   3.17 KB |
+|         Grace_MsDiAdapter |  2.306 us | 0.0251 us | 0.0235 us |  0.60 |    0.01 | 0.7401 |     - |     - |   3.41 KB |
 
 */
 
@@ -1119,13 +1120,13 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             }
 
             [Benchmark(Baseline = true)]
-            public object MsDI() => Measure(_msDi);
+            public object MsDi() => Measure(_msDi);
 
             [Benchmark]
             public object DryIoc() => Measure(_dryIoc);
 
             [Benchmark]
-            public object BmarkDryIocMsDI() => Measure(_dryIocMsDi);
+            public object DryIoc_MsDiAdapter() => Measure(_dryIocMsDi);
 
             [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
@@ -1134,13 +1135,13 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             public object Grace() => Measure(_grace);
 
             [Benchmark]
-            public object Grace_MsDI() => Measure(_graceMsDi);
+            public object Grace_MsDiAdapter() => Measure(_graceMsDi);
 
             //[Benchmark]
             public object Autofac() => Measure(_autofac);
 
             //[Benchmark]
-            public object Autofac_MsDI() => Measure(_autofacMsDi);
+            public object Autofac_MsDiAdapter() => Measure(_autofacMsDi);
         }
     }
 }
