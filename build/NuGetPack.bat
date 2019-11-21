@@ -14,7 +14,7 @@ echo:
 echo:DryIoc source and internal packages
 echo:===================================
 %NUGET% pack %NUSPECS%\DryIoc.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
-PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '.\BuildScripts\MakeInternal.ps1'";
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '.\build\MakeInternal.ps1'";
 %NUGET% pack %NUSPECS%\DryIoc.Internal.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
