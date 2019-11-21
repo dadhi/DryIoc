@@ -39,7 +39,7 @@ dotnet test -c Release -p:GeneratePackageOnBuild=false
 if %ERRORLEVEL% neq 0 goto :error
 echo:## Finished: TESTS ##
 
-call BuildScripts\NugetPack.bat
+call build\NugetPack.bat
 if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: PACKAGING ##
