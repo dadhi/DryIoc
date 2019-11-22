@@ -329,11 +329,11 @@ class Select_last_registered_factory_with_implicit_scope_selection
 
 ## Implicitly available services
  
-DryIoc automatically (without registration) will resolve: `IResolver`, `IRegistrator`, `IContainer`, 
-and `IDisposable`. 
+DryIoc automatically without registration can resolve or inject: `IResolverContext`, `IResolver`, `IRegistrator`, `IContainer`, 
+and `IServiceProvider` (for the platforms where `IServiceProvider` is available).
 
-- The first three are interfaces implemented by `Container` class and provide access to corresponding container roles.
-- The `IDisposable` provides access to current [Resolution Scope](ReuseAndScopes#markdown-header-reuseinresolutionscope).
+Note: `IResolverContext` implements `IResolver` and additionally provides the **access to the current scope** if any and allows 
+to open a nested scope, it also implements `IDisposable` to dispose of the currect scope.
 
 
 ### Container interfaces
