@@ -333,7 +333,7 @@ DryIoc automatically without registration can resolve or inject: `IResolverConte
 and `IServiceProvider` (for the platforms where `IServiceProvider` is available).
 
 Note: `IResolverContext` implements `IResolver` and additionally provides the **access to the current scope** if any and allows 
-to open a nested scope, it also implements `IDisposable` to dispose of the currect scope.
+to open a nested scope, it also implements `IDisposable` to dispose of the current scope.
 
 
 ### Container interfaces
@@ -372,9 +372,9 @@ class Automatically_injected_container_interfaces
 } /*md
 ```
 
-Given the example you can see that registering a `Container` object will not get you a `scope` for scoped services.
+Given the example you can see that registering a `Container` object will not get you a scope for the scoped services.
 
-The right way to register container interfaces manually with the correct scoping behavior maybe this:
+The right way to register container interfaces manually with the correct scoping behavior may be this:
 ```cs md*/
 class Registering_container_interfaces_by_hand
 {
@@ -396,7 +396,7 @@ class Registering_container_interfaces_by_hand
     }
 
     [Test]
-    public void Example_injecting_all_container_interfaces_without_registering_then()
+    public void Example_injecting_all_container_interfaces_without_registering_them()
     {
         var container = new Container();
 

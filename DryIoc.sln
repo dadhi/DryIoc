@@ -116,7 +116,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{6384FD6C
 		nuspecs\DryIocZero\build\DryIocZero.props = nuspecs\DryIocZero\build\DryIocZero.props
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "BuildScripts", "BuildScripts", "{06163480-12C7-4313-B4FB-1781020FE1FE}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{06163480-12C7-4313-B4FB-1781020FE1FE}"
 	ProjectSection(SolutionItems) = preProject
 		BuildScripts\MakeInternal.ps1 = BuildScripts\MakeInternal.ps1
 		BuildScripts\NuGetPack.bat = BuildScripts\NuGetPack.bat
@@ -135,7 +135,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LoadTest", "playground\Load
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReducedStackoverflow", "test\DryIoc.Issue139_ReducedLoadTests\ReducedStackoverflow.csproj", "{0E8A590B-2AF7-4F38-B656-92077BE24C97}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Messages.MediatRLikeExample", "playground\DryIoc.Messages.MediatRLikeExample\DryIoc.Messages.MediatRLikeExample.csproj", "{A5187898-16F4-4573-8628-E58A6AD53E9F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.Messages.MediatRLikeExample", "playground\DryIoc.Messages.MediatRLikeExample\DryIoc.Messages.MediatRLikeExample.csproj", "{A5187898-16F4-4573-8628-E58A6AD53E9F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
