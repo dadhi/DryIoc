@@ -15,13 +15,17 @@ If class has multiple constructors the default behavior is to throw correspondin
 To avoid the exception you may specify what constructor to use while registering.
 
 Given class with two constructors:
-```
-#!c#
-    public class Foo 
-    {
-        public Foo() {}
-        public Foo(IDependency dep) { Dep = dep; }
-    }
+``` 
+
+public interface IDependency { }
+
+public class Foo 
+{
+    public IDependency Dep { get; }
+
+    public Foo() {}
+    public Foo(IDependency dep) { Dep = dep; }
+}
 ```
 
 There are multiple ways to select constructor:
