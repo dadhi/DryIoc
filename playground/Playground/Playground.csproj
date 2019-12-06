@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFrameworks Condition="'$(NoSupportForNetCore22)' != 'true'">netcoreapp2.2</TargetFrameworks>
@@ -6,6 +6,9 @@
         <Description>Benchmarks, sandbox for experiments.</Description>
         <NoWarn>1701;1702;AD0001;NU1608</NoWarn>
     </PropertyGroup>
+    <ItemGroup>
+      <Compile Remove="ImHashMapBenchmarks.cs" />
+    </ItemGroup>
     <ItemGroup>
       <Compile Include="..\..\test\DryIoc.IssuesTests\GHIssue44_Real_world_benchmarks.Setup.cs" Link="GHIssue44_Real_world_benchmarks.Setup.cs" />
     </ItemGroup>

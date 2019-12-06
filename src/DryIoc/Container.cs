@@ -10318,9 +10318,8 @@ namespace DryIoc
         /// <summary>Disposes the scopes and empties internal scope storage.</summary>
         public void Dispose()
         {
-            if (!_scopes.IsEmpty)
-                foreach (var scope in _scopes.Enumerate())
-                    scope.Value?.Dispose();
+            if (!_scopes.IsEmpty) 
+                _scopes.Visit(d => d.Value?.Dispose());
             _scopes = ImMap<IScope>.Empty;
         }
 
