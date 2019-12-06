@@ -983,7 +983,8 @@ namespace DryIoc
 
             var factories = entry == null ? null
                 : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
-                : ((FactoriesEntry)entry).Factories.Enumerate().ToArray();
+                : entry.To<FactoriesEntry>().Factories
+                       .Visit(new List<KV<object, Factory>>(2), (x, list) => list.Add(KV.Of(x.Key, x.Value))).ToArray(); // todo: optimize - we may not need ToArray here
 
             if (!Rules.DynamicRegistrationProviders.IsNullOrEmpty() &&
                 (factories.IsNullOrEmpty() || !Rules.UseDynamicRegistrationsAsFallbackOnly))
@@ -1090,7 +1091,9 @@ namespace DryIoc
                 factories = new[] {new KV<object, Factory>(DefaultKey.Value, singleDefaultFactory)};
             }
             else if (entry is FactoriesEntry e)
-                factories = e.Factories.Enumerate().ToArrayOrSelf();
+            {
+                factories = e.Factories.Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray();
+            }
             else
             {
                 object openGenericEntry;
@@ -1242,7 +1245,8 @@ namespace DryIoc
             entry == null
                 ? Empty<KV<object, Factory>>()
                 : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Value, (Factory)entry) }
-                : ((FactoriesEntry)entry).Factories.Enumerate();
+                // todo: optimize
+                : entry.To<FactoriesEntry>().Factories.Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray();
 
         Expression IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
@@ -1589,8 +1593,7 @@ namespace DryIoc
                         }
 
                         return true;
-                    },
-                     x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
+                    }, x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
 
                 resultFactories = resultFactories.Append(remainingDynamicFactories);
             }
@@ -1767,7 +1770,7 @@ namespace DryIoc
 
                 var m = map;
                 if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(serviceType, cacheSlot), m) != m)
-                    Ref.Swap(ref map, serviceType, cacheSlot, (type, slot, x) => x.AddOrUpdate(type, slot));
+                    Ref.Swap(ref map, serviceType, cacheSlot, (x, type, slot) => x.AddOrUpdate(type, slot));
             }
 
             // Where key object is `KV.Of(ServiceType, ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
@@ -1808,7 +1811,7 @@ namespace DryIoc
                 var current = map;
                 var cacheSlot = new CacheSlot(factory);
                 if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(key, cacheSlot), current) != current)
-                    Ref.Swap(ref map, key, cacheSlot, (type, slot, x) => x.AddOrUpdate(type, slot));
+                    Ref.Swap(ref map, key, cacheSlot, (x, type, slot) => x.AddOrUpdate(type, slot));
             }
 
             internal sealed class ExpressionCacheSlot
@@ -1836,10 +1839,7 @@ namespace DryIoc
                 if (map == null)
                     return null;
 
-                while (map.Height != 0 && factoryId != map.Key)
-                    map = factoryId < map.Key ? map.Left : map.Right;
-
-                slot = map.Value;
+                slot = map.GetValueOrDefault(factoryId);
                 if (slot != null)
                 {
                     var reuse = request.Reuse;
@@ -1881,7 +1881,7 @@ namespace DryIoc
 
                     var current = map;
                     if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(factoryId, slot), current) != current)
-                        Ref.Swap(ref map, factoryId, slot, (type, e, x) => x.AddOrUpdate(type, e));
+                        Ref.Swap(ref map, factoryId, slot, (x, type, e) => x.AddOrUpdate(type, e));
                 }
 
                 var reuse = request.Reuse;
@@ -1990,7 +1990,7 @@ namespace DryIoc
                 return factory.FactoryType == FactoryType.Service
                         ? WithService(factory, serviceType, serviceKey, ifAlreadyRegistered)
                     : factory.FactoryType == FactoryType.Decorator
-                        ? WithDecorators(Decorators.AddOrUpdate(serviceType, factory.One(), out _, out _, (_, old, x) => ArrayTools.Append(old, x)))
+                        ? WithDecorators(Decorators.AddOrUpdate(serviceType, factory.One(), (_, oldf, newf) => oldf.Append(newf)))
                         : WithWrappers(Wrappers.AddOrUpdate(serviceType, factory));
             }
 
@@ -2130,34 +2130,34 @@ namespace DryIoc
 
             private Registry WithDefaultService(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered)
             {
-                var updateOldEntry = 
+                // todo: do we even need the `updateOldFactory` delegate or could we check the old entry directly
+                var updateOldEntry =
                     ifAlreadyRegistered == IfAlreadyRegistered.AppendNotKeyed ? IfAlreadyRegisteredAppendNotKeyedDefaultService :
                     ifAlreadyRegistered == IfAlreadyRegistered.Throw ? IfAlreadyRegisteredThrowDefaultService :
                     ifAlreadyRegistered == IfAlreadyRegistered.Replace ? IfAlreadyRegisteredReplaceDefaultService :
                     ifAlreadyRegistered == IfAlreadyRegistered.AppendNewImplementation ? IfAlreadyRegisteredAppendNewImplDefaultService :
                     (Update<Type, object>)IfAlreadyRegisteredKeepDefaultService;
 
-                var registry = this;
-                var newServices = registry.Services.AddOrUpdate(
-                    serviceType, factory, out var isUpdated, out var updatedOldEntry, updateOldEntry);
+                var services = Services;
+                var oldEntry = services.GetValueOrDefault(serviceType);
 
-                if (registry.Services != newServices)
+                // todo: check the returned entry instead of using delegate
+                var newServices = services.AddOrUpdate(serviceType, factory, updateOldEntry);
+
+                var newRegistry = new Registry(newServices, Decorators, Wrappers,
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
+
+                if (oldEntry != null)
                 {
-                    registry = new Registry(newServices, Decorators, Wrappers,
-                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
-
-                    if (isUpdated)
-                    {
-                        if (updatedOldEntry is Factory oldFactory)
-                            registry.DropFactoryCache(oldFactory, serviceType);
-                        else if (updatedOldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
-                            foreach (var f in oldFactoriesEntry.Factories.Enumerate())
-                                if (f.Key is DefaultKey)
-                                    registry.DropFactoryCache(f.Value, serviceType);
-                    }
+                    if (oldEntry is Factory oldFactory)
+                        newRegistry.DropFactoryCache(oldFactory, serviceType);
+                    else if (oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
+                        foreach (var f in oldFactoriesEntry.Factories.Enumerate())
+                            if (f.Key is DefaultKey)
+                                newRegistry.DropFactoryCache(f.Value, serviceType);
                 }
 
-                return registry;
+                return newRegistry;
             }
 
             private static object IfAlreadyRegisteredKeepKeyedService(object _, object oldEntry, object newEntry)
@@ -2165,14 +2165,16 @@ namespace DryIoc
                 if (oldEntry == null)
                     return newEntry;
 
+                var newFactoriesEntry = (FactoriesEntry)newEntry;
                 if (oldEntry is Factory)
-                    return ((FactoriesEntry)newEntry).With((Factory)oldEntry);
+                    return newFactoriesEntry.With((Factory)oldEntry);
 
-                return new FactoriesEntry(((FactoriesEntry)oldEntry).LastDefaultKey,
-                    ((FactoriesEntry)oldEntry).Factories.AddOrUpdate(
-                        ((FactoriesEntry)newEntry).Factories.Key, ((FactoriesEntry)newEntry).Factories.Value,
-                        out var isUpdatedFactory, out var updatedOldFactory,
-                        (key, oldFactory, newFactory) => oldFactory == null ? newFactory : oldFactory));
+                var oldFactoriesEntry = (FactoriesEntry)oldEntry;
+                return new FactoriesEntry(
+                    oldFactoriesEntry.LastDefaultKey,
+                    oldFactoriesEntry.Factories.AddOrUpdate(
+                        newFactoriesEntry.Factories.Key, newFactoriesEntry.Factories.Value,
+                        (_, oldFactory, newFactory) => oldFactory == null ? newFactory : oldFactory));
             }
 
             private static object IfAlreadyRegisteredReplaceKeyedService(object _, object oldEntry, object newEntry)
@@ -2193,14 +2195,17 @@ namespace DryIoc
                 if (oldEntry == null)
                     return newEntry;
 
+                var newFactoriesEntry = (FactoriesEntry)newEntry;
                 if (oldEntry is Factory)
-                    return ((FactoriesEntry)newEntry).With((Factory)oldEntry);
+                    return newFactoriesEntry.With((Factory)oldEntry);
 
-                return new FactoriesEntry(((FactoriesEntry)oldEntry).LastDefaultKey,
-                    ((FactoriesEntry)oldEntry).Factories.AddOrUpdate(
-                        ((FactoriesEntry)newEntry).Factories.Key, ((FactoriesEntry)newEntry).Factories.Value,
-                        out var isUpdatedFactory, out var updatedOldFactory,
-                        (key, oldFactory, newFactory) => oldFactory == null ? newFactory
+                var oldFactoriesEntry = (FactoriesEntry)oldEntry;
+                return new FactoriesEntry(
+                    oldFactoriesEntry.LastDefaultKey,
+                    oldFactoriesEntry.Factories.AddOrUpdate(
+                        newFactoriesEntry.Factories.Key, newFactoriesEntry.Factories.Value,
+                        (key, oldFactory, newFactory) => oldFactory == null 
+                            ? newFactory
                             : Throw.For<Factory>(Error.UnableToRegisterDuplicateKey, key, newFactory, oldFactory)));
             }
 
@@ -2212,24 +2217,20 @@ namespace DryIoc
                     ifAlreadyRegistered == IfAlreadyRegistered.Replace ? IfAlreadyRegisteredReplaceKeyedService :
                     (Update<Type, object>)IfAlreadyRegisteredThrowKeyedService;
 
-                var registry = this;
-                var newServices = registry.Services.AddOrUpdate(
-                    serviceType, FactoriesEntry.Empty.With(factory, serviceKey),
-                    out var isUpdated, out var updatedOldEntry, updateOldEntry);
+                // todo: do we need the `updateOldEntry`
+                var oldEntry = Services.GetValueOrDefault(serviceType);
+                var newServices = Services.AddOrUpdate(serviceType, FactoriesEntry.Empty.With(factory, serviceKey), updateOldEntry);
 
-                if (newServices != registry.Services)
-                {
-                    registry = new Registry(newServices, Decorators, Wrappers,
-                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), 
-                        _isChangePermitted);
+                var newRegistry = new Registry(newServices, Decorators, Wrappers,
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
+                    _isChangePermitted);
 
-                    if (isUpdated && ifAlreadyRegistered == IfAlreadyRegistered.Replace && 
-                        updatedOldEntry is FactoriesEntry updatedOldFactories &&
-                        updatedOldFactories.Factories.TryFind(serviceKey, out var droppedFactory))
-                        registry.DropFactoryCache(droppedFactory, serviceType, serviceKey);
-                }
+                if (oldEntry != null && ifAlreadyRegistered == IfAlreadyRegistered.Replace &&
+                    oldEntry is FactoriesEntry updatedOldFactories &&
+                    updatedOldFactories.Factories.TryFind(serviceKey, out var droppedFactory))
+                    newRegistry.DropFactoryCache(droppedFactory, serviceType, serviceKey);
 
-                return registry;
+                return newRegistry;
             }
 
             public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
@@ -2378,7 +2379,7 @@ namespace DryIoc
                         var defaultFactoryCache = DefaultFactoryCache;
                         if (defaultFactoryCache != null)
                             Ref.Swap(ref defaultFactoryCache[serviceType.GetHashCode() & CACHE_SLOT_COUNT_MASK],
-                                serviceType, (t, x) => (x ?? ImHashMap<Type, CacheSlot>.Empty).Update(t, null));
+                                serviceType, (x, t) => (x ?? ImHashMap<Type, CacheSlot>.Empty).Update(t, null));
 
                         // todo: At the moment there is not possibility to clean-up a particular factory.
                         // But considering that keyed services are much lees "likely" than the default ones - then  it is fine, right?
@@ -2398,7 +2399,7 @@ namespace DryIoc
                     var cache = FactoryExpressionCache;
                     if (cache != null)
                         Ref.Swap(ref cache[factory.FactoryID & CACHE_SLOT_COUNT_MASK],
-                            factory.FactoryID, (fid, x) => (x ?? ImMap<ExpressionCacheSlot>.Empty).Update(fid, null));
+                            factory.FactoryID, (x, fid) => (x ?? ImMap<ExpressionCacheSlot>.Empty).Update(fid, null));
                 }
             }
 
@@ -2883,7 +2884,7 @@ namespace DryIoc
             // add only, keep old item if it already exists
             var m = map;
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, new ItemRef()), m) != m)
-                Ref.Swap(ref map, id, (i, x) => x.AddOrKeep(i, new ItemRef()));
+                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, new ItemRef()));
 
             itemRef = map.GetValueOrDefault(id);
             if (itemRef.Item == ItemRef.NoItem)
@@ -4958,10 +4959,16 @@ namespace DryIoc
         {
             ctorOrMethodOrMember.ThrowIfNull(Error.PassedCtorOrMemberIsNull);
 
-            if (!(ctorOrMethodOrMember is ConstructorInfo) && !ctorOrMethodOrMember.IsStatic())
-                Throw.If(factoryInfo == null, Error.PassedMemberIsNotStaticButInstanceFactoryIsNull, ctorOrMethodOrMember);
+            if (ctorOrMethodOrMember is ConstructorInfo == false && !ctorOrMethodOrMember.IsStatic())
+            {
+                if (factoryInfo == null)
+                    Throw.It(Error.PassedMemberIsNotStaticButInstanceFactoryIsNull, ctorOrMethodOrMember);
+            }
             else
-                Throw.If(factoryInfo != null, Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, ctorOrMethodOrMember, factoryInfo);
+            {
+                if (factoryInfo != null)
+                    Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, ctorOrMethodOrMember, factoryInfo);
+            }
 
             return new FactoryMethod(ctorOrMethodOrMember, factoryInfo);
         }
@@ -6485,7 +6492,7 @@ namespace DryIoc
                 return;
 
             request.Container.Rules.DependencyResolutionCallExprs.Swap(request, factoryExpr, 
-                (req, facExpr, x) => x.AddOrUpdate(req, facExpr
+                (x, req, facExpr) => x.AddOrUpdate(req, facExpr
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                         .ToExpression()
 #endif
@@ -8433,7 +8440,7 @@ namespace DryIoc
                 var itemRef = new ItemRef();
                 var m = map;
                 if (Interlocked.CompareExchange(ref map, m.AddOrKeep(factoryId, itemRef), m) != m)
-                    Ref.Swap(ref map, factoryId, itemRef, (i, ir, x) => x.AddOrKeep(i, ir));
+                    Ref.Swap(ref map, factoryId, itemRef, (x, i, ir) => x.AddOrKeep(i, ir));
 
                 itemRef = map.GetValueOrDefault(factoryId);
                 if (itemRef.Item == ItemRef.NoItem)
@@ -9206,7 +9213,7 @@ namespace DryIoc
 
                 // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
                 _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
-                    (genFacKey, fac, facs) => facs.AddOrUpdate(genFacKey, fac, (oldFac, _) => closedGenericFactory = oldFac));
+                    (x, genFacKey, fac) => x.AddOrUpdate(genFacKey, fac, (oldFac, _) => closedGenericFactory = oldFac));
 
                 return closedGenericFactory;
             }
@@ -9900,8 +9907,8 @@ namespace DryIoc
 
             var itemRef = new ItemRef();
             var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(id, itemRef, (oldRef, _) => oldRef), m) != m)
-                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrUpdate(i, ir, (oldRef, _) => oldRef));
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, itemRef), m) != m)
+                Ref.Swap(ref map, id, itemRef, (x, i, ir) => x.AddOrKeep(i, ir));
 
             itemRef = map.GetValueOrDefault(id);
             if (!ReferenceEquals(itemRef.Item, ItemRef.NoItem))
@@ -9958,7 +9965,7 @@ namespace DryIoc
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var m = map;
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, new ItemRef()), m) != m)
-                Ref.Swap(ref map, id, (i, x) => x.AddOrKeep(i, new ItemRef()));
+                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, new ItemRef()));
 
             var itemRef = map.GetValueOrDefault(id);
             if (ReferenceEquals(itemRef.Item, ItemRef.NoItem))
@@ -9988,7 +9995,7 @@ namespace DryIoc
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var m = map;
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, new ItemRef()), m) != m)
-                Ref.Swap(ref map, id, (i, x) => x.AddOrKeep(i, new ItemRef()));
+                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, new ItemRef()));
 
             var itemRef = map.GetValueOrDefault(id);
 
@@ -10027,7 +10034,7 @@ namespace DryIoc
             var itemRef = new ItemRef();
             var m = map;
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, itemRef), m) != m)
-                Ref.Swap(ref map, id, itemRef, (i, ir, x) => x.AddOrKeep(i, ir));
+                Ref.Swap(ref map, id, itemRef, (x, i, ir) => x.AddOrKeep(i, ir));
 
             itemRef = map.GetValueOrDefault(id);
             if (itemRef.Item != ItemRef.NoItem)
@@ -10121,15 +10128,15 @@ namespace DryIoc
         {
             var d = _disposables;
             if (Interlocked.CompareExchange(ref _disposables, d.AddOrUpdate(disposalOrder, disposable), d) != d)
-                Ref.Swap(ref _disposables, disposalOrder, disposable, (dispOrder, disp, x) => x.AddOrUpdate(dispOrder, disp));
+                Ref.Swap(ref _disposables, disposalOrder, disposable, (x, dispOrder, disp) => x.AddOrUpdate(dispOrder, disp));
         }
 
         [MethodImpl((MethodImplOptions)256)]
         internal void AddUnorderedDisposable(IDisposable disposable)
         {
             var copy = _unorderedDisposables;
-            if (Interlocked.CompareExchange(ref _unorderedDisposables, copy.Prep(disposable), copy) != copy)
-                Ref.Swap(ref _unorderedDisposables, disposable, (d, x) => x.Prep(d));
+            if (Interlocked.CompareExchange(ref _unorderedDisposables, copy.Push(disposable), copy) != copy)
+                Ref.Swap(ref _unorderedDisposables, disposable, (x, d) => x.Push(d));
         }
 
         /// <inheritdoc />
@@ -10170,7 +10177,7 @@ namespace DryIoc
 
             var f = _factories;
             if (Interlocked.CompareExchange(ref _factories, f.AddOrUpdate(type, factory), f) != f)
-                Ref.Swap(ref _factories, type, factory, (t, fac, x) => x.AddOrUpdate(t, fac));
+                Ref.Swap(ref _factories, type, factory, (x, t, fac) => x.AddOrUpdate(t, fac));
         }
 
         /// Try retrieve instance from the small registry.
@@ -10223,12 +10230,11 @@ namespace DryIoc
 
         private static void SafelyDisposeOrderedDisposables(ImMap<IDisposable> disposables)
         {
-            foreach (var disposable in disposables.Enumerate())
-            {
-                // Ignoring disposing exception, as it is not important to proceed the disposal of other items
+            disposables.Visit(d => {
                 try
                 {
-                    disposable.Value.Dispose();
+                    // Ignoring disposing exception, as it is not important to proceed the disposal of other items
+                    d.Value.Dispose();
                 }
                 catch (ContainerException)
                 {
@@ -10237,7 +10243,7 @@ namespace DryIoc
                 catch (Exception)
                 {
                 }
-            }
+            });
         }
 
         /// <summary>Prints scope info (name and parent) to string for debug purposes.</summary>

@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2018 Maksim Volkau
+Copyright (c) 2016-2019 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -11,7 +11,7 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included AddOrUpdateServiceFactory
+The above copyright notice and this permission notice shall be included 
 all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -22,6 +22,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
+
+// ReSharper disable once InconsistentNaming
+
+#if !NET35 && !PCL
+#define SUPPORTS_SPIN_WAIT
+#endif
 
 namespace ImTools
 {
@@ -35,21 +41,54 @@ namespace ImTools
     /// <summary>Helpers for functional composition</summary>
     public static class Fun
     {
-        /// <summary>Always a true condition.</summary>
+        /// <summary>
+        /// Always a true condition.
+        /// </summary> 
         public static bool Always<T>(T _) => true;
 
-        /// <summary>Identity function returning passed argument as result.</summary>
+        /// <summary>
+        /// Identity function returning passed argument as result.
+        /// </summary> 
         public static T Id<T>(T x) => x;
 
-        /// <summary>Piping</summary>
+        /// <summary>
+        /// Forward pipe operator (`|>` in F#)
+        /// </summary> 
         public static R To<T, R>(this T x, Func<T, R> map) => map(x);
 
-        /// <summary>Piping</summary>
-        public static void Do<T>(this T x, Action<T> effect) => effect(x);
+        /// <summary>
+        /// Forward pipe operator (`|>` in F#) with the additional state A for two arguments function
+        /// </summary> 
+        public static R To<T, S, R>(this T x, S state, Func<T, S, R> map) => map(x, state);
 
-        /// Lift argument to Func without allocations ignoring the first argument.
+        /// <summary>
+        /// Cast to the R type with the forward pipe operator (`|>` in F#)
+        /// </summary> 
+        public static R To<R>(this object x) => (R)x;
+
+        /// <summary>
+        /// Forward pipe operator (`|>` in F#) but with side effect propagating the original `x` value
+        /// </summary> 
+        public static T Do<T>(this T x, Action<T> effect)
+        {
+            effect(x);
+            return x;
+        }
+
+        /// <summary>
+        /// Forward pipe operator (`|>` in F#) but with side effect propagating the original `x` value and the state object
+        /// </summary> 
+        public static T Do<T, S>(this T x, S state, Action<T, S> effect)
+        {
+            effect(x, state);
+            return x;
+        }
+
+        /// <summary>
+        /// Lifts argument to Func without allocations ignoring the first argument.
         /// For example if you have `Func{T, R} = _ => instance`,
-        /// you may rewrite it without allocations as `instance.ToFunc{A, R}` 
+        /// you may rewrite it without allocations as `instance.ToFunc{A, R}`
+        /// </summary> 
         public static R ToFunc<T, R>(this R result, T ignoredArg) => result;
     }
 
@@ -59,6 +98,1370 @@ namespace ImTools
         /// <summary>Provides result type inference for creation of lazy.</summary>
         public static Lazy<T> Of<T>(Func<T> valueFactory) => new Lazy<T>(valueFactory);
     }
+
+    /// Replacement for `Void` type which can be used as a type argument and value.
+    /// In traditional functional languages this type is a singleton empty record type,
+    /// e.g. `()` in Haskell https://en.wikipedia.org/wiki/Unit_type
+    public struct Unit : IEquatable<Unit>
+    {
+        /// Singleton unit value - making it a lower-case so you could import `using static ImTools.Unit;` and write `return unit;`
+        public static readonly Unit unit = new Unit();
+
+        /// <inheritdoc />
+        public override string ToString() => "(unit)";
+
+        /// Equals to any other Unit
+        public bool Equals(Unit other) => true;
+
+        /// <inheritdoc />
+        public override bool Equals(object obj) => obj is Unit;
+
+        /// Using type hash code for the value
+        public override int GetHashCode() => typeof(Unit).GetHashCode();
+    }
+
+    /// Simple value provider interface - useful for the type pattern matching via `case I{T} x: ...`
+    public interface I<out T>
+    {
+        /// The value in this case ;)
+        T Value { get; }
+    }
+
+    /// Helpers for `Is` and `Union`
+    public static class UnionTools
+    {
+        /// Pretty prints the Union using the type information
+        internal static string ToString<TName, T>(T value, string prefix = "case(", string suffix = ")")
+        {
+            if (typeof(TName) == typeof(Unit))
+                return prefix + value + suffix;
+
+            var typeName = typeof(TName).Name;
+            var i = typeName.IndexOf('`');
+            var name = i == -1 ? typeName : typeName.Substring(0, i);
+            return name + prefix + value + suffix;
+        }
+    }
+
+    /// Wraps the `T` in a typed `TData` struct value in a one-line declaration,
+    /// so the <c><![CDATA[class Name : Case<Name, string>]]></c>
+    /// is different from the <c><![CDATA[class Address : Case<Address, string>]]></c> 
+    public abstract class Item<TItem, T> where TItem : Item<TItem, T>
+    {
+        /// Creation method for the consistency with other types
+        public static item Of(T x) => new item(x);
+
+        /// Nested structure that hosts a value.
+        /// All nested types by convention here are lowercase
+        public readonly struct item : IEquatable<item>, I<T>
+        {
+            /// <inheritdoc />
+            public T Value { [MethodImpl((MethodImplOptions)256)] get => Item; }
+
+            /// The value
+            public readonly T Item;
+
+            /// Constructor
+            public item(T x) => Item = x;
+
+            /// <inheritdoc />
+            public bool Equals(item other) => EqualityComparer<T>.Default.Equals(Value, other.Value);
+
+            /// <inheritdoc />
+            public override bool Equals(object obj) => obj is item c && Equals(c);
+
+            /// <inheritdoc />
+            public override int GetHashCode() => EqualityComparer<T>.Default.GetHashCode(Value);
+
+            /// <inheritdoc />
+            public override string ToString() => UnionTools.ToString<TItem, T>(Value);
+        }
+    }
+
+    /// Item without the data payload
+    public abstract class Item<TItem> where TItem : Item<TItem>
+    {
+        /// Single item value
+        public static readonly item Single = new item();
+
+        /// Nested structure that hosts a value.
+        /// All nested types by convention here are lowercase
+        public readonly struct item : IEquatable<item>
+        {
+            /// <inheritdoc />
+            public bool Equals(item other) => true;
+
+            /// <inheritdoc />
+            public override bool Equals(object obj) => obj is item;
+
+            /// <inheritdoc />
+            public override int GetHashCode() => typeof(TItem).GetHashCode();
+
+            /// <inheritdoc />
+            public override string ToString() => "(" + typeof(TItem).Name + ")";
+        }
+    }
+
+    /// Wraps the `T` in a named `TBox` class in a one-line declaration,
+    /// so the <c><![CDATA[class Name : Data<Name, string>]]></c>
+    /// is different from the <c><![CDATA[class Address : Data<Address, string>]]></c> 
+    public abstract class Box<TBox, T> : I<T>, IEquatable<Box<TBox, T>>
+        where TBox : Box<TBox, T>, new()
+    {
+        /// Wraps the value
+        public static TBox Of(T x) => new TBox { Value = x };
+
+        /// <inheritdoc />
+        public T Value { get; private set; }
+
+        /// <inheritdoc />
+        public bool Equals(Box<TBox, T> other) =>
+            other != null && EqualityComparer<T>.Default.Equals(Value, other.Value);
+
+        /// <inheritdoc />
+        public override bool Equals(object obj) => obj is Box<TBox, T> c && Equals(c);
+
+        // ReSharper disable once NonReadonlyMemberInGetHashCode
+        /// <inheritdoc />
+        public override int GetHashCode() => EqualityComparer<T>.Default.GetHashCode(Value);
+
+        /// <inheritdoc />
+        public override string ToString() => UnionTools.ToString<TBox, T>(Value, "data(");
+    }
+
+    /// Unnamed discriminated union (with Empty name), shorter name for simplified inline usage
+    public class U<T1, T2> : Union<Unit, T1, T2> { }
+
+    /// Discriminated union
+    public abstract class Union<TUnion, T1, T2>
+    {
+        /// To tag the cases with enum value for efficient pattern matching of required -
+        /// otherwise we need to use `is CaseN` pattern or similar which is less efficient
+        public enum Tag : byte
+        {
+            /// Tags Case1
+            Case1,
+            /// Tags Case2
+            Case2
+        }
+
+        /// The base interface for the cases to operate.
+        /// The naming is selected to start from the lower letter, cause we need to use the nested type.
+        /// It is an unusual case, that's why using the __union__ will be fine to highlight this.
+        // ReSharper disable once InconsistentNaming
+        public interface union
+        {
+            /// The tag
+            Tag Tag { get; }
+
+            /// Matches the union cases to the R value
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2);
+        }
+
+        /// Creates the respective case
+        public static union Of(T1 x) => new case1(x);
+
+        /// Creates the respective case
+        public static union Of(T2 x) => new case2(x);
+
+        /// Wraps the respective case
+        public readonly struct case1 : union, IEquatable<case1>, I<T1>
+        {
+            /// Implicit conversion
+            public static implicit operator case1(T1 x) => new case1(x);
+
+            /// <inheritdoc />
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
+
+            /// <inheritdoc />
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2) => map1(Case);
+
+            /// <inheritdoc />
+            public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            /// The case value
+            public readonly T1 Case;
+
+            /// Wraps the value
+            public case1(T1 x) => Case = x;
+
+            /// <inheritdoc />
+            public bool Equals(case1 other) => EqualityComparer<T1>.Default.Equals(Value, other.Value);
+
+            /// <inheritdoc />
+            public override bool Equals(object obj) => obj is case1 x && Equals(x);
+
+            /// <inheritdoc />
+            public override int GetHashCode() => EqualityComparer<T1>.Default.GetHashCode(Value);
+
+            /// <inheritdoc />
+            public override string ToString() => UnionTools.ToString<TUnion, T1>(Value);
+        }
+
+        /// Wraps the respective case
+        public readonly struct case2 : union, IEquatable<case2>, I<T2>
+        {
+            /// Conversion
+            public static implicit operator case2(T2 x) => new case2(x);
+
+            /// <inheritdoc />
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
+
+            /// <inheritdoc />
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2) => map2(Value);
+
+            /// <inheritdoc />
+            public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            /// The case value
+            public readonly T2 Case;
+
+            /// Wraps the value
+            public case2(T2 x) => Case = x;
+
+            /// <inheritdoc />
+            public bool Equals(case2 other) => EqualityComparer<T2>.Default.Equals(Value, other.Value);
+
+            /// <inheritdoc />
+            public override bool Equals(object obj) => obj is case2 x && Equals(x);
+
+            /// <inheritdoc />
+            public override int GetHashCode() => EqualityComparer<T2>.Default.GetHashCode(Value);
+
+            /// <inheritdoc />
+            public override string ToString() => UnionTools.ToString<TUnion, T2>(Value);
+        }
+    }
+
+#pragma warning disable 1591
+    public class U<T1, T2, T3> : Union<Unit, T1, T2, T3> { }
+
+    public abstract class Union<TUnion, T1, T2, T3>
+    {
+        public enum Tag : byte { Case1, Case2, Case3 }
+
+        public interface union
+        {
+            Tag Tag { get; }
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3);
+        }
+
+        public static union Of(T1 x) => new case1(x);
+        public static union Of(T2 x) => new case2(x);
+        public static union Of(T3 x) => new case3(x);
+
+        public struct case1 : union, IEquatable<case1>, I<T1>
+        {
+            public static implicit operator case1(T1 x) => new case1(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
+
+            [MethodImpl((MethodImplOptions)256)]
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3) => map1(Case);
+
+            public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T1 Case;
+            public case1(T1 x) => Case = x;
+
+            public bool Equals(case1 other) => EqualityComparer<T1>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case1 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T1>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T1>(Case);
+        }
+
+        public struct case2 : union, IEquatable<case2>, I<T2>
+        {
+            public static implicit operator case2(T2 x) => new case2(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3) => map2(Case);
+
+            public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T2 Case;
+            public case2(T2 x) => Case = x;
+
+            public bool Equals(case2 other) => EqualityComparer<T2>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case2 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T2>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T2>(Case);
+        }
+
+        public struct case3 : union, IEquatable<case3>, I<T3>
+        {
+            public static implicit operator case3(T3 x) => new case3(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case3; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3) => map3(Case);
+
+            public T3 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T3 Case;
+            public case3(T3 x) => Case = x;
+
+            public bool Equals(case3 other) => EqualityComparer<T3>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case3 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T3>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T3>(Case);
+        }
+    }
+
+    public class U<T1, T2, T3, T4> : Union<Unit, T1, T2, T3, T4> { }
+    public abstract class Union<TUnion, T1, T2, T3, T4>
+    {
+        public enum Tag : byte { Case1, Case2, Case3, Case4 }
+
+        public interface union
+        {
+            Tag Tag { get; }
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4);
+        }
+
+        public static union Of(T1 x) => new case1(x);
+        public static union Of(T2 x) => new case2(x);
+        public static union Of(T3 x) => new case3(x);
+        public static union Of(T4 x) => new case4(x);
+
+        public struct case1 : union, IEquatable<case1>, I<T1>
+        {
+            public static implicit operator case1(T1 x) => new case1(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
+
+            [MethodImpl((MethodImplOptions)256)]
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4) => map1(Case);
+
+            public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T1 Case;
+            public case1(T1 x) => Case = x;
+
+            public bool Equals(case1 other) => EqualityComparer<T1>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case1 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T1>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T1>(Case);
+        }
+
+        public struct case2 : union, IEquatable<case2>, I<T2>
+        {
+            public static implicit operator case2(T2 x) => new case2(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4) => map2(Case);
+
+            public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T2 Case;
+            public case2(T2 x) => Case = x;
+
+            public bool Equals(case2 other) => EqualityComparer<T2>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case2 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T2>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T2>(Case);
+        }
+
+        public struct case3 : union, IEquatable<case3>, I<T3>
+        {
+            public static implicit operator case3(T3 x) => new case3(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case3; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4) => map3(Case);
+
+            public T3 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T3 Case;
+            public case3(T3 x) => Case = x;
+
+            public bool Equals(case3 other) => EqualityComparer<T3>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case3 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T3>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T3>(Case);
+        }
+
+        public struct case4 : union, IEquatable<case4>, I<T4>
+        {
+            public static implicit operator case4(T4 x) => new case4(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case4; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4) => map4(Case);
+
+            public T4 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T4 Case;
+            public case4(T4 x) => Case = x;
+
+            public bool Equals(case4 other) => EqualityComparer<T4>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case4 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T4>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T4>(Case);
+        }
+    }
+
+    public class U<T1, T2, T3, T4, T5> : Union<Unit, T1, T2, T3, T4, T5> { }
+    public abstract class Union<TUnion, T1, T2, T3, T4, T5>
+    {
+        public enum Tag : byte { Case1, Case2, Case3, Case4, Case5 }
+
+        public interface union
+        {
+            Tag Tag { get; }
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5);
+        }
+
+        public static union Of(T1 x) => new case1(x);
+        public static union Of(T2 x) => new case2(x);
+        public static union Of(T3 x) => new case3(x);
+        public static union Of(T4 x) => new case4(x);
+        public static union Of(T5 x) => new case5(x);
+
+        public struct case1 : union, IEquatable<case1>, I<T1>
+        {
+            public static implicit operator case1(T1 x) => new case1(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
+
+            [MethodImpl((MethodImplOptions)256)]
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5) => map1(Case);
+
+            public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T1 Case;
+            public case1(T1 x) => Case = x;
+
+            public bool Equals(case1 other) => EqualityComparer<T1>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case1 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T1>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T1>(Case);
+        }
+
+        public struct case2 : union, IEquatable<case2>, I<T2>
+        {
+            public static implicit operator case2(T2 x) => new case2(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5) => map2(Case);
+
+            public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T2 Case;
+            public case2(T2 x) => Case = x;
+
+            public bool Equals(case2 other) => EqualityComparer<T2>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case2 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T2>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T2>(Case);
+        }
+
+        public struct case3 : union, IEquatable<case3>, I<T3>
+        {
+            public static implicit operator case3(T3 x) => new case3(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case3; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5) => map3(Case);
+
+            public T3 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T3 Case;
+            public case3(T3 x) => Case = x;
+
+            public bool Equals(case3 other) => EqualityComparer<T3>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case3 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T3>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T3>(Case);
+        }
+
+        public struct case4 : union, IEquatable<case4>, I<T4>
+        {
+            public static implicit operator case4(T4 x) => new case4(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case4; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5) => map4(Case);
+
+            public T4 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T4 Case;
+            public case4(T4 x) => Case = x;
+
+            public bool Equals(case4 other) => EqualityComparer<T4>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case4 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T4>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T4>(Case);
+        }
+
+        public struct case5 : union, IEquatable<case5>, I<T5>
+        {
+            public static implicit operator case5(T5 x) => new case5(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case5; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5) => map5(Case);
+
+            public T5 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T5 Case;
+            public case5(T5 x) => Case = x;
+
+            public bool Equals(case5 other) => EqualityComparer<T5>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case5 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T5>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T5>(Case);
+        }
+    }
+
+    public class U<T1, T2, T3, T4, T5, T6> : Union<Unit, T1, T2, T3, T4, T5, T6> { }
+    public abstract class Union<TUnion, T1, T2, T3, T4, T5, T6>
+    {
+        public enum Tag : byte { Case1, Case2, Case3, Case4, Case5, Case6 }
+
+        public interface union
+        {
+            Tag Tag { get; }
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6);
+        }
+
+        public static union Of(T1 x) => new case1(x);
+        public static union Of(T2 x) => new case2(x);
+        public static union Of(T3 x) => new case3(x);
+        public static union Of(T4 x) => new case4(x);
+        public static union Of(T5 x) => new case5(x);
+        public static union Of(T6 x) => new case6(x);
+
+        public struct case1 : union, IEquatable<case1>, I<T1>
+        {
+            public static implicit operator case1(T1 x) => new case1(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
+
+            [MethodImpl((MethodImplOptions)256)]
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6) => map1(Case);
+
+            public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T1 Case;
+            public case1(T1 x) => Case = x;
+
+            public bool Equals(case1 other) => EqualityComparer<T1>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case1 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T1>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T1>(Case);
+        }
+
+        public struct case2 : union, IEquatable<case2>, I<T2>
+        {
+            public static implicit operator case2(T2 x) => new case2(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6) => map2(Case);
+
+            public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T2 Case;
+            public case2(T2 x) => Case = x;
+
+            public bool Equals(case2 other) => EqualityComparer<T2>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case2 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T2>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T2>(Case);
+        }
+
+        public struct case3 : union, IEquatable<case3>, I<T3>
+        {
+            public static implicit operator case3(T3 x) => new case3(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case3; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6) => map3(Case);
+
+            public T3 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T3 Case;
+            public case3(T3 x) => Case = x;
+
+            public bool Equals(case3 other) => EqualityComparer<T3>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case3 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T3>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T3>(Case);
+        }
+
+        public struct case4 : union, IEquatable<case4>, I<T4>
+        {
+            public static implicit operator case4(T4 x) => new case4(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case4; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6) => map4(Case);
+
+            public T4 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T4 Case;
+            public case4(T4 x) => Case = x;
+
+            public bool Equals(case4 other) => EqualityComparer<T4>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case4 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T4>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T4>(Case);
+        }
+
+        public struct case5 : union, IEquatable<case5>, I<T5>
+        {
+            public static implicit operator case5(T5 x) => new case5(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case5; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6) => map5(Case);
+
+            public T5 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T5 Case;
+            public case5(T5 x) => Case = x;
+
+            public bool Equals(case5 other) => EqualityComparer<T5>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case5 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T5>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T5>(Case);
+        }
+
+        public struct case6 : union, IEquatable<case6>, I<T6>
+        {
+            public static implicit operator case6(T6 x) => new case6(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case6; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6) => map6(Case);
+
+            public T6 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T6 Case;
+            public case6(T6 x) => Case = x;
+
+            public bool Equals(case6 other) => EqualityComparer<T6>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case6 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T6>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T6>(Case);
+        }
+    }
+
+    public class U<T1, T2, T3, T4, T5, T6, T7> : Union<Unit, T1, T2, T3, T4, T5, T6, T7> { }
+    public abstract class Union<TUnion, T1, T2, T3, T4, T5, T6, T7>
+    {
+        public enum Tag : byte { Case1, Case2, Case3, Case4, Case5, Case6, Case7 }
+
+        public interface union
+        {
+            Tag Tag { get; }
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7);
+        }
+
+        public static union Of(T1 x) => new case1(x);
+        public static union Of(T2 x) => new case2(x);
+        public static union Of(T3 x) => new case3(x);
+        public static union Of(T4 x) => new case4(x);
+        public static union Of(T5 x) => new case5(x);
+        public static union Of(T6 x) => new case6(x);
+        public static union Of(T7 x) => new case7(x);
+
+        public struct case1 : union, IEquatable<case1>, I<T1>
+        {
+            public static implicit operator case1(T1 x) => new case1(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
+
+            [MethodImpl((MethodImplOptions)256)]
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7) => map1(Case);
+
+            public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T1 Case;
+            public case1(T1 x) => Case = x;
+
+            public bool Equals(case1 other) => EqualityComparer<T1>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case1 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T1>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T1>(Case);
+        }
+
+        public struct case2 : union, IEquatable<case2>, I<T2>
+        {
+            public static implicit operator case2(T2 x) => new case2(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7) => map2(Case);
+
+            public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T2 Case;
+            public case2(T2 x) => Case = x;
+
+            public bool Equals(case2 other) => EqualityComparer<T2>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case2 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T2>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T2>(Case);
+        }
+
+        public struct case3 : union, IEquatable<case3>, I<T3>
+        {
+            public static implicit operator case3(T3 x) => new case3(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case3; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7) => map3(Case);
+
+            public T3 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T3 Case;
+            public case3(T3 x) => Case = x;
+
+            public bool Equals(case3 other) => EqualityComparer<T3>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case3 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T3>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T3>(Case);
+        }
+
+        public struct case4 : union, IEquatable<case4>, I<T4>
+        {
+            public static implicit operator case4(T4 x) => new case4(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case4; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7) => map4(Case);
+
+            public T4 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T4 Case;
+            public case4(T4 x) => Case = x;
+
+            public bool Equals(case4 other) => EqualityComparer<T4>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case4 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T4>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T4>(Case);
+        }
+
+        public struct case5 : union, IEquatable<case5>, I<T5>
+        {
+            public static implicit operator case5(T5 x) => new case5(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case5; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7) => map5(Case);
+
+            public T5 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T5 Case;
+            public case5(T5 x) => Case = x;
+
+            public bool Equals(case5 other) => EqualityComparer<T5>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case5 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T5>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T5>(Case);
+        }
+
+        public struct case6 : union, IEquatable<case6>, I<T6>
+        {
+            public static implicit operator case6(T6 x) => new case6(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case6; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7) => map6(Case);
+
+            public T6 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T6 Case;
+            public case6(T6 x) => Case = x;
+
+            public bool Equals(case6 other) => EqualityComparer<T6>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case6 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T6>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T6>(Case);
+        }
+
+        public struct case7 : union, IEquatable<case7>, I<T7>
+        {
+            public static implicit operator case7(T7 x) => new case7(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case7; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7) => map7(Case);
+
+            public T7 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T7 Case;
+            public case7(T7 x) => Case = x;
+
+            public bool Equals(case7 other) => EqualityComparer<T7>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case7 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T7>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T7>(Case);
+        }
+    }
+
+    public abstract class Union<TUnion, T1, T2, T3, T4, T5, T6, T7, T8>
+    {
+        public enum Tag : byte { Case1, Case2, Case3, Case4, Case5, Case6, Case7, Case8 }
+
+        public interface union
+        {
+            Tag Tag { get; }
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8);
+        }
+
+        public static union Of(T1 x) => new case1(x);
+        public static union Of(T2 x) => new case2(x);
+        public static union Of(T3 x) => new case3(x);
+        public static union Of(T4 x) => new case4(x);
+        public static union Of(T5 x) => new case5(x);
+        public static union Of(T6 x) => new case6(x);
+        public static union Of(T7 x) => new case7(x);
+        public static union Of(T8 x) => new case8(x);
+
+        public struct case1 : union, IEquatable<case1>, I<T1>
+        {
+            public static implicit operator case1(T1 x) => new case1(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
+
+            [MethodImpl((MethodImplOptions)256)]
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8) => map1(Case);
+
+            public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T1 Case;
+            public case1(T1 x) => Case = x;
+
+            public bool Equals(case1 other) => EqualityComparer<T1>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case1 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T1>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T1>(Case);
+        }
+
+        public struct case2 : union, IEquatable<case2>, I<T2>
+        {
+            public static implicit operator case2(T2 x) => new case2(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8) => map2(Case);
+
+            public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T2 Case;
+            public case2(T2 x) => Case = x;
+
+            public bool Equals(case2 other) => EqualityComparer<T2>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case2 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T2>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T2>(Case);
+        }
+
+        public struct case3 : union, IEquatable<case3>, I<T3>
+        {
+            public static implicit operator case3(T3 x) => new case3(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case3; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8) => map3(Case);
+
+            public T3 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T3 Case;
+            public case3(T3 x) => Case = x;
+
+            public bool Equals(case3 other) => EqualityComparer<T3>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case3 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T3>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T3>(Case);
+        }
+
+        public struct case4 : union, IEquatable<case4>, I<T4>
+        {
+            public static implicit operator case4(T4 x) => new case4(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case4; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8) => map4(Case);
+
+            public T4 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T4 Case;
+            public case4(T4 x) => Case = x;
+
+            public bool Equals(case4 other) => EqualityComparer<T4>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case4 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T4>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T4>(Case);
+        }
+
+        public struct case5 : union, IEquatable<case5>, I<T5>
+        {
+            public static implicit operator case5(T5 x) => new case5(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case5; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8) => map5(Case);
+
+            public T5 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T5 Case;
+            public case5(T5 x) => Case = x;
+
+            public bool Equals(case5 other) => EqualityComparer<T5>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case5 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T5>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T5>(Case);
+        }
+
+        public struct case6 : union, IEquatable<case6>, I<T6>
+        {
+            public static implicit operator case6(T6 x) => new case6(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case6; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8) => map6(Case);
+
+            public T6 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T6 Case;
+            public case6(T6 x) => Case = x;
+
+            public bool Equals(case6 other) => EqualityComparer<T6>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case6 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T6>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T6>(Case);
+        }
+
+        public struct case7 : union, IEquatable<case7>, I<T7>
+        {
+            public static implicit operator case7(T7 x) => new case7(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case7; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8) => map7(Case);
+
+            public T7 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T7 Case;
+            public case7(T7 x) => Case = x;
+
+            public bool Equals(case7 other) => EqualityComparer<T7>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case7 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T7>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T7>(Case);
+        }
+
+        public struct case8 : union, IEquatable<case8>, I<T8>
+        {
+            public static implicit operator case8(T8 x) => new case8(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case8; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8) => map8(Case);
+
+            public T8 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T8 Case;
+            public case8(T8 x) => Case = x;
+
+            public bool Equals(case8 other) => EqualityComparer<T8>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case8 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T8>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T8>(Case);
+        }
+    }
+
+    public abstract class Union<TUnion, T1, T2, T3, T4, T5, T6, T7, T8, T9>
+    {
+        public enum Tag : byte { Case1, Case2, Case3, Case4, Case5, Case6, Case7, Case8, Case9 }
+
+        public interface union
+        {
+            Tag Tag { get; }
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9);
+        }
+
+        public static union Of(T1 x) => new case1(x);
+        public static union Of(T2 x) => new case2(x);
+        public static union Of(T3 x) => new case3(x);
+        public static union Of(T4 x) => new case4(x);
+        public static union Of(T5 x) => new case5(x);
+        public static union Of(T6 x) => new case6(x);
+        public static union Of(T7 x) => new case7(x);
+        public static union Of(T8 x) => new case8(x);
+        public static union Of(T9 x) => new case9(x);
+
+        public struct case1 : union, IEquatable<case1>, I<T1>
+        {
+            public static implicit operator case1(T1 x) => new case1(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
+
+            [MethodImpl((MethodImplOptions)256)]
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map1(Case);
+
+            public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T1 Case;
+            public case1(T1 x) => Case = x;
+
+            public bool Equals(case1 other) => EqualityComparer<T1>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case1 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T1>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T1>(Case);
+        }
+
+        public struct case2 : union, IEquatable<case2>, I<T2>
+        {
+            public static implicit operator case2(T2 x) => new case2(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map2(Case);
+
+            public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T2 Case;
+            public case2(T2 x) => Case = x;
+
+            public bool Equals(case2 other) => EqualityComparer<T2>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case2 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T2>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T2>(Case);
+        }
+
+        public struct case3 : union, IEquatable<case3>, I<T3>
+        {
+            public static implicit operator case3(T3 x) => new case3(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case3; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map3(Case);
+
+            public T3 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T3 Case;
+            public case3(T3 x) => Case = x;
+
+            public bool Equals(case3 other) => EqualityComparer<T3>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case3 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T3>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T3>(Case);
+        }
+
+        public struct case4 : union, IEquatable<case4>, I<T4>
+        {
+            public static implicit operator case4(T4 x) => new case4(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case4; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map4(Case);
+
+            public T4 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T4 Case;
+            public case4(T4 x) => Case = x;
+
+            public bool Equals(case4 other) => EqualityComparer<T4>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case4 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T4>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T4>(Case);
+        }
+
+        public struct case5 : union, IEquatable<case5>, I<T5>
+        {
+            public static implicit operator case5(T5 x) => new case5(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case5; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map5(Case);
+
+            public T5 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T5 Case;
+            public case5(T5 x) => Case = x;
+
+            public bool Equals(case5 other) => EqualityComparer<T5>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case5 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T5>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T5>(Case);
+        }
+
+        public struct case6 : union, IEquatable<case6>, I<T6>
+        {
+            public static implicit operator case6(T6 x) => new case6(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case6; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map6(Case);
+
+            public T6 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T6 Case;
+            public case6(T6 x) => Case = x;
+
+            public bool Equals(case6 other) => EqualityComparer<T6>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case6 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T6>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T6>(Case);
+        }
+
+        public struct case7 : union, IEquatable<case7>, I<T7>
+        {
+            public static implicit operator case7(T7 x) => new case7(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case7; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map7(Case);
+
+            public T7 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T7 Case;
+            public case7(T7 x) => Case = x;
+
+            public bool Equals(case7 other) => EqualityComparer<T7>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case7 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T7>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T7>(Case);
+        }
+
+        public struct case8 : union, IEquatable<case8>, I<T8>
+        {
+            public static implicit operator case8(T8 x) => new case8(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case8; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map8(Case);
+
+            public T8 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T8 Case;
+            public case8(T8 x) => Case = x;
+
+            public bool Equals(case8 other) => EqualityComparer<T8>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case8 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T8>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T8>(Case);
+        }
+
+        public struct case9 : union, IEquatable<case9>, I<T9>
+        {
+            public static implicit operator case9(T9 x) => new case9(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case9; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map9(Case);
+
+            public T9 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T9 Case;
+            public case9(T9 x) => Case = x;
+
+            public bool Equals(case9 other) => EqualityComparer<T9>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case9 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T9>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T9>(Case);
+        }
+    }
+
+    public abstract class Union<TUnion, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>
+    {
+        public enum Tag : byte { Case1, Case2, Case3, Case4, Case5, Case6, Case7, Case8, Case9, Case10 }
+
+        public interface union
+        {
+            Tag Tag { get; }
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10);
+        }
+
+        public static union Of(T1 x) => new case1(x);
+        public static union Of(T2 x) => new case2(x);
+        public static union Of(T3 x) => new case3(x);
+        public static union Of(T4 x) => new case4(x);
+        public static union Of(T5 x) => new case5(x);
+        public static union Of(T6 x) => new case6(x);
+        public static union Of(T7 x) => new case7(x);
+        public static union Of(T8 x) => new case8(x);
+        public static union Of(T9 x) => new case9(x);
+        public static union Of(T10 x) => new case10(x);
+
+        public struct case1 : union, IEquatable<case1>, I<T1>
+        {
+            public static implicit operator case1(T1 x) => new case1(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
+
+            [MethodImpl((MethodImplOptions)256)]
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10) => map1(Case);
+
+            public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T1 Case;
+            public case1(T1 x) => Case = x;
+
+            public bool Equals(case1 other) => EqualityComparer<T1>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case1 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T1>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T1>(Case);
+        }
+
+        public struct case2 : union, IEquatable<case2>, I<T2>
+        {
+            public static implicit operator case2(T2 x) => new case2(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10) => map2(Case);
+
+            public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T2 Case;
+            public case2(T2 x) => Case = x;
+
+            public bool Equals(case2 other) => EqualityComparer<T2>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case2 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T2>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T2>(Case);
+        }
+
+        public struct case3 : union, IEquatable<case3>, I<T3>
+        {
+            public static implicit operator case3(T3 x) => new case3(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case3; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10) => map3(Case);
+
+            public T3 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T3 Case;
+            public case3(T3 x) => Case = x;
+
+            public bool Equals(case3 other) => EqualityComparer<T3>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case3 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T3>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T3>(Case);
+        }
+
+        public struct case4 : union, IEquatable<case4>, I<T4>
+        {
+            public static implicit operator case4(T4 x) => new case4(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case4; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10) => map4(Case);
+
+            public T4 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T4 Case;
+            public case4(T4 x) => Case = x;
+
+            public bool Equals(case4 other) => EqualityComparer<T4>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case4 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T4>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T4>(Case);
+        }
+
+        public struct case5 : union, IEquatable<case5>, I<T5>
+        {
+            public static implicit operator case5(T5 x) => new case5(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case5; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10) => map5(Case);
+
+            public T5 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T5 Case;
+            public case5(T5 x) => Case = x;
+
+            public bool Equals(case5 other) => EqualityComparer<T5>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case5 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T5>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T5>(Case);
+        }
+
+        public struct case6 : union, IEquatable<case6>, I<T6>
+        {
+            public static implicit operator case6(T6 x) => new case6(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case6; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10) => map6(Case);
+
+            public T6 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T6 Case;
+            public case6(T6 x) => Case = x;
+
+            public bool Equals(case6 other) => EqualityComparer<T6>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case6 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T6>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T6>(Case);
+        }
+
+        public struct case7 : union, IEquatable<case7>, I<T7>
+        {
+            public static implicit operator case7(T7 x) => new case7(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case7; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10) => map7(Case);
+
+            public T7 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T7 Case;
+            public case7(T7 x) => Case = x;
+
+            public bool Equals(case7 other) => EqualityComparer<T7>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case7 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T7>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T7>(Case);
+        }
+
+        public struct case8 : union, IEquatable<case8>, I<T8>
+        {
+            public static implicit operator case8(T8 x) => new case8(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case8; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10) => map8(Case);
+
+            public T8 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T8 Case;
+            public case8(T8 x) => Case = x;
+
+            public bool Equals(case8 other) => EqualityComparer<T8>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case8 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T8>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T8>(Case);
+        }
+
+        public struct case9 : union, IEquatable<case9>, I<T9>
+        {
+            public static implicit operator case9(T9 x) => new case9(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case9; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10) => map9(Case);
+
+            public T9 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T9 Case;
+            public case9(T9 x) => Case = x;
+
+            public bool Equals(case9 other) => EqualityComparer<T9>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case9 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T9>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T9>(Case);
+        }
+
+        public struct case10 : union, IEquatable<case10>, I<T10>
+        {
+            public static implicit operator case10(T10 x) => new case10(x);
+
+            public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case10; }
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+                Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9, Func<T10, R> map10) => map10(Case);
+
+            public T10 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
+
+            public readonly T10 Case;
+            public case10(T10 x) => Case = x;
+
+            public bool Equals(case10 other) => EqualityComparer<T10>.Default.Equals(Case, other.Case);
+            public override bool Equals(object obj) => obj is case10 x && Equals(x);
+            public override int GetHashCode() => EqualityComparer<T10>.Default.GetHashCode(Case);
+            public override string ToString() => UnionTools.ToString<TUnion, T10>(Case);
+        }
+    }
+
+#pragma warning restore 1591
 
     /// <summary>Methods to work with immutable arrays and some sugar.</summary>
     public static class ArrayTools
@@ -83,35 +1486,24 @@ namespace ImTools
         public static T[] EmptyIfNull<T>(this T[] source) => source ?? Empty<T>();
 
         /// Returns source enumerable if it is array, otherwise converts source to array or an empty array if null.
-        public static T[] ToArrayOrSelf<T>(this IEnumerable<T> source)
-        {
-            if (source is T[] arr)
-                return arr;
-            if (source == null)
-                return Empty<T>();
-            return source.ToArray();
-        }
+        public static T[] ToArrayOrSelf<T>(this IEnumerable<T> source) =>
+            source == null ? Empty<T>() : (source as T[] ?? source.ToArray());
 
         /// Returns source enumerable if it is list, otherwise converts source to IList or an empty array if null.
-        public static IList<T> ToListOrSelf<T>(this IEnumerable<T> source)
-        {
-            if (source is IList<T> list)
-                return list;
-            if (source == null)
-                return Empty<T>();
-            return source.ToList();
-        }
+        public static IList<T> ToListOrSelf<T>(this IEnumerable<T> source) =>
+            source == null ? Empty<T>() : source as IList<T> ?? source.ToList();
 
+        /// <summary>
         /// Array copy
+        /// </summary>
         public static T[] Copy<T>(this T[] items)
         {
             if (items == null)
                 return null;
-
-            var clone = new T[items.Length];
-            for (var i = 0; i < clone.Length; i++)
-                clone[i] = items[i];
-            return clone;
+            var copy = new T[items.Length];
+            for (var i = 0; i < copy.Length; i++)
+                copy[i] = items[i];
+            return copy;
         }
 
         /// <summary>Returns new array consisting from all items from source array then all items from added array.
@@ -655,7 +2047,7 @@ namespace ImTools
 
         /// <summary>Creates ref to object, optionally with initial value provided.</summary>
         /// <param name="initialValue">(optional) Initial value.</param>
-        public Ref(T initialValue = default(T))
+        public Ref(T initialValue = default)
         {
             _value = initialValue;
         }
@@ -664,13 +2056,14 @@ namespace ImTools
         /// <param name="getNewValue">Delegate to produce new object value from current one passed as parameter.</param>
         /// <returns>Returns old object value the same way as <see cref="Interlocked.Exchange(ref int,int)"/></returns>
         /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
-        public T Swap(Func<T, T> getNewValue) => Ref.Swap(ref _value, getNewValue);
+        public T Swap(Func<T, T> getNewValue) =>
+            Ref.Swap(ref _value, getNewValue);
 
         /// Option without allocation for capturing `a` in closure of `getNewValue`
-        public T Swap<A>(A a, Func<A, T, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
+        public T Swap<A>(A a, Func<T, A, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
 
         /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
-        public T Swap<A, B>(A a, B b, Func<A, B, T, T> getNewValue) => Ref.Swap(ref _value, a, b, getNewValue);
+        public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue) => Ref.Swap(ref _value, a, b, getNewValue);
 
         /// <summary>Just sets new value ignoring any intermingled changes.</summary>
         /// <param name="newValue"></param> <returns>old value</returns>
@@ -694,6 +2087,9 @@ namespace ImTools
     /// <summary>Provides optimistic-concurrency consistent <see cref="Swap{T}"/> operation.</summary>
     public static class Ref
     {
+        /// The default max retry count - can be overriden by `Swap` optional parameter 
+        public const int RETRY_COUNT_UNTIL_THROW = 50;
+
         /// <summary>Factory for <see cref="Ref{T}"/> with type of value inference.</summary>
         /// <typeparam name="T">Type of value to wrap.</typeparam>
         /// <param name="value">Initial value to wrap.</param>
@@ -710,10 +2106,17 @@ namespace ImTools
         /// <typeparam name="T">Type of value to swap.</typeparam>
         /// <param name="value">Reference to change to new value</param>
         /// <param name="getNewValue">Delegate to get value from old one.</param>
+        /// <param name="retryCountUntilThrow">(optional)</param>
         /// <returns>Old/original value. By analogy with <see cref="Interlocked.Exchange(ref int,int)"/>.</returns>
         /// <remarks>Important: <paramref name="getNewValue"/> May be called multiple times to retry update with value concurrently changed by other code.</remarks>
-        public static T Swap<T>(ref T value, Func<T, T> getNewValue) where T : class
+        [MethodImpl((MethodImplOptions)256)]
+        public static T Swap<T>(ref T value, Func<T, T> getNewValue,
+            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+            where T : class
         {
+#if SUPPORTS_SPIN_WAIT
+            var spinWait = new SpinWait();
+#endif
             var retryCount = 0;
             while (true)
             {
@@ -721,69 +2124,126 @@ namespace ImTools
                 var newValue = getNewValue(oldValue);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
-                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
-                    throw new InvalidOperationException(_errorRetryCountExceeded);
+
+                if (++retryCount > retryCountUntilThrow)
+                    ThrowRetryCountExceeded(retryCountUntilThrow);
+#if SUPPORTS_SPIN_WAIT
+                spinWait.SpinOnce();
+#endif
             }
         }
 
+        private static void ThrowRetryCountExceeded(int retryCountExceeded) =>
+            throw new InvalidOperationException(
+                $"Ref retried to Update for {retryCountExceeded} times But there is always someone else intervened.");
+
+        /// <summary>
         /// Option without allocation for capturing `a` in closure of `getNewValue`
-        public static T Swap<A, T>(ref T value, A a, Func<A, T, T> getNewValue) where T : class
+        /// </summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue,
+            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+            where T : class
         {
+#if SUPPORTS_SPIN_WAIT
+            var spinWait = new SpinWait();
+#endif
             var retryCount = 0;
             while (true)
             {
                 var oldValue = value;
-                var newValue = getNewValue(a, oldValue);
+                var newValue = getNewValue(oldValue, a);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
-                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
-                    throw new InvalidOperationException(_errorRetryCountExceeded);
+                if (++retryCount > retryCountUntilThrow)
+                    ThrowRetryCountExceeded(retryCountUntilThrow);
+#if SUPPORTS_SPIN_WAIT
+                spinWait.SpinOnce();
+#endif
             }
         }
 
         /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
-        public static T Swap<A, B, T>(ref T value, A a, B b, Func<A, B, T, T> getNewValue) where T : class
+        [MethodImpl((MethodImplOptions)256)]
+        public static T Swap<T, A, B>(ref T value, A a, B b, Func<T, A, B, T> getNewValue,
+            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+            where T : class
         {
+#if SUPPORTS_SPIN_WAIT
+            var spinWait = new SpinWait();
+#endif
             var retryCount = 0;
             while (true)
             {
                 var oldValue = value;
-                var newValue = getNewValue(a, b, oldValue);
+                var newValue = getNewValue(oldValue, a, b);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
-                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
-                    throw new InvalidOperationException(_errorRetryCountExceeded);
+
+                if (++retryCount > retryCountUntilThrow)
+                    ThrowRetryCountExceeded(retryCountUntilThrow);
+
+#if SUPPORTS_SPIN_WAIT
+                spinWait.SpinOnce();
+#endif
             }
         }
 
         /// Option without allocation for capturing `a`, `b`, `c` in closure of `getNewValue`
         [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<A, B, C, T>(ref T value, A a, B b, C c, Func<A, B, C, T, T> getNewValue) where T : class
+        public static T Swap<T, A, B, C>(ref T value, A a, B b, C c, Func<T, A, B, C, T> getNewValue,
+            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+            where T : class
         {
+#if SUPPORTS_SPIN_WAIT
+            var spinWait = new SpinWait();
+#endif
             var retryCount = 0;
             while (true)
             {
                 var oldValue = value;
-                var newValue = getNewValue(a, b, c, oldValue);
+                var newValue = getNewValue(oldValue, a, b, c);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
-                if (++retryCount > RETRY_COUNT_UNTIL_THROW)
-                    throw new InvalidOperationException(_errorRetryCountExceeded);
 
-                // relinquishes the thread’s current time slice immediately, voluntarily handing over the CPU to other threads
-                // todo: use Thread.Sleep from .NET 4.0 to relinquish only to threads running on the same processor
-                //Thread.Sleep(0);
+                if (++retryCount > retryCountUntilThrow)
+                    ThrowRetryCountExceeded(retryCountUntilThrow);
+
+#if SUPPORTS_SPIN_WAIT
+                spinWait.SpinOnce();
+#endif
             }
         }
 
-        private const int RETRY_COUNT_UNTIL_THROW = 50;
+        // todo: Func of 5 args is not available on all plats
+        //        /// Option without allocation for capturing `a`, `b`, `c`, `d` in closure of `getNewValue`
+        //        [MethodImpl((MethodImplOptions)256)]
+        //        public static T Swap<T, A, B, C, D>(ref T value, A a, B b, C c, D d, Func<T, A, B, C, D, T> getNewValue,
+        //            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+        //            where T : class
+        //        {
+        //#if SUPPORTS_SPIN_WAIT
+        //            var spinWait = new SpinWait();
+        //#endif
+        //            var retryCount = 0;
+        //            while (true)
+        //            {
+        //                var oldValue = value;
+        //                var newValue = getNewValue(oldValue, a, b, c, d);
+        //                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+        //                    return oldValue;
 
-        private static readonly string _errorRetryCountExceeded =
-            "Ref retried to Update for " + RETRY_COUNT_UNTIL_THROW +
-            " times But there is always someone else intervened.";
+        //                if (++retryCount > retryCountUntilThrow)
+        //                    ThrowRetryCountExceeded(retryCountUntilThrow);
+
+        //#if SUPPORTS_SPIN_WAIT
+        //                spinWait.SpinOnce();
+        //#endif
+        //            }
+        //        }
     }
 
-    /// <summary>Printable string via provided printer </summary>
+    /// <summary>Printable thing via provided printer </summary>
     public interface IPrintable
     {
         /// <summary>Print to the provided string builder via the provided printer.</summary>
@@ -808,11 +2268,11 @@ namespace ImTools
         }
     }
 
-    /// Simple object pool
+    /// Simple unbounded object pool
     public sealed class StackPool<T> where T : class
     {
         /// Give me an object
-        public T Rent() =>
+        public T RentOrDefault() =>
             Interlocked.Exchange(ref _s, _s?.Tail)?.Head;
 
         /// Give it back
@@ -825,7 +2285,6 @@ namespace ImTools
         {
             public readonly T Head;
             public readonly Stack Tail;
-
             public Stack(T h, Stack t)
             {
                 Head = h;
@@ -881,27 +2340,17 @@ namespace ImTools
     public static class KV
     {
         /// <summary>Creates the key value pair.</summary>
-        /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
-        /// <param name="key">Key</param> <param name="value">Value</param> <returns>New pair.</returns>
         public static KV<K, V> Of<K, V>(K key, V value) => new KV<K, V>(key, value);
 
-        /// <summary>Creates the new pair with new key and old value.</summary>
-        /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
-        /// <param name="source">Source value</param> <param name="key">New key</param> <returns>New pair</returns>
-        public static KV<K, V> WithKey<K, V>(this KV<K, V> source, K key) => new KV<K, V>(key, source.Value);
-
-        /// <summary>Creates the new pair with old key and new value.</summary>
-        /// <typeparam name="K">Key type</typeparam> <typeparam name="V">Value type</typeparam>
-        /// <param name="source">Source value</param> <param name="value">New value.</param> <returns>New pair</returns>
-        public static KV<K, V> WithValue<K, V>(this KV<K, V> source, V value) => new KV<K, V>(source.Key, value);
+        /// <summary>Creates the pair with the new value</summary>
+        public static KV<K, V> WithValue<K, V>(this KV<K, V> kv, V value) => new KV<K, V>(kv.Key, value);
     }
 
-    /// <summary>Simple helper for creation of the pair of two parts.</summary>
+    /// Simple helper for creation of the pair of two parts.
     public static class KeyValuePair
     {
-        /// <summary>Pairs key with value.</summary>
-        public static KeyValuePair<K, V> Pair<K, V>(this K key, V value) =>
-            new KeyValuePair<K, V>(key, value);
+        /// Pairs key with value.
+        public static KeyValuePair<K, V> Pair<K, V>(this K key, V value) => new KeyValuePair<K, V>(key, value);
     }
 
     /// <summary>Helper structure which allows to distinguish null value from the default value for optional parameter.</summary>
@@ -924,23 +2373,23 @@ namespace ImTools
         }
 
         /// <summary>Helper to get value or default value if value is not present.</summary>
-        public T OrDefault(T defaultValue = default(T)) => HasValue ? Value : defaultValue;
+        public T OrDefault(T defaultValue = default) => HasValue ? Value : defaultValue;
     }
 
     /// Ever growing stack
     public struct GrowingStack<T>
     {
-        /// The count
-        public int Count;
-
         /// The items array
         public T[] Items;
 
+        /// The count
+        public int Count;
+
         /// Constructs the thing 
-        public GrowingStack(int capacity)
+        public GrowingStack(T[] items, int count = 0)
         {
-            Items = new T[capacity];
-            Count = 0;
+            Items = items;
+            Count = count;
         }
 
         /// Push the new slot and return the ref to it
@@ -972,8 +2421,7 @@ namespace ImTools
         }
     }
 
-    /// <summary>Immutable list - simplest linked list with Head and Rest.</summary>
-    /// <typeparam name="T">Type of the item.</typeparam>
+    /// <summary>Immutable list - simplest linked list with the Head and the Tail.</summary>
     public sealed class ImList<T>
     {
         /// <summary>Empty list to Push to.</summary>
@@ -989,12 +2437,9 @@ namespace ImTools
         public readonly ImList<T> Tail;
 
         /// <summary>Prepends new value and returns new list.</summary>
-        /// <param name="head">New first value.</param>
-        /// <returns>List with the new head.</returns>
-        public ImList<T> Prep(T head) => new ImList<T>(head, this);
+        public ImList<T> Push(T head) => new ImList<T>(head, this);
 
         /// <summary>Enumerates the list.</summary>
-        /// <returns>Each item in turn.</returns>
         public IEnumerable<T> Enumerate()
         {
             if (IsEmpty)
@@ -1003,94 +2448,320 @@ namespace ImTools
                 yield return list.Head;
         }
 
-        #region Implementation
+        /// <summary>String representation for debugging purposes</summary>
+        public override string ToString() => IsEmpty
+            ? "[]" : Tail.IsEmpty
+            ? "[" + Head + "]" : Tail.Tail.IsEmpty
+            ? "[" + Head + "," + Tail.Head + "]" : Tail.Tail.Tail.IsEmpty
+            ? "[" + Head + "," + Tail.Head + "," + Tail.Tail.Head + "]"
+            : "[" + Head + "," + Tail.Head + "," + Tail.Tail.Head + ", ...]";
 
-        private ImList()
-        {
-        }
+        private ImList() { }
 
         private ImList(T head, ImList<T> tail)
         {
             Head = head;
             Tail = tail;
         }
-
-        #endregion
     }
 
     /// <summary>Extension methods providing basic operations on a list.</summary>
     public static class ImList
     {
-        /// <summary>This a basically a Fold function, to address needs in Map, Filter, Reduce.</summary>
-        /// <typeparam name="T">Type of list item.</typeparam>
-        /// <typeparam name="R">Type of result.</typeparam>
-        /// <param name="source">List to fold.</param>
-        /// <param name="initialValue">From were to start.</param>
-        /// <param name="collect">Collects list item into result</param>
-        /// <returns>Return result or <paramref name="initialValue"/> for empty list.</returns>
-        public static R To<T, R>(this ImList<T> source, R initialValue, Func<T, R, R> collect)
+        /// Split list into (Head, Tail, IsEmpty) tuple
+        public static void Deconstruct<T>(this ImList<T> list, out T head, out ImList<T> tail, out bool isEmpty)
         {
-            if (source.IsEmpty)
-                return initialValue;
-            var value = initialValue;
-            for (; !source.IsEmpty; source = source.Tail)
-                value = collect(source.Head, value);
-            return value;
+            head = list.Head;
+            tail = list.Tail;
+            isEmpty = list.IsEmpty;
         }
 
-        /// <summary>Form of fold function with element index for convenience.</summary>
-        /// <typeparam name="T">Type of list item.</typeparam>
-        /// <typeparam name="R">Type of result.</typeparam>
-        /// <param name="source">List to fold.</param>
-        /// <param name="initialValue">From were to start.</param>
-        /// <param name="collect">Collects list item into result</param>
-        /// <returns>Return result or <paramref name="initialValue"/> for empty list.</returns>
-        public static R To<T, R>(this ImList<T> source, R initialValue, Func<T, int, R, R> collect)
+        /// <summary>
+        /// Constructs the reversed list from the parameter array of items
+        /// </summary>
+        public static ImList<T> List<T>(params T[] items)
         {
-            if (source.IsEmpty)
-                return initialValue;
-            var value = initialValue;
-            for (var i = 0; !source.IsEmpty; source = source.Tail)
-                value = collect(source.Head, i++, value);
-            return value;
+            var l = ImList<T>.Empty;
+            if (items != null)
+                for (var i = items.Length - 1; i >= 0; --i)
+                    l = l.Push(items[i]);
+            return l;
+        }
+
+        /// <summary>
+        /// Constructs the list as the reversed input list
+        /// </summary>
+        public static ImList<T> ToImList<T>(this IList<T> source)
+        {
+            var l = ImList<T>.Empty;
+            if (source != null)
+                for (var i = source.Count - 1; i >= 0; --i)
+                    l = l.Push(source[i]);
+            return l;
+        }
+
+        /// <summary>
+        /// Constructs the list as the reversed enumerable
+        /// </summary>
+        public static ImList<T> ToImList<T>(this IEnumerable<T> source)
+        {
+            if (source is IList<T> list)
+                return list.ToImList();
+            var l = ImList<T>.Empty;
+
+            if (source != null)
+                foreach (var item in source)
+                    l = l.Push(item);
+            return l.Reverse();
+        }
+
+        /// <summary>Constructs list of one element</summary>
+        public static ImList<T> List<T>(this T head) => ImList<T>.Empty.Push(head);
+
+        /// <summary>Constructs list from head and tail</summary>
+        public static ImList<T> List<T>(this T head, ImList<T> tail) => tail.Push(head);
+
+        /// <summary>Apples some effect action to each element</summary>
+        public static void ForEach<T>(this ImList<T> list, Action<T> effect)
+        {
+            for (; !list.IsEmpty; list = list.Tail)
+                effect(list.Head);
+        }
+
+        /// <summary>Fold list to a single value. The respective name for it in LINQ is Aggregate</summary>
+        public static S Fold<T, S>(this ImList<T> list, S state, Func<T, S, S> reduce)
+        {
+            if (list.IsEmpty)
+                return state;
+            var result = state;
+            for (; !list.IsEmpty; list = list.Tail)
+                result = reduce(list.Head, result);
+            return result;
+        }
+
+        /// <summary>Fold list to a single value with index of item. The respective name for it in LINQ is Aggregate.</summary>
+        public static S Fold<T, S>(this ImList<T> list, S state, Func<T, int, S, S> reduce)
+        {
+            if (list.IsEmpty)
+                return state;
+            var result = state;
+            for (var i = 0; !list.IsEmpty; list = list.Tail, ++i)
+                result = reduce(list.Head, i, result);
+            return result;
         }
 
         /// <summary>Returns new list in reverse order.</summary>
-        /// <typeparam name="T">List item type</typeparam> <param name="source">List to reverse.</param>
-        /// <returns>New list. If list consist on single element, then the same list.</returns>
-        public static ImList<T> Reverse<T>(this ImList<T> source)
+        public static ImList<T> Reverse<T>(this ImList<T> list)
         {
-            if (source.IsEmpty || source.Tail.IsEmpty)
-                return source;
+            if (list.IsEmpty || list.Tail.IsEmpty)
+                return list;
             var reversed = ImList<T>.Empty;
-            for (; !source.IsEmpty; source = source.Tail)
-                reversed = reversed.Prep(source.Head);
+            for (; !list.IsEmpty; list = list.Tail)
+                reversed = reversed.Push(list.Head);
             return reversed;
         }
 
         /// <summary>Maps the items from the first list to the result list.</summary>
-        /// <typeparam name="T">source item type.</typeparam> 
-        /// <typeparam name="R">result item type.</typeparam>
-        /// <param name="source">input list.</param> <param name="map">converter func.</param>
-        /// <returns>result list.</returns>
-        public static ImList<R> Map<T, R>(this ImList<T> source, Func<T, R> map) => 
-            source.To(ImList<R>.Empty, (it, _) => _.Prep(map(it))).Reverse();
+        public static ImList<R> Map<T, R>(this ImList<T> list, Func<T, R> map) =>
+            list.Fold(ImList<R>.Empty, (x, r) => List(map(x), r)).Reverse();
 
-        /// <summary>Maps the items from the first list to the result list with item index.</summary>
-        /// <typeparam name="T">source item type.</typeparam> 
-        /// <typeparam name="R">result item type.</typeparam>
-        /// <param name="source">input list.</param> <param name="map">converter func.</param>
-        /// <returns>result list.</returns>
-        public static ImList<R> Map<T, R>(this ImList<T> source, Func<T, int, R> map)
+        /// <summary>Maps with index</summary>
+        public static ImList<R> Map<T, R>(this ImList<T> list, Func<T, int, R> map) =>
+            list.Fold(ImList<R>.Empty, (x, i, r) => List(map(x, i), r)).Reverse();
+
+        /// <summary>Copies list to array.</summary>
+        public static T[] ToArray<T>(this ImList<T> source) =>
+            source.IsEmpty ? ArrayTools.Empty<T>()
+            : source.Tail.IsEmpty ? new[] { source.Head } : source.Enumerate().ToArray();
+    }
+
+    /// Zipper is an immutable persistent data structure, to represent collection with single focused (selected, active) element.
+    /// Consist of REVERSED `Left` immutable list, `Focus` element, and the `Right` immutable list. That's why a Zipper name,
+    /// where left and right part are joined / zipped in focus item.
+    public sealed class ImZipper<T>
+    {
+        /// Empty singleton instance to start building your zipper
+        public static readonly ImZipper<T> Empty = new ImZipper<T>();
+
+        /// True is zipper does not contain items
+        public bool IsEmpty => Count == 0;
+
+        /// Index of Focus item, from `0` to `Count-1`
+        public readonly int Index;
+
+        /// Number of items
+        public readonly int Count;
+
+        /// Left REVERSED list, so the Head of the list is just prior the Focus item 
+        public readonly ImList<T> Left;
+
+        /// Right list, where Head is just after the Focus item
+        public readonly ImList<T> Right;
+
+        /// Single focus item
+        public readonly T Focus;
+
+        /// <inheritdoc />
+        public override string ToString() =>
+            IsEmpty ? "[||]" : Count + ":" + Left.Reverse() + "|" + Index + ":" + Focus + "|" + Right;
+
+        /// Sets a new focus and pushes the old focus to the Left list. 
+        public ImZipper<T> Append(T focus) => PushLeft(focus);
+
+        /// Sets a new focus and pushes the old focus to the Left list.
+        public ImZipper<T> PushLeft(T focus) =>
+        IsEmpty ? new ImZipper<T>(ImList<T>.Empty, focus, 0, ImList<T>.Empty, 1)
+                : new ImZipper<T>(Left.Push(Focus), focus, Index + 1, Right, Count + 1);
+
+        /// Sets a new focus and pushes the old focus to the right list. 
+        public ImZipper<T> Insert(T focus) => PushRight(focus);
+
+        /// Sets a new focus and pushes the old focus to the right list. 
+        public ImZipper<T> PushRight(T focus) =>
+            IsEmpty ? new ImZipper<T>(ImList<T>.Empty, focus, 0, ImList<T>.Empty, 1)
+                : new ImZipper<T>(Left, focus, Index, Right.Push(Focus), Count + 1);
+
+        /// Removes a focus, filling the hole with the item from the left list, or from the right if the left is empty
+        public ImZipper<T> PopLeft() =>
+            IsEmpty ? this
+            : Left.IsEmpty && Right.IsEmpty ? Empty
+            : !Left.IsEmpty ? new ImZipper<T>(Left.Tail, Left.Head, Index - 1, Right, Count - 1)
+            : new ImZipper<T>(Left, Right.Head, Index, Right.Tail, Count - 1);
+
+        /// Removes a focus, filling the hole with the item from the right list, or from the left if the right is empty
+        public ImZipper<T> PopRight() =>
+            IsEmpty ? this
+            : Left.IsEmpty && Right.IsEmpty ? Empty
+            : !Right.IsEmpty ? new ImZipper<T>(Left, Right.Head, Index, Right.Tail, Count - 1)
+            : new ImZipper<T>(Left.Tail, Left.Head, Index - 1, Right, Count - 1);
+
+        /// Shifts focus one element to the left (decrementing its Index).
+        public ImZipper<T> ShiftLeft() =>
+            IsEmpty || Left.IsEmpty ? this
+            : new ImZipper<T>(Left.Tail, Left.Head, Index - 1, Right.Push(Focus), Count);
+
+        /// Shifts focus one element to the right (incrementing its Index).
+        public ImZipper<T> ShiftRight() =>
+            IsEmpty || Right.IsEmpty ? this
+            : new ImZipper<T>(Left.Push(Focus), Right.Head, Index + 1, Right.Tail, Count);
+
+        /// Sets a new focus and returns a new zipper with the left and right lists unchanged
+        public ImZipper<T> WithFocus(T focus) =>
+            IsEmpty ? this : new ImZipper<T>(Left, focus, Index, Right, Count);
+
+        /// Maps over the zipper items producing a new zipper
+        public ImZipper<R> Map<R>(Func<T, R> map) =>
+            IsEmpty ? ImZipper<R>.Empty
+                : new ImZipper<R>(Left.Reverse().Fold(ImList<R>.Empty, (x, r) => r.Push(map(x))),
+                    map(Focus), Index, Right.Map(map), Count);
+
+        /// Maps over the zipper items with item index, producing a new zipper
+        public ImZipper<R> Map<R>(Func<T, int, R> map) =>
+            IsEmpty ? ImZipper<R>.Empty
+                : new ImZipper<R>(
+                    Left.Reverse().Fold(ImList<R>.Empty, (x, i, r) => r.Push(map(x, i))),
+                    map(Focus, Index), Index, Right.Map((x, i) => map(x, Index + 1 + i)), Count);
+
+        private ImZipper() => Index = -1;
+
+        private ImZipper(ImList<T> left, T focus, int index, ImList<T> right, int count)
         {
-            return source.To(ImList<R>.Empty, (it, i, _) => _.Prep(map(it, i))).Reverse();
+            Left = left;
+            Focus = focus;
+            Index = index;
+            Right = right;
+            Count = count;
+        }
+    }
+
+    /// Other ImZipper methods
+    public static class ImZipper
+    {
+        /// Appends array items to zipper
+        public static ImZipper<T> Zip<T>(params T[] items)
+        {
+            if (items.IsNullOrEmpty())
+                return ImZipper<T>.Empty;
+            var z = ImZipper<T>.Empty;
+            for (var i = 0; i < items.Length; ++i)
+                z = z.PushLeft(items[i]);
+            return z;
         }
 
-        /// <summary>Copies list to array.</summary> 
-        public static T[] ToArray<T>(this ImList<T> source) =>
-            source.IsEmpty ? ArrayTools.Empty<T>() :
-            source.Tail.IsEmpty ? new[] { source.Head } :
-            source.Enumerate().ToArray();
+        /// Converts to array.
+        public static T[] ToArray<T>(this ImZipper<T> z)
+        {
+            if (z.IsEmpty)
+                return ArrayTools.Empty<T>();
+            var a = new T[z.Count];
+            z.Fold(a, (x, i, xs) =>
+            {
+                xs[i] = x;
+                return xs;
+            });
+            return a;
+        }
+
+        /// Shifts focus to a specified index, e.g. a random access
+        public static ImZipper<T> ShiftTo<T>(this ImZipper<T> z, int i)
+        {
+            if (i < 0 || i >= z.Count || i == z.Index)
+                return z;
+            while (i < z.Index)
+                z = z.ShiftLeft();
+            while (i > z.Index)
+                z = z.ShiftRight();
+            return z;
+        }
+
+        /// Updates a focus element if it is present, otherwise does nothing.
+        /// If the focus item is the equal one, then returns the same zipper back.
+        public static ImZipper<T> Update<T>(this ImZipper<T> z, Func<T, T> update)
+        {
+            if (z.IsEmpty)
+                return z;
+            var result = update(z.Focus);
+            if (ReferenceEquals(z.Focus, result) || result != null && result.Equals(z.Focus))
+                return z;
+            return z.WithFocus(result);
+        }
+
+        /// Update the item at random index, by shifting and updating it
+        public static ImZipper<T> UpdateAt<T>(this ImZipper<T> z, int i, Func<T, T> update) =>
+            i < 0 || i >= z.Count ? z : z.ShiftTo(i).Update(update);
+
+        /// Update the item at random index, by shifting and updating it
+        public static ImZipper<T> RemoveAt<T>(this ImZipper<T> z, int i) =>
+            i < 0 || i >= z.Count ? z : z.ShiftTo(i).PopLeft();
+
+        /// Folds zipper to a single value
+        public static S Fold<T, S>(this ImZipper<T> z, S state, Func<T, S, S> reduce) =>
+            z.IsEmpty ? state :
+            z.Right.Fold(reduce(z.Focus, z.Left.Reverse().Fold(state, reduce)), reduce);
+
+        /// Folds zipper to a single value by using an item index
+        public static S Fold<T, S>(this ImZipper<T> z, S state, Func<T, int, S, S> reduce)
+        {
+            if (z.IsEmpty)
+                return state;
+            var focusIndex = z.Index;
+            var reducedLeft = z.Left.Reverse().Fold(state, reduce);
+            return z.Right.Fold(reduce(z.Focus, focusIndex, reducedLeft),
+                (x, i, r) => reduce(x, focusIndex + i + 1, r));
+        }
+
+        /// <summary>Apply some effect action on each element</summary>
+        public static void ForEach<T>(this ImZipper<T> z, Action<T> effect)
+        {
+            if (!z.IsEmpty)
+            {
+                if (!z.Left.IsEmpty)
+                    z.Left.Reverse().ForEach(effect);
+                effect(z.Focus);
+                if (!z.Right.IsEmpty)
+                    z.Right.ForEach(effect);
+            }
+        }
     }
 
     /// Given the old value should and the new value should return result updated value.
@@ -1099,484 +2770,945 @@ namespace ImTools
     /// Update handler including the key
     public delegate V Update<K, V>(K key, V oldValue, V newValue);
 
-    /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree with integer keys and <typeparamref name="V"/> values.</summary>
-    public sealed class ImMap<V>
+    /// Empty ImMap to start with
+    public class ImMap<V>
     {
-        /// <summary>Empty tree to start with.</summary>
+        /// Empty tree to start with.
         public static readonly ImMap<V> Empty = new ImMap<V>();
 
-        /// <summary>Key.</summary>
-        public readonly int Key;
+        /// Creates an empty map
+        protected ImMap() { }
 
-        /// <summary>Value.</summary>
-        public readonly V Value;
+        /// Height of the longest sub-tree/branch. Starts from 2 because it a tree and not the leaf
+        public virtual int Height => 0;
 
-        /// <summary>Left sub-tree/branch, or empty.</summary>
-        public readonly ImMap<V> Left;
-
-        /// <summary>Right sub-tree/branch, or empty.</summary>
-        public readonly ImMap<V> Right;
-
-        /// <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
-        public readonly int Height;
-
-        /// <summary>Returns true is tree is empty.</summary>
+        /// Returns true if tree is empty.
         public bool IsEmpty => Height == 0;
 
-        /// Returns a new tree with added or updated value for specified key.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImMap<V> AddOrUpdate(int key, V value) =>
-            Height == 0
-                ? new ImMap<V>(key, value)
-                : key == Key
-                    ? new ImMap<V>(key, value, Left, Right, Height)
-                    : AddOrUpdateImpl(key, value);
+        /// Prints "empty"
+        public override string ToString() => "empty";
+    }
 
-        private ImMap<V> AddOrUpdateImpl(int key, V value)
+    /// The leaf node - just the key-value pair
+    public sealed class ImMapData<V> : ImMap<V>
+    {
+        /// <inheritdoc />
+        public override int Height => 1;
+
+        /// The key
+        public readonly int Key;
+
+        /// The value - may be modified if you need a Ref{V} semantics
+        public V Value;
+
+        /// Creates the data leaf
+        public ImMapData(int key, V value)
         {
-            if (key < Key)
+            Key = key;
+            Value = value;
+        }
+
+        /// Prints the key value pair
+        public override string ToString() => Key + ":" + Value;
+    }
+
+    /// <summary>
+    /// Immutable http://en.wikipedia.org/wiki/AVL_tree with integer keys and <typeparamref name="V"/> values.
+    /// </summary>
+    public sealed class ImMapTree<V> : ImMap<V>
+    {
+        /// Starts from 2
+        public override int Height => TreeHeight;
+
+        /// Starts from 2 - allows to access the field directly when you know it is a Tree
+        public int TreeHeight;
+
+        /// Contains the once created data node
+        public readonly ImMapData<V> Data;
+
+        /// Left sub-tree/branch, or empty.
+        public ImMap<V> Left;
+
+        /// Right sub-tree/branch, or empty.
+        public ImMap<V> Right;
+
+        internal ImMapTree(ImMapData<V> data, ImMap<V> left, ImMap<V> right, int height)
+        {
+            Data = data;
+            Left = left;
+            Right = right;
+            TreeHeight = height;
+        }
+
+        internal ImMapTree(ImMapData<V> data, int leftHeight, ImMap<V> left, int rightHeight, ImMap<V> right)
+        {
+            Data = data;
+            Left = left;
+            Right = right;
+            TreeHeight = leftHeight > rightHeight ? leftHeight + 1 : rightHeight + 1;
+        }
+
+        internal ImMapTree(ImMapData<V> data, int leftHeight, ImMap<V> left, ImMap<V> right)
+        {
+            Data = data;
+            Left = left;
+            Right = right;
+            var rightHeight = right.Height;
+            TreeHeight = leftHeight > rightHeight ? leftHeight + 1 : rightHeight + 1;
+        }
+
+        internal ImMapTree(ImMapData<V> data, ImMap<V> left, int rightHeight, ImMap<V> right)
+        {
+            Data = data;
+            Left = left;
+            Right = right;
+            var leftHeight = left.Height;
+            TreeHeight = leftHeight > rightHeight ? leftHeight + 1 : rightHeight + 1;
+        }
+
+        internal ImMapTree(ImMapData<V> data, ImMapTree<V> left, ImMapTree<V> right)
+        {
+            Data = data;
+            Left = left;
+            Right = right;
+            TreeHeight = left.TreeHeight > right.TreeHeight ? left.TreeHeight + 1 : right.TreeHeight + 1;
+        }
+
+        /// Outputs the key value pair
+        public override string ToString() =>
+            "(" + Data
+            + ") -> (left: " + (Left is ImMapTree<V> leftTree ? leftTree.Data : Left)
+            + ", right: " + (Right is ImMapTree<V> rightTree ? rightTree.Data : Right)
+            + ")";
+
+        /// Adds or updates the left or right branch
+        public ImMapTree<V> AddOrUpdateLeftOrRight(int key, V value)
+        {
+            if (key < Data.Key)
             {
-                if (Left.Height == 0)
-                    return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, 2);
-
-                if (Left.Key == key)
-                    return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, Height);
-
-                if (Right.Height == 0)
+                var left = Left;
+                if (left is ImMapData<V> leftLeaf)
                 {
-                    // single rotation:
-                    //      5     =>     2
-                    //   2            1     5
-                    // 1              
-                    if (key < Left.Key)
-                        return new ImMap<V>(Left.Key, Left.Value,
-                            new ImMap<V>(key, value), new ImMap<V>(Key, Value), 2);
+                    if (key < leftLeaf.Key)
+                        return Right == Empty
+                            ? new ImMapTree<V>(leftLeaf, new ImMapData<V>(key, value), Data, 2)
+                            : new ImMapTree<V>(Data,
+                                new ImMapTree<V>(leftLeaf, new ImMapData<V>(key, value), Empty, 2),
+                                Right, 3); // given that left is the leaf, the Right tree should be less than 2 - otherwise tree is unbalanced
 
-                    // double rotation:
-                    //      5     =>     5     =>     4
-                    //   2            4            2     5
-                    //     4        2               
-                    return new ImMap<V>(key, value,
-                        new ImMap<V>(Left.Key, Left.Value), new ImMap<V>(Key, Value), 2);
+                    if (key > leftLeaf.Key)
+                        return Right == Empty
+                            ? new ImMapTree<V>(new ImMapData<V>(key, value), left, Data, 2)
+                            : new ImMapTree<V>(Data,
+                                new ImMapTree<V>(leftLeaf, Empty, new ImMapData<V>(key, value), 2),
+                                Right, 3);
+
+                    return new ImMapTree<V>(Data, new ImMapData<V>(key, value), Right, TreeHeight);
                 }
 
-                var newLeft = Left.AddOrUpdateImpl(key, value);
-
-                if (newLeft.Height > Right.Height + 1) // left is longer by 2, rotate left
+                // when the left is tree the right could not be empty
+                if (left is ImMapTree<V> leftTree)
                 {
-                    var leftLeft = newLeft.Left;
-                    var leftRight = newLeft.Right;
+                    if (key == leftTree.Data.Key)
+                        return new ImMapTree<V>(Data,
+                            new ImMapTree<V>(new ImMapData<V>(key, value), leftTree.Left, leftTree.Right, leftTree.TreeHeight),
+                            Right, TreeHeight);
 
-                    // single rotation:
-                    //      5     =>     2
-                    //   2     6      1     5
-                    // 1   4              4   6
-                    if (leftLeft.Height >= leftRight.Height)
-                        return new ImMap<V>(newLeft.Key, newLeft.Value,
-                            leftLeft, new ImMap<V>(Key, Value, leftRight, Right));
-                    
-                    // double rotation:
-                    //      5     =>     5     =>     4
-                    //   2     6      4     6      2     5
-                    // 1   4        2   3        1   3     6
-                    //    3        1
-                    return new ImMap<V>(leftRight.Key, leftRight.Value,
-                        new ImMap<V>(newLeft.Key, newLeft.Value, leftLeft, leftRight.Left),
-                        new ImMap<V>(Key, Value, leftRight.Right, Right));
+                    var newLeftTree = leftTree.AddOrUpdateLeftOrRight(key, value);
+                    if (newLeftTree.TreeHeight == leftTree.TreeHeight)
+                        return new ImMapTree<V>(Data, newLeftTree, Right, TreeHeight);
+
+                    var rightHeight = (Right as ImMapTree<V>)?.TreeHeight ?? 1;
+                    if (newLeftTree.TreeHeight - 1 > rightHeight)
+                    {
+                        // 1st fact - `leftLeft` and `leftRight` cannot be Empty otherwise we won't need to re-balance the left tree
+                        // 2nd fact - either lefLeft or leftRight or both should be a tree
+                        var leftLeft = newLeftTree.Left;
+                        var leftLeftTree = leftLeft as ImMapTree<V>;
+                        var leftLeftHeight = leftLeftTree?.TreeHeight ?? 1;
+
+                        var leftRight = newLeftTree.Right;
+                        var leftRightTree = leftRight as ImMapTree<V>;
+                        var leftRightHeight = leftRightTree?.TreeHeight ?? 1;
+
+                        if (leftLeftHeight >= leftRightHeight)
+                        {
+                            leftRightTree = new ImMapTree<V>(Data, leftRightHeight, leftRight, rightHeight, Right);
+                            newLeftTree.Right = leftRightTree;
+                            newLeftTree.TreeHeight = leftLeftHeight > leftRightTree.TreeHeight ? leftLeftHeight + 1 : leftRightTree.TreeHeight + 1;
+                            return newLeftTree;
+                        }
+
+                        // the leftRight should a tree because its height is greater than leftLeft and the latter at least the leaf
+                        // ReSharper disable once PossibleNullReferenceException
+                        newLeftTree.Right = leftRightTree.Left;
+                        var newLeftRightHeight = newLeftTree.Right.Height;
+                        newLeftTree.TreeHeight = leftLeftHeight > newLeftRightHeight ? leftLeftHeight + 1 : newLeftRightHeight + 1;
+                        return new ImMapTree<V>(leftRightTree.Data,
+                            newLeftTree,
+                            new ImMapTree<V>(Data, leftRightTree.Right, rightHeight, Right));
+                    }
+
+                    return new ImMapTree<V>(Data, newLeftTree.TreeHeight, newLeftTree, rightHeight, Right);
                 }
 
-                return new ImMap<V>(Key, Value, newLeft, Right);
+                return new ImMapTree<V>(Data, new ImMapData<V>(key, value), Right, 2);
             }
             else
             {
-                if (Right.Height == 0)
-                    return new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), 2);
-
-                if (Right.Key == key)
-                    return new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), Height);
-
-                if (Left.Height == 0)
+                var right = Right;
+                if (right is ImMapData<V> rightLeaf)
                 {
-                    // single rotation:
-                    //      5     =>     8     
-                    //         8      5     9
-                    //           9
-                    if (key >= Right.Key)
-                        return new ImMap<V>(Right.Key, Right.Value,
-                            new ImMap<V>(Key, Value), new ImMap<V>(key, value), 2);
+                    if (key > rightLeaf.Key)
+                        return Left == Empty
+                            ? new ImMapTree<V>(rightLeaf, Data, new ImMapData<V>(key, value), 2)
+                            : new ImMapTree<V>(Data, Left,
+                                new ImMapTree<V>(rightLeaf, Empty, new ImMapData<V>(key, value), 2), 3);
 
-                    // double rotation:
-                    //      5     =>     5     =>     7
-                    //         8            7      5     8
-                    //        7              8
-                    return new ImMap<V>(key, value,
-                        new ImMap<V>(Key, Value), new ImMap<V>(Right.Key, Right.Value), 2);
+                    if (key < rightLeaf.Key)
+                        return Left == Empty
+                            ? new ImMapTree<V>(new ImMapData<V>(key, value), Data, right, 2)
+                            : new ImMapTree<V>(Data, Left,
+                                new ImMapTree<V>(rightLeaf, new ImMapData<V>(key, value), Empty, 2), 3);
+
+                    return new ImMapTree<V>(Data, Left, new ImMapData<V>(key, value), TreeHeight);
                 }
 
-                var newRight = Right.AddOrUpdateImpl(key, value);
-
-                if (newRight.Height > Left.Height + 1)
+                if (right is ImMapTree<V> rightTree)
                 {
-                    var rightLeft = newRight.Left;
-                    var rightRight = newRight.Right;
+                    if (key == rightTree.Data.Key)
+                        return new ImMapTree<V>(Data, Left,
+                            new ImMapTree<V>(new ImMapData<V>(key, value), rightTree.Left, rightTree.Right, rightTree.TreeHeight),
+                            TreeHeight);
 
-                    if (rightRight.Height >= rightLeft.Height)
-                        return new ImMap<V>(newRight.Key, newRight.Value,
-                            new ImMap<V>(Key, Value, Left, rightLeft), rightRight);
+                    var newRightTree = rightTree.AddOrUpdateLeftOrRight(key, value);
+                    if (newRightTree.TreeHeight == rightTree.TreeHeight)
+                        return new ImMapTree<V>(Data, Left, newRightTree, TreeHeight);
 
-                    return new ImMap<V>(rightLeft.Key, rightLeft.Value,
-                        new ImMap<V>(Key, Value, Left, rightLeft.Left),
-                        new ImMap<V>(newRight.Key, newRight.Value, rightLeft.Right, rightRight));
+                    // right tree is at least 3+ deep - means its either rightLeft or rightRight is tree
+                    var leftHeight = (Left as ImMapTree<V>)?.TreeHeight ?? 1;
+                    if (newRightTree.TreeHeight - 1 > leftHeight)
+                    {
+                        var rightLeft = newRightTree.Left;
+                        var rightLeftTree = rightLeft as ImMapTree<V>;
+                        var rightLeftHeight = rightLeftTree?.TreeHeight ?? 1;
+
+                        var rightRight = newRightTree.Right;
+                        var rightRightTree = rightRight as ImMapTree<V>;
+                        var rightRightHeight = rightRightTree?.TreeHeight ?? 1;
+
+                        if (rightRightHeight >= rightLeftHeight)
+                        {
+                            rightLeftTree = new ImMapTree<V>(Data, leftHeight, Left, rightLeftHeight, rightLeft);
+                            newRightTree.Left = rightLeftTree;
+                            newRightTree.TreeHeight = rightLeftTree.TreeHeight > rightRightHeight ? rightLeftTree.TreeHeight + 1 : rightRightHeight + 1;
+                            return newRightTree;
+                        }
+
+                        // `rightLeftTree` should be the tree because rightRight is at least a leaf
+                        // ReSharper disable once PossibleNullReferenceException
+                        newRightTree.Left = rightLeftTree.Right;
+                        var newRightLeftHeight = newRightTree.Left.Height;
+                        newRightTree.TreeHeight = newRightLeftHeight > rightRightHeight ? newRightLeftHeight + 1 : rightRightHeight + 1;
+                        return new ImMapTree<V>(rightLeftTree.Data,
+                            new ImMapTree<V>(Data, leftHeight, Left, rightLeftTree.Left),
+                            newRightTree);
+                    }
+
+                    return new ImMapTree<V>(Data, leftHeight, Left, newRightTree.TreeHeight, newRightTree);
                 }
 
-                return new ImMap<V>(Key, Value, Left, newRight);
+                return new ImMapTree<V>(Data, Left, new ImMapData<V>(key, value), 2);
             }
         }
+
+        /// Adds or keeps the left or right branch
+        public ImMapTree<V> AddOrKeepLeftOrRight(int key, V value)
+        {
+            if (key < Data.Key)
+            {
+                var left = Left;
+                if (left is ImMapData<V> leftLeaf)
+                {
+                    if (key < leftLeaf.Key)
+                        return Right == Empty
+                            ? new ImMapTree<V>(leftLeaf, new ImMapData<V>(key, value), Data, 2)
+                            : new ImMapTree<V>(Data,
+                                new ImMapTree<V>(leftLeaf, new ImMapData<V>(key, value), Empty, 2),
+                                Right, 3); // given that left is the leaf, the Right tree should be less than 2 - otherwise tree is unbalanced
+
+                    if (key > leftLeaf.Key)
+                        return Right == Empty
+                            ? new ImMapTree<V>(new ImMapData<V>(key, value), left, Data, 2)
+                            : new ImMapTree<V>(Data,
+                                new ImMapTree<V>(leftLeaf, Empty, new ImMapData<V>(key, value), 2),
+                                Right, 3);
+
+                    return this;
+                }
+
+                // when the left is tree the right could not be empty
+                if (left is ImMapTree<V> leftTree)
+                {
+                    if (key == leftTree.Data.Key)
+                        return this;
+
+                    var newLeftTree = leftTree.AddOrKeepLeftOrRight(key, value);
+                    if (newLeftTree == leftTree)
+                        return this;
+
+                    if (newLeftTree.TreeHeight == leftTree.TreeHeight)
+                        return new ImMapTree<V>(Data, newLeftTree, Right, TreeHeight);
+
+                    var rightHeight = (Right as ImMapTree<V>)?.TreeHeight ?? 1;
+                    if (newLeftTree.TreeHeight - 1 > rightHeight)
+                    {
+                        // 1st fact - `leftLeft` and `leftRight` cannot be Empty otherwise we won't need to re-balance the left tree
+                        // 2nd fact - either lefLeft or leftRight or both should be a tree
+                        var leftLeft = newLeftTree.Left;
+                        var leftLeftTree = leftLeft as ImMapTree<V>;
+                        var leftLeftHeight = leftLeftTree?.TreeHeight ?? 1;
+
+                        var leftRight = newLeftTree.Right;
+                        var leftRightTree = leftRight as ImMapTree<V>;
+                        var leftRightHeight = leftRightTree?.TreeHeight ?? 1;
+
+                        if (leftLeftHeight >= leftRightHeight)
+                        {
+                            leftRightTree = new ImMapTree<V>(Data, leftRightHeight, leftRight, rightHeight, Right);
+                            newLeftTree.Right = leftRightTree;
+                            newLeftTree.TreeHeight = leftLeftHeight > leftRightTree.TreeHeight ? leftLeftHeight + 1 : leftRightTree.TreeHeight + 1;
+                            return newLeftTree;
+                        }
+
+                        // the leftRight should a tree because its height is greater than leftLeft and the latter at least the leaf
+                        // ReSharper disable once PossibleNullReferenceException
+                        newLeftTree.Right = leftRightTree.Left;
+                        var newLeftRightHeight = newLeftTree.Right.Height;
+                        newLeftTree.TreeHeight = leftLeftHeight > newLeftRightHeight ? leftLeftHeight + 1 : newLeftRightHeight + 1;
+                        return new ImMapTree<V>(leftRightTree.Data,
+                            newLeftTree,
+                            new ImMapTree<V>(Data, leftRightTree.Right, rightHeight, Right));
+                    }
+
+                    return new ImMapTree<V>(Data, newLeftTree.TreeHeight, newLeftTree, rightHeight, Right);
+                }
+
+                return new ImMapTree<V>(Data, new ImMapData<V>(key, value), Right, 2);
+            }
+            else
+            {
+                var right = Right;
+                if (right is ImMapData<V> rightLeaf)
+                {
+                    if (key > rightLeaf.Key)
+                        return Left == Empty
+                            ? new ImMapTree<V>(rightLeaf, Data, new ImMapData<V>(key, value), 2)
+                            : new ImMapTree<V>(Data, Left,
+                                new ImMapTree<V>(rightLeaf, Empty, new ImMapData<V>(key, value), 2), 3);
+
+                    if (key < rightLeaf.Key)
+                        return Left == Empty
+                            ? new ImMapTree<V>(new ImMapData<V>(key, value), Data, right, 2)
+                            : new ImMapTree<V>(Data, Left,
+                                new ImMapTree<V>(rightLeaf, new ImMapData<V>(key, value), Empty, 2), 3);
+
+                    return this;
+                }
+
+                if (right is ImMapTree<V> rightTree)
+                {
+                    if (key == rightTree.Data.Key)
+                        return new ImMapTree<V>(Data, Left,
+                            new ImMapTree<V>(new ImMapData<V>(key, value), rightTree.Left, rightTree.Right, rightTree.TreeHeight),
+                            TreeHeight);
+
+                    var newRightTree = rightTree.AddOrKeepLeftOrRight(key, value);
+                    if (newRightTree == rightTree)
+                        return this;
+
+                    if (newRightTree.TreeHeight == rightTree.TreeHeight)
+                        return new ImMapTree<V>(Data, Left, newRightTree, TreeHeight);
+
+                    // right tree is at least 3+ deep - means its either rightLeft or rightRight is tree
+                    var leftHeight = (Left as ImMapTree<V>)?.TreeHeight ?? 1;
+                    if (newRightTree.TreeHeight - 1 > leftHeight)
+                    {
+                        var rightLeft = newRightTree.Left;
+                        var rightLeftTree = rightLeft as ImMapTree<V>;
+                        var rightLeftHeight = rightLeftTree?.TreeHeight ?? 1;
+
+                        var rightRight = newRightTree.Right;
+                        var rightRightTree = rightRight as ImMapTree<V>;
+                        var rightRightHeight = rightRightTree?.TreeHeight ?? 1;
+
+                        if (rightRightHeight >= rightLeftHeight)
+                        {
+                            rightLeftTree = new ImMapTree<V>(Data, leftHeight, Left, rightLeftHeight, rightLeft);
+                            newRightTree.Left = rightLeftTree;
+                            newRightTree.TreeHeight = rightLeftTree.TreeHeight > rightRightHeight ? rightLeftTree.TreeHeight + 1 : rightRightHeight + 1;
+                            return newRightTree;
+                        }
+
+                        // `rightLeftTree` should be the tree because rightRight is at least a leaf
+                        // ReSharper disable once PossibleNullReferenceException
+                        newRightTree.Left = rightLeftTree.Right;
+                        var newRightLeftHeight = newRightTree.Left.Height;
+                        newRightTree.TreeHeight = newRightLeftHeight > rightRightHeight ? newRightLeftHeight + 1 : rightRightHeight + 1;
+                        return new ImMapTree<V>(rightLeftTree.Data,
+                            new ImMapTree<V>(Data, leftHeight, Left, rightLeftTree.Left),
+                            newRightTree);
+                    }
+
+                    return new ImMapTree<V>(Data, leftHeight, Left, newRightTree.TreeHeight, newRightTree);
+                }
+
+                return new ImMapTree<V>(Data, Left, new ImMapData<V>(key, value), 2);
+            }
+        }
+
+        /// Adds or keeps the left or right branch
+        public ImMapTree<V> AddOrKeepLeftOrRight(int key, ImMapData<V> newData)
+        {
+            if (key < Data.Key)
+            {
+                var left = Left;
+                if (left is ImMapData<V> leftLeaf)
+                {
+                    if (key < leftLeaf.Key)
+                        return Right == Empty
+                            ? new ImMapTree<V>(leftLeaf, newData, Data, 2)
+                            : new ImMapTree<V>(Data,
+                                new ImMapTree<V>(leftLeaf, newData, Empty, 2),
+                                Right, 3); // given that left is the leaf, the Right tree should be less than 2 - otherwise tree is unbalanced
+
+                    if (key > leftLeaf.Key)
+                        return Right == Empty
+                            ? new ImMapTree<V>(newData, left, Data, 2)
+                            : new ImMapTree<V>(Data,
+                                new ImMapTree<V>(leftLeaf, Empty, newData, 2),
+                                Right, 3);
+
+                    return this;
+                }
+
+                // when the left is tree the right could not be empty
+                if (left is ImMapTree<V> leftTree)
+                {
+                    if (key == leftTree.Data.Key)
+                        return this;
+
+                    var newLeftTree = leftTree.AddOrKeepLeftOrRight(key, newData);
+                    if (newLeftTree == leftTree)
+                        return this;
+
+                    if (newLeftTree.TreeHeight == leftTree.TreeHeight)
+                        return new ImMapTree<V>(Data, newLeftTree, Right, TreeHeight);
+
+                    var rightHeight = (Right as ImMapTree<V>)?.TreeHeight ?? 1;
+                    if (newLeftTree.TreeHeight - 1 > rightHeight)
+                    {
+                        // 1st fact - `leftLeft` and `leftRight` cannot be Empty otherwise we won't need to re-balance the left tree
+                        // 2nd fact - either lefLeft or leftRight or both should be a tree
+                        var leftLeft = newLeftTree.Left;
+                        var leftLeftTree = leftLeft as ImMapTree<V>;
+                        var leftLeftHeight = leftLeftTree?.TreeHeight ?? 1;
+
+                        var leftRight = newLeftTree.Right;
+                        var leftRightTree = leftRight as ImMapTree<V>;
+                        var leftRightHeight = leftRightTree?.TreeHeight ?? 1;
+
+                        if (leftLeftHeight >= leftRightHeight)
+                        {
+                            leftRightTree = new ImMapTree<V>(Data, leftRightHeight, leftRight, rightHeight, Right);
+                            newLeftTree.Right = leftRightTree;
+                            newLeftTree.TreeHeight = leftLeftHeight > leftRightTree.TreeHeight ? leftLeftHeight + 1 : leftRightTree.TreeHeight + 1;
+                            return newLeftTree;
+                        }
+
+                        // the leftRight should a tree because its height is greater than leftLeft and the latter at least the leaf
+                        // ReSharper disable once PossibleNullReferenceException
+                        newLeftTree.Right = leftRightTree.Left;
+                        var newLeftRightHeight = newLeftTree.Right.Height;
+                        newLeftTree.TreeHeight = leftLeftHeight > newLeftRightHeight ? leftLeftHeight + 1 : newLeftRightHeight + 1;
+                        return new ImMapTree<V>(leftRightTree.Data,
+                            newLeftTree,
+                            new ImMapTree<V>(Data, leftRightTree.Right, rightHeight, Right));
+                    }
+
+                    return new ImMapTree<V>(Data, newLeftTree.TreeHeight, newLeftTree, rightHeight, Right);
+                }
+
+                return new ImMapTree<V>(Data, newData, Right, 2);
+            }
+            else
+            {
+                var right = Right;
+                if (right is ImMapData<V> rightLeaf)
+                {
+                    if (key > rightLeaf.Key)
+                        return Left == Empty
+                            ? new ImMapTree<V>(rightLeaf, Data, newData, 2)
+                            : new ImMapTree<V>(Data, Left,
+                                new ImMapTree<V>(rightLeaf, Empty, newData, 2), 3);
+
+                    if (key < rightLeaf.Key)
+                        return Left == Empty
+                            ? new ImMapTree<V>(newData, Data, right, 2)
+                            : new ImMapTree<V>(Data, Left,
+                                new ImMapTree<V>(rightLeaf, newData, Empty, 2), 3);
+
+                    return this;
+                }
+
+                if (right is ImMapTree<V> rightTree)
+                {
+                    if (key == rightTree.Data.Key)
+                        return new ImMapTree<V>(Data, Left,
+                            new ImMapTree<V>(newData, rightTree.Left, rightTree.Right, rightTree.TreeHeight),
+                            TreeHeight);
+
+                    var newRightTree = rightTree.AddOrKeepLeftOrRight(key, newData);
+                    if (newRightTree == rightTree)
+                        return this;
+
+                    if (newRightTree.TreeHeight == rightTree.TreeHeight)
+                        return new ImMapTree<V>(Data, Left, newRightTree, TreeHeight);
+
+                    // right tree is at least 3+ deep - means its either rightLeft or rightRight is tree
+                    var leftHeight = (Left as ImMapTree<V>)?.TreeHeight ?? 1;
+                    if (newRightTree.TreeHeight - 1 > leftHeight)
+                    {
+                        var rightLeft = newRightTree.Left;
+                        var rightLeftTree = rightLeft as ImMapTree<V>;
+                        var rightLeftHeight = rightLeftTree?.TreeHeight ?? 1;
+
+                        var rightRight = newRightTree.Right;
+                        var rightRightTree = rightRight as ImMapTree<V>;
+                        var rightRightHeight = rightRightTree?.TreeHeight ?? 1;
+
+                        if (rightRightHeight >= rightLeftHeight)
+                        {
+                            rightLeftTree = new ImMapTree<V>(Data, leftHeight, Left, rightLeftHeight, rightLeft);
+                            newRightTree.Left = rightLeftTree;
+                            newRightTree.TreeHeight = rightLeftTree.TreeHeight > rightRightHeight ? rightLeftTree.TreeHeight + 1 : rightRightHeight + 1;
+                            return newRightTree;
+                        }
+
+                        // `rightLeftTree` should be the tree because rightRight is at least a leaf
+                        // ReSharper disable once PossibleNullReferenceException
+                        newRightTree.Left = rightLeftTree.Right;
+                        var newRightLeftHeight = newRightTree.Left.Height;
+                        newRightTree.TreeHeight = newRightLeftHeight > rightRightHeight ? newRightLeftHeight + 1 : rightRightHeight + 1;
+                        return new ImMapTree<V>(rightLeftTree.Data,
+                            new ImMapTree<V>(Data, leftHeight, Left, rightLeftTree.Left),
+                            newRightTree);
+                    }
+
+                    return new ImMapTree<V>(Data, leftHeight, Left, newRightTree.TreeHeight, newRightTree);
+                }
+
+                return new ImMapTree<V>(Data, Left, newData, 2);
+            }
+        }
+    }
+
+    /// ImMap static methods
+    public static class ImMap
+    {
+        /// Adds or updates the value by key in the map, always returns a modified map
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> AddOrUpdate<V>(this ImMap<V> map, int key, V value) =>
+              map is ImMapTree<V> tree
+                ? key == tree.Data.Key
+                    ? new ImMapTree<V>(new ImMapData<V>(key, value), tree.Left, tree.Right, tree.TreeHeight)
+                    : tree.AddOrUpdateLeftOrRight(key, value)
+            : map is ImMapData<V> data
+                ? key > data.Key ? new ImMapTree<V>(data, ImMap<V>.Empty, new ImMapData<V>(key, value), 2)
+                : key < data.Key ? new ImMapTree<V>(data, new ImMapData<V>(key, value), ImMap<V>.Empty, 2)
+                : (ImMap<V>)new ImMapData<V>(key, value)
+            : new ImMapData<V>(key, value);
 
         /// Returns a new map with added value for the specified key or the existing map if the key is already in the map.
         [MethodImpl((MethodImplOptions)256)]
-        public ImMap<V> AddOrKeep(int key, V value) =>
-            Height == 0
-                ? new ImMap<V>(key, value)
-                : key == Key
-                    ? this
-                    : AddOrKeepImpl(key, value);
+        public static ImMap<V> AddOrKeep<V>(this ImMap<V> map, int key, V value) =>
+              map is ImMapTree<V> tree
+                ? key == tree.Data.Key
+                    ? map
+                    : tree.AddOrKeepLeftOrRight(key, value)
+            : map is ImMapData<V> data
+                ? key > data.Key ? new ImMapTree<V>(data, ImMap<V>.Empty, new ImMapData<V>(key, value), 2)
+                : key < data.Key ? new ImMapTree<V>(data, new ImMapData<V>(key, value), ImMap<V>.Empty, 2)
+                : map
+            : new ImMapData<V>(key, value);
 
-        private ImMap<V> AddOrKeepImpl(int key, V value)
-        {
-            if (key < Key)
-            {
-                if (Left.Height == 0)
-                    return new ImMap<V>(Key, Value, new ImMap<V>(key, value), Right, 2);
 
-                if (Left.Key == key)
-                    return this;
-
-                if (Right.Height == 0)
-                {
-                    if (key < Left.Key)
-                        return new ImMap<V>(Left.Key, Left.Value,
-                            new ImMap<V>(key, value), new ImMap<V>(Key, Value), 2);
-
-                    return new ImMap<V>(key, value,
-                        new ImMap<V>(Left.Key, Left.Value), new ImMap<V>(Key, Value), 2);
-                }
-
-                var newLeft = Left.AddOrKeepImpl(key, value);
-                if (ReferenceEquals(newLeft, Left))
-                    return this;
-
-                if (newLeft.Height > Right.Height + 1) // left is longer by 2, rotate left
-                {
-                    var leftLeft = newLeft.Left;
-                    var leftRight = newLeft.Right;
-
-                    if (leftLeft.Height >= leftRight.Height)
-                        return new ImMap<V>(newLeft.Key, newLeft.Value,
-                            leftLeft, new ImMap<V>(Key, Value, leftRight, Right));
-
-                    return new ImMap<V>(leftRight.Key, leftRight.Value,
-                        new ImMap<V>(newLeft.Key, newLeft.Value, leftLeft, leftRight.Left),
-                        new ImMap<V>(Key, Value, leftRight.Right, Right));
-                }
-
-                return new ImMap<V>(Key, Value, newLeft, Right);
-            }
-            else
-            {
-                if (Right.Height == 0)
-                    return new ImMap<V>(Key, Value, Left, new ImMap<V>(key, value), 2);
-
-                if (Right.Key == key)
-                    return this;
-
-                if (Left.Height == 0)
-                {
-                    if (key >= Right.Key)
-                        return new ImMap<V>(Right.Key, Right.Value,
-                            new ImMap<V>(Key, Value), new ImMap<V>(key, value), 2);
-
-                    return new ImMap<V>(key, value,
-                        new ImMap<V>(Key, Value), new ImMap<V>(Right.Key, Right.Value), 2);
-                }
-
-                var newRight = Right.AddOrKeepImpl(key, value);
-                if (ReferenceEquals(newRight, Right))
-                    return this;
-
-                if (newRight.Height > Left.Height + 1)
-                {
-                    var rightLeft = newRight.Left;
-                    var rightRight = newRight.Right;
-
-                    if (rightRight.Height >= rightLeft.Height)
-                        return new ImMap<V>(newRight.Key, newRight.Value,
-                            new ImMap<V>(Key, Value, Left, rightLeft), rightRight);
-
-                    return new ImMap<V>(rightLeft.Key, rightLeft.Value,
-                        new ImMap<V>(Key, Value, Left, rightLeft.Left),
-                        new ImMap<V>(newRight.Key, newRight.Value, rightLeft.Right, rightRight));
-                }
-
-                return new ImMap<V>(Key, Value, Left, newRight);
-            }
-        }
-
-        /// <summary>Returns new tree with added or updated value for specified key.</summary>
-        /// <param name="key">Key</param> <param name="value">Value</param>
-        /// <param name="updateValue">(optional) Delegate to calculate new value from and old and a new value.</param>
-        /// <returns>New tree.</returns>
+        /// Returns a new map with added value for the specified key or the existing map if the key is already in the map.
         [MethodImpl((MethodImplOptions)256)]
-        public ImMap<V> AddOrUpdate(int key, V value, Update<V> updateValue) =>
-            AddOrUpdateImpl(key, value, false, updateValue);
-
-        /// <summary>Returns new tree with updated value for the key, Or the same tree if key was not found.</summary>
-        /// <param name="key"></param> <param name="value"></param>
-        /// <returns>New tree if key is found, or the same tree otherwise.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public ImMap<V> Update(int key, V value) =>
-            AddOrUpdateImpl(key, value, true, null);
-
-        // todo: Leak, cause returned ImMap references left and right sub-trees - replace with `KeyValuePair`
-        /// <summary>Returns all sub-trees enumerated from left to right.</summary> 
-        /// <returns>Enumerated sub-trees or empty if tree is empty.</returns>
-        public IEnumerable<ImMap<V>> Enumerate()
+        public static ImMap<V> AddOrKeep<V>(this ImMap<V> map, ImMapData<V> newData)
         {
-            if (Height == 0)
-                yield break;
-
-            // todo: Use pool of LiveCountArray for stack!
-            var parents = new ImMap<V>[Height];
-
-            var node = this;
-            var parentCount = -1;
-            while (node.Height != 0 || parentCount != -1)
-            {
-                if (node.Height != 0)
-                {
-                    parents[++parentCount] = node;
-                    node = node.Left;
-                }
-                else
-                {
-                    node = parents[parentCount--];
-                    yield return node;
-                    node = node.Right;
-                }
-            }
+            var key = newData.Key;
+            return map is ImMapTree<V> tree
+                ? key == tree.Data.Key
+                    ? map
+                    : tree.AddOrKeepLeftOrRight(key, newData)
+                : map is ImMapData<V> data
+                    ? key > data.Key ? new ImMapTree<V>(data, ImMap<V>.Empty, newData, 2)
+                    : key < data.Key ? new ImMapTree<V>(data, newData, ImMap<V>.Empty, 2)
+                    : map
+                : newData;
         }
 
-        /// <summary>Removes or updates value for specified key, or does nothing if key is not found.
-        /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx </summary>
-        /// <param name="key">Key to look for.</param> 
-        /// <returns>New tree with removed or updated value.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public ImMap<V> Remove(int key) =>
-            RemoveImpl(key);
-
-        /// <summary>Outputs key value pair</summary>
-        public override string ToString() => IsEmpty ? "empty" : (Key + ":" + Value);
-
-        #region Implementation
-
-        internal ImMap() {}
-
-        internal ImMap(int key, V value)
-        {
-            Key = key;
-            Value = value;
-            Left = Empty;
-            Right = Empty;
-            Height = 1;
-        }
-
-        internal ImMap(int key, V value, ImMap<V> left, ImMap<V> right, int height)
-        {
-            Key = key;
-            Value = value;
-            Left = left;
-            Right = right;
-            Height = height;
-        }
-
-        internal ImMap(int key, V value, ImMap<V> left, ImMap<V> right)
-        {
-            Key = key;
-            Value = value;
-            Left = left;
-            Right = right;
-            Height = left.Height > right.Height ? left.Height + 1 : right.Height + 1;
-        }
-
-        private ImMap<V> AddOrUpdateImpl(int key, V value, bool updateOnly, Update<V> update)
-        {
-            return Height == 0
-                ? // tree is empty
-                (updateOnly ? this : new ImMap<V>(key, value))
-                : (key == Key
-                    ? // actual update
-                    new ImMap<V>(key, update == null ? value : update(Value, value), Left, Right)
-                    : (key < Key // try update on left or right sub-tree
-                        ? Balance(Key, Value, Left.AddOrUpdateImpl(key, value, updateOnly, update), Right)
-                        : Balance(Key, Value, Left, Right.AddOrUpdateImpl(key, value, updateOnly, update))));
-        }
-
-        internal static ImMap<V> Balance(int key, V value, ImMap<V> left, ImMap<V> right)
-        {
-            var delta = left.Height - right.Height;
-            if (delta > 1) // left is longer by 2, rotate left
-            {
-                var leftLeft = left.Left;
-                var leftRight = left.Right;
-                if (leftRight.Height > leftLeft.Height)
-                {
-                    // double rotation:
-                    //      5     =>     5     =>     4
-                    //   2     6      4     6      2     5
-                    // 1   4        2   3        1   3     6
-                    //    3        1
-                    return new ImMap<V>(leftRight.Key, leftRight.Value,
-                        new ImMap<V>(left.Key, left.Value, leftLeft, leftRight.Left),
-                        new ImMap<V>(key, value, leftRight.Right, right));
-                }
-
-                // single rotation:
-                //      5     =>     2
-                //   2     6      1     5
-                // 1   4              4   6
-                return new ImMap<V>(left.Key, left.Value,
-                    leftLeft,
-                    new ImMap<V>(key, value, leftRight, right));
-            }
-
-            if (delta < -1)
-            {
-                var rightLeft = right.Left;
-                var rightRight = right.Right;
-                if (rightLeft.Height > rightRight.Height)
-                {
-                    return new ImMap<V>(rightLeft.Key, rightLeft.Value,
-                        new ImMap<V>(key, value, left, rightLeft.Left),
-                        new ImMap<V>(right.Key, right.Value, rightLeft.Right, rightRight));
-                }
-
-                return new ImMap<V>(right.Key, right.Value,
-                    new ImMap<V>(key, value, left, rightLeft),
-                    rightRight);
-            }
-
-            return new ImMap<V>(key, value, left, right);
-        }
-
-        private ImMap<V> RemoveImpl(int key, bool ignoreKey = false)
-        {
-            if (Height == 0)
-                return this;
-
-            ImMap<V> result;
-            if (key == Key || ignoreKey) // found node
-            {
-                if (Height == 1) // remove node
-                    return Empty;
-
-                if (Right.IsEmpty)
-                    result = Left;
-                else if (Left.IsEmpty)
-                    result = Right;
-                else
-                {
-                    // we have two children, so remove the next highest node and replace this node with it.
-                    var successor = Right;
-                    while (!successor.Left.IsEmpty) successor = successor.Left;
-                    result = new ImMap<V>(successor.Key, successor.Value,
-                        Left, Right.RemoveImpl(successor.Key, true));
-                }
-            }
-            else if (key < Key)
-                result = Balance(Key, Value, Left.RemoveImpl(key), Right);
-            else
-                result = Balance(Key, Value, Left, Right.RemoveImpl(key));
-
-            return result;
-        }
-
-        #endregion
-    }
-
-    /// ImMap methods
-    public static class ImMap
-    {
-        /// Get value for found key or default `V` otherwise.
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<V>(this ImMap<V> map, int key)
-        {
-            while (map.Height != 0 && map.Key != key)
-                map = key < map.Key ? map.Left : map.Right;
-            return map.Value;
-        }
-
-        /// Get value for found key or default value otherwise.
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<V>(this ImMap<V> map, int key, V defaultValue)
-        {
-            while (map.Height != 0 && map.Key != key)
-                map = key < map.Key ? map.Left : map.Right;
-            return map.Height != 0 ? map.Value : defaultValue;
-        }
-
+        /// <summary>
         /// Returns true if key is found and sets the value.
+        /// </summary>
         [MethodImpl((MethodImplOptions)256)]
         public static bool TryFind<V>(this ImMap<V> map, int key, out V value)
         {
-            while (map.Height != 0)
+            ImMapData<V> data;
+            while (map is ImMapTree<V> tree)
             {
-                if (map.Key == key)
+                data = tree.Data;
+                if (key > data.Key)
+                    map = tree.Right;
+                else if (key < data.Key)
+                    map = tree.Left;
+                else
                 {
-                    value = map.Value;
+                    value = data.Value;
                     return true;
                 }
-                map = key < map.Key ? map.Left : map.Right;
             }
 
-            value = default(V);
+            data = map as ImMapData<V>;
+            if (data != null && data.Key == key)
+            {
+                value = data.Value;
+                return true;
+            }
+
+            value = default;
             return false;
+        }
+
+        /// <summary> Returns true if key is found and sets the value. </summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMapData<V> GetDataOrDefault<V>(this ImMap<V> map, int key)
+        {
+            ImMapData<V> data;
+            while (map is ImMapTree<V> tree)
+            {
+                data = tree.Data;
+                if (key > data.Key)
+                    map = tree.Right;
+                else if (key < data.Key)
+                    map = tree.Left;
+                else
+                    return data;
+            }
+
+            data = map as ImMapData<V>;
+            return data != null && data.Key == key ? data : null;
+        }
+
+        /// <summary> Returns true if key is found and sets the value. </summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<V>(this ImMap<V> map, int key)
+        {
+            ImMapData<V> data;
+            while (map is ImMapTree<V> tree)
+            {
+                data = tree.Data;
+                if (key > data.Key)
+                    map = tree.Right;
+                else if (key < data.Key)
+                    map = tree.Left;
+                else
+                    return data.Value;
+            }
+
+            data = map as ImMapData<V>;
+            return data != null && data.Key == key ? data.Value : default;
+        }
+
+        /// <summary> Returns true if key is found and sets the value. </summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool Contains<V>(this ImMap<V> map, int key)
+        {
+            ImMapData<V> data;
+            while (map is ImMapTree<V> tree)
+            {
+                data = tree.Data;
+                if (key > data.Key)
+                    map = tree.Right;
+                else if (key < data.Key)
+                    map = tree.Left;
+                else
+                    return true;
+            }
+
+            data = map as ImMapData<V>;
+            return data != null && data.Key == key;
+        }
+
+        /// <summary>
+        /// Folds all the map nodes with the state from the left to the right and from the bottom to the top
+        /// You may pass `parentStacks` to reuse the array memory.
+        /// NOTE: the length of `parentStack` should be at least of map height, content is not important and could be erased.
+        /// </summary>
+        public static S Fold<V, S>(this ImMap<V> map, S state, Func<ImMapData<V>, S, S> reduce, ImMapTree<V>[] parentStack = null)
+        {
+            if (map is ImMapData<V> data)
+                state = reduce(data, state);
+            else if (map is ImMapTree<V> tree)
+            {
+                if (tree.TreeHeight == 2)
+                {
+                    if (tree.Left is ImMapData<V> ld)
+                        state = reduce(ld, state);
+                    state = reduce(tree.Data, state);
+                    if (tree.Right is ImMapData<V> rd)
+                        state = reduce(rd, state);
+                }
+                else
+                {
+                    parentStack = parentStack ?? new ImMapTree<V>[tree.TreeHeight - 2];
+                    var parentIndex = -1;
+                    do
+                    {
+                        if ((tree = map as ImMapTree<V>) != null)
+                        {
+                            if (tree.TreeHeight == 2)
+                            {
+                                if (tree.Left is ImMapData<V> ld)
+                                    state = reduce(ld, state);
+                                state = reduce(tree.Data, state);
+                                if (tree.Right is ImMapData<V> rd)
+                                    state = reduce(rd, state);
+                                if (parentIndex == -1)
+                                    break;
+                                tree = parentStack[parentIndex--];
+                                state = reduce(tree.Data, state);
+                                map = tree.Right;
+                            }
+                            else
+                            {
+                                parentStack[++parentIndex] = tree;
+                                map = tree.Left;
+                            }
+                        }
+                        else
+                        {
+                            state = reduce((ImMapData<V>)map, state);
+                            if (parentIndex == -1)
+                                break;
+                            tree = parentStack[parentIndex--];
+                            state = reduce(tree.Data, state);
+                            map = tree.Right;
+                        }
+                    }
+                    while (map != ImMap<V>.Empty);
+                }
+            }
+
+            return state;
+        }
+
+        /// <summary>
+        /// Visits all the map nodes with from the left to the right and from the bottom to the top
+        /// You may pass `parentStacks` to reuse the array memory.
+        /// NOTE: the length of `parentStack` should be at least of map height, content is not important and could be erased.
+        /// </summary>
+        public static void Visit<V>(this ImMap<V> map, Action<ImMapData<V>> visit, ImMapTree<V>[] parentStack = null)
+        {
+            if (map is ImMapData<V> data)
+                visit(data);
+            else if (map is ImMapTree<V> tree)
+            {
+                if (tree.TreeHeight == 2)
+                {
+                    if (tree.Left is ImMapData<V> ld)
+                        visit(ld);
+                    visit(tree.Data);
+                    if (tree.Right is ImMapData<V> rd)
+                        visit(rd);
+                }
+                else
+                {
+                    parentStack = parentStack ?? new ImMapTree<V>[tree.TreeHeight - 2];
+                    var parentIndex = -1;
+                    do
+                    {
+                        if ((tree = map as ImMapTree<V>) != null)
+                        {
+                            if (tree.TreeHeight == 2)
+                            {
+                                if (tree.Left is ImMapData<V> ld)
+                                    visit(ld);
+                                visit(tree.Data);
+                                if (tree.Right is ImMapData<V> rd)
+                                    visit(rd);
+                                if (parentIndex == -1)
+                                    break;
+                                tree = parentStack[parentIndex--];
+                                visit(tree.Data);
+                                map = tree.Right;
+                            }
+                            else
+                            {
+                                parentStack[++parentIndex] = tree;
+                                map = tree.Left;
+                            }
+                        }
+                        else
+                        {
+                            visit((ImMapData<V>)map);
+                            if (parentIndex == -1)
+                                break;
+                            tree = parentStack[parentIndex--];
+                            visit(tree.Data);
+                            map = tree.Right;
+                        }
+                    }
+                    while (map != ImMap<V>.Empty);
+                }
+            }
+        }
+
+        ///<summary>Returns the new map with the updated value for the key, or the same map if the key was not found.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> Update<V>(this ImMap<V> map, int key, V value) =>
+            map.Contains(key) ? map.UpdateImpl(key, value) : map;
+
+        internal static ImMap<V> UpdateImpl<V>(this ImMap<V> map, int key, V value) =>
+            map is ImMapTree<V> tree
+                ? key > tree.Data.Key ? new ImMapTree<V>(tree.Data, tree.Left, tree.Right.UpdateImpl(key, value), tree.TreeHeight)
+                : key < tree.Data.Key ? new ImMapTree<V>(tree.Data, tree.Left.UpdateImpl(key, value), tree.Right, tree.TreeHeight)
+                : new ImMapTree<V>(new ImMapData<V>(key, value), tree.Left, tree.Right, tree.TreeHeight)
+                : (ImMap<V>)new ImMapData<V>(key, value);
+    }
+
+    /// The array of ImMap slots where the key first bits are used for FAST slot location
+    /// and the slot is the reference to ImMap that can be swapped with its updated value
+    public static class ImMapSlots
+    {
+        /// Default number of slots
+        public const int SLOT_COUNT_POWER_OF_TWO = 32;
+
+        /// The default mask to partition the key to the target slot
+        public const int KEY_MASK_TO_FIND_SLOT = SLOT_COUNT_POWER_OF_TWO - 1;
+
+        /// Creates the array with the empty slots
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V>[] CreateWithEmpty<V>(int slotCountPowerOfTwo = SLOT_COUNT_POWER_OF_TWO)
+        {
+            var slots = new ImMap<V>[slotCountPowerOfTwo];
+            for (var i = 0; i < slots.Length; ++i)
+                slots[i] = ImMap<V>.Empty;
+            return slots;
+        }
+
+        /// Returns a new tree with added or updated value for specified key.
+        [MethodImpl((MethodImplOptions)256)]
+        public static void AddOrUpdate<V>(this ImMap<V>[] slots, int key, V value, int keyMaskToFindSlot = KEY_MASK_TO_FIND_SLOT)
+        {
+            ref var slot = ref slots[key & keyMaskToFindSlot];
+            var copy = slot;
+            if (Interlocked.CompareExchange(ref slot, copy.AddOrUpdate(key, value), copy) != copy)
+                RefAddOrUpdateSlot(ref slot, key, value);
+        }
+
+        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
+        public static void RefAddOrUpdateSlot<V>(ref ImMap<V> slot, int key, V value) =>
+            Ref.Swap(ref slot, key, value, (x, k, v) => x.AddOrUpdate(k, v));
+
+        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
+        [MethodImpl((MethodImplOptions)256)]
+        public static void AddOrKeep<V>(this ImMap<V>[] slots, int key, V value, int keyMaskToFindSlot = KEY_MASK_TO_FIND_SLOT)
+        {
+            ref var slot = ref slots[key & keyMaskToFindSlot];
+            var copy = slot;
+            if (Interlocked.CompareExchange(ref slot, copy.AddOrKeep(key, value), copy) != copy)
+                RefAddOrKeepSlot(ref slot, key, value);
+        }
+
+        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
+        public static void RefAddOrKeepSlot<V>(ref ImMap<V> slot, int key, V value) =>
+            Ref.Swap(ref slot, key, value, (s, k, v) => s.AddOrKeep(k, v));
+    }
+
+    /// Wraps the stored data
+    public class ImHashMapData<K, V>
+    {
+        /// Empty thingy
+        public static readonly ImHashMapData<K, V> Empty = new ImHashMapData<K, V>();
+
+        /// Key hash
+        public readonly int Hash;
+
+        ///  The key
+        public readonly K Key;
+
+        /// The value - may be mutated implementing the Ref CAS semantics if needed
+        public V Value;
+
+        private ImHashMapData() { }
+
+        /// Constructs the data
+        public ImHashMapData(int hash, K key, V value)
+        {
+            Hash = hash;
+            Key = key;
+            Value = value;
         }
     }
 
-    /// <summary>Immutable http://en.wikipedia.org/wiki/AVL_tree 
-    /// where node key is the hash code of <typeparamref name="K"/>.</summary>
+    /// Stores ALL the data in `Conflicts` array, the fields except the `hash` are just fillers.
+    /// This way we preserve the once created `ImHashMapData` so that client can hold the reference to it and update the Value if needed.
+    public sealed class ImHashMapConflicts<K, V> : ImHashMapData<K, V>
+    {
+        /// Conflicted data
+        public readonly ImHashMapData<K, V>[] Conflicts;
+
+        /// <inheritdoc />
+        public ImHashMapConflicts(int hash, params ImHashMapData<K, V>[] conflicts) : base(hash, default, default) =>
+            Conflicts = conflicts;
+    }
+
+    /// Immutable http://en.wikipedia.org/wiki/AVL_tree 
+    /// where node key is the hash code of <typeparamref name="K"/>
     public sealed class ImHashMap<K, V>
     {
-        /// <summary>Empty tree to start with.</summary>
+        /// Empty map to start with.
         public static readonly ImHashMap<K, V> Empty = new ImHashMap<K, V>();
 
         /// <summary>Calculated key hash.</summary>
         public int Hash
         {
-            [MethodImpl((MethodImplOptions) 256)]
-            get => _data.Hash;
+            [MethodImpl((MethodImplOptions)256)]
+            get => Data.Hash;
         }
 
         /// <summary>Key of type K that should support <see cref="object.Equals(object)"/> and <see cref="object.GetHashCode"/>.</summary>
         public K Key
         {
             [MethodImpl((MethodImplOptions)256)]
-            get => _data.Key;
+            get => Data.Key;
         }
 
         /// <summary>Value of any type V.</summary>
         public V Value
         {
             [MethodImpl((MethodImplOptions)256)]
-            get => _data.Value;
+            get => Data.Value;
         }
 
         /// <summary>In case of <see cref="Hash"/> conflicts for different keys contains conflicted keys with their values.</summary>
-        public KV<K, V>[] Conflicts
+        public ImHashMapData<K, V>[] Conflicts
         {
             [MethodImpl((MethodImplOptions)256)]
-            get => _data.Conflicts;
-        } 
+            get => (Data as ImHashMapConflicts<K, V>)?.Conflicts;
+        }
 
         /// <summary>Left sub-tree/branch, or empty.</summary>
         public readonly ImHashMap<K, V> Left;
@@ -1590,405 +3722,707 @@ namespace ImTools
         /// <summary>Returns true if tree is empty.</summary>
         public bool IsEmpty => Height == 0;
 
-        /// <summary>Returns new tree with added key-value. 
-        /// If value with the same key is exist then the value is replaced.</summary>
-        /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
-        /// <returns>New tree with added or updated key-value.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value) =>
-            AddOrUpdate(key, value, out _, out _);
-
-        /// <summary>Returns new tree with added key-value. If value with the same key is exist, then
-        /// if <paramref name="update"/> is not specified: then existing value will be replaced by <paramref name="value"/>;
-        /// if <paramref name="update"/> is specified: then update delegate will decide what value to keep.</summary>
-        /// <param name="key">Key to add.</param><param name="value">Value to add.</param>
-        /// <param name="update">Update handler.</param>
-        /// <returns>New tree with added or updated key-value.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update) => 
-            AddOrUpdate(key, value, out _, out _, (_, oldVal, newVal) => update(oldVal, newVal));
-
-        /// Allocation free for `update` using the key
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, out bool isUpdated, out V oldValue, Update<K, V> update = null)
-        {
-            isUpdated = false;
-            oldValue = default;
-
-            var hash = key.GetHashCode();
-
-            if (Height == 0)
-                return new ImHashMap<K, V>(new Data(hash, key, value));
-
-            if (hash == Hash)
-                return ReferenceEquals(Key, key) || Key.Equals(key)
-                    ? UpdatedOrOld(hash, key, value, ref isUpdated, ref oldValue, update)
-                    : UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, update);
-
-            return AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
-        }
-
-        /// <summary>Looks for <paramref name="key"/> and replaces its value with new <paramref name="value"/>, or 
-        /// runs custom update handler (<paramref name="update"/>) with old and new value to get the updated result.</summary>
-        /// <param name="key">Key to look for.</param>
-        /// <param name="value">New value to replace key value with.</param>
-        /// <param name="update">(optional) Delegate for custom update logic, it gets old and new <paramref name="value"/>
-        /// as inputs and should return updated value as output.</param>
-        /// <returns>New tree with updated value or the SAME tree if no key found.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> Update(K key, V value, Update<V> update = null) =>
-            Update(key.GetHashCode(), key, value, update);
-
-        /// <summary>Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up (~20% faster than stack).</summary>
-        /// <returns>Sequence of enumerated key value pairs.</returns>
-        public IEnumerable<KV<K, V>> Enumerate()
-        {
-            if (Height == 0)
-                yield break;
-
-            var parents = new ImHashMap<K, V>[Height];
-
-            var node = this;
-            var parentCount = -1;
-            while (node.Height != 0 || parentCount != -1)
-            {
-                if (node.Height != 0)
-                {
-                    parents[++parentCount] = node;
-                    node = node.Left;
-                }
-                else
-                {
-                    node = parents[parentCount--];
-                    yield return new KV<K, V>(node.Key, node.Value);
-
-                    if (node.Conflicts != null)
-                        for (var i = 0; i < node.Conflicts.Length; i++)
-                            yield return node.Conflicts[i];
-
-                    node = node.Right;
-                }
-            }
-        }
-
-        /// <summary>Removes or updates value for specified key, or does nothing if key is not found.
-        /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx </summary>
-        /// <param name="key">Key to look for.</param> 
-        /// <returns>New tree with removed or updated value.</returns>
-        public ImHashMap<K, V> Remove(K key) =>
-            Remove(key.GetHashCode(), key);
-
         /// <summary>Outputs key value pair</summary>
-        public override string ToString() => IsEmpty ? "empty" : (Key + ":" + Value);
+        public override string ToString() => IsEmpty ? "empty" : Key + ":" + Value;
 
-        #region Implementation
+        /// Tha data payload holder
+        public readonly ImHashMapData<K, V> Data;
 
-        private sealed class Data
+        internal ImHashMap() => Data = ImHashMapData<K, V>.Empty;
+
+        /// Creates a leaf node
+        public ImHashMap(int hash, K key, V value)
         {
-            public readonly int Hash;
-            public readonly K Key;
-            public readonly V Value;
-
-            public readonly KV<K, V>[] Conflicts;
-
-            public Data() { }
-
-            public Data(int hash, K key, V value, KV<K, V>[] conflicts = null)
-            {
-                Hash = hash;
-                Key = key;
-                Value = value;
-                Conflicts = conflicts;
-            }
-        }
-
-        private readonly Data _data;
-
-        private ImHashMap()
-        {
-            _data = new Data();
-        }
-
-        private ImHashMap(Data data)
-        {
-            _data = data;
+            Data = new ImHashMapData<K, V>(hash, key, value);
             Left = Empty;
             Right = Empty;
             Height = 1;
         }
 
-        private ImHashMap(Data data, ImHashMap<K, V> left, ImHashMap<K, V> right)
+        /// Creates a leaf node
+        public ImHashMap(ImHashMapData<K, V> data)
         {
-            _data = data;
+            Data = data;
+            Left = Empty;
+            Right = Empty;
+            Height = 1;
+        }
+
+        /// Creates the tree and calculates the height for you
+        public ImHashMap(ImHashMapData<K, V> data, ImHashMap<K, V> left, ImHashMap<K, V> right)
+        {
+            Data = data;
             Left = left;
             Right = right;
             Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
         }
 
-        private ImHashMap(Data data, ImHashMap<K, V> left, ImHashMap<K, V> right, int height)
+        /// Creates the tree with the known height
+        public ImHashMap(ImHashMapData<K, V> data, ImHashMap<K, V> left, ImHashMap<K, V> right, int height)
         {
-            _data = data;
+            Data = data;
             Left = left;
             Right = right;
             Height = height;
         }
 
-        private ImHashMap<K, V> AddOrUpdate(
-            int hash, K key, V value, ref bool isUpdated, ref V oldValue, Update<K, V> update = null)
+        /// Uses the user provided hash and adds and updates the tree with passed key-value. Returns a new tree.
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> AddOrUpdate(int hash, K key, V value) =>
+            Height == 0 ? new ImHashMap<K, V>(hash, key, value)
+            : hash == Hash ? UpdateValueOrAddOrUpdateConflict(hash, key, value)
+            : AddOrUpdateLeftOrRight(hash, key, value);
+
+        /// Adds and updates the tree with passed key-value. Returns a new tree.
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> AddOrUpdate(K key, V value) =>
+            AddOrUpdate(key.GetHashCode(), key, value);
+
+        private ImHashMap<K, V> UpdateValueOrAddOrUpdateConflict(int hash, K key, V value)
+        {
+            var conflictsData = Data as ImHashMapConflicts<K, V>;
+            return conflictsData == null && (ReferenceEquals(key, Key) || key.Equals(Key))
+                ? new ImHashMap<K, V>(new ImHashMapData<K, V>(hash, key, value), Left, Right, Height)
+                : AddOrUpdateConflict(conflictsData, hash, key, value);
+        }
+
+        internal enum DoAddOrUpdateConflicts { AddOrUpdate, AddOrKeep, Update }
+
+        private ImHashMap<K, V> AddOrUpdateConflict(ImHashMapConflicts<K, V> conflictsData, int hash, K key, V value,
+            Update<K, V> update = null, DoAddOrUpdateConflicts doWhat = DoAddOrUpdateConflicts.AddOrUpdate)
+        {
+            if (conflictsData == null)
+                return doWhat == DoAddOrUpdateConflicts.Update
+                    ? this
+                    : new ImHashMap<K, V>(
+                        new ImHashMapConflicts<K, V>(hash, Data, new ImHashMapData<K, V>(hash, key, value)),
+                        Left, Right, Height);
+
+            var conflicts = conflictsData.Conflicts;
+            var conflictCount = conflicts.Length;
+            var conflictIndex = conflictCount - 1;
+            while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Key))
+                --conflictIndex;
+
+            ImHashMapData<K, V>[] newConflicts;
+            if (conflictIndex != -1)
+            {
+                if (doWhat == DoAddOrUpdateConflicts.AddOrKeep)
+                    return this;
+
+                // update the existing conflicted value
+                newConflicts = new ImHashMapData<K, V>[conflictCount];
+                Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
+                var newValue = update == null ? value : update(key, conflicts[conflictIndex].Value, value);
+                newConflicts[conflictIndex] = new ImHashMapData<K, V>(hash, key, newValue);
+            }
+            else
+            {
+                if (doWhat == DoAddOrUpdateConflicts.Update)
+                    return this;
+
+                // add the new conflicting value
+                newConflicts = new ImHashMapData<K, V>[conflictCount + 1];
+                Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
+                newConflicts[conflictCount] = new ImHashMapData<K, V>(hash, key, value);
+            }
+
+            return new ImHashMap<K, V>(new ImHashMapConflicts<K, V>(hash, newConflicts), Left, Right, Height);
+        }
+
+        private ImHashMap<K, V> AddOrUpdateLeftOrRight(int hash, K key, V value)
         {
             if (hash < Hash)
             {
-                if (Height == 1)
-                    return new ImHashMap<K, V>(_data, new ImHashMap<K, V>(new Data(hash, key, value)), Empty, 2);
+                if (Left.Height == 0)
+                    return new ImHashMap<K, V>(Data, new ImHashMap<K, V>(hash, key, value), Right, 2);
 
-                var left = Left;
-                if (left.Height == 0) 
-                    return new ImHashMap<K, V>(_data, new ImHashMap<K, V>(new Data(hash, key, value)), Right, Height);
+                if (Left.Hash == hash)
+                    return new ImHashMap<K, V>(Data, Left.UpdateValueOrAddOrUpdateConflict(hash, key, value), Right, Height);
 
-                if (left.Hash == hash)
+                if (Right.Height == 0)
                 {
-                    var updatedLeft = ReferenceEquals(left.Key, key) || left.Key.Equals(key)
-                        ? left.UpdatedOrOld(hash, key, value, ref isUpdated, ref oldValue, update)
-                        : left.UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, update);
-                    return updatedLeft == left ? this : new ImHashMap<K, V>(_data, updatedLeft, Right);
+                    if (hash < Left.Hash)
+                        return new ImHashMap<K, V>(Left.Data,
+                            new ImHashMap<K, V>(hash, key, value), new ImHashMap<K, V>(Data), 2);
+
+                    return new ImHashMap<K, V>(new ImHashMapData<K, V>(hash, key, value),
+                        new ImHashMap<K, V>(Left.Data), new ImHashMap<K, V>(Data), 2);
                 }
 
-                if (left.Height == 1)
-                {
-                    if (Right.Height == 0)
-                    {
-                        // single rotation:
-                        //      5     =>     2
-                        //   2            1     5
-                        // 1                     
-                        if (hash < left.Hash)
-                            return new ImHashMap<K, V>(left._data,
-                                new ImHashMap<K, V>(new Data(hash, key, value)), new ImHashMap<K, V>(_data), 2);
-
-                        // double rotation:
-                        //      5     =>     5     =>     4
-                        //   2            4            2     5
-                        //     4        2                     
-                        return new ImHashMap<K, V>(new Data(hash, key, value),
-                            new ImHashMap<K, V>(left._data), new ImHashMap<K, V>(_data), 2);
-                    }
-
-                    if (hash < left.Hash)
-                        left = new ImHashMap<K, V>(left._data,
-                            new ImHashMap<K, V>(new Data(hash, key, value)), Empty, 2);
-                    else
-                        left = new ImHashMap<K, V>(left._data,
-                            Empty, new ImHashMap<K, V>(new Data(hash, key, value)), 2);
-                }
-                else
-                {
-                    var oldLeft = left;
-                    left = left.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
-                    if (oldLeft == left)
-                        return this;
-                }
+                var left = Left.AddOrUpdateLeftOrRight(hash, key, value);
 
                 if (left.Height > Right.Height + 1) // left is longer by 2, rotate left
                 {
                     var leftLeft = left.Left;
                     var leftRight = left.Right;
 
-                    // double rotation:
-                    //      5     =>     5     =>     4
-                    //   2     6      4     6      2     5
-                    // 1   4        2   3        1   3     6
-                    //    3        1
                     if (leftRight.Height > leftLeft.Height)
-                        return new ImHashMap<K, V>(leftRight._data,
-                            new ImHashMap<K, V>(left._data, leftLeft, leftRight.Left),
-                            new ImHashMap<K, V>(_data, leftRight.Right, Right));
+                        return new ImHashMap<K, V>(leftRight.Data,
+                            new ImHashMap<K, V>(left.Data, leftLeft, leftRight.Left),
+                            new ImHashMap<K, V>(Data, leftRight.Right, Right));
 
-                    // single rotation:
-                    //      5     =>     2
-                    //   2     6      1     5
-                    // 1   4              4   6
-                    return new ImHashMap<K, V>(left._data,
-                        leftLeft, new ImHashMap<K, V>(_data, leftRight, Right));
+                    return new ImHashMap<K, V>(left.Data,
+                        leftLeft, new ImHashMap<K, V>(Data, leftRight, Right));
                 }
 
-                return new ImHashMap<K, V>(_data, left, Right);
+                return new ImHashMap<K, V>(Data, left, Right);
             }
             else
             {
-                if (Height == 1)
-                    return new ImHashMap<K, V>(_data, Empty, new ImHashMap<K, V>(new Data(hash, key, value)), 2);
+                if (Right.Height == 0)
+                    return new ImHashMap<K, V>(Data, Left, new ImHashMap<K, V>(hash, key, value), 2);
 
-                var right = Right;
-                if (right.Height == 0)
-                    return new ImHashMap<K, V>(_data, Left, new ImHashMap<K, V>(new Data(hash, key, value)), Height);
+                if (Right.Hash == hash)
+                    return new ImHashMap<K, V>(Data, Left, Right.UpdateValueOrAddOrUpdateConflict(hash, key, value), Height);
 
-                if (right.Hash == hash)
+                if (Left.Height == 0)
                 {
-                    var updatedRight = ReferenceEquals(right.Key, key) || right.Key.Equals(key)
-                        ? right.UpdatedOrOld(hash, key, value, ref isUpdated, ref oldValue, update)
-                        : right.UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, update);
-                    return updatedRight == right ? this : new ImHashMap<K, V>(_data, Left, updatedRight);
+                    if (hash < Right.Hash)
+                        return new ImHashMap<K, V>(new ImHashMapData<K, V>(hash, key, value),
+                            new ImHashMap<K, V>(Data), new ImHashMap<K, V>(Right.Data), 2);
+
+                    return new ImHashMap<K, V>(Right.Data,
+                        new ImHashMap<K, V>(Data), new ImHashMap<K, V>(hash, key, value), 2);
                 }
 
-                if (right.Height == 1)
-                {
-                    if (Left.Height == 0)
-                    {
-                        // double rotation:
-                        //    5     =>   5     =>     6
-                        //       8          6      5     8
-                        //      6            8
-                        if (hash < right.Hash)
-                            return new ImHashMap<K, V>(new Data(hash, key, value),
-                                new ImHashMap<K, V>(_data), new ImHashMap<K, V>(right._data), 2);
-
-                        // single rotation:
-                        //    5     =>    6
-                        //      6      5     8
-                        //       8
-                        return new ImHashMap<K, V>(right._data,
-                            new ImHashMap<K, V>(_data), new ImHashMap<K, V>(new Data(hash, key, value)), 2);
-                    }
-
-                    if (hash < right.Hash)
-                        right = new ImHashMap<K, V>(right._data,
-                            new ImHashMap<K, V>(new Data(hash, key, value)), Empty, 2);
-                    else
-                        right = new ImHashMap<K, V>(right._data,
-                            Empty, new ImHashMap<K, V>(new Data(hash, key, value)), 2);
-                }
-                else
-                {
-                    var oldRight = right;
-                    right = right.AddOrUpdate(hash, key, value, ref isUpdated, ref oldValue, update);
-                    if (oldRight == right)
-                        return this;
-                }
+                var right = Right.AddOrUpdateLeftOrRight(hash, key, value);
 
                 if (right.Height > Left.Height + 1)
                 {
                     var rightLeft = right.Left;
                     var rightRight = right.Right;
                     if (rightLeft.Height > rightRight.Height)
-                        return new ImHashMap<K, V>(rightLeft._data,
-                            new ImHashMap<K, V>(_data, Left, rightLeft.Left),
-                            new ImHashMap<K, V>(right._data, rightLeft.Right, rightRight));
+                        return new ImHashMap<K, V>(rightLeft.Data,
+                            new ImHashMap<K, V>(Data, Left, rightLeft.Left),
+                            new ImHashMap<K, V>(right.Data, rightLeft.Right, rightRight));
 
-                    return new ImHashMap<K, V>(right._data,
-                        new ImHashMap<K, V>(_data, Left, rightLeft), rightRight);
+                    return new ImHashMap<K, V>(right.Data,
+                        new ImHashMap<K, V>(Data, Left, rightLeft), rightRight);
                 }
 
-                return new ImHashMap<K, V>(_data, Left, right);
+                return new ImHashMap<K, V>(Data, Left, right);
             }
         }
 
-        private ImHashMap<K, V> UpdatedOrOld(int hash, K key, V value, ref bool isUpdated, ref V oldValue, Update<K, V> update = null)
+        /// Uses the user provided hash and adds and updates the tree with passed key-value and the update function for the existing value. Returns a new tree.
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<K, V> update) =>
+            Height == 0 ? new ImHashMap<K, V>(hash, key, value)
+            : hash == Hash ? UpdateValueOrAddOrUpdateConflict(hash, key, value, update)
+            : AddOrUpdateLeftOrRightWithUpdate(hash, key, value, update);
+
+        private ImHashMap<K, V> UpdateValueOrAddOrUpdateConflict(int hash, K key, V value, Update<K, V> update)
         {
-            if (update != null)
-                value = update(key, Value, value);
-            if (ReferenceEquals(value, Value) || value?.Equals(Value) == true)
-                return this;
-            isUpdated = true;
-            oldValue = Value;
-            return new ImHashMap<K, V>(new Data(hash, key, value, Conflicts), Left, Right);
+            var conflictsData = Data as ImHashMapConflicts<K, V>;
+            return conflictsData == null && (ReferenceEquals(Key, key) || Key.Equals(key))
+                ? new ImHashMap<K, V>(
+                    new ImHashMapData<K, V>(hash, key, update(key, Value, value)),
+                    Left, Right, Height)
+                : AddOrUpdateConflict(conflictsData, hash, key, value, update);
         }
 
-        /// It is fine, made public for testing.
-        public ImHashMap<K, V> Update(int hash, K key, V value, Update<V> update = null)
+        private ImHashMap<K, V> AddOrUpdateLeftOrRightWithUpdate(int hash, K key, V value, Update<K, V> update)
+        {
+            if (hash < Hash)
+            {
+                if (Left.Height == 0)
+                    return new ImHashMap<K, V>(Data, new ImHashMap<K, V>(hash, key, value), Right, 2);
+
+                if (Left.Hash == hash)
+                    return new ImHashMap<K, V>(Data, Left.UpdateValueOrAddOrUpdateConflict(hash, key, value, update), Right, Height);
+
+                if (Right.Height == 0)
+                {
+                    if (hash < Left.Hash)
+                        return new ImHashMap<K, V>(Left.Data, new ImHashMap<K, V>(hash, key, value), new ImHashMap<K, V>(Data), 2);
+
+                    return new ImHashMap<K, V>(new ImHashMapData<K, V>(hash, key, value),
+                        new ImHashMap<K, V>(Left.Data), new ImHashMap<K, V>(Data), 2);
+                }
+
+                var left = Left.AddOrUpdateLeftOrRightWithUpdate(hash, key, value, update);
+
+                if (left.Height > Right.Height + 1) // left is longer by 2, rotate left
+                {
+                    var leftLeft = left.Left;
+                    var leftRight = left.Right;
+
+                    if (leftRight.Height > leftLeft.Height)
+                        return new ImHashMap<K, V>(leftRight.Data,
+                            new ImHashMap<K, V>(left.Data, leftLeft, leftRight.Left),
+                            new ImHashMap<K, V>(Data, leftRight.Right, Right));
+
+                    return new ImHashMap<K, V>(left.Data,
+                        leftLeft, new ImHashMap<K, V>(Data, leftRight, Right));
+                }
+
+                return new ImHashMap<K, V>(Data, left, Right);
+            }
+            else
+            {
+                if (Right.Height == 0)
+                    return new ImHashMap<K, V>(Data, Left, new ImHashMap<K, V>(hash, key, value), 2);
+
+                if (Right.Hash == hash)
+                    return new ImHashMap<K, V>(Data, Left, Right.UpdateValueOrAddOrUpdateConflict(hash, key, value, update), Height);
+
+                if (Left.Height == 0)
+                {
+                    if (hash < Right.Hash)
+                        return new ImHashMap<K, V>(new ImHashMapData<K, V>(hash, key, value),
+                            new ImHashMap<K, V>(Data), new ImHashMap<K, V>(Right.Data), 2);
+
+                    return new ImHashMap<K, V>(Right.Data,
+                        new ImHashMap<K, V>(Data), new ImHashMap<K, V>(hash, key, value), 2);
+                }
+
+                var right = Right.AddOrUpdateLeftOrRightWithUpdate(hash, key, value, update);
+
+                if (right.Height > Left.Height + 1)
+                {
+                    var rightLeft = right.Left;
+                    var rightRight = right.Right;
+                    if (rightLeft.Height > rightRight.Height)
+                        return new ImHashMap<K, V>(rightLeft.Data,
+                            new ImHashMap<K, V>(Data, Left, rightLeft.Left),
+                            new ImHashMap<K, V>(right.Data, rightLeft.Right, rightRight));
+
+                    return new ImHashMap<K, V>(right.Data,
+                        new ImHashMap<K, V>(Data, Left, rightLeft), rightRight);
+                }
+
+                return new ImHashMap<K, V>(Data, Left, right);
+            }
+        }
+
+        /// Returns a new tree with added or updated key-value. Uses the provided <paramref name="update"/> for updating the existing value.
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<K, V> update) =>
+            AddOrUpdate(key.GetHashCode(), key, value, update);
+
+        /// Returns a new tree with added or updated key-value. Uses the provided <paramref name="update"/> for updating the existing value.
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update) =>
+            AddOrUpdate(key.GetHashCode(), key, value, update.IgnoreKey);
+
+        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> AddOrKeep(int hash, K key, V value) =>
+            Height == 0 ? new ImHashMap<K, V>(hash, key, value)
+            : hash == Hash ? KeepValueOrAddConflict(hash, key, value)
+            : AddOrKeepLeftOrRight(hash, key, value);
+
+        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> AddOrKeep(K key, V value) =>
+            AddOrKeep(key.GetHashCode(), key, value);
+
+        private ImHashMap<K, V> KeepValueOrAddConflict(int hash, K key, V value)
+        {
+            var conflictsData = Data as ImHashMapConflicts<K, V>;
+            return conflictsData == null && (ReferenceEquals(Key, key) || Key.Equals(key)) ? this
+                : AddOrUpdateConflict(conflictsData, hash, key, value, null, DoAddOrUpdateConflicts.AddOrKeep);
+        }
+
+        private ImHashMap<K, V> AddOrKeepLeftOrRight(int hash, K key, V value)
+        {
+            if (hash < Hash)
+            {
+                if (Left.Height == 0)
+                    return new ImHashMap<K, V>(Data, new ImHashMap<K, V>(hash, key, value), Right, 2);
+
+                if (Left.Hash == hash)
+                {
+                    var leftWithNewConflict = Left.KeepValueOrAddConflict(hash, key, value);
+                    return ReferenceEquals(leftWithNewConflict, Left) ? this
+                        : new ImHashMap<K, V>(Data, leftWithNewConflict, Right, Height);
+                }
+
+                if (Right.Height == 0)
+                {
+                    if (hash < Left.Hash)
+                        return new ImHashMap<K, V>(Left.Data,
+                            new ImHashMap<K, V>(hash, key, value), new ImHashMap<K, V>(Data), 2);
+
+                    return new ImHashMap<K, V>(new ImHashMapData<K, V>(hash, key, value),
+                        new ImHashMap<K, V>(Left.Data), new ImHashMap<K, V>(Data), 2);
+                }
+
+                var left = Left.AddOrKeepLeftOrRight(hash, key, value);
+                if (ReferenceEquals(left, Left))
+                    return this;
+
+                if (left.Height > Right.Height + 1) // left is longer by 2, rotate left
+                {
+                    var leftLeft = left.Left;
+                    var leftRight = left.Right;
+
+                    if (leftRight.Height > leftLeft.Height)
+                        return new ImHashMap<K, V>(leftRight.Data,
+                            new ImHashMap<K, V>(left.Data, leftLeft, leftRight.Left),
+                            new ImHashMap<K, V>(Data, leftRight.Right, Right));
+
+                    return new ImHashMap<K, V>(left.Data,
+                        leftLeft, new ImHashMap<K, V>(Data, leftRight, Right));
+                }
+
+                return new ImHashMap<K, V>(Data, left, Right);
+            }
+            else
+            {
+                if (Right.Height == 0)
+                    return new ImHashMap<K, V>(Data, Left, new ImHashMap<K, V>(hash, key, value), 2);
+
+                if (Right.Hash == hash)
+                {
+                    var rightWithNewConflict = Right.UpdateValueOrAddOrUpdateConflict(hash, key, value);
+                    return ReferenceEquals(rightWithNewConflict, Right) ? this
+                        : new ImHashMap<K, V>(Data, Left, rightWithNewConflict, Height);
+                }
+
+                if (Left.Height == 0)
+                {
+                    if (hash < Right.Hash)
+                        return new ImHashMap<K, V>(new ImHashMapData<K, V>(hash, key, value),
+                            new ImHashMap<K, V>(Data), new ImHashMap<K, V>(Right.Data), 2);
+
+                    return new ImHashMap<K, V>(Right.Data,
+                        new ImHashMap<K, V>(Data), new ImHashMap<K, V>(hash, key, value), 2);
+                }
+
+                var right = Right.AddOrUpdateLeftOrRight(hash, key, value);
+                if (ReferenceEquals(right, Right))
+                    return this;
+
+                if (right.Height > Left.Height + 1)
+                {
+                    var rightLeft = right.Left;
+                    var rightRight = right.Right;
+                    if (rightLeft.Height > rightRight.Height)
+                        return new ImHashMap<K, V>(rightLeft.Data,
+                            new ImHashMap<K, V>(Data, Left, rightLeft.Left),
+                            new ImHashMap<K, V>(right.Data, rightLeft.Right, rightRight));
+
+                    return new ImHashMap<K, V>(right.Data,
+                        new ImHashMap<K, V>(Data, Left, rightLeft), rightRight);
+                }
+
+                return new ImHashMap<K, V>(Data, Left, right);
+            }
+        }
+
+
+        /// Updates the map with the new value if key is found, otherwise returns the same unchanged map.
+        public ImHashMap<K, V> Update(int hash, K key, V value, Update<K, V> update = null)
         {
             if (Height == 0)
                 return this;
-
-            if (hash == Hash)
-            {
-                if (ReferenceEquals(Key, key) || Key.Equals(key))
-                {
-                    if (update != null)
-                        value = update(Value, value);
-                    return new ImHashMap<K, V>(new Data(hash, key, value, Conflicts), Left, Right);
-                }
-
-                var isUpdated = false;
-                var oldValue = default(V);
-                return UpdateValueAndResolveConflicts(key, value, ref isUpdated, ref oldValue, 
-                    update == null ? (Update<K, V>)null : (k, v, nv) => update(v, nv), 
-                    true);
-            }
 
             // No need to balance cause we not adding or removing nodes
             if (hash < Hash)
             {
                 var left = Left.Update(hash, key, value, update);
-                return left == Left ? this : new ImHashMap<K, V>(_data, left, Right);
+                return ReferenceEquals(left, Left) ? this : new ImHashMap<K, V>(Data, left, Right, Height);
             }
-            else
+
+            if (hash > Hash)
             {
                 var right = Right.Update(hash, key, value, update);
-                return right == Right ? this : new ImHashMap<K, V>(_data, Left, right);
+                return ReferenceEquals(right, Right) ? this : new ImHashMap<K, V>(Data, Left, right, Height);
+            }
+
+            var conflictsData = Data as ImHashMapConflicts<K, V>;
+            if (conflictsData == null && (ReferenceEquals(Key, key) || Key.Equals(key)))
+                return new ImHashMap<K, V>(
+                    new ImHashMapData<K, V>(hash, key, update == null ? value : update(key, Value, value)),
+                    Left, Right, Height);
+
+            return AddOrUpdateConflict(conflictsData, hash, key, value, update, DoAddOrUpdateConflicts.Update);
+        }
+
+        /// Updates the map with the new value if key is found, otherwise returns the same unchanged map.
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> Update(K key, V value) =>
+            Update(key.GetHashCode(), key, value);
+
+        /// Updates the map with the new value if key is found, otherwise returns the same unchanged map.
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> Update(K key, V value, Update<V> update) =>
+            Update(key.GetHashCode(), key, value, update.IgnoreKey);
+
+        /// <summary>
+        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        /// The only difference is using fixed size array instead of stack for speed-up.
+        /// </summary>
+        public IEnumerable<ImHashMapData<K, V>> Enumerate()
+        {
+            if (Height != 0)
+            {
+                var parents = new ImHashMap<K, V>[Height];
+                var node = this;
+                var parentCount = -1;
+                while (node.Height != 0 || parentCount != -1)
+                {
+                    if (node.Height != 0)
+                    {
+                        parents[++parentCount] = node;
+                        node = node.Left;
+                    }
+                    else
+                    {
+                        node = parents[parentCount--];
+                        if (node.Data is ImHashMapConflicts<K, V> conflictsData)
+                        {
+                            var conflicts = conflictsData.Conflicts;
+                            for (var i = 0; i < conflicts.Length; i++)
+                                yield return conflicts[i];
+                        }
+                        else
+                        {
+                            yield return node.Data;
+                        }
+
+                        node = node.Right;
+                    }
+                }
             }
         }
 
-        private ImHashMap<K, V> UpdateValueAndResolveConflicts(
-            K key, V value, ref bool isUpdated, ref V oldValue, Update<K, V> update = null, bool updateOnly = false)
+        /// <summary>
+        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        /// The only difference is using fixed size array instead of stack for speed-up.
+        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
+        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
+        /// </summary>
+        public S Fold<S>(S state, Func<ImHashMapData<K, V>, S, S> reduce, ImHashMap<K, V>[] parentsStack = null)
         {
-            if (Conflicts == null) // add only if updateOnly is false.
-                return updateOnly
-                    ? this
-                    : new ImHashMap<K, V>(new Data(Hash, Key, Value, new[] { new KV<K, V>(key, value) }), Left, Right);
+            if (Height == 1 && Data is ImHashMapConflicts<K, V> == false)
+                return reduce(Data, state);
 
-            var found = Conflicts.Length - 1;
-            while (found >= 0 && !Equals(Conflicts[found].Key, Key)) --found;
-            if (found == -1)
+            if (Height != 0)
             {
-                if (updateOnly)
-                    return this;
-                var newConflicts = new KV<K, V>[Conflicts.Length + 1];
-                Array.Copy(Conflicts, 0, newConflicts, 0, Conflicts.Length);
-                newConflicts[Conflicts.Length] = new KV<K, V>(key, value);
-                return new ImHashMap<K, V>(new Data(Hash, Key, Value, newConflicts), Left, Right);
+                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
+                var node = this;
+                var parentCount = -1;
+                while (node.Height != 0 || parentCount != -1)
+                {
+                    if (node.Height != 0)
+                    {
+                        parentsStack[++parentCount] = node;
+                        node = node.Left;
+                    }
+                    else
+                    {
+                        node = parentsStack[parentCount--];
+
+                        if (!(node.Data is ImHashMapConflicts<K, V> conflicts))
+                            state = reduce(node.Data, state);
+                        else
+                        {
+                            var conflict = conflicts.Conflicts;
+                            for (var i = 0; i < conflict.Length; i++)
+                                state = reduce(conflict[i], state);
+                        }
+
+                        node = node.Right;
+                    }
+                }
             }
 
-            var conflicts = new KV<K, V>[Conflicts.Length];
-            Array.Copy(Conflicts, 0, conflicts, 0, Conflicts.Length);
+            return state;
+        }
 
-            if (update != null)
-                value = update(key, Conflicts[found].Value, value);
-            if (ReferenceEquals(value, Value) || value?.Equals(Value) == true)
+        /// <summary>
+        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        /// The only difference is using fixed size array instead of stack for speed-up.
+        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
+        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
+        /// </summary>
+        public S Visit<S>(S state, Action<ImHashMapData<K, V>, S> effect, ImHashMap<K, V>[] parentsStack = null)
+        {
+            if (Height == 1 && Data is ImHashMapConflicts<K, V> == false)
+            {
+                effect(Data, state);
+            }
+            else if (Height != 0)
+            {
+                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
+                var node = this;
+                var parentCount = -1;
+                while (node.Height != 0 || parentCount != -1)
+                {
+                    if (node.Height != 0)
+                    {
+                        parentsStack[++parentCount] = node;
+                        node = node.Left;
+                    }
+                    else
+                    {
+                        node = parentsStack[parentCount--];
+
+                        if (!(node.Data is ImHashMapConflicts<K, V> conflicts))
+                            effect(node.Data, state);
+                        else
+                        {
+                            var conflict = conflicts.Conflicts;
+                            for (var i = 0; i < conflict.Length; i++)
+                                effect(conflict[i], state);
+                        }
+
+                        node = node.Right;
+                    }
+                }
+            }
+
+            return state;
+        }
+
+        /// <summary>
+        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        /// The only difference is using fixed size array instead of stack for speed-up.
+        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
+        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
+        /// </summary>
+        public S Fold<S>(S state, Func<ImHashMapData<K, V>, int, S, S> reduce, ImHashMap<K, V>[] parentsStack = null)
+        {
+            if (Height == 1 && Data is ImHashMapConflicts<K, V> == false)
+                return reduce(Data, 0, state);
+
+            if (Height != 0)
+            {
+                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
+                var index = 0;
+                var node = this;
+                var parentCount = -1;
+                while (node.Height != 0 || parentCount != -1)
+                {
+                    if (node.Height != 0)
+                    {
+                        parentsStack[++parentCount] = node;
+                        node = node.Left;
+                    }
+                    else
+                    {
+                        node = parentsStack[parentCount--];
+
+                        if (!(node.Data is ImHashMapConflicts<K, V> conflicts))
+                            state = reduce(node.Data, index++, state);
+                        else
+                        {
+                            var conflictData = conflicts.Conflicts;
+                            for (var i = 0; i < conflictData.Length; i++)
+                                state = reduce(conflictData[i], index++, state);
+                        }
+
+                        node = node.Right;
+                    }
+                }
+            }
+
+            return state;
+        }
+
+        /// Removes or updates value for specified key, or does nothing if the key is not found (returns the unchanged map)
+        /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
+        public ImHashMap<K, V> Remove(int hash, K key) =>
+            RemoveImpl(hash, key);
+
+        /// Removes or updates value for specified key, or does nothing if the key is not found (returns the unchanged map)
+        /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
+        [MethodImpl((MethodImplOptions)256)]
+        public ImHashMap<K, V> Remove(K key) =>
+            RemoveImpl(key.GetHashCode(), key);
+
+        private ImHashMap<K, V> RemoveImpl(int hash, K key, bool ignoreKey = false)
+        {
+            if (Height == 0)
                 return this;
 
-            isUpdated = true;
-            oldValue = conflicts[found].Value;
-            conflicts[found] = new KV<K, V>(key, value);
-            return new ImHashMap<K, V>(new Data(Hash, Key, Value, conflicts), Left, Right);
+            ImHashMap<K, V> result;
+            if (hash == Hash) // found node
+            {
+                if (ignoreKey || Equals(Key, key))
+                {
+                    if (Height == 1) // remove node
+                        return Empty;
+
+                    if (Right.IsEmpty)
+                        result = Left;
+                    else if (Left.IsEmpty)
+                        result = Right;
+                    else
+                    {
+                        // we have two children, so remove the next highest node and replace this node with it.
+                        var next = Right;
+                        while (!next.Left.IsEmpty)
+                            next = next.Left;
+                        result = new ImHashMap<K, V>(next.Data, Left, Right.RemoveImpl(next.Hash, default, ignoreKey: true));
+                    }
+                }
+                else if (Data is ImHashMapConflicts<K, V> conflictsData)
+                    return TryRemoveConflicted(conflictsData, hash, key);
+                else
+                    return this; // if key is not matching and no conflicts to lookup - just return
+            }
+            else
+                result = hash < Hash
+                    ? Balance(Data, Left.RemoveImpl(hash, key, ignoreKey), Right)
+                    : Balance(Data, Left, Right.RemoveImpl(hash, key, ignoreKey));
+
+            return result;
         }
 
-        /// It is fine to be public.
+        /// Searches for the key in the node conflicts
+        public ImHashMapData<K, V> GetConflictedDataOrDefault(K key)
+        {
+            if (Conflicts != null)
+            {
+                var conflicts = Conflicts;
+                for (var i = 0; i < conflicts.Length; ++i)
+                {
+                    var data = conflicts[i];
+                    if (key.Equals(data.Key))
+                        return data;
+                }
+            }
+            return null;
+        }
+
+        /// Searches for the key in the node conflicts
         public V GetConflictedValueOrDefault(K key, V defaultValue)
         {
             if (Conflicts != null)
-                for (var i = Conflicts.Length - 1; i >= 0; --i)
-                    if (Equals(Conflicts[i].Key, key))
-                        return Conflicts[i].Value;
+            {
+                var conflicts = Conflicts;
+                for (var i = 0; i < conflicts.Length; ++i)
+                {
+                    var conflict = conflicts[i];
+                    if (key.Equals(conflict.Key))
+                        return conflict.Value;
+                }
+            }
             return defaultValue;
         }
 
-        /// Does it
+        /// Searches for the key in the node conflicts
         public bool TryFindConflictedValue(K key, out V value)
         {
             if (Conflicts != null)
-                for (var i = Conflicts.Length - 1; i >= 0; --i)
-                    if (Equals(Conflicts[i].Key, key))
+            {
+                var conflicts = Conflicts;
+                for (var i = 0; i < conflicts.Length; ++i)
+                    if (Equals(conflicts[i].Key, key))
                     {
-                        value = Conflicts[i].Value;
+                        value = conflicts[i].Value;
                         return true;
                     }
-
-            value = default(V);
+            }
+            value = default;
             return false;
         }
 
-        private static ImHashMap<K, V> Balance(Data data, ImHashMap<K, V> left, ImHashMap<K, V> right)
+        private static ImHashMap<K, V> Balance(ImHashMapData<K, V> data, ImHashMap<K, V> left, ImHashMap<K, V> right)
         {
             var delta = left.Height - right.Height;
             if (delta > 1) // left is longer by 2, rotate left
@@ -2002,8 +4436,8 @@ namespace ImTools
                     //   2     6      4     6      2     5
                     // 1   4        2   3        1   3     6
                     //    3        1
-                    return new ImHashMap<K, V>(leftRight._data,
-                        new ImHashMap<K, V>(left._data, leftLeft, leftRight.Left),
+                    return new ImHashMap<K, V>(leftRight.Data,
+                        new ImHashMap<K, V>(left.Data, leftLeft, leftRight.Left),
                         new ImHashMap<K, V>(data, leftRight.Right, right));
                 }
 
@@ -2011,7 +4445,7 @@ namespace ImTools
                 //      5     =>     2
                 //   2     6      1     5
                 // 1   4              4   6
-                return new ImHashMap<K, V>(left._data,
+                return new ImHashMap<K, V>(left.Data,
                     leftLeft, new ImHashMap<K, V>(data, leftRight, right));
             }
 
@@ -2019,96 +4453,77 @@ namespace ImTools
             {
                 var rightLeft = right.Left;
                 var rightRight = right.Right;
-                if (rightLeft.Height > rightRight.Height)
-                {
-                    return new ImHashMap<K, V>(rightLeft._data,
+                return rightLeft.Height > rightRight.Height
+                    ? new ImHashMap<K, V>(rightLeft.Data,
                         new ImHashMap<K, V>(data, left, rightLeft.Left),
-                        new ImHashMap<K, V>(right._data, rightLeft.Right, rightRight));
-                }
-
-                return new ImHashMap<K, V>(right._data,
-                    new ImHashMap<K, V>(data, left, rightLeft), rightRight);
+                        new ImHashMap<K, V>(right.Data, rightLeft.Right, rightRight))
+                    : new ImHashMap<K, V>(right.Data, new ImHashMap<K, V>(data, left, rightLeft), rightRight);
             }
 
             return new ImHashMap<K, V>(data, left, right);
         }
 
-        internal ImHashMap<K, V> Remove(int hash, K key, bool ignoreKey = false)
+        private ImHashMap<K, V> TryRemoveConflicted(ImHashMapConflicts<K, V> conflictsData, int hash, K key)
         {
-            if (Height == 0)
-                return this;
-
-            ImHashMap<K, V> result;
-            if (hash == Hash) // found node
-            {
-                if (ignoreKey || Equals(Key, key))
-                {
-                    if (!ignoreKey && Conflicts != null)
-                        return ReplaceRemovedWithConflicted();
-
-                    if (Height == 1) // remove node
-                        return Empty;
-
-                    if (Right.IsEmpty)
-                        result = Left;
-                    else if (Left.IsEmpty)
-                        result = Right;
-                    else
-                    {
-                        // we have two children, so remove the next highest node and replace this node with it.
-                        var successor = Right;
-                        while (!successor.Left.IsEmpty) successor = successor.Left;
-                        result = new ImHashMap<K, V>(successor._data,
-                            Left, Right.Remove(successor.Hash, default(K), ignoreKey: true));
-                    }
-                }
-                else if (Conflicts != null)
-                    return TryRemoveConflicted(key);
-                else
-                    return this; // if key is not matching and no conflicts to lookup - just return
-            }
-            else
-                result = hash < Hash
-                    ? Balance(_data, Left.Remove(hash, key, ignoreKey), Right)
-                    : Balance(_data, Left, Right.Remove(hash, key, ignoreKey));
-
-            return result;
-        }
-
-        private ImHashMap<K, V> TryRemoveConflicted(K key)
-        {
-            var index = Conflicts.Length - 1;
-            while (index >= 0 && !Equals(Conflicts[index].Key, key)) --index;
+            var conflicts = conflictsData.Conflicts;
+            var index = conflicts.Length - 1;
+            while (index != -1 && !conflicts[index].Key.Equals(key)) --index;
             if (index == -1) // key is not found in conflicts - just return
                 return this;
 
-            if (Conflicts.Length == 1)
-                return new ImHashMap<K, V>(new Data(Hash, Key, Value), Left, Right);
-            var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
+            // we removing the one from the 2 items, so we can reference the remaining item directly from the map node 
+            if (conflicts.Length == 2)
+                return new ImHashMap<K, V>(index == 0 ? conflicts[1] : conflicts[0], Left, Right, Height);
+
+            // copy all except the `index`ed data into shrinked conflicts
+            var shrinkedConflicts = new ImHashMapData<K, V>[conflicts.Length - 1];
             var newIndex = 0;
-            for (var i = 0; i < Conflicts.Length; ++i)
-                if (i != index) shrinkedConflicts[newIndex++] = Conflicts[i];
-            return new ImHashMap<K, V>(new Data(Hash, Key, Value, shrinkedConflicts), Left, Right);
+            for (var i = 0; i < conflicts.Length; ++i)
+                if (i != index)
+                    shrinkedConflicts[newIndex++] = conflicts[i];
+            return new ImHashMap<K, V>(new ImHashMapConflicts<K, V>(hash, shrinkedConflicts), Left, Right, Height);
         }
-
-        private ImHashMap<K, V> ReplaceRemovedWithConflicted()
-        {
-            if (Conflicts.Length == 1)
-                return new ImHashMap<K, V>(new Data(Hash, Conflicts[0].Key, Conflicts[0].Value), Left, Right);
-            var shrinkedConflicts = new KV<K, V>[Conflicts.Length - 1];
-            Array.Copy(Conflicts, 1, shrinkedConflicts, 0, shrinkedConflicts.Length);
-            return new ImHashMap<K, V>(new Data(Hash, Conflicts[0].Key, Conflicts[0].Value, shrinkedConflicts), Left, Right);
-        }
-
-        #endregion
     }
 
     /// ImHashMap methods for faster performance
     public static class ImHashMap
     {
+        internal static V IgnoreKey<K, V>(this Update<V> update, K _, V oldValue, V newValue) => update(oldValue, newValue);
+
+        /// Looks for key in a tree and returns the Data object if found or `null` otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMapData<K, V> GetDataOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
+        {
+            while (map.Height != 0 && map.Hash != hash)
+                map = hash < map.Hash ? map.Left : map.Right;
+
+            return map.Height == 0 ? null :
+                key.Equals(map.Key) ? map.Data :
+                map.GetConflictedDataOrDefault(key);
+        }
+
+        /// Looks for key in a tree and returns the Data object if found or `null` otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMapData<K, V> GetDataOrDefault<K, V>(this ImHashMap<K, V> map, K key)
+        {
+            if (map.Height == 0)
+                return null;
+
+            var hash = key.GetHashCode();
+
+            while (map.Hash != hash)
+            {
+                map = hash < map.Hash ? map.Left : map.Right;
+                if (map.Height == 0)
+                    return null;
+            }
+
+            return key.Equals(map.Key) ? map.Data : map.GetConflictedDataOrDefault(key);
+        }
+
         /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
         [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue = default(V))
+        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue = default)
         {
             if (map.Height == 0)
                 return defaultValue;
@@ -2122,13 +4537,29 @@ namespace ImTools
                     return defaultValue;
             }
 
-            return ReferenceEquals(key, map.Key) || key.Equals(map.Key)
-                ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
+            return key.Equals(map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
         }
 
         /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
         [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, Type key, V defaultValue = default(V))
+        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key, V defaultValue = default)
+        {
+            if (map.Height == 0)
+                return defaultValue;
+
+            while (map.Hash != hash)
+            {
+                map = hash < map.Hash ? map.Left : map.Right;
+                if (map.Height == 0)
+                    return defaultValue;
+            }
+
+            return key.Equals(map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
+        }
+
+        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, Type key, V defaultValue = default)
         {
             if (map.Height == 0)
                 return defaultValue;
@@ -2145,385 +4576,242 @@ namespace ImTools
             return ReferenceEquals(key, map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
         }
 
-        /// Returns true if key is found and sets the value.
+        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
         [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<K, V>(this ImHashMap<K, V> map, K key, out V value)
+        public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, int hash, Type key, V defaultValue = default)
         {
-            value = default(V);
             if (map.Height == 0)
-                return false;
-
-            var hash = key.GetHashCode();
+                return defaultValue;
 
             while (hash != map.Hash)
             {
                 map = hash < map.Hash ? map.Left : map.Right;
                 if (map.Height == 0)
-                    return false;
+                    return defaultValue;
             }
 
-            if (ReferenceEquals(key, map.Key) || key.Equals(map.Key))
-            {
-                value = map.Value;
-                return true;
-            }
-
-            return map.TryFindConflictedValue(key, out value);
+            // we don't need to check `Height != 0` again cause in that case `key` will be `null` and `ReferenceEquals` will fail
+            return ReferenceEquals(key, map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
         }
 
         /// Returns true if key is found and sets the value.
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<K, V>(this ImHashMap<K, V> map, K key, out V value)
+        {
+            if (map.Height != 0)
+            {
+                var hash = key.GetHashCode();
+
+                while (hash != map.Hash && map.Height != 0)
+                    map = hash < map.Hash ? map.Left : map.Right;
+
+                if (map.Height != 0)
+                {
+                    if (key.Equals(map.Key))
+                    {
+                        value = map.Value;
+                        return true;
+                    }
+
+                    return map.TryFindConflictedValue(key, out value);
+                }
+            }
+
+            value = default;
+            return false;
+        }
+
+        /// Returns true if key is found and sets the value.
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<K, V>(this ImHashMap<K, V> map, int hash, K key, out V value)
+        {
+            if (map.Height != 0)
+            {
+                while (hash != map.Hash && map.Height != 0)
+                    map = hash < map.Hash ? map.Left : map.Right;
+
+                if (map.Height != 0)
+                {
+                    if (key.Equals(map.Key))
+                    {
+                        value = map.Value;
+                        return true;
+                    }
+
+                    return map.TryFindConflictedValue(key, out value);
+                }
+            }
+
+            value = default;
+            return false;
+        }
+
+        /// Returns true if key is found and the result value.
         [MethodImpl((MethodImplOptions)256)]
         public static bool TryFind<V>(this ImHashMap<Type, V> map, Type key, out V value)
         {
-            if (map.Height == 0)
+            if (map.Height != 0)
             {
-                value = default(V);
-                return false;
+                var hash = key.GetHashCode();
+                while (hash != map.Hash && map.Height != 0)
+                    map = hash < map.Hash ? map.Left : map.Right;
+
+                if (map.Height != 0)
+                {
+                    // assign to `var data = ...`
+                    if (ReferenceEquals(key, map.Key))
+                    {
+                        value = map.Value;
+                        return true;
+                    }
+
+                    return map.TryFindConflictedValue(key, out value);
+                }
             }
 
-            var hash = key.GetHashCode();
+            value = default;
+            return false;
+        }
 
-            while (hash != map.Hash && map.Height != 0)
-                map = hash < map.Hash ? map.Left : map.Right;
-
-            if (ReferenceEquals(key, map.Key))
+        /// Returns true if hash and key are found and the result value, or the false otherwise
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<V>(this ImHashMap<Type, V> map, int hash, Type key, out V value)
+        {
+            if (map.Height != 0)
             {
-                value = map.Value;
-                return true;
+                while (hash != map.Hash && map.Height != 0)
+                    map = hash < map.Hash ? map.Left : map.Right;
+
+                if (map.Height != 0)
+                {
+                    if (ReferenceEquals(key, map.Key))
+                    {
+                        value = map.Value;
+                        return true;
+                    }
+
+                    return map.TryFindConflictedValue(key, out value);
+                }
             }
 
-            return map.TryFindConflictedValue(key, out value);
+            value = default;
+            return false;
         }
     }
 
-    /// The array of ImMap of constant width wide, where the `Key` is partitioned using last bits and the rest of bits are combined with `Height` into a single `int32`
-    public struct ImMapArray<V>
+    /// The array of ImMap slots where the key first bits are used for FAST slot location
+    /// and the slot is the reference to ImMap that can be swapped with its updated value
+    public static class ImHashMapSlots
     {
-        // Slots count and mask to partition the Key across the slots 
-        internal const int SLOT_COUNT = 32;
-        internal const int HEIGHT_MASK = SLOT_COUNT - 1;
-        internal const int KEY_MASK = ~HEIGHT_MASK;
+        /// Default number of slots
+        public const int SLOT_COUNT_POWER_OF_TWO = 32;
 
-        /// Creates en empty array
+        /// The default mask to partition the key to the target slot
+        public const int HASH_MASK_TO_FIND_SLOT = SLOT_COUNT_POWER_OF_TWO - 1;
+
+        /// Creates the array with the empty slots
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMapArray<V> Create()
+        public static ImHashMap<K, V>[] CreateWithEmpty<K, V>(int slotCountPowerOfTwo = SLOT_COUNT_POWER_OF_TWO)
         {
-            var slots = new ImMapSlot<V>[SLOT_COUNT];
-            for (var i = 0; i < SLOT_COUNT; ++i)
-                slots[i] = ImMapSlot<V>.Empty;
-            return new ImMapArray<V>(slots);
+            var slots = new ImHashMap<K, V>[slotCountPowerOfTwo];
+            for (var i = 0; i < slots.Length; ++i)
+                slots[i] = ImHashMap<K, V>.Empty;
+            return slots;
         }
-
-        internal readonly ImMapSlot<V>[] Slots;
-        private ImMapArray(ImMapSlot<V>[] slots) => Slots = slots;
 
         /// Returns a new tree with added or updated value for specified key.
         [MethodImpl((MethodImplOptions)256)]
-        public void AddOrUpdate(int key, V value)
+        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] slots, int hash, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT)
         {
-            ref var slot = ref Slots[key & HEIGHT_MASK];
+            ref var slot = ref slots[hash & hashMaskToFindSlot];
             var copy = slot;
-
-            var newSlot = copy.KeyPlusHeight == 0 ? ImMapSlot<V>.Leaf(key & KEY_MASK, value)
-                : (key & KEY_MASK) != copy.KeyPart ? copy.AddOrUpdate(key & KEY_MASK, value)
-                : new ImMapSlot<V>(copy.KeyPlusHeight, value, copy.Left, copy.Right);
-
-            if (Interlocked.CompareExchange(ref slot, newSlot, copy) != copy)
-                RefAddOrUpdateSlot(ref slot, key, value);
+            if (Interlocked.CompareExchange(ref slot, copy.AddOrUpdate(hash, key, value), copy) != copy)
+                RefAddOrUpdateSlot(ref slot, hash, key, value);
         }
 
-        private static void RefAddOrUpdateSlot(ref ImMapSlot<V> slot, int key, V value) =>
-            Ref.Swap(ref slot, key, value, (k, v, s) =>
-                s.KeyPlusHeight == 0 ? ImMapSlot<V>.Leaf(k, v)
-                : k != s.KeyPart ? s.AddOrUpdate(k, v)
-                : new ImMapSlot<V>(s.KeyPlusHeight, v, s.Left, s.Right));
-
-        /// <summary>Returns new tree with added or updated value for specified key.</summary>
-        /// <param name="key">Key</param> <param name="value">Value</param>
-        /// <param name="updateValue">(optional) Delegate to calculate new value from and old and a new value.</param>
-        /// <returns>New tree.</returns>
+        /// Returns a new tree with added or updated value for specified key.
         [MethodImpl((MethodImplOptions)256)]
-        public void AddOrUpdate(int key, V value, Update<V> updateValue)
+        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] slots, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT) =>
+            slots.AddOrUpdate(key.GetHashCode(), key, value, hashMaskToFindSlot);
+
+        /// Updates the ref to the slot with the new version - retry if the someone changed the slot in between
+        public static void RefAddOrUpdateSlot<K, V>(ref ImHashMap<K, V> slot, int hash, K key, V value) =>
+            Ref.Swap(ref slot, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v));
+
+        /// Updates the value with help of `updateValue` function
+        [MethodImpl((MethodImplOptions)256)]
+        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] slots, int hash, K key, V value, Update<K, V> update, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT)
         {
-            ref var slot = ref Slots[key & HEIGHT_MASK];
+            ref var slot = ref slots[hash & hashMaskToFindSlot];
             var copy = slot;
-
-            var newSlot = copy.AddOrUpdate(key & KEY_MASK, value, false, updateValue);
-            if (Interlocked.CompareExchange(ref slot, newSlot, copy) != copy)
-                RefAddOrUpdateSlot(ref slot, key & KEY_MASK, value, updateValue);
+            if (Interlocked.CompareExchange(ref slot, copy.AddOrUpdate(hash, key, value, update), copy) != copy)
+                RefAddOrUpdateSlot(ref slot, hash, key, value, update);
         }
 
-        private static void RefAddOrUpdateSlot(ref ImMapSlot<V> slot, int key, V value, Update<V> updateValue) =>
-            Ref.Swap(ref slot, key, value, updateValue, (k, v, u, s) => s.AddOrUpdate(k, v, false, u));
-
-        /// <summary>Returns new tree with updated value for the key, Or the same tree if key was not found.</summary>
-        /// <param name="key"></param> <param name="value"></param>
-        /// <returns>New tree if key is found, or the same tree otherwise.</returns>
+        /// Updates the value with help of `updateValue` function
         [MethodImpl((MethodImplOptions)256)]
-        public void Update(int key, V value)
+        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] slots, K key, V value, Update<K, V> updateValue, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT) =>
+            slots.AddOrUpdate(key.GetHashCode(), key, value, updateValue, hashMaskToFindSlot);
+
+        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
+        public static void RefAddOrUpdateSlot<K, V>(ref ImHashMap<K, V> slot, int hash, K key, V value, Update<K, V> update) =>
+            Ref.Swap(ref slot, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v, update));
+
+        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
+        [MethodImpl((MethodImplOptions)256)]
+        public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] slots, int hash, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT)
         {
-            ref var slot = ref Slots[key & HEIGHT_MASK];
+            ref var slot = ref slots[hash & hashMaskToFindSlot];
             var copy = slot;
-            var newSlot = copy.AddOrUpdate(key & KEY_MASK, value, true, null);
-            if (Interlocked.CompareExchange(ref slot, newSlot, copy) != copy)
-                RefUpdateSlot(ref slot, key & KEY_MASK, value);
+            if (Interlocked.CompareExchange(ref slot, copy.AddOrKeep(hash, key, value), copy) != copy)
+                RefAddOrKeepSlot(ref slot, hash, key, value);
         }
 
-        private static void RefUpdateSlot(ref ImMapSlot<V> slot, int key, V value) =>
-            Ref.Swap(ref slot, key, value, (k, v, s) => s.AddOrUpdate(k, v, true, null));
-
-        /// Get value for found key or the default value otherwise.
+        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
         [MethodImpl((MethodImplOptions)256)]
-        public V GetValueOrDefault(int key)
-        {
-            var slot = Slots[key & HEIGHT_MASK];
+        public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] slots, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT) =>
+            slots.AddOrKeep(key.GetHashCode(), key, value, hashMaskToFindSlot);
 
-            key &= KEY_MASK;
-            while (slot.KeyPlusHeight != 0 && key != slot.KeyPart)
-                slot = key < slot.KeyPart ? slot.Left : slot.Right;
+        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
+        public static void RefAddOrKeepSlot<K, V>(ref ImHashMap<K, V> slot, int hash, K key, V value) =>
+            Ref.Swap(ref slot, hash, key, value, (s, h, k, v) => s.AddOrKeep(h, k, v));
 
-            return slot.Value;
-        }
-
-        /// Returns true if key is found and sets the value.
+        /// Updates the specified slot or does not change it
         [MethodImpl((MethodImplOptions)256)]
-        public bool TryFind(int key, out V value)
+        public static void Update<K, V>(this ImHashMap<K, V>[] slots, int hash, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT)
         {
-            var slot = Slots[key & HEIGHT_MASK];
-
-            key &= KEY_MASK;
-            while (slot.KeyPlusHeight != 0 && key != slot.KeyPart)
-                slot = key < slot.KeyPart ? slot.Left : slot.Right;
-
-            if (slot.KeyPlusHeight == 0)
-            {
-                value = default;
-                return false;
-            }
-
-            value = slot.Value;
-            return true;
-        }
-    }
-
-    /// Slot used in `ImMapArray` where Height and Key is combined into one field
-    public sealed class ImMapSlot<V>
-    {
-        /// Empty tree to start with
-        public static readonly ImMapSlot<V> Empty = new ImMapSlot<V>(0, default, null, null);
-
-        /// Combines height in lower bits and the trimmed key in upper bits
-        public readonly int KeyPlusHeight;
-
-        /// <summary>Value.</summary>
-        public readonly V Value;
-
-        /// <summary>Left sub-tree/branch, or empty.</summary>
-        public readonly ImMapSlot<V> Left;
-
-        /// <summary>Right sub-tree/branch, or empty.</summary>
-        public readonly ImMapSlot<V> Right;
-
-        /// The Key without last 4 bits
-        public int KeyPart
-        {
-            [MethodImpl((MethodImplOptions)256)]
-            get => KeyPlusHeight & ImMapArray<V>.KEY_MASK;
+            ref var slot = ref slots[hash & hashMaskToFindSlot];
+            var copy = slot;
+            if (Interlocked.CompareExchange(ref slot, copy.Update(hash, key, value), copy) != copy)
+                RefUpdateSlot(ref slot, hash, key, value);
         }
 
-        /// Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.
-        public int Height
-        {
-            [MethodImpl((MethodImplOptions)256)]
-            get => KeyPlusHeight & ImMapArray<V>.HEIGHT_MASK;
-        }
-
-        /// <summary>Returns true is tree is empty.</summary>
-        public bool IsEmpty
-        {
-            [MethodImpl((MethodImplOptions)256)]
-            get => KeyPlusHeight == 0;
-        }
-
-        /// Outputs the key value pair or empty if node is empty
-        public override string ToString() => IsEmpty ? "empty" : "Node: " + KeyPart + " -> " + Value;
-
-        internal ImMapSlot(int keyPlusHeight, V value, ImMapSlot<V> left, ImMapSlot<V> right)
-        {
-            KeyPlusHeight = keyPlusHeight;
-            Value = value;
-            Left = left;
-            Right = right;
-        }
-
+        /// Updates the specified slot or does not change it
         [MethodImpl((MethodImplOptions)256)]
-        internal static ImMapSlot<V> Leaf(int key, V value) =>
-            new ImMapSlot<V>(key | 1, value, Empty, Empty);
+        public static void Update<K, V>(this ImHashMap<K, V>[] slots, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT) =>
+            slots.Update(key.GetHashCode(), key, value, hashMaskToFindSlot);
 
-        [MethodImpl((MethodImplOptions)256)]
-        internal static ImMapSlot<V> Branch(int key, V value, ImMapSlot<V> left, ImMapSlot<V> right) =>
-            new ImMapSlot<V>(key | (left.Height > right.Height ? left.Height + 1 : right.Height + 1), value, left, right);
+        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
+        public static void RefUpdateSlot<K, V>(ref ImHashMap<K, V> slot, int hash, K key, V value) =>
+            Ref.Swap(ref slot, key, value, (s, k, v) => s.Update(k, v));
 
-        internal ImMapSlot<V> AddOrUpdate(int key, V value)
+        /// Returns all map tree nodes without the order
+        public static S Fold<K, V, S>(this ImHashMap<K, V>[] slots, S state, Func<ImHashMapData<K, V>, S, S> reduce)
         {
-            if (key < KeyPart)
+            var parentStack = ArrayTools.Empty<ImHashMap<K, V>>();
+            for (var s = 0; s < slots.Length; s++)
             {
-                if (Left.KeyPlusHeight == 0)
-                    return new ImMapSlot<V>(KeyPart | 2, Value, Leaf(key, value), Right);
-
-                if (Left.KeyPart == key)
-                    return new ImMapSlot<V>(KeyPart | Height, Value, Leaf(key, value), Right);
-
-                if (Right.KeyPlusHeight == 0)
+                var map = slots[s];
+                var height = map.Height;
+                if (height != 0)
                 {
-                    // single rotation:
-                    //      5     =>     2
-                    //   2            1     5
-                    // 1              
-                    if (key < Left.KeyPart)
-                        return new ImMapSlot<V>(Left.KeyPart | 2, Left.Value, Leaf(key, value), Leaf(KeyPart, Value));
-
-                    // double rotation:
-                    //      5     =>     5     =>     4
-                    //   2            4            2     5
-                    //     4        2               
-                    return new ImMapSlot<V>(key | 2, value, Leaf(Left.KeyPart, Left.Value), Leaf(KeyPart, Value));
+                    if (height > 1 && parentStack.Length < height)
+                        parentStack = new ImHashMap<K, V>[height];
+                    state = map.Fold(state, reduce, parentStack);
                 }
-
-                var left = Left.AddOrUpdate(key, value);
-
-                if (left.Height > Right.Height + 1) // left is longer by 2, rotate left
-                {
-                    var leftLeft = left.Left;
-                    var leftRight = left.Right;
-
-                    // single rotation:
-                    //      5     =>     2
-                    //   2     6      1     5
-                    // 1   4              4   6
-                    if (leftLeft.Height >= leftRight.Height)
-                        return Branch(left.KeyPart, left.Value, leftLeft, Branch(KeyPart, Value, leftRight, Right));
-
-                    // double rotation:
-                    //      5     =>     5     =>     4
-                    //   2     6      4     6      2     5
-                    // 1   4        2   3        1   3     6
-                    //    3        1
-                    return Branch(leftRight.KeyPart, leftRight.Value,
-                        Branch(left.KeyPart, left.Value, leftLeft, leftRight.Left),
-                        Branch(KeyPart, Value, leftRight.Right, Right));
-                }
-
-                return Branch(KeyPart, Value, left, Right);
-            }
-            else
-            {
-                if (Right.KeyPlusHeight == 0)
-                    return Branch(KeyPart | 2, Value, Left, Leaf(key, value));
-
-                if (Right.KeyPart == key)
-                    return Branch(KeyPart | Height, Value, Left, Leaf(key, value));
-
-                if (Left.KeyPlusHeight == 0)
-                {
-                    // single rotation:
-                    //      5     =>     8     
-                    //         8      5     9
-                    //           9
-                    if (key >= Right.KeyPart)
-                        return new ImMapSlot<V>(Right.KeyPart | 2, Right.Value, Leaf(KeyPart, Value), Leaf(key, value));
-
-                    // double rotation:
-                    //      5     =>     5     =>     7
-                    //         8            7      5     8
-                    //        7              8
-                    return new ImMapSlot<V>(key | 2, value, Leaf(KeyPart, Value), Leaf(Right.KeyPart, Right.Value));
-                }
-
-                var right = Right.AddOrUpdate(key, value);
-                if (right.Height > Left.Height + 1)
-                {
-                    var rightLeft = right.Left;
-                    var rightRight = right.Right;
-
-                    if (rightRight.Height >= rightLeft.Height)
-                        return Branch(right.KeyPart, right.Value, Branch(KeyPart, Value, Left, rightLeft), rightRight);
-
-                    return Branch(rightLeft.KeyPart, rightLeft.Value,
-                        Branch(KeyPart, Value, Left, rightLeft.Left),
-                        Branch(right.KeyPart, right.Value, rightLeft.Right, rightRight));
-                }
-
-                return Branch(KeyPart, Value, Left, right);
-            }
-        }
-
-        [MethodImpl((MethodImplOptions)256)]
-        internal ImMapSlot<V> GetOrAdd(int key, V newValue, out V value)
-        {
-            var slot = this;
-            while (slot.KeyPlusHeight != 0 && key != slot.KeyPart)
-                slot = key < slot.KeyPart ? slot.Left : slot.Right;
-
-            if (slot.KeyPlusHeight != 0)
-            {
-                value = slot.Value;
-                return this;
             }
 
-            value = newValue;
-            return AddOrUpdate(key, value);
-        }
-
-        // note: Not so much optimized (memory and performance wise) as a AddOrUpdateImpl without `update` delegate
-        internal ImMapSlot<V> AddOrUpdate(int key, V value, bool updateOnly, Update<V> update) =>
-            KeyPlusHeight == 0
-                ? (updateOnly ? this : Leaf(key, value))
-                : key == KeyPart
-                    ? new ImMapSlot<V>(KeyPlusHeight, update == null ? value : update(Value, value), Left, Right)
-                    : key < KeyPart // try update on left or right sub-tree
-                        ? Balance(KeyPart, Value, Left.AddOrUpdate(key, value, updateOnly, update), Right)
-                        : Balance(KeyPart, Value, Left, Right.AddOrUpdate(key, value, updateOnly, update));
-
-        internal static ImMapSlot<V> Balance(int key, V value, ImMapSlot<V> left, ImMapSlot<V> right)
-        {
-            var delta = left.Height - right.Height;
-            if (delta > 1) // left is longer by 2, rotate left
-            {
-                var leftLeft = left.Left;
-                var leftRight = left.Right;
-                if (leftRight.Height > leftLeft.Height)
-                {
-                    // double rotation:
-                    //      5     =>     5     =>     4
-                    //   2     6      4     6      2     5
-                    // 1   4        2   3        1   3     6
-                    //    3        1
-                    return Branch(leftRight.KeyPart, leftRight.Value,
-                        Branch(left.KeyPart, left.Value, leftLeft, leftRight.Left),
-                        Branch(key, value, leftRight.Right, right));
-                }
-
-                // single rotation:
-                //      5     =>     2
-                //   2     6      1     5
-                // 1   4              4   6
-                return Branch(left.KeyPart, left.Value, leftLeft, Branch(key, value, leftRight, right));
-            }
-
-            if (delta < -1)
-            {
-                var rightLeft = right.Left;
-                var rightRight = right.Right;
-                if (rightLeft.Height > rightRight.Height)
-                    return Branch(rightLeft.KeyPart, rightLeft.Value,
-                        Branch(key, value, left, rightLeft.Left),
-                        Branch(right.KeyPart, right.Value, rightLeft.Right, rightRight));
-
-                return Branch(right.KeyPart, right.Value, Branch(key, value, left, rightLeft), rightRight);
-            }
-
-            return Branch(key, value, left, right);
+            return state;
         }
     }
 }
