@@ -1095,6 +1095,17 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 |                     Grace |  1.722 us | 0.0335 us | 0.0262 us |  0.45 |    0.01 | 0.6866 |     - |     - |   3.17 KB |
 |         Grace_MsDiAdapter |  2.306 us | 0.0251 us | 0.0235 us |  0.60 |    0.01 | 0.7401 |     - |     - |   3.41 KB |
 
+            ## ImTools V2 - not optimized ref slots
+
+|                    Method |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|-------------------------- |----------:|----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+|                      MsDi |  4.158 us | 0.1177 us | 0.3377 us |  3.985 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
+|                    DryIoc |  1.868 us | 0.0652 us | 0.0724 us |  1.845 us |  0.40 |    0.02 | 0.7591 |     - |     - |    3.5 KB |
+|        DryIoc_MsDiAdapter |  2.663 us | 0.0993 us | 0.2784 us |  2.492 us |  0.64 |    0.05 | 0.7629 |     - |     - |   3.52 KB |
+| DryIoc_InterpretationOnly | 16.536 us | 0.3299 us | 0.6435 us | 16.357 us |  3.82 |    0.37 | 1.3123 |     - |     - |   6.14 KB |
+|                     Grace |  1.762 us | 0.0278 us | 0.0260 us |  1.755 us |  0.37 |    0.02 | 0.6866 |     - |     - |   3.17 KB |
+|         Grace_MsDiAdapter |  2.334 us | 0.0327 us | 0.0305 us |  2.327 us |  0.50 |    0.02 | 0.7401 |     - |     - |   3.41 KB |
+
 */
 
             private IServiceProvider _msDi;
