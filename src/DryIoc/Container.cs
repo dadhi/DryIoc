@@ -196,9 +196,8 @@ namespace DryIoc
             if (!ifAlreadyRegistered.HasValue)
                 ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
 
-            var registry = _registry.Value;
-
             // Improves performance a bit by first attempting to swap the registry while it is still unchanged.
+            var registry = _registry.Value;
             if (!_registry.TrySwapIfStillCurrent(registry, registry.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
                 RegistrySwap(factory, serviceType, serviceKey, ifAlreadyRegistered);
         }
@@ -2058,92 +2057,81 @@ namespace DryIoc
                     WithDefaultService(factory, serviceType, ifAlreadyRegistered) : 
                     WithKeyedService(factory, serviceType, ifAlreadyRegistered, serviceKey);
 
-            private static object IfAlreadyRegisteredAppendNotKeyedDefaultService(Type _, object oldEntry, object newEntry) =>
-                oldEntry == null ? newEntry :
-               (oldEntry as FactoriesEntry ?? FactoriesEntry.Empty.With((Factory)oldEntry)).With((Factory)newEntry);
-
-            private static object IfAlreadyRegisteredThrowDefaultService(Type serviceType, object oldEntry, object newEntry) => 
-                oldEntry == null ? newEntry
-                : oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
-                    ? (object)oldFactoriesEntry.With((Factory) newEntry)
-                    : Throw.For<object>(Error.UnableToRegisterDuplicateDefault, serviceType, newEntry, oldEntry);
-
-            private static object IfAlreadyRegisteredReplaceDefaultService(Type _, object oldEntry, object newEntry)
-            {
-                if (oldEntry is FactoriesEntry oldFactoriesEntry)
-                {
-                    if (oldFactoriesEntry.LastDefaultKey == null)
-                        return oldFactoriesEntry.With((Factory)newEntry);
-
-                    // remove defaults but keep keyed (issue #569) by collecting the only keyed factories
-                    // and using them in a new factory entry
-                    var keyedFactories = ImHashMap<object, Factory>.Empty;
-                    foreach (var f in oldFactoriesEntry.Factories.Enumerate())
-                        if (f.Key is DefaultKey == false)
-                            keyedFactories = keyedFactories.AddOrUpdate(f.Key, f.Value);
-
-                    if (!keyedFactories.IsEmpty)
-                        return new FactoriesEntry(DefaultKey.Value,
-                            keyedFactories.AddOrUpdate(DefaultKey.Value, (Factory)newEntry));
-                }
-
-                return newEntry;
-            }
-
-            private static object IfAlreadyRegisteredAppendNewImplDefaultService(Type _, object oldEntry, object newEntry)
-            {
-                if (oldEntry == null)
-                    return newEntry;
-                var oldFactoriesEntry = oldEntry as FactoriesEntry;
-                if (oldFactoriesEntry != null && oldFactoriesEntry.LastDefaultKey == null)
-                    return oldFactoriesEntry.With((Factory)newEntry);
-
-                var newFactory = (Factory)newEntry;
-                var oldFactory = oldEntry as Factory;
-
-                var implementationType = newFactory.ImplementationType;
-                if (implementationType == null ||
-                    oldFactory != null && oldFactory.ImplementationType != implementationType)
-                    return (oldFactoriesEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(newFactory);
-
-                if (oldFactoriesEntry != null)
-                {
-                    var isNewImplType = true;
-                    foreach (var f in oldFactoriesEntry.Factories.Enumerate())
-                        if (f.Value.ImplementationType == implementationType)
-                        {
-                            isNewImplType = false;
-                            break;
-                        }
-
-                    if (isNewImplType)
-                        return (oldFactoriesEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(newFactory);
-                }
-
-                return oldEntry;
-            }
-
-            private static object IfAlreadyRegisteredKeepDefaultService(Type _, object oldEntry, object newEntry) =>
-                oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
-                    ? oldFactoriesEntry.With((Factory) newEntry)
-                    : oldEntry;
-
             private Registry WithDefaultService(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered)
             {
-                // todo: do we even need the `updateOldFactory` delegate or could we check the old entry directly
-                var updateOldEntry =
-                    ifAlreadyRegistered == IfAlreadyRegistered.AppendNotKeyed ? IfAlreadyRegisteredAppendNotKeyedDefaultService :
-                    ifAlreadyRegistered == IfAlreadyRegistered.Throw ? IfAlreadyRegisteredThrowDefaultService :
-                    ifAlreadyRegistered == IfAlreadyRegistered.Replace ? IfAlreadyRegisteredReplaceDefaultService :
-                    ifAlreadyRegistered == IfAlreadyRegistered.AppendNewImplementation ? IfAlreadyRegisteredAppendNewImplDefaultService :
-                    (Update<Type, object>)IfAlreadyRegisteredKeepDefaultService;
-
                 var services = Services;
+                object newEntry = factory;
                 var oldEntry = services.GetValueOrDefault(serviceType);
+                if (oldEntry != null)
+                {
+                    switch (ifAlreadyRegistered)
+                    {
+                        case IfAlreadyRegistered.AppendNotKeyed:
+                            newEntry = (oldEntry as FactoriesEntry ?? FactoriesEntry.Empty.With((Factory)oldEntry)).With(factory);
+                            break;
+                        case IfAlreadyRegistered.Throw:
+                            newEntry = oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
+                                ? oldFactoriesEntry.With(factory)
+                                : Throw.For<object>(Error.UnableToRegisterDuplicateDefault, serviceType, factory, oldEntry);
+                            break;
+                        case IfAlreadyRegistered.Replace:
+                            if (oldEntry is FactoriesEntry facEntryToReplace)
+                            {
+                                if (facEntryToReplace.LastDefaultKey == null)
+                                    newEntry = facEntryToReplace.With(factory);
+                                else
+                                {
+                                    // remove defaults but keep keyed (issue #569) by collecting the only keyed factories
+                                    // and using them in a new factory entry
+                                    var keyedFactories = facEntryToReplace.Factories.Fold(
+                                        ImHashMap<object, Factory>.Empty,
+                                        (x, map) => x.Key is DefaultKey == false ? map.AddOrUpdate(x.Key, x.Value) : map);
+                                    if (!keyedFactories.IsEmpty)
+                                        newEntry = new FactoriesEntry(DefaultKey.Value,
+                                            keyedFactories.AddOrUpdate(DefaultKey.Value, factory));
+                                }
+                            }
+                            break;
+                        case IfAlreadyRegistered.AppendNewImplementation:
+                            var oldImplFacsEntry = oldEntry as FactoriesEntry;
+                            if (oldImplFacsEntry != null && oldImplFacsEntry.LastDefaultKey == null)
+                                newEntry = oldImplFacsEntry.With(factory);
+                            else
+                            {
+                                var oldFactory = oldEntry as Factory;
+                                var implementationType = factory.ImplementationType;
+                                if (implementationType == null ||
+                                    oldFactory != null && oldFactory.ImplementationType != implementationType)
+                                    newEntry = (oldImplFacsEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(factory);
+                                else if (oldImplFacsEntry != null)
+                                {
+                                    var isNewImplType = true;
+                                    foreach (var f in oldImplFacsEntry.Factories.Enumerate())
+                                        if (f.Value.ImplementationType == implementationType)
+                                        {
+                                            isNewImplType = false;
+                                            break;
+                                        }
 
-                // todo: check the returned entry instead of using delegate
-                var newServices = services.AddOrUpdate(serviceType, factory, updateOldEntry);
+                                    newEntry = isNewImplType 
+                                        ? (oldImplFacsEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(factory) 
+                                        : oldEntry;
+                                }
+                            }
+                            break;
+                        default: // IfAlreadyRegisteredKeepDefaultService
+                            newEntry = oldEntry is FactoriesEntry oldFacsEntry && oldFacsEntry.LastDefaultKey == null
+                                ? oldFacsEntry.With(factory)
+                                : oldEntry;
+                            break;
+                    }
+                }
 
+                // services did not change
+                if (newEntry == oldEntry)
+                    return this;
+
+                var newServices = services.AddOrUpdate(serviceType, newEntry);
                 var newRegistry = new Registry(newServices, Decorators, Wrappers,
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
 
