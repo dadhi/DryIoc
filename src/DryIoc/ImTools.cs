@@ -4239,51 +4239,6 @@ namespace ImTools
         /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
         /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
         /// </summary>
-        public S Visit<S>(S state, Action<ImHashMapData<K, V>, S> effect, ImHashMap<K, V>[] parentsStack = null)
-        {
-            if (Height == 1 && Data is ImHashMapConflicts<K, V> == false)
-            {
-                effect(Data, state);
-            }
-            else if (Height != 0)
-            {
-                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
-                var node = this;
-                var parentCount = -1;
-                while (node.Height != 0 || parentCount != -1)
-                {
-                    if (node.Height != 0)
-                    {
-                        parentsStack[++parentCount] = node;
-                        node = node.Left;
-                    }
-                    else
-                    {
-                        node = parentsStack[parentCount--];
-
-                        if (!(node.Data is ImHashMapConflicts<K, V> conflicts))
-                            effect(node.Data, state);
-                        else
-                        {
-                            var conflict = conflicts.Conflicts;
-                            for (var i = 0; i < conflict.Length; i++)
-                                effect(conflict[i], state);
-                        }
-
-                        node = node.Right;
-                    }
-                }
-            }
-
-            return state;
-        }
-
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up.
-        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
-        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
-        /// </summary>
         public S Fold<S>(S state, Func<ImHashMapData<K, V>, int, S, S> reduce, ImHashMap<K, V>[] parentsStack = null)
         {
             if (Height == 1 && Data is ImHashMapConflicts<K, V> == false)
@@ -4313,6 +4268,51 @@ namespace ImTools
                             var conflictData = conflicts.Conflicts;
                             for (var i = 0; i < conflictData.Length; i++)
                                 state = reduce(conflictData[i], index++, state);
+                        }
+
+                        node = node.Right;
+                    }
+                }
+            }
+
+            return state;
+        }
+
+        /// <summary>
+        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
+        /// The only difference is using fixed size array instead of stack for speed-up.
+        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
+        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
+        /// </summary>
+        public S Visit<S>(S state, Action<ImHashMapData<K, V>, S> effect, ImHashMap<K, V>[] parentsStack = null)
+        {
+            if (Height == 1 && Data is ImHashMapConflicts<K, V> == false)
+            {
+                effect(Data, state);
+            }
+            else if (Height != 0)
+            {
+                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
+                var node = this;
+                var parentCount = -1;
+                while (node.Height != 0 || parentCount != -1)
+                {
+                    if (node.Height != 0)
+                    {
+                        parentsStack[++parentCount] = node;
+                        node = node.Left;
+                    }
+                    else
+                    {
+                        node = parentsStack[parentCount--];
+
+                        if (!(node.Data is ImHashMapConflicts<K, V> conflicts))
+                            effect(node.Data, state);
+                        else
+                        {
+                            var conflict = conflicts.Conflicts;
+                            for (var i = 0; i < conflict.Length; i++)
+                                effect(conflict[i], state);
                         }
 
                         node = node.Right;
@@ -4371,6 +4371,22 @@ namespace ImTools
                     : Balance(Data, Left, Right.RemoveImpl(hash, key, ignoreKey));
 
             return result;
+        }
+
+        /// <summary> Searches for the key in the conflicts and returns true if found </summary>
+        public bool ContainsConflictedData(K key)
+        {
+            if (Conflicts != null)
+            {
+                var conflicts = Conflicts;
+                for (var i = 0; i < conflicts.Length; ++i)
+                {
+                    var data = conflicts[i];
+                    if (key.Equals(data.Key))
+                        return true;
+                }
+            }
+            return false;
         }
 
         /// Searches for the key in the node conflicts
@@ -4490,7 +4506,7 @@ namespace ImTools
     {
         internal static V IgnoreKey<K, V>(this Update<V> update, K _, V oldValue, V newValue) => update(oldValue, newValue);
 
-        /// Looks for key in a tree and returns the Data object if found or `null` otherwise.
+        /// <summary> Looks for key in a tree and returns the Data object if found or `null` otherwise. </summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMapData<K, V> GetDataOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
         {
@@ -4502,7 +4518,21 @@ namespace ImTools
                 map.GetConflictedDataOrDefault(key);
         }
 
-        /// Looks for key in a tree and returns the Data object if found or `null` otherwise.
+        /// <summary> Looks for key in a tree and returns `true` if found. </summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool Contains<K, V>(this ImHashMap<K, V> map, int hash, K key)
+        {
+            while (map.Height != 0 && map.Hash != hash)
+                map = hash < map.Hash ? map.Left : map.Right;
+            return map.Height != 0 && (key.Equals(map.Key) || map.ContainsConflictedData(key));
+        }
+
+        /// <summary> Looks for key in a tree and returns `true` if found. </summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool Contains<K, V>(this ImHashMap<K, V> map, K key) => 
+            map.Height != 0 && map.Contains(key.GetHashCode(), key);
+
+        /// <summary> Looks for key in a tree and returns the Data object if found or `null` otherwise. </summary> 
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMapData<K, V> GetDataOrDefault<K, V>(this ImHashMap<K, V> map, K key)
         {

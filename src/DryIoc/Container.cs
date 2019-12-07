@@ -2148,67 +2148,55 @@ namespace DryIoc
                 return newRegistry;
             }
 
-            private static object IfAlreadyRegisteredKeepKeyedService(object _, object oldEntry, object newEntry)
-            {
-                if (oldEntry == null)
-                    return newEntry;
-
-                var newFactoriesEntry = (FactoriesEntry)newEntry;
-                if (oldEntry is Factory)
-                    return newFactoriesEntry.With((Factory)oldEntry);
-
-                var oldFactoriesEntry = (FactoriesEntry)oldEntry;
-                return new FactoriesEntry(
-                    oldFactoriesEntry.LastDefaultKey,
-                    oldFactoriesEntry.Factories.AddOrUpdate(
-                        newFactoriesEntry.Factories.Key, newFactoriesEntry.Factories.Value,
-                        (_, oldFactory, newFactory) => oldFactory == null ? newFactory : oldFactory));
-            }
-
-            private static object IfAlreadyRegisteredReplaceKeyedService(object _, object oldEntry, object newEntry)
-            {
-                if (oldEntry == null)
-                    return newEntry;
-
-                if (oldEntry is Factory)
-                    return ((FactoriesEntry)newEntry).With((Factory)oldEntry);
-
-                return new FactoriesEntry(((FactoriesEntry)oldEntry).LastDefaultKey,
-                    ((FactoriesEntry)oldEntry).Factories.AddOrUpdate(
-                    ((FactoriesEntry)newEntry).Factories.Key, ((FactoriesEntry)newEntry).Factories.Value));
-            }
-
-            private static object IfAlreadyRegisteredThrowKeyedService(Type serviceType, object oldEntry, object newEntry)
-            {
-                if (oldEntry == null)
-                    return newEntry;
-
-                var newFactoriesEntry = (FactoriesEntry)newEntry;
-                if (oldEntry is Factory)
-                    return newFactoriesEntry.With((Factory)oldEntry);
-
-                var oldFactoriesEntry = (FactoriesEntry)oldEntry;
-                return new FactoriesEntry(
-                    oldFactoriesEntry.LastDefaultKey,
-                    oldFactoriesEntry.Factories.AddOrUpdate(
-                        newFactoriesEntry.Factories.Key, newFactoriesEntry.Factories.Value,
-                        (key, oldFactory, newFactory) => oldFactory == null 
-                            ? newFactory
-                            : Throw.For<Factory>(Error.UnableToRegisterDuplicateKey, key, newFactory, oldFactory)));
-            }
-
             private Registry WithKeyedService(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, 
                 object serviceKey)
             {
-                var updateOldEntry =
-                    ifAlreadyRegistered == IfAlreadyRegistered.Keep ? IfAlreadyRegisteredKeepKeyedService :
-                    ifAlreadyRegistered == IfAlreadyRegistered.Replace ? IfAlreadyRegisteredReplaceKeyedService :
-                    (Update<Type, object>)IfAlreadyRegisteredThrowKeyedService;
+                object newEntry = null;
+                var services = Services;
+                var oldEntry = services.GetValueOrDefault(serviceType);
+                if (oldEntry != null)
+                {
+                    switch (ifAlreadyRegistered)
+                    {
+                        case IfAlreadyRegistered.Keep:
+                            if (oldEntry is Factory factoryToKeep)
+                                newEntry = FactoriesEntry.Empty.With(factory, serviceKey).With(factoryToKeep);
+                            else
+                            {
+                                var oldFacs = (FactoriesEntry)oldEntry;
+                                if (oldFacs.Factories.Contains(serviceKey))
+                                    return this; // keep the old registry
+                                newEntry = new FactoriesEntry(oldFacs.LastDefaultKey,
+                                    oldFacs.Factories.AddOrUpdate(serviceKey, factory));
+                            }
+                            break;
+                        case IfAlreadyRegistered.Replace:
+                            if (oldEntry is Factory factoryToReplace)
+                                newEntry = FactoriesEntry.Empty.With(factory, serviceKey).With(factoryToReplace);
+                            else
+                                newEntry = new FactoriesEntry(((FactoriesEntry)oldEntry).LastDefaultKey,
+                                    ((FactoriesEntry)oldEntry).Factories.AddOrUpdate(serviceKey, factory));
+                            break;
+                        default:
+                            if (oldEntry is Factory defaultFactory)
+                                newEntry = FactoriesEntry.Empty.With(factory, serviceKey).With(defaultFactory);
+                            else
+                            {
+                                var oldFacs = (FactoriesEntry)oldEntry;
+                                var oldFac = oldFacs.Factories.GetValueOrDefault(serviceKey);
+                                if (oldFac != null)
+                                    Throw.It(Error.UnableToRegisterDuplicateKey, serviceKey, serviceKey, oldFac);
+                                newEntry = new FactoriesEntry(oldFacs.LastDefaultKey,
+                                    ((FactoriesEntry)oldEntry).Factories.AddOrUpdate(serviceKey, factory));
+                            }
+                            break;
+                    }
+                }
 
-                // todo: do we need the `updateOldEntry`
-                var oldEntry = Services.GetValueOrDefault(serviceType);
-                var newServices = Services.AddOrUpdate(serviceType, FactoriesEntry.Empty.With(factory, serviceKey), updateOldEntry);
+                if (newEntry == null)
+                    newEntry = FactoriesEntry.Empty.With(factory, serviceKey);
 
+                var newServices = services.AddOrUpdate(serviceType, newEntry);
                 var newRegistry = new Registry(newServices, Decorators, Wrappers,
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
                     _isChangePermitted);
