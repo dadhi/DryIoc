@@ -3175,6 +3175,35 @@ namespace DryIoc
             return instance;
         }
 
+        /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>
+        /// if the TYPE is not registered yet.</summary>
+        /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
+        /// <param name="concreteType">Type to instantiate. Wrappers (Func, Lazy, etc.) is also supported.</param>
+        /// <param name="setup">Setup for the concrete type, e.g. `TrackDisposableTransient`</param>
+        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, 
+        /// properties and fields.</param>
+        /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
+        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
+        public static object New(this IContainer container, Type concreteType, Setup setup, Made made = null,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache)
+        {
+            var containerClone = container.With(container.Rules, container.ScopeContext,
+                registrySharing, container.SingletonScope);
+
+            var implType = containerClone.GetWrappedType(concreteType, null);
+
+            var condition = setup == null && made == null ? null
+                : made == null  ? (Func<Factory, bool>)(f => f.Setup == setup)
+                : setup == null ? (Func<Factory, bool>)(f => f.Made == made)
+                : (f => f.Made == made && f.Setup == setup);
+
+            if (!containerClone.IsRegistered(implType, condition: condition))
+                 containerClone.Register(implType, made: made, setup: setup);
+
+            // No need to Dispose facade because it shares singleton/open scopes with source container, and disposing source container does the job.
+            return containerClone.Resolve(concreteType, IfUnresolved.Throw);
+        }
+
         /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
         /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
         /// <param name="concreteType">Type to instantiate. Wrappers (Func, Lazy, etc.) is also supported.</param>
@@ -3183,18 +3212,8 @@ namespace DryIoc
         /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
         /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
         public static object New(this IContainer container, Type concreteType, Made made = null,
-            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache)
-        {
-            var containerClone = container.With(container.Rules, container.ScopeContext,
-                registrySharing, container.SingletonScope);
-
-            var implType = containerClone.GetWrappedType(concreteType, null);
-
-            containerClone.Register(implType, made: made);
-
-            // No need to Dispose facade because it shares singleton/open scopes with source container, and disposing source container does the job.
-            return containerClone.Resolve(concreteType, IfUnresolved.Throw);
-        }
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
+            container.New(concreteType, setup: null, made, registrySharing);
 
         /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/>.</summary>
         /// <typeparam name="T">Type to instantiate.</typeparam>
