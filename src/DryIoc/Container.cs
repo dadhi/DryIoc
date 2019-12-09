@@ -1836,7 +1836,7 @@ namespace DryIoc
                 return null;
             }
 
-            [MethodImpl((MethodImplOptions) 256)]
+            [MethodImpl((MethodImplOptions)256)]
             internal void CacheFactoryExpression(int factoryId, Request request, Expression expr,
                 ExpressionCacheSlot slot = null)
             {
@@ -1855,7 +1855,7 @@ namespace DryIoc
 
                     var current = map;
                     if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(factoryId, slot), current) != current)
-                        Ref.Swap(ref map, factoryId, slot, (x, type, e) => x.AddOrUpdate(type, e));
+                        Ref.Swap(ref map, factoryId, slot, (x, id, s) => x.AddOrUpdate(id, s));
                 }
 
                 var reuse = request.Reuse;
