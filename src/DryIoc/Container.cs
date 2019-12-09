@@ -1730,25 +1730,17 @@ namespace DryIoc
             internal const int CACHE_SLOT_COUNT = 16;
             internal const int CACHE_SLOT_COUNT_MASK = CACHE_SLOT_COUNT - 1;
 
-            public ImHashMap<Type, CacheSlot>[] DefaultFactoryCache;
+            public ImHashMap<Type, object>[] DefaultFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
-            public CacheSlot GetCachedDefaultFactoryOrDefault(Type serviceType)
+            public ImHashMapData<Type, object> GetCachedDefaultFactoryOrDefault(Type serviceType)
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = DefaultFactoryCache;
                 if (cache == null)
                     return null;
-
                 var hash = serviceType.GetHashCode();
-                var map = cache[hash & CACHE_SLOT_COUNT_MASK];
-                if (map == null)
-                    return null;
-
-                while (map.Height != 0 && hash != map.Hash)
-                    map = hash < map.Hash ? map.Left : map.Right;
-
-                return ReferenceEquals(serviceType, map.Key) ? map.Value : map.GetConflictedValueOrDefault(serviceType, null);
+                return cache[hash & CACHE_SLOT_COUNT_MASK]?.GetDataOrDefault(hash, serviceType);
             }
 
             public void TryCacheDefaultFactory<T>(Type serviceType, T factory)
@@ -1758,18 +1750,16 @@ namespace DryIoc
                     return;
 
                 if (DefaultFactoryCache == null)
-                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, CacheSlot>[CACHE_SLOT_COUNT], null);
+                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
 
-                ref var map = ref DefaultFactoryCache[serviceType.GetHashCode() & CACHE_SLOT_COUNT_MASK];
-                
+                var hash = serviceType.GetHashCode();
+                ref var map = ref DefaultFactoryCache[hash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
-                    Interlocked.CompareExchange(ref map, ImHashMap<Type, CacheSlot>.Empty, null);
-
-                var cacheSlot = new CacheSlot(factory);
+                    Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
 
                 var m = map;
-                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(serviceType, cacheSlot), m) != m)
-                    Ref.Swap(ref map, serviceType, cacheSlot, (x, type, slot) => x.AddOrUpdate(type, slot));
+                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(hash, serviceType, factory), m) != m)
+                    Ref.Swap(ref map, hash, serviceType, factory, (x, h, t, slot) => x.AddOrUpdate(h, t, slot));
             }
 
             // Where key object is `KV.Of(ServiceType, ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
@@ -1930,7 +1920,7 @@ namespace DryIoc
                 ImHashMap<Type, object> services,
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
-                ImHashMap<Type, CacheSlot>[] defaultFactoryCache,
+                ImHashMap<Type, object>[] defaultFactoryCache,
                 ImHashMap<object, CacheSlot>[] keyedFactoryCache,
                 ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
@@ -2354,8 +2344,11 @@ namespace DryIoc
                     {
                         var defaultFactoryCache = DefaultFactoryCache;
                         if (defaultFactoryCache != null)
-                            Ref.Swap(ref defaultFactoryCache[serviceType.GetHashCode() & CACHE_SLOT_COUNT_MASK],
-                                serviceType, (x, t) => (x ?? ImHashMap<Type, CacheSlot>.Empty).Update(t, null));
+                        {
+                            var hash = serviceType.GetHashCode();
+                            Ref.Swap(ref defaultFactoryCache[hash & CACHE_SLOT_COUNT_MASK],
+                                serviceType, (x, t) => (x ?? ImHashMap<Type, object>.Empty).Update(t, null));
+                        }
 
                         // todo: At the moment there is not possibility to clean-up a particular factory.
                         // But considering that keyed services are much lees "likely" than the default ones - then  it is fine, right?
