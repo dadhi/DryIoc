@@ -1118,7 +1118,6 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 | DryIoc_InterpretationOnly | 16.835 us | 0.2516 us | 0.2354 us |  3.82 |    0.09 | 1.2207 |     - |     - |    5.7 KB |
 |                     Grace |  1.753 us | 0.0340 us | 0.0392 us |  0.40 |    0.01 | 0.6866 |     - |     - |   3.17 KB |
 |         Grace_MsDiAdapter |  2.356 us | 0.0203 us | 0.0190 us |  0.54 |    0.01 | 0.7401 |     - |     - |   3.41 KB |
-
 */
 
             private IServiceProvider _msDi;

@@ -3359,9 +3359,37 @@ namespace ImTools
                 : newData;
         }
 
-        /// <summary>
-        /// Returns true if key is found and sets the value.
-        /// </summary>
+        /// <summary> Returns true if key is found and sets the result data. </summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFindData<V>(this ImMap<V> map, int key, out ImMapData<V> result)
+        {
+            ImMapData<V> data;
+            while (map is ImMapTree<V> tree)
+            {
+                data = tree.Data;
+                if (key > data.Key)
+                    map = tree.Right;
+                else if (key < data.Key)
+                    map = tree.Left;
+                else
+                {
+                    result = data;
+                    return true;
+                }
+            }
+
+            data = map as ImMapData<V>;
+            if (data != null && data.Key == key)
+            {
+                result = data;
+                return true;
+            }
+
+            result = null;
+            return false;
+        }
+
+        /// <summary> Returns true if key is found and sets the value. </summary>
         [MethodImpl((MethodImplOptions)256)]
         public static bool TryFind<V>(this ImMap<V> map, int key, out V value)
         {
@@ -3391,7 +3419,7 @@ namespace ImTools
             return false;
         }
 
-        /// <summary> Returns true if key is found and sets the value. </summary>
+        /// <summary> Returns true if key is found and sets the result data. </summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImMapData<V> GetDataOrDefault<V>(this ImMap<V> map, int key)
         {

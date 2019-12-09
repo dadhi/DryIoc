@@ -9923,18 +9923,19 @@ namespace DryIoc
                 : TryGetOrAddViaFactoryDelegate(id, createValue, r, disposalOrder);
         }
 
+        // todo: create the same Coalesce expression and use it directly - can we
         internal object GetOrAddViaFactoryDelegateExpression(
             int id, FactoryDelegate createValue, IResolverContext r) =>
-            (GetOrDefault(id) ?? GetOrAddViaFactoryDelegateNoDisposalOrder(id, createValue, r)).Value;
+            (GetItemRefOrDefault(id) ?? GetOrAddViaFactoryDelegateNoDisposalOrder(id, createValue, r)).Value;
 
-        internal ImMapData<object> GetOrDefault(int id)
+        internal ImMapData<object> GetItemRefOrDefault(int id)
         {
             var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetDataOrDefault(id);
             return itemRef == null || itemRef.Value == NoItem ? null : itemRef;
         }
 
-        internal static readonly MethodInfo GetOrDefaultMethod =
-            typeof(Scope).GetTypeInfo().GetDeclaredMethod(nameof(Scope.GetOrDefault));
+        internal static readonly MethodInfo GetItemRefOrDefaultMethod =
+            typeof(Scope).GetTypeInfo().GetDeclaredMethod(nameof(Scope.GetItemRefOrDefault));
 
         // todo: WIP try to improve the case where we don't have the disposal order
         internal ImMapData<object> GetOrAddViaFactoryDelegateNoDisposalOrder(int id, FactoryDelegate createValue, IResolverContext r)
@@ -10508,7 +10509,7 @@ namespace DryIoc
             Name == null && !ScopedOrSingleton 
                 ? Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.Scoped)))
                 : ScopedOrSingleton 
-                    ? (Expression) Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.ScopedOrSingleton)))
+                    ? (Expression)Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.ScopedOrSingleton)))
                     : Call(typeof(Reuse).Method(nameof(Reuse.ScopedTo), typeof(object)), fallbackConverter(Name));
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
