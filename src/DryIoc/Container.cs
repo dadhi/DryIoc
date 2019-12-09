@@ -9923,11 +9923,17 @@ namespace DryIoc
                 : TryGetOrAddViaFactoryDelegate(id, createValue, r, disposalOrder);
         }
 
-        // todo: create the same Coalesce expression and use it directly - can we
+        // todo: create the same Coalesce expression and use it directly - can we?
         internal object GetOrAddViaFactoryDelegateExpression(
             int id, FactoryDelegate createValue, IResolverContext r) =>
-            (GetItemRefOrDefault(id) ?? GetOrAddViaFactoryDelegateNoDisposalOrder(id, createValue, r)).Value;
+            (GetItemRefOrDefault(id) ?? TryAddViaFactoryDelegateNoDisposalOrder(id, createValue, r)).Value;
 
+        // todo: create the same Coalesce expression and use it directly - can we?
+        internal object GetOrAddViaFactoryDelegateNoDisposalOrderExpression(
+            int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder) =>
+            (GetItemRefOrDefault(id) ?? TryAddViaFactoryDelegate(id, createValue, r, disposalOrder)).Value;
+
+        [MethodImpl((MethodImplOptions)256)]
         internal ImMapData<object> GetItemRefOrDefault(int id)
         {
             var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetDataOrDefault(id);
@@ -9938,7 +9944,7 @@ namespace DryIoc
             typeof(Scope).GetTypeInfo().GetDeclaredMethod(nameof(Scope.GetItemRefOrDefault));
 
         // todo: WIP try to improve the case where we don't have the disposal order
-        internal ImMapData<object> GetOrAddViaFactoryDelegateNoDisposalOrder(int id, FactoryDelegate createValue, IResolverContext r)
+        internal ImMapData<object> TryAddViaFactoryDelegateNoDisposalOrder(int id, FactoryDelegate createValue, IResolverContext r)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
@@ -9965,8 +9971,35 @@ namespace DryIoc
             return itemRef;
         }
 
-        internal static readonly MethodInfo GetOrAddViaFactoryDelegateNoDisposalOrderMethod =
-            typeof(Scope).GetTypeInfo().GetDeclaredMethod(nameof(Scope.GetOrAddViaFactoryDelegateNoDisposalOrder));
+        internal static readonly MethodInfo TryAddViaFactoryDelegateNoDisposalOrderMethod =
+            typeof(Scope).GetTypeInfo().GetDeclaredMethod(nameof(Scope.TryAddViaFactoryDelegateNoDisposalOrder));
+
+        internal ImMapData<object> TryAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
+        {
+            if (_disposed == 1)
+                Throw.It(Error.ScopeIsDisposed, ToString());
+
+            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
+                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));
+
+            var itemRef = map.GetDataOrDefault(id);
+            if (itemRef.Value != NoItem)
+                return itemRef;
+
+            lock (itemRef)
+            {
+                if (itemRef.Value != NoItem)
+                    return itemRef;
+                itemRef.Value = createValue(r);
+            }
+
+            if (itemRef.Value is IDisposable disp && disp != this)
+                AddDisposable(disp, disposalOrder);
+
+            return itemRef;
+        }
 
         // todo: split to with and without `disposalOrder`
         internal object TryGetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
