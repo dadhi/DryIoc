@@ -879,13 +879,15 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
-|                            Method |        Mean |       Error |      StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |   Gen 2 | Allocated |
-|---------------------------------- |------------:|------------:|------------:|-------:|--------:|---------:|--------:|--------:|----------:|
-| BmarkMicrosoftDependencyInjection |    137.5 us |   1.7400 us |   1.4530 us |   1.00 |    0.00 |  18.5547 |  0.4883 |       - |  80.64 KB |
-|                       BmarkDryIoc |    117.7 us |   2.2876 us |   2.7232 us |   0.85 |    0.02 |  18.6768 |  0.4883 |       - |  86.44 KB |
-|                   BmarkDryIocMsDi |    140.8 us |   0.7857 us |   0.7350 us |   1.02 |    0.01 |  23.1934 |       - |       - | 107.88 KB |
-|                        BmarkGrace | 18,642.4 us | 107.3448 us |  95.1584 us | 135.53 |    1.82 | 156.2500 | 62.5000 |       - | 752.44 KB |
-|                    BmarkGraceMsDi | 21,655.1 us | 122.5632 us | 102.3458 us | 157.47 |    2.18 | 187.5000 | 93.7500 | 31.2500 | 922.18 KB |
+|                    Method |        Mean |     Error |    StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
+|-------------------------- |------------:|----------:|----------:|-------:|--------:|---------:|--------:|------:|----------:|
+|                      MsDI |    133.3 us |   2.58 us |   3.07 us |   1.00 |    0.00 |  16.9678 |  0.1221 |     - |  73.15 KB |
+|                    DryIoc |    103.6 us |   0.16 us |   0.13 us |   0.77 |    0.02 |  16.8457 |       - |     - |  78.04 KB |
+|               DryIoc_MsDI |    126.0 us |   1.08 us |   1.01 us |   0.94 |    0.02 |  21.2402 |       - |     - |  98.73 KB |
+| DryIoc_InterpretationOnly |    110.5 us |   1.15 us |   1.07 us |   0.82 |    0.02 |  16.8457 |       - |     - |  78.13 KB |
+|                     Grace | 18,217.4 us | 192.71 us | 180.26 us | 135.73 |    3.19 | 156.2500 | 62.5000 |     - | 751.76 KB |
+|                Grace_MsDI | 21,183.1 us |  40.35 us |  37.75 us | 157.82 |    3.34 | 187.5000 | 93.7500 |     - | 919.49 KB |
+
              */
 
             [Benchmark(Baseline = true)]
