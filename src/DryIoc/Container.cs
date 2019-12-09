@@ -2327,16 +2327,16 @@ namespace DryIoc
                 {
                     if (factory.FactoryGenerator == null)
                     {
-                        var defaultFactoryCache = DefaultFactoryCache;
-                        if (defaultFactoryCache != null)
+                        var defaultCache = DefaultFactoryCache;
+                        if (defaultCache != null)
                         {
                             var hash = serviceType.GetHashCode();
-                            Ref.Swap(ref defaultFactoryCache[hash & CACHE_SLOT_COUNT_MASK],
-                                serviceType, (x, t) => (x ?? ImHashMap<Type, object>.Empty).Update(t, null));
+                            Ref.Swap(ref defaultCache[hash & CACHE_SLOT_COUNT_MASK],
+                                hash, serviceType, (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).Update(h, t, null));
                         }
 
                         // todo: At the moment there is not possibility to clean-up a particular factory.
-                        // But considering that keyed services are much lees "likely" than the default ones - then  it is fine, right?
+                        // But considering that keyed services are much less "likely" than the default ones - then  it is fine, right?
                         KeyedFactoryCache = null;
                     }
                     else
