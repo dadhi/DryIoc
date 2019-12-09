@@ -1763,25 +1763,17 @@ namespace DryIoc
             }
 
             // Where key object is `KV.Of(ServiceType, ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
-            public ImHashMap<object, CacheSlot>[] KeyedFactoryCache;
+            public ImHashMap<object, object>[] KeyedFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
-            public CacheSlot GetCachedKeyedFactoryOrDefault(object key)
+            public ImHashMapData<object, object> GetCachedKeyedFactoryOrDefault(object key)
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = KeyedFactoryCache;
                 if (cache == null)
                     return null;
-
                 var hash = key.GetHashCode();
-                var map = cache[hash & CACHE_SLOT_COUNT_MASK];
-                if (map == null)
-                    return null;
-
-                while (map.Height != 0 && hash != map.Hash)
-                    map = hash < map.Hash ? map.Left : map.Right;
-
-                return key.Equals(map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, null);
+                return cache[hash & CACHE_SLOT_COUNT_MASK]?.GetDataOrDefault(hash, key);
             }
 
             public void TryCacheKeyedFactory(object key, object factory)
@@ -1791,16 +1783,16 @@ namespace DryIoc
                     return;
 
                 if (KeyedFactoryCache == null)
-                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImHashMap<object, CacheSlot>[CACHE_SLOT_COUNT], null);
+                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImHashMap<object, object>[CACHE_SLOT_COUNT], null);
 
-                ref var map = ref KeyedFactoryCache[key.GetHashCode() & CACHE_SLOT_COUNT_MASK];
+                var hash = key.GetHashCode();
+                ref var map = ref KeyedFactoryCache[hash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
-                    Interlocked.CompareExchange(ref map, ImHashMap<object, CacheSlot>.Empty, null);
+                    Interlocked.CompareExchange(ref map, ImHashMap<object, object>.Empty, null);
 
-                var current = map;
-                var cacheSlot = new CacheSlot(factory);
-                if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(key, cacheSlot), current) != current)
-                    Ref.Swap(ref map, key, cacheSlot, (x, type, slot) => x.AddOrUpdate(type, slot));
+                var m = map;
+                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(hash, key, factory), m) != m)
+                    Ref.Swap(ref map, hash, key, factory, (x, h, k, slot) => x.AddOrUpdate(h, k, slot));
             }
 
             internal sealed class ExpressionCacheSlot
@@ -1921,7 +1913,7 @@ namespace DryIoc
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
                 ImHashMap<Type, object>[] defaultFactoryCache,
-                ImHashMap<object, CacheSlot>[] keyedFactoryCache,
+                ImHashMap<object, object>[] keyedFactoryCache,
                 ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
             {
