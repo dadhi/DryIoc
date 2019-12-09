@@ -1720,13 +1720,6 @@ namespace DryIoc
             public readonly ImHashMap<Type, Factory[]> Decorators;
             public readonly ImHashMap<Type, Factory> Wrappers;
 
-            // FactoryDelegate or factory Expression cache for default (non-keyed services)
-            public sealed class CacheSlot
-            {
-                public object Value;
-                public CacheSlot(object value) => Value = value;
-            }
-
             internal const int CACHE_SLOT_COUNT = 16;
             internal const int CACHE_SLOT_COUNT_MASK = CACHE_SLOT_COUNT - 1;
 
