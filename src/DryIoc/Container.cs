@@ -10563,10 +10563,6 @@ namespace DryIoc
         internal static readonly MethodInfo GetScopedViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedViaFactoryDelegate));
 
-        // todo: idea is to remove `disposalIndex` constant creation
-        //public static object GetScopedViaFactoryDelegate1(IResolverContext r, int id, FactoryDelegate createValue) =>
-        //    r.GetCurrentScope()?.GetOrAddViaFactoryDelegate(id, createValue, r);
-
         /// [Obsolete("Replaced by `GetNameScopedViaFactoryDelegate`")]
         public static object GetNameScoped(IResolverContext r,
             object scopeName, bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
