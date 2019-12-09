@@ -3699,10 +3699,6 @@ namespace DryIoc
         public static IScope GetCurrentScope(this IResolverContext r, bool throwIfNotFound) =>
             r.CurrentScope ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope, r) : null);
 
-        /// Provides access to the current scope - throws if no current scope 
-        public static IScope GetCurrentScope(this IResolverContext r) =>
-            r.CurrentScope ?? Throw.For<IScope>(Error.NoCurrentScope, r);
-
         /// <summary>Gets current scope matching the <paramref name="name"/></summary>
         public static IScope GetNamedScope(this IResolverContext r, object name, bool throwIfNotFound)
         {
