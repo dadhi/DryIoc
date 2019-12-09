@@ -4285,7 +4285,7 @@ namespace DryIoc
             Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments), 
             IfAlreadyRegistered.AppendNotKeyed, 
             DefaultDependencyDepthToSplitObjectGraph, null, null, null, null, null);
-
+         
         /// <summary>Default value for <see cref="DependencyDepthToSplitObjectGraph"/></summary>
         public const int DefaultDependencyDepthToSplitObjectGraph = 20;
 
@@ -8355,7 +8355,8 @@ namespace DryIoc
 
             // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
             var setup = Setup;
-            if (container.Rules.EagerCachingSingletonForFasterAccess &&
+            var rules = container.Rules;
+            if (rules.EagerCachingSingletonForFasterAccess &&
                 request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
             {
                 if (container.SingletonScope.TryGet(out var singleton, FactoryID))
@@ -8367,10 +8368,10 @@ namespace DryIoc
                 (setup.OpenResolutionScope ||
                  !request.IsResolutionCall && // preventing recursion
                  (setup.AsResolutionCall ||
-                  (setup.AsResolutionCallForExpressionGeneration && container.Rules.UsedForExpressionGeneration) ||
-                  setup.UseParentReuse ||
-                  request.FactoryType == FactoryType.Service &&
-                  request.DependencyDepth > container.Rules.DependencyDepthToSplitObjectGraph) &&
+                  (setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration) ||
+                  setup.UseParentReuse
+                  || request.FactoryType == FactoryType.Service && request.DependencyDepth > rules.DependencyDepthToSplitObjectGraph
+                  ) &&
                  request.GetActualServiceType() != typeof(void)))
             {
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
@@ -8415,9 +8416,13 @@ namespace DryIoc
             //// todo: split the expression by wrapping it in a FactoryDelegate
             //if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
             //    request.FactoryType == FactoryType.Service &&
-            //    request.DependencyDepth > container.Rules.DependencyDepthToWrapInDelegate)
+            //    request.DependencyDepth > container.Rules.DependencyDepthToSplitObjectGraph)
             //{
-            //    serviceExpr = Invoke(Lambda<FactoryDelegate>(serviceExpr), FactoryDelegateCompiler.ResolverContextParamExpr);
+            //    var serviceExprType = serviceExpr.Type;
+            //    serviceExpr = Invoke(Lambda<FactoryDelegate>(serviceExpr, 
+            //            FactoryDelegateCompiler.ResolverContextParamExpr), FactoryDelegateCompiler.ResolverContextParamExpr);
+            //    if (serviceExprType != typeof(object))
+            //        serviceExpr = Convert(serviceExpr, serviceExprType);
             //}
 
             return serviceExpr;
