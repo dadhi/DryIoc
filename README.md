@@ -80,7 +80,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 ## Code
 
 * No dependencies on the other libraries.
-* Public API is fully documented.
+* Public API is documented.
 
 
 ## Reliability
