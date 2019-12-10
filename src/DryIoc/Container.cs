@@ -2829,8 +2829,7 @@ namespace DryIoc
 
             var id = (int)ConstValue(args[2]);
 
-            var mapIndex = id & Scope.MAP_COUNT_SUFFIX_MASK;
-            ref var map = ref scope._maps[mapIndex];
+            ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetDataOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
                 return itemRef.Value;
@@ -2874,29 +2873,52 @@ namespace DryIoc
 
         private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
         {
-            var scope = r.GetNamedScope(((ConstantExpression)args[1]).Value, (bool)((ConstantExpression)args[2]).Value);
+            var scope = (Scope)r.GetNamedScope(((ConstantExpression)args[1]).Value, (bool)((ConstantExpression)args[2]).Value);
             if (scope == null)
                 return null; // result is null in this case
 
             // check if scoped dependency is already in scope, then just return it
-            var factoryId = (int)((ConstantExpression)args[3]).Value;
-            if (scope.TryGet(out var result, factoryId))
-                return result;
+            var id = (int)((ConstantExpression)args[3]).Value;
+            ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
+            var itemRef = map.GetDataOrDefault(id);
+            if (itemRef != null && itemRef.Value != Scope.NoItem)
+                return itemRef.Value;
 
-            var disposalOrder = (int)((ConstantExpression)args[5]).Value;
+            // add only, keep old item if it already exists
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
+                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, Scope.NoItem));
 
-            var lambda = args[4];
-            if (lambda is ConstantExpression registeredDelegate)
-                return scope.GetOrAddViaFactoryDelegate(factoryId, (FactoryDelegate)registeredDelegate.Value, r, disposalOrder);
-
-            return scope.TryGetOrAddWithoutClosure(factoryId, r, ((LambdaExpression)lambda).Body, useFec,
-                (rc, e, uf) =>
+            itemRef = map.GetDataOrDefault(id);
+            if (itemRef.Value == Scope.NoItem)
+            {
+                var lambda = args[4];
+                object result = null;
+                lock (itemRef)
                 {
-                    if (TryInterpret(rc, e, uf, out var value))
-                        return value;
-                    return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
-                },
-                disposalOrder);
+                    if (itemRef.Value != Scope.NoItem)
+                        return itemRef.Value;
+
+                    if (lambda is ConstantExpression lambdaConstExpr)
+                        result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
+                    else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, useFec, out result))
+                        result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec,
+                            ((IContainer)r).Rules.UseInterpretation)(r);
+
+                    itemRef.Value = result;
+                }
+
+                if (result is IDisposable disp && disp != scope)
+                {
+                    var disposalOrder = (int)((ConstantExpression)args[5]).Value;
+                    if (disposalOrder == 0)
+                        scope.AddUnorderedDisposable(disp);
+                    else
+                        scope.AddDisposable(disp, disposalOrder);
+                }
+            }
+
+            return itemRef.Value;
         }
 
         private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
@@ -10526,10 +10548,8 @@ namespace DryIoc
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
 
                 if (Name == null)
-                {
                     return Call(GetScopedViaFactoryDelegateMethod, resolverContextParamExpr,
                         ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
-                }
 
                 return Call(GetNameScopedViaFactoryDelegateMethod, resolverContextParamExpr,
                     request.Container.GetConstantExpression(Name, typeof(object)),
