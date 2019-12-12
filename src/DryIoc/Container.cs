@@ -2460,7 +2460,20 @@ namespace DryIoc
             }
         }
 
-        /// Interprets passed expression
+        //internal static readonly object[][] ObjectArrayPool = new object[16][];
+
+        //internal static object[] RentOrNewObjectArray(int objectCount) =>
+        //    objectCount > 16 
+        //        ? new object[objectCount] 
+        //        : Interlocked.Exchange(ref ObjectArrayPool[objectCount - 1], null) ?? new object[objectCount];
+
+        //internal static void ReturnBackObjectArray(int objectCount, object[] array)
+        //{
+        //    if (objectCount <= 16)
+        //        Interlocked.Exchange(ref ObjectArrayPool[objectCount - 1], array);
+        //}
+
+        /// <summary>Interprets passed expression</summary>
         public static bool TryInterpret(IResolverContext r, Expression expr, bool useFec, out object result)
         {
             result = null;
@@ -2469,26 +2482,68 @@ namespace DryIoc
                 case ExprType.New:
                     {
                         var newExpr = (NewExpression)expr;
-                        var newArgs = newExpr.Arguments.ToListOrSelf();
-
-                        if (newArgs.Count == 0)
-                            result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
-                        else
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+                        var fewArgCount = newExpr.FewArgumentCount;
+                        if (fewArgCount == 0)
                         {
-                            var args = new object[newArgs.Count];
-                            for (var i = 0; i < args.Length; i++)
-                            {
-                                var argExpr = newArgs[i];
-                                if (argExpr is ConstantExpression constExpr)
-                                    args[i] = constExpr.Value;
-                                else if (TryInterpret(r, argExpr, useFec, out var arg))
-                                    args[i] = arg;
-                                else
-                                    return false;
-                            }
-                            result = newExpr.Constructor.Invoke(args);
+                            result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
+                            return true;
+                        }
+                        
+                        if (fewArgCount == 1)
+                        {
+                            var oneArg = new object[1];
+                            var argExpr = ((OneArgumentNewExpression)newExpr).Argument;
+                            if (argExpr is ConstantExpression constExpr)
+                                oneArg[0] = constExpr.Value;
+                            else if (!TryInterpret(r, argExpr, useFec, out oneArg[0]))
+                                return false;
+                            result = newExpr.Constructor.Invoke(oneArg);
+                            //ReturnBackObjectArray(1, oneArg);
+                            return true;
+                        }
+                        
+                        if (fewArgCount == 2)
+                        {
+                            var twoArgs = new object[2];
+                            var twoArgsExpr = ((TwoArgumentsNewExpression)newExpr);
+                            if (twoArgsExpr.Argument0 is ConstantExpression constExpr0)
+                                twoArgs[0] = constExpr0.Value;
+                            else if (!TryInterpret(r, twoArgsExpr.Argument0, useFec, out twoArgs[0]))
+                                return false;
+                            if (twoArgsExpr.Argument1 is ConstantExpression constExpr1)
+                                twoArgs[1] = constExpr1.Value;
+                            else if (!TryInterpret(r, twoArgsExpr.Argument1, useFec, out twoArgs[1]))
+                                return false;
+                            result = newExpr.Constructor.Invoke(twoArgs);
+                            //ReturnBackObjectArray(2, twoArgs);
+                            return true;
                         }
 
+                        if (fewArgCount == 3)
+                        {
+                        }
+#endif
+                        var newArgs = newExpr.Arguments.ToListOrSelf();
+                        var newArgCount = newArgs.Count;
+                        if (newArgCount == 0)
+                        {
+                            result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
+                            return true;
+                        }
+
+                        var args = new object[newArgCount];
+                        for (var i = 0; i < args.Length; i++)
+                        {
+                            var argExpr = newArgs[i];
+                            if (argExpr is ConstantExpression constExpr)
+                                args[i] = constExpr.Value;
+                            else if (!TryInterpret(r, argExpr, useFec, out args[i]))
+                                return false;
+                        }
+
+                        result = newExpr.Constructor.Invoke(args);
+                        //ReturnBackObjectArray(newArgCount, args);
                         return true;
                     }
                 case ExprType.Call:
@@ -2655,22 +2710,22 @@ namespace DryIoc
 
                         // todo: handle `Invoke` if possible, e.g. for RegisterDelegate
 
-                        if (callArgs.Count == 0)
+                        var callArgCount = callArgs.Count;
+                        if (callArgCount == 0)
                             result = callMethod.Invoke(instance, ArrayTools.Empty<object>());
                         else
                         {
-                            var args = new object[callArgs.Count];
+                            var args = new object[callArgCount];
                             for (var i = 0; i < args.Length; i++)
                             {
                                 var argExpr = callArgs[i];
                                 if (argExpr is ConstantExpression constExpr)
                                     args[i] = constExpr.Value;
-                                else if (TryInterpret(r, argExpr, useFec, out var arg))
-                                    args[i] = arg;
-                                else
+                                else if (!TryInterpret(r, argExpr, useFec, out args[i]))
                                     return false;
                             }
                             result = callMethod.Invoke(instance, args);
+                            //ReturnBackObjectArray(callArgCount, args);
                         }
 
                         return true;
@@ -3503,11 +3558,10 @@ namespace DryIoc
             var implementationType = r.ImplementationType;
             var decoratedFactoryID = r.DecoratedFactoryID;
 
-            var serviceTypeExpr = Constant(serviceType, typeof(Type));
-            var factoryIdExpr = Constant(factoryID, typeof(int));
-            var implTypeExpr = Constant(implementationType, typeof(Type));
-            var reuseExpr = r.Reuse == null
-                ? Constant(null, typeof(IReuse))
+            var serviceTypeExpr = Constant(serviceType);
+            var factoryIdExpr = Constant(factoryID);
+            var implTypeExpr = Constant(implementationType);
+            var reuseExpr = r.Reuse == null ? Constant(null)
                 : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
 
             if (ifUnresolved == IfUnresolved.Throw &&
@@ -3516,10 +3570,10 @@ namespace DryIoc
                 return Call(parentExpr, Request.PushMethodWith4Args.Value,
                     serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr);
 
-            var requiredServiceTypeExpr = Constant(requiredServiceType, typeof(Type));
+            var requiredServiceTypeExpr = Constant(requiredServiceType);
             var serviceKeyExpr = container.GetConstantExpression(serviceKey, typeof(object));
-            var factoryTypeExpr = Constant(factoryType, typeof(FactoryType));
-            var flagsExpr = Constant(flags, typeof(RequestFlags));
+            var factoryTypeExpr = Constant(factoryType);
+            var flagsExpr = Constant(flags);
 
             if (ifUnresolved == IfUnresolved.Throw &&
                 metadataKey == null && metadata == null && decoratedFactoryID == 0)
@@ -3527,15 +3581,15 @@ namespace DryIoc
                     serviceTypeExpr, requiredServiceTypeExpr, serviceKeyExpr,
                     factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr, flagsExpr);
 
-            var ifUnresolvedExpr = Constant(ifUnresolved, typeof(IfUnresolved));
-            var decoratedFactoryIDExpr = Constant(decoratedFactoryID, typeof(int));
+            var ifUnresolvedExpr = Constant(ifUnresolved);
+            var decoratedFactoryIDExpr = Constant(decoratedFactoryID);
 
             if (metadataKey == null && metadata == null)
                 return Call(parentExpr, Request.PushMethodWith10Args.Value,
                     serviceTypeExpr, requiredServiceTypeExpr, serviceKeyExpr, ifUnresolvedExpr,
                     factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr, flagsExpr, decoratedFactoryIDExpr);
 
-            var metadataKeyExpr = Constant(metadataKey, typeof(string));
+            var metadataKeyExpr = Constant(metadataKey);
             var metadataExpr = container.GetConstantExpression(metadata, typeof(object));
 
             return Call(parentExpr, Request.PushMethodWith12Args.Value,
@@ -4017,13 +4071,10 @@ namespace DryIoc
                 preResolveParentExpr,
                 request.GetInputArgsExpr());
 
-            // cast to object is not required cause Resolve already returns IEnumerable<object>
-            if (itemType != typeof(object))
-                resolveManyExpr = Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr);
-
             return New(typeof(LazyEnumerable<>).MakeGenericType(itemType)
-                .GetTypeInfo().DeclaredConstructors.First(x => x.GetParameters().Length == 1), 
-                resolveManyExpr);
+                .GetTypeInfo().DeclaredConstructors.First(x => x.GetParameters().Length == 1),
+                // cast to object is not required cause Resolve already returns IEnumerable<object>
+                itemType == typeof(object) ? (Expression)resolveManyExpr : Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr));
         }
 
         private static readonly MethodInfo _enumerableCastMethod =

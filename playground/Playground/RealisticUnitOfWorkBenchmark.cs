@@ -879,15 +879,14 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
-|                    Method |        Mean |     Error |    StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
-|-------------------------- |------------:|----------:|----------:|-------:|--------:|---------:|--------:|------:|----------:|
-|                      MsDI |    133.3 us |   2.58 us |   3.07 us |   1.00 |    0.00 |  16.9678 |  0.1221 |     - |  73.15 KB |
-|                    DryIoc |    103.6 us |   0.16 us |   0.13 us |   0.77 |    0.02 |  16.8457 |       - |     - |  78.04 KB |
-|               DryIoc_MsDI |    126.0 us |   1.08 us |   1.01 us |   0.94 |    0.02 |  21.2402 |       - |     - |  98.73 KB |
-| DryIoc_InterpretationOnly |    110.5 us |   1.15 us |   1.07 us |   0.82 |    0.02 |  16.8457 |       - |     - |  78.13 KB |
-|                     Grace | 18,217.4 us | 192.71 us | 180.26 us | 135.73 |    3.19 | 156.2500 | 62.5000 |     - | 751.76 KB |
-|                Grace_MsDI | 21,183.1 us |  40.35 us |  37.75 us | 157.82 |    3.34 | 187.5000 | 93.7500 |     - | 919.49 KB |
-
+|                    Method |        Mean |     Error |    StdDev |      Median |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
+|-------------------------- |------------:|----------:|----------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
+|                      MsDI |    140.8 us |   3.00 us |   7.86 us |    137.7 us |   1.00 |    0.00 |  16.8457 |  0.2441 |     - |  73.16 KB |
+|                    DryIoc |    113.1 us |   2.57 us |   6.55 us |    110.9 us |   0.81 |    0.07 |  16.8457 |  0.1221 |     - |  78.04 KB |
+|               DryIoc_MsDI |    134.9 us |   2.05 us |   1.92 us |    135.0 us |   0.88 |    0.06 |  21.2402 |  0.2441 |     - |  98.16 KB |
+| DryIoc_InterpretationOnly |    110.4 us |   1.71 us |   1.60 us |    110.4 us |   0.72 |    0.05 |  16.8457 |  0.1221 |     - |  78.13 KB |
+|                     Grace | 18,352.7 us |  86.20 us |  80.64 us | 18,360.3 us | 119.17 |    7.11 | 156.2500 | 62.5000 |     - | 751.81 KB |
+|                Grace_MsDI | 21,550.7 us | 117.35 us | 104.03 us | 21,569.6 us | 138.63 |    7.25 | 187.5000 | 93.7500 |     - | 919.47 KB |
              */
 
             [Benchmark(Baseline = true)]
@@ -1118,6 +1117,16 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 | DryIoc_InterpretationOnly | 16.835 us | 0.2516 us | 0.2354 us |  3.82 |    0.09 | 1.2207 |     - |     - |    5.7 KB |
 |                     Grace |  1.753 us | 0.0340 us | 0.0392 us |  0.40 |    0.01 | 0.6866 |     - |     - |   3.17 KB |
 |         Grace_MsDiAdapter |  2.356 us | 0.0203 us | 0.0190 us |  0.54 |    0.01 | 0.7401 |     - |     - |   3.41 KB |
+
+|                    Method |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|-------------------------- |----------:|----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+|                      MsDi |  3.951 us | 0.1237 us | 0.2262 us |  3.854 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
+|                    DryIoc |  1.689 us | 0.0236 us | 0.0221 us |  1.694 us |  0.41 |    0.03 | 0.6618 |     - |     - |   3.05 KB |
+|        DryIoc_MsDiAdapter |  2.306 us | 0.0294 us | 0.0275 us |  2.314 us |  0.56 |    0.04 | 0.6676 |     - |     - |   3.08 KB |
+| DryIoc_InterpretationOnly | 18.130 us | 0.2009 us | 0.1880 us | 18.129 us |  4.39 |    0.30 | 1.3123 |     - |     - |   6.09 KB |
+|                     Grace |  1.758 us | 0.0260 us | 0.0243 us |  1.761 us |  0.43 |    0.03 | 0.6866 |     - |     - |   3.17 KB |
+|         Grace_MsDiAdapter |  2.358 us | 0.0436 us | 0.0387 us |  2.346 us |  0.57 |    0.04 | 0.7401 |     - |     - |   3.41 KB |
+
 */
 
             private IServiceProvider _msDi;
