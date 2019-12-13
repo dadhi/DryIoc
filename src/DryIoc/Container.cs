@@ -2547,189 +2547,7 @@ namespace DryIoc
                         return true;
                     }
                 case ExprType.Call:
-                    {
-                        if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
-                        {
-                            result = r.Root ?? r;
-                            return true;
-                        }
-
-                        var callExpr = (MethodCallExpression)expr;
-                        var callMethod = callExpr.Method;
-                        var methodDeclaringType = callMethod.DeclaringType;
-
-                        var callObject = callExpr.Object;
-                        var callArgs = callExpr.Arguments.ToListOrSelf();
-
-                        if (methodDeclaringType == typeof(CurrentScopeReuse))
-                        {
-                            var resolver = r;
-                            if (!ReferenceEquals(callArgs[0], FactoryDelegateCompiler.ResolverContextParamExpr))
-                            {
-                                if (!TryInterpret(r, callArgs[0], useFec, out var resolverObj))
-                                    return false;
-                                resolver = (IResolverContext)resolverObj;
-                            }
-
-                            // todo: we need the overload without disposalOrder
-                            if (callMethod == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod)
-                            {
-                                result = InterpretGetScopedViaFactoryDelegate(resolver, callArgs, useFec);
-                                return true;
-                            }
-
-                            if (callMethod == CurrentScopeReuse.GetNameScopedViaFactoryDelegateMethod)
-                            {
-                                result = InterpretGetNameScopedViaFactoryDelegate(resolver, callArgs, useFec);
-                                return true;
-                            }
-
-                            if (callMethod == CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateMethod)
-                            {
-                                result = InterpretGetScopedOrSingletonViaFactoryDelegate(resolver, callArgs, useFec);
-                                return true;
-                            }
-
-                            if (callMethod == CurrentScopeReuse.TrackScopedOrSingletonMethod)
-                            {
-                                if (!TryInterpret(resolver, callArgs[1], useFec, out var service))
-                                    return false;
-                                result = CurrentScopeReuse.TrackScopedOrSingleton(resolver, service);
-                                return true;
-                            }
-
-                            if (callMethod == CurrentScopeReuse.TrackScopedMethod)
-                            {
-                                var scope = resolver.GetCurrentScope((bool)ConstValue(callArgs[1]));
-                                if (scope == null)
-                                    result = null; // result is null in this case
-                                else
-                                {
-                                    if (!TryInterpret(resolver, callArgs[2], useFec, out var service))
-                                        return false;
-                                    result = scope.TrackDisposable(service /* todo: what is with `disposalOrder`*/);
-                                }
-                                return true;
-                            }
-
-                            if (callMethod == CurrentScopeReuse.TrackNameScopedMethod)
-                            {
-                                var scope = resolver.GetNamedScope(ConstValue(callArgs[1]), (bool)ConstValue(callArgs[2]));
-                                if (scope == null)
-                                    result = null; // result is null in this case
-                                else
-                                {
-                                    if (!TryInterpret(resolver, callArgs[3], useFec, out var service))
-                                        return false;
-                                    result = scope.TrackDisposable(service);
-                                }
-                                return true;
-                            }
-                        }
-                        else if (methodDeclaringType == typeof(IScope))
-                        {
-                            if (callMethod == Scope.GetOrAddViaFactoryDelegateMethod)
-                            {
-                                r = r.Root ?? r;
-
-                                // check if scoped dependency is already in scope, then just return it
-                                var factoryId = (int)ConstValue(callArgs[0]);
-                                if (!r.SingletonScope.TryGet(out result, factoryId))
-                                {
-                                    result = r.SingletonScope.TryGetOrAddWithoutClosure(factoryId, r,
-                                        ((LambdaExpression)callArgs[1]).Body, useFec,
-                                        (rc, e, uf) =>
-                                        {
-                                            if (TryInterpret(rc, e, uf, out var value))
-                                                return value;
-                                            return e.CompileToFactoryDelegate(useFastExpressionCompiler: uf, 
-                                                preferInterpretation: ((IContainer)rc).Rules.UseInterpretation)(rc);
-                                        },
-                                        (int)ConstValue(callArgs[3]));
-                                }
-
-                                return true;
-                            }
-
-                            if (callMethod == Scope.TrackDisposableMethod)
-                            {
-                                r = r.Root ?? r;
-                                if (!TryInterpret(r, callArgs[0], useFec, out var service))
-                                    return false;
-                                result = r.SingletonScope.TrackDisposable(service, (int)ConstValue(callArgs[1]));
-                                return true;
-                            }
-                        }
-                        else if (methodDeclaringType == typeof(IResolver))
-                        {
-                            var resolver = r;
-                            if (!ReferenceEquals(callObject, FactoryDelegateCompiler.ResolverContextParamExpr))
-                            {
-                                if (!TryInterpret(r, callObject, useFec, out var resolverObj))
-                                    return false;
-                                resolver = (IResolverContext)resolverObj;
-                            }
-
-                            if (callMethod == Resolver.ResolveFastMethod)
-                            {
-                                result = resolver.Resolve((Type)ConstValue(callArgs[0]), (IfUnresolved)ConstValue(callArgs[1]));
-                                return true;
-                            }
-
-                            if (callMethod == Resolver.ResolveMethod)
-                            {
-                                object serviceKey = null, preResolveParent = null, resolveArgs = null;
-                                if (!TryInterpret(resolver, callArgs[1], useFec, out serviceKey) ||
-                                    !TryInterpret(resolver, callArgs[4], useFec, out preResolveParent) ||
-                                    !TryInterpret(resolver, callArgs[5], useFec, out resolveArgs))
-                                    return false;
-
-                                result = resolver.Resolve((Type)ConstValue(callArgs[0]), serviceKey, (IfUnresolved)ConstValue(callArgs[2]), 
-                                    (Type)ConstValue(callArgs[3]), (Request)preResolveParent, (object[])resolveArgs);
-                                return true;
-                            }
-
-                            if (callMethod == Resolver.ResolveManyMethod)
-                            {
-                                object serviceKey = null, preResolveParent = null, resolveArgs = null;
-                                if (!TryInterpret(resolver, callArgs[1], useFec, out serviceKey) ||
-                                    !TryInterpret(resolver, callArgs[3], useFec, out preResolveParent) ||
-                                    !TryInterpret(resolver, callArgs[4], useFec, out resolveArgs))
-                                    return false;
-
-                                result = resolver.ResolveMany((Type)ConstValue(callArgs[0]), serviceKey, (Type)ConstValue(callArgs[2]),
-                                    (Request)preResolveParent, (object[])resolveArgs);
-                                return true;
-                            }
-                        }
-
-                        // fallback to reflection invocation
-                        object instance = null;
-                        if (callObject != null && !TryInterpret(r, callObject, useFec, out instance))
-                            return false;
-
-                        // todo: handle `Invoke` if possible, e.g. for RegisterDelegate
-
-                        var callArgCount = callArgs.Count;
-                        if (callArgCount == 0)
-                            result = callMethod.Invoke(instance, ArrayTools.Empty<object>());
-                        else
-                        {
-                            var args = new object[callArgCount];
-                            for (var i = 0; i < args.Length; i++)
-                            {
-                                var argExpr = callArgs[i];
-                                if (argExpr is ConstantExpression constExpr)
-                                    args[i] = constExpr.Value;
-                                else if (!TryInterpret(r, argExpr, useFec, out args[i]))
-                                    return false;
-                            }
-                            result = callMethod.Invoke(instance, args);
-                            //ReturnBackObjectArray(callArgCount, args);
-                        }
-
-                        return true;
-                    }
+                    return TryInterpretMethodCall(r, expr, useFec, ref result);
                 case ExprType.Parameter:
                 {
                     // todo: handles IResolverContext only
@@ -2739,141 +2557,335 @@ namespace DryIoc
                     return true;
                 }
                 case ExprType.Constant:
-                    {
-                        result = ((ConstantExpression)expr).Value;
-                        return true;
-                    }
+                {
+                    result = ((ConstantExpression)expr).Value;
+                    return true;
+                }
                 case ExprType.Convert:
-                    {
-                        var convertExpr = (UnaryExpression)expr;
-                        if (!TryInterpret(r, convertExpr.Operand, useFec, out var instance))
-                            return false;
-
-                        // skip conversion for null and for directly assignable type
-                        if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
-                            result = instance;
-                        else
-                            result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
-                        return true;
-                    }
-                case ExprType.MemberAccess:
-                    {
-                        var memberExpr = (MemberExpression)expr;
-                        object instance = null;
-                        if (memberExpr.Expression != null &&
-                            !TryInterpret(r, memberExpr.Expression, useFec, out instance))
-                            return false;
-
-                        if (memberExpr.Member is FieldInfo field)
-                        {
-                            result = field.GetValue(instance);
-                            return true;
-                        }
-
-                        if (memberExpr.Member is PropertyInfo prop)
-                        {
-                            result = prop.GetValue(instance, null);
-                            return true;
-                        }
-
+                {
+                    var convertExpr = (UnaryExpression)expr;
+                    if (!TryInterpret(r, convertExpr.Operand, useFec, out var instance))
                         return false;
-                    }
-                case ExprType.MemberInit:
+
+                    // skip conversion for null and for directly assignable type
+                    if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
+                        result = instance;
+                    else
+                        result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
+                    return true;
+                }
+                case ExprType.MemberAccess:
+                {
+                    var memberExpr = (MemberExpression)expr;
+                    object instance = null;
+                    if (memberExpr.Expression != null &&
+                        !TryInterpret(r, memberExpr.Expression, useFec, out instance))
+                        return false;
+
+                    if (memberExpr.Member is FieldInfo field)
                     {
-                        var memberInit = (MemberInitExpression)expr;
-                        if (!TryInterpret(r, memberInit.NewExpression, useFec, out var instance))
+                        result = field.GetValue(instance);
+                        return true;
+                    }
+
+                    if (memberExpr.Member is PropertyInfo prop)
+                    {
+                        result = prop.GetValue(instance, null);
+                        return true;
+                    }
+
+                    return false;
+                }
+                case ExprType.MemberInit:
+                {
+                    var memberInit = (MemberInitExpression)expr;
+                    if (!TryInterpret(r, memberInit.NewExpression, useFec, out var instance))
+                        return false;
+
+                    var bindings = memberInit.Bindings;
+                    for (var i = 0; i < bindings.Count; i++)
+                    {
+                        var binding = (MemberAssignment)bindings[i];
+                        if (!TryInterpret(r, binding.Expression, useFec, out var memberValue))
                             return false;
 
-                        var bindings = memberInit.Bindings;
-                        for (var i = 0; i < bindings.Count; i++)
-                        {
-                            var binding = (MemberAssignment)bindings[i];
-                            if (!TryInterpret(r, binding.Expression, useFec, out var memberValue))
-                                return false;
-
-                            var field = binding.Member as FieldInfo;
-                            if (field != null)
-                                field.SetValue(instance, memberValue);
-                            else
-                                ((PropertyInfo)binding.Member).SetValue(instance, memberValue, null);
-                        }
-
-                        result = instance;
-                        return true;
+                        var field = binding.Member as FieldInfo;
+                        if (field != null)
+                            field.SetValue(instance, memberValue);
+                        else
+                            ((PropertyInfo)binding.Member).SetValue(instance, memberValue, null);
                     }
+
+                    result = instance;
+                    return true;
+                }
                 case ExprType.NewArrayInit:
+                {
+                    var newArray = (NewArrayExpression)expr;
+
+                    var itemExprs = newArray.Expressions.ToListOrSelf();
+                    var items = new object[itemExprs.Count];
+                    for (var i = 0; i < items.Length; i++)
                     {
-                        var newArray = (NewArrayExpression)expr;
-
-                        var itemExprs = newArray.Expressions.ToListOrSelf();
-                        var items = new object[itemExprs.Count];
-                        for (var i = 0; i < items.Length; i++)
-                        {
-                            var argExpr = itemExprs[i];
-                            if (argExpr is ConstantExpression constExpr)
-                                items[i] = constExpr.Value;
-                            else if (TryInterpret(r, argExpr, useFec, out var arg))
-                                items[i] = arg;
-                            else
-                                return false;
-                        }
-
-                        result = Converter.ConvertMany(items, newArray.Type.GetElementType());
-                        return true;
+                        var argExpr = itemExprs[i];
+                        if (argExpr is ConstantExpression constExpr)
+                            items[i] = constExpr.Value;
+                        else if (TryInterpret(r, argExpr, useFec, out var arg))
+                            items[i] = arg;
+                        else
+                            return false;
                     }
+
+                    result = Converter.ConvertMany(items, newArray.Type.GetElementType());
+                    return true;
+                }
 #if SUPPORTS_FAST_EXPRESSION_COMPILER && !NETSTANDARD1_3 || NET35 || NET40 || NET403
                 // Delegate.Method is not supported on NETSTANDARD <= 2.0 :( Need help!
                 case ExprType.Invoke:
+                {
+                    var invokeExpr = (InvocationExpression)expr;
+                    var delegateExpr = invokeExpr.Expression;
+
+                    // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
+                    if (delegateExpr.Type == typeof(FactoryDelegate) && 
+                        delegateExpr is ConstantExpression delegateConstExpr)
                     {
-                        var invokeExpr = (InvocationExpression)expr;
-                        var delegateExpr = invokeExpr.Expression;
-
-                        // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
-                        if (delegateExpr.Type == typeof(FactoryDelegate) && 
-                            delegateExpr is ConstantExpression delegateConstExpr)
-                        {
-                            if (!TryInterpret(r, invokeExpr.Arguments[0], useFec, out var resolver))
-                                return false;
-
-                            result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
-                            return true;
-                        }
-
-                        if (delegateExpr.NodeType == ExprType.Lambda)
+                        if (!TryInterpret(r, invokeExpr.Arguments[0], useFec, out var resolver))
                             return false;
 
-                        if (!TryInterpret(r, delegateExpr, useFec, out var delegateObj))
-                            return false;
-                        var lambda = (Delegate)delegateObj;
-
-                        var argExprs = invokeExpr.Arguments.ToListOrSelf();
-                        if (argExprs.Count == 0)
-                            result = lambda.Method.Invoke(lambda.Target, ArrayTools.Empty<object>());
-                        else
-                        {
-                            var args = new object[argExprs.Count];
-                            for (var i = 0; i < args.Length; i++)
-                            {
-                                var argExpr = argExprs[i];
-                                if (argExpr is ConstantExpression constExpr)
-                                    args[i] = constExpr.Value;
-                                else if (TryInterpret(r, argExpr, useFec, out var arg))
-                                    args[i] = arg;
-                                else
-                                    return false;
-                            }
-                            result = lambda.Method.Invoke(lambda.Target, args);
-                        }
+                        result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
                         return true;
                     }
+
+                    if (delegateExpr.NodeType == ExprType.Lambda)
+                        return false;
+
+                    if (!TryInterpret(r, delegateExpr, useFec, out var delegateObj))
+                        return false;
+                    var lambda = (Delegate)delegateObj;
+
+                    var argExprs = invokeExpr.Arguments.ToListOrSelf();
+                    if (argExprs.Count == 0)
+                        result = lambda.Method.Invoke(lambda.Target, ArrayTools.Empty<object>());
+                    else
+                    {
+                        var args = new object[argExprs.Count];
+                        for (var i = 0; i < args.Length; i++)
+                        {
+                            var argExpr = argExprs[i];
+                            if (argExpr is ConstantExpression constExpr)
+                                args[i] = constExpr.Value;
+                            else if (TryInterpret(r, argExpr, useFec, out var arg))
+                                args[i] = arg;
+                            else
+                                return false;
+                        }
+                        result = lambda.Method.Invoke(lambda.Target, args);
+                    }
+                    return true;
+                }
 #endif
                 case ExprType.Lambda:
                     break; // not supported nested lambdas
                 default:
                     break;
             }
-
+ 
             return false;
+        }
+
+        private static bool TryInterpretMethodCall(IResolverContext r, Expression expr, bool useFec, ref object result)
+        {
+            if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
+            {
+                result = r.Root ?? r;
+                return true;
+            }
+
+            var callExpr = (MethodCallExpression) expr;
+            var method = callExpr.Method;
+            var methodDeclaringType = method.DeclaringType;
+
+            var callObject = callExpr.Object;
+
+            if (methodDeclaringType == typeof(CurrentScopeReuse))
+            {
+                var resolver = r;
+
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+#endif
+                var callArgs = callExpr.Arguments.ToListOrSelf();
+                if (!ReferenceEquals(callArgs[0], FactoryDelegateCompiler.ResolverContextParamExpr))
+                {
+                    if (!TryInterpret(r, callArgs[0], useFec, out var resolverObj))
+                        return false;
+                    resolver = (IResolverContext) resolverObj;
+                }
+
+                // todo: do we need an overload without disposalOrder
+                if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod)
+                {
+                    result = InterpretGetScopedViaFactoryDelegate(resolver, callArgs, useFec);
+                    return true;
+                }
+
+                if (method == CurrentScopeReuse.GetNameScopedViaFactoryDelegateMethod)
+                {
+                    result = InterpretGetNameScopedViaFactoryDelegate(resolver, callArgs, useFec);
+                    return true;
+                }
+
+                if (method == CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateMethod)
+                {
+                    result = InterpretGetScopedOrSingletonViaFactoryDelegate(resolver, callArgs, useFec);
+                    return true;
+                }
+
+                if (method == CurrentScopeReuse.TrackScopedOrSingletonMethod)
+                {
+                    if (!TryInterpret(resolver, callArgs[1], useFec, out var service))
+                        return false;
+                    result = CurrentScopeReuse.TrackScopedOrSingleton(resolver, service);
+                    return true;
+                }
+
+                if (method == CurrentScopeReuse.TrackScopedMethod)
+                {
+                    var scope = resolver.GetCurrentScope((bool) ConstValue(callArgs[1]));
+                    if (scope == null)
+                        result = null; // result is null in this case
+                    else
+                    {
+                        if (!TryInterpret(resolver, callArgs[2], useFec, out var service))
+                            return false;
+                        result = scope.TrackDisposable(service /* todo: what is with `disposalOrder`*/);
+                    }
+
+                    return true;
+                }
+
+                if (method == CurrentScopeReuse.TrackNameScopedMethod)
+                {
+                    var scope = resolver.GetNamedScope(ConstValue(callArgs[1]), (bool) ConstValue(callArgs[2]));
+                    if (scope == null)
+                        result = null; // result is null in this case
+                    else
+                    {
+                        if (!TryInterpret(resolver, callArgs[3], useFec, out var service))
+                            return false;
+                        result = scope.TrackDisposable(service);
+                    }
+
+                    return true;
+                }
+            }
+            else if (methodDeclaringType == typeof(IScope))
+            {
+                var callArgs = callExpr.Arguments.ToListOrSelf();
+                if (method == Scope.GetOrAddViaFactoryDelegateMethod)
+                {
+                    r = r.Root ?? r;
+
+                    // check if scoped dependency is already in scope, then just return it
+                    var factoryId = (int) ConstValue(callArgs[0]);
+                    if (!r.SingletonScope.TryGet(out result, factoryId))
+                    {
+                        result = r.SingletonScope.TryGetOrAddWithoutClosure(factoryId, r,
+                            ((LambdaExpression) callArgs[1]).Body, useFec,
+                            (rc, e, uf) =>
+                            {
+                                if (TryInterpret(rc, e, uf, out var value))
+                                    return value;
+                                return e.CompileToFactoryDelegate(useFastExpressionCompiler: uf,
+                                    preferInterpretation: ((IContainer) rc).Rules.UseInterpretation)(rc);
+                            },
+                            (int) ConstValue(callArgs[3]));
+                    }
+
+                    return true;
+                }
+
+                if (method == Scope.TrackDisposableMethod)
+                {
+                    r = r.Root ?? r;
+                    if (!TryInterpret(r, callArgs[0], useFec, out var service))
+                        return false;
+                    result = r.SingletonScope.TrackDisposable(service, (int) ConstValue(callArgs[1]));
+                    return true;
+                }
+            }
+            else if (methodDeclaringType == typeof(IResolver))
+            {
+                var callArgs = callExpr.Arguments.ToListOrSelf();
+                var resolver = r;
+                if (!ReferenceEquals(callObject, FactoryDelegateCompiler.ResolverContextParamExpr))
+                {
+                    if (!TryInterpret(r, callObject, useFec, out var resolverObj))
+                        return false;
+                    resolver = (IResolverContext) resolverObj;
+                }
+
+                if (method == Resolver.ResolveFastMethod)
+                {
+                    result = resolver.Resolve((Type) ConstValue(callArgs[0]), (IfUnresolved) ConstValue(callArgs[1]));
+                    return true;
+                }
+
+                if (method == Resolver.ResolveMethod)
+                {
+                    object serviceKey = null, preResolveParent = null, resolveArgs = null;
+                    if (!TryInterpret(resolver, callArgs[1], useFec, out serviceKey) ||
+                        !TryInterpret(resolver, callArgs[4], useFec, out preResolveParent) ||
+                        !TryInterpret(resolver, callArgs[5], useFec, out resolveArgs))
+                        return false;
+
+                    result = resolver.Resolve((Type) ConstValue(callArgs[0]), serviceKey,
+                        (IfUnresolved) ConstValue(callArgs[2]),
+                        (Type) ConstValue(callArgs[3]), (Request) preResolveParent, (object[]) resolveArgs);
+                    return true;
+                }
+
+                if (method == Resolver.ResolveManyMethod)
+                {
+                    object serviceKey = null, preResolveParent = null, resolveArgs = null;
+                    if (!TryInterpret(resolver, callArgs[1], useFec, out serviceKey) ||
+                        !TryInterpret(resolver, callArgs[3], useFec, out preResolveParent) ||
+                        !TryInterpret(resolver, callArgs[4], useFec, out resolveArgs))
+                        return false;
+
+                    result = resolver.ResolveMany((Type) ConstValue(callArgs[0]), serviceKey, (Type) ConstValue(callArgs[2]),
+                        (Request) preResolveParent, (object[]) resolveArgs);
+                    return true;
+                }
+            }
+            
+            // fallback to reflection invocation
+            object instance = null;
+            if (callObject != null && !TryInterpret(r, callObject, useFec, out instance))
+                return false;
+
+            // todo: handle `Invoke` if possible, e.g. for RegisterDelegate
+            var args = callExpr.Arguments.ToListOrSelf();
+            var callArgCount = args.Count;
+            if (callArgCount == 0)
+                result = method.Invoke(instance, ArrayTools.Empty<object>());
+            else
+            {
+                var argObjects = new object[callArgCount];
+                for (var i = 0; i < argObjects.Length; i++)
+                {
+                    var argExpr = args[i];
+                    if (argExpr is ConstantExpression constExpr)
+                        argObjects[i] = constExpr.Value;
+                    else if (!TryInterpret(r, argExpr, useFec, out argObjects[i]))
+                        return false;
+                }
+
+                result = method.Invoke(instance, argObjects);
+                //ReturnBackObjectArray(callArgCount, args);
+            }
+
+            return true;
         }
 
         private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
@@ -2978,28 +2990,50 @@ namespace DryIoc
 
         private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, IList<Expression> args, bool useFec)
         {
-            var scope = r.CurrentScope ?? r.SingletonScope;
+            var scope = (Scope)(r.CurrentScope ?? r.SingletonScope);
 
-            // check if scoped dependency is already in scope, then just return it
             var id = (int)ConstValue(args[1]);
-            if (scope.TryGet(out var result, id))
-                return result;
 
-            var lambda = args[2];
-            var disposalOrder = (int)((ConstantExpression)args[3]).Value;
+            ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
+            var itemRef = map.GetDataOrDefault(id);
+            if (itemRef != null && itemRef.Value != Scope.NoItem)
+                return itemRef.Value;
 
-            if (lambda is ConstantExpression registeredDelegate)
-                return scope.GetOrAddViaFactoryDelegate(id, (FactoryDelegate)registeredDelegate.Value, r, disposalOrder);
+            // add only, keep old item if it already exists
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
+                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, Scope.NoItem));
 
-            var lambdaExpr = (LambdaExpression)lambda;
-            return scope.TryGetOrAddWithoutClosure(id, r, lambdaExpr.Body, useFec,
-                (rc, e, uf) =>
+            itemRef = map.GetDataOrDefault(id);
+            if (itemRef.Value == Scope.NoItem)
+            {
+                var lambda = args[2];
+                object result = null;
+                lock (itemRef)
                 {
-                    if (TryInterpret(rc, e, uf, out var value))
-                        return value;
-                    return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
-                },
-                disposalOrder);
+                    if (itemRef.Value != Scope.NoItem)
+                        return itemRef.Value;
+
+                    if (lambda is ConstantExpression lambdaConstExpr)
+                        result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
+                    else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, useFec, out result))
+                        result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec,
+                            ((IContainer)r).Rules.UseInterpretation)(r);
+
+                    itemRef.Value = result;
+                }
+
+                if (result is IDisposable disp && disp != scope)
+                {
+                    var disposalOrder = (int)((ConstantExpression)args[3]).Value;
+                    if (disposalOrder == 0)
+                        scope.AddUnorderedDisposable(disp);
+                    else
+                        scope.AddDisposable(disp, disposalOrder);
+                }
+            }
+
+            return itemRef.Value;
         }
 
         [MethodImpl((MethodImplOptions)256)]
