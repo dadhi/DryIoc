@@ -1095,17 +1095,6 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 |                     Grace |  1.722 us | 0.0335 us | 0.0262 us |  0.45 |    0.01 | 0.6866 |     - |     - |   3.17 KB |
 |         Grace_MsDiAdapter |  2.306 us | 0.0251 us | 0.0235 us |  0.60 |    0.01 | 0.7401 |     - |     - |   3.41 KB |
 
-            ## ImTools V2 - not optimized ref slots
-
-|                    Method |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
-|-------------------------- |----------:|----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
-|                      MsDi |  4.158 us | 0.1177 us | 0.3377 us |  3.985 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
-|                    DryIoc |  1.868 us | 0.0652 us | 0.0724 us |  1.845 us |  0.40 |    0.02 | 0.7591 |     - |     - |    3.5 KB |
-|        DryIoc_MsDiAdapter |  2.663 us | 0.0993 us | 0.2784 us |  2.492 us |  0.64 |    0.05 | 0.7629 |     - |     - |   3.52 KB |
-| DryIoc_InterpretationOnly | 16.536 us | 0.3299 us | 0.6435 us | 16.357 us |  3.82 |    0.37 | 1.3123 |     - |     - |   6.14 KB |
-|                     Grace |  1.762 us | 0.0278 us | 0.0260 us |  1.755 us |  0.37 |    0.02 | 0.6866 |     - |     - |   3.17 KB |
-|         Grace_MsDiAdapter |  2.334 us | 0.0327 us | 0.0305 us |  2.327 us |  0.50 |    0.02 | 0.7401 |     - |     - |   3.41 KB |
-
             ## ImTools V2 - optimized ref slots
 
 |                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
@@ -1117,14 +1106,14 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 |                     Grace |  1.753 us | 0.0340 us | 0.0392 us |  0.40 |    0.01 | 0.6866 |     - |     - |   3.17 KB |
 |         Grace_MsDiAdapter |  2.356 us | 0.0203 us | 0.0190 us |  0.54 |    0.01 | 0.7401 |     - |     - |   3.41 KB |
 
-|                    Method |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
-|-------------------------- |----------:|----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
-|                      MsDi |  3.951 us | 0.1237 us | 0.2262 us |  3.854 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
-|                    DryIoc |  1.689 us | 0.0236 us | 0.0221 us |  1.694 us |  0.41 |    0.03 | 0.6618 |     - |     - |   3.05 KB |
-|        DryIoc_MsDiAdapter |  2.306 us | 0.0294 us | 0.0275 us |  2.314 us |  0.56 |    0.04 | 0.6676 |     - |     - |   3.08 KB |
-| DryIoc_InterpretationOnly | 18.130 us | 0.2009 us | 0.1880 us | 18.129 us |  4.39 |    0.30 | 1.3123 |     - |     - |   6.09 KB |
-|                     Grace |  1.758 us | 0.0260 us | 0.0243 us |  1.761 us |  0.43 |    0.03 | 0.6866 |     - |     - |   3.17 KB |
-|         Grace_MsDiAdapter |  2.358 us | 0.0436 us | 0.0387 us |  2.346 us |  0.57 |    0.04 | 0.7401 |     - |     - |   3.41 KB |
+            ## FEC V3
+
+|                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|-------------------------- |----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+|                      MsDi |  3.807 us | 0.0222 us | 0.0197 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
+|                    DryIoc |  1.586 us | 0.0019 us | 0.0017 us |  0.42 |    0.00 | 0.6618 |     - |     - |   3.05 KB |
+|        DryIoc_MsDiAdapter |  2.201 us | 0.0420 us | 0.0450 us |  0.58 |    0.01 | 0.6676 |     - |     - |   3.08 KB |
+| DryIoc_InterpretationOnly | 17.068 us | 0.0511 us | 0.0478 us |  4.48 |    0.03 | 1.5564 |     - |     - |   7.26 KB |
 
 */
 
@@ -1153,19 +1142,19 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark(Baseline = true)]
             public object MsDi() => Measure(_msDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object DryIoc() => Measure(_dryIoc);
 
-            [Benchmark]
+            //[Benchmark]
             public object DryIoc_MsDiAdapter() => Measure(_dryIocMsDi);
 
             [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace() => Measure(_grace);
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace_MsDiAdapter() => Measure(_graceMsDi);
 
             //[Benchmark]
