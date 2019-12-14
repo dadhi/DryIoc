@@ -899,11 +899,11 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        internal Expression GetCachedFactoryExpression(int factoryId, Request request, out Registry.ExpressionCacheSlot slot) => 
+        internal Expression GetCachedFactoryExpression(int factoryId, Request request, out ImMapData<Registry.ExpressionCacheSlot> slot) => 
             _registry.Value.GetCachedFactoryExpression(factoryId, request, out slot);
 
         [MethodImpl((MethodImplOptions) 256)]
-        internal void CacheFactoryExpression(int factoryId, Request request, Expression expr, Registry.ExpressionCacheSlot slot) =>
+        internal void CacheFactoryExpression(int factoryId, Request request, Expression expr, ImMapData<Registry.ExpressionCacheSlot> slot) =>
             _registry.Value.CacheFactoryExpression(factoryId, request, expr, slot);
 
         Factory IContainer.ResolveFactory(Request request)
@@ -1788,7 +1788,7 @@ namespace DryIoc
                     Ref.Swap(ref map, hash, key, factory, (x, h, k, slot) => x.AddOrUpdate(h, k, slot));
             }
 
-            internal sealed class ExpressionCacheSlot
+            internal struct ExpressionCacheSlot
             {
                 public Expression Transient;
                 public Expression Scoped;
@@ -1798,9 +1798,8 @@ namespace DryIoc
             /// The int key is the `FactoryID`
             public ImMap<ExpressionCacheSlot>[] FactoryExpressionCache;
 
-            [MethodImpl((MethodImplOptions)256)]
             public Expression GetCachedFactoryExpression(
-                int factoryId, Request request, out Registry.ExpressionCacheSlot slot)
+                int factoryId, Request request, out ImMapData<Registry.ExpressionCacheSlot> slot)
             {
                 slot = null;
 
@@ -1813,19 +1812,19 @@ namespace DryIoc
                 if (map == null)
                     return null;
 
-                slot = map.GetValueOrDefault(factoryId);
+                slot = map.GetDataOrDefault(factoryId);
                 if (slot != null)
                 {
                     var reuse = request.Reuse;
                     if (reuse == Reuse.Transient)
-                        return slot.Transient;
+                        return slot.Value.Transient;
 
                     if (reuse is CurrentScopeReuse scoped)
                     {
                         if (scoped.Name == null)
-                            return slot.Scoped;
+                            return slot.Value.Scoped;
 
-                        var named = slot.ScopedToName;
+                        var named = slot.Value.ScopedToName;
                         if (named != null)
                             for (var i = 0; i < named.Length; i++)
                                 if (Equals(named[i].Key, scoped.Name))
@@ -1836,9 +1835,8 @@ namespace DryIoc
                 return null;
             }
 
-            [MethodImpl((MethodImplOptions)256)]
             internal void CacheFactoryExpression(int factoryId, Request request, Expression expr,
-                ExpressionCacheSlot slot = null)
+                ImMapData<ExpressionCacheSlot> slot = null)
             {
                 if (slot == null)
                 {
@@ -1850,29 +1848,31 @@ namespace DryIoc
                     if (map == null)
                         Interlocked.CompareExchange(ref map, ImMap<ExpressionCacheSlot>.Empty, null);
 
-                    // double check that other thread created the slot in between
-                    slot = map.GetValueOrDefault(factoryId) ?? new ExpressionCacheSlot();
-
-                    var current = map;
-                    if (Interlocked.CompareExchange(ref map, current.AddOrUpdate(factoryId, slot), current) != current)
-                        Ref.Swap(ref map, factoryId, slot, (x, id, s) => x.AddOrUpdate(id, s));
+                    slot = map.GetDataOrDefault(factoryId);
+                    if (slot == null)
+                    {
+                        var m = map;
+                        if (Interlocked.CompareExchange(ref map, m.AddOrKeep(factoryId, new ExpressionCacheSlot()), m) != m)
+                            Ref.Swap(ref map, factoryId, (x, id) => x.AddOrKeep(id, new ExpressionCacheSlot()));
+                        slot = map.GetDataOrDefault(factoryId);
+                    }
                 }
 
                 var reuse = request.Reuse;
                 if (reuse == Reuse.Transient)
                 {
-                    slot.Transient = expr;
+                    slot.Value.Transient = expr;
                 }
                 else if (reuse is CurrentScopeReuse scoped)
                 {
                     if (scoped.Name == null)
-                        slot.Scoped = expr;
+                        slot.Value.Scoped = expr;
                     else
                     {
-                        var named = slot.ScopedToName;
+                        var named = slot.Value.ScopedToName;
                         if (named == null)
                         {
-                            slot.ScopedToName = new[] {scoped.Name.Pair(expr)};
+                            slot.Value.ScopedToName = scoped.Name.Pair(expr).One();
                         }
                         else
                         {
@@ -1885,7 +1885,7 @@ namespace DryIoc
                                 var newNamed = new KeyValuePair<object, Expression>[named.Length + 1];
                                 Array.Copy(named, 0, newNamed, 0, named.Length);
                                 newNamed[named.Length] = scoped.Name.Pair(expr);
-                                slot.ScopedToName = newNamed;
+                                slot.Value.ScopedToName = newNamed;
                             }
                         }
                     }
@@ -1897,7 +1897,7 @@ namespace DryIoc
 
             private Registry(ImHashMap<Type, Factory> wrapperFactories = null)
                 : this(ImHashMap<Type, object>.Empty, ImHashMap<Type, Factory[]>.Empty, wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
-                    null, null, null, // caches
+                    null, null, null, // todo: initialize with empty slots
                     IsChangePermitted.Permitted)
             { }
 
@@ -2353,7 +2353,7 @@ namespace DryIoc
                     var cache = FactoryExpressionCache;
                     if (cache != null)
                         Ref.Swap(ref cache[factory.FactoryID & CACHE_SLOT_COUNT_MASK],
-                            factory.FactoryID, (x, fid) => (x ?? ImMap<ExpressionCacheSlot>.Empty).Update(fid, null));
+                            factory.FactoryID, (x, fid) => (x ?? ImMap<ExpressionCacheSlot>.Empty).Update(fid, default(ExpressionCacheSlot)));
                 }
             }
 
@@ -2711,8 +2711,13 @@ namespace DryIoc
             {
                 var resolver = r;
 
-#if SUPPORTS_FAST_EXPRESSION_COMPILER
-#endif
+//#if SUPPORTS_FAST_EXPRESSION_COMPILER
+//                var fewArgCount = callExpr.FewArgumentCount;
+//                if (fewArgCount != -1)
+//                {
+//                }
+//#endif
+
                 var callArgs = callExpr.Arguments.ToListOrSelf();
                 if (!ReferenceEquals(callArgs[0], FactoryDelegateCompiler.ResolverContextParamExpr))
                 {
@@ -8362,7 +8367,7 @@ namespace DryIoc
                 !setup.UseParentReuse &&
                 !Made.IsConditional;
 
-            Container.Registry.ExpressionCacheSlot cacheSlot = null;
+            ImMapData<Container.Registry.ExpressionCacheSlot> cacheSlot = null;
             if (mayCache)
             {
                 var cachedExpr = ((Container)container).GetCachedFactoryExpression(FactoryID, request, out cacheSlot);
