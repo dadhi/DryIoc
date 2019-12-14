@@ -879,14 +879,13 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
-|                    Method |        Mean |     Error |    StdDev |      Median |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
-|-------------------------- |------------:|----------:|----------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
-|                      MsDI |    140.8 us |   3.00 us |   7.86 us |    137.7 us |   1.00 |    0.00 |  16.8457 |  0.2441 |     - |  73.16 KB |
-|                    DryIoc |    113.1 us |   2.57 us |   6.55 us |    110.9 us |   0.81 |    0.07 |  16.8457 |  0.1221 |     - |  78.04 KB |
-|               DryIoc_MsDI |    134.9 us |   2.05 us |   1.92 us |    135.0 us |   0.88 |    0.06 |  21.2402 |  0.2441 |     - |  98.16 KB |
-| DryIoc_InterpretationOnly |    110.4 us |   1.71 us |   1.60 us |    110.4 us |   0.72 |    0.05 |  16.8457 |  0.1221 |     - |  78.13 KB |
-|                     Grace | 18,352.7 us |  86.20 us |  80.64 us | 18,360.3 us | 119.17 |    7.11 | 156.2500 | 62.5000 |     - | 751.81 KB |
-|                Grace_MsDI | 21,550.7 us | 117.35 us | 104.03 us | 21,569.6 us | 138.63 |    7.25 | 187.5000 | 93.7500 |     - | 919.47 KB |
+|                    Method |     Mean |   Error |  StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|-------------------------- |---------:|--------:|--------:|------:|--------:|-------:|------:|----------:|
+|                      MsDI | 128.3 us | 1.87 us | 1.66 us |  1.00 | 16.8457 | 0.2441 |     - |  73.16 KB |
+|                    DryIoc | 103.1 us | 0.53 us | 0.49 us |  0.80 | 16.8457 | 0.1221 |     - |  78.04 KB |
+|               DryIoc_MsDI | 122.5 us | 0.53 us | 0.50 us |  0.95 | 21.2402 | 0.2441 |     - |  98.16 KB |
+| DryIoc_InterpretationOnly | 102.4 us | 0.18 us | 0.15 us |  0.80 | 16.8457 | 0.1221 |     - |  78.13 KB |
+
              */
 
             [Benchmark(Baseline = true)]
@@ -901,10 +900,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace_MsDI() => Measure(PrepareGraceMsDi());
 
             //[Benchmark]
