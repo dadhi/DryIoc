@@ -37,14 +37,16 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void OpenScopeAndResolve()
+        public void Prepare_and_3_times_resolve_with_Interpretation_Compilation_and_Cache()
         {
             var container = new Container().PrepareDryIoc();
-            var x1 = container.Measure();
-            var x2 = container.Measure();
+            var x1 = container.Measure(); // Interpretation
+            var x2 = container.Measure(); // Compilation
+            var x3 = container.Measure(); // Cache
 
             Assert.IsNotNull(x1);
             Assert.IsNotNull(x2);
+            Assert.IsNotNull(x3);
         }
 
         [Test]
