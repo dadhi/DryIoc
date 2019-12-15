@@ -164,9 +164,7 @@ namespace FastExpressionCompiler.LightExpression
         }
 
         public static ConstantExpression Constant(object value, Type type) =>
-            value == null || type != value.GetType()
-                ? new TypedConstantExpression(value, type)
-                : Constant(value);
+            new TypedConstantExpression(value, type);
 
         public static NewExpression New(Type type)
         {

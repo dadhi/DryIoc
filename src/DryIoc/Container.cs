@@ -2460,6 +2460,7 @@ namespace DryIoc
             }
         }
 
+        // todo: benchmark
         //internal static readonly object[][] ObjectArrayPool = new object[16][];
 
         //internal static object[] RentOrNewObjectArray(int objectCount) =>
@@ -2480,16 +2481,18 @@ namespace DryIoc
             switch (expr.NodeType)
             {
                 case ExprType.New:
-                    {
-                        var newExpr = (NewExpression)expr;
+                {
+                    var newExpr = (NewExpression)expr;
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                        var fewArgCount = newExpr.FewArgumentCount;
+                    var fewArgCount = newExpr.FewArgumentCount;
+                    if (fewArgCount >= 0)
+                    {
                         if (fewArgCount == 0)
                         {
                             result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                             return true;
                         }
-                        
+
                         if (fewArgCount == 1)
                         {
                             var oneArg = new object[1];
@@ -2502,7 +2505,7 @@ namespace DryIoc
                             //ReturnBackObjectArray(1, oneArg);
                             return true;
                         }
-                        
+
                         if (fewArgCount == 2)
                         {
                             var twoArgs = new object[2];
@@ -2519,33 +2522,30 @@ namespace DryIoc
                             //ReturnBackObjectArray(2, twoArgs);
                             return true;
                         }
-
-                        if (fewArgCount == 3)
-                        {
-                        }
+                    }
 #endif
-                        var newArgs = newExpr.Arguments.ToListOrSelf();
-                        var newArgCount = newArgs.Count;
-                        if (newArgCount == 0)
-                        {
-                            result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
-                            return true;
-                        }
-
-                        var args = new object[newArgCount];
-                        for (var i = 0; i < args.Length; i++)
-                        {
-                            var argExpr = newArgs[i];
-                            if (argExpr is ConstantExpression constExpr)
-                                args[i] = constExpr.Value;
-                            else if (!TryInterpret(r, argExpr, useFec, out args[i]))
-                                return false;
-                        }
-
-                        result = newExpr.Constructor.Invoke(args);
-                        //ReturnBackObjectArray(newArgCount, args);
+                    var newArgs = newExpr.Arguments.ToListOrSelf();
+                    var newArgCount = newArgs.Count;
+                    if (newArgCount == 0)
+                    {
+                        result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                         return true;
                     }
+
+                    var args = new object[newArgCount];
+                    for (var i = 0; i < args.Length; i++)
+                    {
+                        var argExpr = newArgs[i];
+                        if (argExpr is ConstantExpression constExpr)
+                            args[i] = constExpr.Value;
+                        else if (!TryInterpret(r, argExpr, useFec, out args[i]))
+                            return false;
+                    }
+
+                    result = newExpr.Constructor.Invoke(args);
+                    //ReturnBackObjectArray(newArgCount, args);
+                    return true;
+                }
                 case ExprType.Call:
                     return TryInterpretMethodCall(r, expr, useFec, ref result);
                 case ExprType.Parameter:
@@ -2705,7 +2705,6 @@ namespace DryIoc
             var callExpr = (MethodCallExpression)expr;
             var method = callExpr.Method;
             var methodDeclaringType = method.DeclaringType;
-            var callObject = callExpr.Object;
 
             if (methodDeclaringType == typeof(CurrentScopeReuse))
             {
@@ -2809,15 +2808,12 @@ namespace DryIoc
             }
             else if (methodDeclaringType == typeof(IResolver))
             {
-                var callArgs = callExpr.Arguments.ToListOrSelf();
                 var resolver = r;
-                if (!ReferenceEquals(callObject, FactoryDelegateCompiler.ResolverContextParamExpr))
-                {
-                    if (!TryInterpret(r, callObject, useFec, out var resolverObj))
-                        return false;
-                    resolver = (IResolverContext) resolverObj;
-                }
+                if (!ReferenceEquals(callExpr.Object, FactoryDelegateCompiler.ResolverContextParamExpr) &&
+                    !TryInterpretResolverContext(ref resolver, useFec, callExpr.Object))
+                    return false;
 
+                var callArgs = callExpr.Arguments.ToListOrSelf();
                 if (method == Resolver.ResolveFastMethod)
                 {
                     result = resolver.Resolve((Type) ConstValue(callArgs[0]), (IfUnresolved) ConstValue(callArgs[1]));
@@ -2854,8 +2850,14 @@ namespace DryIoc
             
             // fallback to reflection invocation
             object instance = null;
-            if (callObject != null && !TryInterpret(r, callObject, useFec, out instance))
-                return false;
+            var callObjectExpr = callExpr.Object;
+            if (callObjectExpr != null)
+            {
+                if (callObjectExpr is ConstantExpression constObj)
+                    instance = constObj.Value;
+                else if (!TryInterpret(r, callExpr.Object, useFec, out instance)) 
+                    return false;
+            }
 
             // todo: handle `Invoke` if possible, e.g. for RegisterDelegate
             var args = callExpr.Arguments.ToListOrSelf();
@@ -6105,10 +6107,10 @@ namespace DryIoc
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
         private const string InvokeMethodName = "Invoke";
-        private static void RegisterDelegateFunc(IRegistrator r, Type serviceType, 
-            object factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
+        private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
+            TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
         {
-            var invokeMethod = factory.ThrowIfNull().GetType().GetTypeInfo().GetDeclaredMethod(InvokeMethodName);
+            var invokeMethod = typeof(TFunc).GetTypeInfo().GetDeclaredMethod(InvokeMethodName);
             var made = new Made(new FactoryMethod(invokeMethod, Constant(factory)), serviceType);
             r.Register(new ReflectionFactory(serviceType, reuse, made, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
