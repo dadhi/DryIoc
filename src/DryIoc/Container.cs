@@ -2711,14 +2711,6 @@ namespace DryIoc
             if (methodDeclaringType == typeof(CurrentScopeReuse))
             {
                 var resolver = r;
-
-//#if SUPPORTS_FAST_EXPRESSION_COMPILER
-//                var fewArgCount = callExpr.FewArgumentCount;
-//                if (fewArgCount != -1)
-//                {
-//                }
-//#endif
-
                 var callArgs = callExpr.Arguments.ToListOrSelf();
                 if (!ReferenceEquals(callArgs[0], FactoryDelegateCompiler.ResolverContextParamExpr))
                 {
@@ -2727,7 +2719,6 @@ namespace DryIoc
                     resolver = (IResolverContext)resolverObj;
                 }
 
-                // todo: do we need an overload with NO disposalOrder
                 var index 
                     = method == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod ? 2
                     : method == CurrentScopeReuse.GetNameScopedViaFactoryDelegateMethod ? 3
@@ -10532,13 +10523,13 @@ namespace DryIoc
 
                 if (ScopedOrSingleton)
                     return Call(GetScopedOrSingletonViaFactoryDelegateMethod, 
-                        resolverContextParamExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
+                        new[] { resolverContextParamExpr, idExpr, factoryDelegateExpr, disposalOrderExpr });
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
 
                 if (Name == null)
-                    return Call(GetScopedViaFactoryDelegateMethod, resolverContextParamExpr,
-                        ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
+                    return Call(GetScopedViaFactoryDelegateMethod, 
+                        new[] { resolverContextParamExpr, ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, disposalOrderExpr });
 
                 return Call(GetNameScopedViaFactoryDelegateMethod, resolverContextParamExpr,
                     request.Container.GetConstantExpression(Name, typeof(object)),
