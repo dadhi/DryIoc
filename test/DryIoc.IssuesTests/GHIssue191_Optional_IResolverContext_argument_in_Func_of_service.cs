@@ -7,7 +7,21 @@ namespace DryIoc.IssuesTests
     public class GHIssue191_Optional_IResolverContext_argument_in_Func_of_service
     {
         [Test]
-        public void Test1()
+        public void Can_resolve_as_FactoryDelegate()
+        {
+            var container = new Container();
+
+            container.Register<A>();
+            container.Register<B>();
+
+            var f = container.Resolve<FactoryDelegate>(typeof(B));
+            var b = f(container) as B;
+
+            Assert.IsNotNull(b);
+        }
+
+        [Test]
+        public void ResolverContext_is_ignored_in_resolved_Func()
         {
             var container = new Container();
 
@@ -21,7 +35,7 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void Test2()
+        public void ResolverContext_is_ignored_in_injected_Func()
         {
             var container = new Container();
 

@@ -311,12 +311,12 @@ namespace DryIoc
                     _registry.Value.TryCacheDefaultFactory(serviceType, expr);
 
                 // 1) First try to interpret
-                var useFec = Rules.UseFastExpressionCompiler;
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, useFec, out var instance))
+                var rules = Rules;
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
                     return instance;
 
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegate(useFec, Rules.UseInterpretation);
+                factoryDelegate = expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
             }
 
             if (factoryDelegate == null)
@@ -4018,6 +4018,9 @@ namespace DryIoc
             wrappers = wrappers.AddOrUpdate(typeof(System.Linq.Expressions.LambdaExpression),
                 new ExpressionFactory(GetLambdaExpressionExpressionOrDefault, setup: Setup.Wrapper));
 
+            wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate),
+                new ExpressionFactory(GetFactoryDelegateExpressionOrDefault, setup: Setup.Wrapper));
+
             wrappers = wrappers.AddOrUpdate(typeof(Func<>),
                 new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.Wrapper));
 
@@ -4275,6 +4278,18 @@ namespace DryIoc
                 .ToLambdaExpression()
 #endif
                 , typeof(LambdaExpression));
+        }
+
+        private static Expression GetFactoryDelegateExpressionOrDefault(Request request)
+        {
+            var serviceType = request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request);
+            request = request.Push(serviceType);
+            var container = request.Container;
+            var expr = container.ResolveFactory(request)?.GetExpressionOrDefault(request);
+            if (expr == null)
+                return null;
+            var rules = container.Rules;
+            return Constant(expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation));
         }
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request)
