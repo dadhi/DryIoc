@@ -3061,7 +3061,7 @@ namespace ImTools
         }
 
         /// Adds or keeps the left or right branch
-        public ImMapTree<V> GetOrAddDefaultLeftOrRight(int key, Ref<ImMapData<V>> result)
+        public ImMapTree<V> AddOrKeepLeftOrRight(int key)
         {
             if (key < Data.Key)
             {
@@ -3070,19 +3070,18 @@ namespace ImTools
                 {
                     if (key < leftLeaf.Key)
                         return Right == Empty
-                            ? new ImMapTree<V>(leftLeaf, result.SetNonAtomic(new ImMapData<V>(key)), Data, 2)
+                            ? new ImMapTree<V>(leftLeaf, new ImMapData<V>(key), Data, 2)
                             : new ImMapTree<V>(Data,
-                                new ImMapTree<V>(leftLeaf, result.SetNonAtomic(new ImMapData<V>(key)), Empty, 2),
+                                new ImMapTree<V>(leftLeaf, new ImMapData<V>(key), Empty, 2),
                                 Right, 3); // given that left is the leaf, the Right tree should be less than 2 - otherwise tree is unbalanced
 
                     if (key > leftLeaf.Key)
                         return Right == Empty
-                            ? new ImMapTree<V>(result.SetNonAtomic(new ImMapData<V>(key)), left, Data, 2)
+                            ? new ImMapTree<V>(new ImMapData<V>(key), left, Data, 2)
                             : new ImMapTree<V>(Data,
-                                new ImMapTree<V>(leftLeaf, Empty, result.SetNonAtomic(new ImMapData<V>(key)), 2),
+                                new ImMapTree<V>(leftLeaf, Empty, new ImMapData<V>(key), 2),
                                 Right, 3);
 
-                    result.SetNonAtomic(leftLeaf);
                     return this;
                 }
 
@@ -3090,12 +3089,9 @@ namespace ImTools
                 if (left is ImMapTree<V> leftTree)
                 {
                     if (key == leftTree.Data.Key)
-                    {
-                        result.SetNonAtomic(leftTree.Data);
                         return this;
-                    }
 
-                    var newLeftTree = leftTree.GetOrAddDefaultLeftOrRight(key, result);
+                    var newLeftTree = leftTree.AddOrKeepLeftOrRight(key);
                     if (newLeftTree == leftTree)
                         return this;
 
@@ -3109,7 +3105,7 @@ namespace ImTools
                     return new ImMapTree<V>(Data, newLeftTree.TreeHeight, newLeftTree, rightHeight, Right);
                 }
 
-                return new ImMapTree<V>(Data, result.SetNonAtomic(new ImMapData<V>(key)), Right, 2);
+                return new ImMapTree<V>(Data, new ImMapData<V>(key), Right, 2);
             }
             else
             {
@@ -3118,29 +3114,25 @@ namespace ImTools
                 {
                     if (key > rightLeaf.Key)
                         return Left == Empty
-                            ? new ImMapTree<V>(rightLeaf, Data, result.SetNonAtomic(new ImMapData<V>(key)), 2)
+                            ? new ImMapTree<V>(rightLeaf, Data, new ImMapData<V>(key), 2)
                             : new ImMapTree<V>(Data, Left,
-                                new ImMapTree<V>(rightLeaf, Empty, result.SetNonAtomic(new ImMapData<V>(key)), 2), 3);
+                                new ImMapTree<V>(rightLeaf, Empty, new ImMapData<V>(key), 2), 3);
 
                     if (key < rightLeaf.Key)
                         return Left == Empty
-                            ? new ImMapTree<V>(result.SetNonAtomic(new ImMapData<V>(key)), Data, right, 2)
+                            ? new ImMapTree<V>(new ImMapData<V>(key), Data, right, 2)
                             : new ImMapTree<V>(Data, Left,
-                                new ImMapTree<V>(rightLeaf, result.SetNonAtomic(new ImMapData<V>(key)), Empty, 2), 3);
+                                new ImMapTree<V>(rightLeaf, new ImMapData<V>(key), Empty, 2), 3);
 
-                    result.SetNonAtomic(rightLeaf);
                     return this;
                 }
 
                 if (right is ImMapTree<V> rightTree)
                 {
                     if (key == rightTree.Data.Key)
-                    {
-                        result.SetNonAtomic(rightTree.Data);
                         return this;
-                    }
 
-                    var newRightTree = rightTree.GetOrAddDefaultLeftOrRight(key, result);
+                    var newRightTree = rightTree.AddOrKeepLeftOrRight(key);
                     if (newRightTree == rightTree)
                         return this;
 
@@ -3155,7 +3147,7 @@ namespace ImTools
                     return new ImMapTree<V>(Data, leftHeight, Left, newRightTree.TreeHeight, newRightTree);
                 }
 
-                return new ImMapTree<V>(Data, Left, result.SetNonAtomic(new ImMapData<V>(key)), 2);
+                return new ImMapTree<V>(Data, Left, new ImMapData<V>(key), 2);
             }
         }
 
@@ -3233,7 +3225,7 @@ namespace ImTools
                 : (ImMap<V>)new ImMapData<V>(key, value)
             : new ImMapData<V>(key, value);
 
-        /// Returns a new map with added value for the specified key or the existing map if the key is already in the map.
+        /// <summary> Returns a new map with added value for the specified key or the existing map if the key is already in the map.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImMap<V> AddOrKeep<V>(this ImMap<V> map, int key, V value) =>
               map is ImMapTree<V> tree
@@ -3246,28 +3238,18 @@ namespace ImTools
                 : map
             : new ImMapData<V>(key, value);
 
-        /// <summary>If the the key is present the method returns the data in the result ref,
-        /// otherwise it creates a new data with key and default value and sets the result to it</summary>
+        /// <summary> Returns a new map with added value for the specified key or the existing map if the key is already in the map.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> GetDataOrAddDefault<V>(this ImMap<V> map, int key, Ref<ImMapData<V>> result)
-        {
-            if (map is ImMapTree<V> tree)
-            {
-                if (key != tree.Data.Key)
-                    return tree.GetOrAddDefaultLeftOrRight(key, result);
-                result.SetNonAtomic(tree.Data);
-                return map;
-            }
-
-            if (map is ImMapData<V> data)
-                return key > data.Key ? new ImMapTree<V>(data, ImMap<V>.Empty,
-                        result.SetNonAtomic(new ImMapData<V>(key)), 2)
-                    : key < data.Key ? new ImMapTree<V>(data, result.SetNonAtomic(new ImMapData<V>(key)),
-                        ImMap<V>.Empty, 2)
-                    : (ImMap<V>)result.SetNonAtomic(data);
-            
-            return result.SetNonAtomic(new ImMapData<V>(key));
-        }
+        public static ImMap<V> AddDefaultValueOrKeep<V>(this ImMap<V> map, int key) =>
+            map is ImMapTree<V> tree
+                ? key == tree.Data.Key
+                    ? map
+                    : tree.AddOrKeepLeftOrRight(key)
+                : map is ImMapData<V> data
+                    ? key > data.Key ? new ImMapTree<V>(data, ImMap<V>.Empty, new ImMapData<V>(key), 2)
+                    : key < data.Key ? new ImMapTree<V>(data, new ImMapData<V>(key), ImMap<V>.Empty, 2)
+                    : map
+                : new ImMapData<V>(key);
 
         /// <summary> Returns true if key is found and sets the result data. </summary>
         [MethodImpl((MethodImplOptions)256)]

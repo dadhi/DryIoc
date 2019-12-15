@@ -1851,11 +1851,10 @@ namespace DryIoc
                     slot = map.GetDataOrDefault(factoryId);
                     if (slot == null)
                     {
-                        var slotRef = new Ref<ImMapData<ExpressionCacheSlot>>();
                         var m = map;
-                        if (Interlocked.CompareExchange(ref map, m.GetDataOrAddDefault(factoryId, slotRef), m) != m)
-                            Ref.Swap(ref map, factoryId, slotRef, (x, id, sr) => x.GetDataOrAddDefault(id, sr));
-                        slot = slotRef.Value;
+                        if (Interlocked.CompareExchange(ref map, m.AddDefaultValueOrKeep(factoryId), m) != m)
+                            Ref.Swap(ref map, factoryId, (x, id) => x.AddDefaultValueOrKeep(id));
+                        slot = map.GetDataOrDefault(factoryId);
                     }
                 }
 

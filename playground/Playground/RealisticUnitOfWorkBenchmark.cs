@@ -1142,16 +1142,16 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark(Baseline = true)]
             public object MsDi() => Measure(_msDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object DryIoc() => Measure(_dryIoc);
 
-            //[Benchmark]
+            [Benchmark]
             public object DryIoc_MsDiAdapter() => Measure(_dryIocMsDi);
 
             [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            //[Benchmark]
+            [Benchmark]
             public object Grace() => Measure(_grace);
 
             //[Benchmark]
