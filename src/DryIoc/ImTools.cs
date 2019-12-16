@@ -4605,18 +4605,6 @@ namespace ImTools
     {
         internal static V IgnoreKey<K, V>(this Update<V> update, K _, V oldValue, V newValue) => update(oldValue, newValue);
 
-        /// <summary> Looks for key in a tree and returns the Data object if found or `null` otherwise. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapData<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
-        {
-            while (map.Height != 0 && map.Hash != hash)
-                map = hash < map.Hash ? map.Left : map.Right;
-
-            return map.Height == 0 ? null :
-                key.Equals(map.Key) ? map.Data :
-                map.GetConflictedDataOrDefault(key);
-        }
-
         /// <summary> Looks for key in a tree and returns `true` if found. </summary>
         [MethodImpl((MethodImplOptions)256)]
         public static bool Contains<K, V>(this ImHashMap<K, V> map, int hash, K key)
@@ -4628,8 +4616,20 @@ namespace ImTools
 
         /// <summary> Looks for key in a tree and returns `true` if found. </summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static bool Contains<K, V>(this ImHashMap<K, V> map, K key) => 
+        public static bool Contains<K, V>(this ImHashMap<K, V> map, K key) =>
             map.Height != 0 && map.Contains(key.GetHashCode(), key);
+
+        /// <summary> Looks for key in a tree and returns the Data object if found or `null` otherwise. </summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMapData<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
+        {
+            while (map.Height != 0 && map.Hash != hash)
+                map = hash < map.Hash ? map.Left : map.Right;
+
+            return map.Height == 0 ? null :
+                key.Equals(map.Key) ? map.Data :
+                map.GetConflictedDataOrDefault(key);
+        }
 
         /// <summary> Looks for key in a tree and returns the Data object if found or `null` otherwise. </summary> 
         [MethodImpl((MethodImplOptions)256)]
