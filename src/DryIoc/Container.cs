@@ -6079,12 +6079,10 @@ namespace DryIoc
         /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> factory,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
-        {
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
-                //,((Func<TDep1, TDep2, TDep3, TService>)factory.Invoke).Method);
-        }
 
+        //,((Func<TDep1, TDep2, TDep3, TService>)factory.Invoke).Method);
         /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TService> factory,
@@ -6111,9 +6109,9 @@ namespace DryIoc
 
         private const string InvokeMethodName = "Invoke";
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
-            TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey, MethodInfo m = null)
+            TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
         {
-            var invokeMethod = m ?? typeof(TFunc).GetTypeInfo().GetDeclaredMethod(InvokeMethodName);
+            var invokeMethod = typeof(TFunc).GetTypeInfo().GetDeclaredMethod(InvokeMethodName);
             var made = new Made(new FactoryMethod(invokeMethod, Constant(factory)), serviceType);
             r.Register(new ReflectionFactory(serviceType, reuse, made, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
