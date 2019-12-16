@@ -882,7 +882,7 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 |                    Method |     Mean |   Error |  StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |-------------------------- |---------:|--------:|--------:|------:|--------:|-------:|------:|----------:|
 |                      MsDI | 128.3 us | 1.87 us | 1.66 us |  1.00 | 16.8457 | 0.2441 |     - |  73.16 KB |
-|                    DryIoc | 103.1 us | 0.53 us | 0.49 us |  0.80 | 16.8457 | 0.1221 |     - |  78.04 KB |
+|                    DryIoc | 103.1 us | 0.53 us | 0.49 us |  0.80 | 16.8457 | 0.1221 |     - |  78.04 KB |75.21
 |               DryIoc_MsDI | 122.5 us | 0.53 us | 0.50 us |  0.95 | 21.2402 | 0.2441 |     - |  98.16 KB |
 | DryIoc_InterpretationOnly | 102.4 us | 0.18 us | 0.15 us |  0.80 | 16.8457 | 0.1221 |     - |  78.13 KB |
 
@@ -894,10 +894,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object DryIoc() => Measure(PrepareDryIoc());
 
-            [Benchmark]
+            //[Benchmark]
             public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
             //[Benchmark]

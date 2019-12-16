@@ -1,4 +1,5 @@
 using System;
+using ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -18,6 +19,99 @@ namespace DryIoc.IssuesTests
             var b = f(container) as B;
 
             Assert.IsNotNull(b);
+        }
+
+        [Test]
+        public void Main_test()
+        {
+            var c = new Container();
+            
+            c.Register<IFoo, Foo>(Reuse.Scoped);
+            c.Register<IFoo, FooDecorator>(Reuse.Scoped, setup: Setup.Decorator);
+            c.Register<FooFactory>(Reuse.Scoped);
+            c.Register<IFoo>(Made.Of(_ => ServiceInfo.Of<FooFactory>(), 
+                f => f.GetOrCreate(Arg.Of<IResolverContext>(), Arg.Of<FactoryDelegate, Func<string, IFoo>>(), Arg.Of<string>())), 
+                setup: Setup.Decorator);
+
+            using (var scope = c.OpenScope())
+            {
+                var foo1 = scope.Resolve<IFoo>(new object[] { "1" });
+                var foo2 = scope.Resolve<IFoo>(new object[] { "2" });
+
+                // Test that each IFoo is a different instance.
+                Assert.AreNotSame(foo1, foo2);
+
+                // That that I get the same instance when provided the same address while the named scope (address)
+                // has not been disposed.
+                var foo11 = scope.Resolve<IFoo>(new object[] { "1" });
+                Assert.AreSame(foo1, foo11);
+
+                var foo22 = scope.Resolve<IFoo>(new object[] { "2" });
+                Assert.AreSame(foo2, foo22);
+
+                // Test that after disposing FooDecorator, the named scope is closed and I get
+                // a new instance of foo for address = "1". 
+                foo1.Dispose();
+                var foo111 = scope.Resolve<IFoo>(new object[] { "1" });
+                Assert.AreNotSame(foo1, foo111);
+            }
+        }
+
+        public interface IFoo : IDisposable
+        {
+            void DoSomething();
+        }
+
+        public class Foo : IFoo
+        {
+            public string Address { get; }
+
+            public Foo(string address) => Address = address;
+
+            public void DoSomething() { }
+
+            public void Dispose() {}
+        }
+
+        public class FooDecorator : IFoo
+        {
+            private readonly IFoo _foo;
+            private readonly IResolverContext _ctx;
+
+            public FooDecorator(IFoo foo, IResolverContext ctx)
+            {
+                _foo = foo;
+                _ctx = ctx;
+            }
+
+            public void DoSomething() => _foo.DoSomething();
+
+            public void Dispose() => _ctx.Dispose();
+        }
+
+        public class FooFactory
+        {
+            private ImHashMap<string, IResolverContext> _scopes = ImHashMap<string, IResolverContext>.Empty;
+
+            public IFoo GetOrCreate(IResolverContext ctx, FactoryDelegate fooFactory, string address)
+            {
+                // fancy ensuring that we have a single new Scope created and stored
+                var scopeEntry = _scopes.GetEntryOrDefault(address);
+                if (scopeEntry == null)
+                {
+                    Ref.Swap(ref _scopes, address, (x, a) => x.AddEntryOrKeep(a));
+                    scopeEntry = _scopes.GetEntryOrDefault(address);
+                }
+
+                lock (scopeEntry)
+                    if (scopeEntry.Value == null || scopeEntry.Value.IsDisposed)
+                        scopeEntry.Value = ctx.OpenScope(address);
+
+                return ((Func<string, IFoo>)fooFactory(scopeEntry.Value)).Invoke(address);
+            }
+
+            // Closes all scopes - Note: alternatively we may add scope tracking in parent and rely on parent scope disposal
+            public void Dispose() => _scopes.Visit(entry => entry.Value?.Dispose());
         }
 
         [Test]

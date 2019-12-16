@@ -1733,7 +1733,7 @@ namespace DryIoc
                 if (cache == null)
                     return null;
                 var hash = serviceType.GetHashCode();
-                return cache[hash & CACHE_SLOT_COUNT_MASK]?.GetDataOrDefault(hash, serviceType);
+                return cache[hash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(hash, serviceType);
             }
 
             public void TryCacheDefaultFactory<T>(Type serviceType, T factory)
@@ -1766,7 +1766,7 @@ namespace DryIoc
                 if (cache == null)
                     return null;
                 var hash = key.GetHashCode();
-                return cache[hash & CACHE_SLOT_COUNT_MASK]?.GetDataOrDefault(hash, key);
+                return cache[hash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(hash, key);
             }
 
             public void TryCacheKeyedFactory(object key, object factory)
@@ -6079,8 +6079,11 @@ namespace DryIoc
         /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> factory,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
+        {
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+                //,((Func<TDep1, TDep2, TDep3, TService>)factory.Invoke).Method);
+        }
 
         /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
@@ -6108,9 +6111,9 @@ namespace DryIoc
 
         private const string InvokeMethodName = "Invoke";
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
-            TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
+            TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey, MethodInfo m = null)
         {
-            var invokeMethod = typeof(TFunc).GetTypeInfo().GetDeclaredMethod(InvokeMethodName);
+            var invokeMethod = m ?? typeof(TFunc).GetTypeInfo().GetDeclaredMethod(InvokeMethodName);
             var made = new Made(new FactoryMethod(invokeMethod, Constant(factory)), serviceType);
             r.Register(new ReflectionFactory(serviceType, reuse, made, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
