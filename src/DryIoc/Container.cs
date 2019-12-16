@@ -1812,7 +1812,7 @@ namespace DryIoc
                 if (map == null)
                     return null;
 
-                slot = map.GetDataOrDefault(factoryId);
+                slot = map.GetEntryOrDefault(factoryId);
                 if (slot != null)
                 {
                     var reuse = request.Reuse;
@@ -1848,13 +1848,13 @@ namespace DryIoc
                     if (map == null)
                         Interlocked.CompareExchange(ref map, ImMap<ExpressionCacheSlot>.Empty, null);
 
-                    slot = map.GetDataOrDefault(factoryId);
+                    slot = map.GetEntryOrDefault(factoryId);
                     if (slot == null)
                     {
                         var m = map;
-                        if (Interlocked.CompareExchange(ref map, m.AddDefaultValueOrKeep(factoryId), m) != m)
-                            Ref.Swap(ref map, factoryId, (x, id) => x.AddDefaultValueOrKeep(id));
-                        slot = map.GetDataOrDefault(factoryId);
+                        if (Interlocked.CompareExchange(ref map, m.AddEntryOrKeep(factoryId), m) != m)
+                            Ref.Swap(ref map, factoryId, (x, id) => x.AddEntryOrKeep(id));
+                        slot = map.GetEntryOrDefault(factoryId);
                     }
                 }
 
@@ -2914,7 +2914,7 @@ namespace DryIoc
 #endif
             var id = (int)((ConstantExpression)factoryIdArg).Value;
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
                 return itemRef.Value;
 
@@ -2923,7 +2923,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
                 Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, Scope.NoItem));
 
-            itemRef = map.GetDataOrDefault(id);
+            itemRef = map.GetEntryOrDefault(id);
             if (itemRef.Value == Scope.NoItem)
             {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -2979,7 +2979,7 @@ namespace DryIoc
             // check if scoped dependency is already in scope, then just return it
             var id = (int)((ConstantExpression)args[3]).Value;
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
                 return itemRef.Value;
 
@@ -2988,7 +2988,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
                 Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, Scope.NoItem));
 
-            itemRef = map.GetDataOrDefault(id);
+            itemRef = map.GetEntryOrDefault(id);
             if (itemRef.Value == Scope.NoItem)
             {
                 var lambda = args[4];
@@ -3043,7 +3043,7 @@ namespace DryIoc
             var id = (int)((ConstantExpression)factoryIdArg).Value;
 
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
                 return itemRef.Value;
 
@@ -3052,7 +3052,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
                 Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, Scope.NoItem));
 
-            itemRef = map.GetDataOrDefault(id);
+            itemRef = map.GetEntryOrDefault(id);
             if (itemRef.Value == Scope.NoItem)
             {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -8610,7 +8610,7 @@ namespace DryIoc
                 if (Interlocked.CompareExchange(ref map, m.AddOrKeep(factoryId, Scope.NoItem), m) != m)
                     Ref.Swap(ref map, factoryId, (x, i) => x.AddOrKeep(i, Scope.NoItem));
 
-                var itemRef = map.GetDataOrDefault(factoryId);
+                var itemRef = map.GetEntryOrDefault(factoryId);
                 if (itemRef.Value == Scope.NoItem)
                 {
                     object newItem = null;
@@ -10064,7 +10064,7 @@ namespace DryIoc
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != NoItem)
                 return itemRef.Value;
             return TryGetOrAdd(ref map, id, createValue, disposalOrder);
@@ -10079,7 +10079,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
                 Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));
 
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef.Value != NoItem)
                 return itemRef.Value;
 
@@ -10105,7 +10105,7 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
-            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetDataOrDefault(id);
+            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
             return itemRef != null && itemRef.Value != NoItem
                 ? itemRef.Value
                 : TryGetOrAddViaFactoryDelegate(id, createValue, r, disposalOrder);
@@ -10124,7 +10124,7 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         internal ImMapData<object> GetItemRefOrDefault(int id)
         {
-            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetDataOrDefault(id);
+            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
             return itemRef == null || itemRef.Value == NoItem ? null : itemRef;
         }
 
@@ -10142,7 +10142,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
                 Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));
 
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef.Value == NoItem)
             {
                 lock (itemRef)
@@ -10172,7 +10172,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
                 Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));
 
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef.Value != NoItem)
                 return itemRef;
 
@@ -10200,7 +10200,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
                 Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));
 
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef.Value != NoItem)
                 return itemRef.Value;
 
@@ -10237,7 +10237,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
                 Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));
 
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef.Value != NoItem)
                 return itemRef.Value;
 
@@ -10268,7 +10268,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
                 Ref.Swap(ref map, x => x.AddOrKeep(id, NoItem));
 
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef.Value != NoItem)
                 return;
 
@@ -10294,7 +10294,7 @@ namespace DryIoc
 
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
 
-            var itemRef = map.GetDataOrDefault(id);
+            var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != NoItem)
                 return itemRef.Value;
 
@@ -10302,7 +10302,7 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
                 Ref.Swap(ref map, x => x.AddOrUpdate(id, NoItem));
 
-            itemRef = map.GetDataOrDefault(id);
+            itemRef = map.GetEntryOrDefault(id);
 
             // lock on the ref itself to set its `Item` field
             lock (itemRef)
@@ -10343,7 +10343,7 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public bool TryGet(out object item, int id)
         {
-            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetDataOrDefault(id); 
+            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id); 
             if (itemRef != null && itemRef.Value != NoItem)
             {
                 item = itemRef.Value;

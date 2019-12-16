@@ -3240,7 +3240,7 @@ namespace ImTools
 
         /// <summary> Returns a new map with added value for the specified key or the existing map if the key is already in the map.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> AddDefaultValueOrKeep<V>(this ImMap<V> map, int key) =>
+        public static ImMap<V> AddEntryOrKeep<V>(this ImMap<V> map, int key) =>
             map is ImMapTree<V> tree
                 ? key == tree.Data.Key
                     ? map
@@ -3253,7 +3253,7 @@ namespace ImTools
 
         /// <summary> Returns true if key is found and sets the result data. </summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFindData<V>(this ImMap<V> map, int key, out ImMapData<V> result)
+        public static bool TryFindEntry<V>(this ImMap<V> map, int key, out ImMapData<V> result)
         {
             ImMapData<V> data;
             while (map is ImMapTree<V> tree)
@@ -3313,7 +3313,7 @@ namespace ImTools
 
         /// <summary> Returns true if key is found and sets the result data. </summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMapData<V> GetDataOrDefault<V>(this ImMap<V> map, int key)
+        public static ImMapData<V> GetEntryOrDefault<V>(this ImMap<V> map, int key)
         {
             ImMapData<V> data;
             while (map is ImMapTree<V> tree)
@@ -3789,7 +3789,6 @@ namespace ImTools
 
             return new ImHashMap<K, V>(new ImHashMapConflicts<K, V>(hash, newConflicts), Left, Right, Height);
         }
-
 
         private ImHashMap<K, V> AddOrUpdateLeftOrRight(int hash, K key, V value)
         {
