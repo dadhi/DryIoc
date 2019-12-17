@@ -1086,16 +1086,16 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ## DryIoc v4.1
 
-                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
--------------------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
-                      MsDi |  3.786 us | 0.0241 us | 0.0226 us |  1.00 |    0.00 |  0.9460 |      - |     - |   4.37 KB |
-                    DryIoc |  1.657 us | 0.0170 us | 0.0151 us |  0.44 |    0.00 |  0.6618 |      - |     - |   3.05 KB |
-        DryIoc_MsDiAdapter |  2.181 us | 0.0272 us | 0.0254 us |  0.58 |    0.01 |  0.6676 |      - |     - |   3.08 KB |
- DryIoc_InterpretationOnly | 14.771 us | 0.0315 us | 0.0263 us |  3.90 |    0.03 |  1.2207 |      - |     - |    5.7 KB |
-                     Grace |  1.682 us | 0.0131 us | 0.0116 us |  0.44 |    0.00 |  0.6866 |      - |     - |   3.17 KB |
-         Grace_MsDiAdapter |  2.223 us | 0.0102 us | 0.0090 us |  0.59 |    0.00 |  0.7401 |      - |     - |   3.41 KB |
-                   Autofac | 38.147 us | 0.2835 us | 0.2651 us | 10.08 |    0.11 |  9.8267 |      - |     - |  45.37 KB |
-       Autofac_MsDiAdapter | 48.932 us | 0.1168 us | 0.1035 us | 12.91 |    0.07 | 13.3667 | 0.0610 |     - |  61.64 KB |
+|                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 | Gen 1 | Gen 2 | Allocated |
+|-------------------------- |----------:|----------:|----------:|------:|--------:|--------:|------:|------:|----------:|
+|                      MsDi |  3.884 us | 0.0222 us | 0.0208 us |  1.00 |    0.00 |  0.9460 |     - |     - |   4.37 KB |
+|                    DryIoc |  1.642 us | 0.0088 us | 0.0083 us |  0.42 |    0.00 |  0.6618 |     - |     - |   3.05 KB |
+|        DryIoc_MsDiAdapter |  2.186 us | 0.0148 us | 0.0131 us |  0.56 |    0.01 |  0.6676 |     - |     - |   3.08 KB |
+| DryIoc_InterpretationOnly | 15.392 us | 0.0646 us | 0.0604 us |  3.96 |    0.02 |  1.2207 |     - |     - |    5.7 KB |
+|                     Grace |  1.696 us | 0.0074 us | 0.0069 us |  0.44 |    0.00 |  0.6866 |     - |     - |   3.17 KB |
+|         Grace_MsDiAdapter |  2.230 us | 0.0121 us | 0.0113 us |  0.57 |    0.00 |  0.7401 |     - |     - |   3.41 KB |
+|                   Autofac | 40.361 us | 0.2717 us | 0.2269 us | 10.39 |    0.06 | 10.4980 |     - |     - |  48.59 KB |
+|       Autofac_MsDiAdapter | 49.225 us | 0.1701 us | 0.1591 us | 12.67 |    0.08 | 13.3667 |     - |     - |   61.8 KB |
 */
 
             private IServiceProvider _msDi;

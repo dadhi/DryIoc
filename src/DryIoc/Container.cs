@@ -197,8 +197,8 @@ namespace DryIoc
                 ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
 
             // Improves performance a bit by first attempting to swap the registry while it is still unchanged.
-            var registry = _registry.Value;
-            if (!_registry.TrySwapIfStillCurrent(registry, registry.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
+            var r = _registry.Value;
+            if (!_registry.TrySwapIfStillCurrent(r, r.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
                 RegistrySwap(factory, serviceType, serviceKey, ifAlreadyRegistered);
         }
 
@@ -778,17 +778,18 @@ namespace DryIoc
                     }
                 }
 
-                var registry = r.WithServices(r.Services.AddOrUpdate(serviceType, entry));
+                var hash = RuntimeHelpers.GetHashCode(serviceType);
+                var registry = r.WithServices(r.Services.AddOrUpdate(hash, serviceType, entry));
 
                 // clearing the resolution cache for the updated factory if any
                 if (oldEntry != null && oldEntry != entry)
                 {
                     var oldFactory = oldEntry as Factory;
                     if (oldFactory != null)
-                        registry.DropFactoryCache(oldFactory, serviceType);
+                        registry.DropFactoryCache(oldFactory, hash, serviceType);
                     else
                         ((FactoriesEntry)oldEntry).Factories.Enumerate().ToArray()
-                            .ForEach(x => registry.DropFactoryCache(x.Value, serviceType, serviceKey));
+                            .ForEach(x => registry.DropFactoryCache(x.Value, hash, serviceType, serviceKey));
                 }
 
                 return registry;
@@ -882,14 +883,16 @@ namespace DryIoc
         /// <inheritdoc />
         public bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey)
         {
+            var hash = RuntimeHelpers.GetHashCode(serviceType);
+
             if (factoryType != null)
-                return _registry.Value.ClearCache(serviceType, serviceKey, factoryType.Value);
+                return _registry.Value.ClearCache(hash, serviceType, serviceKey, factoryType.Value);
 
             var registry = _registry.Value;
 
-            var clearedServices = registry.ClearCache(serviceType, serviceKey, FactoryType.Service);
-            var clearedWrapper = registry.ClearCache(serviceType, serviceKey, FactoryType.Wrapper);
-            var clearedDecorator = registry.ClearCache(serviceType, serviceKey, FactoryType.Decorator);
+            var clearedServices  = registry.ClearCache(hash, serviceType, serviceKey, FactoryType.Service);
+            var clearedWrapper   = registry.ClearCache(hash, serviceType, serviceKey, FactoryType.Wrapper);
+            var clearedDecorator = registry.ClearCache(hash, serviceType, serviceKey, FactoryType.Decorator);
 
             return clearedServices || clearedWrapper || clearedDecorator;
         }
@@ -1728,7 +1731,8 @@ namespace DryIoc
                 var cache = DefaultFactoryCache;
                 if (cache == null)
                     return null;
-                var hash = serviceType.GetHashCode();
+                var hash = RuntimeHelpers.GetHashCode(serviceType);
+                //var hash = serviceType.GetHashCode();
                 return cache[hash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(hash, serviceType);
             }
 
@@ -1741,7 +1745,8 @@ namespace DryIoc
                 if (DefaultFactoryCache == null)
                     Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
 
-                var hash = serviceType.GetHashCode();
+                //var hash = serviceType.GetHashCode();
+                var hash = RuntimeHelpers.GetHashCode(serviceType);
                 ref var map = ref DefaultFactoryCache[hash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
                     Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
@@ -1767,7 +1772,8 @@ namespace DryIoc
                 var cache = KeyedFactoryCache;
                 if (cache != null)
                 {
-                    var hash = type.GetHashCode();
+                    var hash = RuntimeHelpers.GetHashCode(type);
+                    //var hash = type.GetHashCode();
                     var typeEntry = cache[hash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(hash, type);
                     if (typeEntry != null)
                     {
@@ -2055,14 +2061,14 @@ namespace DryIoc
                 }
             }
 
-            public bool ClearCache(Type serviceType, object serviceKey, FactoryType factoryType)
+            public bool ClearCache(int hash, Type serviceType, object serviceKey, FactoryType factoryType)
             {
                 var factories = GetRegisteredFactories(serviceType, serviceKey, factoryType, null);
                 if (factories.IsNullOrEmpty())
                     return false;
 
                 for (var i = 0; i < factories.Length; i++)
-                    DropFactoryCache(factories[i], serviceType, serviceKey);
+                    DropFactoryCache(factories[i], hash, serviceType, serviceKey);
 
                 return true;
             }
@@ -2076,7 +2082,8 @@ namespace DryIoc
             {
                 var services = Services;
                 object newEntry = factory;
-                var oldEntry = services.GetValueOrDefault(serviceType);
+                var hash = RuntimeHelpers.GetHashCode(serviceType);
+                var oldEntry = services.GetValueOrDefault(hash, serviceType);
                 if (oldEntry != null)
                 {
                     switch (ifAlreadyRegistered)
@@ -2146,31 +2153,31 @@ namespace DryIoc
                 if (newEntry == oldEntry)
                     return this;
 
-                var newServices = services.AddOrUpdate(serviceType, newEntry);
+                var newServices = services.AddOrUpdate(hash, serviceType, newEntry);
                 var newRegistry = new Registry(newServices, Decorators, Wrappers,
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
 
                 if (oldEntry != null)
                 {
                     if (oldEntry is Factory oldFactory)
-                        newRegistry.DropFactoryCache(oldFactory, serviceType);
+                        newRegistry.DropFactoryCache(oldFactory, hash, serviceType);
                     else if (oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
-                        oldFactoriesEntry.Factories.Visit(KV.Of(serviceType, newRegistry), (x, s) =>
+                        oldFactoriesEntry.Factories.Visit(new{ newRegistry, hash, serviceType }, (x, s) =>
                         {
                             if (x.Key is DefaultKey)
-                                s.Value.DropFactoryCache(x.Value, s.Key);
+                                s.newRegistry.DropFactoryCache(x.Value, s.hash, s.serviceType);
                         });
                 }
 
                 return newRegistry;
             }
 
-            private Registry WithKeyedService(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, 
-                object serviceKey)
+            private Registry WithKeyedService(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
             {
                 object newEntry = null;
                 var services = Services;
-                var oldEntry = services.GetValueOrDefault(serviceType);
+                var hash = RuntimeHelpers.GetHashCode(serviceType);
+                var oldEntry = services.GetValueOrDefault(hash, serviceType);
                 if (oldEntry != null)
                 {
                     switch (ifAlreadyRegistered)
@@ -2221,11 +2228,12 @@ namespace DryIoc
                 if (oldEntry != null && ifAlreadyRegistered == IfAlreadyRegistered.Replace &&
                     oldEntry is FactoriesEntry updatedOldFactories &&
                     updatedOldFactories.Factories.TryFind(serviceKey, out var droppedFactory))
-                    newRegistry.DropFactoryCache(droppedFactory, serviceType, serviceKey);
+                    newRegistry.DropFactoryCache(droppedFactory, hash, serviceType, serviceKey);
 
                 return newRegistry;
             }
 
+            // todo: optimize allocations away
             public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
             {
                 if (_isChangePermitted != IsChangePermitted.Permitted)
@@ -2233,35 +2241,35 @@ namespace DryIoc
                         : Throw.For<Registry>(Error.NoMoreUnregistrationsAllowed,
                             serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factoryType);
 
+                var hash = RuntimeHelpers.GetHashCode(serviceType);
                 switch (factoryType)
                 {
                     case FactoryType.Wrapper:
                         Factory removedWrapper = null;
-                        var registry = WithWrappers(Wrappers.Update(serviceType, null, (factory, _null) =>
+                        var registry = WithWrappers(Wrappers.Update(hash, serviceType, null, (_, factory, _null) =>
                         {
                             if (factory != null && condition != null && !condition(factory))
                                 return factory;
                             removedWrapper = factory;
                             return null;
-
                         }));
 
                         if (removedWrapper == null)
                             return this;
-                        registry.DropFactoryCache(removedWrapper, serviceType);
+                        registry.DropFactoryCache(removedWrapper, hash, serviceType);
                         return registry;
 
                     case FactoryType.Decorator:
                         Factory[] removedDecorators = null;
                         // todo: minimize allocations in the lambdas below
                         if (condition == null)
-                            registry = WithDecorators(Decorators.Update(serviceType, null, (factories, _) =>
+                            registry = WithDecorators(Decorators.Update(hash, serviceType, null, (_, factories, _null) =>
                             {
                                 removedDecorators = factories;
                                 return null;
                             }));
                         else
-                            registry = WithDecorators(Decorators.Update(serviceType, null, (factories, _) =>
+                            registry = WithDecorators(Decorators.Update(hash, serviceType, null, (_, factories, _null) =>
                             {
                                 removedDecorators = factories.Match(condition);
                                 return removedDecorators == factories ? null : factories.Except(removedDecorators).ToArray();
@@ -2271,7 +2279,7 @@ namespace DryIoc
                             return this;
 
                         for (var i = 0; i < removedDecorators.Length; i++)
-                            registry.DropFactoryCache(removedDecorators[i], serviceType);
+                            registry.DropFactoryCache(removedDecorators[i], hash, serviceType);
 
                         return registry;
 
@@ -2280,19 +2288,21 @@ namespace DryIoc
                 }
             }
 
+            // todo: optimize allocations away
             private Registry UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
             {
                 object removed = null; // Factory or FactoriesEntry or Factory[]
                 ImHashMap<Type, object> services;
 
+                var hash = RuntimeHelpers.GetHashCode(serviceType);
                 if (serviceKey == null && condition == null) // simplest case with simplest handling
-                    services = Services.Update(serviceType, null, (entry, _null) =>
+                    services = Services.Update(hash, serviceType, null, (_, entry, _null) =>
                     {
                         removed = entry;
                         return null;
                     });
                 else
-                    services = Services.Update(serviceType, null, (entry, _null) =>
+                    services = Services.Update(hash, serviceType, null, (_, entry, _null) =>
                     {
                         if (entry == null)
                             return null;
@@ -2312,9 +2322,10 @@ namespace DryIoc
                         if (serviceKey == null) // automatically means condition != null
                         {
                             // keep factories for which condition is true
-                            foreach (var factory in oldFactories.Enumerate())
-                                if (condition != null && !condition(factory.Value))
-                                    remainingFactories = remainingFactories.AddOrUpdate(factory.Key, factory.Value);
+                            remainingFactories = oldFactories.Fold(remainingFactories,
+                                (oldFac, remainingFacs) => condition != null && !condition(oldFac.Value)
+                                    ? remainingFacs.AddOrUpdate(oldFac.Key, oldFac.Value)
+                                    : remainingFacs);
                         }
                         else // serviceKey is not default, which automatically means condition == null
                         {
@@ -2334,6 +2345,7 @@ namespace DryIoc
                             return null;
                         }
 
+                        // todo: huh - no perf here?
                         removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(f => f.Value).ToArray();
 
                         if (remainingFactories.Height == 1 && DefaultKey.Value.Equals(remainingFactories.Key))
@@ -2354,16 +2366,16 @@ namespace DryIoc
 
                 var removedFactory = removed as Factory;
                 if (removedFactory != null)
-                    registry.DropFactoryCache(removedFactory, serviceType, serviceKey);
+                    registry.DropFactoryCache(removedFactory, hash, serviceType, serviceKey);
                 else
                     (removed as Factory[] ??
                      ((FactoriesEntry)removed).Factories.Enumerate().Select(f => f.Value).ToArray())
-                        .ForEach(x => registry.DropFactoryCache(x, serviceType, serviceKey));
+                        .ForEach(x => registry.DropFactoryCache(x, hash, serviceType, serviceKey));
 
                 return registry;
             }
 
-            internal void DropFactoryCache(Factory factory, Type serviceType, object serviceKey = null)
+            internal void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null)
             {
                 if (DefaultFactoryCache != null || KeyedFactoryCache != null)
                 {
@@ -2371,19 +2383,13 @@ namespace DryIoc
                     {
                         var d = DefaultFactoryCache;
                         if (d != null)
-                        {
-                            var hash = serviceType.GetHashCode();
                             Ref.Swap(ref d[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
                                 (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).Update(h, t, null));
-                        }
 
                         var k = KeyedFactoryCache;
                         if (k != null)
-                        {
-                            var hash = serviceType.GetHashCode();
                             Ref.Swap(ref k[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
                                 (x, h, t) => (x ?? ImHashMap<Type, GrowingList<KeyAndFactorySlot>>.Empty).Update(h, t, default)); // todo: add UpdateToDefault
-                        }
                     }
                     else
                     {
@@ -4009,7 +4015,8 @@ namespace DryIoc
         internal static bool TryGetUsedInstance(this IResolverContext r, Type serviceType, out object instance)
         {
             instance = null;
-            var hash = serviceType.GetHashCode();
+            //var hash = serviceType.GetHashCode();
+            var hash = RuntimeHelpers.GetHashCode(serviceType);
             return r.CurrentScope? .TryGetUsedInstance(r, serviceType, hash, out instance) == true 
                 || r.SingletonScope.TryGetUsedInstance(r, serviceType, hash, out instance);
         }
@@ -10465,7 +10472,8 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
             var f = _factories;
-            var hash = type.GetHashCode();
+            //var hash = type.GetHashCode();
+            var hash = RuntimeHelpers.GetHashCode(type);
             if (Interlocked.CompareExchange(ref _factories, f.AddOrUpdate(hash, type, factory), f) != f)
                 Ref.Swap(ref _factories, hash, type, factory, (x, h, t, fac) => x.AddOrUpdate(h, t, fac));
         }
@@ -10477,7 +10485,8 @@ namespace DryIoc
             if (_disposed == 1)
                 return false;
 
-            var hash = type.GetHashCode();
+            //var hash = type.GetHashCode();
+            var hash = RuntimeHelpers.GetHashCode(type);
             var factory = _factories.GetValueOrDefault(hash, type);
             if (factory != null)
             {

@@ -4265,6 +4265,7 @@ namespace ImTools
             }
         }
 
+        // todo: add FindFirst
         /// <summary>
         /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         /// The only difference is using fixed size array instead of stack for speed-up.
