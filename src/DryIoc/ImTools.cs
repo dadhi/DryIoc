@@ -2374,8 +2374,8 @@ namespace ImTools
         public T OrDefault(T defaultValue = default) => HasValue ? Value : defaultValue;
     }
 
-    /// Ever growing stack
-    public struct GrowingStack<T>
+    /// <summary>Ever growing list</summary>
+    public struct GrowingList<T>
     {
         /// <summary>Default initial capacity </summary>
         public const int DefaultInitialCapacity = 2;
@@ -2387,7 +2387,7 @@ namespace ImTools
         public int Count;
 
         /// Constructs the thing 
-        public GrowingStack(T[] items, int count = 0)
+        public GrowingList(T[] items, int count = 0)
         {
             Items = items;
             Count = count;
@@ -2427,8 +2427,7 @@ namespace ImTools
 
         /// <inheritdoc />
         public override string ToString() =>
-            $"Count: {Count} of {(Count == 0 || Items == null || Items.Length == 0 ? "empty" : "first (" + Items[0] + ") and last (" + Items[Count - 1] + ")")}";
-
+            $"Count {Count} of {(Count == 0 || Items == null || Items.Length == 0 ? "empty" : "first (" + Items[0] + ") and last (" + Items[Count - 1] + ")")}";
     }
 
     /// <summary>Immutable list - simplest linked list with the Head and the Tail.</summary>

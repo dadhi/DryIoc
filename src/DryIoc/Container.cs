@@ -1758,7 +1758,7 @@ namespace DryIoc
             }
 
             // Where key object is `KV.Of(ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
-            public ImHashMap<Type, GrowingStack<KeyAndFactorySlot>>[] KeyedFactoryCache;
+            public ImHashMap<Type, GrowingList<KeyAndFactorySlot>>[] KeyedFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
             public bool GetCachedKeyedFactoryOrDefault(Type type, object key, out KeyAndFactorySlot slot)
@@ -1792,12 +1792,12 @@ namespace DryIoc
                     return;
 
                 if (KeyedFactoryCache == null)
-                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImHashMap<Type, GrowingStack<KeyAndFactorySlot>>[CACHE_SLOT_COUNT], null);
+                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImHashMap<Type, GrowingList<KeyAndFactorySlot>>[CACHE_SLOT_COUNT], null);
 
                 var hash = key.GetHashCode();
                 ref var map = ref KeyedFactoryCache[hash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
-                    Interlocked.CompareExchange(ref map, ImHashMap<Type, GrowingStack<KeyAndFactorySlot>>.Empty, null);
+                    Interlocked.CompareExchange(ref map, ImHashMap<Type, GrowingList<KeyAndFactorySlot>>.Empty, null);
 
                 var entry = map.GetEntryOrDefault(hash, type);
                 if (entry == null)
@@ -1946,7 +1946,7 @@ namespace DryIoc
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
                 ImHashMap<Type, object>[] defaultFactoryCache,
-                ImHashMap<Type, GrowingStack<KeyAndFactorySlot>>[] keyedFactoryCache,
+                ImHashMap<Type, GrowingList<KeyAndFactorySlot>>[] keyedFactoryCache,
                 ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
             {
@@ -2155,9 +2155,11 @@ namespace DryIoc
                     if (oldEntry is Factory oldFactory)
                         newRegistry.DropFactoryCache(oldFactory, serviceType);
                     else if (oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
-                        foreach (var f in oldFactoriesEntry.Factories.Enumerate())
-                            if (f.Key is DefaultKey)
-                                newRegistry.DropFactoryCache(f.Value, serviceType);
+                        oldFactoriesEntry.Factories.Visit(KV.Of(serviceType, newRegistry), (x, s) =>
+                        {
+                            if (x.Key is DefaultKey)
+                                s.Value.DropFactoryCache(x.Value, s.Key);
+                        });
                 }
 
                 return newRegistry;
