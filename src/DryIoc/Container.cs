@@ -2369,17 +2369,21 @@ namespace DryIoc
                 {
                     if (factory.FactoryGenerator == null)
                     {
-                        var defaultCache = DefaultFactoryCache;
-                        if (defaultCache != null)
+                        var d = DefaultFactoryCache;
+                        if (d != null)
                         {
                             var hash = serviceType.GetHashCode();
-                            Ref.Swap(ref defaultCache[hash & CACHE_SLOT_COUNT_MASK],
-                                hash, serviceType, (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).Update(h, t, null));
+                            Ref.Swap(ref d[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
+                                (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).Update(h, t, null));
                         }
 
-                        // todo: At the moment there is not possibility to clean-up a particular factory.
-                        // But considering that keyed services are much less "likely" than the default ones - then  it is fine, right?
-                        KeyedFactoryCache = null;
+                        var k = KeyedFactoryCache;
+                        if (k != null)
+                        {
+                            var hash = serviceType.GetHashCode();
+                            Ref.Swap(ref k[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
+                                (x, h, t) => (x ?? ImHashMap<Type, GrowingList<KeyAndFactorySlot>>.Empty).Update(h, t, default)); // todo: add UpdateToDefault
+                        }
                     }
                     else
                     {
@@ -2392,10 +2396,10 @@ namespace DryIoc
 
                 if (FactoryExpressionCache != null)
                 {
-                    var cache = FactoryExpressionCache;
-                    if (cache != null)
-                        Ref.Swap(ref cache[factory.FactoryID & CACHE_SLOT_COUNT_MASK],
-                            factory.FactoryID, (x, fid) => (x ?? ImMap<ExpressionCacheSlot>.Empty).Update(fid, default(ExpressionCacheSlot)));
+                    var e = FactoryExpressionCache;
+                    if (e != null)
+                        Ref.Swap(ref e[factory.FactoryID & CACHE_SLOT_COUNT_MASK],
+                            factory.FactoryID, (x, i) => (x ?? ImMap<ExpressionCacheSlot>.Empty).Update(i, default)); // todo: add UpdateToDefault
                 }
             }
 
