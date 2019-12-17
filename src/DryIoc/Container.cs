@@ -347,24 +347,23 @@ namespace DryIoc
             object cacheKey = null;
             if (requiredServiceType == null && preResolveParent.IsEmpty && args.IsNullOrEmpty())
             {
-                cacheKey = scopeName == null 
-                    ? KV.Of(serviceType, serviceKey) 
-                    : KV.Of(serviceType, serviceKey == null ? scopeName : KV.Of(scopeName, serviceKey));
+                cacheKey = scopeName == null ? serviceKey 
+                    : serviceKey == null ? scopeName 
+                    : KV.Of(scopeName, serviceKey);
 
-                var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(cacheKey);
-                if (cacheSlot != null)
+                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceType, cacheKey, out var cacheSlot))
                 {
-                    if (cacheSlot.Value is FactoryDelegate cachedDelegate)
+                    if (cacheSlot.Factory is FactoryDelegate cachedDelegate)
                         return cachedDelegate(this);
 
-                    if (cacheSlot.Value is Expression cachedExpression)
+                    if (cacheSlot.Factory is Expression cachedExpression)
                     {
                         if (Rules.UseInterpretation && 
                             Interpreter.TryInterpretAndUnwrapContainerException(this, cachedExpression, Rules.UseFastExpressionCompiler, out var result))
                             return result;
 
                         var compiledDelegate = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler, Rules.UseInterpretation);
-                        cacheSlot.Value = compiledDelegate;
+                        cacheSlot.Factory = compiledDelegate;
                         return compiledDelegate(this);
                     }
                 }
@@ -387,24 +386,21 @@ namespace DryIoc
             // so we need to look into Default cache again for the new key
             if (cacheKey != null && serviceKey == null && request.ServiceKey != null)
             {
-                cacheKey = scopeName == null
-                    ? (object)KV.Of(serviceType, request.ServiceKey)
-                    : KV.Of(serviceType, KV.Of(scopeName, request.ServiceKey));
+                cacheKey = scopeName == null ? request.ServiceKey : KV.Of(scopeName, request.ServiceKey);
 
-                var cacheSlot = _registry.Value.GetCachedKeyedFactoryOrDefault(cacheKey);
-                if (cacheSlot != null)
+                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceType, cacheKey, out var cacheSlot))
                 {
-                    if (cacheSlot.Value is FactoryDelegate cachedDelegate)
+                    if (cacheSlot.Factory is FactoryDelegate cachedDelegate)
                         return cachedDelegate(this);
 
-                    if (cacheSlot.Value is Expression cachedExpression)
+                    if (cacheSlot.Factory is Expression cachedExpression)
                     {
                         if (Rules.UseInterpretation && 
                             Interpreter.TryInterpretAndUnwrapContainerException(this, cachedExpression, Rules.UseFastExpressionCompiler, out var result))
                             return result;
 
                         var compiledDelegate = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler, Rules.UseInterpretation);
-                        cacheSlot.Value = compiledDelegate;
+                        cacheSlot.Factory = compiledDelegate;
                         return compiledDelegate(this);
                     }
                 }
@@ -421,14 +417,14 @@ namespace DryIoc
                 {
                     var value = ce.Value;
                     if (cacheKey != null)
-                        _registry.Value.TryCacheKeyedFactory(cacheKey, (FactoryDelegate)value.ToFactoryDelegate);
+                        _registry.Value.TryCacheKeyedFactory(serviceType, cacheKey, (FactoryDelegate)value.ToFactoryDelegate);
                     return value;
                 }
 
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
                 if (cacheKey != null)
-                    _registry.Value.TryCacheKeyedFactory(cacheKey, expr);
+                    _registry.Value.TryCacheKeyedFactory(serviceType, cacheKey, expr);
 
                 // 1) First try to interpret
                 var useFec = Rules.UseFastExpressionCompiler;
@@ -449,7 +445,7 @@ namespace DryIoc
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
             if (cacheKey != null)
-                _registry.Value.TryCacheKeyedFactory(cacheKey, factoryDelegate);
+                _registry.Value.TryCacheKeyedFactory(serviceType, cacheKey, factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -1755,37 +1751,81 @@ namespace DryIoc
                     Ref.Swap(ref map, hash, serviceType, factory, (x, h, t, slot) => x.AddOrUpdate(h, t, slot));
             }
 
-            // Where key object is `KV.Of(ServiceType, ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
-            public ImHashMap<object, object>[] KeyedFactoryCache;
+            internal struct KeyAndFactorySlot
+            {
+                public object Key;
+                public object Factory;
+            }
+
+            // Where key object is `KV.Of(ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
+            public ImHashMap<Type, GrowingStack<KeyAndFactorySlot>>[] KeyedFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
-            public ImHashMapData<object, object> GetCachedKeyedFactoryOrDefault(object key)
+            public bool GetCachedKeyedFactoryOrDefault(Type type, object key, out KeyAndFactorySlot slot)
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = KeyedFactoryCache;
-                if (cache == null)
-                    return null;
-                var hash = key.GetHashCode();
-                return cache[hash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(hash, key);
+                if (cache != null)
+                {
+                    var hash = type.GetHashCode();
+                    var typeEntry = cache[hash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(hash, type);
+                    if (typeEntry != null)
+                    {
+                        ref var items = ref typeEntry.Value;
+                        for (int i = 0; i < items.Count; i++)
+                        {
+                            ref var item = ref items.Items[i];
+                            if (Equals(item.Key, key))
+                                slot = item;
+                        }
+                    }
+                }
+
+                slot = default;
+                return false;
             }
 
-            public void TryCacheKeyedFactory(object key, object factory)
+            public void TryCacheKeyedFactory(Type type, object key, object factory)
             {
                 // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
                 if (Services.IsEmpty)
                     return;
 
                 if (KeyedFactoryCache == null)
-                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImHashMap<object, object>[CACHE_SLOT_COUNT], null);
+                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImHashMap<Type, GrowingStack<KeyAndFactorySlot>>[CACHE_SLOT_COUNT], null);
 
                 var hash = key.GetHashCode();
                 ref var map = ref KeyedFactoryCache[hash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
-                    Interlocked.CompareExchange(ref map, ImHashMap<object, object>.Empty, null);
+                    Interlocked.CompareExchange(ref map, ImHashMap<Type, GrowingStack<KeyAndFactorySlot>>.Empty, null);
 
-                var m = map;
-                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(hash, key, factory), m) != m)
-                    Ref.Swap(ref map, hash, key, factory, (x, h, k, slot) => x.AddOrUpdate(h, k, slot));
+                var entry = map.GetEntryOrDefault(hash, type);
+                if (entry == null)
+                {
+                    var m = map;
+                    if (Interlocked.CompareExchange(ref map, m.AddEntryOrKeep(hash, type), m) != m)
+                        Ref.Swap(ref map, hash, type, (x, h, t) => x.AddEntryOrKeep(h, t));
+                    entry = map.GetEntryOrDefault(hash, type);
+                }
+
+                var updated = false;
+                ref var items = ref entry.Value;
+                for (int i = 0; i < items.Count; i++)
+                {
+                    ref var item = ref items.Items[i];
+                    if (Equals(item.Key, key))
+                    {
+                        item.Factory = factory;
+                        updated = true;
+                    }
+                }
+
+                if (!updated)
+                {
+                    ref var newItem = ref items.PushSlot();
+                    newItem.Key = key;
+                    newItem.Factory = factory;
+                }
             }
 
             internal struct ExpressionCacheSlot
@@ -1906,7 +1946,7 @@ namespace DryIoc
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
                 ImHashMap<Type, object>[] defaultFactoryCache,
-                ImHashMap<object, object>[] keyedFactoryCache,
+                ImHashMap<Type, GrowingStack<KeyAndFactorySlot>>[] keyedFactoryCache,
                 ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
             {
