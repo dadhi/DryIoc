@@ -24,7 +24,7 @@ namespace DryIoc.Messages.MediatRLikeExample
             return Runner.Run(container, writer, "DryIoc.Messages");
         }
 
-        private static void BuildMediator(IContainer container, TextWriter writer)
+        private static void BuildMediator(IRegistrator container, TextWriter writer)
         {
             container.RegisterInstance(writer);
             container.RegisterMany(new[] { typeof(Program).GetAssembly() }, Registrator.Interfaces);
