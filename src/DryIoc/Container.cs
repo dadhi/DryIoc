@@ -284,14 +284,15 @@ namespace DryIoc
             if (factory == null)
                 return null;
 
+            var rules = Rules;
             FactoryDelegate factoryDelegate;
 
             // todo: in v5.0 there should be no check nor the InstanceFactory
-            if (factory is InstanceFactory)
+            if (factory is InstanceFactory || !rules.UseInterpretationForTheFirstResolution)
             {
                 factoryDelegate = factory.GetDelegateOrDefault(request);
             }
-            else
+            else 
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
@@ -311,7 +312,6 @@ namespace DryIoc
                     _registry.Value.TryCacheDefaultFactory(serviceType, expr);
 
                 // 1) First try to interpret
-                var rules = Rules;
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
                     return instance;
 
@@ -407,7 +407,7 @@ namespace DryIoc
             }
 
             FactoryDelegate factoryDelegate;
-            if (factory.UseInterpretation(request))
+            if (factory is InstanceFactory == false && Rules.UseInterpretationForTheFirstResolution)
             {
                 var expr = factory.GetExpressionOrDefault(request);
                 if (expr == null)
@@ -8766,7 +8766,8 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        /// Instructs to ignore GetDelegateOrDefault and try the interpreter 
+        // todo: remove this
+        /// [Obsolete("Not need to control on the factory level, the remaining UseInstanceFactory will be removed")] 
         public virtual bool UseInterpretation(Request request) => request.Rules.UseInterpretationForTheFirstResolution;
 
         /// Creates factory delegate from service expression and returns it.
