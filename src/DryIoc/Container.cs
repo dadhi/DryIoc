@@ -9215,7 +9215,6 @@ namespace DryIoc
                     ? Made.Parameters.OverrideWith(rules.Parameters)
                     : rules.Parameters.OverrideWith(Made.Parameters);
                 var paramServiceInfoSelector = paramSelector(request);
-
                 var usedArgCount = 0;
                 paramExprs = TryResolveParameterExpressions(parameters, paramServiceInfoSelector, request, ref usedArgCount);
                 if (paramExprs == null)
@@ -9230,8 +9229,18 @@ namespace DryIoc
             ParameterInfo[] parameters, Func<ParameterInfo, ParameterServiceInfo> parameterServiceInfoSelector,
             Request request, ref int usedInputArgAndCustomValueCount)
         {
-            var paramExprs = new Expression[parameters.Length];
+            //Expression arg0, arg1, arg2;
+            if (parameters.Length == 1)
+            {
+            }
+            if (parameters.Length == 2)
+            {
+            }
+            if (parameters.Length == 3)
+            {
+            }
 
+            var paramExprs = new Expression[parameters.Length];
             var argsUsedMask = 0;
             var argExprs = request.InputArgExprs;
 
@@ -9283,6 +9292,7 @@ namespace DryIoc
                     paramExprs[i] = hasConversionOperator
                         ? Convert(request.Container.GetConstantExpression(customValue), paramServiceType)
                         : request.Container.GetConstantExpression(customValue, paramServiceType);
+
                     ++usedInputArgAndCustomValueCount;
                     continue;
                 }
@@ -10339,7 +10349,6 @@ namespace DryIoc
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-
             var m = map;
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
                 Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));

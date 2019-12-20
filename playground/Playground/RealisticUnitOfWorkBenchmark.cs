@@ -879,15 +879,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
-                            Method |     Mean |   Error |  StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-                           ------- |---------:|--------:|--------:|------:|--------:|-------:|------:|----------:|
-                              MsDI | 119.4 us | 2.25 us | 1.88 us |  1.00 | 16.9678 | 0.1221 |     - |  73.15 KB |
-                            DryIoc | 102.0 us | 0.31 us | 0.27 us |  0.85 | 16.3574 |      - |     - |  75.58 KB |
-
-                            Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-                           ------- |---------:|--------:|--------:|------:|--------:|--------:|-------:|------:|----------:|
-                              MsDI | 124.4 us | 2.49 us | 3.06 us |  1.00 |    0.00 | 16.8457 | 0.2441 |     - |  73.16 KB |
-                            DryIoc | 103.1 us | 0.23 us | 0.22 us |  0.83 |    0.02 | 16.1133 | 0.1221 |     - |  74.46 KB |
+ Method |     Mean |   Error |  StdDev |   Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+------- |---------:|--------:|--------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+   MsDI | 118.1 us | 2.36 us | 5.42 us | 120.2 us |  1.00 |    0.00 | 16.9678 | 0.2441 |     - |  73.15 KB |
+ DryIoc | 101.6 us | 0.68 us | 0.64 us | 101.5 us |  0.92 |    0.06 | 16.2354 |      - |     - |  75.36 KB |
 
              */
 
