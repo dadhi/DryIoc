@@ -1732,7 +1732,6 @@ namespace DryIoc
                 if (cache == null)
                     return null;
                 var hash = RuntimeHelpers.GetHashCode(serviceType);
-                //var hash = serviceType.GetHashCode();
                 return cache[hash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(hash, serviceType);
             }
 
@@ -1745,7 +1744,6 @@ namespace DryIoc
                 if (DefaultFactoryCache == null)
                     Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
 
-                //var hash = serviceType.GetHashCode();
                 var hash = RuntimeHelpers.GetHashCode(serviceType);
                 ref var map = ref DefaultFactoryCache[hash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
@@ -1773,7 +1771,6 @@ namespace DryIoc
                 if (cache != null)
                 {
                     var hash = RuntimeHelpers.GetHashCode(type);
-                    //var hash = type.GetHashCode();
                     var typeEntry = cache[hash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(hash, type);
                     if (typeEntry != null)
                     {
@@ -4028,7 +4025,6 @@ namespace DryIoc
         internal static bool TryGetUsedInstance(this IResolverContext r, Type serviceType, out object instance)
         {
             instance = null;
-            //var hash = serviceType.GetHashCode();
             var hash = RuntimeHelpers.GetHashCode(serviceType);
             return r.CurrentScope? .TryGetUsedInstance(r, serviceType, hash, out instance) == true 
                 || r.SingletonScope.TryGetUsedInstance(r, serviceType, hash, out instance);
@@ -10486,7 +10482,6 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
             var f = _factories;
-            //var hash = type.GetHashCode();
             var hash = RuntimeHelpers.GetHashCode(type);
             if (Interlocked.CompareExchange(ref _factories, f.AddOrUpdate(hash, type, factory), f) != f)
                 Ref.Swap(ref _factories, hash, type, factory, (x, h, t, fac) => x.AddOrUpdate(h, t, fac));
@@ -10499,7 +10494,6 @@ namespace DryIoc
             if (_disposed == 1)
                 return false;
 
-            //var hash = type.GetHashCode();
             var hash = RuntimeHelpers.GetHashCode(type);
             var factory = _factories.GetValueOrDefault(hash, type);
             if (factory != null)
