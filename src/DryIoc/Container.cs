@@ -2512,12 +2512,23 @@ namespace DryIoc
             }
         }
 
-        // todo: benchmark
+        // todo: benchmark - but probably bad idea because of static references to already created object = so we need an additional cleanup and perf costs
+        /*
+            Method |     Mean |   Error |  StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+           ------- |---------:|--------:|--------:|------:|--------:|-------:|------:|----------:|
+              MsDI | 119.4 us | 2.25 us | 1.88 us |  1.00 | 16.9678 | 0.1221 |     - |  73.15 KB |
+            DryIoc | 102.0 us | 0.31 us | 0.27 us |  0.85 | 16.3574 |      - |     - |  75.58 KB |
+
+            Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+           ------- |---------:|--------:|--------:|------:|--------:|--------:|-------:|------:|----------:|
+              MsDI | 124.4 us | 2.49 us | 3.06 us |  1.00 |    0.00 | 16.8457 | 0.2441 |     - |  73.16 KB |
+            DryIoc | 103.1 us | 0.23 us | 0.22 us |  0.83 |    0.02 | 16.1133 | 0.1221 |     - |  74.46 KB |
+        */
         //internal static readonly object[][] ObjectArrayPool = new object[16][];
 
         //internal static object[] RentOrNewObjectArray(int objectCount) =>
-        //    objectCount > 16 
-        //        ? new object[objectCount] 
+        //    objectCount > 16
+        //        ? new object[objectCount]
         //        : Interlocked.Exchange(ref ObjectArrayPool[objectCount - 1], null) ?? new object[objectCount];
 
         //internal static void ReturnBackObjectArray(int objectCount, object[] array)
@@ -2581,21 +2592,23 @@ namespace DryIoc
                     if (newArgCount == 0)
                     {
                         result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
-                        return true;
                     }
-
-                    var args = new object[newArgCount];
-                    for (var i = 0; i < args.Length; i++)
+                    else
                     {
-                        var argExpr = newArgs[i];
-                        if (argExpr is ConstantExpression constExpr)
-                            args[i] = constExpr.Value;
-                        else if (!TryInterpret(r, argExpr, useFec, out args[i]))
-                            return false;
-                    }
+                        //var args = RentOrNewObjectArray(newArgCount);
+                        var args = new object[newArgCount];
+                        for (var i = 0; i < args.Length; i++)
+                        {
+                            var argExpr = newArgs[i];
+                            if (argExpr is ConstantExpression constExpr)
+                                args[i] = constExpr.Value;
+                            else if (!TryInterpret(r, argExpr, useFec, out args[i]))
+                                return false;
+                        }
 
-                    result = newExpr.Constructor.Invoke(args);
-                    //ReturnBackObjectArray(newArgCount, args);
+                        result = newExpr.Constructor.Invoke(args);
+                        //ReturnBackObjectArray(newArgCount, args);
+                    }
                     return true;
                 }
                 case ExprType.Call:
@@ -7409,7 +7422,7 @@ namespace DryIoc
             var stack = RequestStack.Get();
             ref var req = ref stack.GetOrPushRef(0);
 
-            // we re-starting the dependency depth count from `1`
+            // we are re-starting the dependency depth count from `1`
             if (req == null)
                 req =  new Request(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
             else
@@ -7425,7 +7438,7 @@ namespace DryIoc
                 preResolveParent, flags, inputArgs);
 
         // todo: Make a property in v4.0
-        /// <summary>Available in runtime only, provides access to container initiated request.</summary>
+        /// <summary>Available in runtime only, provides access to container initiated the request.</summary>
         public IContainer Container;
 
         /// <summary>Request immediate parent.</summary>
