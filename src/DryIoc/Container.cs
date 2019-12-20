@@ -2010,7 +2010,9 @@ namespace DryIoc
                             serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factory);
 
                 return factory.FactoryType == FactoryType.Service
-                        ? WithService(factory, serviceType, serviceKey, ifAlreadyRegistered)
+                        ? serviceKey == null 
+                            ? WithDefaultService(factory, serviceType, ifAlreadyRegistered) 
+                            : WithKeyedService(factory, serviceType, ifAlreadyRegistered, serviceKey)
                     : factory.FactoryType == FactoryType.Decorator
                         ? WithDecorators(Decorators.AddOrUpdate(serviceType, factory.One(), (_, oldf, newf) => oldf.Append(newf)))
                         : WithWrappers(Wrappers.AddOrUpdate(serviceType, factory));
@@ -2074,11 +2076,6 @@ namespace DryIoc
 
                 return true;
             }
-
-            private Registry WithService(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered ifAlreadyRegistered) => 
-                serviceKey == null ? 
-                    WithDefaultService(factory, serviceType, ifAlreadyRegistered) : 
-                    WithKeyedService(factory, serviceType, ifAlreadyRegistered, serviceKey);
 
             private Registry WithDefaultService(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered)
             {
@@ -2514,7 +2511,8 @@ namespace DryIoc
             }
         }
 
-        // todo: benchmark - but probably bad idea because of static references to already created object = so we need an additional cleanup and perf costs
+        // todo: benchmark - but probably bad idea because of static references to already created object =
+        // so we need an additional cleanup and perf costs - OR! we could put it into Container
         /*
             Method |     Mean |   Error |  StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
            ------- |---------:|--------:|--------:|------:|--------:|-------:|------:|----------:|
