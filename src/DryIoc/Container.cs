@@ -9254,6 +9254,7 @@ namespace DryIoc
             {
                 var param = parameters[i];
 
+                // todo: Extract to method, maybe move it to Request
                 // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
                 if (argExprs != null)
                     for (var a = 0; a < argExprs.Length; ++a)
@@ -9303,22 +9304,20 @@ namespace DryIoc
                     continue;
                 }
 
-                var paramFactory = request.Container.ResolveFactory(paramRequest);
-                var paramExpr = paramFactory?.GetExpressionOrDefault(paramRequest);
+                var paramDetails = paramInfo.Details;
+                var paramExpr = request.Container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
                 if (paramExpr == null ||
                     // When param is an empty array / collection, then we may use a default value instead (#581)
-                    paramInfo.Details.DefaultValue != null &&
+                    paramDetails.DefaultValue != null &&
                     paramExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
                     ((NewArrayExpression) paramExpr).Expressions.Count == 0)
                 {
                     // Check if parameter dependency itself (without propagated parent details)
                     // does not allow default, then stop checking the rest of parameters.
-                    if (paramInfo.Details.IfUnresolved == IfUnresolved.Throw)
+                    if (paramDetails.IfUnresolved == IfUnresolved.Throw)
                         return null;
-
-                    var defaultValue = paramInfo.Details.DefaultValue;
-                    paramExpr = defaultValue != null
-                        ? request.Container.GetConstantExpression(defaultValue)
+                    paramExpr = paramDetails.DefaultValue != null
+                        ? request.Container.GetConstantExpression(paramDetails.DefaultValue)
                         : paramServiceType.GetDefaultValueExpression();
                 }
 
