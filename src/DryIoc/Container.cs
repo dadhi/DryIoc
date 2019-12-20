@@ -312,6 +312,11 @@ namespace DryIoc
                     _registry.Value.TryCacheDefaultFactory(serviceType, expr);
 
                 // 1) First try to interpret
+                if (request._sharedState.IsWrappedInFunc)
+                {
+
+                }
+
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
                     return instance;
 
@@ -3172,11 +3177,13 @@ namespace DryIoc
         public static object ConvertWithOperator(object source, Type targetType, Expression expr)
         {
             var sourceType = source.GetType();
-            var sourceConvertOp = sourceType.GetSourceConversionOperatorToTarget(targetType);
+            //var sourceConvertOp = sourceType.GetSourceConversionOperatorToTarget(targetType);
+            var sourceConvertOp = sourceType.FindConvertOperator(sourceType, targetType);
             if (sourceConvertOp != null)
                 return sourceConvertOp.Invoke(null, new[] { source });
 
-            var targetConvertOp = sourceType.GetTargetConversionOperatorFromSource(targetType);
+            //var targetConvertOp = sourceType.GetTargetConversionOperatorFromSource(targetType);
+            var targetConvertOp = targetType.FindConvertOperator(sourceType, targetType);
             if (targetConvertOp == null)
                 Throw.It(Error.NoConversionOperatorFoundWhenInterpretingTheConvertExpression, expr);
             return targetConvertOp.Invoke(null, new[] { source });
@@ -4334,12 +4341,10 @@ namespace DryIoc
                 // assign valid unique argument names for code generation
                 for (var i = 0; i < argCount; ++i)
                     argExprs[i] = Parameter(argTypes[i], argTypes[i].Name + "@" + i); // todo: optimize string allocations
-
                 request = request.WithInputArgs(argExprs);
             }
 
             var serviceRequest = request.Push(serviceType, flags: RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
-
             var container = request.Container;
             var serviceExpr = container.Rules.FuncAndLazyWithoutRegistration && !isAction
                 ? Resolver.CreateResolutionExpression(serviceRequest)
@@ -4347,6 +4352,8 @@ namespace DryIoc
 
             if (serviceExpr == null)
                 return null;
+
+            request._sharedState.IsWrappedInFunc = true;
 
             // The conversion to handle lack of covariance for Func<out T> in .NET 3.5
             // So that Func<Derived> may be used for Func<Base>
@@ -7381,14 +7388,15 @@ namespace DryIoc
 
         /// <summary>Empty terminal request.</summary>
         public static readonly Request Empty =
-            new Request(null, null, 0, null, DefaultFlags, ServiceInfo.Empty, null);
+            new Request(null, null, 0, null, DefaultFlags, ServiceInfo.Empty, null, null);
 
         internal static readonly Expression EmptyRequestExpr =
             Field(null, typeof(Request).Field(nameof(Empty)));
 
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
-            new Request(null, null, 0, null, DefaultFlags | RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, ServiceInfo.Empty, null);
+            new Request(null, null, 0, null, DefaultFlags | RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, 
+                ServiceInfo.Empty, null, null);
 
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
             Field(null, typeof(Request).Field(nameof(EmptyOpensResolutionScope)));
@@ -7420,9 +7428,9 @@ namespace DryIoc
 
             // we are re-starting the dependency depth count from `1`
             if (req == null)
-                req =  new Request(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
+                req =  new Request(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs, new SharedStateInfo());
             else
-                req.SetServiceInfo(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
+                req.SetServiceInfo(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs, new SharedStateInfo());
             return req;
         }
 
@@ -7432,6 +7440,13 @@ namespace DryIoc
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null) =>
             Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
                 preResolveParent, flags, inputArgs);
+
+        internal class SharedStateInfo
+        {
+            public bool IsWrappedInFunc;
+        }
+
+        internal SharedStateInfo _sharedState;
 
         // todo: Make a property in v4.0
         /// <summary>Available in runtime only, provides access to container initiated the request.</summary>
@@ -7601,9 +7616,10 @@ namespace DryIoc
 
             ref var req = ref stack.GetOrPushRef(indexInStack);
             if (req == null)
-                req  = new Request(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
+                req  = new Request(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs, _sharedState);
             else
-                req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
+                req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs, _sharedState);
+            
             return req;
         }
 
@@ -7652,8 +7668,8 @@ namespace DryIoc
         {
             return new Request(Container, this, DependencyDepth + 1, null, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
-                InputArgExprs, implementationType, 
-                null, // factory cannot be supplied in generated code
+                InputArgExprs, _sharedState, 
+                implementationType, null, // factory cannot be supplied in generated code
                 factoryID, factoryType, reuse,
                 decoratedFactoryID);
         }
@@ -7672,22 +7688,23 @@ namespace DryIoc
             var newServiceInfo = getInfo(_serviceInfo);
             return newServiceInfo == _serviceInfo ? this
                 : new Request(Container, 
-                    DirectParent, DependencyDepth, RequestStack, Flags, newServiceInfo, InputArgExprs,
+                    DirectParent, DependencyDepth, RequestStack, Flags, newServiceInfo, InputArgExprs, _sharedState,
                     _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
         /// Produces the new request with the changed `ifUnresolved` or returns original request otherwise
         public Request WithIfUnresolved(IfUnresolved ifUnresolved) =>
             IfUnresolved == ifUnresolved ? this
-                : new Request(Container, 
-                    DirectParent, DependencyDepth, RequestStack, Flags, _serviceInfo.WithIfUnresolved(ifUnresolved),
-                    InputArgExprs, _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
+                : new Request(Container,
+                    DirectParent, DependencyDepth, RequestStack, Flags, 
+                    _serviceInfo.WithIfUnresolved(ifUnresolved), InputArgExprs, _sharedState, 
+                    _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // todo: in place mutation?
         /// <summary>Updates the flags</summary>
         public Request WithFlags(RequestFlags newFlags) =>
             new Request(Container,
-                DirectParent, DependencyDepth, RequestStack, newFlags, _serviceInfo, InputArgExprs,
+                DirectParent, DependencyDepth, RequestStack, newFlags, _serviceInfo, InputArgExprs, _sharedState,
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // note: Mutates the request, required for proper caching
@@ -7706,7 +7723,7 @@ namespace DryIoc
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expression[] inputArgs) =>
             new Request(Container, 
-                DirectParent, DependencyDepth, RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs),
+                DirectParent, DependencyDepth, RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs), _sharedState,
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -7769,7 +7786,7 @@ namespace DryIoc
             {
                 IsolateRequestChain();
                 return new Request(Container,
-                    DirectParent, DependencyDepth, null, flags, _serviceInfo, InputArgExprs,
+                    DirectParent, DependencyDepth, null, flags, _serviceInfo, InputArgExprs, _sharedState,
                     null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
             }
 
@@ -8008,7 +8025,7 @@ namespace DryIoc
 
         // Initial request without factory info yet
         private Request(IContainer container, Request parent, int dependencyDepth, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
+            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs, SharedStateInfo sharedState)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
@@ -8022,14 +8039,15 @@ namespace DryIoc
             // runtime state
             InputArgExprs = inputArgExprs;
             Container     = container;
+            _sharedState = sharedState;
         }
 
         // Request with resolved factory state
         private Request(IContainer container, 
             Request parent, int dependencyDepth, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs,
+            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs, SharedStateInfo sharedState,
             Type factoryImplType, Factory factory, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
-            : this(container, parent, dependencyDepth, stack, flags, serviceInfo, inputArgExprs)
+            : this(container, parent, dependencyDepth, stack, flags, serviceInfo, inputArgExprs, sharedState)
         {
             SetResolvedFactory(factoryImplType, factory , factoryID, factoryType, reuse, decoratedFactoryID);
         }
@@ -8055,7 +8073,7 @@ namespace DryIoc
 
         private void SetServiceInfo(IContainer container, 
             Request parent, int dependencyDepth, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
+            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs, SharedStateInfo sharedState)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
@@ -8068,7 +8086,8 @@ namespace DryIoc
 
             // runtime state
             InputArgExprs = inputArgExprs;
-            Container = container;
+            Container     = container;
+            _sharedState  = sharedState;
 
             // reset factory info
             SetResolvedFactory(null, null, 0, FactoryType.Service, null, 0);
@@ -9229,17 +9248,6 @@ namespace DryIoc
             ParameterInfo[] parameters, Func<ParameterInfo, ParameterServiceInfo> parameterServiceInfoSelector,
             Request request, ref int usedInputArgAndCustomValueCount)
         {
-            //Expression arg0, arg1, arg2;
-            if (parameters.Length == 1)
-            {
-            }
-            if (parameters.Length == 2)
-            {
-            }
-            if (parameters.Length == 3)
-            {
-            }
-
             var paramExprs = new Expression[parameters.Length];
             var argsUsedMask = 0;
             var argExprs = request.InputArgExprs;
@@ -11990,24 +11998,36 @@ namespace DryIoc
 
         /// <summary>Returns true if type can be casted with conversion operators.</summary>
         public static bool HasConversionOperatorTo(this Type sourceType, Type targetType) =>
-            sourceType != null && targetType != null &&
-            (sourceType.GetSourceConversionOperatorToTarget(targetType) ?? 
-             sourceType.GetTargetConversionOperatorFromSource(targetType)) != null;
+            (sourceType.FindConvertOperator(sourceType, targetType) ?? 
+             targetType.FindConvertOperator(sourceType, targetType)) != null;
 
         /// Returns `target source.op_(Explicit|Implicit)(source)` or null if not found
         public static MethodInfo GetSourceConversionOperatorToTarget(this Type sourceType, Type targetType) => 
-            sourceType?.GetTypeInfo().DeclaredMethods.Match(m => 
-                m.IsPublic && m.IsStatic && m.ReturnType == targetType &&
-                (m.Name == "op_Implicit" || m.Name == "op_Explicit"))
-            .SingleOrDefaultIfMany();
+            sourceType.FindConvertOperator(sourceType, targetType);
 
         /// Returns `target target.op_(Explicit|Implicit)(source)` or null if not found
         public static MethodInfo GetTargetConversionOperatorFromSource(this Type sourceType, Type targetType) =>
-            targetType?.GetTypeInfo().DeclaredMethods.Match(m =>
-                m.IsPublic && m.IsStatic && m.ReturnType == targetType && 
-                m.GetParameters().SingleOrDefaultIfMany()?.ParameterType == sourceType &&
-                (m.Name == "op_Implicit" || m.Name == "op_Explicit"))
-            .SingleOrDefaultIfMany();
+            targetType.FindConvertOperator(sourceType, targetType);
+
+        internal static MethodInfo FindConvertOperator(this Type type, Type sourceType, Type targetType)
+        {
+            var methods = type.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            for (var i = 0; i < methods.Length; i++)
+            {
+                var m = methods[i];
+                if (m.IsStatic && m.IsSpecialName && m.ReturnType == targetType)
+                {
+                    var n = m.Name;
+                    // n == "op_Implicit" || n == "op_Explicit"
+                    if (n.Length == 11 &&
+                        n[2] == '_' && n[5] == 'p' && n[6] == 'l' && n[7] == 'i' && n[8] == 'c' && n[9] == 'i' && n[10] == 't' &&
+                        m.GetParameters()[0].ParameterType == sourceType)
+                        return m;
+                }
+            }
+
+            return null;
+        }
 
         /// <summary>Returns true if type is assignable to <paramref name="other"/> type.</summary>
         public static bool IsAssignableTo(this Type type, Type other) =>

@@ -181,8 +181,11 @@ namespace FastExpressionCompiler.LightExpression
         public static NewExpression New(ConstructorInfo ctor, params Expression[] arguments) =>
             arguments == null || arguments.Length == 0 ? new NewExpression(ctor): new ManyArgumentsNewExpression(ctor, arguments);
 
-        public static NewExpression New(ConstructorInfo ctor, IEnumerable<Expression> arguments) =>
-            arguments == null ? new NewExpression(ctor) : new ManyArgumentsNewExpression(ctor, arguments.AsReadOnlyList());
+        public static NewExpression New(ConstructorInfo ctor, IEnumerable<Expression> arguments)
+        {
+            var args = arguments.AsReadOnlyList();
+            return args == null || args.Count == 0 ? new NewExpression(ctor) : new ManyArgumentsNewExpression(ctor, args);
+        }
 
         public static NewExpression New(ConstructorInfo ctor) => new NewExpression(ctor);
 
