@@ -5214,7 +5214,7 @@ namespace DryIoc
         /// Alternatively you may just provide an expression for factory
         public readonly Expression FactoryExpression;
 
-        // Contains expression of parameters resolve when looking up for most resolvable constructor
+        ///<summary> Contains resolved parameter expressions found when looking for most resolvable constructor</summary> 
         internal readonly Expression[] ResolvedParameterExpressions;
 
         /// <summary>Wraps method and factory instance.
@@ -9191,7 +9191,8 @@ namespace DryIoc
         /// <summary>Creates service expression.</summary>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            var rules = request.Container.Rules;
+            var container = request.Container;
+            var rules = container.Rules;
 
             FactoryMethod factoryMethod;
             var factoryMethodSelector = Made.FactoryMethod ?? rules.FactoryMethod;
@@ -9210,7 +9211,7 @@ namespace DryIoc
             if (factoryExpr == null && factoryMethod.FactoryServiceInfo != null)
             {
                 var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
-                var factoryFactory = request.Container.ResolveFactory(factoryRequest);
+                var factoryFactory = container.ResolveFactory(factoryRequest);
                 factoryExpr = factoryFactory?.GetExpressionOrDefault(factoryRequest);
                 if (factoryExpr == null)
                     return null;
@@ -9232,10 +9233,57 @@ namespace DryIoc
                     ? Made.Parameters.OverrideWith(rules.Parameters)
                     : rules.Parameters.OverrideWith(Made.Parameters);
                 var paramServiceInfoSelector = paramSelector(request);
-                var usedArgCount = 0;
-                paramExprs = TryResolveParameterExpressions(parameters, paramServiceInfoSelector, request, ref usedArgCount);
-                if (paramExprs == null)
-                    return null;
+
+                var inputArgs = request.InputArgExprs;
+                var argsUsedMask = 0;
+
+                paramExprs = new Expression[parameters.Length];
+
+                for (var i = 0; i < parameters.Length; i++)
+                {
+                    var param = parameters[i];
+                    if (inputArgs != null)
+                    {
+                        var inputArgExpr = TryGetExpressionFromInputArgs(param, inputArgs, ref argsUsedMask);
+                        if (inputArgExpr != null)
+                        {
+                            paramExprs[i] = inputArgExpr;
+                            continue;
+                        }
+                    }
+
+                    var paramInfo = paramServiceInfoSelector(param) ?? ParameterServiceInfo.Of(param);
+                    var paramRequest = request.Push(paramInfo);
+
+                    var paramDetails = paramInfo.Details;
+                    if (paramDetails.HasCustomValue || paramDetails == DryIoc.ServiceDetails.Default)
+                    {
+                        var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
+                        if (usedOrCustomValExpr != null)
+                        {
+                            paramExprs[i] = usedOrCustomValExpr;
+                            continue;
+                        }
+                    }
+
+                    var injectedExpr = container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
+                    if (injectedExpr == null ||
+                        // When param is an empty array / collection, then we may use a default value instead (#581)
+                        paramDetails.DefaultValue != null &&
+                        injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
+                        ((NewArrayExpression)injectedExpr).Expressions.Count == 0)
+                    {
+                        // Check if parameter dependency itself (without propagated parent details)
+                        // does not allow default, then stop checking the rest of parameters.
+                        if (paramDetails.IfUnresolved == IfUnresolved.Throw)
+                            return null;
+                        injectedExpr = paramDetails.DefaultValue != null
+                            ? container.GetConstantExpression(paramDetails.DefaultValue)
+                            : paramRequest.ServiceType.GetDefaultValueExpression();
+                    }
+
+                    paramExprs[i] = injectedExpr;
+                }
             }
 
             return CreateServiceExpression(ctorOrMember, factoryExpr, paramExprs, request);
@@ -9267,32 +9315,35 @@ namespace DryIoc
                 var paramInfo = parameterServiceInfoSelector(param) ?? ParameterServiceInfo.Of(param);
                 var paramRequest = request.Push(paramInfo);
 
-                var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramInfo.Details);
-                if (usedOrCustomValExpr != null)
+                var paramDetails = paramInfo.Details;
+                if (paramDetails.HasCustomValue || paramDetails == DryIoc.ServiceDetails.Default)
                 {
-                    ++usedInputArgAndCustomValueCount;
-                    paramExprs[i] = usedOrCustomValExpr;
-                    continue;
+                    var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
+                    if (usedOrCustomValExpr != null)
+                    {
+                        ++usedInputArgAndCustomValueCount;
+                        paramExprs[i] = usedOrCustomValExpr;
+                        continue;
+                    }
                 }
 
-                var paramDetails = paramInfo.Details;
-                var paramExpr = request.Container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
-                if (paramExpr == null ||
+                var injectedExpr = request.Container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
+                if (injectedExpr == null ||
                     // When param is an empty array / collection, then we may use a default value instead (#581)
                     paramDetails.DefaultValue != null &&
-                    paramExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
-                    ((NewArrayExpression) paramExpr).Expressions.Count == 0)
+                    injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
+                    ((NewArrayExpression)injectedExpr).Expressions.Count == 0)
                 {
                     // Check if parameter dependency itself (without propagated parent details)
                     // does not allow default, then stop checking the rest of parameters.
                     if (paramDetails.IfUnresolved == IfUnresolved.Throw)
                         return null;
-                    paramExpr = paramDetails.DefaultValue != null
+                    injectedExpr = paramDetails.DefaultValue != null
                         ? request.Container.GetConstantExpression(paramDetails.DefaultValue)
                         : paramRequest.ServiceType.GetDefaultValueExpression();
                 }
 
-                paramExprs[i] = paramExpr;
+                paramExprs[i] = injectedExpr;
             }
 
             return paramExprs;
@@ -9300,15 +9351,7 @@ namespace DryIoc
 
         private static Expression TryGetUsedInstanceOrCustomValueExpression(Request request, Request paramRequest, ServiceDetails paramDetails)
         {
-            if (paramDetails == DryIoc.ServiceDetails.Default)
-            {
-                // Generate the fast resolve call for used instances
-                var serviceType = paramRequest.ServiceType;
-                if (request.Container.TryGetUsedInstance(serviceType, out var instance))
-                    return Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
-                        Constant(serviceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
-            }
-            else if (paramDetails.HasCustomValue)
+            if (paramDetails.HasCustomValue)
             {
                 var serviceType = paramRequest.ServiceType;
                 var hasConversionOperator = false;
@@ -9326,6 +9369,15 @@ namespace DryIoc
                 return hasConversionOperator
                     ? Convert(request.Container.GetConstantExpression(customValue), serviceType)
                     : request.Container.GetConstantExpression(customValue, serviceType);
+            }
+
+            if (paramDetails == DryIoc.ServiceDetails.Default)
+            {
+                // Generate the fast resolve call for used instances
+                var serviceType = paramRequest.ServiceType;
+                if (request.Container.TryGetUsedInstance(serviceType, out var instance))
+                    return Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
+                        Constant(serviceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
             }
 
             return null;
