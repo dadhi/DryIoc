@@ -5272,11 +5272,8 @@ namespace DryIoc
         /// <returns>Constructor or null if not found.</returns>
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) => request =>
         {
-            var implType = request.ImplementationType
-                .ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
-
+            var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
             var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
-
             var ctorCount = ctors.Length;
             if (ctorCount == 0)
                 return null;
@@ -5303,8 +5300,8 @@ namespace DryIoc
             var manyToFewParamCtors = ctors.OrderByDescending(x => x.GetParameters().Length);
 
             var mostUsedArgCount = -1;
-            var mostResolvedCtor = default(ConstructorInfo);
-            var mostResolvedExprs = default(Expression[]);
+            ConstructorInfo mostResolvedCtor = null;
+            Expression[] mostResolvedExprs = null;
             foreach (var ctor in manyToFewParamCtors)
             {
                 var parameters = ctor.GetParameters();
@@ -5315,22 +5312,72 @@ namespace DryIoc
                 }
 
                 // If the most resolved expressions (constructor) is found and the next one has less parameters, we exit. 
-                if (mostResolvedExprs != null && 
-                    parameters.Length < mostResolvedExprs.Length)
+                if (mostResolvedExprs != null && mostResolvedExprs.Length > parameters.Length)
                     break;
 
                 // Otherwise for similar parameters count constructor we prefer the one with most used input args / custom values
                 // Should count custom values provided via `Resolve(args)`, `Func<args..>`, `Parameter.Of...(_ -> arg)`, `container.Use(arg)`
-                var usedArgCount = 0;
-                var resolvedExprs = ReflectionFactory.TryResolveParameterExpressions(parameters, paramSelector, request, ref usedArgCount);
-                if (resolvedExprs != null)
+                var usedInputArgOrUsedOrCustomValueCount = 0;
+                var inputArgs = request.InputArgExprs;
+                var argsUsedMask = 0;
+                var paramExprs = new Expression[parameters.Length];
+
+                for (var i = 0; i < parameters.Length; i++)
                 {
-                    if (usedArgCount > mostUsedArgCount)
+                    var param = parameters[i];
+                    if (inputArgs != null)
                     {
-                        mostUsedArgCount = usedArgCount;
-                        mostResolvedCtor = ctor;
-                        mostResolvedExprs = resolvedExprs;
+                        var inputArgExpr = ReflectionFactory.TryGetExpressionFromInputArgs(param, inputArgs, ref argsUsedMask);
+                        if (inputArgExpr != null)
+                        {
+                            ++usedInputArgOrUsedOrCustomValueCount;
+                            paramExprs[i] = inputArgExpr;
+                            continue;
+                        }
                     }
+
+                    var paramInfo = paramSelector(param) ?? ParameterServiceInfo.Of(param);
+                    var paramRequest = request.Push(paramInfo);
+
+                    var paramDetails = paramInfo.Details;
+                    if (paramDetails.HasCustomValue || paramDetails == DryIoc.ServiceDetails.Default)
+                    {
+                        var usedOrCustomValExpr = ReflectionFactory.TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
+                        if (usedOrCustomValExpr != null)
+                        {
+                            ++usedInputArgOrUsedOrCustomValueCount;
+                            paramExprs[i] = usedOrCustomValExpr;
+                            continue;
+                        }
+                    }
+
+                    var injectedExpr = request.Container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
+                    if (injectedExpr == null ||
+                        // When param is an empty array / collection, then we may use a default value instead (#581)
+                        paramDetails.DefaultValue != null &&
+                        injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
+                        ((NewArrayExpression)injectedExpr).Expressions.Count == 0)
+                    {
+                        // Check if parameter dependency itself (without propagated parent details)
+                        // does not allow default, then stop checking the rest of parameters.
+                        if (paramDetails.IfUnresolved == IfUnresolved.Throw)
+                        {
+                            paramExprs = null;
+                            break;
+                        }
+
+                        injectedExpr = paramDetails.DefaultValue != null
+                            ? request.Container.GetConstantExpression(paramDetails.DefaultValue)
+                            : paramRequest.ServiceType.GetDefaultValueExpression();
+                    }
+                    paramExprs[i] = injectedExpr;
+                }
+
+                if (paramExprs != null && usedInputArgOrUsedOrCustomValueCount > mostUsedArgCount)
+                {
+                    mostUsedArgCount = usedInputArgOrUsedOrCustomValueCount;
+                    mostResolvedCtor = ctor;
+                    mostResolvedExprs = paramExprs;
                 }
             }
 
@@ -5344,8 +5391,7 @@ namespace DryIoc
         /// <summary>Easy way to specify default constructor to be used for resolution.</summary>
         public static FactoryMethodSelector DefaultConstructor(bool includeNonPublic = false) => request =>
             request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request)
-                .GetConstructorOrNull(includeNonPublic, Empty<Type>())
-                ?.To(ctor => Of(ctor));
+                .GetConstructorOrNull(includeNonPublic, Empty<Type>())?.To(ctor => Of(ctor));
 
         /// Better be named `ConstructorWithMostResolvableArguments`.
         /// Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
@@ -9289,67 +9335,19 @@ namespace DryIoc
             return CreateServiceExpression(ctorOrMember, factoryExpr, paramExprs, request);
         }
 
-        /// Tries to create expressions for supplied parameters to use in factory method or constructor
-        public static Expression[] TryResolveParameterExpressions(
-            ParameterInfo[] parameters, Func<ParameterInfo, ParameterServiceInfo> parameterServiceInfoSelector,
-            Request request, ref int usedInputArgAndCustomValueCount)
+        // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
+        internal static Expression TryGetExpressionFromInputArgs(ParameterInfo param, Expression[] inputArgs, ref int argsUsedMask)
         {
-            var inputArgs = request.InputArgExprs;
-            var argsUsedMask = 0;
-            var paramExprs = new Expression[parameters.Length];
-
-            for (var i = 0; i < parameters.Length; i++)
-            {
-                var param = parameters[i];
-                if (inputArgs != null)
+            for (var a = 0; a < inputArgs.Length; ++a)
+                if ((argsUsedMask & 1 << a) == 0 && inputArgs[a].Type.IsAssignableTo(param.ParameterType))
                 {
-                    var inputArgExpr = TryGetExpressionFromInputArgs(param, inputArgs, ref argsUsedMask);
-                    if (inputArgExpr != null)
-                    {
-                        ++usedInputArgAndCustomValueCount;
-                        paramExprs[i] = inputArgExpr;
-                        continue;
-                    }
+                    argsUsedMask |= 1 << a; // mark that argument was used
+                    return inputArgs[a];
                 }
-
-                var paramInfo = parameterServiceInfoSelector(param) ?? ParameterServiceInfo.Of(param);
-                var paramRequest = request.Push(paramInfo);
-
-                var paramDetails = paramInfo.Details;
-                if (paramDetails.HasCustomValue || paramDetails == DryIoc.ServiceDetails.Default)
-                {
-                    var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
-                    if (usedOrCustomValExpr != null)
-                    {
-                        ++usedInputArgAndCustomValueCount;
-                        paramExprs[i] = usedOrCustomValExpr;
-                        continue;
-                    }
-                }
-
-                var injectedExpr = request.Container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
-                if (injectedExpr == null ||
-                    // When param is an empty array / collection, then we may use a default value instead (#581)
-                    paramDetails.DefaultValue != null &&
-                    injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
-                    ((NewArrayExpression)injectedExpr).Expressions.Count == 0)
-                {
-                    // Check if parameter dependency itself (without propagated parent details)
-                    // does not allow default, then stop checking the rest of parameters.
-                    if (paramDetails.IfUnresolved == IfUnresolved.Throw)
-                        return null;
-                    injectedExpr = paramDetails.DefaultValue != null
-                        ? request.Container.GetConstantExpression(paramDetails.DefaultValue)
-                        : paramRequest.ServiceType.GetDefaultValueExpression();
-                }
-
-                paramExprs[i] = injectedExpr;
-            }
-
-            return paramExprs;
+            return null;
         }
 
-        private static Expression TryGetUsedInstanceOrCustomValueExpression(Request request, Request paramRequest, ServiceDetails paramDetails)
+        internal static Expression TryGetUsedInstanceOrCustomValueExpression(Request request, Request paramRequest, ServiceDetails paramDetails)
         {
             if (paramDetails.HasCustomValue)
             {
@@ -9380,18 +9378,6 @@ namespace DryIoc
                         Constant(serviceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
             }
 
-            return null;
-        }
-
-        // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
-        private static Expression TryGetExpressionFromInputArgs(ParameterInfo param, Expression[] inputArgs, ref int argsUsedMask)
-        {
-            for (var a = 0; a < inputArgs.Length; ++a)
-                if ((argsUsedMask & 1 << a) == 0 && inputArgs[a].Type.IsAssignableTo(param.ParameterType))
-                {
-                    argsUsedMask |= 1 << a; // mark that argument was used
-                    return inputArgs[a];
-                }
             return null;
         }
 
