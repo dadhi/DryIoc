@@ -9246,28 +9246,23 @@ namespace DryIoc
             ParameterInfo[] parameters, Func<ParameterInfo, ParameterServiceInfo> parameterServiceInfoSelector,
             Request request, ref int usedInputArgAndCustomValueCount)
         {
-            var paramExprs = new Expression[parameters.Length];
+            var inputArgs = request.InputArgExprs;
             var argsUsedMask = 0;
-            var argExprs = request.InputArgExprs;
+            var paramExprs = new Expression[parameters.Length];
 
             for (var i = 0; i < parameters.Length; i++)
             {
                 var param = parameters[i];
-
-                // todo: Extract to method, maybe move it to Request
-                // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
-                if (argExprs != null)
-                    for (var a = 0; a < argExprs.Length; ++a)
-                        if ((argsUsedMask & 1 << a) == 0 && argExprs[a].Type.IsAssignableTo(param.ParameterType))
-                        {
-                            argsUsedMask |= 1 << a; // mark that argument was used
-                            paramExprs[i] = argExprs[a];
-                            ++usedInputArgAndCustomValueCount;
-                            break;
-                        }
-
-                if (paramExprs[i] != null)
-                    continue; // done, parameter is provided via argument expression
+                if (inputArgs != null)
+                {
+                    var inputArgExpr = TryGetExpressionFromInputArgs(param, inputArgs, ref argsUsedMask);
+                    if (inputArgExpr != null)
+                    {
+                        ++usedInputArgAndCustomValueCount;
+                        paramExprs[i] = inputArgExpr;
+                        continue;
+                    }
+                }
 
                 var paramInfo = parameterServiceInfoSelector(param) ?? ParameterServiceInfo.Of(param);
                 var paramRequest = request.Push(paramInfo);
@@ -9325,6 +9320,18 @@ namespace DryIoc
             }
 
             return paramExprs;
+        }
+
+        // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
+        private static Expression TryGetExpressionFromInputArgs(ParameterInfo param, Expression[] inputArgs, ref int argsUsedMask)
+        {
+            for (var a = 0; a < inputArgs.Length; ++a)
+                if ((argsUsedMask & 1 << a) == 0 && inputArgs[a].Type.IsAssignableTo(param.ParameterType))
+                {
+                    argsUsedMask |= 1 << a; // mark that argument was used
+                    return inputArgs[a];
+                }
+            return null;
         }
 
         internal override bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
