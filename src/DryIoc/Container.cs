@@ -9266,36 +9266,12 @@ namespace DryIoc
 
                 var paramInfo = parameterServiceInfoSelector(param) ?? ParameterServiceInfo.Of(param);
                 var paramRequest = request.Push(paramInfo);
-                var paramServiceType = paramRequest.ServiceType;
 
-                if (paramInfo.Details == DryIoc.ServiceDetails.Default)
+                var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramInfo.Details);
+                if (usedOrCustomValExpr != null)
                 {
-                    if (request.Container.TryGetUsedInstance(paramServiceType, out var instance))
-                    {
-                        // Generate the fast resolve call for used instances
-                        paramExprs[i] = Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
-                            Constant(paramServiceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
-                        ++usedInputArgAndCustomValueCount;
-                        continue;
-                    }
-                }
-                else if (paramInfo.Details.HasCustomValue)
-                {
-                    var customValue = paramInfo.Details.CustomValue;
-                    var hasConversionOperator = false;
-                    if (customValue != null && !customValue.GetType().IsArray)
-                    {
-                        if (!customValue.GetType().IsAssignableTo(paramServiceType) &&
-                            !(hasConversionOperator = customValue.GetType().HasConversionOperatorTo(paramServiceType)))
-                            return Throw.For<Expression[]>(paramRequest.IfUnresolved != IfUnresolved.ReturnDefault,
-                                Error.InjectedCustomValueIsOfDifferentType, customValue, paramServiceType, paramRequest);
-                    }
-
-                    paramExprs[i] = hasConversionOperator
-                        ? Convert(request.Container.GetConstantExpression(customValue), paramServiceType)
-                        : request.Container.GetConstantExpression(customValue, paramServiceType);
-
                     ++usedInputArgAndCustomValueCount;
+                    paramExprs[i] = usedOrCustomValExpr;
                     continue;
                 }
 
@@ -9313,13 +9289,46 @@ namespace DryIoc
                         return null;
                     paramExpr = paramDetails.DefaultValue != null
                         ? request.Container.GetConstantExpression(paramDetails.DefaultValue)
-                        : paramServiceType.GetDefaultValueExpression();
+                        : paramRequest.ServiceType.GetDefaultValueExpression();
                 }
 
                 paramExprs[i] = paramExpr;
             }
 
             return paramExprs;
+        }
+
+        private static Expression TryGetUsedInstanceOrCustomValueExpression(Request request, Request paramRequest, ServiceDetails paramDetails)
+        {
+            if (paramDetails == DryIoc.ServiceDetails.Default)
+            {
+                // Generate the fast resolve call for used instances
+                var serviceType = paramRequest.ServiceType;
+                if (request.Container.TryGetUsedInstance(serviceType, out var instance))
+                    return Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
+                        Constant(serviceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
+            }
+            else if (paramDetails.HasCustomValue)
+            {
+                var serviceType = paramRequest.ServiceType;
+                var hasConversionOperator = false;
+                var customValue = paramDetails.CustomValue;
+                if (customValue != null)
+                {
+                    var customTypeValue = customValue.GetType();
+                    if (!customTypeValue.IsArray && 
+                        !customTypeValue.IsAssignableTo(serviceType) && 
+                        !(hasConversionOperator = customTypeValue.HasConversionOperatorTo(serviceType)))
+                        return Throw.For<Expression>(paramRequest.IfUnresolved != IfUnresolved.ReturnDefault,
+                            Error.InjectedCustomValueIsOfDifferentType, customValue, serviceType, paramRequest);
+                }
+
+                return hasConversionOperator
+                    ? Convert(request.Container.GetConstantExpression(customValue), serviceType)
+                    : request.Container.GetConstantExpression(customValue, serviceType);
+            }
+
+            return null;
         }
 
         // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
