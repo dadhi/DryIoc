@@ -7507,7 +7507,7 @@ namespace DryIoc
         public RequestFlags Flags;
 
         /// mutable, so that the ServiceKey or IfUnresolved can be changed in place.
-        private IServiceInfo _serviceInfo;
+        internal IServiceInfo _serviceInfo;
 
         /// <summary>Input arguments provided with `Resolve`</summary>
         internal Expression[] InputArgExprs;
@@ -9646,23 +9646,12 @@ namespace DryIoc
                     continue;
 
                 Expression memberExpr = null;
-                var memberRequest = request.Push(member);
-                var memberServiceType = memberRequest.ServiceType;
 
-                if (member.Details == DryIoc.ServiceDetails.Default)
-                {
-                    // Generate the fast resolve call for used instances
-                    if (request.Container.TryGetUsedInstance(memberServiceType, out var instance))
-                        memberExpr = Call(ResolverContext.GetRootOrSelfExpr(memberRequest), Resolver.ResolveFastMethod,
-                            Constant(memberServiceType, typeof(Type)), Constant(memberRequest.IfUnresolved));
-                }
-                else if (member.Details.HasCustomValue)
-                {
-                    var customValue = member.Details.CustomValue;
-                    customValue?.ThrowIfNotInstanceOf(memberServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
-                    memberExpr = container.GetConstantExpression(customValue, memberServiceType);
-                }
-                
+                var memberRequest = request.Push(member);
+                var memberDetails = memberRequest._serviceInfo.Details;
+                if (memberDetails.HasCustomValue || memberDetails == DryIoc.ServiceDetails.Default)
+                    memberExpr = TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, memberDetails);
+
                 if (memberExpr == null)
                 {
                     memberExpr = container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
