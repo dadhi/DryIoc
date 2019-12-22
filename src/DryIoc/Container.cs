@@ -2543,6 +2543,11 @@ namespace DryIoc
             result = null;
             switch (expr.NodeType)
             {
+                case ExprType.Constant:
+                {
+                    result = ((ConstantExpression)expr).Value;
+                    return true;
+                }
                 case ExprType.New:
                 {
                     var newExpr = (NewExpression)expr;
@@ -2558,31 +2563,34 @@ namespace DryIoc
 
                         if (fewArgCount == 1)
                         {
-                            var oneArg = new object[1];
-                            var argExpr = ((OneArgumentNewExpression)newExpr).Argument;
-                            if (argExpr is ConstantExpression constExpr)
-                                oneArg[0] = constExpr.Value;
-                            else if (!TryInterpret(r, argExpr, useFec, out oneArg[0]))
+                            var fewArgs = new object[1];
+                            var fewArgsExpr = ((OneArgumentNewExpression)newExpr).Argument;
+                            if (!TryInterpret(r, fewArgsExpr, useFec, out fewArgs[0]))
                                 return false;
-                            result = newExpr.Constructor.Invoke(oneArg);
-                            //ReturnBackObjectArray(1, oneArg);
+                            result = newExpr.Constructor.Invoke(fewArgs);
                             return true;
                         }
 
                         if (fewArgCount == 2)
                         {
-                            var twoArgs = new object[2];
-                            var twoArgsExpr = ((TwoArgumentsNewExpression)newExpr);
-                            if (twoArgsExpr.Argument0 is ConstantExpression constExpr0)
-                                twoArgs[0] = constExpr0.Value;
-                            else if (!TryInterpret(r, twoArgsExpr.Argument0, useFec, out twoArgs[0]))
+                            var fewArgs = new object[2];
+                            var fewArgsExpr = ((TwoArgumentsNewExpression)newExpr);
+                            if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]))
                                 return false;
-                            if (twoArgsExpr.Argument1 is ConstantExpression constExpr1)
-                                twoArgs[1] = constExpr1.Value;
-                            else if (!TryInterpret(r, twoArgsExpr.Argument1, useFec, out twoArgs[1]))
+                            result = newExpr.Constructor.Invoke(fewArgs);
+                            return true;
+                        }
+
+                        if (fewArgCount == 3)
+                        {
+                            var fewArgs = new object[3];
+                            var fewArgsExpr = ((ThreeArgumentsNewExpression)newExpr);
+                            if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]))
                                 return false;
-                            result = newExpr.Constructor.Invoke(twoArgs);
-                            //ReturnBackObjectArray(2, twoArgs);
+                            result = newExpr.Constructor.Invoke(fewArgs);
                             return true;
                         }
                     }
@@ -2590,22 +2598,14 @@ namespace DryIoc
                     var newArgs = newExpr.Arguments.ToListOrSelf();
                     var newArgCount = newArgs.Count;
                     if (newArgCount == 0)
-                    {
                         result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
-                    }
                     else
                     {
                         //var args = RentOrNewObjectArray(newArgCount);
                         var args = new object[newArgCount];
                         for (var i = 0; i < args.Length; i++)
-                        {
-                            var argExpr = newArgs[i];
-                            if (argExpr is ConstantExpression constExpr)
-                                args[i] = constExpr.Value;
-                            else if (!TryInterpret(r, argExpr, useFec, out args[i]))
+                            if (!TryInterpret(r, newArgs[i], useFec, out args[i]))
                                 return false;
-                        }
-
                         result = newExpr.Constructor.Invoke(args);
                         //ReturnBackObjectArray(newArgCount, args);
                     }
@@ -2621,17 +2621,11 @@ namespace DryIoc
                     result = r;
                     return true;
                 }
-                case ExprType.Constant:
-                {
-                    result = ((ConstantExpression)expr).Value;
-                    return true;
-                }
                 case ExprType.Convert:
                 {
                     var convertExpr = (UnaryExpression)expr;
                     if (!TryInterpret(r, convertExpr.Operand, useFec, out var instance))
                         return false;
-
                     // skip conversion for null and for directly assignable type
                     if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
                         result = instance;
@@ -2642,9 +2636,9 @@ namespace DryIoc
                 case ExprType.MemberAccess:
                 {
                     var memberExpr = (MemberExpression)expr;
+                    var instanceExpr = memberExpr.Expression;
                     object instance = null;
-                    if (memberExpr.Expression != null &&
-                        !TryInterpret(r, memberExpr.Expression, useFec, out instance))
+                    if (instanceExpr != null && !TryInterpret(r, instanceExpr, useFec, out instance))
                         return false;
 
                     if (memberExpr.Member is FieldInfo field)
@@ -2687,19 +2681,12 @@ namespace DryIoc
                 case ExprType.NewArrayInit:
                 {
                     var newArray = (NewArrayExpression)expr;
-
                     var itemExprs = newArray.Expressions.ToListOrSelf();
                     var items = new object[itemExprs.Count];
+
                     for (var i = 0; i < items.Length; i++)
-                    {
-                        var argExpr = itemExprs[i];
-                        if (argExpr is ConstantExpression constExpr)
-                            items[i] = constExpr.Value;
-                        else if (TryInterpret(r, argExpr, useFec, out var arg))
-                            items[i] = arg;
-                        else
+                        if (!TryInterpret(r, itemExprs[i], useFec, out items[i]))
                             return false;
-                    }
 
                     result = Converter.ConvertMany(items, newArray.Type.GetElementType());
                     return true;
@@ -2717,7 +2704,6 @@ namespace DryIoc
                     {
                         if (!TryInterpret(r, invokeExpr.Arguments[0], useFec, out var resolver))
                             return false;
-
                         result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
                         return true;
                     }
@@ -2736,15 +2722,8 @@ namespace DryIoc
                     {
                         var args = new object[argExprs.Count];
                         for (var i = 0; i < args.Length; i++)
-                        {
-                            var argExpr = argExprs[i];
-                            if (argExpr is ConstantExpression constExpr)
-                                args[i] = constExpr.Value;
-                            else if (TryInterpret(r, argExpr, useFec, out var arg))
-                                args[i] = arg;
-                            else
+                            if (!TryInterpret(r, argExprs[i], useFec, out args[i]))
                                 return false;
-                        }
                         result = lambda.Method.Invoke(lambda.Target, args);
                     }
                     return true;
@@ -2853,8 +2832,7 @@ namespace DryIoc
                             {
                                 if (TryInterpret(rc, e, uf, out var value))
                                     return value;
-                                return e.CompileToFactoryDelegate(uf,
-                                    ((IContainer) rc).Rules.UseInterpretation)(rc);
+                                return e.CompileToFactoryDelegate(uf, ((IContainer) rc).Rules.UseInterpretation)(rc);
                             },
                             (int) ConstValue(callArgs[3]));
                     }
@@ -2916,15 +2894,9 @@ namespace DryIoc
             // fallback to reflection invocation
             object instance = null;
             var callObjectExpr = callExpr.Object;
-            if (callObjectExpr != null)
-            {
-                if (callObjectExpr is ConstantExpression constObj)
-                    instance = constObj.Value;
-                else if (!TryInterpret(r, callExpr.Object, useFec, out instance)) 
-                    return false;
-            }
+            if (callObjectExpr != null && !TryInterpret(r, callObjectExpr, useFec, out instance)) 
+                return false;
 
-            // todo: handle `Invoke` if possible, e.g. for RegisterDelegate
             var args = callExpr.Arguments.ToListOrSelf();
             var callArgCount = args.Count;
             if (callArgCount == 0)
@@ -2933,13 +2905,8 @@ namespace DryIoc
             {
                 var argObjects = new object[callArgCount];
                 for (var i = 0; i < argObjects.Length; i++)
-                {
-                    var argExpr = args[i];
-                    if (argExpr is ConstantExpression constExpr)
-                        argObjects[i] = constExpr.Value;
-                    else if (!TryInterpret(r, argExpr, useFec, out argObjects[i]))
+                    if (!TryInterpret(r, args[i], useFec, out argObjects[i]))
                         return false;
-                }
 
                 result = method.Invoke(instance, argObjects);
                 //ReturnBackObjectArray(callArgCount, args);
@@ -9258,12 +9225,13 @@ namespace DryIoc
             var ctorOrMethod = ctorOrMember as MethodBase;
             if (ctorOrMethod == null) // return early when factory is Property or Field
             {
-                var serviceExpr = ctorOrMember is PropertyInfo 
+                var memberExpr = ctorOrMember is PropertyInfo 
                     ? Property(factoryExpr, (PropertyInfo)ctorOrMember)
                     : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember);
-                return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMember);
+                return ConvertExpressionIfNeeded(memberExpr, request, ctorOrMember);
             }
 
+            Expression arg0 = null, arg1 = null, arg2 = null;
             Expression[] paramExprs = Empty<Expression>();
             var parameters = ctorOrMethod.GetParameters();
             if (parameters.Length != 0)
@@ -9271,6 +9239,9 @@ namespace DryIoc
                 paramExprs = factoryMethod.ResolvedParameterExpressions;
                 if (paramExprs == null)
                 {
+                    if (parameters.Length > 3)
+                        paramExprs = new Expression[parameters.Length];
+                 
                     var paramSelector = rules.OverrideRegistrationMade
                         ? Made.Parameters.OverrideWith(rules.Parameters)
                         : rules.Parameters.OverrideWith(Made.Parameters);
@@ -9278,8 +9249,6 @@ namespace DryIoc
 
                     var inputArgs = request.InputArgExprs;
                     var argsUsedMask = 0;
-                    paramExprs = new Expression[parameters.Length];
-
                     for (var i = 0; i < parameters.Length; i++)
                     {
                         var param = parameters[i];
@@ -9288,7 +9257,14 @@ namespace DryIoc
                             var inputArgExpr = TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
                             if (inputArgExpr != null)
                             {
-                                paramExprs[i] = inputArgExpr;
+                                if (paramExprs != null)
+                                    paramExprs[i] = inputArgExpr;
+                                else if (i == 0)
+                                    arg0 = inputArgExpr;
+                                else if (i == 1)
+                                    arg1 = inputArgExpr;
+                                else 
+                                    arg2 = inputArgExpr;
                                 continue;
                             }
                         }
@@ -9299,7 +9275,14 @@ namespace DryIoc
                         var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
                         if (usedOrCustomValExpr != null)
                         {
-                            paramExprs[i] = usedOrCustomValExpr;
+                            if (paramExprs != null)
+                                paramExprs[i] = usedOrCustomValExpr;
+                            else if (i == 0)
+                                arg0 = usedOrCustomValExpr;
+                            else if (i == 1)
+                                arg1 = usedOrCustomValExpr;
+                            else
+                                arg2 = usedOrCustomValExpr;
                             continue;
                         }
 
@@ -9319,35 +9302,55 @@ namespace DryIoc
                                 : paramRequest.ServiceType.GetDefaultValueExpression();
                         }
 
-                        paramExprs[i] = injectedExpr;
+                        if (paramExprs != null)
+                            paramExprs[i] = injectedExpr;
+                        else if (i == 0)
+                            arg0 = injectedExpr;
+                        else if (i == 1)
+                            arg1 = injectedExpr;
+                        else
+                            arg2 = injectedExpr;
                     }
                 }
             }
 
             var ctor = ctorOrMethod as ConstructorInfo;
+            Expression serviceExpr;
+            if (arg0 == null)
+                serviceExpr = ctor != null ? New(ctor, paramExprs) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, paramExprs);
+            else if (arg1 == null)
+                serviceExpr = ctor != null ? New(ctor, arg0) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, arg0);
+            else if (arg2 == null)
+                serviceExpr = ctor != null ? New(ctor, arg0, arg1) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, arg0, arg1);
+            else
+                serviceExpr = ctor != null ? New(ctor, arg0, arg1, arg2) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, arg0, arg1, arg2);
+
             if (ctor == null)
-            {
-                var serviceExpr = Call(factoryExpr, (MethodInfo)ctorOrMethod, paramExprs);
                 return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMember);
-            }
 
-            var newServiceExpr = New(ctor, paramExprs);
             if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
-                return newServiceExpr;
+                return serviceExpr;
 
+            return CreateMemberInitExpression(serviceExpr, request);
+        }
+
+        private Expression CreateMemberInitExpression(Expression serviceExpr, Request request)
+        {
+            var container = request.Container;
+            var rules = container.Rules;
             var propertiesAndFieldsSelector = rules.OverrideRegistrationMade
                 ? Made.PropertiesAndFields.OverrideWith(rules.PropertiesAndFields)
                 : rules.PropertiesAndFields.OverrideWith(Made.PropertiesAndFields);
-            var propertiesAndFields = propertiesAndFieldsSelector?.Invoke(request);
+            var propertiesAndFields = propertiesAndFieldsSelector.Invoke(request);
             if (propertiesAndFields == null)
-                return newServiceExpr;
+                return serviceExpr;
 
             var assignments = Empty<MemberAssignment>();
             foreach (var member in propertiesAndFields)
                 if (member != null)
                 {
                     var memberRequest = request.Push(member);
-                    var memberExpr = 
+                    var memberExpr =
                         TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, member.Details)
                         ?? container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
                     if (memberExpr != null)
@@ -9356,7 +9359,7 @@ namespace DryIoc
                         return null;
                 }
 
-            return assignments.Length == 0 ? (Expression)newServiceExpr : MemberInit(newServiceExpr, assignments);
+            return assignments.Length == 0 ? serviceExpr : MemberInit((NewExpression) serviceExpr, assignments);
         }
 
         private static Expression ConvertExpressionIfNeeded(Expression serviceExpr, Request request, MemberInfo ctorOrMember)
