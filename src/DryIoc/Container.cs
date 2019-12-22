@@ -5338,17 +5338,13 @@ namespace DryIoc
 
                     var paramInfo = paramSelector(param) ?? ParameterServiceInfo.Of(param);
                     var paramRequest = request.Push(paramInfo);
-
                     var paramDetails = paramInfo.Details;
-                    if (paramDetails.HasCustomValue || paramDetails == DryIoc.ServiceDetails.Default)
+                    var usedOrCustomValExpr = ReflectionFactory.TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
+                    if (usedOrCustomValExpr != null)
                     {
-                        var usedOrCustomValExpr = ReflectionFactory.TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
-                        if (usedOrCustomValExpr != null)
-                        {
-                            ++usedInputArgOrUsedOrCustomValueCount;
-                            paramExprs[i] = usedOrCustomValExpr;
-                            continue;
-                        }
+                        ++usedInputArgOrUsedOrCustomValueCount;
+                        paramExprs[i] = usedOrCustomValExpr;
+                        continue;
                     }
 
                     var injectedExpr = request.Container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
@@ -9244,21 +9240,16 @@ namespace DryIoc
             var factoryMethodSelector = Made.FactoryMethod ?? rules.FactoryMethod;
             if (factoryMethodSelector == null)
                 factoryMethod = FactoryMethod.Of(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
-            else
-            {
-                factoryMethod = factoryMethodSelector(request);
-                if (factoryMethod == null)
-                    return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
-                        Error.UnableToSelectCtor, request.ImplementationType, request);
-            }
+            else if ((factoryMethod = factoryMethodSelector(request)) == null)
+                return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
+                    Error.UnableToSelectCtor, request.ImplementationType, request);
 
             // If factory method is the method of some registered service, then resolve factory service first.
             var factoryExpr = factoryMethod.FactoryExpression;
             if (factoryExpr == null && factoryMethod.FactoryServiceInfo != null)
             {
                 var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
-                var factoryFactory = container.ResolveFactory(factoryRequest);
-                factoryExpr = factoryFactory?.GetExpressionOrDefault(factoryRequest);
+                factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
                 if (factoryExpr == null)
                     return null;
             }
@@ -9267,75 +9258,118 @@ namespace DryIoc
             var ctorOrMethod = ctorOrMember as MethodBase;
             if (ctorOrMethod == null) // return early when factory is Property or Field
             {
-                return CreateNonConstructorServiceExpression(ctorOrMember, factoryExpr, Empty<Expression>(), request);
+                var serviceExpr = ctorOrMember is PropertyInfo 
+                    ? Property(factoryExpr, (PropertyInfo)ctorOrMember)
+                    : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember);
+                return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMember);
             }
 
+            Expression[] paramExprs = Empty<Expression>();
             var parameters = ctorOrMethod.GetParameters();
-            if (parameters.Length == 0) // the same when no parameters to inject
+            if (parameters.Length != 0)
             {
-                return CreateServiceExpression(ctorOrMember, factoryExpr, Empty<Expression>(), request);
-            }
-
-            var paramExprs = factoryMethod.ResolvedParameterExpressions;
-            if (paramExprs == null)
-            {
-                var paramSelector = rules.OverrideRegistrationMade
-                    ? Made.Parameters.OverrideWith(rules.Parameters)
-                    : rules.Parameters.OverrideWith(Made.Parameters);
-                var paramServiceInfoSelector = paramSelector(request);
-
-                var inputArgs = request.InputArgExprs;
-                var argsUsedMask = 0;
-                paramExprs = new Expression[parameters.Length];
-
-                for (var i = 0; i < parameters.Length; i++)
+                paramExprs = factoryMethod.ResolvedParameterExpressions;
+                if (paramExprs == null)
                 {
-                    var param = parameters[i];
-                    if (inputArgs != null)
+                    var paramSelector = rules.OverrideRegistrationMade
+                        ? Made.Parameters.OverrideWith(rules.Parameters)
+                        : rules.Parameters.OverrideWith(Made.Parameters);
+                    var paramServiceInfoSelector = paramSelector(request);
+
+                    var inputArgs = request.InputArgExprs;
+                    var argsUsedMask = 0;
+                    paramExprs = new Expression[parameters.Length];
+
+                    for (var i = 0; i < parameters.Length; i++)
                     {
-                        var inputArgExpr = TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
-                        if (inputArgExpr != null)
+                        var param = parameters[i];
+                        if (inputArgs != null)
                         {
-                            paramExprs[i] = inputArgExpr;
-                            continue;
+                            var inputArgExpr = TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
+                            if (inputArgExpr != null)
+                            {
+                                paramExprs[i] = inputArgExpr;
+                                continue;
+                            }
                         }
-                    }
 
-                    var paramInfo = paramServiceInfoSelector(param) ?? ParameterServiceInfo.Of(param);
-                    var paramRequest = request.Push(paramInfo);
-
-                    var paramDetails = paramInfo.Details;
-                    if (paramDetails.HasCustomValue || paramDetails == DryIoc.ServiceDetails.Default)
-                    {
+                        var paramInfo = paramServiceInfoSelector(param) ?? ParameterServiceInfo.Of(param);
+                        var paramRequest = request.Push(paramInfo);
+                        var paramDetails = paramInfo.Details;
                         var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
                         if (usedOrCustomValExpr != null)
                         {
                             paramExprs[i] = usedOrCustomValExpr;
                             continue;
                         }
-                    }
 
-                    var injectedExpr = container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
-                    if (injectedExpr == null ||
-                        // When param is an empty array / collection, then we may use a default value instead (#581)
-                        paramDetails.DefaultValue != null &&
-                        injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
-                        ((NewArrayExpression)injectedExpr).Expressions.Count == 0)
-                    {
-                        // Check if parameter dependency itself (without propagated parent details)
-                        // does not allow default, then stop checking the rest of parameters.
-                        if (paramDetails.IfUnresolved == IfUnresolved.Throw)
-                            return null;
-                        injectedExpr = paramDetails.DefaultValue != null
-                            ? container.GetConstantExpression(paramDetails.DefaultValue)
-                            : paramRequest.ServiceType.GetDefaultValueExpression();
-                    }
+                        var injectedExpr = container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
+                        if (injectedExpr == null ||
+                            // When param is an empty array / collection, then we may use a default value instead (#581)
+                            paramDetails.DefaultValue != null &&
+                            injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
+                            ((NewArrayExpression) injectedExpr).Expressions.Count == 0)
+                        {
+                            // Check if parameter dependency itself (without propagated parent details)
+                            // does not allow default, then stop checking the rest of parameters.
+                            if (paramDetails.IfUnresolved == IfUnresolved.Throw)
+                                return null;
+                            injectedExpr = paramDetails.DefaultValue != null
+                                ? container.GetConstantExpression(paramDetails.DefaultValue)
+                                : paramRequest.ServiceType.GetDefaultValueExpression();
+                        }
 
-                    paramExprs[i] = injectedExpr;
+                        paramExprs[i] = injectedExpr;
+                    }
                 }
             }
 
-            return CreateServiceExpression(ctorOrMember, factoryExpr, paramExprs, request);
+            var ctor = ctorOrMethod as ConstructorInfo;
+            if (ctor == null)
+            {
+                var serviceExpr = Call(factoryExpr, (MethodInfo)ctorOrMethod, paramExprs);
+                return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMember);
+            }
+
+            var newServiceExpr = New(ctor, paramExprs);
+            if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
+                return newServiceExpr;
+
+            var propertiesAndFieldsSelector = rules.OverrideRegistrationMade
+                ? Made.PropertiesAndFields.OverrideWith(rules.PropertiesAndFields)
+                : rules.PropertiesAndFields.OverrideWith(Made.PropertiesAndFields);
+            var propertiesAndFields = propertiesAndFieldsSelector?.Invoke(request);
+            if (propertiesAndFields == null)
+                return newServiceExpr;
+
+            var assignments = Empty<MemberAssignment>();
+            foreach (var member in propertiesAndFields)
+                if (member != null)
+                {
+                    var memberRequest = request.Push(member);
+                    var memberExpr = 
+                        TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, member.Details)
+                        ?? container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
+                    if (memberExpr != null)
+                        assignments = assignments.AppendOrUpdate(Bind(member.Member, memberExpr));
+                    else if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+                        return null;
+                }
+
+            return assignments.Length == 0 ? (Expression)newServiceExpr : MemberInit(newServiceExpr, assignments);
+        }
+
+        private static Expression ConvertExpressionIfNeeded(Expression serviceExpr, Request request, MemberInfo ctorOrMember)
+        {
+            var actualServiceType = request.GetActualServiceType();
+            var serviceExprType = serviceExpr.Type;
+            if (serviceExprType == typeof(object))
+                return Convert(serviceExpr, actualServiceType);
+            return serviceExprType == actualServiceType || serviceExprType.IsAssignableTo(actualServiceType) ? serviceExpr
+                : serviceExprType.HasConversionOperatorTo(actualServiceType) ? Convert(serviceExpr, actualServiceType)
+                : request.IfUnresolved != IfUnresolved.Throw ? null
+                : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, actualServiceType, ctorOrMember,
+                    request);
         }
 
         // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
@@ -9616,74 +9650,6 @@ namespace DryIoc
             }
 
             _implementationType = knownImplType;
-        }
-
-        private Expression CreateServiceExpression(MemberInfo ctorOrMember, Expression factoryExpr, Expression[] paramExprs, Request request)
-        {
-            var ctor = ctorOrMember as ConstructorInfo;
-            if (ctor == null)
-                return CreateNonConstructorServiceExpression(ctorOrMember, factoryExpr, paramExprs, request);
-
-            var newServiceExpr = New(ctor, paramExprs);
-
-            var container = request.Container;
-            var rules = container.Rules;
-            if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
-                return newServiceExpr;
-
-            var selector = rules.OverrideRegistrationMade
-                ? Made.PropertiesAndFields.OverrideWith(rules.PropertiesAndFields)
-                : rules.PropertiesAndFields.OverrideWith(Made.PropertiesAndFields);
-
-            var propertiesAndFields = selector(request);
-            if (propertiesAndFields == null)
-                return newServiceExpr;
-
-            var assignments = Empty<MemberAssignment>();
-            foreach (var member in propertiesAndFields)
-            {
-                if (member == null)
-                    continue;
-
-                Expression memberExpr = null;
-
-                var memberRequest = request.Push(member);
-                var memberDetails = memberRequest._serviceInfo.Details;
-                if (memberDetails.HasCustomValue || memberDetails == DryIoc.ServiceDetails.Default)
-                    memberExpr = TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, memberDetails);
-
-                if (memberExpr == null)
-                {
-                    memberExpr = container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
-                    if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault)
-                        return null;
-                }
-
-                if (memberExpr != null)
-                    assignments = assignments.AppendOrUpdate(Bind(member.Member, memberExpr));
-            }
-
-            return assignments.Length == 0 ? (Expression)newServiceExpr : MemberInit(newServiceExpr, assignments);
-        }
-
-        private static Expression CreateNonConstructorServiceExpression(
-            MemberInfo ctorOrMember, Expression factoryExpr, Expression[] paramExprs, Request request)
-        {
-            var serviceExpr
-                = ctorOrMember is MethodInfo ? Call(factoryExpr, (MethodInfo) ctorOrMember, paramExprs)
-                : ctorOrMember is PropertyInfo ? Property(factoryExpr, (PropertyInfo) ctorOrMember)
-                : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember);
-
-            var requestedServiceType = request.GetActualServiceType();
-            var serviceExprType = serviceExpr.Type;
-            if (serviceExprType == typeof(object))
-                return Convert(serviceExpr, requestedServiceType);
-
-            return serviceExprType.IsAssignableTo(requestedServiceType) ? serviceExpr
-                : serviceExprType.HasConversionOperatorTo(requestedServiceType) ? Convert(serviceExpr, requestedServiceType)
-                : request.IfUnresolved != IfUnresolved.Throw ? null
-                : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, requestedServiceType, ctorOrMember,
-                    request);
         }
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
