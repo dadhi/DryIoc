@@ -5301,7 +5301,7 @@ namespace DryIoc
 
             var mostUsedArgCount = -1;
             ConstructorInfo mostResolvedCtor = null;
-            Expression[] mostResolvedExprs = null;
+            Expression[] mostResolvedExprs   = null;
             foreach (var ctor in manyToFewParamCtors)
             {
                 var parameters = ctor.GetParameters();
@@ -5327,7 +5327,7 @@ namespace DryIoc
                     var param = parameters[i];
                     if (inputArgs != null)
                     {
-                        var inputArgExpr = ReflectionFactory.TryGetExpressionFromInputArgs(param, inputArgs, ref argsUsedMask);
+                        var inputArgExpr = ReflectionFactory.TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
                         if (inputArgExpr != null)
                         {
                             ++usedInputArgOrUsedOrCustomValueCount;
@@ -9266,11 +9266,15 @@ namespace DryIoc
             var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
             var ctorOrMethod = ctorOrMember as MethodBase;
             if (ctorOrMethod == null) // return early when factory is Property or Field
-                return CreateServiceExpression(ctorOrMember, factoryExpr, Empty<Expression>(), request);
+            {
+                return CreateNonConstructorServiceExpression(ctorOrMember, factoryExpr, Empty<Expression>(), request);
+            }
 
             var parameters = ctorOrMethod.GetParameters();
             if (parameters.Length == 0) // the same when no parameters to inject
+            {
                 return CreateServiceExpression(ctorOrMember, factoryExpr, Empty<Expression>(), request);
+            }
 
             var paramExprs = factoryMethod.ResolvedParameterExpressions;
             if (paramExprs == null)
@@ -9282,7 +9286,6 @@ namespace DryIoc
 
                 var inputArgs = request.InputArgExprs;
                 var argsUsedMask = 0;
-
                 paramExprs = new Expression[parameters.Length];
 
                 for (var i = 0; i < parameters.Length; i++)
@@ -9290,7 +9293,7 @@ namespace DryIoc
                     var param = parameters[i];
                     if (inputArgs != null)
                     {
-                        var inputArgExpr = TryGetExpressionFromInputArgs(param, inputArgs, ref argsUsedMask);
+                        var inputArgExpr = TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
                         if (inputArgExpr != null)
                         {
                             paramExprs[i] = inputArgExpr;
@@ -9336,10 +9339,10 @@ namespace DryIoc
         }
 
         // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
-        internal static Expression TryGetExpressionFromInputArgs(ParameterInfo param, Expression[] inputArgs, ref int argsUsedMask)
+        internal static Expression TryGetExpressionFromInputArgs(Type paramType, Expression[] inputArgs, ref int argsUsedMask)
         {
             for (var a = 0; a < inputArgs.Length; ++a)
-                if ((argsUsedMask & 1 << a) == 0 && inputArgs[a].Type.IsAssignableTo(param.ParameterType))
+                if ((argsUsedMask & 1 << a) == 0 && inputArgs[a].Type.IsAssignableTo(paramType))
                 {
                     argsUsedMask |= 1 << a; // mark that argument was used
                     return inputArgs[a];
@@ -9623,7 +9626,8 @@ namespace DryIoc
 
             var newServiceExpr = New(ctor, paramExprs);
 
-            var rules = request.Rules;
+            var container = request.Container;
+            var rules = container.Rules;
             if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
                 return newServiceExpr;
 
@@ -9636,7 +9640,6 @@ namespace DryIoc
                 return newServiceExpr;
 
             var assignments = Empty<MemberAssignment>();
-            var container = request.Container;
             foreach (var member in propertiesAndFields)
             {
                 if (member == null)
@@ -9648,37 +9651,21 @@ namespace DryIoc
 
                 if (member.Details == DryIoc.ServiceDetails.Default)
                 {
-                    if (memberServiceType == typeof(IResolverContext) || memberServiceType == typeof(IResolver)
-#if SUPPORTS_ISERVICE_PROVIDER
-                    || memberServiceType == typeof(IServiceProvider)
-#endif
-                    )
-                    {
-                        memberExpr = ResolverContext.GetRootOrSelfExpr(memberRequest);
-                    }
-                    else if (memberServiceType == typeof(IRegistrator) || memberServiceType == typeof(IContainer))
-                    {
-                        memberExpr = Convert(ResolverContext.GetRootOrSelfExpr(memberRequest), memberServiceType);
-                    }
-
+                    // Generate the fast resolve call for used instances
                     if (request.Container.TryGetUsedInstance(memberServiceType, out var instance))
-                    {
-                        // Generate the fast resolve call for used instances
                         memberExpr = Call(ResolverContext.GetRootOrSelfExpr(memberRequest), Resolver.ResolveFastMethod,
                             Constant(memberServiceType, typeof(Type)), Constant(memberRequest.IfUnresolved));
-                    }
                 }
                 else if (member.Details.HasCustomValue)
                 {
                     var customValue = member.Details.CustomValue;
-                    customValue?.ThrowIfNotInstanceOf(memberRequest.ServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
-                    memberExpr = container.GetConstantExpression(customValue, memberRequest.ServiceType);
+                    customValue?.ThrowIfNotInstanceOf(memberServiceType, Error.InjectedCustomValueIsOfDifferentType, memberRequest);
+                    memberExpr = container.GetConstantExpression(customValue, memberServiceType);
                 }
                 
                 if (memberExpr == null)
                 {
-                    var memberFactory = container.ResolveFactory(memberRequest);
-                    memberExpr = memberFactory?.GetExpressionOrDefault(memberRequest);
+                    memberExpr = container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
                     if (memberExpr == null && request.IfUnresolved == IfUnresolved.ReturnDefault)
                         return null;
                 }
@@ -9694,8 +9681,8 @@ namespace DryIoc
             MemberInfo ctorOrMember, Expression factoryExpr, Expression[] paramExprs, Request request)
         {
             var serviceExpr
-                = ctorOrMember is MethodInfo ? Call(factoryExpr, (MethodInfo)ctorOrMember, paramExprs)
-                : ctorOrMember is PropertyInfo ? Property(factoryExpr, (PropertyInfo)ctorOrMember)
+                = ctorOrMember is MethodInfo ? Call(factoryExpr, (MethodInfo) ctorOrMember, paramExprs)
+                : ctorOrMember is PropertyInfo ? Property(factoryExpr, (PropertyInfo) ctorOrMember)
                 : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember);
 
             var requestedServiceType = request.GetActualServiceType();
@@ -9706,7 +9693,8 @@ namespace DryIoc
             return serviceExprType.IsAssignableTo(requestedServiceType) ? serviceExpr
                 : serviceExprType.HasConversionOperatorTo(requestedServiceType) ? Convert(serviceExpr, requestedServiceType)
                 : request.IfUnresolved != IfUnresolved.Throw ? null
-                : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, requestedServiceType, ctorOrMember, request);
+                : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, requestedServiceType, ctorOrMember,
+                    request);
         }
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
