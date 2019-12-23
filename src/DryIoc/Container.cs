@@ -2593,6 +2593,32 @@ namespace DryIoc
                             result = newExpr.Constructor.Invoke(fewArgs);
                             return true;
                         }
+
+                        if (fewArgCount == 4)
+                        {
+                            var fewArgs = new object[4];
+                            var fewArgsExpr = ((FourArgumentsNewExpression)newExpr);
+                            if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument3, useFec, out fewArgs[3]))
+                                return false;
+                            result = newExpr.Constructor.Invoke(fewArgs);
+                            return true;
+                        }
+                        if (fewArgCount == 5)
+                        {
+                            var fewArgs = new object[5];
+                            var fewArgsExpr = ((FiveArgumentsNewExpression)newExpr);
+                            if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument3, useFec, out fewArgs[3]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument4, useFec, out fewArgs[4]))
+                                return false;
+                            result = newExpr.Constructor.Invoke(fewArgs);
+                            return true;
+                        }
                     }
 #endif
                     var newArgs = newExpr.Arguments.ToListOrSelf();
@@ -2897,6 +2923,76 @@ namespace DryIoc
             if (callObjectExpr != null && !TryInterpret(r, callObjectExpr, useFec, out instance)) 
                 return false;
 
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+            var fewArgCount = callExpr.FewArgumentCount;
+            if (fewArgCount >= 0)
+            {
+                if (fewArgCount == 0)
+                {
+                    result = callExpr.Method.Invoke(instance, ArrayTools.Empty<object>());
+                    return true;
+                }
+
+                if (fewArgCount == 1)
+                {
+                    var fewArgs = new object[1];
+                    var fewArgsExpr = ((OneArgumentMethodCallExpression)callExpr).Argument;
+                    if (!TryInterpret(r, fewArgsExpr, useFec, out fewArgs[0]))
+                        return false;
+                    result = callExpr.Method.Invoke(instance, fewArgs);
+                    return true;
+                }
+
+                if (fewArgCount == 2)
+                {
+                    var fewArgs = new object[2];
+                    var fewArgsExpr = ((TwoArgumentsMethodCallExpression)callExpr);
+                    if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]))
+                        return false;
+                    result = callExpr.Method.Invoke(instance, fewArgs);
+                    return true;
+                }
+
+                if (fewArgCount == 3)
+                {
+                    var fewArgs = new object[3];
+                    var fewArgsExpr = ((ThreeArgumentsMethodCallExpression)callExpr);
+                    if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]))
+                        return false;
+                    result = callExpr.Method.Invoke(instance, fewArgs);
+                    return true;
+                }
+
+                if (fewArgCount == 4)
+                {
+                    var fewArgs = new object[4];
+                    var fewArgsExpr = ((FourArgumentsMethodCallExpression)callExpr);
+                    if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument3, useFec, out fewArgs[3]))
+                        return false;
+                    result = callExpr.Method.Invoke(instance, fewArgs);
+                    return true;
+                }
+                if (fewArgCount == 5)
+                {
+                    var fewArgs = new object[5];
+                    var fewArgsExpr = ((FiveArgumentsMethodCallExpression)callExpr);
+                    if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument3, useFec, out fewArgs[3]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument4, useFec, out fewArgs[4]))
+                        return false;
+                    result = callExpr.Method.Invoke(instance, fewArgs);
+                    return true;
+                }
+            }
+#endif
             var args = callExpr.Arguments.ToListOrSelf();
             var callArgCount = args.Count;
             if (callArgCount == 0)
@@ -2907,7 +3003,6 @@ namespace DryIoc
                 for (var i = 0; i < argObjects.Length; i++)
                     if (!TryInterpret(r, args[i], useFec, out argObjects[i]))
                         return false;
-
                 result = method.Invoke(instance, argObjects);
                 //ReturnBackObjectArray(callArgCount, args);
             }
@@ -9231,7 +9326,7 @@ namespace DryIoc
                 return ConvertExpressionIfNeeded(memberExpr, request, ctorOrMember);
             }
 
-            Expression arg0 = null, arg1 = null, arg2 = null;
+            Expression arg0 = null, arg1 = null, arg2 = null, arg3 = null, arg4 = null;
             Expression[] paramExprs = Empty<Expression>();
             var parameters = ctorOrMethod.GetParameters();
             if (parameters.Length != 0)
@@ -9239,7 +9334,7 @@ namespace DryIoc
                 paramExprs = factoryMethod.ResolvedParameterExpressions;
                 if (paramExprs == null)
                 {
-                    if (parameters.Length > 3)
+                    if (parameters.Length > 5)
                         paramExprs = new Expression[parameters.Length];
                  
                     var paramSelector = rules.OverrideRegistrationMade
@@ -9263,8 +9358,12 @@ namespace DryIoc
                                     arg0 = inputArgExpr;
                                 else if (i == 1)
                                     arg1 = inputArgExpr;
-                                else 
+                                else if (i == 2)
                                     arg2 = inputArgExpr;
+                                else if (i == 3)
+                                    arg3 = inputArgExpr;
+                                else
+                                    arg4 = inputArgExpr;
                                 continue;
                             }
                         }
@@ -9281,8 +9380,12 @@ namespace DryIoc
                                 arg0 = usedOrCustomValExpr;
                             else if (i == 1)
                                 arg1 = usedOrCustomValExpr;
-                            else
+                            else if (i == 2)
                                 arg2 = usedOrCustomValExpr;
+                            else if (i == 3)
+                                arg3 = usedOrCustomValExpr;
+                            else
+                                arg4 = usedOrCustomValExpr;
                             continue;
                         }
 
@@ -9308,8 +9411,12 @@ namespace DryIoc
                             arg0 = injectedExpr;
                         else if (i == 1)
                             arg1 = injectedExpr;
-                        else
+                        else if (i == 2)
                             arg2 = injectedExpr;
+                        else if (i == 3)
+                            arg3 = injectedExpr;
+                        else
+                            arg4 = injectedExpr;
                     }
                 }
             }
@@ -9322,8 +9429,12 @@ namespace DryIoc
                 serviceExpr = ctor != null ? New(ctor, arg0) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, arg0);
             else if (arg2 == null)
                 serviceExpr = ctor != null ? New(ctor, arg0, arg1) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, arg0, arg1);
-            else
+            else if (arg3 == null)
                 serviceExpr = ctor != null ? New(ctor, arg0, arg1, arg2) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, arg0, arg1, arg2);
+            else if (arg4 == null)
+                serviceExpr = ctor != null ? New(ctor, arg0, arg1, arg2, arg3) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, arg0, arg1, arg2, arg3);
+            else
+                serviceExpr = ctor != null ? New(ctor, arg0, arg1, arg2, arg3, arg4) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, arg0, arg1, arg2, arg3, arg4);
 
             if (ctor == null)
                 return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMember);
