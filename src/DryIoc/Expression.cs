@@ -541,15 +541,22 @@ namespace FastExpressionCompiler.LightExpression
             new LambdaExpression(Tools.GetFuncOrActionType(Tools.Empty<Type>(), body.Type), 
                 body, body.Type);
 
+        public static LambdaExpression Lambda(Type delegateType, Expression body) =>
+            new LambdaExpression(delegateType, body, body.Type);
+
+        public static LambdaExpression Lambda(Type delegateType, Expression body, Type returnType) =>
+            new LambdaExpression(delegateType, body, returnType);
+
         public static LambdaExpression Lambda(Expression body, params ParameterExpression[] parameters) =>
-            new ManyParametersLambdaExpression(Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), body.Type), 
-                body, parameters, body.Type);
+            Lambda(Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), body.Type), body, parameters, body.Type);
 
         public static LambdaExpression Lambda(Type delegateType, Expression body, params ParameterExpression[] parameters) =>
-            new ManyParametersLambdaExpression(delegateType, body, parameters, GetDelegateReturnType(delegateType));
+            Lambda(delegateType, body, parameters, GetDelegateReturnType(delegateType));
 
         public static LambdaExpression Lambda(Type delegateType, Expression body, ParameterExpression[] parameters, Type returnType) =>
-            new ManyParametersLambdaExpression(delegateType, body, parameters, returnType);
+            parameters == null || parameters.Length == 0 
+                ? new LambdaExpression(delegateType, body, returnType)
+                : new ManyParametersLambdaExpression(delegateType, body, parameters, returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body) =>
             new Expression<TDelegate>(body, typeof(TDelegate).FindDelegateInvokeMethod().ReturnType);
@@ -558,10 +565,12 @@ namespace FastExpressionCompiler.LightExpression
             new Expression<TDelegate>(body, returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body, params ParameterExpression[] parameters) =>
-            new ManyParametersExpression<TDelegate>(body, parameters, GetDelegateReturnType(typeof(TDelegate)));
+            Lambda<TDelegate>(body, parameters, GetDelegateReturnType(typeof(TDelegate)));
 
-        public static Expression<TDelegate> Lambda<TDelegate>(Expression body, ParameterExpression[] parameters, Type returnType) where TDelegate : class =>
-            new ManyParametersExpression<TDelegate>(body, parameters, returnType);
+        public static Expression<TDelegate> Lambda<TDelegate>(Expression body, ParameterExpression[] parameters, Type returnType) =>
+            parameters == null || parameters.Length == 0 
+                ? new Expression<TDelegate>(body, returnType)
+                : new ManyParametersExpression<TDelegate>(body, parameters, returnType);
 
         /// <summary>
         /// <paramref name="name"/> is ignored for now, the method is just for compatibility with SysExpression

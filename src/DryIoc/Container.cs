@@ -312,13 +312,10 @@ namespace DryIoc
                     _registry.Value.TryCacheDefaultFactory(serviceType, expr);
 
                 // 1) First try to interpret
-                if (request._sharedState.IsWrappedInFunc)
-                {
-
-                }
-
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
-                    return instance;
+                // todo except for
+                if (!request._sharedState.ContainsNestedLambda)
+                    if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
+                        return instance;
 
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
@@ -2511,32 +2508,6 @@ namespace DryIoc
             }
         }
 
-        // todo: benchmark - but probably bad idea because of static references to already created object =
-        // so we need an additional cleanup and perf costs - OR! we could put it into Container
-        /*
-            Method |     Mean |   Error |  StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-           ------- |---------:|--------:|--------:|------:|--------:|-------:|------:|----------:|
-              MsDI | 119.4 us | 2.25 us | 1.88 us |  1.00 | 16.9678 | 0.1221 |     - |  73.15 KB |
-            DryIoc | 102.0 us | 0.31 us | 0.27 us |  0.85 | 16.3574 |      - |     - |  75.58 KB |
-
-            Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-           ------- |---------:|--------:|--------:|------:|--------:|--------:|-------:|------:|----------:|
-              MsDI | 124.4 us | 2.49 us | 3.06 us |  1.00 |    0.00 | 16.8457 | 0.2441 |     - |  73.16 KB |
-            DryIoc | 103.1 us | 0.23 us | 0.22 us |  0.83 |    0.02 | 16.1133 | 0.1221 |     - |  74.46 KB |
-        */
-        //internal static readonly object[][] ObjectArrayPool = new object[16][];
-
-        //internal static object[] RentOrNewObjectArray(int objectCount) =>
-        //    objectCount > 16
-        //        ? new object[objectCount]
-        //        : Interlocked.Exchange(ref ObjectArrayPool[objectCount - 1], null) ?? new object[objectCount];
-
-        //internal static void ReturnBackObjectArray(int objectCount, object[] array)
-        //{
-        //    if (objectCount <= 16)
-        //        Interlocked.Exchange(ref ObjectArrayPool[objectCount - 1], array);
-        //}
-
         /// <summary>Interprets passed expression</summary>
         public static bool TryInterpret(IResolverContext r, Expression expr, bool useFec, out object result)
         {
@@ -4361,6 +4332,8 @@ namespace DryIoc
                 serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
             }
 
+            serviceRequest.SetConstainsNestedLambda();
+
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
@@ -4372,6 +4345,7 @@ namespace DryIoc
 
             var lazyValueFactoryType = typeof(Func<>).MakeGenericType(serviceType);
             var wrapperCtor = lazyType.Constructor(lazyValueFactoryType);
+
             return New(wrapperCtor, Lambda(lazyValueFactoryType, serviceExpr, Empty<ParameterExpression>()
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                 , serviceType
@@ -4395,11 +4369,12 @@ namespace DryIoc
             var argCount = isAction ? argTypes.Length : argTypes.Length - 1;
             var serviceType = isAction ? typeof(void) : argTypes[argCount];
 
-            var argExprs = new ParameterExpression[argCount]; // may be empty, that's OK
+            var argExprs = Empty<ParameterExpression>(); // may be empty, that's OK
             if (argCount != 0)
             {
-                // assign valid unique argument names for code generation
+                argExprs = new ParameterExpression[argCount];
                 for (var i = 0; i < argCount; ++i)
+                    // assign valid unique argument names for code generation
                     argExprs[i] = Parameter(argTypes[i], argTypes[i].Name + "@" + i); // todo: optimize string allocations
                 request = request.WithInputArgs(argExprs);
             }
@@ -4413,7 +4388,7 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
-            request._sharedState.IsWrappedInFunc = true;
+            request.SetConstainsNestedLambda();
 
             // The conversion to handle lack of covariance for Func<out T> in .NET 3.5
             // So that Func<Derived> may be used for Func<Base>
@@ -7545,12 +7520,15 @@ namespace DryIoc
 
         internal class SharedStateInfo
         {
-            public bool IsWrappedInFunc;
+            public bool ContainsNestedLambda;
         }
 
         internal SharedStateInfo _sharedState;
 
-        // todo: Make a property in v4.0
+        /// <summary>Indicate that request chain contains a lambda - to consider this info for interpretation </summary>
+        public void SetConstainsNestedLambda() => _sharedState.ContainsNestedLambda = true;
+
+        // todo: Make a property in v5.0
         /// <summary>Available in runtime only, provides access to container initiated the request.</summary>
         public IContainer Container;
 

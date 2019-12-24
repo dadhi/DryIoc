@@ -26,7 +26,7 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual("Simple2", simple2.Text);
         }
 
-        [Test, Ignore("To be fixed")]
+        [Test]//, Ignore("To be fixed")]
         public void Resolve_only_one_dependency_instance()
         {
             var container = new Container();
@@ -73,7 +73,7 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(1, Countable.Counter, "The container resolved more than one instance of Countable.");
         }
 
-        [Test]//, Ignore("To be fixed")]
+        [Test]
         public void Resolve_only_one_dependency_instance_with_RegisterDelegate_of_func_with_args()
         {
             var container = new Container(rules => rules.WithoutInterpretationForTheFirstResolution());
@@ -158,6 +158,7 @@ namespace DryIoc.IssuesTests
 
         public override Expression CreateExpressionOrDefault(Request request)
         {
+            request.SetConstainsNestedLambda();
             var originalFactoryType = GetOriginalFactoryType();
             var originalFactoryRequest = Request.Create(request.Container, originalFactoryType, request.ServiceKey);
             var originalFactory = originalFactoryRequest.Container.ResolveFactory(originalFactoryRequest);

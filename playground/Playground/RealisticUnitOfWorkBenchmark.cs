@@ -879,15 +879,16 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
-| Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------- |---------:|--------:|--------:|------:|--------:|--------:|-------:|------:|----------:|
-|   MsDI | 102.7 us | 2.29 us | 2.72 us |  1.00 |    0.00 | 16.1133 | 0.4883 |     - |  74.25 KB |
-| DryIoc | 104.6 us | 0.99 us | 0.93 us |  1.01 |    0.02 | 16.4795 | 1.5869 |     - |  76.04 KB |
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=3.1.100
+  [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
 
-| Method |     Mean |    Error |   StdDev |   Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------- |---------:|---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|   MsDI | 79.89 us | 2.035 us | 4.338 us | 78.14 us |  1.00 |    0.00 | 16.1133 | 0.1221 |     - |  74.23 KB |
-| DryIoc | 94.32 us | 0.545 us | 0.483 us | 94.10 us |  1.12 |    0.08 | 16.4795 | 0.1221 |     - |  75.79 KB |
+| Method |     Mean |    Error |   StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------- |---------:|---------:|---------:|------:|--------:|-------:|------:|----------:|
+|   MsDI | 77.02 us | 0.710 us | 0.664 us |  1.00 | 16.1133 | 0.4883 |     - |  74.25 KB |
+| DryIoc | 93.16 us | 0.533 us | 0.472 us |  1.21 | 16.3574 | 1.5869 |     - |  75.41 KB |
 
              */
 
@@ -1089,16 +1090,23 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ## DryIoc v4.1
 
-|                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 | Gen 1 | Gen 2 | Allocated |
-|-------------------------- |----------:|----------:|----------:|------:|--------:|--------:|------:|------:|----------:|
-|                      MsDi |  3.884 us | 0.0222 us | 0.0208 us |  1.00 |    0.00 |  0.9460 |     - |     - |   4.37 KB |
-|                    DryIoc |  1.642 us | 0.0088 us | 0.0083 us |  0.42 |    0.00 |  0.6618 |     - |     - |   3.05 KB |
-|        DryIoc_MsDiAdapter |  2.186 us | 0.0148 us | 0.0131 us |  0.56 |    0.01 |  0.6676 |     - |     - |   3.08 KB |
-| DryIoc_InterpretationOnly | 15.392 us | 0.0646 us | 0.0604 us |  3.96 |    0.02 |  1.2207 |     - |     - |    5.7 KB |
-|                     Grace |  1.696 us | 0.0074 us | 0.0069 us |  0.44 |    0.00 |  0.6866 |     - |     - |   3.17 KB |
-|         Grace_MsDiAdapter |  2.230 us | 0.0121 us | 0.0113 us |  0.57 |    0.00 |  0.7401 |     - |     - |   3.41 KB |
-|                   Autofac | 40.361 us | 0.2717 us | 0.2269 us | 10.39 |    0.06 | 10.4980 |     - |     - |  48.59 KB |
-|       Autofac_MsDiAdapter | 49.225 us | 0.1701 us | 0.1591 us | 12.67 |    0.08 | 13.3667 |     - |     - |   61.8 KB |
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=3.1.100
+  [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+
+
+|                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|-------------------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|                      MsDi |  3.379 us | 0.0178 us | 0.0167 us |  1.00 |    0.00 |  0.9460 | 0.0153 |     - |   4.35 KB |
+|                    DryIoc |  1.620 us | 0.0030 us | 0.0026 us |  0.48 |    0.00 |  0.6638 | 0.0095 |     - |   3.05 KB |
+|        DryIoc_MsDiAdapter |  2.116 us | 0.0175 us | 0.0146 us |  0.63 |    0.01 |  0.6676 | 0.0076 |     - |   3.08 KB |
+| DryIoc_InterpretationOnly | 13.406 us | 0.0647 us | 0.0605 us |  3.97 |    0.03 |  1.2360 | 0.0153 |     - |    5.7 KB |
+|                     Grace |  1.711 us | 0.0139 us | 0.0123 us |  0.51 |    0.00 |  0.6886 | 0.0095 |     - |   3.17 KB |
+|         Grace_MsDiAdapter |  2.303 us | 0.0191 us | 0.0178 us |  0.68 |    0.01 |  0.7401 | 0.0076 |     - |   3.41 KB |
+|                   Autofac | 36.210 us | 0.2359 us | 0.2207 us | 10.72 |    0.08 |  9.8267 | 0.6104 |     - |  45.33 KB |
+|       Autofac_MsDiAdapter | 45.746 us | 0.2135 us | 0.1997 us | 13.54 |    0.09 | 13.3057 | 0.7935 |     - |  61.16 KB |
 */
 
             private IServiceProvider _msDi;
