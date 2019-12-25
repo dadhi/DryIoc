@@ -312,10 +312,8 @@ namespace DryIoc
                     _registry.Value.TryCacheDefaultFactory(serviceType, expr);
 
                 // 1) First try to interpret
-                // todo except for
-                if (!request._sharedState.ContainsNestedLambda)
-                    if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
-                        return instance;
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
+                    return instance;
 
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
@@ -2497,7 +2495,7 @@ namespace DryIoc
         {
             try
             {
-                return Interpreter.TryInterpret(r, expr, useFec, out result);
+                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r.One(), null, useFec, out result);
             }
             catch (TargetInvocationException tex)
             {
@@ -2508,8 +2506,31 @@ namespace DryIoc
             }
         }
 
+        /// <summary>Stores parent lambda params and args</summary>
+        public sealed class ParentLambdaArgs
+        {
+            /// <summary> Parent or the `null` for the root </summary>
+            public readonly ParentLambdaArgs ParentWithArgs;
+
+            /// <summary> Params </summary>
+            public readonly ParameterExpression[] ParamExprs;
+
+            /// <summary> Args </summary>
+            public readonly object[] ParamValues;
+
+            /// <summary>Constructs with parent parent or `null` for the root</summary>
+            public ParentLambdaArgs(ParentLambdaArgs parentWithArgs, ParameterExpression[] paramExprs, object[] paramValues)
+            {
+                ParentWithArgs = parentWithArgs;
+                ParamExprs  = paramExprs;
+                ParamValues = paramValues;
+            }
+        }
+
         /// <summary>Interprets passed expression</summary>
-        public static bool TryInterpret(IResolverContext r, Expression expr, bool useFec, out object result)
+        public static bool TryInterpret(IResolverContext r, Expression expr, 
+            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
+            bool useFec, out object result)
         {
             result = null;
             switch (expr.NodeType)
@@ -2536,7 +2557,7 @@ namespace DryIoc
                         {
                             var fewArgs = new object[1];
                             var fewArgsExpr = ((OneArgumentNewExpression)newExpr).Argument;
-                            if (!TryInterpret(r, fewArgsExpr, useFec, out fewArgs[0]))
+                            if (!TryInterpret(r, fewArgsExpr, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]))
                                 return false;
                             result = newExpr.Constructor.Invoke(fewArgs);
                             return true;
@@ -2546,8 +2567,8 @@ namespace DryIoc
                         {
                             var fewArgs = new object[2];
                             var fewArgsExpr = ((TwoArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]))
+                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]))
                                 return false;
                             result = newExpr.Constructor.Invoke(fewArgs);
                             return true;
@@ -2557,9 +2578,9 @@ namespace DryIoc
                         {
                             var fewArgs = new object[3];
                             var fewArgsExpr = ((ThreeArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]))
+                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]))
                                 return false;
                             result = newExpr.Constructor.Invoke(fewArgs);
                             return true;
@@ -2569,10 +2590,10 @@ namespace DryIoc
                         {
                             var fewArgs = new object[4];
                             var fewArgsExpr = ((FourArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument3, useFec, out fewArgs[3]))
+                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]))
                                 return false;
                             result = newExpr.Constructor.Invoke(fewArgs);
                             return true;
@@ -2581,11 +2602,11 @@ namespace DryIoc
                         {
                             var fewArgs = new object[5];
                             var fewArgsExpr = ((FiveArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument3, useFec, out fewArgs[3]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument4, useFec, out fewArgs[4]))
+                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]) ||
+                                !TryInterpret(r, fewArgsExpr.Argument4, paramExprs, paramValues, parentArgs, useFec, out fewArgs[4]))
                                 return false;
                             result = newExpr.Constructor.Invoke(fewArgs);
                             return true;
@@ -2598,30 +2619,22 @@ namespace DryIoc
                         result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                     else
                     {
-                        //var args = RentOrNewObjectArray(newArgCount);
                         var args = new object[newArgCount];
                         for (var i = 0; i < args.Length; i++)
-                            if (!TryInterpret(r, newArgs[i], useFec, out args[i]))
+                            if (!TryInterpret(r, newArgs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
                                 return false;
                         result = newExpr.Constructor.Invoke(args);
-                        //ReturnBackObjectArray(newArgCount, args);
                     }
                     return true;
                 }
                 case ExprType.Call:
-                    return TryInterpretMethodCall(r, expr, useFec, ref result);
-                case ExprType.Parameter:
                 {
-                    // todo: handles IResolverContext only
-                    if (expr != FactoryDelegateCompiler.ResolverContextParamExpr)
-                        return false;
-                    result = r;
-                    return true;
+                    return TryInterpretMethodCall(r, expr, paramExprs, paramValues, parentArgs, useFec, ref result);
                 }
                 case ExprType.Convert:
                 {
                     var convertExpr = (UnaryExpression)expr;
-                    if (!TryInterpret(r, convertExpr.Operand, useFec, out var instance))
+                    if (!TryInterpret(r, convertExpr.Operand, paramExprs, paramValues, parentArgs, useFec, out var instance))
                         return false;
                     // skip conversion for null and for directly assignable type
                     if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
@@ -2635,7 +2648,7 @@ namespace DryIoc
                     var memberExpr = (MemberExpression)expr;
                     var instanceExpr = memberExpr.Expression;
                     object instance = null;
-                    if (instanceExpr != null && !TryInterpret(r, instanceExpr, useFec, out instance))
+                    if (instanceExpr != null && !TryInterpret(r, instanceExpr, paramExprs, paramValues, parentArgs, useFec, out instance))
                         return false;
 
                     if (memberExpr.Member is FieldInfo field)
@@ -2655,14 +2668,14 @@ namespace DryIoc
                 case ExprType.MemberInit:
                 {
                     var memberInit = (MemberInitExpression)expr;
-                    if (!TryInterpret(r, memberInit.NewExpression, useFec, out var instance))
+                    if (!TryInterpret(r, memberInit.NewExpression, paramExprs, paramValues, parentArgs, useFec, out var instance))
                         return false;
 
                     var bindings = memberInit.Bindings;
                     for (var i = 0; i < bindings.Count; i++)
                     {
                         var binding = (MemberAssignment)bindings[i];
-                        if (!TryInterpret(r, binding.Expression, useFec, out var memberValue))
+                        if (!TryInterpret(r, binding.Expression, paramExprs, paramValues, parentArgs, useFec, out var memberValue))
                             return false;
 
                         var field = binding.Member as FieldInfo;
@@ -2682,7 +2695,7 @@ namespace DryIoc
                     var items = new object[itemExprs.Count];
 
                     for (var i = 0; i < items.Length; i++)
-                        if (!TryInterpret(r, itemExprs[i], useFec, out items[i]))
+                        if (!TryInterpret(r, itemExprs[i], paramExprs, paramValues, parentArgs, useFec, out items[i]))
                             return false;
 
                     result = Converter.ConvertMany(items, newArray.Type.GetElementType());
@@ -2699,7 +2712,7 @@ namespace DryIoc
                     if (delegateExpr.Type == typeof(FactoryDelegate) && 
                         delegateExpr is ConstantExpression delegateConstExpr)
                     {
-                        if (!TryInterpret(r, invokeExpr.Arguments[0], useFec, out var resolver))
+                        if (!TryInterpret(r, invokeExpr.Arguments[0], paramExprs, paramValues, parentArgs, useFec, out var resolver))
                             return false;
                         result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
                         return true;
@@ -2708,7 +2721,7 @@ namespace DryIoc
                     if (delegateExpr.NodeType == ExprType.Lambda)
                         return false;
 
-                    if (!TryInterpret(r, delegateExpr, useFec, out var delegateObj))
+                    if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
                         return false;
                     var lambda = (Delegate)delegateObj;
 
@@ -2719,15 +2732,79 @@ namespace DryIoc
                     {
                         var args = new object[argExprs.Count];
                         for (var i = 0; i < args.Length; i++)
-                            if (!TryInterpret(r, argExprs[i], useFec, out args[i]))
+                            if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
                                 return false;
                         result = lambda.Method.Invoke(lambda.Target, args);
                     }
                     return true;
                 }
 #endif
+                case ExprType.Parameter:
+                {
+                    if (expr == FactoryDelegateCompiler.ResolverContextParamExpr)
+                    {
+                        result = r;
+                        return true;
+                    }
+
+                    if (paramExprs.Length != 0)
+                        for (var i = 0; i < paramExprs.Length; i++)
+                            if (expr == paramExprs[i])
+                            {
+                                result = paramValues[i];
+                                return true;
+                            }
+
+                    if (parentArgs != null)
+                        for (var p = parentArgs; p != null; p = p.ParentWithArgs)
+                        for (var i = 0; i < paramExprs.Length; i++)
+                            if (expr == p.ParamExprs[i])
+                            {
+                                result = p.ParamValues[i];
+                                return true;
+                            }
+                    return false;
+                }
                 case ExprType.Lambda:
-                    break; // not supported nested lambdas
+                {
+                    var lambdaExpr = (LambdaExpression) expr;
+                    if (lambdaExpr.Parameters.Count == 0 && lambdaExpr.ReturnType != typeof(void))
+                    {
+                        if (paramExprs.Length != 0)
+                            parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
+
+                        Func<object> f = () =>
+                        {
+                            try
+                            {
+                                // todo: fix me
+                                if (r.IsDisposed)
+                                {
+                                    //if (r.IsScoped())
+                                    //    Throw.It(Error.ScopeIsDisposed, r);
+                                    //else
+                                    //    Throw.It(Error.ContainerIsDisposed, r);
+                                }
+
+                                if (!TryInterpret(r, lambdaExpr.Body, Empty<ParameterExpression>(), null, parentArgs, useFec, out var nestedLambdaResult))
+                                    Throw.It(Error.UnableToInterpretTheNestedLambda, lambdaExpr.Body);
+                                return nestedLambdaResult;
+                            }
+                            catch (TargetInvocationException tex)
+                            {
+                                // It may happen when using `IResolver` or `Scope` methods inside your own factory methods
+                                if (tex.InnerException is ContainerException)
+                                    throw tex.InnerException;
+                                throw;
+                             }
+                        };
+
+                        result = _convertFuncMethod.MakeGenericMethod(lambdaExpr.ReturnType).Invoke(null, new[] { f });
+                        return true;
+                    }
+
+                    return false;
+                }
                 default:
                     break;
             }
@@ -2735,7 +2812,14 @@ namespace DryIoc
             return false;
         }
 
-        private static bool TryInterpretMethodCall(IResolverContext r, Expression expr, bool useFec, ref object result)
+        internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
+
+        private static readonly MethodInfo _convertFuncMethod =
+            typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
+
+        private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
+            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
+            bool useFec, ref object result)
         {
             if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
             {
@@ -2752,31 +2836,31 @@ namespace DryIoc
                 // todo: do we need an overload without disposalOrder
                 if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod)
                 {
-                    result = InterpretGetScopedViaFactoryDelegate(r, callExpr, useFec);
+                    result = InterpretGetScopedViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs, useFec);
                     return true;
                 }
 
                 if (method == CurrentScopeReuse.GetNameScopedViaFactoryDelegateMethod)
                 {
-                    result = InterpretGetNameScopedViaFactoryDelegate(r, callExpr, useFec);
+                    result = InterpretGetNameScopedViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs, useFec);
                     return true;
                 }
 
                 if (method == CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateMethod)
                 {
-                    result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, callExpr, useFec);
+                    result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs, useFec);
                     return true;
                 }
 
                 var callArgs = callExpr.Arguments.ToListOrSelf();
                 var resolver = r;
                 if (!ReferenceEquals(callArgs[0], FactoryDelegateCompiler.ResolverContextParamExpr) &&
-                    !TryInterpretResolverContext(ref resolver, useFec, callArgs[0]))
+                    !TryInterpretResolverContext(ref resolver, paramExprs, paramValues, parentArgs, useFec, callArgs[0]))
                     return false;
 
                 if (method == CurrentScopeReuse.TrackScopedOrSingletonMethod)
                 {
-                    if (!TryInterpret(resolver, callArgs[1], useFec, out var service))
+                    if (!TryInterpret(resolver, callArgs[1], paramExprs, paramValues, parentArgs, useFec, out var service))
                         return false;
                     result = CurrentScopeReuse.TrackScopedOrSingleton(resolver, service);
                     return true;
@@ -2789,7 +2873,7 @@ namespace DryIoc
                         result = null; // result is null in this case
                     else
                     {
-                        if (!TryInterpret(resolver, callArgs[2], useFec, out var service))
+                        if (!TryInterpret(resolver, callArgs[2], paramExprs, paramValues, parentArgs, useFec, out var service))
                             return false;
                         result = scope.TrackDisposable(service /* todo: what is with `disposalOrder`*/);
                     }
@@ -2804,7 +2888,7 @@ namespace DryIoc
                         result = null; // result is null in this case
                     else
                     {
-                        if (!TryInterpret(resolver, callArgs[3], useFec, out var service))
+                        if (!TryInterpret(resolver, callArgs[3], paramExprs, paramValues, parentArgs, useFec, out var service))
                             return false;
                         result = scope.TrackDisposable(service);
                     }
@@ -2827,7 +2911,7 @@ namespace DryIoc
                             ((LambdaExpression) callArgs[1]).Body, useFec,
                             (rc, e, uf) =>
                             {
-                                if (TryInterpret(rc, e, uf, out var value))
+                                if (TryInterpret(rc, e, paramExprs, paramValues, parentArgs, uf, out var value))
                                     return value;
                                 return e.CompileToFactoryDelegate(uf, ((IContainer) rc).Rules.UseInterpretation)(rc);
                             },
@@ -2840,7 +2924,7 @@ namespace DryIoc
                 if (method == Scope.TrackDisposableMethod)
                 {
                     r = r.Root ?? r;
-                    if (!TryInterpret(r, callArgs[0], useFec, out var service))
+                    if (!TryInterpret(r, callArgs[0], paramExprs, paramValues, parentArgs, useFec, out var service))
                         return false;
                     result = r.SingletonScope.TrackDisposable(service, (int) ConstValue(callArgs[1]));
                     return true;
@@ -2850,7 +2934,7 @@ namespace DryIoc
             {
                 var resolver = r;
                 if (!ReferenceEquals(callExpr.Object, FactoryDelegateCompiler.ResolverContextParamExpr) &&
-                    !TryInterpretResolverContext(ref resolver, useFec, callExpr.Object))
+                    !TryInterpretResolverContext(ref resolver, paramExprs, paramValues, parentArgs, useFec, callExpr.Object))
                     return false;
 
                 var callArgs = callExpr.Arguments.ToListOrSelf();
@@ -2863,9 +2947,9 @@ namespace DryIoc
                 if (method == Resolver.ResolveMethod)
                 {
                     object serviceKey = null, preResolveParent = null, resolveArgs = null;
-                    if (!TryInterpret(resolver, callArgs[1], useFec, out serviceKey) ||
-                        !TryInterpret(resolver, callArgs[4], useFec, out preResolveParent) ||
-                        !TryInterpret(resolver, callArgs[5], useFec, out resolveArgs))
+                    if (!TryInterpret(resolver, callArgs[1], paramExprs, paramValues, parentArgs, useFec, out serviceKey) ||
+                        !TryInterpret(resolver, callArgs[4], paramExprs, paramValues, parentArgs, useFec, out preResolveParent) ||
+                        !TryInterpret(resolver, callArgs[5], paramExprs, paramValues, parentArgs, useFec, out resolveArgs))
                         return false;
 
                     result = resolver.Resolve((Type) ConstValue(callArgs[0]), serviceKey,
@@ -2877,9 +2961,9 @@ namespace DryIoc
                 if (method == Resolver.ResolveManyMethod)
                 {
                     object serviceKey = null, preResolveParent = null, resolveArgs = null;
-                    if (!TryInterpret(resolver, callArgs[1], useFec, out serviceKey) ||
-                        !TryInterpret(resolver, callArgs[3], useFec, out preResolveParent) ||
-                        !TryInterpret(resolver, callArgs[4], useFec, out resolveArgs))
+                    if (!TryInterpret(resolver, callArgs[1], paramExprs, paramValues, parentArgs, useFec, out serviceKey) ||
+                        !TryInterpret(resolver, callArgs[3], paramExprs, paramValues, parentArgs, useFec, out preResolveParent) ||
+                        !TryInterpret(resolver, callArgs[4], paramExprs, paramValues, parentArgs, useFec, out resolveArgs))
                         return false;
 
                     result = resolver.ResolveMany((Type) ConstValue(callArgs[0]), serviceKey, (Type) ConstValue(callArgs[2]),
@@ -2891,7 +2975,7 @@ namespace DryIoc
             // fallback to reflection invocation
             object instance = null;
             var callObjectExpr = callExpr.Object;
-            if (callObjectExpr != null && !TryInterpret(r, callObjectExpr, useFec, out instance)) 
+            if (callObjectExpr != null && !TryInterpret(r, callObjectExpr, paramExprs, paramValues, parentArgs, useFec, out instance)) 
                 return false;
 
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -2908,7 +2992,7 @@ namespace DryIoc
                 {
                     var fewArgs = new object[1];
                     var fewArgsExpr = ((OneArgumentMethodCallExpression)callExpr).Argument;
-                    if (!TryInterpret(r, fewArgsExpr, useFec, out fewArgs[0]))
+                    if (!TryInterpret(r, fewArgsExpr, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]))
                         return false;
                     result = callExpr.Method.Invoke(instance, fewArgs);
                     return true;
@@ -2918,8 +3002,8 @@ namespace DryIoc
                 {
                     var fewArgs = new object[2];
                     var fewArgsExpr = ((TwoArgumentsMethodCallExpression)callExpr);
-                    if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
-                        !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]))
+                    if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]))
                         return false;
                     result = callExpr.Method.Invoke(instance, fewArgs);
                     return true;
@@ -2929,9 +3013,9 @@ namespace DryIoc
                 {
                     var fewArgs = new object[3];
                     var fewArgsExpr = ((ThreeArgumentsMethodCallExpression)callExpr);
-                    if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
-                        !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
-                        !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]))
+                    if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]))
                         return false;
                     result = callExpr.Method.Invoke(instance, fewArgs);
                     return true;
@@ -2941,10 +3025,10 @@ namespace DryIoc
                 {
                     var fewArgs = new object[4];
                     var fewArgsExpr = ((FourArgumentsMethodCallExpression)callExpr);
-                    if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
-                        !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
-                        !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]) ||
-                        !TryInterpret(r, fewArgsExpr.Argument3, useFec, out fewArgs[3]))
+                    if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]))
                         return false;
                     result = callExpr.Method.Invoke(instance, fewArgs);
                     return true;
@@ -2953,11 +3037,11 @@ namespace DryIoc
                 {
                     var fewArgs = new object[5];
                     var fewArgsExpr = ((FiveArgumentsMethodCallExpression)callExpr);
-                    if (!TryInterpret(r, fewArgsExpr.Argument0, useFec, out fewArgs[0]) ||
-                        !TryInterpret(r, fewArgsExpr.Argument1, useFec, out fewArgs[1]) ||
-                        !TryInterpret(r, fewArgsExpr.Argument2, useFec, out fewArgs[2]) ||
-                        !TryInterpret(r, fewArgsExpr.Argument3, useFec, out fewArgs[3]) ||
-                        !TryInterpret(r, fewArgsExpr.Argument4, useFec, out fewArgs[4]))
+                    if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]) ||
+                        !TryInterpret(r, fewArgsExpr.Argument4, paramExprs, paramValues, parentArgs, useFec, out fewArgs[4]))
                         return false;
                     result = callExpr.Method.Invoke(instance, fewArgs);
                     return true;
@@ -2972,7 +3056,7 @@ namespace DryIoc
             {
                 var argObjects = new object[callArgCount];
                 for (var i = 0; i < argObjects.Length; i++)
-                    if (!TryInterpret(r, args[i], useFec, out argObjects[i]))
+                    if (!TryInterpret(r, args[i], paramExprs, paramValues, parentArgs, useFec, out argObjects[i]))
                         return false;
                 result = method.Invoke(instance, argObjects);
                 //ReturnBackObjectArray(callArgCount, args);
@@ -2981,7 +3065,9 @@ namespace DryIoc
             return true;
         }
 
-        private static object InterpretGetScopedViaFactoryDelegate(IResolverContext resolver, MethodCallExpression callExpr, bool useFec)
+        private static object InterpretGetScopedViaFactoryDelegate(IResolverContext resolver, MethodCallExpression callExpr, 
+            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
+            bool useFec)
         {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
             var fewArgExpr = (FiveArgumentsMethodCallExpression)callExpr;
@@ -2991,7 +3077,7 @@ namespace DryIoc
             var resolverArg = args[0];
 #endif            
             if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr) && 
-                !TryInterpretResolverContext(ref resolver, useFec, resolverArg)) 
+                !TryInterpretResolverContext(ref resolver, paramExprs, paramValues, parentArgs, useFec, resolverArg)) 
                 return false;
 
             var scope = (Scope)resolver.CurrentScope;
@@ -3037,7 +3123,7 @@ namespace DryIoc
 
                     if (lambdaArg is ConstantExpression lambdaConstExpr)
                         result = ((FactoryDelegate)lambdaConstExpr.Value)(resolver);
-                    else if (!TryInterpret(resolver, ((LambdaExpression)lambdaArg).Body, useFec, out result))
+                    else if (!TryInterpret(resolver, ((LambdaExpression)lambdaArg).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                         result = ((LambdaExpression)lambdaArg).Body.CompileToFactoryDelegate(useFec,
                             ((IContainer)resolver).Rules.UseInterpretation)(resolver);
 
@@ -3062,12 +3148,14 @@ namespace DryIoc
             return itemRef.Value;
         }
 
-        private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, MethodCallExpression callExpr, bool useFec)
+        private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, MethodCallExpression callExpr, 
+            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
+            bool useFec)
         {
             var args = callExpr.Arguments.ToListOrSelf();
 
             if (!ReferenceEquals(args[0], FactoryDelegateCompiler.ResolverContextParamExpr) &&
-                !TryInterpretResolverContext(ref r, useFec, args[0]))
+                !TryInterpretResolverContext(ref r, paramExprs, paramValues, parentArgs, useFec, args[0]))
                 return false;
 
             var scope = (Scope)r.GetNamedScope(((ConstantExpression)args[1]).Value, (bool)((ConstantExpression)args[2]).Value);
@@ -3098,7 +3186,7 @@ namespace DryIoc
 
                     if (lambda is ConstantExpression lambdaConstExpr)
                         result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-                    else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, useFec, out result))
+                    else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                         result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec,
                             ((IContainer)r).Rules.UseInterpretation)(r);
 
@@ -3118,7 +3206,9 @@ namespace DryIoc
             return itemRef.Value;
         }
 
-        private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, MethodCallExpression callExpr, bool useFec)
+        private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, MethodCallExpression callExpr,
+            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
+            bool useFec)
         {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
             var fewArgExpr = (FourArgumentsMethodCallExpression)callExpr;
@@ -3128,7 +3218,7 @@ namespace DryIoc
             var resolverArg = args[0];
 #endif
             if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr) &&
-                !TryInterpretResolverContext(ref r, useFec, resolverArg))
+                !TryInterpretResolverContext(ref r, paramExprs, paramValues, parentArgs, useFec, resolverArg))
                 return false;
 
             var scope = (Scope)(r.CurrentScope ?? r.SingletonScope);
@@ -3166,7 +3256,7 @@ namespace DryIoc
 
                     if (lambda is ConstantExpression lambdaConstExpr)
                         result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-                    else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, useFec, out result))
+                    else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                         result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec,
                             ((IContainer)r).Rules.UseInterpretation)(r);
 
@@ -3191,9 +3281,11 @@ namespace DryIoc
             return itemRef.Value;
         }
 
-        private static bool TryInterpretResolverContext(ref IResolverContext resolver, bool useFec, Expression arg)
+        private static bool TryInterpretResolverContext(ref IResolverContext resolver,
+            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
+            bool useFec, Expression arg)
         {
-            if (!TryInterpret(resolver, arg, useFec, out var resolverObj))
+            if (!TryInterpret(resolver, arg, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
                 return false;
             resolver = (IResolverContext)resolverObj;
             return true;
@@ -11748,7 +11840,11 @@ namespace DryIoc
                 "or did not specify to use non-public service types, etc."),
             FoundNoRootsToValidate = Of(
                 "No roots to Validate found. Check the `condition` passed to Validate method for container: {0}" + NewLine +
-                "You may also examine all container registrations via `container.container.GetServiceRegistrations()` method.");
+                "You may also examine all container registrations via `container.container.GetServiceRegistrations()` method."),
+            UnableToInterpretTheNestedLambda = Of(
+                "Unable to interpret the nested lambda with Body:" + NewLine +
+                "{0}")
+            ;
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
