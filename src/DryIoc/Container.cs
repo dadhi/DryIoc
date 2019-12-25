@@ -3102,6 +3102,9 @@ namespace DryIoc
             if (itemRef != null && itemRef.Value != Scope.NoItem)
                 return itemRef.Value;
 
+            if (scope.IsDisposed)
+                Throw.It(Error.ScopeIsDisposed, scope.ToString());
+
             // add only, keep old item if it already exists
             var m = map;
             if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
