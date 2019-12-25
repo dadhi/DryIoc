@@ -2767,48 +2767,56 @@ namespace DryIoc
                 }
                 case ExprType.Lambda:
                 {
-                    var lambdaExpr = (LambdaExpression) expr;
-                    if (lambdaExpr.Parameters.Count == 0 && lambdaExpr.ReturnType != typeof(void))
-                    {
-                        if (paramExprs.Length != 0)
-                            parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
-
-                        Func<object> f = () =>
-                        {
-                            try
-                            {
-                                // todo: fix me
-                                if (r.IsDisposed)
-                                {
-                                    //if (r.IsScoped())
-                                    //    Throw.It(Error.ScopeIsDisposed, r);
-                                    //else
-                                    //    Throw.It(Error.ContainerIsDisposed, r);
-                                }
-
-                                if (!TryInterpret(r, lambdaExpr.Body, Empty<ParameterExpression>(), null, parentArgs, useFec, out var nestedLambdaResult))
-                                    Throw.It(Error.UnableToInterpretTheNestedLambda, lambdaExpr.Body);
-                                return nestedLambdaResult;
-                            }
-                            catch (TargetInvocationException tex)
-                            {
-                                // It may happen when using `IResolver` or `Scope` methods inside your own factory methods
-                                if (tex.InnerException is ContainerException)
-                                    throw tex.InnerException;
-                                throw;
-                             }
-                        };
-
-                        result = _convertFuncMethod.MakeGenericMethod(lambdaExpr.ReturnType).Invoke(null, new[] { f });
-                        return true;
-                    }
-
-                    return false;
+                    return TryInterpretNestedLambda(r, (LambdaExpression)expr, paramExprs, paramValues, parentArgs, useFec, ref result);
                 }
                 default:
                     break;
             }
  
+            return false;
+        }
+
+        private static bool TryInterpretNestedLambda(IResolverContext r, LambdaExpression lambdaExpr,
+            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs, 
+            bool useFec, ref object result)
+        {
+            if (lambdaExpr.Parameters.Count == 0)
+            {
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+                var returnType = lambdaExpr.ReturnType;
+#else
+                var returnType = lambdaExpr.Type.GetTypeInfo().GetDeclaredMethod("Invoke").ReturnType;
+#endif
+                if (returnType != typeof(void))
+                {
+                    if (paramExprs.Length != 0)
+                        parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
+
+                    Func<object> f = () =>
+                    {
+                        try
+                        {
+                            if (!TryInterpret(r, lambdaExpr.Body, Empty<ParameterExpression>(), null, parentArgs, useFec, out var lambdaResult))
+                                Throw.It(Error.UnableToInterpretTheNestedLambda, lambdaExpr.Body);
+                            return lambdaResult;
+                        }
+                        catch (TargetInvocationException tex)
+                        {
+                            // It may happen when using `IResolver` or `Scope` methods inside your own factory methods
+                            if (tex.InnerException is ContainerException)
+                                throw tex.InnerException;
+                            throw;
+                        }
+                    };
+
+                    if (returnType == typeof(object))
+                        result = f;
+                    else
+                        result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] {f});
+                    return true;
+                }
+            }
+
             return false;
         }
 
@@ -2854,9 +2862,12 @@ namespace DryIoc
 
                 var callArgs = callExpr.Arguments.ToListOrSelf();
                 var resolver = r;
-                if (!ReferenceEquals(callArgs[0], FactoryDelegateCompiler.ResolverContextParamExpr) &&
-                    !TryInterpretResolverContext(ref resolver, paramExprs, paramValues, parentArgs, useFec, callArgs[0]))
-                    return false;
+                if (!ReferenceEquals(callArgs[0], FactoryDelegateCompiler.ResolverContextParamExpr))
+                {
+                    if (!TryInterpret(resolver, callArgs[0], paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                        return false;
+                    resolver = (IResolverContext)resolverObj;
+                }
 
                 if (method == CurrentScopeReuse.TrackScopedOrSingletonMethod)
                 {
@@ -2933,9 +2944,13 @@ namespace DryIoc
             else if (methodDeclaringType == typeof(IResolver))
             {
                 var resolver = r;
-                if (!ReferenceEquals(callExpr.Object, FactoryDelegateCompiler.ResolverContextParamExpr) &&
-                    !TryInterpretResolverContext(ref resolver, paramExprs, paramValues, parentArgs, useFec, callExpr.Object))
-                    return false;
+                if (!ReferenceEquals(callExpr.Object, FactoryDelegateCompiler.ResolverContextParamExpr))
+                {
+                    if (!TryInterpret(resolver, callExpr.Object, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                        return false;
+                    resolver = (IResolverContext)resolverObj;
+                }
+
 
                 var callArgs = callExpr.Arguments.ToListOrSelf();
                 if (method == Resolver.ResolveFastMethod)
@@ -3059,7 +3074,6 @@ namespace DryIoc
                     if (!TryInterpret(r, args[i], paramExprs, paramValues, parentArgs, useFec, out argObjects[i]))
                         return false;
                 result = method.Invoke(instance, argObjects);
-                //ReturnBackObjectArray(callArgCount, args);
             }
 
             return true;
@@ -3075,10 +3089,13 @@ namespace DryIoc
 #else
             var args = callExpr.Arguments.ToListOrSelf();
             var resolverArg = args[0];
-#endif            
-            if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr) && 
-                !TryInterpretResolverContext(ref resolver, paramExprs, paramValues, parentArgs, useFec, resolverArg)) 
-                return false;
+#endif
+            if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
+            {
+                if (!TryInterpret(resolver, resolverArg, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                    return false;
+                resolver = (IResolverContext)resolverObj;
+            }
 
             var scope = (Scope)resolver.CurrentScope;
             if (scope == null)
@@ -3157,13 +3174,19 @@ namespace DryIoc
         {
             var args = callExpr.Arguments.ToListOrSelf();
 
-            if (!ReferenceEquals(args[0], FactoryDelegateCompiler.ResolverContextParamExpr) &&
-                !TryInterpretResolverContext(ref r, paramExprs, paramValues, parentArgs, useFec, args[0]))
-                return false;
+            if (!ReferenceEquals(args[0], FactoryDelegateCompiler.ResolverContextParamExpr))
+            {
+                if (!TryInterpret(r, args[0], paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                    return false;
+                r = (IResolverContext)resolverObj;
+            }
 
             var scope = (Scope)r.GetNamedScope(((ConstantExpression)args[1]).Value, (bool)((ConstantExpression)args[2]).Value);
             if (scope == null)
                 return null; // result is null in this case
+
+            if (scope.IsDisposed)
+                Throw.It(Error.ScopeIsDisposed, scope.ToString());
 
             // check if scoped dependency is already in scope, then just return it
             var id = (int)((ConstantExpression)args[3]).Value;
@@ -3220,9 +3243,12 @@ namespace DryIoc
             var args = callExpr.Arguments.ToListOrSelf();
             var resolverArg = args[0];
 #endif
-            if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr) &&
-                !TryInterpretResolverContext(ref r, paramExprs, paramValues, parentArgs, useFec, resolverArg))
-                return false;
+            if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
+            {
+                if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                    return false;
+                r = (IResolverContext)resolverObj;
+            }
 
             var scope = (Scope)(r.CurrentScope ?? r.SingletonScope);
 
@@ -3237,6 +3263,9 @@ namespace DryIoc
             var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
                 return itemRef.Value;
+
+            if (scope.IsDisposed)
+                Throw.It(Error.ScopeIsDisposed, scope.ToString());
 
             // add only, keep old item if it already exists
             var m = map;
@@ -3282,16 +3311,6 @@ namespace DryIoc
             }
 
             return itemRef.Value;
-        }
-
-        private static bool TryInterpretResolverContext(ref IResolverContext resolver,
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec, Expression arg)
-        {
-            if (!TryInterpret(resolver, arg, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
-                return false;
-            resolver = (IResolverContext)resolverObj;
-            return true;
         }
 
         [MethodImpl((MethodImplOptions)256)]
