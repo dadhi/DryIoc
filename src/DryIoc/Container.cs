@@ -2495,7 +2495,7 @@ namespace DryIoc
         {
             try
             {
-                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r.One(), null, useFec, out result);
+                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.ResolverContextParamExpr, r, null, useFec, out result);
             }
             catch (TargetInvocationException tex)
             {
@@ -2513,13 +2513,13 @@ namespace DryIoc
             public readonly ParentLambdaArgs ParentWithArgs;
 
             /// <summary> Params </summary>
-            public readonly ParameterExpression[] ParamExprs;
+            public readonly object ParamExprs;
 
             /// <summary> Args </summary>
-            public readonly object[] ParamValues;
+            public readonly object ParamValues;
 
             /// <summary>Constructs with parent parent or `null` for the root</summary>
-            public ParentLambdaArgs(ParentLambdaArgs parentWithArgs, ParameterExpression[] paramExprs, object[] paramValues)
+            public ParentLambdaArgs(ParentLambdaArgs parentWithArgs, object paramExprs, object paramValues)
             {
                 ParentWithArgs = parentWithArgs;
                 ParamExprs  = paramExprs;
@@ -2529,8 +2529,7 @@ namespace DryIoc
 
         /// <summary>Interprets passed expression</summary>
         public static bool TryInterpret(IResolverContext r, Expression expr, 
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec, out object result)
+            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result)
         {
             result = null;
             switch (expr.NodeType)
@@ -2741,28 +2740,42 @@ namespace DryIoc
 #endif
                 case ExprType.Parameter:
                 {
-                    if (expr == FactoryDelegateCompiler.ResolverContextParamExpr)
+                    if (expr == paramExprs)
                     {
-                        result = r;
+                        result = paramValues;
                         return true;
                     }
 
-                    if (paramExprs.Length != 0)
-                        for (var i = 0; i < paramExprs.Length; i++)
-                            if (expr == paramExprs[i])
+                    if (paramExprs is ParameterExpression[] multipleParams)
+                        for (var i = 0; i < multipleParams.Length; i++)
+                            if (expr == multipleParams[i])
                             {
-                                result = paramValues[i];
+                                result = multipleParams[i];
                                 return true;
                             }
 
                     if (parentArgs != null)
+                    {
                         for (var p = parentArgs; p != null; p = p.ParentWithArgs)
-                        for (var i = 0; i < paramExprs.Length; i++)
-                            if (expr == p.ParamExprs[i])
+                        {
+                            if (expr == p.ParamExprs)
                             {
-                                result = p.ParamValues[i];
+                                result = p.ParamValues;
                                 return true;
                             }
+
+                            multipleParams = p.ParamExprs as ParameterExpression[];
+                            if (multipleParams != null)
+                            {
+                                for (var i = 0; i < multipleParams.Length; i++)
+                                    if (expr == multipleParams[i])
+                                    {
+                                        result = multipleParams[i];
+                                        return true;
+                                    }
+                            }
+                        }
+                    }
                     return false;
                 }
                 case ExprType.Lambda:
@@ -2777,8 +2790,7 @@ namespace DryIoc
         }
 
         private static bool TryInterpretNestedLambda(IResolverContext r, LambdaExpression lambdaExpr,
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs, 
-            bool useFec, ref object result)
+            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
         {
             if (lambdaExpr.Parameters.Count == 0)
             {
@@ -2789,14 +2801,14 @@ namespace DryIoc
 #endif
                 if (returnType != typeof(void))
                 {
-                    if (paramExprs.Length != 0)
+                    if (paramExprs != null)
                         parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
 
                     Func<object> f = () =>
                     {
                         try
                         {
-                            if (!TryInterpret(r, lambdaExpr.Body, Empty<ParameterExpression>(), null, parentArgs, useFec, out var lambdaResult))
+                            if (!TryInterpret(r, lambdaExpr.Body, null, null, parentArgs, useFec, out var lambdaResult))
                                 Throw.It(Error.UnableToInterpretTheNestedLambda, lambdaExpr.Body);
                             return lambdaResult;
                         }
@@ -2812,7 +2824,7 @@ namespace DryIoc
                     if (returnType == typeof(object))
                         result = f;
                     else
-                        result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] {f});
+                        result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] { f });
                     return true;
                 }
             }
@@ -2826,8 +2838,7 @@ namespace DryIoc
             typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec, ref object result)
+            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
         {
             if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
             {
@@ -2950,7 +2961,6 @@ namespace DryIoc
                         return false;
                     resolver = (IResolverContext)resolverObj;
                 }
-
 
                 var callArgs = callExpr.Arguments.ToListOrSelf();
                 if (method == Resolver.ResolveFastMethod)
@@ -3079,9 +3089,8 @@ namespace DryIoc
             return true;
         }
 
-        private static object InterpretGetScopedViaFactoryDelegate(IResolverContext resolver, MethodCallExpression callExpr, 
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec)
+        private static object InterpretGetScopedViaFactoryDelegate(IResolverContext resolver, 
+            MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
             var fewArgExpr = (FiveArgumentsMethodCallExpression)callExpr;
@@ -3168,9 +3177,8 @@ namespace DryIoc
             return itemRef.Value;
         }
 
-        private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, MethodCallExpression callExpr, 
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec)
+        private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, 
+            MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
             var args = callExpr.Arguments.ToListOrSelf();
 
@@ -3232,9 +3240,8 @@ namespace DryIoc
             return itemRef.Value;
         }
 
-        private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, MethodCallExpression callExpr,
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec)
+        private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, 
+            MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
             var fewArgExpr = (FourArgumentsMethodCallExpression)callExpr;
