@@ -158,7 +158,6 @@ namespace DryIoc.IssuesTests
 
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            request.SetConstainsNestedLambda();
             var originalFactoryType = GetOriginalFactoryType();
             var originalFactoryRequest = Request.Create(request.Container, originalFactoryType, request.ServiceKey);
             var originalFactory = originalFactoryRequest.Container.ResolveFactory(originalFactoryRequest);

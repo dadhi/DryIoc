@@ -2497,12 +2497,9 @@ namespace DryIoc
             {
                 return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.ResolverContextParamExpr, r, null, useFec, out result);
             }
-            catch (TargetInvocationException tex)
+            catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
-                // It may happen when using `IResolver` or `Scope` methods inside your own factory methods
-                if (tex.InnerException is ContainerException)
-                    throw tex.InnerException;
-                throw;
+                throw tex.InnerException;
             }
         }
 
@@ -2792,45 +2789,47 @@ namespace DryIoc
         private static bool TryInterpretNestedLambda(IResolverContext r, LambdaExpression lambdaExpr,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
         {
-            var bodyExpr = lambdaExpr.Body;
-            if (lambdaExpr.Parameters.Count == 0)
-            {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                 var returnType = lambdaExpr.ReturnType;
 #else
-                var returnType = lambdaExpr.Type.GetTypeInfo().GetDeclaredMethod("Invoke").ReturnType;
+            var returnType = lambdaExpr.Type.GetTypeInfo().GetDeclaredMethod("Invoke").ReturnType;
 #endif
+            if (paramExprs != null)
+                parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
+
+            var bodyExpr = lambdaExpr.Body;
+            if (lambdaExpr.Parameters.Count == 0)
+            {
                 if (returnType != typeof(void))
                 {
-                    if (paramExprs != null)
-                        parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
-
-                    Func<object> f = () =>
-                    {
-                        try
-                        {
-                            if (!TryInterpret(r, bodyExpr, null, null, parentArgs, useFec, out var lambdaResult))
-                                Throw.It(Error.UnableToInterpretTheNestedLambda, bodyExpr);
-                            return lambdaResult;
-                        }
-                        catch (TargetInvocationException tex)
-                        {
-                            // It may happen when using `IResolver` or `Scope` methods inside your own factory methods
-                            if (tex.InnerException is ContainerException)
-                                throw tex.InnerException;
-                            throw;
-                        }
-                    };
-
-                    if (returnType == typeof(object))
-                        result = f;
-                    else
-                        result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] { f });
-                    return true;
+                    result = new Func<object>(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, parentArgs, useFec));
+                    if (returnType != typeof(object))
+                        result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] { result });
                 }
+                else
+                {
+                    result = new Action(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, parentArgs, useFec));
+                }
+                return true;
             }
 
             return false;
+        }
+
+        private static object TryInterpretNestedLambdaBodyAndUnwrapException(IResolverContext r, 
+            Expression bodyExpr, ParentLambdaArgs parentArgs, bool useFec)
+        {
+            try
+            {
+                if (!TryInterpret(r, bodyExpr, null, null, parentArgs, useFec, out var lambdaResult))
+                    Throw.It(Error.UnableToInterpretTheNestedLambda, bodyExpr);
+                return lambdaResult;
+            }
+            catch (TargetInvocationException tex) when (tex.InnerException != null)
+            {
+                // restore the original excpetion which is expected by the consumer code
+                throw tex.InnerException;
+            }
         }
 
         internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
