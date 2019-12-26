@@ -2495,14 +2495,12 @@ namespace DryIoc
         {
             try
             {
-                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r.One(), null, useFec, out result);
+                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.ResolverContextParamExpr, r, null, useFec, out result);
             }
-            catch (TargetInvocationException tex)
+            catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
-                // It may happen when using `IResolver` or `Scope` methods inside your own factory methods
-                if (tex.InnerException is ContainerException)
-                    throw tex.InnerException;
-                throw;
+                // restore the original excpetion which is expected by the consumer code
+                throw tex.InnerException;
             }
         }
 
@@ -2513,13 +2511,13 @@ namespace DryIoc
             public readonly ParentLambdaArgs ParentWithArgs;
 
             /// <summary> Params </summary>
-            public readonly ParameterExpression[] ParamExprs;
+            public readonly object ParamExprs;
 
             /// <summary> Args </summary>
-            public readonly object[] ParamValues;
+            public readonly object ParamValues;
 
             /// <summary>Constructs with parent parent or `null` for the root</summary>
-            public ParentLambdaArgs(ParentLambdaArgs parentWithArgs, ParameterExpression[] paramExprs, object[] paramValues)
+            public ParentLambdaArgs(ParentLambdaArgs parentWithArgs, object paramExprs, object paramValues)
             {
                 ParentWithArgs = parentWithArgs;
                 ParamExprs  = paramExprs;
@@ -2529,8 +2527,7 @@ namespace DryIoc
 
         /// <summary>Interprets passed expression</summary>
         public static bool TryInterpret(IResolverContext r, Expression expr, 
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec, out object result)
+            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result)
         {
             result = null;
             switch (expr.NodeType)
@@ -2701,8 +2698,6 @@ namespace DryIoc
                     result = Converter.ConvertMany(items, newArray.Type.GetElementType());
                     return true;
                 }
-#if SUPPORTS_FAST_EXPRESSION_COMPILER && !NETSTANDARD1_3 || NET35 || NET40 || NET403
-                // Delegate.Method is not supported on NETSTANDARD <= 2.0 :( Need help!
                 case ExprType.Invoke:
                 {
                     var invokeExpr = (InvocationExpression)expr;
@@ -2718,51 +2713,61 @@ namespace DryIoc
                         return true;
                     }
 
-                    if (delegateExpr.NodeType == ExprType.Lambda)
-                        return false;
-
                     if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
                         return false;
                     var lambda = (Delegate)delegateObj;
 
                     var argExprs = invokeExpr.Arguments.ToListOrSelf();
                     if (argExprs.Count == 0)
-                        result = lambda.Method.Invoke(lambda.Target, ArrayTools.Empty<object>());
+                        result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
                     else
                     {
                         var args = new object[argExprs.Count];
                         for (var i = 0; i < args.Length; i++)
                             if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
                                 return false;
-                        result = lambda.Method.Invoke(lambda.Target, args);
+                        result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
                     }
                     return true;
                 }
-#endif
                 case ExprType.Parameter:
                 {
-                    if (expr == FactoryDelegateCompiler.ResolverContextParamExpr)
+                    if (expr == paramExprs)
                     {
-                        result = r;
+                        result = paramValues;
                         return true;
                     }
 
-                    if (paramExprs.Length != 0)
-                        for (var i = 0; i < paramExprs.Length; i++)
-                            if (expr == paramExprs[i])
+                    if (paramExprs is IReadOnlyList<ParameterExpression> multipleParams)
+                        for (var i = 0; i < multipleParams.Count; i++)
+                            if (expr == multipleParams[i])
                             {
-                                result = paramValues[i];
+                                result = ((object[])paramValues)[i];
                                 return true;
                             }
 
                     if (parentArgs != null)
+                    {
                         for (var p = parentArgs; p != null; p = p.ParentWithArgs)
-                        for (var i = 0; i < paramExprs.Length; i++)
-                            if (expr == p.ParamExprs[i])
+                        {
+                            if (expr == p.ParamExprs)
                             {
-                                result = p.ParamValues[i];
+                                result = p.ParamValues;
                                 return true;
                             }
+
+                            multipleParams = p.ParamExprs as IReadOnlyList<ParameterExpression>;
+                            if (multipleParams != null)
+                            {
+                                for (var i = 0; i < multipleParams.Count; i++)
+                                    if (expr == multipleParams[i])
+                                    {
+                                        result = ((object[])paramValues)[i];
+                                        return true;
+                                    }
+                            }
+                        }
+                    }
                     return false;
                 }
                 case ExprType.Lambda:
@@ -2777,57 +2782,159 @@ namespace DryIoc
         }
 
         private static bool TryInterpretNestedLambda(IResolverContext r, LambdaExpression lambdaExpr,
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs, 
-            bool useFec, ref object result)
+            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
         {
-            if (lambdaExpr.Parameters.Count == 0)
-            {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                 var returnType = lambdaExpr.ReturnType;
 #else
-                var returnType = lambdaExpr.Type.GetTypeInfo().GetDeclaredMethod("Invoke").ReturnType;
+            var returnType = lambdaExpr.Type.GetTypeInfo().GetDeclaredMethod("Invoke").ReturnType;
 #endif
+            if (paramExprs != null)
+                parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
+
+            var bodyExpr = lambdaExpr.Body;
+            var lambdaParams = lambdaExpr.Parameters;
+            if (lambdaParams.Count == 0)
+            {
                 if (returnType != typeof(void))
                 {
-                    if (paramExprs.Length != 0)
-                        parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
-
-                    Func<object> f = () =>
-                    {
-                        try
-                        {
-                            if (!TryInterpret(r, lambdaExpr.Body, Empty<ParameterExpression>(), null, parentArgs, useFec, out var lambdaResult))
-                                Throw.It(Error.UnableToInterpretTheNestedLambda, lambdaExpr.Body);
-                            return lambdaResult;
-                        }
-                        catch (TargetInvocationException tex)
-                        {
-                            // It may happen when using `IResolver` or `Scope` methods inside your own factory methods
-                            if (tex.InnerException is ContainerException)
-                                throw tex.InnerException;
-                            throw;
-                        }
-                    };
-
-                    if (returnType == typeof(object))
-                        result = f;
-                    else
-                        result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] {f});
-                    return true;
+                    result = new Func<object>(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
+                    if (returnType != typeof(object))
+                        result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] { result });
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
+                else
+                {
+                    result = new Action(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
+                    if (lambdaExpr.Type != typeof(Action))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                return true;
             }
+
+            if (lambdaParams.Count == 1)
+            {
+                var paramExpr = lambdaParams[0];
+                if (returnType != typeof(void))
+                {
+                    result = new Func<object, object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, paramExpr, arg, parentArgs, useFec));
+                    if (paramExpr.Type != typeof(object) || returnType != typeof(object))
+                        result = _convertOneArgFuncMethod.MakeGenericMethod(paramExpr.Type, returnType).Invoke(null, new[] { result });
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<,>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                else
+                {
+                    result = new Action<object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, paramExpr, arg, parentArgs, useFec));
+                    if (paramExpr.Type != typeof(object))
+                        result = _convertOneArgActionMethod.MakeGenericMethod(paramExpr.Type).Invoke(null, new[] { result });
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Action<>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                return true;
+            }
+
+            if (lambdaParams.Count == 2)
+            {
+                var paramExpr0 = lambdaParams[0];
+                var paramExpr1 = lambdaParams[1];
+                if (returnType != typeof(void))
+                {
+                    result = new Func<object, object, object>((arg0, arg1) => 
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, new[] { arg0, arg1 }, parentArgs, useFec));
+
+                    if (paramExpr0.Type != typeof(object) || paramExpr1.Type != typeof(object) || returnType != typeof(object))
+                        result = _convertTwoArgFuncMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, returnType).Invoke(null, new[] { result });
+                    
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<,,>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                else
+                {
+                    result = new Action<object, object>((arg0, arg1) =>
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, new[] { arg0, arg1 }, parentArgs, useFec));
+
+                    if (paramExpr0.Type != typeof(object) || paramExpr1.Type != typeof(object))
+                        result = _convertTwoArgActionMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type).Invoke(null, new[] { result });
+                    
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Action<,>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                return true;
+            }
+
+            if (lambdaParams.Count == 3)
+            {
+                var paramExpr0 = lambdaParams[0];
+                var paramExpr1 = lambdaParams[1];
+                var paramExpr2 = lambdaParams[2];
+                if (returnType != typeof(void))
+                {
+                    result = new Func<object[], object>(args => 
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, args, parentArgs, useFec));
+                    result = _convertThreeArgFuncMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, paramExpr2.Type, returnType)
+                        .Invoke(null, new[] { result });
+
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<,,>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                else
+                {
+                    result = new Action<object[]>(args => 
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, args, parentArgs, useFec));
+                    result = _convertThreeArgActionMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, paramExpr2.Type)
+                        .Invoke(null, new[] { result });
+
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Action<,>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                return true;
+            }
+
 
             return false;
         }
 
-        internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
+        private static object TryInterpretNestedLambdaBodyAndUnwrapException(IResolverContext r,
+            Expression bodyExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
+        {
+            try
+            {
+                if (!TryInterpret(r, bodyExpr, paramExprs, paramValues, parentArgs, useFec, out var lambdaResult))
+                    Throw.It(Error.UnableToInterpretTheNestedLambda, bodyExpr);
+                return lambdaResult;
+            }
+            catch (TargetInvocationException tex) when (tex.InnerException != null)
+            {
+                // restore the original excpetion which is expected by the consumer code
+                throw tex.InnerException;
+            }
+        }
 
-        private static readonly MethodInfo _convertFuncMethod =
-            typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
+        internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
+        private static readonly MethodInfo _convertFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
+
+        internal static Func<T, R> ConvertOneArgFunc<T, R>(Func<object, object> f) => a => (R)f(a);
+        private static readonly MethodInfo _convertOneArgFuncMethod   = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgFunc));
+        
+        internal static Action<T> ConvertOneArgAction<T>(Action<object> f) => a => f(a);
+        private static readonly MethodInfo _convertOneArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgAction));
+
+        internal static Func<T0, T1, R> ConvertTwoArgFunc<T0, T1, R>(Func<object, object, object> f) => (a0, a1) => (R)f(a0, a1);
+        private static readonly MethodInfo _convertTwoArgFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertTwoArgFunc));
+
+        internal static Action<T0, T1> ConvertTwoArgAction<T0, T1>(Action<object, object> f) => (a0, a1) => f(a0, a1);
+        private static readonly MethodInfo _convertTwoArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertTwoArgAction));
+
+        internal static Func<T0, T1, T2, R> ConvertThreeArgFunc<T0, T1, T2, R>(Func<object[], object> f) => (a0, a1, a2) => (R)f(new object[] {a0, a1, a2});
+        private static readonly MethodInfo _convertThreeArgFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertThreeArgFunc));
+
+        internal static Action<T0, T1, T2> ConvertThreeArgAction<T0, T1, T2>(Action<object[]> f) => (a0, a1, a2) => f(new object[] {a0, a1, a2});
+        private static readonly MethodInfo _convertThreeArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertThreeArgAction));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec, ref object result)
+            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
         {
             if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
             {
@@ -2950,7 +3057,6 @@ namespace DryIoc
                         return false;
                     resolver = (IResolverContext)resolverObj;
                 }
-
 
                 var callArgs = callExpr.Arguments.ToListOrSelf();
                 if (method == Resolver.ResolveFastMethod)
@@ -3079,9 +3185,8 @@ namespace DryIoc
             return true;
         }
 
-        private static object InterpretGetScopedViaFactoryDelegate(IResolverContext resolver, MethodCallExpression callExpr, 
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec)
+        private static object InterpretGetScopedViaFactoryDelegate(IResolverContext resolver, 
+            MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
             var fewArgExpr = (FiveArgumentsMethodCallExpression)callExpr;
@@ -3168,9 +3273,8 @@ namespace DryIoc
             return itemRef.Value;
         }
 
-        private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, MethodCallExpression callExpr, 
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec)
+        private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, 
+            MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
             var args = callExpr.Arguments.ToListOrSelf();
 
@@ -3232,9 +3336,8 @@ namespace DryIoc
             return itemRef.Value;
         }
 
-        private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, MethodCallExpression callExpr,
-            ParameterExpression[] paramExprs, object[] paramValues, ParentLambdaArgs parentArgs,
-            bool useFec)
+        private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, 
+            MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
             var fewArgExpr = (FourArgumentsMethodCallExpression)callExpr;
@@ -4446,8 +4549,6 @@ namespace DryIoc
                 serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
             }
 
-            serviceRequest.SetConstainsNestedLambda();
-
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
@@ -4501,8 +4602,6 @@ namespace DryIoc
 
             if (serviceExpr == null)
                 return null;
-
-            request.SetConstainsNestedLambda();
 
             // The conversion to handle lack of covariance for Func<out T> in .NET 3.5
             // So that Func<Derived> may be used for Func<Base>
@@ -7579,7 +7678,7 @@ namespace DryIoc
 
         /// <summary>Empty terminal request.</summary>
         public static readonly Request Empty =
-            new Request(null, null, 0, null, DefaultFlags, ServiceInfo.Empty, null, null);
+            new Request(null, null, 0, null, DefaultFlags, ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyRequestExpr =
             Field(null, typeof(Request).Field(nameof(Empty)));
@@ -7587,7 +7686,7 @@ namespace DryIoc
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
             new Request(null, null, 0, null, DefaultFlags | RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, 
-                ServiceInfo.Empty, null, null);
+                ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
             Field(null, typeof(Request).Field(nameof(EmptyOpensResolutionScope)));
@@ -7619,9 +7718,9 @@ namespace DryIoc
 
             // we are re-starting the dependency depth count from `1`
             if (req == null)
-                req =  new Request(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs, new SharedStateInfo());
+                req =  new Request(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
             else
-                req.SetServiceInfo(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs, new SharedStateInfo());
+                req.SetServiceInfo(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
             return req;
         }
 
@@ -7631,16 +7730,6 @@ namespace DryIoc
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null) =>
             Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
                 preResolveParent, flags, inputArgs);
-
-        internal class SharedStateInfo
-        {
-            public bool ContainsNestedLambda;
-        }
-
-        internal SharedStateInfo _sharedState;
-
-        /// <summary>Indicate that request chain contains a lambda - to consider this info for interpretation </summary>
-        public void SetConstainsNestedLambda() => _sharedState.ContainsNestedLambda = true;
 
         // todo: Make a property in v5.0
         /// <summary>Available in runtime only, provides access to container initiated the request.</summary>
@@ -7810,9 +7899,9 @@ namespace DryIoc
 
             ref var req = ref stack.GetOrPushRef(indexInStack);
             if (req == null)
-                req  = new Request(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs, _sharedState);
+                req  = new Request(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
             else
-                req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs, _sharedState);
+                req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
             
             return req;
         }
@@ -7862,10 +7951,8 @@ namespace DryIoc
         {
             return new Request(Container, this, DependencyDepth + 1, null, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
-                InputArgExprs, _sharedState, 
-                implementationType, null, // factory cannot be supplied in generated code
-                factoryID, factoryType, reuse,
-                decoratedFactoryID);
+                InputArgExprs, implementationType, null, // factory cannot be supplied in generated code
+                factoryID, factoryType, reuse, decoratedFactoryID);
         }
 
         internal static readonly Lazy<MethodInfo> PushMethodWith12Args = Lazy.Of(() =>
@@ -7882,7 +7969,7 @@ namespace DryIoc
             var newServiceInfo = getInfo(_serviceInfo);
             return newServiceInfo == _serviceInfo ? this
                 : new Request(Container, 
-                    DirectParent, DependencyDepth, RequestStack, Flags, newServiceInfo, InputArgExprs, _sharedState,
+                    DirectParent, DependencyDepth, RequestStack, Flags, newServiceInfo, InputArgExprs,
                     _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
@@ -7891,14 +7978,14 @@ namespace DryIoc
             IfUnresolved == ifUnresolved ? this
                 : new Request(Container,
                     DirectParent, DependencyDepth, RequestStack, Flags, 
-                    _serviceInfo.WithIfUnresolved(ifUnresolved), InputArgExprs, _sharedState, 
+                    _serviceInfo.WithIfUnresolved(ifUnresolved), InputArgExprs,
                     _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // todo: in place mutation?
         /// <summary>Updates the flags</summary>
         public Request WithFlags(RequestFlags newFlags) =>
             new Request(Container,
-                DirectParent, DependencyDepth, RequestStack, newFlags, _serviceInfo, InputArgExprs, _sharedState,
+                DirectParent, DependencyDepth, RequestStack, newFlags, _serviceInfo, InputArgExprs,
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // note: Mutates the request, required for proper caching
@@ -7917,7 +8004,7 @@ namespace DryIoc
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expression[] inputArgs) =>
             new Request(Container, 
-                DirectParent, DependencyDepth, RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs), _sharedState,
+                DirectParent, DependencyDepth, RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs),
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -7979,9 +8066,8 @@ namespace DryIoc
             if (copyRequest)
             {
                 IsolateRequestChain();
-                return new Request(Container,
-                    DirectParent, DependencyDepth, null, flags, _serviceInfo, InputArgExprs, _sharedState,
-                    null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
+                return new Request(Container, DirectParent, DependencyDepth, null, flags, _serviceInfo, 
+                    InputArgExprs, null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
             }
 
             Flags = flags;
@@ -8218,8 +8304,8 @@ namespace DryIoc
         public override int GetHashCode() => _hashCode;
 
         // Initial request without factory info yet
-        private Request(IContainer container, Request parent, int dependencyDepth, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs, SharedStateInfo sharedState)
+        private Request(IContainer container, Request parent, 
+            int dependencyDepth, RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
@@ -8233,15 +8319,14 @@ namespace DryIoc
             // runtime state
             InputArgExprs = inputArgExprs;
             Container     = container;
-            _sharedState = sharedState;
         }
 
         // Request with resolved factory state
         private Request(IContainer container, 
             Request parent, int dependencyDepth, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs, SharedStateInfo sharedState,
+            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs,
             Type factoryImplType, Factory factory, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
-            : this(container, parent, dependencyDepth, stack, flags, serviceInfo, inputArgExprs, sharedState)
+            : this(container, parent, dependencyDepth, stack, flags, serviceInfo, inputArgExprs)
         {
             SetResolvedFactory(factoryImplType, factory , factoryID, factoryType, reuse, decoratedFactoryID);
         }
@@ -8265,9 +8350,8 @@ namespace DryIoc
             return this;
         }
 
-        private void SetServiceInfo(IContainer container, 
-            Request parent, int dependencyDepth, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs, SharedStateInfo sharedState)
+        private void SetServiceInfo(IContainer container, Request parent, 
+            int dependencyDepth, RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
@@ -8281,7 +8365,6 @@ namespace DryIoc
             // runtime state
             InputArgExprs = inputArgExprs;
             Container     = container;
-            _sharedState  = sharedState;
 
             // reset factory info
             SetResolvedFactory(null, null, 0, FactoryType.Service, null, 0);
