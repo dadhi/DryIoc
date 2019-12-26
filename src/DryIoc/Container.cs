@@ -2746,8 +2746,8 @@ namespace DryIoc
                         return true;
                     }
 
-                    if (paramExprs is ParameterExpression[] multipleParams)
-                        for (var i = 0; i < multipleParams.Length; i++)
+                    if (paramExprs is IReadOnlyList<ParameterExpression> multipleParams)
+                        for (var i = 0; i < multipleParams.Count; i++)
                             if (expr == multipleParams[i])
                             {
                                 result = multipleParams[i];
@@ -2764,10 +2764,10 @@ namespace DryIoc
                                 return true;
                             }
 
-                            multipleParams = p.ParamExprs as ParameterExpression[];
+                            multipleParams = p.ParamExprs as IReadOnlyList<ParameterExpression>;
                             if (multipleParams != null)
                             {
-                                for (var i = 0; i < multipleParams.Length; i++)
+                                for (var i = 0; i < multipleParams.Count; i++)
                                     if (expr == multipleParams[i])
                                     {
                                         result = multipleParams[i];
@@ -2792,6 +2792,7 @@ namespace DryIoc
         private static bool TryInterpretNestedLambda(IResolverContext r, LambdaExpression lambdaExpr,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
         {
+            var bodyExpr = lambdaExpr.Body;
             if (lambdaExpr.Parameters.Count == 0)
             {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -2808,8 +2809,8 @@ namespace DryIoc
                     {
                         try
                         {
-                            if (!TryInterpret(r, lambdaExpr.Body, null, null, parentArgs, useFec, out var lambdaResult))
-                                Throw.It(Error.UnableToInterpretTheNestedLambda, lambdaExpr.Body);
+                            if (!TryInterpret(r, bodyExpr, null, null, parentArgs, useFec, out var lambdaResult))
+                                Throw.It(Error.UnableToInterpretTheNestedLambda, bodyExpr);
                             return lambdaResult;
                         }
                         catch (TargetInvocationException tex)
@@ -4453,8 +4454,6 @@ namespace DryIoc
                 serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
             }
 
-            serviceRequest.SetConstainsNestedLambda();
-
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
@@ -4508,8 +4507,6 @@ namespace DryIoc
 
             if (serviceExpr == null)
                 return null;
-
-            request.SetConstainsNestedLambda();
 
             // The conversion to handle lack of covariance for Func<out T> in .NET 3.5
             // So that Func<Derived> may be used for Func<Base>
@@ -7586,7 +7583,7 @@ namespace DryIoc
 
         /// <summary>Empty terminal request.</summary>
         public static readonly Request Empty =
-            new Request(null, null, 0, null, DefaultFlags, ServiceInfo.Empty, null, null);
+            new Request(null, null, 0, null, DefaultFlags, ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyRequestExpr =
             Field(null, typeof(Request).Field(nameof(Empty)));
@@ -7594,7 +7591,7 @@ namespace DryIoc
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
             new Request(null, null, 0, null, DefaultFlags | RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, 
-                ServiceInfo.Empty, null, null);
+                ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
             Field(null, typeof(Request).Field(nameof(EmptyOpensResolutionScope)));
@@ -7626,9 +7623,9 @@ namespace DryIoc
 
             // we are re-starting the dependency depth count from `1`
             if (req == null)
-                req =  new Request(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs, new SharedStateInfo());
+                req =  new Request(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
             else
-                req.SetServiceInfo(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs, new SharedStateInfo());
+                req.SetServiceInfo(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
             return req;
         }
 
@@ -7638,16 +7635,6 @@ namespace DryIoc
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null) =>
             Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
                 preResolveParent, flags, inputArgs);
-
-        internal class SharedStateInfo
-        {
-            public bool ContainsNestedLambda;
-        }
-
-        internal SharedStateInfo _sharedState;
-
-        /// <summary>Indicate that request chain contains a lambda - to consider this info for interpretation </summary>
-        public void SetConstainsNestedLambda() => _sharedState.ContainsNestedLambda = true;
 
         // todo: Make a property in v5.0
         /// <summary>Available in runtime only, provides access to container initiated the request.</summary>
@@ -7817,9 +7804,9 @@ namespace DryIoc
 
             ref var req = ref stack.GetOrPushRef(indexInStack);
             if (req == null)
-                req  = new Request(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs, _sharedState);
+                req  = new Request(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
             else
-                req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs, _sharedState);
+                req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
             
             return req;
         }
@@ -7869,10 +7856,8 @@ namespace DryIoc
         {
             return new Request(Container, this, DependencyDepth + 1, null, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
-                InputArgExprs, _sharedState, 
-                implementationType, null, // factory cannot be supplied in generated code
-                factoryID, factoryType, reuse,
-                decoratedFactoryID);
+                InputArgExprs, implementationType, null, // factory cannot be supplied in generated code
+                factoryID, factoryType, reuse, decoratedFactoryID);
         }
 
         internal static readonly Lazy<MethodInfo> PushMethodWith12Args = Lazy.Of(() =>
@@ -7889,7 +7874,7 @@ namespace DryIoc
             var newServiceInfo = getInfo(_serviceInfo);
             return newServiceInfo == _serviceInfo ? this
                 : new Request(Container, 
-                    DirectParent, DependencyDepth, RequestStack, Flags, newServiceInfo, InputArgExprs, _sharedState,
+                    DirectParent, DependencyDepth, RequestStack, Flags, newServiceInfo, InputArgExprs,
                     _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
@@ -7898,14 +7883,14 @@ namespace DryIoc
             IfUnresolved == ifUnresolved ? this
                 : new Request(Container,
                     DirectParent, DependencyDepth, RequestStack, Flags, 
-                    _serviceInfo.WithIfUnresolved(ifUnresolved), InputArgExprs, _sharedState, 
+                    _serviceInfo.WithIfUnresolved(ifUnresolved), InputArgExprs,
                     _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // todo: in place mutation?
         /// <summary>Updates the flags</summary>
         public Request WithFlags(RequestFlags newFlags) =>
             new Request(Container,
-                DirectParent, DependencyDepth, RequestStack, newFlags, _serviceInfo, InputArgExprs, _sharedState,
+                DirectParent, DependencyDepth, RequestStack, newFlags, _serviceInfo, InputArgExprs,
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // note: Mutates the request, required for proper caching
@@ -7924,7 +7909,7 @@ namespace DryIoc
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expression[] inputArgs) =>
             new Request(Container, 
-                DirectParent, DependencyDepth, RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs), _sharedState,
+                DirectParent, DependencyDepth, RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs),
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -7986,9 +7971,8 @@ namespace DryIoc
             if (copyRequest)
             {
                 IsolateRequestChain();
-                return new Request(Container,
-                    DirectParent, DependencyDepth, null, flags, _serviceInfo, InputArgExprs, _sharedState,
-                    null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
+                return new Request(Container, DirectParent, DependencyDepth, null, flags, _serviceInfo, 
+                    InputArgExprs, null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
             }
 
             Flags = flags;
@@ -8225,8 +8209,8 @@ namespace DryIoc
         public override int GetHashCode() => _hashCode;
 
         // Initial request without factory info yet
-        private Request(IContainer container, Request parent, int dependencyDepth, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs, SharedStateInfo sharedState)
+        private Request(IContainer container, Request parent, 
+            int dependencyDepth, RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
@@ -8240,15 +8224,14 @@ namespace DryIoc
             // runtime state
             InputArgExprs = inputArgExprs;
             Container     = container;
-            _sharedState = sharedState;
         }
 
         // Request with resolved factory state
         private Request(IContainer container, 
             Request parent, int dependencyDepth, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs, SharedStateInfo sharedState,
+            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs,
             Type factoryImplType, Factory factory, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
-            : this(container, parent, dependencyDepth, stack, flags, serviceInfo, inputArgExprs, sharedState)
+            : this(container, parent, dependencyDepth, stack, flags, serviceInfo, inputArgExprs)
         {
             SetResolvedFactory(factoryImplType, factory , factoryID, factoryType, reuse, decoratedFactoryID);
         }
@@ -8272,9 +8255,8 @@ namespace DryIoc
             return this;
         }
 
-        private void SetServiceInfo(IContainer container, 
-            Request parent, int dependencyDepth, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs, SharedStateInfo sharedState)
+        private void SetServiceInfo(IContainer container, Request parent, 
+            int dependencyDepth, RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
@@ -8288,7 +8270,6 @@ namespace DryIoc
             // runtime state
             InputArgExprs = inputArgExprs;
             Container     = container;
-            _sharedState  = sharedState;
 
             // reset factory info
             SetResolvedFactory(null, null, 0, FactoryType.Service, null, 0);
