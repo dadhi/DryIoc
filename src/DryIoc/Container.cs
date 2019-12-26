@@ -2698,8 +2698,6 @@ namespace DryIoc
                     result = Converter.ConvertMany(items, newArray.Type.GetElementType());
                     return true;
                 }
-#if SUPPORTS_FAST_EXPRESSION_COMPILER && !NETSTANDARD1_3 || NET35 || NET40 || NET403
-                // Delegate.Method is not supported on NETSTANDARD <= 2.0 :( Need help!
                 case ExprType.Invoke:
                 {
                     var invokeExpr = (InvocationExpression)expr;
@@ -2715,27 +2713,23 @@ namespace DryIoc
                         return true;
                     }
 
-                    if (delegateExpr.NodeType == ExprType.Lambda)
-                        return false;
-
                     if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
                         return false;
                     var lambda = (Delegate)delegateObj;
 
                     var argExprs = invokeExpr.Arguments.ToListOrSelf();
                     if (argExprs.Count == 0)
-                        result = lambda.Method.Invoke(lambda.Target, ArrayTools.Empty<object>());
+                        result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
                     else
                     {
                         var args = new object[argExprs.Count];
                         for (var i = 0; i < args.Length; i++)
                             if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
                                 return false;
-                        result = lambda.Method.Invoke(lambda.Target, args);
+                        result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
                     }
                     return true;
                 }
-#endif
                 case ExprType.Parameter:
                 {
                     if (expr == paramExprs)
@@ -2807,10 +2801,14 @@ namespace DryIoc
                     result = new Func<object>(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
                     if (returnType != typeof(object))
                         result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] { result });
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
                 else
                 {
                     result = new Action(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
+                    if (lambdaExpr.Type != typeof(Action))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
                 return true;
             }
@@ -2823,14 +2821,16 @@ namespace DryIoc
                     result = new Func<object, object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, paramExpr, arg, parentArgs, useFec));
                     if (paramExpr.Type != typeof(object) || returnType != typeof(object))
                         result = _convertOneArgFuncMethod.MakeGenericMethod(paramExpr.Type, returnType).Invoke(null, new[] { result });
-                    if (!WrappersSupport.IsFunc(lambdaExpr.Type))
-                        result  = _tryConvertDelegateMethod.MakeGenericMethod(result.GetType(), lambdaExpr.Type).Invoke(null, new[] { result });
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<,>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
                 else
                 {
                     result = new Action<object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, paramExpr, arg, parentArgs, useFec));
                     if (paramExpr.Type != typeof(object))
                         result = _convertOneArgActionMethod.MakeGenericMethod(paramExpr.Type).Invoke(null, new[] { result });
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Action<>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
                 return true;
             }
@@ -2861,15 +2861,6 @@ namespace DryIoc
         private static readonly MethodInfo _convertFuncMethod         = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
         private static readonly MethodInfo _convertOneArgFuncMethod   = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgFunc));
         private static readonly MethodInfo _convertOneArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgAction));
-
-        internal static R TryConvertDelegate<T, R>(T source) where T : class where R : class
-        {
-            var sourceDelegate = source as Delegate; 
-            return (Delegate.CreateDelegate(typeof(R), sourceDelegate.Target, sourceDelegate.Method, false) as R)
-                .ThrowIfNull(Error.UnableToInterpretTheNestedLambda, typeof(R));
-        }
-
-        private static readonly MethodInfo _tryConvertDelegateMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(TryConvertDelegate));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
