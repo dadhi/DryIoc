@@ -2742,7 +2742,7 @@ namespace DryIoc
                         for (var i = 0; i < multipleParams.Count; i++)
                             if (expr == multipleParams[i])
                             {
-                                result = multipleParams[i];
+                                result = ((object[])paramValues)[i];
                                 return true;
                             }
 
@@ -2762,7 +2762,7 @@ namespace DryIoc
                                 for (var i = 0; i < multipleParams.Count; i++)
                                     if (expr == multipleParams[i])
                                     {
-                                        result = multipleParams[i];
+                                        result = ((object[])paramValues)[i];
                                         return true;
                                     }
                             }
@@ -2835,6 +2835,35 @@ namespace DryIoc
                 return true;
             }
 
+            if (lambdaParams.Count == 2)
+            {
+                var paramExpr0 = lambdaParams[0];
+                var paramExpr1 = lambdaParams[1];
+                if (returnType != typeof(void))
+                {
+                    result = new Func<object, object, object>((arg0, arg1) => 
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, new[] { arg0, arg1 }, parentArgs, useFec));
+
+                    if (paramExpr0.Type != typeof(object) || paramExpr1.Type != typeof(object) || returnType != typeof(object))
+                        result = _convertTwoArgFuncMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, returnType).Invoke(null, new[] { result });
+                    
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<,,>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                else
+                {
+                    result = new Action<object, object>((arg0, arg1) =>
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, new[] { arg0, arg1 }, parentArgs, useFec));
+
+                    if (paramExpr0.Type != typeof(object) || paramExpr1.Type != typeof(object))
+                        result = _convertTwoArgActionMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type).Invoke(null, new[] { result });
+                    
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Action<,>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                return true;
+            }
+
             return false;
         }
 
@@ -2856,11 +2885,16 @@ namespace DryIoc
 
         internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
         internal static Func<T, R> ConvertOneArgFunc<T, R>(Func<object, object> f) => a => (R)f(a);
+        internal static Func<T0, T1, R> ConvertTwoArgFunc<T0, T1, R>(Func<object, object, object> f) => (a0, a1) => (R)f(a0, a1);
+        
         internal static Action<T> ConvertOneArgAction<T>(Action<object> f) => a => f(a);
+        internal static Action<T0, T1> ConvertTwoArgAction<T0, T1>(Action<object, object> f) => (a0, a1) => f(a0, a1);
 
         private static readonly MethodInfo _convertFuncMethod         = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
         private static readonly MethodInfo _convertOneArgFuncMethod   = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgFunc));
+        private static readonly MethodInfo _convertTwoArgFuncMethod   = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertTwoArgFunc));
         private static readonly MethodInfo _convertOneArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgAction));
+        private static readonly MethodInfo _convertTwoArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertTwoArgAction));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)

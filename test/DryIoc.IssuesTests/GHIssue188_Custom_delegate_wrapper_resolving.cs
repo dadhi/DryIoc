@@ -26,7 +26,7 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual("Simple2", simple2.Text);
         }
 
-        [Test, Ignore("todo: To be fixed")]
+        [Test]
         public void Resolve_only_one_dependency_instance()
         {
             var container = new Container();
