@@ -2499,6 +2499,7 @@ namespace DryIoc
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
+                // restore the original excpetion which is expected by the consumer code
                 throw tex.InnerException;
             }
         }
@@ -2798,17 +2799,36 @@ namespace DryIoc
                 parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
 
             var bodyExpr = lambdaExpr.Body;
-            if (lambdaExpr.Parameters.Count == 0)
+            var lambdaParams = lambdaExpr.Parameters;
+            if (lambdaParams.Count == 0)
             {
                 if (returnType != typeof(void))
                 {
-                    result = new Func<object>(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, parentArgs, useFec));
+                    result = new Func<object>(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
                     if (returnType != typeof(object))
                         result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] { result });
                 }
                 else
                 {
-                    result = new Action(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, parentArgs, useFec));
+                    result = new Action(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
+                }
+                return true;
+            }
+
+            if (lambdaParams.Count == 1)
+            {
+                var paramExpr = lambdaParams[0];
+                if (returnType != typeof(void))
+                {
+                    result = new Func<object, object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, paramExpr, arg, parentArgs, useFec));
+                    if (paramExpr.Type != typeof(object) || returnType != typeof(object))
+                        result = _convertOneArgFuncMethod.MakeGenericMethod(paramExpr.Type, returnType).Invoke(null, new[] { result });
+                }
+                else
+                {
+                    result = new Action<object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, paramExpr, arg, parentArgs, useFec));
+                    if (paramExpr.Type != typeof(object))
+                        result = _convertOneArgActionMethod.MakeGenericMethod(paramExpr.Type).Invoke(null, new[] { result });
                 }
                 return true;
             }
@@ -2816,12 +2836,12 @@ namespace DryIoc
             return false;
         }
 
-        private static object TryInterpretNestedLambdaBodyAndUnwrapException(IResolverContext r, 
-            Expression bodyExpr, ParentLambdaArgs parentArgs, bool useFec)
+        private static object TryInterpretNestedLambdaBodyAndUnwrapException(IResolverContext r,
+            Expression bodyExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
             try
             {
-                if (!TryInterpret(r, bodyExpr, null, null, parentArgs, useFec, out var lambdaResult))
+                if (!TryInterpret(r, bodyExpr, paramExprs, paramValues, parentArgs, useFec, out var lambdaResult))
                     Throw.It(Error.UnableToInterpretTheNestedLambda, bodyExpr);
                 return lambdaResult;
             }
@@ -2832,10 +2852,14 @@ namespace DryIoc
             }
         }
 
-        internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
 
-        private static readonly MethodInfo _convertFuncMethod =
-            typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
+        internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
+        internal static Func<T, R> ConvertOneArgFunc<T, R>(Func<object, object> f) => a => (R)f(a);
+        internal static Action<T> ConvertOneArgAction<T>(Action<object> f) => a => f(a);
+
+        private static readonly MethodInfo _convertFuncMethod         = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
+        private static readonly MethodInfo _convertOneArgFuncMethod   = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgFunc));
+        private static readonly MethodInfo _convertOneArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgAction));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
