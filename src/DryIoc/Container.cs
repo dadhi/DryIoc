@@ -2823,6 +2823,8 @@ namespace DryIoc
                     result = new Func<object, object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, paramExpr, arg, parentArgs, useFec));
                     if (paramExpr.Type != typeof(object) || returnType != typeof(object))
                         result = _convertOneArgFuncMethod.MakeGenericMethod(paramExpr.Type, returnType).Invoke(null, new[] { result });
+                    if (!WrappersSupport.IsFunc(lambdaExpr.Type))
+                        result  = _tryConvertDelegateMethod.MakeGenericMethod(result.GetType(), lambdaExpr.Type).Invoke(null, new[] { result });
                 }
                 else
                 {
@@ -2852,7 +2854,6 @@ namespace DryIoc
             }
         }
 
-
         internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
         internal static Func<T, R> ConvertOneArgFunc<T, R>(Func<object, object> f) => a => (R)f(a);
         internal static Action<T> ConvertOneArgAction<T>(Action<object> f) => a => f(a);
@@ -2860,6 +2861,15 @@ namespace DryIoc
         private static readonly MethodInfo _convertFuncMethod         = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
         private static readonly MethodInfo _convertOneArgFuncMethod   = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgFunc));
         private static readonly MethodInfo _convertOneArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgAction));
+
+        internal static R TryConvertDelegate<T, R>(T source) where T : class where R : class
+        {
+            var sourceDelegate = source as Delegate; 
+            return (Delegate.CreateDelegate(typeof(R), sourceDelegate.Target, sourceDelegate.Method, false) as R)
+                .ThrowIfNull(Error.UnableToInterpretTheNestedLambda, typeof(R));
+        }
+
+        private static readonly MethodInfo _tryConvertDelegateMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(TryConvertDelegate));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
