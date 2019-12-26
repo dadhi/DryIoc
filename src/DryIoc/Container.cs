@@ -2864,6 +2864,35 @@ namespace DryIoc
                 return true;
             }
 
+            if (lambdaParams.Count == 3)
+            {
+                var paramExpr0 = lambdaParams[0];
+                var paramExpr1 = lambdaParams[1];
+                var paramExpr2 = lambdaParams[2];
+                if (returnType != typeof(void))
+                {
+                    result = new Func<object[], object>(args => 
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, args, parentArgs, useFec));
+                    result = _convertThreeArgFuncMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, paramExpr2.Type, returnType)
+                        .Invoke(null, new[] { result });
+
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<,,>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                else
+                {
+                    result = new Action<object[]>(args => 
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, args, parentArgs, useFec));
+                    result = _convertThreeArgActionMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, paramExpr2.Type)
+                        .Invoke(null, new[] { result });
+
+                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Action<,>))
+                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
+                }
+                return true;
+            }
+
+
             return false;
         }
 
@@ -2884,17 +2913,25 @@ namespace DryIoc
         }
 
         internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
+        private static readonly MethodInfo _convertFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
+
         internal static Func<T, R> ConvertOneArgFunc<T, R>(Func<object, object> f) => a => (R)f(a);
-        internal static Func<T0, T1, R> ConvertTwoArgFunc<T0, T1, R>(Func<object, object, object> f) => (a0, a1) => (R)f(a0, a1);
+        private static readonly MethodInfo _convertOneArgFuncMethod   = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgFunc));
         
         internal static Action<T> ConvertOneArgAction<T>(Action<object> f) => a => f(a);
-        internal static Action<T0, T1> ConvertTwoArgAction<T0, T1>(Action<object, object> f) => (a0, a1) => f(a0, a1);
-
-        private static readonly MethodInfo _convertFuncMethod         = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
-        private static readonly MethodInfo _convertOneArgFuncMethod   = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgFunc));
-        private static readonly MethodInfo _convertTwoArgFuncMethod   = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertTwoArgFunc));
         private static readonly MethodInfo _convertOneArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgAction));
+
+        internal static Func<T0, T1, R> ConvertTwoArgFunc<T0, T1, R>(Func<object, object, object> f) => (a0, a1) => (R)f(a0, a1);
+        private static readonly MethodInfo _convertTwoArgFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertTwoArgFunc));
+
+        internal static Action<T0, T1> ConvertTwoArgAction<T0, T1>(Action<object, object> f) => (a0, a1) => f(a0, a1);
         private static readonly MethodInfo _convertTwoArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertTwoArgAction));
+
+        internal static Func<T0, T1, T2, R> ConvertThreeArgFunc<T0, T1, T2, R>(Func<object[], object> f) => (a0, a1, a2) => (R)f(new object[] {a0, a1, a2});
+        private static readonly MethodInfo _convertThreeArgFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertThreeArgFunc));
+
+        internal static Action<T0, T1, T2> ConvertThreeArgAction<T0, T1, T2>(Action<object[]> f) => (a0, a1, a2) => f(new object[] {a0, a1, a2});
+        private static readonly MethodInfo _convertThreeArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertThreeArgAction));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
