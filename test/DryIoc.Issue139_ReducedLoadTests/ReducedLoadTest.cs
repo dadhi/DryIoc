@@ -26,7 +26,7 @@ namespace LoadTest
                     scope.Resolve(typeof(EmailController));
         }
 
-        [Test, Ignore("todo: fix")]
+        [Test]
         public void Test_with_transient_decorators()
         {
             var container = new Container(rules => rules

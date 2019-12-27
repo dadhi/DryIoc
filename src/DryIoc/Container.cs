@@ -9117,8 +9117,6 @@ namespace DryIoc
             }
             else if (setup.FactoryType == FactoryType.Decorator)
             {
-                // todo: review if we can cache the decorators
-                //DoNotCache();
                 if (serviceKey != null)
                     Throw.It(Error.DecoratorShouldNotBeRegisteredWithServiceKey, serviceKey);
             }
