@@ -39,5 +39,20 @@ namespace LoadTest
                 using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
                     scope.Resolve(typeof(EmailController));
         }
+
+        [Test]
+        public void Test_with_UseDecorateeReuse_decorators()
+        {
+            var container = new Container(rules => rules
+                .WithUseDecorateeReuseForDecorators()
+                .With(FactoryMethod.ConstructorWithResolvableArguments))
+                .WithWebApi(new HttpConfiguration());
+
+            Registrations.RegisterTypes(container, false);
+
+            for (var i = 0; i < 10; i++)
+                using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
+                    scope.Resolve(typeof(EmailController));
+        }
     }
 }

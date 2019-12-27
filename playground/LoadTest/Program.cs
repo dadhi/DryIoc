@@ -31,11 +31,11 @@ namespace LoadTest
             var container = new Container(rules => rules
                 // depth:5 - completes in 00:02:22.07, for singletonDecorators: false - 00:02:15.27; depth 8 - is still a stack overflow
                 //.WithDependencyDepthToSplitObjectGraph(5)
-                .WithUseDecorateeReuseForDecorators()
+                //.WithUseDecorateeReuseForDecorators() // 00:00:39.16 (requires singletonDecorators: false to work)
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
-            Registrations.RegisterTypes(container, true);
+            Registrations.RegisterTypes(container, false);
 
             // The same SO exception as above with `singletonDecorators: true`
             //var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);

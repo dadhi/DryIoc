@@ -8022,10 +8022,11 @@ namespace DryIoc
         public Request WithResolvedFactory(Factory factory,
             bool skipRecursiveDependencyCheck = false, bool skipCaptiveDependencyCheck = false, bool copyRequest = false)
         {
+            var factoryId = factory.FactoryID;
             var decoratedFactoryID = 0;
             if (Factory != null) // resolving the factory for the second time, usually happens in decorators
             {
-                if (Factory.FactoryID == factory.FactoryID)
+                if (Factory.FactoryID == factoryId)
                     return this; // stop resolving to the same factory twice
 
                 if (Factory.FactoryType != FactoryType.Decorator &&
@@ -8036,8 +8037,8 @@ namespace DryIoc
             // checking the service types only cause wrapper and decorators may be used multiple times
             if (!skipRecursiveDependencyCheck &&
                 factory.FactoryType == FactoryType.Service &&
-                HasRecursiveParent(factory.FactoryID))
-                Throw.It(Error.RecursiveDependencyDetected, Print(factory.FactoryID));
+                HasRecursiveParent(factoryId))
+                Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
 
             // It is required to nullify the TD tracking when factory is resolved multiple times, e.g. for decorator
             var flags = Flags & ~RequestFlags.TracksTransientDisposable;
@@ -8046,7 +8047,7 @@ namespace DryIoc
 
             var reuse = IsWrappedInFuncWithArgs() && Rules.IgnoringReuseForFuncWithArgs
                 ? DryIoc.Reuse.Transient
-                : factory.Reuse ?? GetDefaultReuse(factory);
+                : factory.Reuse ?? CalculateDefaultReuse(factory);
 
             if (!skipCaptiveDependencyCheck &&
                 !DirectParent.IsEmpty &&
@@ -8072,11 +8073,11 @@ namespace DryIoc
             {
                 IsolateRequestChain();
                 return new Request(Container, DirectParent, DependencyDepth, null, flags, _serviceInfo, 
-                    InputArgExprs, null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
+                    InputArgExprs, null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             }
 
             Flags = flags;
-            SetResolvedFactory(null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
+            SetResolvedFactory(null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             return this;
         }
 
@@ -8093,16 +8094,20 @@ namespace DryIoc
             return false;
         }
 
-        private IReuse GetDefaultReuse(Factory factory)
+        private IReuse CalculateDefaultReuse(Factory factory)
         {
             if (factory.Setup.UseParentReuse)
                 return GetFirstParentNonTransientReuseUntilFunc();
 
-            if (factory.FactoryType == FactoryType.Decorator &&
-                ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse)
-                return Reuse; // use reuse of resolved service factory for decorator
+            if (factory.FactoryType == FactoryType.Decorator)
+            {
+                if (factory.Setup.To<Setup.DecoratorSetup>().UseDecorateeReuse ||
+                    Rules.UseDecorateeReuseForDecorators) 
+                    return Reuse; // use reuse of resolved service factory for decorator
+            }
 
-            return factory.FactoryType == FactoryType.Wrapper ? DryIoc.Reuse.Transient : Rules.DefaultReuse;
+            return factory.FactoryType == FactoryType.Wrapper 
+                ? DryIoc.Reuse.Transient : Rules.DefaultReuse;
         }
 
         private IReuse GetTransientDisposableTrackingReuse(Factory factory)
