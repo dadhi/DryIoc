@@ -25,7 +25,7 @@ namespace LoadTest
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              *
              * With the new FEC using variables for closure constants
-             * - singletonDecorators: true  - 00:00:43.39, 
+             * - singletonDecorators: true  - 00:00:43.39, (00:00:28.41 with cached decorators)
              * - singletonDecorators: false - 00:02:54.76, (00:01:20.13 with cached decorators)
              */
             var container = new Container(rules => rules
@@ -35,7 +35,7 @@ namespace LoadTest
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
-            Registrations.RegisterTypes(container, false);
+            Registrations.RegisterTypes(container, true);
 
             // The same SO exception as above with `singletonDecorators: true`
             //var container = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments)).WithWebApi(config);
