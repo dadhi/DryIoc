@@ -2801,9 +2801,8 @@ namespace DryIoc
 
             var bodyExpr     = lambdaExpr.Body;
             var lambdaParams = lambdaExpr.Parameters;
-            var lambdaType   = lambdaExpr.Type;
-
-            if (lambdaParams.Count == 0)
+            var paramCount   = lambdaParams.Count;
+            if (paramCount == 0)
             {
                 if (returnType != typeof(void))
                 {
@@ -2816,7 +2815,7 @@ namespace DryIoc
                     result = new Action(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
                 }
             }
-            else if (lambdaParams.Count == 1)
+            else if (paramCount == 1)
             {
                 var paramExpr = lambdaParams[0];
                 if (returnType != typeof(void))
@@ -2832,7 +2831,7 @@ namespace DryIoc
                         result = _convertOneArgActionMethod.MakeGenericMethod(paramExpr.Type).Invoke(null, new[] { result });
                 }
             }
-            else if (lambdaParams.Count == 2)
+            else if (paramCount == 2)
             {
                 var paramExpr0 = lambdaParams[0];
                 var paramExpr1 = lambdaParams[1];
@@ -2853,7 +2852,7 @@ namespace DryIoc
                         result = _convertTwoArgActionMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type).Invoke(null, new[] { result });
                 }
             }
-            else if (lambdaParams.Count == 3)
+            else if (paramCount == 3)
             {
                 var paramExpr0 = lambdaParams[0];
                 var paramExpr1 = lambdaParams[1];
@@ -2873,23 +2872,44 @@ namespace DryIoc
                         .Invoke(null, new[] { result });
                 }
             }
-
-            if (result != null)
+            else if (paramCount == 4)
             {
-                var resultType = result.GetType();
-                if ((resultType.GetGenericDefinitionOrNull() ?? resultType) != (lambdaType.GetGenericDefinitionOrNull() ?? lambdaType))
+                var paramExpr0 = lambdaParams[0];
+                var paramExpr1 = lambdaParams[1];
+                var paramExpr2 = lambdaParams[2];
+                var paramExpr3 = lambdaParams[3];
+                if (returnType != typeof(void))
                 {
-#if SUPPORTS_DELEGATE_METHOD
-                    result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaType, ((Delegate)result).Target);
-#else
-                    return false;
-#endif
+                    result = new Func<object[], object>(args =>
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, args, parentArgs, useFec));
+                    result = _convertFourArgFuncMethod
+                        .MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, paramExpr2.Type, paramExpr3.Type, returnType)
+                        .Invoke(null, new[] {result});
                 }
+                else
+                {
+                    result = new Action<object[]>(args =>
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, args, parentArgs, useFec));
+                    result = _convertFourArgActionMethod
+                        .MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, paramExpr2.Type, paramExpr3.Type)
+                        .Invoke(null, new[] {result});
+                }
+            }
+            else 
+                return false;
 
-                return true;
+            var resultType = result.GetType();
+            var lambdaType = lambdaExpr.Type;
+            if ((resultType.GetGenericDefinitionOrNull() ?? resultType) != (lambdaType.GetGenericDefinitionOrNull() ?? lambdaType))
+            {
+#if SUPPORTS_DELEGATE_METHOD
+                result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaType, ((Delegate)result).Target);
+#else
+                return false;
+#endif
             }
 
-            return false;
+            return true;
         }
 
         private static object TryInterpretNestedLambdaBodyAndUnwrapException(IResolverContext r,
@@ -2928,6 +2948,12 @@ namespace DryIoc
 
         internal static Action<T0, T1, T2> ConvertThreeArgAction<T0, T1, T2>(Action<object[]> f) => (a0, a1, a2) => f(new object[] {a0, a1, a2});
         private static readonly MethodInfo _convertThreeArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertThreeArgAction));
+
+        internal static Func<T0, T1, T2, T3, R> ConvertFourArgFunc<T0, T1, T2, T3, R>(Func<object[], object> f) => (a0, a1, a2, a3) => (R)f(new object[] { a0, a1, a2, a3 });
+        private static readonly MethodInfo _convertFourArgFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFourArgFunc));
+
+        internal static Action<T0, T1, T2, T3> ConvertFourArgAction<T0, T1, T2, T3>(Action<object[]> f) => (a0, a1, a2, a3) => f(new object[] { a0, a1, a2, a3 });
+        private static readonly MethodInfo _convertFourArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFourArgAction));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
