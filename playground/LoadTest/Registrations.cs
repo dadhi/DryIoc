@@ -267,12 +267,12 @@ namespace LoadTest
                 container
                     .Register<IUniqueUserRepository,
                         UniqueUserConnUpdateHandlerRepository>(setup: Setup.Decorator,
-                        reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
+                        reuse: singletonDecorators ? Reuse.Singleton : null);
                 container.Register<IUniqueUserRepository, UniqueUserUuidHandlerRepository>(
-                    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
+                    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null);
                 container
                     .Register<IUniqueUserRepository, UniqueUserToUserReplicator>(
-                        setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
+                        setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null);
             }
         }
 
@@ -603,13 +603,13 @@ namespace LoadTest
                 container.Register<IGoogleDriveSettings, GoogleDriveSettings>(Reuse.Singleton);
 
                 container.Register<IContactService, ContactAuditTrailServiceDecorator>(setup: Setup.Decorator,
-                    reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+                    reuse: singletonDecorators ? Reuse.Singleton : null, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
                 container.Register<IBillingPlanService, BillingPlanService>(Reuse.Singleton,
                     ifAlreadyRegistered: IfAlreadyRegistered.Throw);
                 container.Register<IBillingPlanService, BillingPlanAuditTrailServiceDecorator>(setup: Setup.Decorator,
-                    reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+                    reuse: singletonDecorators ? Reuse.Singleton : null, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
                 container.Register<IContactCommunicationService, ContactCommunicationAuditTrailServiceDecorator>(
-                    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+                    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
                 container.Register<IImageResizer, ImageResizer>(Reuse.Singleton,
                     ifAlreadyRegistered: IfAlreadyRegistered.Replace);
                 container.Register<Logic.IUserService, Logic.UserService>(Reuse.Singleton,
@@ -638,7 +638,7 @@ namespace LoadTest
 
                 container.Register<IBilledPaymentPdfBuilder, BilledPaymentPdfBuilderImpl>(Reuse.Singleton);
                 container.Register<IAddonActivationRepository, AddonActivationAppApiGuidRuleDecorator>(
-                    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
+                    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null);
             }
         }
     }

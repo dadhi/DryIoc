@@ -1,9 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
+        <!-- <TargetFrameworks>netcoreapp3.1</TargetFrameworks> -->
         <TargetFrameworks Condition="'$(NoSupportForNetCore22)' != 'true'">netcoreapp2.2</TargetFrameworks>
         <TargetFrameworks Condition="'$(NoSupportForNetCore22)' == 'true'">netcoreapp2.1</TargetFrameworks>
+        
         <Description>Benchmarks, sandbox for experiments.</Description>
+
+        <TieredCompilation>true</TieredCompilation>
+        <DebugType>pdbonly</DebugType>
+        <DebugSymbols>true</DebugSymbols>
+
         <NoWarn>1701;1702;AD0001;NU1608</NoWarn>
     </PropertyGroup>
     <ItemGroup>
@@ -21,10 +28,10 @@
         <PackageReference Include="Grace.DependencyInjection.Extensions" Version="7.0.1" />
         <PackageReference Include="LightInject" Version="6.2.0" />
         <PackageReference Include="Microsoft.Experimental.Collections" Version="1.0.6-e190117-3" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.0.1" />
-        <PackageReference Include="SimpleInjector" Version="4.7.1" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.1.0" />
+        <PackageReference Include="SimpleInjector" Version="4.8.1" />
 
-        <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="3.3.1" /><!--Required for Lamar-->
+        <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="3.4.0" /><!--Required for Lamar-->
     </ItemGroup>
 
     <ItemGroup>

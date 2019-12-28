@@ -43,6 +43,9 @@ THE SOFTWARE.
 #if !PCL && !NET35 && !NET40 && !NET403 && !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 && !NET471 && !NET472 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4
 #define SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
 #endif
+#if !NET35 && !NET40 && !NET403
+#define SUPPORTS_DELEGATE_METHOD
+#endif
 
 namespace DryIoc
 {
@@ -2713,6 +2716,9 @@ namespace DryIoc
                         return true;
                     }
 
+#if !SUPPORTS_DELEGATE_METHOD
+                    return false;
+#else
                     if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
                         return false;
                     var lambda = (Delegate)delegateObj;
@@ -2729,7 +2735,8 @@ namespace DryIoc
                         result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
                     }
                     return true;
-                }
+#endif
+                    }
                 case ExprType.Parameter:
                 {
                     if (expr == paramExprs)
@@ -2738,7 +2745,7 @@ namespace DryIoc
                         return true;
                     }
 
-                    if (paramExprs is IReadOnlyList<ParameterExpression> multipleParams)
+                    if (paramExprs is IList<ParameterExpression> multipleParams)
                         for (var i = 0; i < multipleParams.Count; i++)
                             if (expr == multipleParams[i])
                             {
@@ -2756,7 +2763,7 @@ namespace DryIoc
                                 return true;
                             }
 
-                            multipleParams = p.ParamExprs as IReadOnlyList<ParameterExpression>;
+                            multipleParams = p.ParamExprs as IList<ParameterExpression>;
                             if (multipleParams != null)
                             {
                                 for (var i = 0; i < multipleParams.Count; i++)
@@ -2785,35 +2792,30 @@ namespace DryIoc
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
         {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                var returnType = lambdaExpr.ReturnType;
+            var returnType = lambdaExpr.ReturnType;
 #else
             var returnType = lambdaExpr.Type.GetTypeInfo().GetDeclaredMethod("Invoke").ReturnType;
 #endif
             if (paramExprs != null)
                 parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
 
-            var bodyExpr = lambdaExpr.Body;
+            var bodyExpr     = lambdaExpr.Body;
             var lambdaParams = lambdaExpr.Parameters;
-            if (lambdaParams.Count == 0)
+            var paramCount   = lambdaParams.Count;
+            if (paramCount == 0)
             {
                 if (returnType != typeof(void))
                 {
                     result = new Func<object>(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
                     if (returnType != typeof(object))
                         result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] { result });
-                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<>))
-                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
                 else
                 {
                     result = new Action(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
-                    if (lambdaExpr.Type != typeof(Action))
-                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
-                return true;
             }
-
-            if (lambdaParams.Count == 1)
+            else if (paramCount == 1)
             {
                 var paramExpr = lambdaParams[0];
                 if (returnType != typeof(void))
@@ -2821,21 +2823,15 @@ namespace DryIoc
                     result = new Func<object, object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, paramExpr, arg, parentArgs, useFec));
                     if (paramExpr.Type != typeof(object) || returnType != typeof(object))
                         result = _convertOneArgFuncMethod.MakeGenericMethod(paramExpr.Type, returnType).Invoke(null, new[] { result });
-                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<,>))
-                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
                 else
                 {
                     result = new Action<object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, paramExpr, arg, parentArgs, useFec));
                     if (paramExpr.Type != typeof(object))
                         result = _convertOneArgActionMethod.MakeGenericMethod(paramExpr.Type).Invoke(null, new[] { result });
-                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Action<>))
-                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
-                return true;
             }
-
-            if (lambdaParams.Count == 2)
+            else if (paramCount == 2)
             {
                 var paramExpr0 = lambdaParams[0];
                 var paramExpr1 = lambdaParams[1];
@@ -2846,9 +2842,6 @@ namespace DryIoc
 
                     if (paramExpr0.Type != typeof(object) || paramExpr1.Type != typeof(object) || returnType != typeof(object))
                         result = _convertTwoArgFuncMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, returnType).Invoke(null, new[] { result });
-                    
-                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<,,>))
-                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
                 else
                 {
@@ -2857,14 +2850,9 @@ namespace DryIoc
 
                     if (paramExpr0.Type != typeof(object) || paramExpr1.Type != typeof(object))
                         result = _convertTwoArgActionMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type).Invoke(null, new[] { result });
-                    
-                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Action<,>))
-                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
-                return true;
             }
-
-            if (lambdaParams.Count == 3)
+            else if (paramCount == 3)
             {
                 var paramExpr0 = lambdaParams[0];
                 var paramExpr1 = lambdaParams[1];
@@ -2875,9 +2863,6 @@ namespace DryIoc
                         TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, args, parentArgs, useFec));
                     result = _convertThreeArgFuncMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, paramExpr2.Type, returnType)
                         .Invoke(null, new[] { result });
-
-                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Func<,,>))
-                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
                 else
                 {
@@ -2885,15 +2870,46 @@ namespace DryIoc
                         TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, args, parentArgs, useFec));
                     result = _convertThreeArgActionMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, paramExpr2.Type)
                         .Invoke(null, new[] { result });
-
-                    if (lambdaExpr.Type.GetGenericDefinitionOrNull() != typeof(Action<,>))
-                        result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaExpr.Type, ((Delegate)result).Target);
                 }
-                return true;
+            }
+            else if (paramCount == 4)
+            {
+                var paramExpr0 = lambdaParams[0];
+                var paramExpr1 = lambdaParams[1];
+                var paramExpr2 = lambdaParams[2];
+                var paramExpr3 = lambdaParams[3];
+                if (returnType != typeof(void))
+                {
+                    result = new Func<object[], object>(args =>
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, args, parentArgs, useFec));
+                    result = _convertFourArgFuncMethod
+                        .MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, paramExpr2.Type, paramExpr3.Type, returnType)
+                        .Invoke(null, new[] {result});
+                }
+                else
+                {
+                    result = new Action<object[]>(args =>
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaParams, args, parentArgs, useFec));
+                    result = _convertFourArgActionMethod
+                        .MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, paramExpr2.Type, paramExpr3.Type)
+                        .Invoke(null, new[] {result});
+                }
+            }
+            else 
+                return false;
+
+            var resultType = result.GetType();
+            var lambdaType = lambdaExpr.Type;
+            if ((resultType.GetGenericDefinitionOrNull() ?? resultType) != (lambdaType.GetGenericDefinitionOrNull() ?? lambdaType))
+            {
+#if SUPPORTS_DELEGATE_METHOD
+                result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaType, ((Delegate)result).Target);
+#else
+                return false;
+#endif
             }
 
-
-            return false;
+            return true;
         }
 
         private static object TryInterpretNestedLambdaBodyAndUnwrapException(IResolverContext r,
@@ -2932,6 +2948,12 @@ namespace DryIoc
 
         internal static Action<T0, T1, T2> ConvertThreeArgAction<T0, T1, T2>(Action<object[]> f) => (a0, a1, a2) => f(new object[] {a0, a1, a2});
         private static readonly MethodInfo _convertThreeArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertThreeArgAction));
+
+        internal static Func<T0, T1, T2, T3, R> ConvertFourArgFunc<T0, T1, T2, T3, R>(Func<object[], object> f) => (a0, a1, a2, a3) => (R)f(new object[] { a0, a1, a2, a3 });
+        private static readonly MethodInfo _convertFourArgFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFourArgFunc));
+
+        internal static Action<T0, T1, T2, T3> ConvertFourArgAction<T0, T1, T2, T3>(Action<object[]> f) => (a0, a1, a2, a3) => f(new object[] { a0, a1, a2, a3 });
+        private static readonly MethodInfo _convertFourArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFourArgAction));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
@@ -5324,13 +5346,21 @@ namespace DryIoc
         public bool UseInterpretation => 
             (_settings & Settings.UseInterpretation) != 0;
 
-        /// Uses DryIoc own interpretation mechanism or fallbacks to `Compile(preferInterpretation: true)`
+        /// <summary>Uses DryIoc own interpretation mechanism or is falling back to `Compile(preferInterpretation: true)`</summary>
         public Rules WithUseInterpretation() => 
             WithSettings(_settings | Settings.UseInterpretation | Settings.UseInterpretationForTheFirstResolution);
 
-        /// Subject
+        /// <summary>Uses DryIoc own interpretation mechanism or is falling back to `Compile(preferInterpretation: true)`</summary>
         public Rules WithoutUseInterpretation() => 
             WithSettings(_settings & ~Settings.UseInterpretation);
+
+        /// <summary>If Decorator reuse is not set instructs to use `Decorator.SetupWith(useDecarateeReuse: true)`</summary>
+        public bool UseDecorateeReuseForDecorators =>
+            (_settings & Settings.UseDecorateeReuseForDecorators) != 0;
+
+        /// <summary>If Decorator reuse is not set instructs to use `Decorator.SetupWith(useDecarateeReuse: true)`</summary>
+        public Rules WithUseDecorateeReuseForDecorators() =>
+            WithSettings(_settings | Settings.UseDecorateeReuseForDecorators);
 
         /// Outputs most notable non-default rules
         public override string ToString()
@@ -5435,7 +5465,8 @@ namespace DryIoc
             UsedForExpressionGeneration = 1 << 16,
             UseFastExpressionCompilerIfPlatformSupported = 1 << 17,
             UseInterpretationForTheFirstResolution = 1 << 18,
-            UseInterpretation = 1 << 19
+            UseInterpretation = 1 << 19,
+            UseDecorateeReuseForDecorators = 1 << 20
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -8017,10 +8048,11 @@ namespace DryIoc
         public Request WithResolvedFactory(Factory factory,
             bool skipRecursiveDependencyCheck = false, bool skipCaptiveDependencyCheck = false, bool copyRequest = false)
         {
+            var factoryId = factory.FactoryID;
             var decoratedFactoryID = 0;
             if (Factory != null) // resolving the factory for the second time, usually happens in decorators
             {
-                if (Factory.FactoryID == factory.FactoryID)
+                if (Factory.FactoryID == factoryId)
                     return this; // stop resolving to the same factory twice
 
                 if (Factory.FactoryType != FactoryType.Decorator &&
@@ -8031,8 +8063,8 @@ namespace DryIoc
             // checking the service types only cause wrapper and decorators may be used multiple times
             if (!skipRecursiveDependencyCheck &&
                 factory.FactoryType == FactoryType.Service &&
-                HasRecursiveParent(factory.FactoryID))
-                Throw.It(Error.RecursiveDependencyDetected, Print(factory.FactoryID));
+                HasRecursiveParent(factoryId))
+                Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
 
             // It is required to nullify the TD tracking when factory is resolved multiple times, e.g. for decorator
             var flags = Flags & ~RequestFlags.TracksTransientDisposable;
@@ -8041,7 +8073,7 @@ namespace DryIoc
 
             var reuse = IsWrappedInFuncWithArgs() && Rules.IgnoringReuseForFuncWithArgs
                 ? DryIoc.Reuse.Transient
-                : factory.Reuse ?? GetDefaultReuse(factory);
+                : factory.Reuse ?? CalculateDefaultReuse(factory);
 
             if (!skipCaptiveDependencyCheck &&
                 !DirectParent.IsEmpty &&
@@ -8067,11 +8099,11 @@ namespace DryIoc
             {
                 IsolateRequestChain();
                 return new Request(Container, DirectParent, DependencyDepth, null, flags, _serviceInfo, 
-                    InputArgExprs, null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
+                    InputArgExprs, null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             }
 
             Flags = flags;
-            SetResolvedFactory(null, factory, factory.FactoryID, factory.FactoryType, reuse, decoratedFactoryID);
+            SetResolvedFactory(null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             return this;
         }
 
@@ -8088,16 +8120,20 @@ namespace DryIoc
             return false;
         }
 
-        private IReuse GetDefaultReuse(Factory factory)
+        private IReuse CalculateDefaultReuse(Factory factory)
         {
             if (factory.Setup.UseParentReuse)
                 return GetFirstParentNonTransientReuseUntilFunc();
 
-            if (factory.FactoryType == FactoryType.Decorator &&
-                ((Setup.DecoratorSetup)factory.Setup).UseDecorateeReuse)
-                return Reuse; // use reuse of resolved service factory for decorator
+            if (factory.FactoryType == FactoryType.Decorator)
+            {
+                if (factory.Setup.To<Setup.DecoratorSetup>().UseDecorateeReuse ||
+                    Rules.UseDecorateeReuseForDecorators) 
+                    return Reuse; // use reuse of resolved service factory for decorator
+            }
 
-            return factory.FactoryType == FactoryType.Wrapper ? DryIoc.Reuse.Transient : Rules.DefaultReuse;
+            return factory.FactoryType == FactoryType.Wrapper 
+                ? DryIoc.Reuse.Transient : Rules.DefaultReuse;
         }
 
         private IReuse GetTransientDisposableTrackingReuse(Factory factory)
@@ -9112,8 +9148,6 @@ namespace DryIoc
             }
             else if (setup.FactoryType == FactoryType.Decorator)
             {
-                // todo: review if we can cache the decorators
-                DoNotCache();
                 if (serviceKey != null)
                     Throw.It(Error.DecoratorShouldNotBeRegisteredWithServiceKey, serviceKey);
             }

@@ -128,17 +128,17 @@ namespace LoadTest
         static void RegUsers(IRegistrator container, bool singletonDecorators)
         {
             container.Register<Users.IUniqueUserService, Users.UniqueUserService>(ifAlreadyRegistered: IfAlreadyRegistered.Throw, reuse: Reuse.Singleton);
-            //container.Register<Users.IUniqueUserService, UniqueUserDependencyServiceDecorator>(setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+            //container.Register<Users.IUniqueUserService, UniqueUserDependencyServiceDecorator>(setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
 
             container.Register<IPsaUserService, PsaUserService>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             container.Register<IUserRepositoryController, UserRepositoryController>(reuse: Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
             container.Register<IUserRepository, UserRepository>(reuse: Reuse.Singleton);
-            container.Register<IUserRepository, UniqueUserDecoratorForUserRepository>(setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
-            container.Register<IUserRepository, UserChangeBlockerWhenExternallyOwned>(setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
+            container.Register<IUserRepository, UniqueUserDecoratorForUserRepository>(setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null);
+            container.Register<IUserRepository, UserChangeBlockerWhenExternallyOwned>(setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null);
 
             //container.Register<IOrganizationUserRepository, OrganizationUserRepository>(reuse: Reuse.Singleton);
-            container.Register<IOrganizationUserRepository, ConnOrganizationUserRepository>(setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
+            container.Register<IOrganizationUserRepository, ConnOrganizationUserRepository>(setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null);
 
             //container.Register<ITrustedOrganizationUserRepository, TrustedOrganizationUserRepository>(Reuse.Singleton);
         }
@@ -263,15 +263,12 @@ namespace LoadTest
 
                 container.Register<IUniqueUserRepository, UniqueUserRepository>(
                     Reuse.Singleton);
-                container
-                    .Register<IUniqueUserRepository,
-                        UniqueUserConnUpdateHandlerRepository>(setup: Setup.Decorator,
-                        reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
+                container.Register<IUniqueUserRepository, UniqueUserConnUpdateHandlerRepository>(
+                        setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null);
                 container.Register<IUniqueUserRepository, UniqueUserUuidHandlerRepository>(
-                    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
-                container
-                    .Register<IUniqueUserRepository, UniqueUserToUserReplicator>(
-                        setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
+                    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null);
+                container.Register<IUniqueUserRepository, UniqueUserToUserReplicator>(
+                        setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null);
             }
         }
 
@@ -575,13 +572,13 @@ namespace LoadTest
                 container.Register<IGoogleDriveSettings, GoogleDriveSettings>(Reuse.Singleton);
 
                 container.Register<IContactService, ContactAuditTrailServiceDecorator>(setup: Setup.Decorator,
-                    reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+                    reuse: singletonDecorators ? Reuse.Singleton : null, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
                 container.Register<IBillingPlanService, BillingPlanService>(Reuse.Singleton,
                     ifAlreadyRegistered: IfAlreadyRegistered.Throw);
                 //container.Register<IBillingPlanService, BillingPlanAuditTrailServiceDecorator>(setup: Setup.Decorator,
-                //    reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+                //    reuse: singletonDecorators ? Reuse.Singleton : null, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
                 //container.Register<IContactCommunicationService, ContactCommunicationAuditTrailServiceDecorator>(
-                //    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
+                //    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null, ifAlreadyRegistered: IfAlreadyRegistered.Throw);
                 container.Register<IImageResizer, ImageResizer>(Reuse.Singleton,
                     ifAlreadyRegistered: IfAlreadyRegistered.Replace);
                 container.Register<Logic.IUserService, Logic.UserService>(Reuse.Singleton,
@@ -610,7 +607,7 @@ namespace LoadTest
 
                 container.Register<IBilledPaymentPdfBuilder, BilledPaymentPdfBuilderImpl>(Reuse.Singleton);
                 //container.Register<IAddonActivationRepository, AddonActivationAppApiGuidRuleDecorator>(
-                //    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : Reuse.Transient);
+                //    setup: Setup.Decorator, reuse: singletonDecorators ? Reuse.Singleton : null);
             }
         }
     }
