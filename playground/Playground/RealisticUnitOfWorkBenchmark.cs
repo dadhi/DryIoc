@@ -865,7 +865,7 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                       BmarkAutofac |    653.1 us |   2.1808 us |   1.9332 us |   5.25 |    0.18 |    102.5391 |     23.4375 |           - |           472.85 KB |
                   BmarkAutofacMsDi |    631.7 us |   6.4908 us |   6.0715 us |   5.09 |    0.18 |    105.4688 |      0.9766 |           - |           490.02 KB |
 
-            ## DryIoc v4.0.5
+            ## DryIoc v4.0.7
 
                             Method |        Mean |       Error |      StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|------------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
@@ -879,12 +879,17 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
-|                    Method |      Mean |    Error |   StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|-------------------------- |----------:|---------:|---------:|------:|--------:|-------:|------:|----------:|
-|                      MsDI |  75.51 us | 0.354 us | 0.331 us |  1.00 | 16.1133 | 0.1221 |     - |  74.23 KB |
-|                    DryIoc |  92.25 us | 0.232 us | 0.217 us |  1.22 | 15.1367 | 1.3428 |     - |  70.04 KB |
-|               DryIoc_MsDI | 113.28 us | 1.132 us | 1.059 us |  1.50 | 19.2871 | 0.3662 |     - |  89.13 KB |
-| DryIoc_InterpretationOnly |  92.93 us | 0.451 us | 0.422 us |  1.23 | 15.2588 | 1.4648 |     - |  70.14 KB |
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=3.1.100
+  [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+
+|      Method |      Mean |    Error |   StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|---------:|------:|--------:|-------:|------:|----------:|
+|        MsDI |  76.93 us | 0.434 us | 0.362 us |  1.00 | 16.1133 | 0.1221 |     - |  74.23 KB |
+|      DryIoc |  91.65 us | 0.567 us | 0.531 us |  1.19 | 15.1367 | 1.3428 |     - |  69.79 KB |
+| DryIoc_MsDI | 115.11 us | 0.703 us | 0.658 us |  1.49 | 19.2871 | 0.3662 |     - |  89.13 KB |
 
              */
 
@@ -897,7 +902,8 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
 
-            [Benchmark]
+            // note: no need for this because it is the same as DryIoc benchmark
+            //[Benchmark] 
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
             //[Benchmark]

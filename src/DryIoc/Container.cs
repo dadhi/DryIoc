@@ -2977,7 +2977,12 @@ namespace DryIoc
 
             if (methodDeclaringType == typeof(CurrentScopeReuse))
             {
-                // todo: do we need an overload without disposalOrder
+                if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateNoDisposalIndexMethod)
+                {
+                    result = InterpretGetScopedViaFactoryDelegateNoDisposalIndex(r, callExpr, paramExprs, paramValues, parentArgs, useFec);
+                    return true;
+                }
+
                 if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod)
                 {
                     result = InterpretGetScopedViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs, useFec);
@@ -3212,6 +3217,83 @@ namespace DryIoc
             }
 
             return true;
+        }
+
+        private static object InterpretGetScopedViaFactoryDelegateNoDisposalIndex(IResolverContext resolver,
+    MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
+        {
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+            var fewArgExpr = (FourArgumentsMethodCallExpression)callExpr;
+            var resolverArg = fewArgExpr.Argument0;
+#else
+            var args = callExpr.Arguments.ToListOrSelf();
+            var resolverArg = args[0];
+#endif
+            if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
+            {
+                if (!TryInterpret(resolver, resolverArg, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                    return false;
+                resolver = (IResolverContext)resolverObj;
+            }
+
+            var scope = (Scope)resolver.CurrentScope;
+            if (scope == null)
+            {
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+                var throwIfNoScopeArg = fewArgExpr.Argument1;
+#else
+                var throwIfNoScopeArg = args[1];
+#endif
+                return (bool)((ConstantExpression)throwIfNoScopeArg).Value ? Throw.For<IScope>(Error.NoCurrentScope, resolver) : null;
+            }
+
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+            var factoryIdArg = fewArgExpr.Argument2;
+#else
+            var factoryIdArg = args[2];
+#endif
+            var id = (int)((ConstantExpression)factoryIdArg).Value;
+            ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
+            var itemRef = map.GetEntryOrDefault(id);
+            if (itemRef != null && itemRef.Value != Scope.NoItem)
+                return itemRef.Value;
+
+            if (scope.IsDisposed)
+                Throw.It(Error.ScopeIsDisposed, scope.ToString());
+
+            // add only, keep old item if it already exists
+            var m = map;
+            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
+                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, Scope.NoItem));
+
+            itemRef = map.GetEntryOrDefault(id);
+            if (itemRef.Value == Scope.NoItem)
+            {
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+                var lambdaArg = fewArgExpr.Argument3;
+#else
+                var lambdaArg = args[3];
+#endif
+                object result = null;
+                lock (itemRef)
+                {
+                    if (itemRef.Value != Scope.NoItem)
+                        return itemRef.Value;
+
+                    if (lambdaArg is ConstantExpression lambdaConstExpr)
+                        result = ((FactoryDelegate)lambdaConstExpr.Value)(resolver);
+                    else if (!TryInterpret(resolver, ((LambdaExpression)lambdaArg).Body, paramExprs, paramValues, parentArgs, useFec, out result))
+                        result = ((LambdaExpression)lambdaArg).Body.CompileToFactoryDelegate(useFec,
+                            ((IContainer)resolver).Rules.UseInterpretation)(resolver);
+
+                    itemRef.Value = result;
+                }
+
+                if (result is IDisposable disp && disp != scope) 
+                    scope.AddUnorderedDisposable(disp);
+            }
+
+            return itemRef.Value;
         }
 
         private static object InterpretGetScopedViaFactoryDelegate(IResolverContext resolver, 
@@ -11135,7 +11217,6 @@ namespace DryIoc
             else
             {
                 var idExpr = Constant(request.FactoryID);
-                var disposalOrderExpr = Constant(request.Factory.Setup.DisposalOrder);
 
                 Expression factoryDelegateExpr;
                 if (serviceFactoryExpr is InvocationExpression ie &&
@@ -11155,19 +11236,27 @@ namespace DryIoc
                     );
                 }
 
+                var disposalIndex = request.Factory.Setup.DisposalOrder;
+
                 if (ScopedOrSingleton)
                     return Call(GetScopedOrSingletonViaFactoryDelegateMethod,
-                        resolverContextParamExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
+                        resolverContextParamExpr, idExpr, factoryDelegateExpr, Constant(disposalIndex));
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
 
                 if (Name == null)
+                {
+                    if (disposalIndex == 0)
+                        return Call(GetScopedViaFactoryDelegateNoDisposalIndexMethod,
+                            resolverContextParamExpr, ifNoScopeThrowExpr, idExpr, factoryDelegateExpr);
+
                     return Call(GetScopedViaFactoryDelegateMethod, 
-                        resolverContextParamExpr, ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
+                        resolverContextParamExpr, ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, Constant(disposalIndex));
+                }
 
                 return Call(GetNameScopedViaFactoryDelegateMethod, resolverContextParamExpr,
                     request.Container.GetConstantExpression(Name, typeof(object)),
-                    ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, disposalOrderExpr);
+                    ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, Constant(disposalIndex));
             }
         }
 
@@ -11222,6 +11311,14 @@ namespace DryIoc
         public static object GetScoped(IResolverContext r,
             bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
+
+        /// Subject
+        public static object GetScopedViaFactoryDelegateNoDisposalIndex(IResolverContext r,
+            bool throwIfNoScope, int id, FactoryDelegate createValue) =>
+            r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r);
+
+        internal static readonly MethodInfo GetScopedViaFactoryDelegateNoDisposalIndexMethod =
+            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedViaFactoryDelegateNoDisposalIndex));
 
         /// Subject
         public static object GetScopedViaFactoryDelegate(IResolverContext r,
