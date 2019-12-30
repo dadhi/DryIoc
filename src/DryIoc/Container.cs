@@ -621,7 +621,7 @@ namespace DryIoc
 
             _registry.Swap(r =>
             {
-                var entry = r.Services.GetValueOrDefault(serviceType);
+                var entry = r.Services.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType);
                 var oldEntry = entry;
 
                 // no entries, first registration, usual/hot path
@@ -955,12 +955,13 @@ namespace DryIoc
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
         {
             var serviceType = GetServiceTypeAndKeyForFactoryLookup(request, out var serviceKey);
+            var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
 
             if (Rules.FactorySelector != null && serviceKey == null)
-                return GetRuleSelectedServiceFactoryOrDefault(request, serviceType);
+                return GetRuleSelectedServiceFactoryOrDefault(request, serviceTypeHash, serviceType);
 
             var serviceFactories = _registry.Value.Services;
-            var entry = serviceFactories.GetValueOrDefault(serviceType);
+            var entry = serviceFactories.GetValueOrDefault(serviceTypeHash, serviceType);
 
             // For closed-generic type, when the entry is not found or the key in entry is not found,
             // go for the open-generic services
@@ -968,7 +969,11 @@ namespace DryIoc
                 if (entry == null || serviceKey != null && (
                     entry is Factory && !serviceKey.Equals(DefaultKey.Value) ||
                     entry is FactoriesEntry factoriesEntry && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null))
-                    entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) ?? entry;
+                {
+                    var openGenericServiceType = serviceType.GetGenericTypeDefinition();
+                    var openGenericDefHash = RuntimeHelpers.GetHashCode(openGenericServiceType);
+                    entry = serviceFactories.GetValueOrDefault(openGenericDefHash, openGenericServiceType) ?? entry;
+                }
 
             // Most common case when we have a single default factory and no dynamic rules in addition
             if (entry is Factory singleDefaultFactory && 
@@ -1074,10 +1079,10 @@ namespace DryIoc
             return null;
         }
 
-        private Factory GetRuleSelectedServiceFactoryOrDefault(Request request, Type serviceType)
+        private Factory GetRuleSelectedServiceFactoryOrDefault(Request request, int serviceTypeHash, Type serviceType)
         {
             var serviceFactories = _registry.Value.Services;
-            var entry = serviceFactories.GetValueOrDefault(serviceType);
+            var entry = serviceFactories.GetValueOrDefault(serviceTypeHash, serviceType);
 
             KV<object, Factory>[] factories;
             if (entry is Factory singleDefaultFactory)
@@ -1098,11 +1103,14 @@ namespace DryIoc
             else
             {
                 object openGenericEntry;
-                if (serviceType.IsClosedGeneric() &&
-                    null != (openGenericEntry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition())))
-                    factories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf();
-                else
-                    factories = Empty<KV<object, Factory>>();
+                factories = Empty<KV<object, Factory>>();
+                if (serviceType.IsClosedGeneric())
+                {
+                    var openGenericServiceType = serviceType.GetGenericTypeDefinition();
+                    openGenericEntry = serviceFactories.GetValueOrDefault(RuntimeHelpers.GetHashCode(openGenericServiceType), openGenericServiceType);
+                    if (openGenericEntry != null)
+                        factories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf();
+                }
             }
 
             if ((factories.Length == 0 || !Rules.UseDynamicRegistrationsAsFallbackOnly) &&
@@ -1224,13 +1232,15 @@ namespace DryIoc
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics)
         {
             var serviceFactories = _registry.Value.Services;
-            var entry = serviceFactories.GetValueOrDefault(serviceType);
+            var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
+            var entry = serviceFactories.GetValueOrDefault(serviceTypeHash, serviceType);
 
             var factories = GetRegistryEntryKeyFactoryPairs(entry).ToArrayOrSelf();
 
             if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
             {
-                var openGenericEntry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
+                var openGenericServiceType  = serviceType.GetGenericTypeDefinition();
+                var openGenericEntry = serviceFactories.GetValueOrDefault(RuntimeHelpers.GetHashCode(openGenericServiceType), openGenericServiceType);
                 if (openGenericEntry != null)
                     factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
             }
@@ -1718,7 +1728,7 @@ namespace DryIoc
             public static readonly Registry Default = new Registry(WrappersSupport.Wrappers);
 
             // Factories:
-            public readonly ImHashMap<Type, object> Services;
+            public readonly ImMap<ImMap.KVEntry<Type>> Services;
             public readonly ImHashMap<Type, Factory[]> Decorators;
             public readonly ImHashMap<Type, Factory> Wrappers;
 
@@ -1941,13 +1951,13 @@ namespace DryIoc
             private readonly IsChangePermitted _isChangePermitted;
 
             private Registry(ImHashMap<Type, Factory> wrapperFactories = null)
-                : this(ImHashMap<Type, object>.Empty, ImHashMap<Type, Factory[]>.Empty, wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
+                : this(ImMap<ImMap.KVEntry<Type>>.Empty, ImHashMap<Type, Factory[]>.Empty, wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
                     null, null, null, // todo: initialize with empty slots
                     IsChangePermitted.Permitted)
             { }
 
             private Registry(
-                ImHashMap<Type, object> services,
+                ImMap<ImMap.KVEntry<Type>> services,
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
                 ImHashMap<Type, object>[] defaultFactoryCache,
@@ -1967,7 +1977,7 @@ namespace DryIoc
             public Registry WithoutCache() =>
                 new Registry(Services, Decorators, Wrappers, null, null, null, _isChangePermitted);
 
-            internal Registry WithServices(ImHashMap<Type, object> services) =>
+            internal Registry WithServices(ImMap<ImMap.KVEntry<Type>> services) =>
                 services == Services ? this :
                 new Registry(services, Decorators, Wrappers,
                     // Using Copy is fine when you have only the registrations because the caches will be null and no actual copy will be done.
@@ -1988,13 +1998,13 @@ namespace DryIoc
             {
                 foreach (var entry in Services.Enumerate())
                 {
-                    if (entry.Value is Factory factory)
-                        yield return new ServiceRegistrationInfo(factory, entry.Key, null);
+                    if (entry.Value.Value is Factory factory)
+                        yield return new ServiceRegistrationInfo(factory, entry.Value.Key, null);
                     else
                     {
-                        var factories = ((FactoriesEntry)entry.Value).Factories;
+                        var factories = ((FactoriesEntry)entry.Value.Value).Factories;
                         foreach (var f in factories.Enumerate())
-                            yield return new ServiceRegistrationInfo(f.Value, entry.Key, f.Key);
+                            yield return new ServiceRegistrationInfo(f.Value, entry.Value.Key, f.Key);
                     }
                 }
             }
@@ -2041,7 +2051,7 @@ namespace DryIoc
                         return null;
 
                     default:
-                        var entry = Services.GetValueOrDefault(serviceType);
+                        var entry = Services.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType);
                         if (entry == null)
                             return null;
 
@@ -2288,8 +2298,7 @@ namespace DryIoc
             private Registry UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
             {
                 object removed = null; // Factory or FactoriesEntry or Factory[]
-                ImHashMap<Type, object> services;
-
+                ImMap<ImMap.KVEntry<Type>> services;
                 var hash = RuntimeHelpers.GetHashCode(serviceType);
                 if (serviceKey == null && condition == null) // simplest case with simplest handling
                     services = Services.Update(hash, serviceType, null, (_, entry, _null) =>

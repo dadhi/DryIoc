@@ -4388,7 +4388,7 @@ namespace ImTools
         /// <summary> Returns the value if key is found or default value otherwise. </summary>
         [MethodImpl((MethodImplOptions)256)]
         public static object GetValueOrDefault(this ImMap<KVEntry<Type>> map, int hash, Type typeKey) =>
-            map.GetEntryOrDefault(hash, typeKey).Value.Value;
+            map.GetEntryOrDefault(hash, typeKey)?.Value.Value;
 
         internal static ImMapEntry<KVEntry<K>> GetConflictedEntryOrDefault<K>(ImMapEntry<KVEntry<K>> conflictedEntry, K key)
         {
@@ -5951,8 +5951,8 @@ namespace ImTools
         }
     }
 
-    /// The array of ImMap slots where the key first bits are used for FAST slot location
-    /// and the slot is the reference to ImMap that can be swapped with its updated value
+    /// The array of ImHashMap slots where the key first bits are used for FAST slot location
+    /// and the slot is the reference to ImHashMap that can be swapped with its updated value
     public static class ImHashMapSlots
     {
         /// Default number of slots

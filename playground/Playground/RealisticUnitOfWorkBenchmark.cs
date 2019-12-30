@@ -879,17 +879,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
-BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
-Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
-.NET Core SDK=3.1.100
-  [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
-  DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
-
 | Method |     Mean |    Error |   StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------- |---------:|---------:|---------:|------:|--------:|-------:|------:|----------:|
-|   MsDI | 79.03 us | 0.573 us | 0.536 us |  1.00 | 16.1133 | 0.1221 |     - |  74.23 KB |
-| DryIoc | 92.83 us | 0.384 us | 0.340 us |  1.18 | 16.3574 | 1.5869 |     - |  75.59 KB |
-
+|   MsDI | 77.28 us | 0.508 us | 0.451 us |  1.00 | 16.1133 | 0.1221 |     - |  74.23 KB |
+| DryIoc | 91.93 us | 0.255 us | 0.226 us |  1.19 | 15.5029 | 1.3428 |     - |  71.27 KB |
 
              */
 
