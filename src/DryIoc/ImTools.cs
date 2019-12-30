@@ -4112,18 +4112,18 @@ namespace ImTools
             }
         }
 
-        /// <summary>A</summary>
-        public struct KVEntry<K>
+        /// <summary>Wraps Key and Value payload to store inside ImMapEntry</summary>
+        public struct KValue<K>
         {
-            /// <summary>B</summary>
+            /// <summary>The key</summary>
             public K Key;
-            /// <summary>Value</summary>
+            /// <summary>The value</summary>
             public object Value;
         }
 
         /// <summary>Uses the user provided hash and adds or updates the tree with passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KVEntry<K>> AddOrUpdate<K>(this ImMap<KVEntry<K>> map, int hash, K key, object value, Update<K, object> update)
+        public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, K key, object value, Update<K, object> update)
         {
             var oldEntry = map.GetEntryOrDefault(hash);
             return oldEntry == null
@@ -4131,8 +4131,8 @@ namespace ImTools
                 : UpdateEntryOrAddOrUpdateConflict(map, hash, oldEntry, key, value, update);
         }
 
-        private static ImMap<KVEntry<K>> UpdateEntryOrAddOrUpdateConflict<K>(ImMap<KVEntry<K>> map, int hash,
-            ImMapEntry<KVEntry<K>> oldEntry, K key, object value, Update<K, object> update = null)
+        private static ImMap<KValue<K>> UpdateEntryOrAddOrUpdateConflict<K>(ImMap<KValue<K>> map, int hash,
+            ImMapEntry<KValue<K>> oldEntry, K key, object value, Update<K, object> update = null)
         {
             if (key.Equals(oldEntry.Value.Key))
             {
@@ -4141,8 +4141,8 @@ namespace ImTools
             }
 
             // add a new conflicting key value
-            ImMapEntry<KVEntry<K>>[] newConflicts;
-            if (oldEntry.Value.Value is ImMapEntry<KVEntry<Type>>[] conflicts)
+            ImMapEntry<KValue<K>>[] newConflicts;
+            if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
             {
                 // entry is already containing the conflicted entries
                 var conflictCount = conflicts.Length;
@@ -4153,7 +4153,7 @@ namespace ImTools
                 if (conflictIndex != -1)
                 {
                     // update the existing conflict
-                    newConflicts = new ImMapEntry<KVEntry<K>>[conflictCount];
+                    newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
                     Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
                     value = update == null ? value : update(key, conflicts[conflictIndex].Value.Value, value);
                     newConflicts[conflictIndex] = CreateNewEntry(hash, key, value);
@@ -4161,7 +4161,7 @@ namespace ImTools
                 else
                 {
                     // add the new conflicting value
-                    newConflicts = new ImMapEntry<KVEntry<K>>[conflictCount + 1];
+                    newConflicts = new ImMapEntry<KValue<K>>[conflictCount + 1];
                     Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
                     newConflicts[conflictCount] = CreateNewEntry(hash, key, value);
                 }
@@ -4171,41 +4171,41 @@ namespace ImTools
                 newConflicts = new[] { oldEntry, CreateNewEntry(hash, key, value) };
             }
 
-            var conflictsEntry = new ImMapEntry<KVEntry<K>>(hash);
+            var conflictsEntry = new ImMapEntry<KValue<K>>(hash);
             conflictsEntry.Value.Value = newConflicts;
             return map.UpdateEntryUnsafe(conflictsEntry);
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        private static ImMapEntry<KVEntry<K>> CreateNewEntry<K>(int hash, K key, object value)
+        private static ImMapEntry<KValue<K>> CreateNewEntry<K>(int hash, K key, object value)
         {
-            var newEntry = new ImMapEntry<KVEntry<K>>(hash);
+            var newEntry = new ImMapEntry<KValue<K>>(hash);
             newEntry.Value.Key = key;
             newEntry.Value.Value = value;
             return newEntry;
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        private static ImMapEntry<KVEntry<K>> CreateNewEntry<K>(int hash, K key)
+        private static ImMapEntry<KValue<K>> CreateNewEntry<K>(int hash, K key)
         {
-            var newEntry = new ImMapEntry<KVEntry<K>>(hash);
+            var newEntry = new ImMapEntry<KValue<K>>(hash);
             newEntry.Value.Key = key;
             return newEntry;
         }
 
         /// <summary>Uses the user provided hash and adds or updates the tree with passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KVEntry<K>> AddOrUpdate<K>(this ImMap<KVEntry<K>> map, int hash, K key, object value) =>
+        public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, K key, object value) =>
             map.AddOrUpdate(hash, CreateNewEntry(hash, key, value));
 
         /// <summary>Adds or updates the tree with passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KVEntry<K>> AddOrUpdate<K>(this ImMap<KVEntry<K>> map, K key, object value) =>
+        public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, K key, object value) =>
             map.AddOrUpdate(key.GetHashCode(), key, value);
 
         /// <summary>Uses the user provided hash and adds or updates the tree with passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KVEntry<K>> AddOrUpdate<K>(this ImMap<KVEntry<K>> map, int hash, ImMapEntry<KVEntry<K>> entry)
+        public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, ImMapEntry<KValue<K>> entry)
         {
             var oldEntry = map.GetEntryOrDefault(hash);
             return oldEntry == null
@@ -4213,16 +4213,16 @@ namespace ImTools
                 : UpdateEntryOrAddOrUpdateConflict(map, hash, oldEntry, entry);
         }
 
-        private static ImMap<KVEntry<K>> UpdateEntryOrAddOrUpdateConflict<K>(ImMap<KVEntry<K>> map, int hash,
-            ImMapEntry<KVEntry<K>> oldEntry, ImMapEntry<KVEntry<K>> newEntry)
+        private static ImMap<KValue<K>> UpdateEntryOrAddOrUpdateConflict<K>(ImMap<KValue<K>> map, int hash,
+            ImMapEntry<KValue<K>> oldEntry, ImMapEntry<KValue<K>> newEntry)
         {
             var key = newEntry.Value.Key;
             if (key.Equals(oldEntry.Value.Key))
                 return map.UpdateEntryUnsafe(newEntry);
 
             // add a new conflicting key value
-            ImMapEntry<KVEntry<K>>[] newConflicts;
-            if (oldEntry.Value.Value is ImMapEntry<KVEntry<Type>>[] conflicts)
+            ImMapEntry<KValue<K>>[] newConflicts;
+            if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
             {
                 // entry is already containing the conflicted entries
                 var conflictCount = conflicts.Length;
@@ -4233,14 +4233,14 @@ namespace ImTools
                 if (conflictIndex != -1)
                 {
                     // update the existing conflict
-                    newConflicts = new ImMapEntry<KVEntry<K>>[conflictCount];
+                    newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
                     Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
                     newConflicts[conflictIndex] = newEntry;
                 }
                 else
                 {
                     // add the new conflicting value
-                    newConflicts = new ImMapEntry<KVEntry<K>>[conflictCount + 1];
+                    newConflicts = new ImMapEntry<KValue<K>>[conflictCount + 1];
                     Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
                     newConflicts[conflictCount] = newEntry;
                 }
@@ -4250,20 +4250,20 @@ namespace ImTools
                 newConflicts = new[] { oldEntry, newEntry };
             }
 
-            var conflictsEntry = new ImMapEntry<KVEntry<K>>(hash);
+            var conflictsEntry = new ImMapEntry<KValue<K>>(hash);
             conflictsEntry.Value.Value = newConflicts;
             return map.UpdateEntryUnsafe(conflictsEntry);
         }
 
         /// <summary>Updates the map with the new value if key is found, otherwise returns the same unchanged map.</summary>
-        public static ImMap<KVEntry<K>> Update<K>(this ImMap<KVEntry<K>> map, int hash, K key, object value, Update<K, object> update = null)
+        public static ImMap<KValue<K>> Update<K>(this ImMap<KValue<K>> map, int hash, K key, object value, Update<K, object> update = null)
         {
             var oldEntry = map.GetEntryOrDefault(hash);
             return oldEntry == null ? map : UpdateEntryOrReturnSelf(map, hash, oldEntry, key, value, update);
         }
 
-        private static ImMap<KVEntry<K>> UpdateEntryOrReturnSelf<K>(ImMap<KVEntry<K>> map,
-            int hash, ImMapEntry<KVEntry<K>> oldEntry, K key, object value, Update<K, object> update = null)
+        private static ImMap<KValue<K>> UpdateEntryOrReturnSelf<K>(ImMap<KValue<K>> map,
+            int hash, ImMapEntry<KValue<K>> oldEntry, K key, object value, Update<K, object> update = null)
         {
             if (key.Equals(oldEntry.Value.Key))
             {
@@ -4272,8 +4272,8 @@ namespace ImTools
             }
 
             // add a new conflicting key value
-            ImMapEntry<KVEntry<K>>[] newConflicts;
-            if (oldEntry.Value.Value is ImMapEntry<KVEntry<Type>>[] conflicts)
+            ImMapEntry<KValue<K>>[] newConflicts;
+            if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
             {
                 // entry is already containing the conflicted entries
                 var conflictCount = conflicts.Length;
@@ -4285,7 +4285,7 @@ namespace ImTools
                     return map;
 
                 // update the existing conflict
-                newConflicts = new ImMapEntry<KVEntry<K>>[conflictCount];
+                newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
                 Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
                 value = update == null ? value : update(key, conflicts[conflictIndex].Value.Value, value);
                 newConflicts[conflictIndex] = CreateNewEntry(hash, key, value);
@@ -4295,27 +4295,27 @@ namespace ImTools
                 return map;
             }
 
-            var conflictsEntry = new ImMapEntry<KVEntry<K>>(hash);
+            var conflictsEntry = new ImMapEntry<KValue<K>>(hash);
             conflictsEntry.Value.Value = newConflicts;
             return map.UpdateEntryUnsafe(conflictsEntry);
         }
 
         /// <summary>Updates the map with the default value if the key is found, otherwise returns the same unchanged map.</summary>
-        public static ImMap<KVEntry<K>> UpdateToDefault<K>(this ImMap<KVEntry<K>> map, int hash, K key)
+        public static ImMap<KValue<K>> UpdateToDefault<K>(this ImMap<KValue<K>> map, int hash, K key)
         {
             var oldEntry = map.GetEntryOrDefault(hash);
             return oldEntry == null ? map : UpdateEntryOrReturnSelf(map, hash, oldEntry, key);
         }
 
-        private static ImMap<KVEntry<K>> UpdateEntryOrReturnSelf<K>(ImMap<KVEntry<K>> map,
-            int hash, ImMapEntry<KVEntry<K>> oldEntry, K key)
+        private static ImMap<KValue<K>> UpdateEntryOrReturnSelf<K>(ImMap<KValue<K>> map,
+            int hash, ImMapEntry<KValue<K>> oldEntry, K key)
         {
             if (key.Equals(oldEntry.Value.Key))
                 return map.UpdateEntryUnsafe(CreateNewEntry(hash, key));
 
             // add a new conflicting key value
-            ImMapEntry<KVEntry<K>>[] newConflicts;
-            if (oldEntry.Value.Value is ImMapEntry<KVEntry<Type>>[] conflicts)
+            ImMapEntry<KValue<K>>[] newConflicts;
+            if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
             {
                 // entry is already containing the conflicted entries
                 var conflictCount = conflicts.Length;
@@ -4327,7 +4327,7 @@ namespace ImTools
                     return map;
 
                 // update the existing conflict
-                newConflicts = new ImMapEntry<KVEntry<K>>[conflictCount];
+                newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
                 Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
                 newConflicts[conflictIndex] = CreateNewEntry(hash, key);
             }
@@ -4336,31 +4336,29 @@ namespace ImTools
                 return map;
             }
 
-            var conflictsEntry = new ImMapEntry<KVEntry<K>>(hash);
+            var conflictsEntry = new ImMapEntry<KValue<K>>(hash);
             conflictsEntry.Value.Value = newConflicts;
             return map.UpdateEntryUnsafe(conflictsEntry);
         }
 
         /// <summary> Returns the entry if key is found or default value otherwise. </summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMapEntry<KVEntry<K>> GetEntryOrDefault<K>(this ImMap<KVEntry<K>> map, int hash, K key)
+        public static ImMapEntry<KValue<K>> GetEntryOrDefault<K>(this ImMap<KValue<K>> map, int hash, K key)
         {
             var entry = map.GetEntryOrDefault(hash);
             return entry != null
-                ? key.Equals(entry.Value.Key) ? entry
-                : entry.Value.Key == null ? GetConflictedEntryOrDefault(entry, key)
-                : null
+                ? key.Equals(entry.Value.Key) ? entry : GetConflictedEntryOrDefault(entry, key)
                 : null;
         }
 
         /// <summary> Returns the value if key is found or default value otherwise. </summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static object GetValueOrDefault<K>(this ImMap<KVEntry<K>> map, int hash, K key) =>
-            map.GetEntryOrDefault(hash, key).Value.Value;
+        public static object GetValueOrDefault<K>(this ImMap<KValue<K>> map, int hash, K key) =>
+            map.GetEntryOrDefault(hash, key)?.Value.Value;
 
         /// <summary> Sets the value if key is found or returns false otherwise. </summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<K>(this ImMap<KVEntry<K>> map, int hash, K key, out object value)
+        public static bool TryFind<K>(this ImMap<KValue<K>> map, int hash, K key, out object value)
         {
             var entry = map.GetEntryOrDefault(hash, key);
             if (entry != null)
@@ -4373,29 +4371,27 @@ namespace ImTools
             return false;
         }
 
-        /// <summary> Returns the entry if key is found or default value otherwise. </summary>
+        /// <summary> Returns the entry if key is found or `null` otherwise. </summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMapEntry<KVEntry<Type>> GetEntryOrDefault(this ImMap<KVEntry<Type>> map, int hash, Type typeKey)
+        public static ImMapEntry<KValue<Type>> GetEntryOrDefault(this ImMap<KValue<Type>> map, int hash, Type type)
         {
             var entry = map.GetEntryOrDefault(hash);
             return entry != null
-                ? entry.Value.Key == typeKey ? entry
-                : entry.Value.Key == null ? GetConflictedEntryOrDefault(entry, typeKey)
-                : null
+                ? entry.Value.Key == type ? entry : GetConflictedEntryOrDefault(entry, type)
                 : null;
         }
 
         /// <summary> Returns the value if key is found or default value otherwise. </summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static object GetValueOrDefault(this ImMap<KVEntry<Type>> map, int hash, Type typeKey) =>
+        public static object GetValueOrDefault(this ImMap<KValue<Type>> map, int hash, Type typeKey) =>
             map.GetEntryOrDefault(hash, typeKey)?.Value.Value;
 
-        internal static ImMapEntry<KVEntry<K>> GetConflictedEntryOrDefault<K>(ImMapEntry<KVEntry<K>> conflictedEntry, K key)
+        internal static ImMapEntry<KValue<K>> GetConflictedEntryOrDefault<K>(ImMapEntry<KValue<K>> entry, K key)
         {
-            var conflicts = (ImMapEntry<KVEntry<K>>[])conflictedEntry.Value.Value;
-            for (var i = 0; i < conflicts.Length; ++i)
-                if (key.Equals(conflicts[i].Value.Key))
-                    return conflicts[i];
+            if (entry.Value.Value is ImMapEntry<KValue<K>>[] conflicts)
+                for (var i = 0; i < conflicts.Length; ++i)
+                    if (key.Equals(conflicts[i].Value.Key))
+                        return conflicts[i];
             return null;
         }
 
@@ -4403,11 +4399,11 @@ namespace ImTools
         /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
         /// The only difference is using fixed size array instead of stack for speed-up.
         /// </summary>
-        public static IEnumerable<ImMapEntry<KVEntry<K>>> Enumerate<K>(this ImMap<KVEntry<K>> map)
+        public static IEnumerable<ImMapEntry<KValue<K>>> Enumerate<K>(this ImMap<KValue<K>> map)
         {
             foreach (var entry in map.Enumerate(null))
             {
-                if (entry.Value.Value is ImMapEntry<KVEntry<K>>[] conflicts)
+                if (entry.Value.Value is ImMapEntry<KValue<K>>[] conflicts)
                     for (var i = 0; i < conflicts.Length; i++)
                         yield return conflicts[i];
                 else
@@ -4421,11 +4417,11 @@ namespace ImTools
         /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
         /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
         /// </summary>
-        public static S Fold<K, S>(this ImMap<KVEntry<K>> map,
-            S state, Func<ImMapEntry<KVEntry<K>>, S, S> reduce, ImMapTree<KVEntry<K>>[] parentsStack = null) =>
+        public static S Fold<K, S>(this ImMap<KValue<K>> map,
+            S state, Func<ImMapEntry<KValue<K>>, S, S> reduce, ImMapTree<KValue<K>>[] parentsStack = null) =>
                 map.Fold(state, reduce, (entry, s, r) =>
                 {
-                    if (entry.Value.Value is ImMapEntry<KVEntry<K>>[] conflicts)
+                    if (entry.Value.Value is ImMapEntry<KValue<K>>[] conflicts)
                         for (var i = 0; i < conflicts.Length; i++)
                             s = r(conflicts[i], s);
                     else
@@ -4440,11 +4436,11 @@ namespace ImTools
         /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
         /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
         /// </summary>
-        public static S Visit<K, S>(this ImMap<KVEntry<K>> map,
-            S state, Action<ImMapEntry<KVEntry<K>>, S> effect, ImMapTree<KVEntry<K>>[] parentsStack = null) =>
+        public static S Visit<K, S>(this ImMap<KValue<K>> map,
+            S state, Action<ImMapEntry<KValue<K>>, S> effect, ImMapTree<KValue<K>>[] parentsStack = null) =>
             map.Fold(state, effect, (entry, s, eff) =>
             {
-                if (entry.Value.Value is ImMapEntry<KVEntry<K>>[] conflicts)
+                if (entry.Value.Value is ImMapEntry<KValue<K>>[] conflicts)
                     for (var i = 0; i < conflicts.Length; i++)
                         eff(conflicts[i], s);
                 else
@@ -4459,11 +4455,11 @@ namespace ImTools
         /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
         /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
         /// </summary>
-        public static void Visit<K>(this ImMap<KVEntry<K>> map,
-            Action<ImMapEntry<KVEntry<K>>> effect, ImMapTree<KVEntry<K>>[] parentsStack = null) =>
+        public static void Visit<K>(this ImMap<KValue<K>> map,
+            Action<ImMapEntry<KValue<K>>> effect, ImMapTree<KValue<K>>[] parentsStack = null) =>
             map.Fold(false, effect, (entry, s, eff) =>
             {
-                if (entry.Value.Value is ImMapEntry<KVEntry<K>>[] conflicts)
+                if (entry.Value.Value is ImMapEntry<KValue<K>>[] conflicts)
                     for (var i = 0; i < conflicts.Length; i++)
                         eff(conflicts[i]);
                 else

@@ -238,29 +238,28 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var cacheSlot = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceType);
-            if (cacheSlot != null)
+            var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceType);
+            if (cacheEntry != null)
             {
-                if (cacheSlot.Value is FactoryDelegate cachedDelegate)
+                ref var entry = ref cacheEntry.Value;
+                if (entry.Value is FactoryDelegate cachedDelegate)
                     return cachedDelegate(this);
 
-                if (ResolverContext.TryGetUsedInstance(this, serviceType, out var obj))
+                if (ResolverContext.TryGetUsedInstance(this, serviceType, out var usedInstance))
                 {
-                    cacheSlot.Value = null; // reset the cache
-                    return obj;
+                    entry.Value = null; // reset the cache
+                    return usedInstance;
                 }
 
-                if (cacheSlot.Value is Expression cachedExpression)
+                if (entry.Value is Expression cachedExpression)
                 {
-                    if (Rules.UseInterpretation)
-                    {
-                        if (Interpreter.TryInterpretAndUnwrapContainerException(this,
-                            cachedExpression, false, out var result))
-                            return result;
-                    }
+                    var rules = Rules;
+                    if (rules.UseInterpretation && 
+                        Interpreter.TryInterpretAndUnwrapContainerException(this, cachedExpression, false, out var result))
+                        return result;
 
-                    var compiledFactory = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler, Rules.UseInterpretation);
-                    cacheSlot.Value = compiledFactory;
+                    var compiledFactory = cachedExpression.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
+                    entry.Value = compiledFactory;
                     return compiledFactory(this);
                 }
             }
@@ -1728,17 +1727,17 @@ namespace DryIoc
             public static readonly Registry Default = new Registry(WrappersSupport.Wrappers);
 
             // Factories:
-            public readonly ImMap<ImMap.KVEntry<Type>> Services;
+            public readonly ImMap<ImMap.KValue<Type>> Services;
             public readonly ImHashMap<Type, Factory[]> Decorators;
             public readonly ImHashMap<Type, Factory> Wrappers;
 
             internal const int CACHE_SLOT_COUNT = 16;
             internal const int CACHE_SLOT_COUNT_MASK = CACHE_SLOT_COUNT - 1;
 
-            public ImHashMap<Type, object>[] DefaultFactoryCache;
+            public ImMap<ImMap.KValue<Type>>[] DefaultFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
-            public ImHashMapEntry<Type, object> GetCachedDefaultFactoryOrDefault(Type serviceType)
+            public ImMapEntry<ImMap.KValue<Type>> GetCachedDefaultFactoryOrDefault(Type serviceType)
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = DefaultFactoryCache;
@@ -1755,12 +1754,12 @@ namespace DryIoc
                     return;
 
                 if (DefaultFactoryCache == null)
-                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
+                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImMap<ImMap.KValue<Type>>[CACHE_SLOT_COUNT], null);
 
                 var hash = RuntimeHelpers.GetHashCode(serviceType);
                 ref var map = ref DefaultFactoryCache[hash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
-                    Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
+                    Interlocked.CompareExchange(ref map, ImMap<ImMap.KValue<Type>>.Empty, null);
 
                 var m = map;
                 if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(hash, serviceType, factory), m) != m)
@@ -1951,16 +1950,16 @@ namespace DryIoc
             private readonly IsChangePermitted _isChangePermitted;
 
             private Registry(ImHashMap<Type, Factory> wrapperFactories = null)
-                : this(ImMap<ImMap.KVEntry<Type>>.Empty, ImHashMap<Type, Factory[]>.Empty, wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
+                : this(ImMap<ImMap.KValue<Type>>.Empty, ImHashMap<Type, Factory[]>.Empty, wrapperFactories ?? ImHashMap<Type, Factory>.Empty,
                     null, null, null, // todo: initialize with empty slots
                     IsChangePermitted.Permitted)
             { }
 
             private Registry(
-                ImMap<ImMap.KVEntry<Type>> services,
+                ImMap<ImMap.KValue<Type>> services,
                 ImHashMap<Type, Factory[]> decorators,
                 ImHashMap<Type, Factory> wrappers,
-                ImHashMap<Type, object>[] defaultFactoryCache,
+                ImMap<ImMap.KValue<Type>>[] defaultFactoryCache,
                 ImHashMap<Type, GrowingList<KeyAndFactorySlot>>[] keyedFactoryCache,
                 ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
@@ -1977,7 +1976,7 @@ namespace DryIoc
             public Registry WithoutCache() =>
                 new Registry(Services, Decorators, Wrappers, null, null, null, _isChangePermitted);
 
-            internal Registry WithServices(ImMap<ImMap.KVEntry<Type>> services) =>
+            internal Registry WithServices(ImMap<ImMap.KValue<Type>> services) =>
                 services == Services ? this :
                 new Registry(services, Decorators, Wrappers,
                     // Using Copy is fine when you have only the registrations because the caches will be null and no actual copy will be done.
@@ -2298,7 +2297,7 @@ namespace DryIoc
             private Registry UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
             {
                 object removed = null; // Factory or FactoriesEntry or Factory[]
-                ImMap<ImMap.KVEntry<Type>> services;
+                ImMap<ImMap.KValue<Type>> services;
                 var hash = RuntimeHelpers.GetHashCode(serviceType);
                 if (serviceKey == null && condition == null) // simplest case with simplest handling
                     services = Services.Update(hash, serviceType, null, (_, entry, _null) =>
@@ -2389,7 +2388,7 @@ namespace DryIoc
                         var d = DefaultFactoryCache;
                         if (d != null)
                             Ref.Swap(ref d[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
-                                (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).UpdateToDefault(h, t));
+                                (x, h, t) => (x ?? ImMap<ImMap.KValue<Type>>.Empty).UpdateToDefault(h, t));
 
                         var k = KeyedFactoryCache;
                         if (k != null)

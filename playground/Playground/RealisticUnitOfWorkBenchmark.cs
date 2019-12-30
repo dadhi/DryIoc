@@ -879,10 +879,12 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
 
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
-| Method |     Mean |    Error |   StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------- |---------:|---------:|---------:|------:|--------:|-------:|------:|----------:|
-|   MsDI | 77.28 us | 0.508 us | 0.451 us |  1.00 | 16.1133 | 0.1221 |     - |  74.23 KB |
-| DryIoc | 91.93 us | 0.255 us | 0.226 us |  1.19 | 15.5029 | 1.3428 |     - |  71.27 KB |
+|                    Method |      Mean |    Error |   StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|-------------------------- |----------:|---------:|---------:|------:|--------:|-------:|------:|----------:|
+|                      MsDI |  75.51 us | 0.354 us | 0.331 us |  1.00 | 16.1133 | 0.1221 |     - |  74.23 KB |
+|                    DryIoc |  92.25 us | 0.232 us | 0.217 us |  1.22 | 15.1367 | 1.3428 |     - |  70.04 KB |
+|               DryIoc_MsDI | 113.28 us | 1.132 us | 1.059 us |  1.50 | 19.2871 | 0.3662 |     - |  89.13 KB |
+| DryIoc_InterpretationOnly |  92.93 us | 0.451 us | 0.422 us |  1.23 | 15.2588 | 1.4648 |     - |  70.14 KB |
 
              */
 
@@ -892,10 +894,10 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
             [Benchmark]
             public object DryIoc() => Measure(PrepareDryIoc());
 
-            //[Benchmark]
+            [Benchmark]
             public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
 
-            //[Benchmark]
+            [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
             //[Benchmark]
@@ -1102,16 +1104,14 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |                   Autofac | 36.210 us | 0.2359 us | 0.2207 us | 10.72 |    0.08 |  9.8267 | 0.6104 |     - |  45.33 KB |
 |       Autofac_MsDiAdapter | 45.746 us | 0.2135 us | 0.1997 us | 13.54 |    0.09 | 13.3057 | 0.7935 |     - |  61.16 KB |
 
-|                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|-------------------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
-|                      MsDi |  3.443 us | 0.0164 us | 0.0145 us |  1.00 |    0.00 |  0.9460 | 0.0153 |     - |   4.35 KB |
-|                    DryIoc |  1.710 us | 0.0036 us | 0.0032 us |  0.50 |    0.00 |  0.6428 | 0.0076 |     - |   2.96 KB |
-|        DryIoc_MsDiAdapter |  2.204 us | 0.0297 us | 0.0278 us |  0.64 |    0.01 |  0.6485 | 0.0076 |     - |   2.98 KB |
-| DryIoc_InterpretationOnly | 14.022 us | 0.0286 us | 0.0239 us |  4.07 |    0.02 |  1.4801 | 0.0153 |     - |   6.81 KB |
-|                     Grace |  1.783 us | 0.0278 us | 0.0217 us |  0.52 |    0.01 |  0.6886 | 0.0095 |     - |   3.17 KB |
-|        Grace_MsDiAdapter  |  2.328 us | 0.0097 us | 0.0081 us |  0.68 |    0.00 |  0.7401 | 0.0076 |     - |   3.41 KB |
-|                   Autofac | 38.336 us | 0.7015 us | 0.6219 us | 11.13 |    0.17 |  9.8267 | 0.5493 |     - |  45.22 KB |
-|       Autofac_MsDiAdapter | 46.567 us | 0.1341 us | 0.1120 us | 13.53 |    0.07 | 12.5122 | 0.7324 |     - |  57.73 KB |
+|                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|-------------------------- |----------:|----------:|----------:|------:|--------:|-------:|-------:|------:|----------:|
+|                      MsDi |  3.357 us | 0.0238 us | 0.0211 us |  1.00 |    0.00 | 0.9460 | 0.0153 |     - |   4.35 KB |
+|                    DryIoc |  1.654 us | 0.0067 us | 0.0059 us |  0.49 |    0.00 | 0.6428 | 0.0076 |     - |   2.96 KB |
+|        DryIoc_MsDiAdapter |  2.144 us | 0.0169 us | 0.0158 us |  0.64 |    0.01 | 0.6485 | 0.0076 |     - |   2.98 KB |
+| DryIoc_InterpretationOnly | 13.764 us | 0.0294 us | 0.0230 us |  4.10 |    0.03 | 1.4801 | 0.0153 |     - |   6.81 KB |
+|                     Grace |  1.703 us | 0.0094 us | 0.0079 us |  0.51 |    0.00 | 0.6886 | 0.0095 |     - |   3.17 KB |
+|         Grace_MsDiAdapter |  2.267 us | 0.0287 us | 0.0268 us |  0.68 |    0.01 | 0.7401 | 0.0076 |     - |   3.41 KB |
 
 */
 
@@ -1155,10 +1155,10 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             [Benchmark]
             public object Grace_MsDiAdapter() => Measure(_graceMsDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            [Benchmark]
+            //[Benchmark]
             public object Autofac_MsDiAdapter() => Measure(_autofacMsDi);
         }
     }
