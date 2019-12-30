@@ -887,8 +887,9 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 
 | Method |     Mean |    Error |   StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------- |---------:|---------:|---------:|------:|--------:|-------:|------:|----------:|
-|   MsDI | 77.02 us | 0.710 us | 0.664 us |  1.00 | 16.1133 | 0.4883 |     - |  74.25 KB |
-| DryIoc | 93.16 us | 0.533 us | 0.472 us |  1.21 | 16.3574 | 1.5869 |     - |  75.41 KB |
+|   MsDI | 79.03 us | 0.573 us | 0.536 us |  1.00 | 16.1133 | 0.1221 |     - |  74.23 KB |
+| DryIoc | 92.83 us | 0.384 us | 0.340 us |  1.18 | 16.3574 | 1.5869 |     - |  75.59 KB |
+
 
              */
 
@@ -1107,6 +1108,18 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |         Grace_MsDiAdapter |  2.303 us | 0.0191 us | 0.0178 us |  0.68 |    0.01 |  0.7401 | 0.0076 |     - |   3.41 KB |
 |                   Autofac | 36.210 us | 0.2359 us | 0.2207 us | 10.72 |    0.08 |  9.8267 | 0.6104 |     - |  45.33 KB |
 |       Autofac_MsDiAdapter | 45.746 us | 0.2135 us | 0.1997 us | 13.54 |    0.09 | 13.3057 | 0.7935 |     - |  61.16 KB |
+
+|                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|-------------------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|                      MsDi |  3.443 us | 0.0164 us | 0.0145 us |  1.00 |    0.00 |  0.9460 | 0.0153 |     - |   4.35 KB |
+|                    DryIoc |  1.710 us | 0.0036 us | 0.0032 us |  0.50 |    0.00 |  0.6428 | 0.0076 |     - |   2.96 KB |
+|        DryIoc_MsDiAdapter |  2.204 us | 0.0297 us | 0.0278 us |  0.64 |    0.01 |  0.6485 | 0.0076 |     - |   2.98 KB |
+| DryIoc_InterpretationOnly | 14.022 us | 0.0286 us | 0.0239 us |  4.07 |    0.02 |  1.4801 | 0.0153 |     - |   6.81 KB |
+|                     Grace |  1.783 us | 0.0278 us | 0.0217 us |  0.52 |    0.01 |  0.6886 | 0.0095 |     - |   3.17 KB |
+|        Grace_MsDiAdapter  |  2.328 us | 0.0097 us | 0.0081 us |  0.68 |    0.00 |  0.7401 | 0.0076 |     - |   3.41 KB |
+|                   Autofac | 38.336 us | 0.7015 us | 0.6219 us | 11.13 |    0.17 |  9.8267 | 0.5493 |     - |  45.22 KB |
+|       Autofac_MsDiAdapter | 46.567 us | 0.1341 us | 0.1120 us | 13.53 |    0.07 | 12.5122 | 0.7324 |     - |  57.73 KB |
+
 */
 
             private IServiceProvider _msDi;

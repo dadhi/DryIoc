@@ -109,7 +109,7 @@ namespace DryIoc.IssuesTests
                     var scopeEntry = _scopes.GetEntryOrDefault(address);
                     if (scopeEntry == null)
                     {
-                        Ref.Swap(ref _scopes, address, (x, a) => x.AddEntryOrKeep(a));
+                        Ref.Swap(ref _scopes, address, (x, a) => x.AddOrKeep(a));
                         scopeEntry = _scopes.GetEntryOrDefault(address);
                     }
 
@@ -189,7 +189,7 @@ namespace DryIoc.IssuesTests
                 var scopeEntry = _scopes.GetEntryOrDefault(address);
                 if (scopeEntry == null)
                 {
-                    Ref.Swap(ref _scopes, address, (x, a) => x.AddEntryOrKeep(a));
+                    Ref.Swap(ref _scopes, address, (x, a) => x.AddOrKeep(a));
                     scopeEntry = _scopes.GetEntryOrDefault(address);
                 }
 
@@ -206,7 +206,7 @@ namespace DryIoc.IssuesTests
                 var scopeEntry = _scopes.GetEntryOrDefault(address);
                 if (scopeEntry == null)
                 {
-                    Ref.Swap(ref _scopes, address, (x, a) => x.AddEntryOrKeep(a));
+                    Ref.Swap(ref _scopes, address, (x, a) => x.AddOrKeep(a));
                     scopeEntry = _scopes.GetEntryOrDefault(address);
                 }
 

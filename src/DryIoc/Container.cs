@@ -901,11 +901,11 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        internal Expression GetCachedFactoryExpression(int factoryId, Request request, out ImMapData<Registry.ExpressionCacheSlot> slot) => 
+        internal Expression GetCachedFactoryExpression(int factoryId, Request request, out ImMapEntry<Registry.ExpressionCacheSlot> slot) => 
             _registry.Value.GetCachedFactoryExpression(factoryId, request, out slot);
 
         [MethodImpl((MethodImplOptions) 256)]
-        internal void CacheFactoryExpression(int factoryId, Request request, Expression expr, ImMapData<Registry.ExpressionCacheSlot> slot) =>
+        internal void CacheFactoryExpression(int factoryId, Request request, Expression expr, ImMapEntry<Registry.ExpressionCacheSlot> slot) =>
             _registry.Value.CacheFactoryExpression(factoryId, request, expr, slot);
 
         Factory IContainer.ResolveFactory(Request request)
@@ -1728,7 +1728,7 @@ namespace DryIoc
             public ImHashMap<Type, object>[] DefaultFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
-            public ImHashMapData<Type, object> GetCachedDefaultFactoryOrDefault(Type serviceType)
+            public ImHashMapEntry<Type, object> GetCachedDefaultFactoryOrDefault(Type serviceType)
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = DefaultFactoryCache;
@@ -1809,8 +1809,8 @@ namespace DryIoc
                 if (entry == null)
                 {
                     var m = map;
-                    if (Interlocked.CompareExchange(ref map, m.AddEntryOrKeep(hash, type), m) != m)
-                        Ref.Swap(ref map, hash, type, (x, h, t) => x.AddEntryOrKeep(h, t));
+                    if (Interlocked.CompareExchange(ref map, m.AddOrKeep(hash, type), m) != m)
+                        Ref.Swap(ref map, hash, type, (x, h, t) => x.AddOrKeep(h, t));
                     entry = map.GetEntryOrDefault(hash, type);
                 }
 
@@ -1845,7 +1845,7 @@ namespace DryIoc
             public ImMap<ExpressionCacheSlot>[] FactoryExpressionCache;
 
             public Expression GetCachedFactoryExpression(
-                int factoryId, Request request, out ImMapData<Registry.ExpressionCacheSlot> slot)
+                int factoryId, Request request, out ImMapEntry<Registry.ExpressionCacheSlot> slot)
             {
                 slot = null;
 
@@ -1881,8 +1881,7 @@ namespace DryIoc
                 return null;
             }
 
-            internal void CacheFactoryExpression(int factoryId, Request request, Expression expr,
-                ImMapData<ExpressionCacheSlot> slot = null)
+            internal void CacheFactoryExpression(int factoryId, Request request, Expression expr, ImMapEntry<ExpressionCacheSlot> slot = null)
             {
                 if (slot == null)
                 {
@@ -1898,8 +1897,8 @@ namespace DryIoc
                     if (slot == null)
                     {
                         var m = map;
-                        if (Interlocked.CompareExchange(ref map, m.AddEntryOrKeep(factoryId), m) != m)
-                            Ref.Swap(ref map, factoryId, (x, id) => x.AddEntryOrKeep(id));
+                        if (Interlocked.CompareExchange(ref map, m.AddOrKeep(factoryId), m) != m)
+                            Ref.Swap(ref map, factoryId, (x, id) => x.AddOrKeep(id));
                         slot = map.GetEntryOrDefault(factoryId);
                     }
                 }
@@ -2331,7 +2330,7 @@ namespace DryIoc
                             var factory = oldFactories.GetValueOrDefault(serviceKey);
                             if (factory != null)
                                 remainingFactories = oldFactories.Height > 1
-                                    ? oldFactories.Update(serviceKey, null)
+                                    ? oldFactories.UpdateToDefault(serviceKey.GetHashCode(), serviceKey)
                                     : ImHashMap<object, Factory>.Empty;
                         }
 
@@ -2381,12 +2380,12 @@ namespace DryIoc
                         var d = DefaultFactoryCache;
                         if (d != null)
                             Ref.Swap(ref d[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
-                                (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).Update(h, t, null));
+                                (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).UpdateToDefault(h, t));
 
                         var k = KeyedFactoryCache;
                         if (k != null)
                             Ref.Swap(ref k[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
-                                (x, h, t) => (x ?? ImHashMap<Type, GrowingList<KeyAndFactorySlot>>.Empty).Update(h, t, default)); // todo: add UpdateToDefault
+                                (x, h, t) => (x ?? ImHashMap<Type, GrowingList<KeyAndFactorySlot>>.Empty).UpdateToDefault(h, t));
                     }
                     else
                     {
@@ -2402,7 +2401,7 @@ namespace DryIoc
                     var e = FactoryExpressionCache;
                     if (e != null)
                         Ref.Swap(ref e[factory.FactoryID & CACHE_SLOT_COUNT_MASK],
-                            factory.FactoryID, (x, i) => (x ?? ImMap<ExpressionCacheSlot>.Empty).Update(i, default)); // todo: add UpdateToDefault
+                            factory.FactoryID, (x, i) => (x ?? ImMap<ExpressionCacheSlot>.Empty).UpdateToDefault(i));
                 }
             }
 
@@ -8983,7 +8982,7 @@ namespace DryIoc
                 !setup.UseParentReuse &&
                 !Made.IsConditional;
 
-            ImMapData<Container.Registry.ExpressionCacheSlot> cacheSlot = null;
+            ImMapEntry<Container.Registry.ExpressionCacheSlot> cacheSlot = null;
             if (mayCache)
             {
                 var cachedExpr = ((Container)container).GetCachedFactoryExpression(FactoryID, request, out cacheSlot);
@@ -10564,7 +10563,7 @@ namespace DryIoc
             (GetItemRefOrDefault(id) ?? TryAddViaFactoryDelegate(id, createValue, r, disposalOrder)).Value;
 
         [MethodImpl((MethodImplOptions)256)]
-        internal ImMapData<object> GetItemRefOrDefault(int id)
+        internal ImMapEntry<object> GetItemRefOrDefault(int id)
         {
             var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
             return itemRef == null || itemRef.Value == NoItem ? null : itemRef;
@@ -10574,7 +10573,7 @@ namespace DryIoc
             typeof(Scope).GetTypeInfo().GetDeclaredMethod(nameof(Scope.GetItemRefOrDefault));
 
         // todo: WIP try to improve the case where we don't have the disposal order
-        internal ImMapData<object> TryAddViaFactoryDelegateNoDisposalOrder(int id, FactoryDelegate createValue, IResolverContext r)
+        internal ImMapEntry<object> TryAddViaFactoryDelegateNoDisposalOrder(int id, FactoryDelegate createValue, IResolverContext r)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
@@ -10604,7 +10603,7 @@ namespace DryIoc
         internal static readonly MethodInfo TryAddViaFactoryDelegateNoDisposalOrderMethod =
             typeof(Scope).GetTypeInfo().GetDeclaredMethod(nameof(Scope.TryAddViaFactoryDelegateNoDisposalOrder));
 
-        internal ImMapData<object> TryAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
+        internal ImMapEntry<object> TryAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
