@@ -40,7 +40,7 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
-            //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
+            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.Measure(
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIocMsDi());
@@ -51,7 +51,7 @@ namespace Playground
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.SecondOpenScopeResolve>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.ThirdOpenScopeResolve>();
 
-            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.CreateContainerRegister_FirstTimeOpenScopeResolve>();
+            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.CreateContainerRegister_FirstTimeOpenScopeResolve>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.FirstTimeOpenScopeResolve>();
 
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientNamedScopedDeps.BenchmarkRegistrationAndResolution>();

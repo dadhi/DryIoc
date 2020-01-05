@@ -653,8 +653,8 @@ namespace PerformanceTests
         [MemoryDiagnoser]
         public class CreateContainerAndRegisterServices
         {
-            /*
-            ## Baseline:
+/*
+## Baseline:
 
                             Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
@@ -666,7 +666,26 @@ namespace PerformanceTests
                         BmarkGrace | 5,933.57 us | 48.6780 us | 45.5335 us | 159.79 |    1.51 |     70.3125 |     31.2500 |      7.8125 |            338.2 KB |
                     BmarkGraceMsDi | 6,295.46 us | 43.3164 us | 40.5182 us | 169.46 |    0.98 |     78.1250 |     39.0625 |      7.8125 |           371.36 KB |
 
-             */
+## v4.1
+
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=3.1.100
+  [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+
+
+|                            Method |        Mean |     Error |    StdDev |  Ratio | RatioSD |   Gen 0 |   Gen 1 | Gen 2 | Allocated |
+|---------------------------------- |------------:|----------:|----------:|-------:|--------:|--------:|--------:|------:|----------:|
+| BmarkMicrosoftDependencyInjection |    29.24 us |  0.233 us |  0.218 us |   1.00 |    0.00 |  9.0332 |  0.0305 |     - |  41.54 KB |
+|                       BmarkDryIoc |    35.03 us |  0.223 us |  0.186 us |   1.20 |    0.01 |  8.7891 |  0.0610 |     - |  40.63 KB |
+|                   BmarkDryIocMsDi |    35.96 us |  0.233 us |  0.218 us |   1.23 |    0.01 |  9.5825 |  0.1831 |     - |   44.3 KB |
+|                        BmarkGrace | 5,210.27 us | 28.299 us | 26.471 us | 178.18 |    1.81 | 70.3125 | 31.2500 |     - | 332.61 KB |
+|                    BmarkGraceMsDi | 5,277.32 us | 37.934 us | 31.677 us | 180.23 |    1.77 | 78.1250 | 39.0625 |     - | 365.01 KB |
+|                      BmarkAutofac |   300.60 us |  2.431 us |  2.030 us |  10.27 |    0.11 | 53.7109 | 15.6250 |     - | 248.44 KB |
+|                  BmarkAutofacMsDi |   307.78 us |  1.040 us |  0.922 us |  10.52 |    0.09 | 55.1758 | 17.0898 |     - | 254.09 KB |
+
+*/
             [Benchmark(Baseline = true)]
             public object BmarkMicrosoftDependencyInjection() => PrepareMsDi();
 
@@ -885,11 +904,15 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
   [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
   DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
 
-|      Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------ |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|        MsDI |  85.42 us | 1.493 us | 1.247 us |  1.00 |    0.00 | 16.1133 | 0.1221 |     - |  74.23 KB |
-|      DryIoc |  92.88 us | 0.994 us | 0.830 us |  1.09 |    0.02 | 15.1367 | 1.3428 |     - |  69.79 KB |
-| DryIoc_MsDI | 116.65 us | 4.399 us | 7.103 us |  1.39 |    0.12 | 19.2871 | 1.7090 |     - |   89.1 KB |
+|       Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
+|------------- |-------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|------:|----------:|
+|         MsDI |     76.74 us |   0.570 us |   0.505 us |   1.00 |    0.00 |  16.1133 |  0.2441 |     - |  74.23 KB |
+|       DryIoc |     92.62 us |   0.763 us |   0.714 us |   1.21 |    0.02 |  15.1367 |  1.3428 |     - |  69.55 KB |
+|  DryIoc_MsDI |    116.60 us |   1.849 us |   1.544 us |   1.52 |    0.03 |  19.2871 |  1.8311 |     - |  88.85 KB |
+|      Autofac |    517.68 us |   1.748 us |   1.635 us |   6.75 |    0.06 | 101.5625 | 24.4141 |     - | 468.08 KB |
+| Autofac_MsDI |    524.51 us |   2.640 us |   2.340 us |   6.84 |    0.06 | 101.5625 | 24.4141 |     - |  466.9 KB |
+|        Grace | 15,844.41 us |  72.839 us |  64.570 us | 206.48 |    1.70 | 156.2500 | 62.5000 |     - | 729.29 KB |
+|   Grace_MsDI | 19,203.81 us | 139.461 us | 130.452 us | 250.25 |    2.78 | 187.5000 | 93.7500 |     - | 899.61 KB |
 
              */
 
@@ -906,16 +929,16 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             //[Benchmark] 
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            //[Benchmark]
+            [Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            //[Benchmark]
+            [Benchmark]
             public object Grace_MsDI() => Measure(PrepareGraceMsDi());
 
-            //[Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            //[Benchmark]
+            [Benchmark]
             public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
         }
 
@@ -1101,24 +1124,14 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 
 |                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |-------------------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
-|                      MsDi |  3.379 us | 0.0178 us | 0.0167 us |  1.00 |    0.00 |  0.9460 | 0.0153 |     - |   4.35 KB |
-|                    DryIoc |  1.620 us | 0.0030 us | 0.0026 us |  0.48 |    0.00 |  0.6638 | 0.0095 |     - |   3.05 KB |
-|        DryIoc_MsDiAdapter |  2.116 us | 0.0175 us | 0.0146 us |  0.63 |    0.01 |  0.6676 | 0.0076 |     - |   3.08 KB |
-| DryIoc_InterpretationOnly | 13.406 us | 0.0647 us | 0.0605 us |  3.97 |    0.03 |  1.2360 | 0.0153 |     - |    5.7 KB |
-|                     Grace |  1.711 us | 0.0139 us | 0.0123 us |  0.51 |    0.00 |  0.6886 | 0.0095 |     - |   3.17 KB |
-|         Grace_MsDiAdapter |  2.303 us | 0.0191 us | 0.0178 us |  0.68 |    0.01 |  0.7401 | 0.0076 |     - |   3.41 KB |
-|                   Autofac | 36.210 us | 0.2359 us | 0.2207 us | 10.72 |    0.08 |  9.8267 | 0.6104 |     - |  45.33 KB |
-|       Autofac_MsDiAdapter | 45.746 us | 0.2135 us | 0.1997 us | 13.54 |    0.09 | 13.3057 | 0.7935 |     - |  61.16 KB |
-
-|                    Method |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|-------------------------- |----------:|----------:|----------:|----------:|------:|--------:|-------:|-------:|------:|----------:|
-|                      MsDi |  3.433 us | 0.1273 us | 0.2483 us |  3.324 us |  1.00 |    0.00 | 0.9460 | 0.0153 |     - |   4.35 KB |
-|                    DryIoc |  1.638 us | 0.0062 us | 0.0055 us |  1.638 us |  0.45 |    0.04 | 0.6180 | 0.0076 |     - |   2.84 KB |
-|        DryIoc_MsDiAdapter |  2.166 us | 0.0525 us | 0.0466 us |  2.150 us |  0.59 |    0.05 | 0.6218 | 0.0076 |     - |   2.87 KB |
-| DryIoc_InterpretationOnly | 14.452 us | 0.3673 us | 0.3772 us | 14.237 us |  4.04 |    0.38 | 1.4496 | 0.0153 |     - |    6.7 KB |
-|                     Grace |  1.700 us | 0.0325 us | 0.0288 us |  1.690 us |  0.47 |    0.05 | 0.6886 | 0.0095 |     - |   3.17 KB |
-|         Grace_MsDiAdapter |  2.278 us | 0.0082 us | 0.0068 us |  2.276 us |  0.62 |    0.06 | 0.7401 | 0.0076 |     - |   3.41 KB |
-
+|                      MsDI |  3.352 us | 0.0195 us | 0.0163 us |  1.00 |    0.00 |  0.9460 | 0.0153 |     - |   4.35 KB |
+|                    DryIoc |  1.645 us | 0.0078 us | 0.0069 us |  0.49 |    0.00 |  0.6180 | 0.0076 |     - |   2.84 KB |
+|        DryIoc_MsDIAdapter |  2.098 us | 0.0171 us | 0.0152 us |  0.63 |    0.01 |  0.6218 | 0.0076 |     - |   2.87 KB |
+| DryIoc_InterpretationOnly | 13.798 us | 0.0718 us | 0.0671 us |  4.11 |    0.03 |  1.4496 | 0.0153 |     - |    6.7 KB |
+|                     Grace |  1.736 us | 0.0188 us | 0.0167 us |  0.52 |    0.01 |  0.6886 | 0.0095 |     - |   3.17 KB |
+|         Grace_MsDIAdapter |  2.228 us | 0.0279 us | 0.0261 us |  0.67 |    0.01 |  0.7401 | 0.0076 |     - |   3.41 KB |
+|                   Autofac | 37.386 us | 0.2686 us | 0.2513 us | 11.13 |    0.04 | 10.5591 | 0.6714 |     - |  48.66 KB |
+|       Autofac_MsDIAdapter | 44.416 us | 0.1591 us | 0.1488 us | 13.25 |    0.06 | 12.5732 | 0.7324 |     - |  57.78 KB |
 */
 
             private IServiceProvider _msDi;
@@ -1144,28 +1157,28 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             }
 
             [Benchmark(Baseline = true)]
-            public object MsDi() => Measure(_msDi);
+            public object MsDI() => Measure(_msDi);
 
             [Benchmark]
             public object DryIoc() => Measure(_dryIoc);
 
             [Benchmark]
-            public object DryIoc_MsDiAdapter() => Measure(_dryIocMsDi);
+            public object DryIoc_MsDIAdapter() => Measure(_dryIocMsDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            //[Benchmark]
+            [Benchmark]
             public object Grace() => Measure(_grace);
 
-            //[Benchmark]
-            public object Grace_MsDiAdapter() => Measure(_graceMsDi);
+            [Benchmark]
+            public object Grace_MsDIAdapter() => Measure(_graceMsDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            //[Benchmark]
-            public object Autofac_MsDiAdapter() => Measure(_autofacMsDi);
+            [Benchmark]
+            public object Autofac_MsDIAdapter() => Measure(_autofacMsDi);
         }
     }
 }
