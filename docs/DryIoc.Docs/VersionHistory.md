@@ -1,6 +1,14 @@
 Version History
 ---------------
 
+## v4.0.7 Bug-fix release / 2019-09-04
+
+- fixed: #173 Validate-Method throws System.TypeInitializationException : The type initializer for 'DryIoc.OpenGenericTypeKey' threw an exception.
+
+## v4.0.6 Bug-fix release / 2019-08-29
+
+- fixed: Wrong IContainer resolved #171 
+
 ## v4.0.5 Release notes / 2019-06-08
 
 - fixed: #133 Validate method call hangs
