@@ -274,6 +274,23 @@ Frequency=2156252 Hz, Resolution=463.7677 ns, Timer=TSC
                       BmarkAutofac |  30.870 us | 0.2843 us | 0.2660 us |   8.08 |    0.08 |      5.2185 |           - |           - |            24.15 KB |
                   BmarkLightInject | 435.833 us | 3.6918 us | 3.4533 us | 114.01 |    1.03 |      6.8359 |      3.4180 |           - |            32.42 KB |
                         BmarkGrace | 552.673 us | 3.3771 us | 3.1590 us | 144.57 |    1.06 |      5.8594 |      2.9297 |           - |            30.24 KB |
+
+## v4.1
+
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=3.1.100
+  [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
+
+
+|                            Method |       Mean |     Error |    StdDev |  Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|---------------------------------- |-----------:|----------:|----------:|-------:|--------:|-------:|-------:|------:|----------:|
+|                       BmarkDryIoc |   2.934 us | 0.0192 us | 0.0179 us |   0.74 |    0.02 | 0.6409 | 0.0038 |     - |   2.95 KB |
+| BmarkMicrosoftDependencyInjection |   3.941 us | 0.0752 us | 0.0805 us |   1.00 |    0.00 | 1.3428 | 0.0191 |     - |   6.18 KB |
+|                      BmarkAutofac |  28.563 us | 0.2652 us | 0.2215 us |   7.22 |    0.15 | 6.5002 | 0.2136 |     - |  29.97 KB |
+|                        BmarkGrace | 473.166 us | 2.5459 us | 2.3814 us | 120.03 |    2.83 | 5.8594 | 2.9297 |     - |  29.22 KB |
+|                  BmarkLightInject | 482.806 us | 1.5686 us | 1.4672 us | 122.47 |    2.68 | 6.8359 | 2.9297 |     - |  32.33 KB |
  */
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
         public class CreateContainerRegister_FirstTimeOpenScopeResolve

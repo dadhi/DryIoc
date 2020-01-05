@@ -51,11 +51,11 @@ namespace Playground
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.SecondOpenScopeResolve>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.ThirdOpenScopeResolve>();
 
-            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.CreateContainerRegister_FirstTimeOpenScopeResolve>();
+            BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.CreateContainerRegister_FirstTimeOpenScopeResolve>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.FirstTimeOpenScopeResolve>();
 
-            BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientNamedScopedDeps.BenchmarkRegistrationAndResolution>();
-            //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientNamedScopedDeps.BenchmarkResolution>();
+            //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientNamedScopedDeps.BenchmarkRegistrationAndResolution>();
+            //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientNamedScopedDeps.BenchmarkFirstTimeResolutionResolution>();
 
             //BenchmarkRunner.Run<ActivatorCreateInstance_vs_CtorInvoke>();
             //BenchmarkRunner.Run<AutoConcreteTypeResolutionBenchmark.Resolve>();

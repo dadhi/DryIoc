@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.1.0-preview-03</version>
+        <version>4.1.0-preview-04</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2019 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,18 +13,49 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
-## v4.1.0
+## v4.1.0 Feature release
 
-### Briefly:
+### Highlights
 
-- Better memory and performance for the real-world applications - big object graphs and the Unit-of-work scenarios
-- FEC V3.0 optimized for nested lambda invocation (scoped services in DryIoc) and consuming less memory
-- Rules.WithUseInterpretation to work iOS
-- Streamlined ambient ScopeContext scope disposal, ensuring more predictable AsyncExecutionFlowScopeContext, ThreadScopeContext behavior
+- Better memory use and massively improved performance for the real-world applications - big object graphs and the unit-of-work scenarios. See the updated benchmark results in [readme.md].(https://github.com/dadhi/DryIoc/blob/master/README.md#creating-the-container-registering-the-services-then-opening-a-scope-and-resolving-the-scoped-service-eg-controller-for-the-first-time))
+- Improve parallelism / reduce thread blocking #137
+- Full and fast DryIoc own Interpretation support via `Rules.WithUseInterpretation()` - useful for iOS and other platforms without compilation support #90
+- Copied DryIoc sample project from the MediatR but with DryIoc.Messages #117 
 
-### Bug fixes:
+### Features
 
-- 151 Resolve problem with ThreadScopeContext in version 4.0.*
+- Interpretation only option #90 
+- Add RegisterDelegate with the list of dependencies to Inject and not to Resolve #147
+- Lift restrictions for Scope disposal when using ambient ScopeContext #168 
+- FactoryDelegate<T> wrapper support #191
+- Add Rules.UseDecorateeReuseForDecorators #201
+
+### Fixes
+
+- Resolving a component for the second time throws #130
+- Stackoverflow exception #139
+- Xamarin Forms iOS: Operation is not supported on this platform. #156
+- DryIoc 4.0.5 withoutFastExpressionCompiler deadlock issue #157
+- Rules.WithDependencyDepthToSplitObjectGraph is not propagated through most of `Rules.With` methods #163
+- Rules.WithDependencyDepthToSplitObjectGraph was not applied in some cases with Decorators in graph #164
+- Made.Of() Parameters don't follow Reuse setting #179
+- ThreadScopeContext not working in DryIoc.dll 4.1.0-preview-02? #183
+- ReflectionTools methods unexpectedly return static constructors #184
+- Container creates multiple instances if TryInterpret fails #188
+- Open-generic implementation may be wrongly considered for service with many type args #190
+- DryIOC new Transient Disposable #192
+- Private and public Constructors in generic classes #196
+- Fix documentation regarding implicitly injected scope as IDisposable #197
+- Open generics resolve fails if there is a static constructor #198
+
+
+## v4.0.7 Bug-fix release
+
+- fixed: #173 Validate-Method throws System.TypeInitializationException : The type initializer for 'DryIoc.OpenGenericTypeKey' threw an exception.
+
+## v4.0.6 Bug-fix release
+
+- fixed: Wrong IContainer resolved #171 
 
 ## v4.0.5 Release notes
 
