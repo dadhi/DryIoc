@@ -360,7 +360,7 @@ namespace FastExpressionCompiler.LightExpression
             if (paramCount == 0)
                 return _closureAsASingleParamType;
 
-            if (paramCount < _closureTypePlusParamTypesPool.Length)
+            if (paramCount < 8)
             {
                 var closureAndParamTypes = Interlocked.Exchange(ref _closureTypePlusParamTypesPool[paramCount], null);
                 if (closureAndParamTypes != null)
@@ -380,7 +380,7 @@ namespace FastExpressionCompiler.LightExpression
         private static void ReturnClosureTypeToParamTypesToPool(Type[] closurePlusParamTypes)
         {
             var paramCount = closurePlusParamTypes.Length - 1;
-            if (paramCount != 0 && paramCount < _closureTypePlusParamTypesPool.Length)
+            if (paramCount != 0 && paramCount < 8)
                 Interlocked.Exchange(ref _closureTypePlusParamTypesPool[paramCount], closurePlusParamTypes);
         }
 
@@ -1313,7 +1313,7 @@ namespace FastExpressionCompiler.LightExpression
             var nestedLambdaExpr = nestedLambdaInfo.LambdaExpression;
             ref var nestedLambdaClosureInfo = ref nestedLambdaInfo.ClosureInfo;
 
-            var nestedLambdaParamExprs = nestedLambdaExpr.Parameters;
+            // todo: try remove recursion for the single nested lambda
             var nestedLambdaNestedLambdas = nestedLambdaClosureInfo.NestedLambdas;
             if (nestedLambdaNestedLambdas.Length != 0)
                 for (var i = 0; i < nestedLambdaNestedLambdas.Length; ++i)
@@ -1329,8 +1329,10 @@ namespace FastExpressionCompiler.LightExpression
                     nestedLambdaClosure = new ArrayClosure(nestedLambdaClosureInfo.GetArrayOfConstantsAndNestedLambdas());
             }
 
-            var nestedReturnType = nestedLambdaExpr.ReturnType;
+            var nestedLambdaParamExprs = nestedLambdaExpr.Parameters;
             var closurePlusParamTypes = GetClosureTypeToParamTypes(nestedLambdaParamExprs);
+
+            var nestedReturnType = nestedLambdaExpr.ReturnType;
 
             var method = new DynamicMethod(string.Empty, 
                 nestedReturnType, closurePlusParamTypes, typeof(ArrayClosure), true);

@@ -24,14 +24,13 @@ namespace LoadTest
              *
              * Reproduces https://github.com/dadhi/DryIoc/issues/139
              *
-             * With the new FEC using variables for closure constants
-             * - singletonDecorators: true  - 00:00:43.39, (00:00:28.41 with cached decorators)
-             * - singletonDecorators: false - 00:02:54.76, (00:01:20.13 with cached decorators)
+             * Fix results:
+             * - singletonDecorators: true                                         - 00:00:33.65
+             * - singletonDecorators: false                                        - 00:01:04.08
+             * - WithUseDecorateeReuseForDecorators and singletonDecorators: false - 00:00:42.31
              */
             var container = new Container(rules => rules
-                // depth:5 - completes in 00:02:22.07, for singletonDecorators: false - 00:02:15.27; depth 8 - is still a stack overflow
-                //.WithDependencyDepthToSplitObjectGraph(5)
-                //.WithUseDecorateeReuseForDecorators() // 00:00:39.16 (requires singletonDecorators: false to work)
+                .WithUseDecorateeReuseForDecorators()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 

@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <!-- <TargetFrameworks>netcoreapp3.1</TargetFrameworks> -->
-        <TargetFrameworks Condition="'$(NoSupportForNetCore22)' != 'true'">netcoreapp2.2</TargetFrameworks>
-        <TargetFrameworks Condition="'$(NoSupportForNetCore22)' == 'true'">netcoreapp2.1</TargetFrameworks>
+        <TargetFrameworks>netcoreapp3.1</TargetFrameworks> 
+        <!--<TargetFrameworks Condition="'$(NoSupportForNetCore22)' != 'true'">netcoreapp2.2</TargetFrameworks>
+        <TargetFrameworks Condition="'$(NoSupportForNetCore22)' == 'true'">netcoreapp2.1</TargetFrameworks>-->
         
         <Description>Benchmarks, sandbox for experiments.</Description>
 
-        <TieredCompilation>true</TieredCompilation>
+        <TieredCompilation>false</TieredCompilation>
         <DebugType>pdbonly</DebugType>
         <DebugSymbols>true</DebugSymbols>
 

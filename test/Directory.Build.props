@@ -4,6 +4,10 @@
     <PropertyGroup>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
+
+        <TieredCompilation>false</TieredCompilation>
+        <DebugType>pdbonly</DebugType>
+        <DebugSymbols>true</DebugSymbols>
     </PropertyGroup>
 
     <ItemGroup>  

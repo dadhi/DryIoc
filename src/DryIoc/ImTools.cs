@@ -2270,11 +2270,13 @@ namespace ImTools
     /// Simple unbounded object pool
     public sealed class StackPool<T> where T : class
     {
-        /// Give me an object
+        /// <summary>Give me an object</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public T RentOrDefault() =>
             Interlocked.Exchange(ref _s, _s?.Tail)?.Head;
 
-        /// Give it back
+        /// <summary>Give it back</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public void Return(T x) =>
             Interlocked.Exchange(ref _s, new Stack(x, _s));
 
@@ -2858,13 +2860,6 @@ namespace ImTools
             RightEntry = rightEntry;
         }
 
-        /// Creates with data and right data passed in any order. Note: the keys though should no be equal - it should be checked on caller side
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMapBranch<V> CreateNormalized(ImMapEntry<V> data1, ImMapEntry<V> data2) =>
-            data2.Key > data1.Key
-                ? new ImMapBranch<V>(data1, data2)
-                : new ImMapBranch<V>(data2, data1);
-
         /// Prints the key value pair
         public override string ToString() => Entry + "->" + RightEntry;
     }
@@ -3350,15 +3345,30 @@ namespace ImTools
                 Debug.Assert(newLeftTree.TreeHeight == 3, "Otherwise it is too un-balanced");
                 if (newLeftTree.Left is ImMapEntry<V> leftLeftLeaf)
                 {
+                    //            30                    15
+                    //    10            40 =>    10           20
+                    //  5     15               5    12     30    40
+                    //     12   20                     
                     if (newLeftTree.Right is ImMapTree<V> leftRightTree)
+                    {
+                        newLeftTree.Right = leftRightTree.Left;
+                        newLeftTree.TreeHeight = 2;
                         return new ImMapTree<V>(leftRightTree.Entry,
-                            new ImMapTree<V>(newLeftTree.Entry, 1, leftLeftLeaf, leftRightTree.Left),
-                            new ImMapTree<V>(Entry, leftRightTree.Right, 1, rightLeaf));
+                            newLeftTree,
+                            new ImMapTree<V>(Entry, leftRightTree.Right, rightLeaf, 2),
+                            3);
+                    }
 
+                    // we cannot reuse the new left tree here because it is reduced into the branch
+                    //           30                     15
+                    //    10            40 =>    5           20
+                    //  5    15                    10     30    40
+                    //         20                     
                     var leftRightBranch = (ImMapBranch<V>)newLeftTree.Right;
                     return new ImMapTree<V>(leftRightBranch.Entry,
-                        2, ImMapBranch<V>.CreateNormalized(newLeftTree.Entry, leftLeftLeaf),
-                        new ImMapTree<V>(Entry, leftRightBranch.RightEntry, rightLeaf));
+                        new ImMapBranch<V>(leftLeftLeaf, newLeftTree.Entry), 
+                        new ImMapTree<V>(Entry, leftRightBranch.RightEntry, rightLeaf),
+                        3);
                 }
 
                 newLeftTree.Right = new ImMapTree<V>(Entry, newLeftTree.Right, rightLeaf, 2);
@@ -3408,16 +3418,29 @@ namespace ImTools
                     return newRightTree;
                 }
 
-                // todo: optimize this the same as below
+                //        20                        30       
+                // 10             40     =>    20        40  
+                //            30      50     10  25    35  50
+                //          25  35                           
                 if (newRightTree.Left is ImMapTree<V> rightLeftTree)
+                {
+                    newRightTree.Left = rightLeftTree.Right;
+                    newRightTree.TreeHeight = 2;
                     return new ImMapTree<V>(rightLeftTree.Entry,
-                        new ImMapTree<V>(Entry, 1, leftLeaf, rightLeftTree.Left),
-                        new ImMapTree<V>(newRightTree.Entry, rightLeftTree.Right, 1, newRightTree.Right));
+                        new ImMapTree<V>(Entry, leftLeaf, rightLeftTree.Left, 2),
+                        newRightTree, 3);
+                }
 
+                //        20                        30       
+                // 10             40     =>    10        40  
+                //            30      50         20    35  50
+                //              35                           
                 var rightLeftBranch = (ImMapBranch<V>)newRightTree.Left;
+                newRightTree.Left = rightLeftBranch.RightEntry;
+                newRightTree.TreeHeight = 2;
                 return new ImMapTree<V>(rightLeftBranch.Entry,
-                    2, ImMapBranch<V>.CreateNormalized(Entry, leftLeaf),
-                    new ImMapTree<V>(newRightTree.Entry, rightLeftBranch.RightEntry, (ImMapEntry<V>)newRightTree.Right));
+                    new ImMapBranch<V>(leftLeaf, Entry),
+                    newRightTree, 3);
             }
 
             var leftHeight = (Left as ImMapTree<V>)?.TreeHeight ?? 2;
