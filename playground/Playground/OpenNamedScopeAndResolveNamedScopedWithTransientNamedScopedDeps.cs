@@ -112,14 +112,22 @@ namespace PerformanceTests
             }
         }
 
-        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        [MemoryDiagnoser]
         public class BenchmarkRegistrationAndResolution
         {
-            /*
+/*
+## v4
        Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
   BmarkDryIoc |  4.394 us | 0.0220 us | 0.0206 us |  1.00 |    0.00 |      0.9842 |           - |           - |             4.56 KB |
  BmarkAutofac | 37.145 us | 0.2879 us | 0.2404 us |  8.45 |    0.06 |      6.5918 |           - |           - |             30.4 KB |
+
+## v4.1
+|       Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------- |----------:|----------:|----------:|------:|--------:|-------:|-------:|------:|----------:|
+|  BmarkDryIoc |  3.883 us | 0.0766 us | 0.0996 us |  1.00 |    0.00 | 0.8240 | 0.0076 |     - |    3.8 KB |
+| BmarkAutofac | 30.005 us | 0.2775 us | 0.2596 us |  7.75 |    0.17 | 6.5308 | 0.2441 |     - |  30.01 KB |
+
              */
             [Benchmark]
             public object BmarkAutofac()
