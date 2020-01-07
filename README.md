@@ -30,7 +30,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
     - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-- [Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.0.6) :: [Previous Versions](https://bitbucket.org/dadhi/dryioc/wiki/VersionHistory)
+- [Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.1.0) :: [Previous Versions](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/VersionHistory.md)
 - [Extensions and Companions](Extensions.md)
 - [Documentation][WikiHome]
 - [Contribution guide](CONTRIBUTING.md)
@@ -41,11 +41,16 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 * [Features](http://featuretests.apphb.com/DependencyInjection.html)
 * [Performance overview](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
-* Realistic performance of unit-of-work with the modest size object graph ([#44](https://github.com/dadhi/DryIoc/issues/44#issuecomment-466440634), [#26](https://github.com/dadhi/DryIoc/issues/26#issuecomment-466460255)):
 
-### Bootstrapping the container then opening scope and resolving the root scoped service (e.g. controller) for the first time
+### Realistic performance of unit-of-work with the modest size object graph 
 
-#### DryIoc v4.1 and the libs updated
+Related issues are [#44](https://github.com/dadhi/DryIoc/issues/44#issuecomment-466440634) and [#26](https://github.com/dadhi/DryIoc/issues/26#issuecomment-466460255).
+
+The results are below
+
+#### Bootstrapping the container then opening scope and resolving the root scoped service (e.g. controller) for the first time
+
+DryIoc v4.1 and the libs updated (MsDI v3.1, Autofac v4.9.4, Grace v7.1.0):
 
 ```md
 BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
@@ -65,7 +70,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |   Grace_MsDIAdapter | 19,203.81 us | 139.461 us | 130.452 us | 250.25 |    2.78 | 187.5000 | 93.7500 |     - | 899.61 KB |
 ```
 
-#### DryIoc v4.0 and older libs - kept for comparison
+DryIoc v4.0 and older libs - kept for comparison:
 
 ```md
 |              Method |        Mean  |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
@@ -79,9 +84,9 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 | Autofac_MsDIAdapter |    747.80 us |   7.209 us |   6.391 us |   4.48 |    0.07 |    105.4688 |      7.8125 |           - |            487.8 KB |
 ```
 
-### Openning scope and resolving the root scoped service (e.g. controller) after warm up
+#### Opening scope and resolving the root scoped service (e.g. controller) after warm up
 
-#### DryIoc v4.1 and the libs updated
+DryIoc v4.1 and the libs updated (MsDI v3.1, Autofac v4.9.4, Grace v7.1.0):
 
 ```md
 BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
@@ -102,7 +107,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |       Autofac_MsDIAdapter | 44.416 us | 0.1591 us | 0.1488 us | 13.25 |    0.06 | 12.5732 | 0.7324 |     - |  57.78 KB |
 ```
 
-#### DryIoc v4.0 and older libs - kept for comparison
+DryIoc v4.0 and older libs - kept for comparison:
 
 ```md
 |                  Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
