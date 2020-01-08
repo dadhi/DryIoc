@@ -20,6 +20,7 @@ using Utilities;
 using Web.Rest.API;
 using CustomerDatabase = Databases.CustomerDatabase;
 using IUserService = Conn.IUserService;
+using Mega;
 
 namespace LoadTest
 {
@@ -42,6 +43,8 @@ namespace LoadTest
             CUsersIocModule.Load(container);
             RestApiIocModule.Load(container, singletonDecorators);
             RegisterLogging(container);
+
+            container.Register<IMegaClass, MegaClass>(Reuse.Transient);
         }
 
         static void RegUtilities(IContainer builder)

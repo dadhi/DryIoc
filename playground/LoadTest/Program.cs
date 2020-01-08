@@ -8,6 +8,7 @@ using System.Web.Http;
 using System.Web.Http.Controllers;
 using DryIoc;
 using DryIoc.WebApi;
+using Mega;
 using ThreadState = System.Threading.ThreadState;
 
 namespace LoadTest
@@ -20,8 +21,6 @@ namespace LoadTest
         {
             var config = new HttpConfiguration();
             var container = new Container(rules => rules
-                // With UseInterpretation it completes without error in 28 sec
-                .WithoutFastExpressionCompiler()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
@@ -50,6 +49,12 @@ namespace LoadTest
             var results = container.Validate();
             if (results.Length > 0)
             {
+                foreach (KeyValuePair<DryIoc.ServiceInfo, DryIoc.ContainerException> kvp in results)
+                {
+                    Console.WriteLine("Validation error ServiceType = {0}", kvp.Key.ServiceType.Name);
+                    Console.WriteLine(kvp.Value.Message);
+                }
+
                 throw new Exception(results.ToString());
             }
             stopWatch.Stop();
@@ -63,14 +68,18 @@ namespace LoadTest
             var httpControllerType = typeof(IHttpController);
 
             // Get Controllers which would normally be used for routing web requests
-            var controllers = Assembly.GetExecutingAssembly().GetLoadedTypes()
+            var typesToResolve = Assembly.GetExecutingAssembly().GetLoadedTypes()
                 .Where((t) =>
                     !t.IsAbstract && !t.IsInterface && !t.Name.Contains("Base") &&
                     httpControllerType.IsAssignableFrom(t))
-                .ToArray();
+                .ToList();
+
+            typesToResolve.Add(typeof(IMegaClass));
+
+            var typeArray = typesToResolve.ToArray();
 
             // Make sure all controllers can be resolved
-            ResolveAllControllersOnce(container, controllers);
+            ResolveAllControllersOnce(container, typeArray);
 
             Console.WriteLine("");
             Console.WriteLine("----------------------------------");
@@ -80,14 +89,14 @@ namespace LoadTest
 
             container = CreateContainer();
             ForceGarbageCollector();
-            ResolveAllControllersOnce(container, controllers); // Intepret
-            ResolveAllControllersOnce(container, controllers); // Compile, cache
-            IterateInOrder(controllers, container);
+            ResolveAllControllersOnce(container, typeArray); // Intepret
+            ResolveAllControllersOnce(container, typeArray); // Compile, cache
+            IterateInOrder(container, typeArray);
             container = CreateContainer();
             ForceGarbageCollector();
-            ResolveAllControllersOnce(container, controllers); // Intepret
-            ResolveAllControllersOnce(container, controllers); // Compile, cache
-            StartRandomOrderTest(controllers, container);
+            ResolveAllControllersOnce(container, typeArray); // Intepret
+            ResolveAllControllersOnce(container, typeArray); // Compile, cache
+            StartRandomOrderTest(container, typeArray);
 
 
 
@@ -100,13 +109,13 @@ namespace LoadTest
 
             container = CreateContainer();
             ForceGarbageCollector();
-            IterateInOrder(controllers, container);
+            IterateInOrder(container, typeArray);
             container = CreateContainer();
             ForceGarbageCollector();
-            StartRandomOrderTest(controllers, container);
+            StartRandomOrderTest(container, typeArray);
         }
 
-        public static void IterateInOrder(Type[] controllerTypes, IContainer container)
+        public static void IterateInOrder(IContainer container, Type[] controllerTypes)
         {
             var threadCount = 32;
             var iterations = 10;
@@ -171,7 +180,7 @@ namespace LoadTest
 
         public static void ParaetrizedLoop(object param)
         {
-            LoadTestParams p = (LoadTestParams)param;
+            var p = (LoadTestParams)param;
             int controllerCount = p.controllerTypes.Length;
 
             for (var j = 0; j < p.iterations; j++)
@@ -190,7 +199,7 @@ namespace LoadTest
 
         private static Thread[] _threads;
 
-        public static void StartRandomOrderTest(Type[] controllerTypes, IContainer container)
+        public static void StartRandomOrderTest(IContainer container, Type[] controllerTypes)
         {
             var threadCount = controllerTypes.Length - 1;
             var iterations = 10;
