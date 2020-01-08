@@ -26,12 +26,12 @@ namespace DryIoc.IssuesTests.FastExpressionCompiler
                     Lambda<Func<String, ILogTableManager>>(
                         Convert(Call(
                             Property(rParam, rCtxType.GetDeclaredProperty(nameof(IResolverContext.SingletonScope))),
-                                scopeType.SingleMethod("get_" + nameof(IScope.Parent)),
+                                scopeType.SingleMethod(nameof(IScope.GetOrAdd)),
                             Constant(174, typeof(int)),
-                                Lambda<CreateScopedValue>(
-                                    Call(null, 
-                                        typeof(LogTableManager).GetTypeInfo().GetDeclaredMethod(nameof(LogTableManager.Create)), sParam)),
-                                        Constant(0, typeof(Int32))), 
+                            Lambda<CreateScopedValue>(
+                                Call(null, 
+                                    typeof(LogTableManager).GetTypeInfo().GetDeclaredMethod(nameof(LogTableManager.Create)), sParam)),
+                            Constant(0)), 
                             typeof(ILogTableManager)),
                         sParam)));
 

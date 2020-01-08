@@ -879,7 +879,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_decorate_ienumerable_and_alter_the_service_key_filtering()
+        public void Can_decorate_enumerable_and_alter_the_service_key_filtering()
         {
             var container = new Container();
 

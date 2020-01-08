@@ -144,7 +144,9 @@ namespace DryIoc.IssuesTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Y<string, int>>());
 
-            Assert.AreEqual(Error.NoMatchedFactoryMethodWithServiceTypeArgs, ex.Error);
+            Assert.AreEqual(
+                Error.NameOf(Error.NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs), 
+                ex.ErrorName);
         }
 
         [Test]

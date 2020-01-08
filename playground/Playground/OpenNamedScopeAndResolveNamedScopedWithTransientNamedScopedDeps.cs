@@ -86,15 +86,24 @@ namespace PerformanceTests
 
         #endregion
 
-        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
-        public class BenchmarkResolution
+        [MemoryDiagnoser]
+        public class BenchmarkFirstTimeResolutionResolution
         {
             /*
+## v4
                    Method |       Mean |      Error |     StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
             ------------- |-----------:|-----------:|-----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
               BmarkDryIoc |   366.7 ns |  0.3240 ns |  0.2872 ns |  1.00 |    0.00 |      0.1183 |           - |           - |               560 B |
              BmarkAutofac | 2,392.4 ns | 15.0952 ns | 11.7853 ns |  6.52 |    0.03 |      0.8125 |           - |           - |              3840 B |
-             */
+
+## v4.1
+
+|       Method |     Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------- |---------:|----------:|----------:|------:|--------:|-------:|-------:|------:|----------:|
+| BmarkAutofac | 2.501 us | 0.0349 us | 0.0291 us |  1.05 |    0.02 | 0.8049 | 0.0038 |     - |   3.71 KB |
+|  BmarkDryIoc | 2.368 us | 0.0452 us | 0.0423 us |  1.00 |    0.00 | 0.3662 |      - |     - |    1.7 KB |
+
+           */
             private IContainer _autofac = PrepareAutofac();
 
             private global::DryIoc.IContainer _dryioc = PrepareDryIoc();
@@ -112,15 +121,23 @@ namespace PerformanceTests
             }
         }
 
-        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        [MemoryDiagnoser]
         public class BenchmarkRegistrationAndResolution
         {
-            /*
+/*
+## v4
        Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
   BmarkDryIoc |  4.394 us | 0.0220 us | 0.0206 us |  1.00 |    0.00 |      0.9842 |           - |           - |             4.56 KB |
  BmarkAutofac | 37.145 us | 0.2879 us | 0.2404 us |  8.45 |    0.06 |      6.5918 |           - |           - |             30.4 KB |
-             */
+
+## v4.1
+|       Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------- |----------:|----------:|----------:|------:|--------:|-------:|-------:|------:|----------:|
+|  BmarkDryIoc |  3.883 us | 0.0766 us | 0.0996 us |  1.00 |    0.00 | 0.8240 | 0.0076 |     - |    3.8 KB |
+| BmarkAutofac | 30.005 us | 0.2775 us | 0.2596 us |  7.75 |    0.17 | 6.5308 | 0.2441 |     - |  30.01 KB |
+
+*/
             [Benchmark]
             public object BmarkAutofac()
             {

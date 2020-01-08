@@ -113,24 +113,23 @@ namespace PerformanceTests
                 return scope.GetInstance<ScopedBlah>();
         }
 
-        public static Lamar.Container PrepareLamar()
-        {
-            return new Lamar.Container(c =>
-            {
-                c.AddTransient<Parameter1>();
-                c.AddSingleton<Parameter2>();
-                c.AddScoped<Parameter3>();
+        //public static Lamar.Container PrepareLamar()
+        //{
+        //    return new Lamar.Container(c =>
+        //    {
+        //        c.AddTransient<Parameter1>();
+        //        c.AddSingleton<Parameter2>();
+        //        c.AddScoped<Parameter3>();
 
-                c.AddScoped<ScopedBlah>();
-            });
-        }
+        //        c.AddScoped<ScopedBlah>();
+        //    });
+        //}
 
-        public static object Measure(Lamar.Container container)
-        {
-            using (var scope = container.CreateScope())
-                return scope.ServiceProvider.GetRequiredService<ScopedBlah>();
-        }
-
+        //public static object Measure(Lamar.Container container)
+        //{
+        //    using (var scope = container.CreateScope())
+        //        return scope.ServiceProvider.GetRequiredService<ScopedBlah>();
+        //}
 
         public static SimpleInjector.Container PrepareSimpleInjector()
         {
@@ -302,7 +301,7 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             private readonly IServiceProvider _msDi = PrepareMsDi();
             private readonly DependencyInjectionContainer _grace = PrepareGrace();
             private readonly ServiceContainer _lightInject = PrepareLightInject();
-            private readonly Lamar.Container _lamar = PrepareLamar();
+            //private readonly Lamar.Container _lamar = PrepareLamar();
             private readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
 
             [Benchmark]
@@ -321,7 +320,7 @@ Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
             public object BmarkLightInject() => Measure(_lightInject);
 
             //[Benchmark]
-            public object BmarkLamar() => Measure(_lamar);
+            //public object BmarkLamar() => Measure(_lamar);
 
             //[Benchmark]
             public object BmarkSimpleInjector() => Measure(_simpleInjector);
@@ -464,7 +463,7 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             public object BmarkLightInject() => Measure(PrepareLightInject());
 
             //[Benchmark]
-            public object BmarkLamar() => Measure(PrepareLamar());
+            //public object BmarkLamar() => Measure(PrepareLamar());
 
             //[Benchmark]
             public object BmarkSimpleInjector() => Measure(PrepareSimpleInjector());
@@ -540,7 +539,7 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             public object BmarkLightInject() => PrepareLightInject();
 
             //[Benchmark]
-            public object BmarkLamar() => Measure(PrepareLamar());
+            //public object BmarkLamar() => Measure(PrepareLamar());
 
             //[Benchmark]
             public object BmarkSimpleInjector() => Measure(PrepareSimpleInjector());
@@ -565,7 +564,7 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             private static readonly IServiceProvider _msDi = PrepareMsDi();
             private static readonly DependencyInjectionContainer _grace = PrepareGrace();
             private static readonly ServiceContainer _lightInject = PrepareLightInject();
-            private static readonly Lamar.Container _lamar = PrepareLamar();
+            //private static readonly Lamar.Container _lamar = PrepareLamar();
             private static readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
 
             [GlobalSetup]
@@ -598,7 +597,7 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             public object BmarkLightInject() => Measure(_lightInject);
 
             //[Benchmark]
-            public object BmarkLamar() => Measure(_lamar);
+            //public object BmarkLamar() => Measure(_lamar);
 
             //[Benchmark]
             public object BmarkSimpleInjector() => Measure(_simpleInjector);
@@ -616,7 +615,7 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             private static readonly IServiceProvider _msDi = PrepareMsDi();
             private static readonly DependencyInjectionContainer _grace = PrepareGrace();
             private static readonly ServiceContainer _lightInject = PrepareLightInject();
-            private static readonly Lamar.Container _lamar = PrepareLamar();
+            //private static readonly Lamar.Container _lamar = PrepareLamar();
             private static readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
 
             [GlobalSetup]
@@ -657,7 +656,7 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             public object BmarkLightInject() => Measure(_lightInject);
 
             //[Benchmark]
-            public object BmarkLamar() => Measure(_lamar);
+            //public object BmarkLamar() => Measure(_lamar);
 
             //[Benchmark]
             public object BmarkSimpleInjector() => Measure(_simpleInjector);

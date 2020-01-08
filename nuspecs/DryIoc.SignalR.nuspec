@@ -4,7 +4,7 @@
         <id>DryIoc.SignalR</id>
         <version>4.0.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2016-2019 Maksim Volkau</copyright>
+        <copyright>Copyright © 2016-2020 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
         <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>

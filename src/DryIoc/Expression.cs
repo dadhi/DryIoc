@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2019 Maksim Volkau
+Copyright (c) 2016-2020 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -11,7 +11,7 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included AddOrUpdateServiceFactory
+The above copyright notice and this permission notice shall be included
 all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -119,11 +119,15 @@ namespace FastExpressionCompiler.LightExpression
             if (arguments.Count == 0)
                 return $"new {typeof(T).Name}[0]";
 
-            var s = "";
+            var s = new StringBuilder();
             for (var i = 0; i < arguments.Count; i++)
-                s += (i > 0 ? "," + NewLine : "") + arguments[i].CodeString;
+            {
+                if (i > 0)
+                    s.Append(",");
+                s.Append(arguments[i].CodeString);
+            }
 
-            return s;
+            return s.ToString();
         }
 
         public static ParameterExpression Parameter(Type type, string name = null) =>
@@ -131,65 +135,199 @@ namespace FastExpressionCompiler.LightExpression
 
         public static ParameterExpression Variable(Type type, string name = null) => Parameter(type, name);
 
-        public static ConstantExpression Constant(object value, Type type = null)
+        public static readonly ConstantExpression NullConstant  = new TypedConstantExpression(null, typeof(object));
+        public static readonly ConstantExpression FalseConstant = new ConstantExpression(false);
+        public static readonly ConstantExpression TrueConstant  = new ConstantExpression(true);
+        public static readonly ConstantExpression ZeroConstant  = new ConstantExpression(0);
+
+        public static ConstantExpression Constant(bool value) =>
+            value ? TrueConstant : FalseConstant;
+
+        public static ConstantExpression Constant(int value) =>
+            value == 0 ? ZeroConstant : new TypedConstantExpression<int>(value);
+
+        public static ConstantExpression Constant<T>(T value) => 
+            new TypedConstantExpression<T>(value);
+
+        public static ConstantExpression Constant(object value)
         {
+            if (value == null)
+                return NullConstant;
+
             if (value is bool b)
-                return b ? _trueExpr : _falseExpr;
-            if (type == null)
-                return value != null ? new ConstantExpression(value, value.GetType()) : _nullExpr;
-            return new ConstantExpression(value, type);
+                return b ? TrueConstant : FalseConstant;
+
+            if (value is int n)
+                return n == 0 ? ZeroConstant : new TypedConstantExpression<int>(n);
+
+            return new ConstantExpression(value);
         }
 
-        private static readonly ConstantExpression _nullExpr  = new ConstantExpression(null,  typeof(object));
-        private static readonly ConstantExpression _falseExpr = new ConstantExpression(false, typeof(bool));
-        private static readonly ConstantExpression _trueExpr  = new ConstantExpression(true,  typeof(bool));
+        public static ConstantExpression Constant(object value, Type type) =>
+            new TypedConstantExpression(value, type);
 
         public static NewExpression New(Type type)
         {
-            ConstructorInfo ctor = null;
+            if (type.IsValueType())
+                return new NewValueTypeExpression(type);
+
             foreach (var x in type.GetTypeInfo().DeclaredConstructors)
                 if (x.GetParameters().Length == 0)
-                    ctor = x;
-            return new NewExpression(ctor, Tools.Empty<Expression>());
+                    return new NewExpression(x);
+
+            throw new ArgumentException($"The type {type} is missing the default constructor");
         }
 
-        public static NewExpression New(ConstructorInfo ctor) =>
-            new NewExpression(ctor, Tools.Empty<Expression>());
-
         public static NewExpression New(ConstructorInfo ctor, params Expression[] arguments) =>
-            new NewExpression(ctor, arguments);
+            arguments == null || arguments.Length == 0 ? new NewExpression(ctor): new ManyArgumentsNewExpression(ctor, arguments);
 
-        public static NewExpression New(ConstructorInfo ctor, IEnumerable<Expression> arguments) =>
-            new NewExpression(ctor, arguments.AsReadOnlyList());
+        public static NewExpression New(ConstructorInfo ctor, IEnumerable<Expression> arguments)
+        {
+            var args = arguments.AsReadOnlyList();
+            return args == null || args.Count == 0 ? new NewExpression(ctor) : new ManyArgumentsNewExpression(ctor, args);
+        }
 
-        public static MethodCallExpression Call(Expression instance, MethodInfo method, params Expression[] arguments) =>
-            new MethodCallExpression(instance, method, arguments);
+        public static NewExpression New(ConstructorInfo ctor) => new NewExpression(ctor);
 
-        public static MethodCallExpression Call(Expression instance, MethodInfo method, IEnumerable<Expression> arguments) =>
-            new MethodCallExpression(instance, method, arguments.AsReadOnlyList());
+        public static NewExpression New(ConstructorInfo ctor, Expression arg) =>
+            new OneArgumentNewExpression(ctor, arg);
 
-        public static MethodCallExpression Call(MethodInfo method, params Expression[] arguments) =>
-            Call(null, method, arguments);
+        public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1) =>
+            new TwoArgumentsNewExpression(ctor, arg0, arg1);
 
-        public static MethodCallExpression Call(MethodInfo method, IEnumerable<Expression> arguments) =>
-            Call(null, method, arguments.AsReadOnlyList());
+        public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2) =>
+            new ThreeArgumentsNewExpression(ctor, arg0, arg1, arg2);
 
-        public static MethodCallExpression Call(Type type, string methodName, Type[] typeArguments, params Expression[] arguments) =>
-            Call(null, type.FindMethod(methodName, typeArguments, arguments, isStatic: true), arguments);
+        public static NewExpression New(ConstructorInfo ctor, 
+            Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
+            new FourArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3);
+
+        public static NewExpression New(ConstructorInfo ctor,
+            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
+            new FiveArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4);
+
+        public static MethodCallExpression Call(MethodInfo method, params Expression[] arguments)
+        {
+            if (arguments == null || arguments.Length == 0)
+                return new MethodCallExpression(method);
+            return new ManyArgumentsMethodCallExpression(method, arguments);
+        }
+
+        public static MethodCallExpression Call(MethodInfo method, IEnumerable<Expression> arguments)
+        {
+            var args = arguments.AsReadOnlyList();
+            if (args == null || args.Count == 0)
+                return new MethodCallExpression(method);
+            return new ManyArgumentsMethodCallExpression(method, args);
+        }
+
+        public static MethodCallExpression Call(Expression instance, MethodInfo method, params Expression[] arguments)
+        {
+            if (arguments == null || arguments.Length == 0)
+                return new InstanceMethodCallExpression(instance, method);
+            return new InstanceManyArgumentsMethodCallExpression(instance, method, arguments);
+        }
+
+        public static MethodCallExpression Call(Expression instance, MethodInfo method, IEnumerable<Expression> arguments)
+        {
+            var args = arguments.AsReadOnlyList();
+            if (args == null || args.Count == 0)
+                return new InstanceMethodCallExpression(instance, method);
+            return new InstanceManyArgumentsMethodCallExpression(instance, method, args);
+        }
+
+        public static MethodCallExpression Call(Type type, string methodName, Type[] typeArguments, params Expression[] arguments)
+        {
+            if (arguments == null || arguments.Length == 0)
+                return new MethodCallExpression(type.FindMethod(methodName, typeArguments, arguments, isStatic: true));
+            return new ManyArgumentsMethodCallExpression(type.FindMethod(methodName, typeArguments, arguments, isStatic: true), arguments);
+        }
 
         public static MethodCallExpression Call(Type type, string methodName, Type[] typeArguments, IEnumerable<Expression> arguments)
         {
             var args = arguments.AsReadOnlyList();
-            return Call(null, type.FindMethod(methodName, typeArguments, args, isStatic: true), args);
+            if (args == null || args.Count == 0)
+                return new MethodCallExpression(type.FindMethod(methodName, typeArguments, args, isStatic: true));
+            return new ManyArgumentsMethodCallExpression(type.FindMethod(methodName, typeArguments, args, isStatic: true), args);
         }
 
-        public static MethodCallExpression Call(Expression instance, string methodName, Type[] typeArguments, params Expression[] arguments) =>
-            new MethodCallExpression(instance, instance.Type.FindMethod(methodName, typeArguments, arguments), arguments);
+        public static MethodCallExpression Call(Expression instance, string methodName, Type[] typeArguments, params Expression[] arguments)
+        {
+            if (arguments == null || arguments.Length == 0)
+                return new InstanceMethodCallExpression(instance, instance.Type.FindMethod(methodName, typeArguments, arguments));
+            return new InstanceManyArgumentsMethodCallExpression(instance, instance.Type.FindMethod(methodName, typeArguments, arguments), arguments);
+        }
 
         public static MethodCallExpression Call(Expression instance, string methodName, Type[] typeArguments, IEnumerable<Expression> arguments)
         {
             var args = arguments.AsReadOnlyList();
-            return new MethodCallExpression(instance, instance.Type.FindMethod(methodName, typeArguments, args), args);
+            if (args == null || args.Count == 0)
+                return new InstanceMethodCallExpression(instance, instance.Type.FindMethod(methodName, typeArguments, args));
+            return new InstanceManyArgumentsMethodCallExpression(instance, instance.Type.FindMethod(methodName, typeArguments, args), args);
+        }
+
+        public static MethodCallExpression Call(MethodInfo method) => 
+            new MethodCallExpression(method);
+
+        public static MethodCallExpression Call(Expression instance, MethodInfo method) =>
+            instance == null
+            ? new MethodCallExpression(method)
+            : new InstanceMethodCallExpression(instance, method);
+
+        public static MethodCallExpression Call(MethodInfo method, Expression argument) =>
+            new OneArgumentMethodCallExpression(method, argument);
+
+        public static MethodCallExpression Call(Expression instance, MethodInfo method, Expression argument) =>
+            instance == null
+            ? new OneArgumentMethodCallExpression(method, argument)
+            : new InstanceOneArgumentMethodCallExpression(instance, method, argument);
+
+        public static MethodCallExpression Call(MethodInfo method, Expression arg0, Expression arg1) =>
+            new TwoArgumentsMethodCallExpression(method, arg0, arg1);
+
+        public static MethodCallExpression Call(Expression instance, MethodInfo method, Expression arg0, Expression arg1) =>
+            instance == null
+            ? new TwoArgumentsMethodCallExpression(method, arg0, arg1)
+            : new InstanceTwoArgumentsMethodCallExpression(instance, method, arg0, arg1);
+
+        public static MethodCallExpression Call(MethodInfo method, Expression arg0, Expression arg1, Expression arg2) =>
+            new ThreeArgumentsMethodCallExpression(method, arg0, arg1, arg2);
+
+        public static MethodCallExpression Call(Expression instance, MethodInfo method, Expression arg0, Expression arg1, Expression arg2) =>
+            instance == null
+            ? new ThreeArgumentsMethodCallExpression(method, arg0, arg1, arg2)
+            : new InstanceThreeArgumentsMethodCallExpression(instance, method, arg0, arg1, arg2);
+
+        public static MethodCallExpression Call(MethodInfo method,
+            Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
+            new FourArgumentsMethodCallExpression(method, arg0, arg1, arg2, arg3);
+
+        public static MethodCallExpression Call(Expression instance, MethodInfo method,
+            Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
+            instance == null 
+                ? new FourArgumentsMethodCallExpression(method, arg0, arg1, arg2, arg3)
+                : new InstanceFourArgumentsMethodCallExpression(instance, method, arg0, arg1, arg2, arg3);
+
+        public static MethodCallExpression Call(MethodInfo method,
+            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
+            new FiveArgumentsMethodCallExpression(method, arg0, arg1, arg2, arg3, arg4);
+
+        public static MethodCallExpression Call(Expression instance, MethodInfo method,
+            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
+            instance == null
+            ? new FiveArgumentsMethodCallExpression(method, arg0, arg1, arg2, arg3, arg4)
+            : new InstanceFiveArgumentsMethodCallExpression(instance, method, arg0, arg1, arg2, arg3, arg4);
+
+        public static Expression CallIfNotNull(Expression instance, MethodInfo method) =>
+            CallIfNotNull(instance, method, Tools.Empty<Expression>());
+
+        public static Expression CallIfNotNull(Expression instance, MethodInfo method, IEnumerable<Expression> arguments)
+        {
+            var instanceVar = Parameter(instance.Type, "f");
+            return Block(instanceVar,
+                Assign(instanceVar, instance),
+                Condition(Equal(instanceVar, Constant(null)),
+                    Constant(null), Call(instanceVar, method, arguments)));
         }
 
         public static MemberExpression Property(PropertyInfo property) =>
@@ -246,14 +384,14 @@ namespace FastExpressionCompiler.LightExpression
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to Not and the Operand property set to the specified value.</returns>
         public static UnaryExpression Not(Expression expression) =>
-            new UnaryExpression(ExpressionType.Not, expression, expression.Type);
+            new UnaryExpression(ExpressionType.Not, expression);
 
         /// <summary>Creates a UnaryExpression that represents an explicit reference or boxing conversion where null is supplied if the conversion fails.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <param name="type">A Type to set the Type property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to TypeAs and the Operand and Type properties set to the specified values.</returns>
         public static UnaryExpression TypeAs(Expression expression, Type type) =>
-            new UnaryExpression(ExpressionType.TypeAs, expression, type);
+            new TypedUnaryExpression(ExpressionType.TypeAs, expression, type);
 
         public static TypeBinaryExpression TypeEqual(Expression operand, Type type) =>
             new TypeBinaryExpression(ExpressionType.TypeEqual, operand, type);
@@ -265,14 +403,21 @@ namespace FastExpressionCompiler.LightExpression
         /// <param name="array">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to ArrayLength and the Operand property equal to array.</returns>
         public static UnaryExpression ArrayLength(Expression array) =>
-            new UnaryExpression(ExpressionType.ArrayLength, array, typeof(int));
+            new TypedUnaryExpression<int>(ExpressionType.ArrayLength, array);
 
         /// <summary>Creates a UnaryExpression that represents a type conversion operation.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <param name="type">A Type to set the Type property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to Convert and the Operand and Type properties set to the specified values.</returns>
         public static UnaryExpression Convert(Expression expression, Type type) =>
-            Convert(expression, type, null);
+            new TypedUnaryExpression(ExpressionType.Convert, expression, type);
+
+        /// <summary>Creates a UnaryExpression that represents a type conversion operation.</summary>
+        /// <typeparam name="TTo">A Type to set the Type property equal to.</typeparam>
+        /// <param name="expression">An Expression to set the Operand property equal to.</param>
+        /// <returns>A UnaryExpression that has the NodeType property equal to Convert and the Operand and Type properties set to the specified values.</returns>
+        public static UnaryExpression Convert<TTo>(Expression expression) =>
+            new TypedUnaryExpression<TTo>(ExpressionType.Convert, expression);
 
         /// <summary>Creates a UnaryExpression that represents a conversion operation for which the implementing method is specified.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
@@ -280,14 +425,14 @@ namespace FastExpressionCompiler.LightExpression
         /// <param name="method">A MethodInfo to set the Method property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to Convert and the Operand, Type, and Method properties set to the specified values.</returns>
         public static UnaryExpression Convert(Expression expression, Type type, MethodInfo method) =>
-            new UnaryExpression(ExpressionType.Convert, expression, type, method);
+            new ConvertWithMethodUnaryExpression(ExpressionType.Convert, expression, type, method);
 
         /// <summary>Creates a UnaryExpression that represents a conversion operation that throws an exception if the target type is overflowed.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <param name="type">A Type to set the Type property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to ConvertChecked and the Operand and Type properties set to the specified values.</returns>
         public static UnaryExpression ConvertChecked(Expression expression, Type type) =>
-            ConvertChecked(expression, type, null);
+            new TypedUnaryExpression(ExpressionType.ConvertChecked, expression, type);
 
         /// <summary>Creates a UnaryExpression that represents a conversion operation that throws an exception if the target type is overflowed and for which the implementing method is specified.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
@@ -295,31 +440,31 @@ namespace FastExpressionCompiler.LightExpression
         /// <param name="method">A MethodInfo to set the Method property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to ConvertChecked and the Operand, Type, and Method properties set to the specified values.</returns>
         public static UnaryExpression ConvertChecked(Expression expression, Type type, MethodInfo method) =>
-            new UnaryExpression(ExpressionType.ConvertChecked, expression, type, method);
+            new ConvertWithMethodUnaryExpression(ExpressionType.ConvertChecked, expression, type, method);
 
         /// <summary>Creates a UnaryExpression that represents the decrementing of the expression by 1.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that represents the decremented expression.</returns>
         public static UnaryExpression Decrement(Expression expression) =>
-            new UnaryExpression(ExpressionType.Decrement, expression, expression.Type);
+            new UnaryExpression(ExpressionType.Decrement, expression);
 
         /// <summary>Creates a UnaryExpression that represents the incrementing of the expression value by 1.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that represents the incremented expression.</returns>
         public static UnaryExpression Increment(Expression expression) =>
-            new UnaryExpression(ExpressionType.Increment, expression, expression.Type);
+            new UnaryExpression(ExpressionType.Increment, expression);
 
         /// <summary>Returns whether the expression evaluates to false.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>An instance of UnaryExpression.</returns>
         public static UnaryExpression IsFalse(Expression expression) =>
-            new UnaryExpression(ExpressionType.IsFalse, expression, typeof(bool));
+            new TypedUnaryExpression<bool>(ExpressionType.IsFalse, expression);
 
         /// <summary>Returns whether the expression evaluates to true.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>An instance of UnaryExpression.</returns>
         public static UnaryExpression IsTrue(Expression expression) =>
-            new UnaryExpression(ExpressionType.IsTrue, expression, typeof(bool));
+            new TypedUnaryExpression<bool>(ExpressionType.IsTrue, expression);
 
         /// <summary>Creates a UnaryExpression, given an operand, by calling the appropriate factory method.</summary>
         /// <param name="unaryType">The ExpressionType that specifies the type of unary operation.</param>
@@ -327,96 +472,143 @@ namespace FastExpressionCompiler.LightExpression
         /// <param name="type">The Type that specifies the type to be converted to (pass null if not applicable).</param>
         /// <returns>The UnaryExpression that results from calling the appropriate factory method.</returns>
         public static UnaryExpression MakeUnary(ExpressionType unaryType, Expression operand, Type type) =>
-            new UnaryExpression(unaryType, operand, type);
+            type == null 
+                ? new UnaryExpression(unaryType, operand) 
+                : new TypedUnaryExpression(unaryType, operand, type);
 
         /// <summary>Creates a UnaryExpression that represents an arithmetic negation operation.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to Negate and the Operand property set to the specified value.</returns>
         public static UnaryExpression Negate(Expression expression) =>
-            new UnaryExpression(ExpressionType.Negate, expression, expression.Type);
+            new UnaryExpression(ExpressionType.Negate, expression);
 
         /// <summary>Creates a UnaryExpression that represents an arithmetic negation operation that has overflow checking.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to NegateChecked and the Operand property set to the specified value.</returns>
         public static UnaryExpression NegateChecked(Expression expression) =>
-            new UnaryExpression(ExpressionType.NegateChecked, expression, expression.Type);
+            new UnaryExpression(ExpressionType.NegateChecked, expression);
 
         /// <summary>Returns the expression representing the ones complement.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>An instance of UnaryExpression.</returns>
         public static UnaryExpression OnesComplement(Expression expression) =>
-            new UnaryExpression(ExpressionType.OnesComplement, expression, expression.Type);
+            new UnaryExpression(ExpressionType.OnesComplement, expression);
 
         /// <summary>Creates a UnaryExpression that increments the expression by 1 and assigns the result back to the expression.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that represents the resultant expression.</returns>
         public static UnaryExpression PreIncrementAssign(Expression expression) =>
-            new UnaryExpression(ExpressionType.PreIncrementAssign, expression, expression.Type);
+            new UnaryExpression(ExpressionType.PreIncrementAssign, expression);
 
         /// <summary>Creates a UnaryExpression that represents the assignment of the expression followed by a subsequent increment by 1 of the original expression.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that represents the resultant expression.</returns>
         public static UnaryExpression PostIncrementAssign(Expression expression) =>
-            new UnaryExpression(ExpressionType.PostIncrementAssign, expression, expression.Type);
+            new UnaryExpression(ExpressionType.PostIncrementAssign, expression);
 
         /// <summary>Creates a UnaryExpression that decrements the expression by 1 and assigns the result back to the expression.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that represents the resultant expression.</returns>
         public static UnaryExpression PreDecrementAssign(Expression expression) =>
-            new UnaryExpression(ExpressionType.PreDecrementAssign, expression, expression.Type);
+            new UnaryExpression(ExpressionType.PreDecrementAssign, expression);
 
         /// <summary>Creates a UnaryExpression that represents the assignment of the expression followed by a subsequent decrement by 1 of the original expression.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that represents the resultant expression.</returns>
         public static UnaryExpression PostDecrementAssign(Expression expression) =>
-            new UnaryExpression(ExpressionType.PostDecrementAssign, expression, expression.Type);
+            new UnaryExpression(ExpressionType.PostDecrementAssign, expression);
 
         /// <summary>Creates a UnaryExpression that represents an expression that has a constant value of type Expression.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to Quote and the Operand property set to the specified value.</returns>
         public static UnaryExpression Quote(Expression expression) =>
-            new UnaryExpression(ExpressionType.Quote, expression, expression.Type);
+            new UnaryExpression(ExpressionType.Quote, expression);
 
         /// <summary>Creates a UnaryExpression that represents a unary plus operation.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to UnaryPlus and the Operand property set to the specified value.</returns>
         public static UnaryExpression UnaryPlus(Expression expression) =>
-            new UnaryExpression(ExpressionType.UnaryPlus, expression, expression.Type);
+            new UnaryExpression(ExpressionType.UnaryPlus, expression);
 
         /// <summary>Creates a UnaryExpression that represents an explicit unboxing.</summary>
         /// <param name="expression">An Expression to set the Operand property equal to.</param>
         /// <param name="type">A Type to set the Type property equal to.</param>
         /// <returns>A UnaryExpression that has the NodeType property equal to unbox and the Operand and Type properties set to the specified values.</returns>
         public static UnaryExpression Unbox(Expression expression, Type type) =>
-            new UnaryExpression(ExpressionType.Unbox, expression, type);
+            new TypedUnaryExpression(ExpressionType.Unbox, expression, type);
 
         public static LambdaExpression Lambda(Expression body) =>
-            new LambdaExpression(Tools.GetFuncOrActionType(Tools.Empty<Type>(), body.Type), body, Tools.Empty<ParameterExpression>(), body.Type);
+            new LambdaExpression(Tools.GetFuncOrActionType(Tools.Empty<Type>(), body.Type), 
+                body, body.Type);
+
+        public static LambdaExpression Lambda(Type delegateType, Expression body) =>
+            new LambdaExpression(delegateType, body, body.Type);
+
+        public static LambdaExpression Lambda(Type delegateType, Expression body, Type returnType) =>
+            new LambdaExpression(delegateType, body, returnType);
 
         public static LambdaExpression Lambda(Expression body, params ParameterExpression[] parameters) =>
-            new LambdaExpression(Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), body.Type), body, parameters, body.Type);
+            Lambda(Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), body.Type), body, parameters, body.Type);
 
         public static LambdaExpression Lambda(Type delegateType, Expression body, params ParameterExpression[] parameters) =>
-            new LambdaExpression(delegateType, body, parameters, delegateType.FindDelegateInvokeMethod().ReturnType);
+            Lambda(delegateType, body, parameters, GetDelegateReturnType(delegateType));
 
         public static LambdaExpression Lambda(Type delegateType, Expression body, ParameterExpression[] parameters, Type returnType) =>
-            new LambdaExpression(delegateType, body, parameters, returnType);
+            parameters == null || parameters.Length == 0 
+                ? new LambdaExpression(delegateType, body, returnType)
+                : new ManyParametersLambdaExpression(delegateType, body, parameters, returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body) =>
-            new Expression<TDelegate>(body, Tools.Empty<ParameterExpression>(), typeof(TDelegate).FindDelegateInvokeMethod().ReturnType);
+            new Expression<TDelegate>(body, typeof(TDelegate).FindDelegateInvokeMethod().ReturnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body, Type returnType) =>
-            new Expression<TDelegate>(body, Tools.Empty<ParameterExpression>(), returnType);
+            new Expression<TDelegate>(body, returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body, params ParameterExpression[] parameters) =>
-            new Expression<TDelegate>(body, parameters, typeof(TDelegate).FindDelegateInvokeMethod().ReturnType);
+            Lambda<TDelegate>(body, parameters, GetDelegateReturnType(typeof(TDelegate)));
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body, ParameterExpression[] parameters, Type returnType) =>
-            new Expression<TDelegate>(body, parameters, returnType);
+            parameters == null || parameters.Length == 0 
+                ? new Expression<TDelegate>(body, returnType)
+                : new ManyParametersExpression<TDelegate>(body, parameters, returnType);
 
-        /// todo: <paramref name="name"/> is ignored for now, the method is just for compatibility with SysExpression
-        public static Expression<TDelegate> Lambda<TDelegate>(Expression body, string name, params ParameterExpression[] parameters) =>
-            new Expression<TDelegate>(body, parameters, typeof(TDelegate).FindDelegateInvokeMethod().ReturnType);
+        /// <summary>
+        /// <paramref name="name"/> is ignored for now, the method is just for compatibility with SysExpression
+        /// </summary>
+        public static Expression<TDelegate> Lambda<TDelegate>(Expression body, string name, params ParameterExpression[] parameters) where TDelegate : class =>
+            new ManyParametersExpression<TDelegate>(body, parameters, GetDelegateReturnType(typeof(TDelegate)));
+
+        private static Type GetDelegateReturnType(Type delType)
+        {
+            var typeInfo = delType.GetTypeInfo();
+            if (typeInfo.IsGenericType)
+            {
+                var typeArguments = typeInfo.GenericTypeArguments;
+                var index = typeArguments.Length - 1;
+                var typeDef = typeInfo.GetGenericTypeDefinition();
+                if (typeDef == FuncTypes[index])
+                    return typeArguments[index];
+
+                if (typeDef == ActionTypes[index])
+                    return typeof(void);
+            }
+            else if (delType == typeof(Action))
+                return typeof(void);
+
+            return delType.FindDelegateInvokeMethod().ReturnType;
+        }
+
+        internal static readonly Type[] FuncTypes =
+        {
+            typeof(Func<>), typeof(Func<,>), typeof(Func<,,>), typeof(Func<,,,>), typeof(Func<,,,,>),
+            typeof(Func<,,,,,>), typeof(Func<,,,,,,>), typeof(Func<,,,,,,,>)
+        };
+
+        internal static readonly Type[] ActionTypes =
+        {
+            typeof(Action<>), typeof(Action<,>), typeof(Action<,,>), typeof(Action<,,,>),
+            typeof(Action<,,,,>), typeof(Action<,,,,,>), typeof(Action<,,,,,,>)
+        };
 
         /// <summary>Creates a BinaryExpression that represents applying an array index operator to an array of rank one.</summary>
         /// <param name="array">A Expression to set the Left property equal to.</param>
@@ -727,16 +919,27 @@ namespace FastExpressionCompiler.LightExpression
             new SimpleBinaryExpression(ExpressionType.NotEqual, left, right, typeof(bool));
 
         public static BlockExpression Block(params Expression[] expressions) =>
+            Block(expressions[expressions.Length - 1].Type, Tools.Empty<ParameterExpression>(), expressions);
+
+        public static BlockExpression Block(IReadOnlyList<Expression> expressions) =>
             Block(Tools.Empty<ParameterExpression>(), expressions);
 
         public static BlockExpression Block(IEnumerable<ParameterExpression> variables, params Expression[] expressions) =>
-            Block(expressions[expressions.Length - 1].Type, variables.AsReadOnlyList(), expressions);
+            Block(variables.AsReadOnlyList(), new List<Expression>(expressions));
+
+        public static BlockExpression Block(IReadOnlyList<ParameterExpression> variables, IReadOnlyList<Expression> expressions) =>
+            Block(expressions[expressions.Count - 1].Type, variables, expressions);
 
         public static BlockExpression Block(Type type, IEnumerable<ParameterExpression> variables, params Expression[] expressions) =>
-            new BlockExpression(type, variables.AsReadOnlyList(), expressions);
+            new BlockExpression(type, variables.AsReadOnlyList(), expressions.AsReadOnlyList());
 
         public static BlockExpression Block(Type type, IEnumerable<ParameterExpression> variables, IEnumerable<Expression> expressions) =>
             new BlockExpression(type, variables.AsReadOnlyList(), expressions.AsReadOnlyList());
+
+        public static Expression Block(ParameterExpression variable, Expression expression1, Expression expression2) =>
+            expression2.NodeType == ExpressionType.Throw || expression1.NodeType == ExpressionType.Throw
+                ? (Expression)Block(new[] {variable}, expression1, expression2)
+                : new OneVariableTwoExpressionBlockExpression(variable, expression1, expression2);
 
         /// <summary>
         /// Creates a LoopExpression with the given body and (optional) break target.
@@ -782,7 +985,7 @@ namespace FastExpressionCompiler.LightExpression
         /// <param name="type">The Type of the expression.</param>
         /// <returns>A UnaryExpression that represents the exception.</returns>
         public static UnaryExpression Throw(Expression value, Type type) =>
-            new UnaryExpression(ExpressionType.Throw, value, type);
+            new TypedUnaryExpression(ExpressionType.Throw, value, type);
 
         public static LabelExpression Label(LabelTarget target, Expression defaultValue = null) =>
             new LabelExpression(target, defaultValue);
@@ -881,7 +1084,16 @@ namespace FastExpressionCompiler.LightExpression
         /// <param name="left">An Expression to set the Left property equal to.</param>
         /// <param name="right">An Expression to set the Right property equal to.</param>
         /// <returns>A BinaryExpression that has the NodeType property equal to Coalesce and the Left and Right properties set to the specified values.</returns>
-        public static BinaryExpression Coalesce(Expression left, Expression right) => Coalesce(left, right, null);
+        public static BinaryExpression Coalesce(Expression left, Expression right) =>
+            new SimpleBinaryExpression(ExpressionType.Coalesce, left, right, GetCoalesceType(left.Type, right.Type));
+
+        /// <summary>Creates a BinaryExpression that represents a coalescing operation.</summary>
+        /// <param name="left">An Expression to set the Left property equal to.</param>
+        /// <param name="right">An Expression to set the Right property equal to.</param>
+        /// <param name="type">Result type</param>
+        /// <returns>A BinaryExpression that has the NodeType property equal to Coalesce and the Left and Right properties set to the specified values.</returns>
+        public static BinaryExpression Coalesce(Expression left, Expression right, Type type) =>
+            new SimpleBinaryExpression(ExpressionType.Coalesce, left, right, type);
 
         /// <summary>Creates a BinaryExpression that represents a coalescing operation, given a conversion function.</summary>
         /// <param name="left">An Expression to set the Left property equal to.</param>
@@ -918,6 +1130,15 @@ namespace FastExpressionCompiler.LightExpression
 
     internal static class TypeTools
     {
+        internal static int GetFirstIndex<T>(this IReadOnlyList<T> source, T item)
+        {
+            if (source.Count != 0)
+                for (var i = 0; i < source.Count; ++i)
+                    if (ReferenceEquals(source[i], item))
+                        return i;
+            return -1;
+        }
+
         internal static bool IsImplicitlyBoxingConvertibleTo(this Type source, Type target) =>
             source.GetTypeInfo().IsValueType &&
             (target == typeof(object) ||
@@ -1075,7 +1296,6 @@ namespace FastExpressionCompiler.LightExpression
         }
     }
 
-
     /// Converts the object of known type into the valid C# code representation
     public static class CodePrinter
     {
@@ -1210,10 +1430,11 @@ namespace FastExpressionCompiler.LightExpression
     public class UnaryExpression : Expression
     {
         public override ExpressionType NodeType { get; }
-        public override Type Type { get; }
 
+        public override Type Type => Operand.Type;
         public readonly Expression Operand;
-        public readonly MethodInfo Method;
+
+        public virtual MethodInfo Method => null;
 
         internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted)
         {
@@ -1308,28 +1529,40 @@ namespace FastExpressionCompiler.LightExpression
             }
         }
 
-        public UnaryExpression(ExpressionType nodeType, Expression operand, Type type)
+        public UnaryExpression(ExpressionType nodeType, Expression operand)
         {
             NodeType = nodeType;
             Operand = operand;
-            Type = type;
         }
+    }
 
-        public UnaryExpression(ExpressionType nodeType, Expression operand, MethodInfo method)
-        {
-            NodeType = nodeType;
-            Operand = operand;
-            Method = method;
-            Type = Method.ReturnType;
-        }
+    public class TypedUnaryExpression : UnaryExpression
+    {
+        public override Type Type { get; }
 
-        public UnaryExpression(ExpressionType nodeType, Expression operand, Type type, MethodInfo method)
-        {
-            NodeType = nodeType;
-            Operand = operand;
-            Method = method;
+        public TypedUnaryExpression(ExpressionType nodeType, Expression operand, Type type) : base(nodeType, operand) =>
             Type = type;
-        }
+    }
+
+    public sealed class TypedUnaryExpression<T> : UnaryExpression
+    {
+        public override Type Type => typeof(T);
+
+        public TypedUnaryExpression(ExpressionType nodeType, Expression operand) : base(nodeType, operand) { }
+    }
+
+    public sealed class ConvertWithMethodUnaryExpression : TypedUnaryExpression
+    {
+        public override MethodInfo Method { get; }
+        public override Type Type => Method.ReturnType;
+
+        public ConvertWithMethodUnaryExpression(ExpressionType nodeType, Expression operand, MethodInfo method) 
+            : base(nodeType, operand, method.ReturnType) =>
+            Method = method;
+
+        public ConvertWithMethodUnaryExpression(ExpressionType nodeType, Expression operand, Type type, MethodInfo method)
+            : base(nodeType, operand, type) =>
+            Method = method;
     }
 
     public abstract class BinaryExpression : Expression
@@ -1548,7 +1781,7 @@ namespace FastExpressionCompiler.LightExpression
                         bindings += "," + NewLine;
                     bindings += Bindings[i].CodeString;
                 }
-                return $"MemberInit({NewExpression.CodeString}," + NewLine +
+                return $"MemberInit({Expression.CodeString}," + NewLine +
                        $"{bindings})";
             }
         }
@@ -1568,6 +1801,7 @@ namespace FastExpressionCompiler.LightExpression
         public override ExpressionType NodeType => ExpressionType.Parameter;
         public override Type Type { get; }
 
+        // todo: we need the version without this members
         public readonly string Name;
         public readonly bool IsByRef;
 
@@ -1602,12 +1836,14 @@ namespace FastExpressionCompiler.LightExpression
         }
     }
 
-    public sealed class ConstantExpression : Expression
+    public class ConstantExpression : Expression
     {
         public override ExpressionType NodeType => ExpressionType.Constant;
-        public override Type Type { get; }
+        public override Type Type => Value.GetType();
 
         public readonly object Value;
+
+        internal ConstantExpression(object value) => Value = value;
 
         internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> _) =>
             SysExpr.Constant(Value, Type);
@@ -1618,30 +1854,40 @@ namespace FastExpressionCompiler.LightExpression
 
         public override string CodeString =>
             $"Constant({Value.ToCode(NotRecognizedValueToCode)}, {Type.ToCode()})";
+    }
 
-        internal ConstantExpression(object value, Type type)
-        {
-            Value = value;
-            Type = type;
-        }
+    public sealed class TypedConstantExpression : ConstantExpression
+    {
+        public override Type Type { get; }
+
+        internal TypedConstantExpression(object value, Type type) : base(value) => Type = type;
+    }
+
+    public sealed class TypedConstantExpression<T> : ConstantExpression
+    {
+        public override Type Type => typeof(T);
+
+        internal TypedConstantExpression(T value) : base(value) { }
     }
 
     public abstract class ArgumentsExpression : Expression
     {
         public readonly IReadOnlyList<Expression> Arguments;
 
-        protected ArgumentsExpression(IReadOnlyList<Expression> arguments)
-        {
-            Arguments = arguments ?? Tools.Empty<Expression>();
-        }
+        protected ArgumentsExpression(IReadOnlyList<Expression> arguments) => Arguments = arguments ?? Tools.Empty<Expression>();
     }
 
-    public sealed class NewExpression : ArgumentsExpression
+    public class NewExpression : Expression
     {
         public override ExpressionType NodeType => ExpressionType.New;
         public override Type Type => Constructor.DeclaringType;
 
         public readonly ConstructorInfo Constructor;
+
+        public virtual int FewArgumentCount => 0;
+        public virtual IReadOnlyList<Expression> Arguments => Tools.Empty<Expression>();
+
+        internal NewExpression(ConstructorInfo constructor) => Constructor = constructor;
 
         internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
             SysExpr.New(Constructor, ToExpressions(Arguments, ref exprsConverted));
@@ -1651,16 +1897,116 @@ namespace FastExpressionCompiler.LightExpression
             get
             {
                 var ctorIndex = Constructor.DeclaringType.GetTypeInfo().DeclaredConstructors.ToArray().GetFirstIndex(Constructor);
-                return $"New({Type.ToCode()}.GetTypeInfo().DeclaredConstructors.ToArray()[{ctorIndex}]," + NewLine + 
+                return $"New({Type.ToCode()}.GetTypeInfo().DeclaredConstructors.ToArray()[{ctorIndex}]," + NewLine +
                        $"{ToParamsCode(Arguments)})";
             }
         }
+    }
 
-        internal NewExpression(ConstructorInfo constructor, IReadOnlyList<Expression> arguments) :
-            base(arguments)
+    public sealed class NewValueTypeExpression : NewExpression
+    {
+        public override Type Type { get; }
+
+        internal NewValueTypeExpression(Type type) : base(null) => Type = type;
+
+        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) => SysExpr.New(Type);
+
+        public override string CodeString => $"New({Type.ToCode()})";
+    }
+
+    public sealed class OneArgumentNewExpression : NewExpression
+    {
+        public readonly Expression Argument;
+        public override IReadOnlyList<Expression> Arguments => new[] { Argument };
+        public override int FewArgumentCount => 1;
+
+        internal OneArgumentNewExpression(ConstructorInfo constructor, Expression argument) : base(constructor) =>
+            Argument = argument;
+    }
+
+    public sealed class TwoArgumentsNewExpression : NewExpression
+    {
+        public readonly Expression Argument0;
+        public readonly Expression Argument1;
+
+        public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1 };
+        public override int FewArgumentCount => 2;
+
+        internal TwoArgumentsNewExpression(ConstructorInfo constructor,
+            Expression argument0, Expression argument1) : base(constructor)
         {
-            Constructor = constructor;
+            Argument0 = argument0;
+            Argument1 = argument1;
         }
+    }
+
+    public sealed class ThreeArgumentsNewExpression : NewExpression
+    {
+        public readonly Expression Argument0;
+        public readonly Expression Argument1;
+        public readonly Expression Argument2;
+
+        public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2 };
+        public override int FewArgumentCount => 3;
+
+        internal ThreeArgumentsNewExpression(ConstructorInfo constructor,
+            Expression argument0, Expression argument1, Expression argument2) : base(constructor)
+        {
+            Argument0 = argument0;
+            Argument1 = argument1;
+            Argument2 = argument2;
+        }
+    }
+
+    public sealed class FourArgumentsNewExpression : NewExpression
+    {
+        public readonly Expression Argument0;
+        public readonly Expression Argument1;
+        public readonly Expression Argument2;
+        public readonly Expression Argument3;
+
+        public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3 };
+        public override int FewArgumentCount => 4;
+
+        internal FourArgumentsNewExpression(ConstructorInfo constructor,
+            Expression argument0, Expression argument1, Expression argument2, Expression argument3) : base(constructor)
+        {
+            Argument0 = argument0;
+            Argument1 = argument1;
+            Argument2 = argument2;
+            Argument3 = argument3;
+        }
+    }
+
+    public sealed class FiveArgumentsNewExpression : NewExpression
+    {
+        public readonly Expression Argument0;
+        public readonly Expression Argument1;
+        public readonly Expression Argument2;
+        public readonly Expression Argument3;
+        public readonly Expression Argument4;
+
+        public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4 };
+        public override int FewArgumentCount => 5;
+
+        internal FiveArgumentsNewExpression(ConstructorInfo constructor,
+            Expression argument0, Expression argument1, Expression argument2, Expression argument3, Expression argument4) : base(constructor)
+        {
+            Argument0 = argument0;
+            Argument1 = argument1;
+            Argument2 = argument2;
+            Argument3 = argument3;
+            Argument4 = argument4;
+        }
+    }
+
+    public sealed class ManyArgumentsNewExpression : NewExpression
+    {
+        public override IReadOnlyList<Expression> Arguments { get; }
+        public override int FewArgumentCount => -1;
+
+        internal ManyArgumentsNewExpression(ConstructorInfo constructor, IReadOnlyList<Expression> arguments) : base(constructor) =>
+            Arguments = arguments;
     }
 
     public sealed class NewArrayExpression : ArgumentsExpression
@@ -1692,34 +2038,188 @@ namespace FastExpressionCompiler.LightExpression
         }
     }
 
-    public class MethodCallExpression : ArgumentsExpression
+    public class MethodCallExpression : Expression
     {
         public override ExpressionType NodeType => ExpressionType.Call;
         public override Type Type => Method.ReturnType;
 
+        public virtual Expression Object => null;
+        public virtual IReadOnlyList<Expression> Arguments => Tools.Empty<Expression>();
+        public virtual int FewArgumentCount => 0;
+
         public readonly MethodInfo Method;
-        public readonly Expression Object;
+
+        internal MethodCallExpression(MethodInfo method) => Method = method;
 
         internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
-            SysExpr.Call(Object?.ToExpression(ref exprsConverted), Method, ToExpressions(Arguments, ref exprsConverted));
+            SysExpr.Call(Object?.ToExpression(ref exprsConverted), Method, 
+                ToExpressions(Arguments, ref exprsConverted));
 
         public override string CodeString
         {
             get
             {
-                var methodIndex = Method.DeclaringType.GetTypeInfo().DeclaredMethods.AsArray().GetFirstIndex(Method);
-                return $"Call({Object?.CodeString ?? "null"}," + NewLine + 
-                       $"{Method.DeclaringType.ToCode()}.GetTypeInfo().DeclaredMethods.ToArray()[{methodIndex}]," + NewLine + 
+                var methodIndex = Method.DeclaringType.GetTypeInfo().GetDeclaredMethods(Method.Name).AsArray().GetFirstIndex(Method);
+                return $"Call({Object?.CodeString ?? "null"}," + NewLine +
+                       $"{Method.DeclaringType.ToCode()}.GetTypeInfo().GetDeclaredMethods(\"{Method.Name}\").ToArray()[{methodIndex}]," + NewLine + 
                        $"{ToParamsCode(Arguments)})";
             }
         }
+    }
 
-        internal MethodCallExpression(Expression @object, MethodInfo method, IReadOnlyList<Expression> arguments)
-            : base(arguments)
+    public sealed class InstanceMethodCallExpression : MethodCallExpression
+    {
+        public override Expression Object { get; }
+
+        internal InstanceMethodCallExpression(Expression instance, MethodInfo method) : base(method) =>
+            Object = instance;
+    }
+
+    public class ManyArgumentsMethodCallExpression : MethodCallExpression
+    {
+        public override IReadOnlyList<Expression> Arguments { get; }
+        public override int FewArgumentCount => -1;
+
+        internal ManyArgumentsMethodCallExpression(MethodInfo method, IReadOnlyList<Expression> arguments) : base(method) =>
+            Arguments = arguments;
+    }
+
+    public sealed class InstanceManyArgumentsMethodCallExpression : ManyArgumentsMethodCallExpression
+    {
+        public override Expression Object { get; }
+
+        internal InstanceManyArgumentsMethodCallExpression(Expression instance, MethodInfo method, IReadOnlyList<Expression> arguments) 
+            : base(method, arguments) => Object = instance;
+    }
+
+    public class OneArgumentMethodCallExpression : MethodCallExpression
+    {
+        public override IReadOnlyList<Expression> Arguments => new[] { Argument };
+        public override int FewArgumentCount => 1;
+
+        public readonly Expression Argument;
+
+        internal OneArgumentMethodCallExpression(MethodInfo method, Expression argument) : base(method) => 
+            Argument = argument;
+    }
+
+    public sealed class InstanceOneArgumentMethodCallExpression : OneArgumentMethodCallExpression
+    {
+        public override Expression Object { get; }
+
+        internal InstanceOneArgumentMethodCallExpression(Expression instance, MethodInfo method, Expression argument) 
+            : base(method, argument) => Object = instance;
+    }
+
+    public class TwoArgumentsMethodCallExpression : MethodCallExpression
+    {
+        public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1 };
+        public override int FewArgumentCount => 2;
+
+        public readonly Expression Argument0;
+        public readonly Expression Argument1;
+
+        internal TwoArgumentsMethodCallExpression(MethodInfo method, Expression argument0, Expression argument1) : base(method)
         {
-            Object = @object;
-            Method = method;
+            Argument0 = argument0;
+            Argument1 = argument1;
         }
+    }
+
+    public sealed class InstanceTwoArgumentsMethodCallExpression : TwoArgumentsMethodCallExpression
+    {
+        public override Expression Object { get; }
+
+        internal InstanceTwoArgumentsMethodCallExpression(Expression instance, MethodInfo method,
+            Expression argument0, Expression argument1) : base(method, argument0, argument1) => Object = instance;
+    }
+
+    public class ThreeArgumentsMethodCallExpression : MethodCallExpression
+    {
+        public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2 };
+        public override int FewArgumentCount => 3;
+
+        public readonly Expression Argument0;
+        public readonly Expression Argument1;
+        public readonly Expression Argument2;
+
+        internal ThreeArgumentsMethodCallExpression(MethodInfo method, 
+            Expression argument0, Expression argument1, Expression argument2) : base(method)
+        {
+            Argument0 = argument0;
+            Argument1 = argument1;
+            Argument2 = argument2;
+        }
+    }
+
+    public sealed class InstanceThreeArgumentsMethodCallExpression : ThreeArgumentsMethodCallExpression
+    {
+        public override Expression Object { get; }
+
+        internal InstanceThreeArgumentsMethodCallExpression(Expression instance, MethodInfo method,
+            Expression argument0, Expression argument1, Expression argument2)
+            : base(method, argument0, argument1, argument2) => Object = instance;
+    }
+
+    public class FourArgumentsMethodCallExpression : MethodCallExpression
+    {
+        public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3 };
+        public override int FewArgumentCount => 4;
+
+        public readonly Expression Argument0;
+        public readonly Expression Argument1;
+        public readonly Expression Argument2;
+        public readonly Expression Argument3;
+
+        internal FourArgumentsMethodCallExpression(MethodInfo method,
+            Expression argument0, Expression argument1, Expression argument2, Expression argument3) : base(method)
+        {
+            Argument0 = argument0;
+            Argument1 = argument1;
+            Argument2 = argument2;
+            Argument3 = argument3;
+        }
+    }
+
+    public sealed class InstanceFourArgumentsMethodCallExpression : FourArgumentsMethodCallExpression
+    {
+        public override Expression Object { get; }
+
+        internal InstanceFourArgumentsMethodCallExpression(Expression instance, MethodInfo method,
+            Expression argument0, Expression argument1, Expression argument2, Expression argument3)
+            : base(method, argument0, argument1, argument2, argument3) => Object = instance;
+    }
+
+    public class FiveArgumentsMethodCallExpression : MethodCallExpression
+    {
+        public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4 };
+        public override int FewArgumentCount => 5;
+
+        public readonly Expression Argument0;
+        public readonly Expression Argument1;
+        public readonly Expression Argument2;
+        public readonly Expression Argument3;
+        public readonly Expression Argument4;
+
+        internal FiveArgumentsMethodCallExpression(MethodInfo method,
+            Expression argument0, Expression argument1, Expression argument2, Expression argument3, Expression argument4) 
+            : base(method)
+        {
+            Argument0 = argument0;
+            Argument1 = argument1;
+            Argument2 = argument2;
+            Argument3 = argument3;
+            Argument4 = argument4;
+        }
+    }
+
+    public sealed class InstanceFiveArgumentsMethodCallExpression : FiveArgumentsMethodCallExpression
+    {
+        public override Expression Object { get; }
+
+        internal InstanceFiveArgumentsMethodCallExpression(Expression instance, MethodInfo method,
+            Expression argument0, Expression argument1, Expression argument2, Expression argument3, Expression argument4) 
+            : base(method, argument0, argument1, argument2, argument3, argument4) => Object = instance;
     }
 
     public abstract class MemberExpression : Expression
@@ -1754,7 +2254,8 @@ namespace FastExpressionCompiler.LightExpression
             }
         }
 
-        internal PropertyExpression(Expression instance, PropertyInfo property) : base(instance, property) { }
+        internal PropertyExpression(Expression instance, PropertyInfo property) :
+            base(instance, property) { }
     }
 
     // todo: specialize to 2 class - with and without object expression
@@ -1917,7 +2418,33 @@ namespace FastExpressionCompiler.LightExpression
         }
     }
 
-    // todo: specialize to 1 var and 1 expression
+    /// <summary>Optimized version for the specific block structure</summary> 
+    public sealed class OneVariableTwoExpressionBlockExpression : Expression
+    {
+        public static explicit operator BlockExpression(OneVariableTwoExpressionBlockExpression x) =>
+            Block(new[] { x.Variable }, x.Expression1, x.Expression2);
+
+        public override ExpressionType NodeType => ExpressionType.Block;
+        public override Type Type => Expression2.Type;
+
+        public new readonly ParameterExpression Variable;
+        public readonly Expression Expression1;
+        public readonly Expression Expression2;
+        public Expression Result => Expression2;
+
+        internal OneVariableTwoExpressionBlockExpression(ParameterExpression variable, Expression expression1, Expression expression2)
+        {
+            Variable = variable;
+            Expression1 = expression1;
+            Expression2 = expression2;
+        }
+
+        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
+            ((BlockExpression)this).CreateSysExpression(ref exprsConverted);
+
+        public override string CodeString => ((BlockExpression)this).CodeString;
+    }
+
     public sealed class BlockExpression : Expression
     {
         public override ExpressionType NodeType => ExpressionType.Block;
@@ -1925,7 +2452,14 @@ namespace FastExpressionCompiler.LightExpression
 
         public readonly IReadOnlyList<ParameterExpression> Variables;
         public readonly IReadOnlyList<Expression> Expressions;
-        public readonly Expression Result;
+        public Expression Result => Expressions[Expressions.Count - 1];
+
+        internal BlockExpression(Type type, IReadOnlyList<ParameterExpression> variables, IReadOnlyList<Expression> expressions)
+        {
+            Variables = variables ?? Tools.Empty<ParameterExpression>();
+            Expressions = expressions ?? Tools.Empty<Expression>();
+            Type = type;
+        }
 
         internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
             SysExpr.Block(Type,
@@ -1937,14 +2471,6 @@ namespace FastExpressionCompiler.LightExpression
                 $"{Type.ToCode()}," + NewLine +
                 $"new ParameterExpression[]{{ {(Variables.Count == 0 ? "" : ToParamsCode(Variables))} }}," + NewLine +
                 $"{ToParamsCode(Expressions)})";
-
-        internal BlockExpression(Type type, IReadOnlyList<ParameterExpression> variables, IReadOnlyList<Expression> expressions)
-        {
-            Variables = variables ?? Tools.Empty<ParameterExpression>();
-            Expressions = expressions ?? Tools.Empty<Expression>();
-            Result = Expressions[Expressions.Count - 1];
-            Type = type;
-        }
     }
 
     public sealed class LoopExpression : Expression
@@ -1975,7 +2501,6 @@ namespace FastExpressionCompiler.LightExpression
         }
     }
 
-    // todo: specialize for 1 catch block
     public sealed class TryExpression : Expression
     {
         public override ExpressionType NodeType => ExpressionType.Try;
@@ -2206,33 +2731,40 @@ namespace FastExpressionCompiler.LightExpression
 
         public readonly Type ReturnType;
         public readonly Expression Body;
-        public readonly IReadOnlyList<ParameterExpression> Parameters;
+        public virtual IReadOnlyList<ParameterExpression> Parameters => Tools.Empty<ParameterExpression>();
 
-        public System.Linq.Expressions.LambdaExpression ToLambdaExpression() => 
+        public System.Linq.Expressions.LambdaExpression ToLambdaExpression() =>
             (System.Linq.Expressions.LambdaExpression)ToExpression();
 
         internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
             SysExpr.Lambda(Type, Body.ToExpression(ref exprsConverted), ParameterExpression.ToParameterExpressions(Parameters, ref exprsConverted));
 
         public override string CodeString =>
-            $"Lambda({Type.ToCode()}," + NewLine + 
-            $"{Body.CodeString}," + NewLine + 
+            $"Lambda({Type.ToCode()}," + NewLine +
+            $"{Body.CodeString}," + NewLine +
             $"{ToParamsCode(Parameters)})";
 
-        internal LambdaExpression(Type delegateType, Expression body, IReadOnlyList<ParameterExpression> parameters, Type returnType)
+        internal LambdaExpression(Type delegateType, Expression body, Type returnType)
         {
             Body = body;
-            Parameters = parameters;
             ReturnType = returnType;
 
             if (delegateType != null && delegateType != typeof(Delegate))
                 Type = delegateType;
             else
-                Type = Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), ReturnType);
+                Type = Tools.GetFuncOrActionType(Tools.Empty<Type>(), ReturnType);
         }
     }
 
-    public sealed class Expression<TDelegate> : LambdaExpression
+    public sealed class ManyParametersLambdaExpression : LambdaExpression
+    {
+        public override IReadOnlyList<ParameterExpression> Parameters { get; }
+
+        internal ManyParametersLambdaExpression(Type delegateType, Expression body, IReadOnlyList<ParameterExpression> parameters, Type returnType)
+         : base(delegateType, body, returnType) => Parameters = parameters;
+    }
+
+    public class Expression<TDelegate> : LambdaExpression
     {
         public new System.Linq.Expressions.Expression<TDelegate> ToLambdaExpression()
         {
@@ -2241,8 +2773,16 @@ namespace FastExpressionCompiler.LightExpression
                 ParameterExpression.ToParameterExpressions(Parameters, ref exprsConverted));
         }
 
-        internal Expression(Expression body, IReadOnlyList<ParameterExpression> parameters, Type returnType)
-            : base(typeof(TDelegate), body, parameters, returnType) { }
+        internal Expression(Expression body, Type returnType)
+            : base(typeof(TDelegate), body, returnType) { }
+    }
+
+    public sealed class ManyParametersExpression<TDelegate> : Expression<TDelegate>
+    {
+        public override IReadOnlyList<ParameterExpression> Parameters { get; }
+
+        internal ManyParametersExpression(Expression body, IReadOnlyList<ParameterExpression> parameters, Type returnType)
+            : base(body, returnType) => Parameters = parameters;
     }
 }
 

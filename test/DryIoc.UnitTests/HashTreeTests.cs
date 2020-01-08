@@ -304,14 +304,9 @@ namespace ImTools.UnitTests
             _hash = hash;
         }
 
-        public override int GetHashCode()
-        {
-            return _hash;
-        }
+        public override int GetHashCode() => _hash;
 
-        public override bool Equals(object obj)
-        {
-            return Equals(Key, ((HashConflictingKey<T>)obj).Key);
-        }
+        public override bool Equals(object obj) =>
+            obj is HashConflictingKey<T> other && Equals(Key, other.Key);
     }
 }

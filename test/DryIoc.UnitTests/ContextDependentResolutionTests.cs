@@ -43,7 +43,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Can_use_different_imlementations_based_on_context_using_condition()
+        public void Can_use_different_implementations_based_on_context_using_condition()
         {
             var container = new Container();
 
