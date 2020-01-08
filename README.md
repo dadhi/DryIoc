@@ -121,17 +121,6 @@ DryIoc v4.0 and older libs - kept for comparison:
 |     Autofac_MsDIAdapter | 51.747 us | 1.0334 us | 1.4821 us | 15.47 |    0.52 |     12.6953 |           - |           - |            58.53 KB |
 ```
 
-## Performance
-
-* General use-cases optimized for max speed.
-* Memory footprint preserved as small as possible.
-
-
-## Code
-
-* No dependencies on the other libraries.
-* Public API is documented.
-
 
 ## Reliability
 
