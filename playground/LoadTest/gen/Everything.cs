@@ -12,7 +12,7 @@ namespace Mega
 
     public interface IMegaClass
     {
-        public string Foo();
+        string Foo();
     }
 
     public class MegaClass : IMegaClass
