@@ -10590,7 +10590,7 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
-            : this(parent, name, _mapsPool.RentOrDefault() ?? CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, 
+            : this(parent, name, /*_mapsPool.RentOrDefault() ??*/ CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, 
                 ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty)
         { }
 
@@ -10669,6 +10669,9 @@ namespace DryIoc
                 : TryGetOrAddViaFactoryDelegate(id, createValue, r, disposalOrder);
         }
 
+        internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
+            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAddViaFactoryDelegate));
+
         internal ImMapEntry<object> TryAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
         {
             if (_disposed == 1)
@@ -10727,9 +10730,6 @@ namespace DryIoc
 
             return itemRef.Value;
         }
-
-        internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
-            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAddViaFactoryDelegate));
 
         /// <inheritdoc />
         public object TryGetOrAddWithoutClosure(int id,
@@ -10938,8 +10938,8 @@ namespace DryIoc
             
             var maps = Interlocked.Exchange(ref _maps, _emptySlots);
             var empty = ImMap<object>.Empty;
-            for (int i = 0; i < MAP_COUNT; i++) maps[i] = empty;
-            _mapsPool.Return(maps);
+            //for (int i = 0; i < MAP_COUNT; i++) maps[i] = empty;
+            //_mapsPool.Return(maps);
         }
 
         private static void SafelyDisposeOrderedDisposables(ImMap<IDisposable> disposables)
