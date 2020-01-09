@@ -12861,14 +12861,18 @@ namespace DryIoc
             if (!type.IsGeneric())
                 return s.Append(typeName.Replace('+', '.'));
 
-            s.Append(typeName.Substring(0, typeName.IndexOf('`')).Replace('+', '.')).Append('<');
+            var tickIndex = typeName.IndexOf('`');
+            if (tickIndex != -1)
+                typeName = typeName.Substring(0, tickIndex);
 
+            s.Append(typeName.Replace('+', '.'));
+
+            s.Append('<');
             var genericArgs = type.GetGenericParamsAndArgs();
             if (type.IsGenericDefinition())
                 s.Append(',', genericArgs.Length - 1);
             else
-                s.Print(genericArgs, ", ", (_, t) => _.Print((Type)t, getTypeName));
-
+                s.Print(genericArgs, ", ", (b, t) => b.Print((Type)t, getTypeName));
             s.Append('>');
 
             if (isArray)
