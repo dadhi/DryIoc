@@ -35,6 +35,20 @@ namespace LoadTest
             return container;
         }
 
+        /*
+         * The results after fixes on my 8750h machine:
+         *
+         * - Validation finished      - 00:00:55.39
+         *
+         * - Starting compiled + cached tests:
+         * -- Load Test Finished       - 00:01:19.40
+         * -- Randomized Load Finished - 00:14:01.74
+         *
+         * - Starting cold run tests
+         * -- Load Test Finished       - 00:01:22.59
+         * -- Randomized Load Finished --00:16:16.45
+         */
+
         static void Main(string[] args)
         {
             Console.WriteLine("Starting up!");
@@ -49,7 +63,7 @@ namespace LoadTest
             var results = container.Validate();
             if (results.Length > 0)
             {
-                foreach (KeyValuePair<DryIoc.ServiceInfo, DryIoc.ContainerException> kvp in results)
+                foreach (var kvp in results)
                 {
                     Console.WriteLine("Validation error ServiceType = {0}", kvp.Key.ServiceType.Name);
                     Console.WriteLine(kvp.Value.Message);
@@ -89,12 +103,12 @@ namespace LoadTest
 
             container = CreateContainer();
             ForceGarbageCollector();
-            ResolveAllControllersOnce(container, typeArray); // Intepret
+            ResolveAllControllersOnce(container, typeArray); // Interpret
             ResolveAllControllersOnce(container, typeArray); // Compile, cache
             IterateInOrder(container, typeArray);
             container = CreateContainer();
             ForceGarbageCollector();
-            ResolveAllControllersOnce(container, typeArray); // Intepret
+            ResolveAllControllersOnce(container, typeArray); // Interpret
             ResolveAllControllersOnce(container, typeArray); // Compile, cache
             StartRandomOrderTest(container, typeArray);
 
@@ -113,6 +127,9 @@ namespace LoadTest
             container = CreateContainer();
             ForceGarbageCollector();
             StartRandomOrderTest(container, typeArray);
+
+            Console.WriteLine("Success!");
+            Console.ReadKey();
         }
 
         public static void IterateInOrder(IContainer container, Type[] controllerTypes)
