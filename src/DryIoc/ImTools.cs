@@ -4165,6 +4165,13 @@ namespace ImTools
             public K Key;
             /// <summary>The value</summary>
             public object Value;
+
+            /// <summary>Constructs a pair</summary>
+            public KValue(K key, object value)
+            {
+                Key = key;
+                Value = value;
+            }
         }
 
         /// <summary>Uses the user provided hash and adds or updates the tree with passed key-value. Returns a new tree.</summary>
@@ -4173,7 +4180,7 @@ namespace ImTools
         {
             var oldEntry = map.GetEntryOrDefault(hash);
             return oldEntry == null
-                ? map.AddEntryUnsafe(CreateNewEntry(hash, key, value))
+                ? map.AddEntryUnsafe(CreateKValueEntry(hash, key, value))
                 : UpdateEntryOrAddOrUpdateConflict(map, hash, oldEntry, key, value, update);
         }
 
@@ -4183,7 +4190,7 @@ namespace ImTools
             if (key.Equals(oldEntry.Value.Key))
             {
                 value = update == null ? value : update(key, oldEntry.Value.Value, value);
-                return map.UpdateEntryUnsafe(CreateNewEntry(hash, key, value));
+                return map.UpdateEntryUnsafe(CreateKValueEntry(hash, key, value));
             }
 
             // add a new conflicting key value
@@ -4202,19 +4209,19 @@ namespace ImTools
                     newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
                     Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
                     value = update == null ? value : update(key, conflicts[conflictIndex].Value.Value, value);
-                    newConflicts[conflictIndex] = CreateNewEntry(hash, key, value);
+                    newConflicts[conflictIndex] = CreateKValueEntry(hash, key, value);
                 }
                 else
                 {
                     // add the new conflicting value
                     newConflicts = new ImMapEntry<KValue<K>>[conflictCount + 1];
                     Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                    newConflicts[conflictCount] = CreateNewEntry(hash, key, value);
+                    newConflicts[conflictCount] = CreateKValueEntry(hash, key, value);
                 }
             }
             else
             {
-                newConflicts = new[] { oldEntry, CreateNewEntry(hash, key, value) };
+                newConflicts = new[] { oldEntry, CreateKValueEntry(hash, key, value) };
             }
 
             var conflictsEntry = new ImMapEntry<KValue<K>>(hash);
@@ -4222,8 +4229,9 @@ namespace ImTools
             return map.UpdateEntryUnsafe(conflictsEntry);
         }
 
+        /// <summary>Efficiently creates the new entry</summary>
         [MethodImpl((MethodImplOptions)256)]
-        private static ImMapEntry<KValue<K>> CreateNewEntry<K>(int hash, K key, object value)
+        private static ImMapEntry<KValue<K>> CreateKValueEntry<K>(int hash, K key, object value)
         {
             var newEntry = new ImMapEntry<KValue<K>>(hash);
             newEntry.Value.Key = key;
@@ -4231,8 +4239,9 @@ namespace ImTools
             return newEntry;
         }
 
+        /// <summary>Efficiently creates the new entry</summary>
         [MethodImpl((MethodImplOptions)256)]
-        private static ImMapEntry<KValue<K>> CreateNewEntry<K>(int hash, K key)
+        public static ImMapEntry<KValue<K>> CreateKValueEntry<K>(int hash, K key)
         {
             var newEntry = new ImMapEntry<KValue<K>>(hash);
             newEntry.Value.Key = key;
@@ -4242,14 +4251,14 @@ namespace ImTools
         /// <summary>Uses the user provided hash and adds or updates the tree with passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, K key, object value) =>
-            map.AddOrUpdate(hash, CreateNewEntry(hash, key, value));
+            map.AddOrUpdate(hash, CreateKValueEntry(hash, key, value));
 
         /// <summary>Adds or updates the tree with passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, K key, object value) =>
             map.AddOrUpdate(key.GetHashCode(), key, value);
 
-        /// <summary>Uses the user provided hash and adds or updates the tree with passed key-value. Returns a new tree.</summary>
+        /// <summary>Uses the provided hash and adds or updates the tree with the passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, ImMapEntry<KValue<K>> entry)
         {
@@ -4262,8 +4271,7 @@ namespace ImTools
         private static ImMap<KValue<K>> UpdateEntryOrAddOrUpdateConflict<K>(ImMap<KValue<K>> map, int hash,
             ImMapEntry<KValue<K>> oldEntry, ImMapEntry<KValue<K>> newEntry)
         {
-            var key = newEntry.Value.Key;
-            if (key.Equals(oldEntry.Value.Key))
+            if (newEntry.Value.Key.Equals(oldEntry.Value.Key))
                 return map.UpdateEntryUnsafe(newEntry);
 
             // add a new conflicting key value
@@ -4271,6 +4279,7 @@ namespace ImTools
             if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
             {
                 // entry is already containing the conflicted entries
+                var key = newEntry.Value.Key;
                 var conflictCount = conflicts.Length;
                 var conflictIndex = conflictCount - 1;
                 while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Value.Key))
@@ -4296,9 +4305,59 @@ namespace ImTools
                 newConflicts = new[] { oldEntry, newEntry };
             }
 
-            var conflictsEntry = new ImMapEntry<KValue<K>>(hash);
-            conflictsEntry.Value.Value = newConflicts;
-            return map.UpdateEntryUnsafe(conflictsEntry);
+            return map.UpdateEntryUnsafe(CreateKValueEntry(hash, default(K), newConflicts));
+        }
+
+        /// <summary>Adds the new entry or keeps the current map if entry key is already present</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<KValue<K>> AddOrKeep<K>(this ImMap<KValue<K>> map, int hash, K key)
+        {
+            var oldEntry = map.GetEntryOrDefault(hash);
+            return oldEntry == null
+                ? map.AddEntryUnsafe(CreateKValueEntry(hash, key))
+                : AddOrKeepConflict(map, hash, oldEntry, key);
+        }
+
+        /// <summary>Adds the new entry or keeps the current map if entry key is already present</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<KValue<K>> AddOrKeep<K>(this ImMap<KValue<K>> map, int hash, K key, object value)
+        {
+            var oldEntry = map.GetEntryOrDefault(hash);
+            return oldEntry == null
+                ? map.AddEntryUnsafe(CreateKValueEntry(hash, key, value))
+                : AddOrKeepConflict(map, hash, oldEntry, key, value);
+        }
+
+        private static ImMap<KValue<K>> AddOrKeepConflict<K>(ImMap<KValue<K>> map, int hash,
+            ImMapEntry<KValue<K>> oldEntry, K key, object value = null)
+        {
+            if (key.Equals(oldEntry.Value.Key))
+                return map;
+
+            // add a new conflicting key value
+            ImMapEntry<KValue<K>>[] newConflicts;
+            if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
+            {
+                // entry is already containing the conflicted entries
+                var conflictCount = conflicts.Length;
+                var conflictIndex = conflictCount - 1;
+                while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Value.Key))
+                    --conflictIndex;
+
+                if (conflictIndex != -1)
+                    return map;
+                
+                // add the new conflicting value
+                newConflicts = new ImMapEntry<KValue<K>>[conflictCount + 1];
+                Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
+                newConflicts[conflictCount] = CreateKValueEntry(hash, key, value);
+            }
+            else
+            {
+                newConflicts = new[] { oldEntry, CreateKValueEntry(hash, key, value) };
+            }
+
+            return map.UpdateEntryUnsafe(CreateKValueEntry(hash, default(K), newConflicts));
         }
 
         /// <summary>Updates the map with the new value if key is found, otherwise returns the same unchanged map.</summary>
@@ -4314,7 +4373,7 @@ namespace ImTools
             if (key.Equals(oldEntry.Value.Key))
             {
                 value = update == null ? value : update(key, oldEntry.Value.Value, value);
-                return map.UpdateEntryUnsafe(CreateNewEntry(hash, key, value));
+                return map.UpdateEntryUnsafe(CreateKValueEntry(hash, key, value));
             }
 
             // add a new conflicting key value
@@ -4334,16 +4393,14 @@ namespace ImTools
                 newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
                 Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
                 value = update == null ? value : update(key, conflicts[conflictIndex].Value.Value, value);
-                newConflicts[conflictIndex] = CreateNewEntry(hash, key, value);
+                newConflicts[conflictIndex] = CreateKValueEntry(hash, key, value);
             }
             else
             {
                 return map;
             }
 
-            var conflictsEntry = new ImMapEntry<KValue<K>>(hash);
-            conflictsEntry.Value.Value = newConflicts;
-            return map.UpdateEntryUnsafe(conflictsEntry);
+            return map.UpdateEntryUnsafe(CreateKValueEntry(hash, default(K), newConflicts));
         }
 
         /// <summary>Updates the map with the default value if the key is found, otherwise returns the same unchanged map.</summary>
@@ -4357,7 +4414,7 @@ namespace ImTools
             int hash, ImMapEntry<KValue<K>> oldEntry, K key)
         {
             if (key.Equals(oldEntry.Value.Key))
-                return map.UpdateEntryUnsafe(CreateNewEntry(hash, key));
+                return map.UpdateEntryUnsafe(CreateKValueEntry(hash, key));
 
             // add a new conflicting key value
             ImMapEntry<KValue<K>>[] newConflicts;
@@ -4375,7 +4432,7 @@ namespace ImTools
                 // update the existing conflict
                 newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
                 Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                newConflicts[conflictIndex] = CreateNewEntry(hash, key);
+                newConflicts[conflictIndex] = CreateKValueEntry(hash, key);
             }
             else
             {

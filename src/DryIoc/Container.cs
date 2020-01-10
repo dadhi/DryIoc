@@ -238,7 +238,8 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
-            var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceType);
+            var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
+            var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
             if (cacheEntry != null)
             {
                 ref var entry = ref cacheEntry.Value;
@@ -264,15 +265,15 @@ namespace DryIoc
                 }
             }
 
-            return ResolveAndCache(serviceType, ifUnresolved);
+            return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
         }
 
-        private object ResolveAndCache(Type serviceType, IfUnresolved ifUnresolved)
+        private object ResolveAndCache(int serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved)
         {
             ThrowIfContainerDisposed();
 
-            if (ResolverContext.TryGetUsedInstance(this, serviceType, out var obj))
-                return obj;
+            if (ResolverContext.TryGetUsedInstance(this, serviceType, out var usedInstance))
+                return usedInstance;
 
             var request = Request.Create(this, serviceType, ifUnresolved: ifUnresolved);
             var factory = ((IContainer)this).ResolveFactory(request); // HACK: may mutate request, but it should be safe
@@ -281,7 +282,7 @@ namespace DryIoc
             var serviceKey = request.ServiceKey;
             var scopeName = CurrentScope?.Name;
             if (serviceKey != null || scopeName != null)
-                return ResolveAndCacheKeyed(serviceType, serviceKey, ifUnresolved, scopeName, null, Request.Empty, null);
+                return ResolveAndCacheKeyed(serviceTypeHash, serviceType, serviceKey, ifUnresolved, scopeName, null, Request.Empty, null);
 
             if (factory == null)
                 return null;
@@ -304,14 +305,14 @@ namespace DryIoc
                 {
                     var value = constExpr.Value;
                     if (factory.Caching != FactoryCaching.DoNotCache)
-                        _registry.Value.TryCacheDefaultFactory<FactoryDelegate>(serviceType, value.ToFactoryDelegate);
+                        _registry.Value.TryCacheDefaultFactory<FactoryDelegate>(serviceTypeHash, serviceType, value.ToFactoryDelegate);
                     return value;
                 }
 
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed.
                 if (factory.Caching != FactoryCaching.DoNotCache)
-                    _registry.Value.TryCacheDefaultFactory(serviceType, expr);
+                    _registry.Value.TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
 
                 // 1) First try to interpret
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
@@ -325,7 +326,7 @@ namespace DryIoc
                 return null;
 
             if (factory.Caching != FactoryCaching.DoNotCache)
-                _registry.Value.TryCacheDefaultFactory(serviceType, factoryDelegate);
+                _registry.Value.TryCacheDefaultFactory(serviceTypeHash, serviceType, factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -339,12 +340,13 @@ namespace DryIoc
                 (preResolveParent == null || preResolveParent.IsEmpty) && args.IsNullOrEmpty())
                 return ((IResolver)this).Resolve(serviceType, ifUnresolved);
 
-            return ResolveAndCacheKeyed(serviceType, serviceKey, ifUnresolved, 
-                scopeName, requiredServiceType, preResolveParent ?? Request.Empty, args);
+            return ResolveAndCacheKeyed(RuntimeHelpers.GetHashCode(serviceType), serviceType, 
+                serviceKey, ifUnresolved, scopeName, requiredServiceType, preResolveParent ?? Request.Empty, args);
         }
 
-        private object ResolveAndCacheKeyed(Type serviceType, object serviceKey, IfUnresolved ifUnresolved,
-            object scopeName, Type requiredServiceType, Request preResolveParent, object[] args)
+        private object ResolveAndCacheKeyed(int serviceTypeHash, Type serviceType,
+            object serviceKey, IfUnresolved ifUnresolved, object scopeName, Type requiredServiceType, Request preResolveParent, 
+            object[] args)
         {
             object cacheKey = null;
             if (requiredServiceType == null && preResolveParent.IsEmpty && args.IsNullOrEmpty())
@@ -353,18 +355,19 @@ namespace DryIoc
                     : serviceKey == null ? scopeName 
                     : KV.Of(scopeName, serviceKey);
 
-                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceType, cacheKey, out var cacheSlot))
+                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceTypeHash, serviceType, cacheKey, out var cacheSlot))
                 {
                     if (cacheSlot.Factory is FactoryDelegate cachedDelegate)
                         return cachedDelegate(this);
 
                     if (cacheSlot.Factory is Expression cachedExpression)
                     {
-                        if (Rules.UseInterpretation && 
-                            Interpreter.TryInterpretAndUnwrapContainerException(this, cachedExpression, Rules.UseFastExpressionCompiler, out var result))
+                        var rules = Rules;
+                        if (rules.UseInterpretation && 
+                            Interpreter.TryInterpretAndUnwrapContainerException(this, cachedExpression, rules.UseFastExpressionCompiler, out var result))
                             return result;
 
-                        var compiledDelegate = cachedExpression.CompileToFactoryDelegate(Rules.UseFastExpressionCompiler, Rules.UseInterpretation);
+                        var compiledDelegate = cachedExpression.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
                         cacheSlot.Factory = compiledDelegate;
                         return compiledDelegate(this);
                     }
@@ -374,8 +377,7 @@ namespace DryIoc
             // Cache is missed, so get the factory and put it into cache:
             ThrowIfContainerDisposed();
 
-            var request = Request.Create(this, 
-                serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, default, args);
+            var request = Request.Create(this, serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, default, args);
             var factory = ((IContainer)this).ResolveFactory(request);
             if (factory == null)
                 return null;
@@ -390,7 +392,7 @@ namespace DryIoc
             {
                 cacheKey = scopeName == null ? request.ServiceKey : KV.Of(scopeName, request.ServiceKey);
 
-                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceType, cacheKey, out var cacheSlot))
+                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceTypeHash, serviceType, cacheKey, out var cacheSlot))
                 {
                     if (cacheSlot.Factory is FactoryDelegate cachedDelegate)
                         return cachedDelegate(this);
@@ -419,14 +421,14 @@ namespace DryIoc
                 {
                     var value = ce.Value;
                     if (cacheKey != null)
-                        _registry.Value.TryCacheKeyedFactory(serviceType, cacheKey, (FactoryDelegate)value.ToFactoryDelegate);
+                        _registry.Value.TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, (FactoryDelegate)value.ToFactoryDelegate);
                     return value;
                 }
 
                 // Important to cache expression first before tying to interpret,
                 // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
                 if (cacheKey != null)
-                    _registry.Value.TryCacheKeyedFactory(serviceType, cacheKey, expr);
+                    _registry.Value.TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, expr);
 
                 // 1) First try to interpret
                 var useFec = Rules.UseFastExpressionCompiler;
@@ -447,7 +449,7 @@ namespace DryIoc
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
             if (cacheKey != null)
-                _registry.Value.TryCacheKeyedFactory(serviceType, cacheKey, factoryDelegate);
+                _registry.Value.TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -1738,17 +1740,14 @@ namespace DryIoc
             public ImMap<ImMap.KValue<Type>>[] DefaultFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
-            public ImMapEntry<ImMap.KValue<Type>> GetCachedDefaultFactoryOrDefault(Type serviceType)
+            public ImMapEntry<ImMap.KValue<Type>> GetCachedDefaultFactoryOrDefault(int serviceTypeHash, Type serviceType)
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = DefaultFactoryCache;
-                if (cache == null)
-                    return null;
-                var hash = RuntimeHelpers.GetHashCode(serviceType);
-                return cache[hash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(hash, serviceType);
+                return cache == null ? null : cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
             }
 
-            public void TryCacheDefaultFactory<T>(Type serviceType, T factory)
+            public void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
             {
                 // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
                 if (Services.IsEmpty)
@@ -1757,90 +1756,97 @@ namespace DryIoc
                 if (DefaultFactoryCache == null)
                     Interlocked.CompareExchange(ref DefaultFactoryCache, new ImMap<ImMap.KValue<Type>>[CACHE_SLOT_COUNT], null);
 
-                var hash = RuntimeHelpers.GetHashCode(serviceType);
-                ref var map = ref DefaultFactoryCache[hash & CACHE_SLOT_COUNT_MASK];
+                ref var map = ref DefaultFactoryCache[serviceTypeHash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
                     Interlocked.CompareExchange(ref map, ImMap<ImMap.KValue<Type>>.Empty, null);
 
                 var m = map;
-                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(hash, serviceType, factory), m) != m)
-                    Ref.Swap(ref map, hash, serviceType, factory, (x, h, t, slot) => x.AddOrUpdate(h, t, slot));
+                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(serviceTypeHash, serviceType, factory), m) != m)
+                    Ref.Swap(ref map, serviceTypeHash, serviceType, factory, (x, h, t, entry) => x.AddOrUpdate(h, t, entry));
             }
 
-            internal struct KeyAndFactorySlot
+            internal struct KeyedFactoryCacheEntry
             {
                 public object Key;
                 public object Factory;
             }
 
-            // Where key object is `KV.Of(ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
-            public ImHashMap<Type, GrowingList<KeyAndFactorySlot>>[] KeyedFactoryCache;
+            internal sealed class KeyedFactoryCacheEntries
+            {
+                public readonly KeyedFactoryCacheEntries Tail;
+                public KeyedFactoryCacheEntry Entry;
+                public KeyedFactoryCacheEntries(KeyedFactoryCacheEntries tail = null) => Tail = tail;
+            }
+
+            // Where key is `KV.Of(ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
+            // and value is `KeyedFactoryCacheEntries`
+            public ImMap<ImMap.KValue<Type>>[] KeyedFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
-            public bool GetCachedKeyedFactoryOrDefault(Type type, object key, out KeyAndFactorySlot slot)
+            public bool GetCachedKeyedFactoryOrDefault(int serviceTypeHash, Type serviceType, object key, out KeyedFactoryCacheEntry entry)
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = KeyedFactoryCache;
                 if (cache != null)
                 {
-                    var hash = RuntimeHelpers.GetHashCode(type);
-                    var typeEntry = cache[hash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(hash, type);
+                    var typeEntry = cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
                     if (typeEntry != null)
                     {
-                        ref var items = ref typeEntry.Value;
-                        for (int i = 0; i < items.Count; i++)
-                        {
-                            ref var item = ref items.Items[i];
-                            if (Equals(item.Key, key))
-                                slot = item;
-                        }
+                        var keyEntries = (KeyedFactoryCacheEntries)typeEntry.Value.Value;
+                        for (; keyEntries != null; keyEntries = keyEntries.Tail)
+                            if (keyEntries.Entry.Key.Equals(key))
+                            {
+                                entry = keyEntries.Entry;
+                                return true;
+                            }
                     }
                 }
 
-                slot = default;
+                entry = default;
                 return false;
             }
 
-            public void TryCacheKeyedFactory(Type type, object key, object factory)
+            public void TryCacheKeyedFactory(int serviceTypeHash, Type serviceType, object key, object factory)
             {
                 // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
                 if (Services.IsEmpty)
                     return;
 
                 if (KeyedFactoryCache == null)
-                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImHashMap<Type, GrowingList<KeyAndFactorySlot>>[CACHE_SLOT_COUNT], null);
+                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImMap<ImMap.KValue<Type>>[CACHE_SLOT_COUNT], null);
 
-                var hash = key.GetHashCode();
-                ref var map = ref KeyedFactoryCache[hash & CACHE_SLOT_COUNT_MASK];
+                ref var map = ref KeyedFactoryCache[serviceTypeHash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
-                    Interlocked.CompareExchange(ref map, ImHashMap<Type, GrowingList<KeyAndFactorySlot>>.Empty, null);
+                    Interlocked.CompareExchange(ref map, ImMap<ImMap.KValue<Type>>.Empty, null);
 
-                var entry = map.GetEntryOrDefault(hash, type);
+                var entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
                 if (entry == null)
                 {
                     var m = map;
-                    if (Interlocked.CompareExchange(ref map, m.AddOrKeep(hash, type), m) != m)
-                        Ref.Swap(ref map, hash, type, (x, h, t) => x.AddOrKeep(h, t));
-                    entry = map.GetEntryOrDefault(hash, type);
+                    if (Interlocked.CompareExchange(ref map, m.AddOrKeep(serviceTypeHash, serviceType), m) != m)
+                        Ref.Swap(ref map, serviceTypeHash, serviceType, (x, h, t) => x.AddOrKeep(h, t));
+                    entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
                 }
 
                 var updated = false;
-                ref var items = ref entry.Value;
-                for (int i = 0; i < items.Count; i++)
+                var keyEntries = entry.Value.Value as KeyedFactoryCacheEntries;
+                for (; keyEntries != null; keyEntries = keyEntries.Tail)
                 {
-                    ref var item = ref items.Items[i];
-                    if (Equals(item.Key, key))
+                    ref var keyedEntry = ref keyEntries.Entry;
+                    if (keyedEntry.Key.Equals(key))
                     {
-                        item.Factory = factory;
+                        keyedEntry.Factory = factory;
                         updated = true;
+                        break;
                     }
                 }
 
                 if (!updated)
                 {
-                    ref var newItem = ref items.PushSlot();
-                    newItem.Key = key;
-                    newItem.Factory = factory;
+                    var newEntry = new KeyedFactoryCacheEntries(keyEntries);
+                    Interlocked.Exchange(ref entry.Value.Value, newEntry);
+                    newEntry.Entry.Key = key;
+                    newEntry.Entry.Factory = factory;
                 }
             }
 
@@ -1961,7 +1967,7 @@ namespace DryIoc
                 ImMap<ImMap.KValue<Type>> decorators,
                 ImMap<ImMap.KValue<Type>> wrappers,
                 ImMap<ImMap.KValue<Type>>[] defaultFactoryCache,
-                ImHashMap<Type, GrowingList<KeyAndFactorySlot>>[] keyedFactoryCache,
+                ImMap<ImMap.KValue<Type>>[] keyedFactoryCache,
                 ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
                 IsChangePermitted isChangePermitted)
             {
@@ -2395,7 +2401,7 @@ namespace DryIoc
                         var k = KeyedFactoryCache;
                         if (k != null)
                             Ref.Swap(ref k[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
-                                (x, h, t) => (x ?? ImHashMap<Type, GrowingList<KeyAndFactorySlot>>.Empty).UpdateToDefault(h, t));
+                                (x, h, t) => (x ?? ImMap<ImMap.KValue<Type>>.Empty).UpdateToDefault(h, t));
                     }
                     else
                     {

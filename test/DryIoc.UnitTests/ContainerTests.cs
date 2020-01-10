@@ -321,6 +321,21 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Resolving_named_service_for_the_second_time_should_hit_the_cache()
+        {
+            var container = new Container();
+            container.Register<IService, Service>(serviceKey: "a");
+
+            var service1 = container.Resolve<IService>("a");
+            var service2 = container.Resolve<IService>("a");
+            var service3 = container.Resolve<IService>("a");
+
+            Assert.IsInstanceOf<Service>(service1);
+            Assert.IsInstanceOf<Service>(service2);
+            Assert.IsInstanceOf<Service>(service3);
+        }
+
+        [Test]
         //[Description("https://bitbucket.org/dadhi/dryioc/issue/73/remove-reused-instance-when-unregister")]
         public void Unregister_singleton_without_swappable()
         {
