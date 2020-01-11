@@ -355,7 +355,9 @@ namespace DryIoc
                     : serviceKey == null ? scopeName 
                     : KV.Of(scopeName, serviceKey);
 
-                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceTypeHash, serviceType, cacheKey, out var cacheSlot))
+
+                Registry.KeyedFactoryCacheEntry cacheSlot = default;
+                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceTypeHash, serviceType, cacheKey, ref cacheSlot))
                 {
                     if (cacheSlot.Factory is FactoryDelegate cachedDelegate)
                         return cachedDelegate(this);
@@ -392,7 +394,8 @@ namespace DryIoc
             {
                 cacheKey = scopeName == null ? request.ServiceKey : KV.Of(scopeName, request.ServiceKey);
 
-                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceTypeHash, serviceType, cacheKey, out var cacheSlot))
+                Registry.KeyedFactoryCacheEntry cacheSlot = default;
+                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceTypeHash, serviceType, cacheKey, ref cacheSlot))
                 {
                     if (cacheSlot.Factory is FactoryDelegate cachedDelegate)
                         return cachedDelegate(this);
@@ -1783,7 +1786,7 @@ namespace DryIoc
             public ImMap<ImMap.KValue<Type>>[] KeyedFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
-            public bool GetCachedKeyedFactoryOrDefault(int serviceTypeHash, Type serviceType, object key, out KeyedFactoryCacheEntry entry)
+            public bool GetCachedKeyedFactoryOrDefault(int serviceTypeHash, Type serviceType, object key, ref KeyedFactoryCacheEntry entry)
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = KeyedFactoryCache;
@@ -1796,13 +1799,12 @@ namespace DryIoc
                         for (; keyEntries != null; keyEntries = keyEntries.Tail)
                             if (keyEntries.Entry.Key.Equals(key))
                             {
-                                entry = keyEntries.Entry;
+                                entry = ref keyEntries.Entry;
                                 return true;
                             }
                     }
                 }
 
-                entry = default;
                 return false;
             }
 
