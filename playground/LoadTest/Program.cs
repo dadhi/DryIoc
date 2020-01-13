@@ -21,7 +21,7 @@ namespace LoadTest
         {
             var config = new HttpConfiguration();
             var container = new Container(rules => rules
-                //.WithoutFastExpressionCompiler()
+                .WithoutFastExpressionCompiler()
                 //.WithUseInterpretation()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
@@ -331,7 +331,6 @@ namespace LoadTest
 
         static void ResolveAllControllersOnce(IContainer container, Type[] controllers)
         {
-            Console.WriteLine("ResolveAllControllersOnce is started for N " + controllers.Length + " controllers ...");
             var sw = Stopwatch.StartNew();
             using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
             {
@@ -341,7 +340,7 @@ namespace LoadTest
                 }
             }
             sw.Stop();
-            Console.WriteLine("ResolveAllControllersOnce is done in " + sw.Elapsed.TotalSeconds + " seconds");
+            Console.WriteLine($"ResolveAllControllersOnce of {controllers.Length} controllers is done in {sw.Elapsed.TotalSeconds} seconds");
         }
 
         static void ForceGarbageCollector()

@@ -355,7 +355,6 @@ namespace DryIoc
                     : serviceKey == null ? scopeName 
                     : KV.Of(scopeName, serviceKey);
 
-
                 Registry.KeyedFactoryCacheEntry cacheSlot = default;
                 if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceTypeHash, serviceType, cacheKey, ref cacheSlot))
                 {
@@ -1778,7 +1777,12 @@ namespace DryIoc
             {
                 public readonly KeyedFactoryCacheEntries Tail;
                 public KeyedFactoryCacheEntry Entry;
-                public KeyedFactoryCacheEntries(KeyedFactoryCacheEntries tail = null) => Tail = tail;
+                public KeyedFactoryCacheEntries(KeyedFactoryCacheEntries tail, object key, object factory)
+                {
+                    Tail = tail;
+                    Entry.Key = key;
+                    Entry.Factory = factory;
+                }
             }
 
             // Where key is `KV.Of(ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
@@ -1790,20 +1794,19 @@ namespace DryIoc
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = KeyedFactoryCache;
-                if (cache != null)
-                {
-                    var typeEntry = cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
-                    if (typeEntry != null)
+                if (cache == null) 
+                    return false;
+                
+                var typeEntry = cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
+                if (typeEntry == null) 
+                    return false;
+                
+                for (var entries = (KeyedFactoryCacheEntries)typeEntry.Value.Value; entries != null; entries = entries.Tail)
+                    if (entries.Entry.Key.Equals(key))
                     {
-                        var keyEntries = (KeyedFactoryCacheEntries)typeEntry.Value.Value;
-                        for (; keyEntries != null; keyEntries = keyEntries.Tail)
-                            if (keyEntries.Entry.Key.Equals(key))
-                            {
-                                entry = ref keyEntries.Entry;
-                                return true;
-                            }
+                        entry = ref entries.Entry;
+                        return true;
                     }
-                }
 
                 return false;
             }
@@ -1830,26 +1833,24 @@ namespace DryIoc
                     entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
                 }
 
-                var updated = false;
-                var keyEntries = entry.Value.Value as KeyedFactoryCacheEntries;
-                for (; keyEntries != null; keyEntries = keyEntries.Tail)
+                var e = entry.Value.Value;
+                if (Interlocked.CompareExchange(ref entry.Value.Value, SetOrAddKeyedCacheFactory(e, key, factory), e) != e)
+                    Ref.Swap(ref entry.Value.Value, key, factory, SetOrAddKeyedCacheFactory);
+            }
+
+            private object SetOrAddKeyedCacheFactory(object x, object k, object f)
+            {
+                for (var entries = (KeyedFactoryCacheEntries)x; entries != null; entries = entries.Tail)
                 {
-                    ref var keyedEntry = ref keyEntries.Entry;
-                    if (keyedEntry.Key.Equals(key))
+                    ref var keyedEntry = ref entries.Entry;
+                    if (keyedEntry.Key.Equals(k))
                     {
-                        keyedEntry.Factory = factory;
-                        updated = true;
-                        break;
+                        keyedEntry.Factory = f;
+                        return x;
                     }
                 }
 
-                if (!updated)
-                {
-                    var newEntry = new KeyedFactoryCacheEntries(keyEntries);
-                    Interlocked.Exchange(ref entry.Value.Value, newEntry);
-                    newEntry.Entry.Key = key;
-                    newEntry.Entry.Factory = factory;
-                }
+                return new KeyedFactoryCacheEntries((KeyedFactoryCacheEntries)x, k, f);
             }
 
             internal struct ExpressionCacheSlot
