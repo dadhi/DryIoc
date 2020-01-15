@@ -77,6 +77,10 @@
         <file src="..\DryIoc.snk" />
         <file src="..\nuspecs\DryIocZero\readme.txt" />
 
+        <!--Compile-time dependencies-->
+        <file src="..\nuspecs\DryIocZero\tools\ExpressionToCodeLib.2.6.0\net452\ExpressionToCodeLib.dll" target="tools\ExpressionToCodeLib.2.6.0\net452" />
+        <file src="..\src\DryIoc\DryIocZero.props" target="build" />
+
         <!--net35-->
         <file src="..\src\DryIoc\Container.cs" target="content\net35\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs" target="content\net35\DryIoc" />
