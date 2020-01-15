@@ -554,6 +554,17 @@ namespace DryIoc
         {
             var requiredItemType = requiredServiceType ?? serviceType;
 
+            // first return compile-time generated factories if any
+            var generatedFactories = Enumerable.Empty<ResolveManyResult>();
+            ResolveManyGenerated(ref generatedFactories, serviceType);
+            if (serviceKey != null)
+                generatedFactories = generatedFactories.Where(x => serviceKey.Equals(x.ServiceKey));
+            if (requiredServiceType != null)
+                generatedFactories = generatedFactories.Where(x => requiredServiceType == x.RequiredServiceType);
+
+            foreach (var generated in generatedFactories)
+                yield return generated.FactoryDelegate(this);
+
             // Emulating the collection parent so that collection related rules and conditions were applied
             // the same way as if resolving IEnumerable<T>
             if (preResolveParent == null || preResolveParent.IsEmpty)
