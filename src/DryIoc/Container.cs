@@ -99,7 +99,7 @@ namespace DryIoc
         /// <summary>Helper to create singleton scope</summary>
         public static IScope NewSingletonScope() => new Scope(name: "<sigletons>");
 
-        /// <summary>Outputs info about container disposal state and current scopes.</summary>
+        /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
         {
             var s = _scopeContext == null ? "Container" : "Container with ambient ScopeContext " + _scopeContext;
@@ -162,6 +162,44 @@ namespace DryIoc
                 _scopeContext?.Dispose();
             }
         }
+
+        #region Compile-time generated parts - former DryIocZero
+
+        partial void GetLastGeneratedFactoryID(ref int lastFactoryID);
+
+        // todo: May be replace with TryResolveGenerated to accommodate for the possible null service
+        partial void ResolveGenerated(ref object service, Type serviceType);
+
+        // todo: May be replace with TryResolveGenerated to accommodate for the possible null service
+        partial void ResolveGenerated(ref object service,
+            Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
+
+        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType);
+
+        /// <summary>Identifies the service when resolving collection</summary>
+        public struct ResolveManyResult
+        {
+            /// <summary>Factory, the required part</summary>
+            public FactoryDelegate FactoryDelegate;
+
+            /// <summary>Optional key</summary>
+            public object ServiceKey;
+
+            /// <summary>Optional required service type, can be an open-generic type.</summary>
+            public Type RequiredServiceType;
+
+            /// <summary>Constructs the struct.</summary>
+            public static ResolveManyResult Of(FactoryDelegate factoryDelegate,
+                object serviceKey = null, Type requiredServiceType = null) =>
+                new ResolveManyResult
+                {
+                    FactoryDelegate = factoryDelegate,
+                    ServiceKey = serviceKey,
+                    RequiredServiceType = requiredServiceType
+                };
+        }
+
+        #endregion
 
         #region IRegistrator
 

@@ -73,6 +73,19 @@ namespace DryIocZero
         /// <summary>The unique factory ID, which may be used for runtime scoped registrations.</summary>
         public int GetNextFactoryID() => Interlocked.Increment(ref _lastFactoryID);
 
+        /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
+        public override string ToString()
+        {
+            var scope = CurrentScope;
+            var scopeStr = scope == null
+                ? "container without open scope"
+                : ScopeContext != null
+                    ? "ambient scoped container with scope " + scope
+                    : "container with scope " + scope;
+
+            return IsDisposed ? "disposed " + scopeStr : scopeStr;
+        }
+
         #region IResolver
 
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID);
@@ -319,19 +332,6 @@ namespace DryIocZero
             Throw.If(_disposed == 1, Error.ContainerIsDisposed, this);
 
         #endregion
-
-        /// <summary>Outputs scope info for open scope.</summary> 
-        public override string ToString()
-        {
-            var scope = CurrentScope;
-            var scopeStr = scope == null 
-                ? "container without open scope"
-                : ScopeContext != null
-                ? "ambient scoped container with scope " + scope
-                : "container with scope " + scope;
-
-            return IsDisposed ? "disposed " + scopeStr : scopeStr;
-        }
     }
 
     /// <summary>Identifies the service when resolving collection</summary>
