@@ -167,10 +167,8 @@ namespace DryIoc
 
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID);
 
-        // todo: May be replace with TryResolveGenerated to accommodate for the possible null service
         partial void ResolveGenerated(ref object service, Type serviceType);
 
-        // todo: May be replace with TryResolveGenerated to accommodate for the possible null service
         partial void ResolveGenerated(ref object service,
             Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
 
@@ -197,6 +195,35 @@ namespace DryIoc
                     ServiceKey = serviceKey,
                     RequiredServiceType = requiredServiceType
                 };
+        }
+
+        /// <summary>Directly uses generated factories to resolve service. Or returns the default if service does not have generated factory.</summary>
+        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
+        [SuppressMessage("ReSharper", "ExpressionIsAlwaysNull", Justification = "Per design")]
+        public object ResolveCompileTimeGeneratedOrDefault(Type serviceType)
+        {
+            object service = null;
+            ResolveGenerated(ref service, serviceType);
+            return service;
+        }
+
+        /// <summary>Directly uses generated factories to resolve service. Or returns the default if service does not have generated factory.</summary>
+        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
+        [SuppressMessage("ReSharper", "ExpressionIsAlwaysNull", Justification = "Per design")]
+        public object ResolveCompileTimeGeneratedOrDefault(Type serviceType, object serviceKey)
+        {
+            object service = null;
+            ResolveGenerated(ref service, serviceType, serviceKey,
+                requiredServiceType: null, preRequestParent: null, args: null);
+            return service;
+        }
+
+        /// <summary>Resolves many generated only services. Ignores runtime registrations.</summary>
+        public IEnumerable<ResolveManyResult> ResolveManyCompileTimeGeneratedOrEmpty(Type serviceType)
+        {
+            IEnumerable<ResolveManyResult> manyGenerated = ArrayTools.Empty<ResolveManyResult>();
+            ResolveManyGenerated(ref manyGenerated, serviceType);
+            return manyGenerated;
         }
 
         #endregion
@@ -273,9 +300,13 @@ namespace DryIoc
             ((IResolver)this).Resolve(serviceType, IfUnresolved.ReturnDefaultIfNotRegistered);
 #endif
 
-        [MethodImpl((MethodImplOptions)256)]
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
+            object service = null;
+            ResolveGenerated(ref service, serviceType);
+            if (service != null)
+                return service;
+
             var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
             var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
             if (cacheEntry != null)
@@ -340,10 +371,13 @@ namespace DryIoc
             var rules = Rules;
             FactoryDelegate factoryDelegate;
 
-            // todo: in v5.0 there should be no check nor the InstanceFactory
-            if (factory is InstanceFactory || !rules.UseInterpretationForTheFirstResolution)
+            // todo: [Obsolete] - in v5.0 there should be no check nor the InstanceFactory
+            if (factory is InstanceFactory || 
+                !rules.UseInterpretationForTheFirstResolution)
             {
                 factoryDelegate = factory.GetDelegateOrDefault(request);
+                if (factoryDelegate == null)
+                    return null;
             }
             else 
             {
@@ -367,13 +401,9 @@ namespace DryIoc
                 // 1) First try to interpret
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
                     return instance;
-
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
             }
-
-            if (factoryDelegate == null)
-                return null;
 
             if (factory.Caching != FactoryCaching.DoNotCache)
                 _registry.Value.TryCacheDefaultFactory(serviceTypeHash, serviceType, factoryDelegate);
