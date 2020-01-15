@@ -36,7 +36,6 @@ using System;
 using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
-using System.Diagnostics.CodeAnalysis;
 using ImTools;
 
 // Specified `NamespaceUsings` if any:
@@ -46,32 +45,27 @@ namespace DryIoc
 {
     partial class Container
     {
-        [ExcludeFromCodeCoverage]
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID)
         {
             lastFactoryID = 34; // generated: equals to last used Factory.FactoryID 
         }
 
-        [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service, Type serviceType)
         {
             if (serviceType == typeof(IService))
                 service = Get_0_IService(this);
         }
 
-        [ExcludeFromCodeCoverage]
         partial void ResolveGenerated(ref object service,
             Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
         {
         }
 
-        [ExcludeFromCodeCoverage]
         partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType) 
         {
             services = ResolveManyGenerated(serviceType);
         }
 
-        [ExcludeFromCodeCoverage]
         private IEnumerable<ResolveManyResult> ResolveManyGenerated(Type serviceType)
         {
             if (serviceType == typeof(IService))

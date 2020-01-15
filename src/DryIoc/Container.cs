@@ -428,6 +428,11 @@ namespace DryIoc
             object serviceKey, IfUnresolved ifUnresolved, object scopeName, Type requiredServiceType, Request preResolveParent, 
             object[] args)
         {
+            object service = null;
+            ResolveGenerated(ref service, serviceType, serviceKey, requiredServiceType, preResolveParent, args);
+            if (service != null)
+                return service;
+
             object cacheKey = null;
             if (requiredServiceType == null && preResolveParent.IsEmpty && args.IsNullOrEmpty())
             {
@@ -474,6 +479,8 @@ namespace DryIoc
             if (factory is InstanceFactory || !Rules.UseInterpretationForTheFirstResolution)
             {
                 factoryDelegate = factory.GetDelegateOrDefault(request);
+                if (factoryDelegate == null)
+                    return null;
             }
             else
             {
@@ -502,9 +509,6 @@ namespace DryIoc
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(useFec, Rules.UseInterpretation);
             }
-
-            if (factoryDelegate == null)
-                return null;
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
