@@ -1,15 +1,15 @@
 ﻿Hello Sailor,
 
-Your starting point is the Registrations.ttinclude file that should be included in project now.
-If not included, please do checks below.
+The starting point is the Registrations.ttinclude file which should be included into your project.
+If it is not included, please do the checks below.
 
 
-CHECK 1: If you don't see any new files in your project, please copy all files from
+Check 1: If you don't see any new files in your project, please copy all the files from the
 %USERPROFILE%/.nuget/packages/DryIocZero/<version>/tools/content
 
-CHECK 2: If you see errors in Container.Generated.tt file of DryIoc and ExpressionToCodeLib 
+Checj 2: If you see errors in Container.Generated.tt file with DryIoc and/or ExpressionToCodeLib 
 namespaces not resolved, 
-please copy "%USERPROFILE%/.nuget/packages/DryIocZero/<version>/build/DryIocZero.props" into
-your project, edit the project file and add closer to top the following Import:
+please copy the "%USERPROFILE%/.nuget/packages/DryIocZero/<version>/build/DryIocZero.props" into
+your project, edit the project file and add to the top the following Import:
 
 <Import Project="DryIocZero.props" />
