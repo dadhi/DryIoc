@@ -21,8 +21,8 @@ namespace LoadTest
         {
             var config = new HttpConfiguration();
             var container = new Container(rules => rules
-                .WithoutFastExpressionCompiler()
-                //.WithUseInterpretation()
+                //.WithoutFastExpressionCompiler()
+                .WithUseInterpretation()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
@@ -36,20 +36,6 @@ namespace LoadTest
 
             return container;
         }
-
-        /*
-         * The results after fixes on my 8750h machine:
-         *
-         * - Validation finished      - 00:00:55.39
-         *
-         * - Starting compiled + cached tests:
-         * -- Load Test Finished       - 00:01:19.40
-         * -- Randomized Load Finished - 00:14:01.74
-         *
-         * - Starting cold run tests
-         * -- Load Test Finished       - 00:01:22.59
-         * -- Randomized Load Finished --00:16:16.45
-         */
 
         static void Main(string[] args)
         {
@@ -191,6 +177,24 @@ namespace LoadTest
 
         private class LoadTestParams
         {
+            /*
+         * The results after fixes on my 8750h machine:
+         *
+         * - Validation finished       - 00:00:27.39
+         *
+         * - ResolveAllControllersOnce of 156 controllers
+         * -- Default               - 1st time: 0.2001231 seconds, 2nd time (cache entry compilation):    4.8156956  seconds (!!! - FEC is 4 times faster)
+         * -- WithoutFEC            - 1st time: 0.2052857 seconds, 2nd time (cache entry compilation):    16.4215528 seconds
+         * -- WithUseInterpretation - 1st time: 0.20758   seconds, 2nd time (cache entry interpretation): 0.1651708  seconds
+         *
+         * - Starting compiled + cached tests:
+         * -- Load Test Finished       - 00:00:37.35; WithoutFEC: 00:00:33.65; WithUseInterpretation: 00:00:58.54; 
+         * -- Randomized Load Finished - 00:07:42.93; WithoutFEC: 00:07:49.95; WithUseInterpretation: 00:08:07.61; 
+         *
+         * - Starting cold run tests
+         * -- Load Test Finished       - 00:00:41.93; WithoutFEC: 00:00:50.20; WithUseInterpretation: 00:00:59.72; 
+         * -- Randomized Load Finished - 00:07:53.44; WithoutFEC: 00:08:18.08; WithUseInterpretation: 00:08:20.03; 
+         */
             public int iterations;
             public int threadNum;
             public Type[] controllerTypes;
