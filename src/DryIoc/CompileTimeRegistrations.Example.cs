@@ -10,6 +10,7 @@ namespace Example
     }
 
     public interface IDependencyA { }
+
     public class DependencyA : IDependencyA { }
 
     public class DependencyB<T>

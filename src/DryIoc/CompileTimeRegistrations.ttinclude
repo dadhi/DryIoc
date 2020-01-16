@@ -2,7 +2,7 @@
 // TODO:
 // 1. Fill-in method `GetContainerWithRegistrations` below with creation of DryIoc `Container` and registrations.
 // 2. Specify the resolution roots via `SpecifyResolutionRoots` method, see example below.
-// 3. Re-save the "Container.Generated.tt" file. Confirm the Visual Studio prompt if any.
+// 3. Save the "Container.Generated.tt" file. Confirm the Visual Studio prompt if any.
 // 4. Check the "Container.Generated.cs" for the generated results and issues.
 //
 // Note: 
@@ -11,8 +11,7 @@
 #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="ImTools" #>
-<##>
-<#// TODO: Insert assemblies and namespaces of your services to be registered in container #>
+<#// TODO: Insert the assemblies and namespaces of your services to be registered in container #>
 <#@ import Namespace="Example" #>
 <#+
     // TODO: Specify the container and registrations ...
@@ -46,10 +45,10 @@
     ServiceInfo[] CustomResolutionRoots =
     {
         // for example:
-        ServiceInfo.Of<IService>(), 
+        ServiceInfo.Of<Example.IService>(), 
     };
 
-    // TODO: Specify the namespace to go into using instead of qualify the type all the times, 
+    // TODO: Specify the namespace to go into `using` instead of qualify the type all the times, 
     // You may generate the Container.Generated.cs first, then look what you want to move to using
     string[] NamespaceUsings =
     {
