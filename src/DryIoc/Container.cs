@@ -79,7 +79,9 @@ namespace DryIoc
     {
         /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
         public Container() : this(Rules.Default, Ref.Of(Registry.Default), NewSingletonScope())
-        { }
+        {
+            SetInitialFactoryID();
+        }
 
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
         /// <param name="rules">(optional) Rules to modify container default resolution behavior.
@@ -87,7 +89,9 @@ namespace DryIoc
         /// <param name="scopeContext">(optional) Scope context to use for scoped reuse.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
             : this(rules ?? Rules.Default, Ref.Of(Registry.Default), NewSingletonScope(), scopeContext)
-        { }
+        {
+            SetInitialFactoryID();
+        }
 
         /// <summary>Creates new container with configured rules.</summary>
         /// <param name="configure">Allows to modify <see cref="DryIoc.Rules.Default"/> rules.</param>
@@ -2546,13 +2550,17 @@ namespace DryIoc
             _disposeStackTrace = disposeStackTrace;
 
             _parent = parent;
-
-            var lastGeneratedId = 0;
-            GetLastGeneratedFactoryID(ref lastGeneratedId);
-            Factory._lastFactoryID += lastGeneratedId;
         }
 
-#endregion
+        private void SetInitialFactoryID()
+        {
+            var lastGeneratedId = 0;
+            GetLastGeneratedFactoryID(ref lastGeneratedId);
+            if (lastGeneratedId > Factory._lastFactoryID)
+                Factory._lastFactoryID = lastGeneratedId + 1;
+        }
+
+        #endregion
     }
 
     /// Special service key with info about open-generic service type
