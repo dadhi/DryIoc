@@ -64,10 +64,10 @@
         <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.3.0" />
     </ItemGroup>
 
-    <Import Project="CompileTimeDependencies.props" />
+    <Import Project="DryIoc.props" />
 
     <ItemGroup>
-        <None Include="CompileTimeDependencies.props" />
+        <None Include="DryIoc.props" />
     </ItemGroup>
 
     <ItemGroup>

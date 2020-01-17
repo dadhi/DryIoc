@@ -19,11 +19,11 @@ Troubleshooting:
 
 1. If you see errors in "Container.Generated.tt" file with the namespaces not being resolved, 
 please ensure that "CompileTimeDependencies.props" is copied to your project from the DryIoc package installation, 
-e.g. from the "%USERPROFILE%\.nuget\packages\DryIoc\<version>\build\CompileTimeDependencies.props" 
+e.g. from the "%USERPROFILE%\.nuget\packages\DryIoc\<version>\build\DryIoc.props" 
 
 2. Edit the target ".csproj" file and add closer to the top the following Import:
 
-<Import Project="CompileTimeDependencies.props" />
+<Import Project="DryIoc.props" />
 
-3. Check the "CompileTimeDependencies.props" to ensure the path to "ExpressionToCodeLib.dll" points to the correct location in DryIoc package installation.
+3. Check the "DryIoc.props" to ensure the path to "ExpressionToCodeLib.dll" points to the correct location in DryIoc package installation.
 Modify the file accordingly.

@@ -144,7 +144,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DryIoc", "DryIoc", "{1858EE
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{83610519-3793-469D-8BAA-93FBB5206292}"
 	ProjectSection(SolutionItems) = preProject
-		nuspecs\DryIoc\build\CompileTimeDependencies.props = nuspecs\DryIoc\build\CompileTimeDependencies.props
+		nuspecs\DryIoc\build\DryIoc.props = nuspecs\DryIoc\build\DryIoc.props
 	EndProjectSection
 EndProject
 Global

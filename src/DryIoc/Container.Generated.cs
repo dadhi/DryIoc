@@ -47,7 +47,7 @@ namespace DryIoc
     {
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID)
         {
-            lastFactoryID = 34; // generated: equals to the last used Factory.FactoryID 
+            lastFactoryID = 136; // generated: equals to the last used Factory.FactoryID 
         }
 
         partial void ResolveGenerated(ref object service, Type serviceType)
@@ -78,7 +78,7 @@ namespace DryIoc
         // typeof(IService)
         internal static object Get_0_IService(IResolverContext r)
         {
-            return new MyService(new DependencyA(), new DependencyB<string>(), (RuntimeDependencyC)r.Resolve(typeof(RuntimeDependencyC), null, DryIoc.IfUnresolved.Throw, default(System.Type), DryIoc.Request.Empty.Push(typeof(IService), default(System.Type), null, 29, DryIoc.FactoryType.Service, typeof(MyService), DryIoc.Reuse.Transient, DryIoc.RequestFlags.IsResolutionCall), default(object[])));
+            return new MyService(new DependencyA(), new DependencyB<string>(), (RuntimeDependencyC)r.Resolve(typeof(RuntimeDependencyC), null, DryIoc.IfUnresolved.Throw, default(System.Type), DryIoc.Request.Empty.Push(typeof(IService), default(System.Type), null, 64, DryIoc.FactoryType.Service, typeof(MyService), DryIoc.Reuse.Transient, DryIoc.RequestFlags.IsResolutionCall), default(object[])));
         }
 
     }

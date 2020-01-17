@@ -2546,6 +2546,10 @@ namespace DryIoc
             _disposeStackTrace = disposeStackTrace;
 
             _parent = parent;
+
+            var lastGeneratedId = 0;
+            GetLastGeneratedFactoryID(ref lastGeneratedId);
+            Factory._lastFactoryID += lastGeneratedId;
         }
 
 #endregion
@@ -9394,7 +9398,7 @@ namespace DryIoc
 
 #region Implementation
 
-        private static int _lastFactoryID;
+        internal static int _lastFactoryID;
         private IReuse _reuse;
         private Setup _setup;
 
