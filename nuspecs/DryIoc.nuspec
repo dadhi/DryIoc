@@ -102,14 +102,14 @@
         <!--net40-->
         <file src="..\src\DryIoc\Container.cs"                        target="content\net40\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs"                          target="content\net40\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="content\net40\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="content\net40\DryIoc" />
         <file src="..\src\DryIoc\CompileTimeRegistrations.Example.cs" target="content\net40\DryIoc" />
         <file src="..\src\DryIoc\Container.Generated.tt"              target="content\net40\DryIoc" />
         <file src="..\src\DryIoc\CompileTimeRegistrations.ttinclude"  target="content\net40\DryIoc" />
 
         <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\net40\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\net40\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\net40\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\net40\DryIoc" />
         <file src="..\src\DryIoc\CompileTimeRegistrations.Example.cs" target="contentFiles\cs\net40\DryIoc" />
         <file src="..\src\DryIoc\Container.Generated.tt"              target="contentFiles\tt\net40\DryIoc" />
         <file src="..\src\DryIoc\CompileTimeRegistrations.ttinclude"  target="contentFiles\tt\net40\DryIoc" />
