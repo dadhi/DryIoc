@@ -9,14 +9,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DryIoc.MefAttributedModel.dll" Version="5.0.0" />
-    <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="3.0.0" />
-    <PackageReference Include="DryIocAttributes.dll" Version="5.0.0" />
+    <PackageReference Include="DryIoc" Version="4.1.0-preview-05" />
+    <PackageReference Include="DryIoc.MefAttributedModel" Version="5.0.0" />
+    <PackageReference Include="DryIocAttributes" Version="5.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics" Version="2.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Server.IISIntegration" Version="2.2.1" />
     <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel" Version="2.2.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="3.0.0-preview.19074.2" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.2.0" />
+    <PackageReference Include="System.ComponentModel.Composition" Version="4.7.0" />
   </ItemGroup>
 
 </Project>
