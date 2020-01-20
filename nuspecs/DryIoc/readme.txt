@@ -27,6 +27,8 @@ e.g. from the "%USERPROFILE%\.nuget\packages\DryIoc\<version>\build\DryIoc.props
 
 3. Edit the "DryIoc.props" to ensure the path to "ExpressionToCodeLib.dll" points to the correct location in 
 the DryIoc package installation.
+4. If some of System assemblies are not loading try the accepted answer from the 
+https://stackoverflow.com/questions/51550265/t4-template-could-not-load-file-or-assembly-system-runtime-version-4-2-0-0
 
 
 For editing and viewing the T4 text template files you may use ForTea plugin JetBrains ReSharper
