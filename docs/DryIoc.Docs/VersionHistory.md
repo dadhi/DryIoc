@@ -8,6 +8,7 @@ Version History
 - Better memory use and massively improved performance for the real-world applications - big object graphs and the unit-of-work scenarios. See the updated benchmark results in [readme.md].(https://github.com/dadhi/DryIoc/blob/master/README.md#creating-the-container-registering-the-services-then-opening-a-scope-and-resolving-the-scoped-service-eg-controller-for-the-first-time))
 - Improve parallelism / reduce thread blocking #137
 - Full and fast DryIoc own Interpretation support via `Rules.WithUseInterpretation()` - useful for iOS and other platforms without compilation support #90
+- Add DryIocZero capabilities to the DryIoc source package #101
 - Copied DryIoc sample project from the MediatR but with DryIoc.Messages #117 
 
 ### Features
@@ -35,6 +36,8 @@ Version History
 - Private and public Constructors in generic classes #196
 - Fix documentation regarding implicitly injected scope as IDisposable #197
 - Open generics resolve fails if there is a static constructor #198
+- 4.1.0 Unhandled Exception: System.NullReferenceException: Object reference not set to an instance of an object. #205
+- Avoid wasteful compilation of the same cached expression by multiple threads #208
 
 
 ## v4.0.7 Bug-fix release / 2019-09-04

@@ -20,6 +20,12 @@ namespace PerformanceTests
         public static IContainer PrepareDryIocWithoutFEC() => 
             PrepareDryIoc(new Container(Rules.Default.WithoutFastExpressionCompiler()));
 
+        public static IContainer PrepareDryIoc_WebRequestScoped() =>
+            PrepareDryIoc_WebRequestScoped(new Container());
+
+        public static IContainer PrepareDryIoc_WebRequestScoped_WithoutFEC() =>
+            PrepareDryIoc_WebRequestScoped(new Container(Rules.Default.WithoutFastExpressionCompiler()));
+
         public static IContainer PrepareDryIocInterpretationOnly() => 
             PrepareDryIoc(new Container(Rules.Default.WithUseInterpretation()));
 
@@ -116,9 +122,108 @@ namespace PerformanceTests
             return container;
         }
 
+        private static IContainer PrepareDryIoc_WebRequestScoped(IContainer container)
+        {
+            // register dummy scoped and singletons services to populate resolution cache and scopes to be close to reality
+            RegisterDummyPopulation(container);
+
+            // register graph for benchmarking starting with scoped R (root) / Controller
+            container.Register<R>(Reuse.InWebRequest);
+
+            container.Register<Scoped1>(Reuse.InWebRequest);
+            container.Register<Scoped2>(Reuse.InWebRequest);
+
+            container.Register<Trans1>(Reuse.Transient);
+            container.Register<Trans2>(Reuse.Transient);
+
+            container.Register<Single1>(Reuse.Singleton);
+            container.Register<Single2>(Reuse.Singleton);
+
+            container.RegisterDelegate<Scoped1, Scoped3, Single1, SingleObj1, ScopedFac1>(
+                (scoped1, scoped3, single1, singleObj1) => new ScopedFac1(scoped1, scoped3, single1, singleObj1),
+                Reuse.InWebRequest);
+
+            container.RegisterDelegate<Scoped2, Scoped4, Single2, SingleObj2, ScopedFac2>(
+                (scoped2, scoped4, single2, singleObj2) => new ScopedFac2(scoped2, scoped4, single2, singleObj2),
+                Reuse.InWebRequest);
+
+            container.RegisterInstance(new SingleObj1());
+            container.RegisterInstance(new SingleObj2());
+
+            // level 2
+            container.Register<Scoped3>(Reuse.InWebRequest);
+            container.Register<Scoped4>(Reuse.InWebRequest);
+
+            container.Register<Scoped12>(Reuse.InWebRequest);
+            container.Register<Scoped22>(Reuse.InWebRequest);
+
+            container.Register<Single12>(Reuse.Singleton);
+            container.Register<Single22>(Reuse.Singleton);
+
+            container.Register<Trans12>(Reuse.Transient);
+            container.Register<Trans22>(Reuse.Transient);
+
+            container.RegisterDelegate<Scoped13, Single1, SingleObj13, ScopedFac12>(
+                (scoped13, single1, singleObj13) => new ScopedFac12(scoped13, single1, singleObj13),
+                Reuse.InWebRequest);
+
+            container.RegisterDelegate<Scoped23, Single2, SingleObj23, ScopedFac22>(
+                (scoped23, single2, singleObj23) => new ScopedFac22(scoped23, single2, singleObj23),
+                Reuse.InWebRequest);
+
+            container.RegisterInstance(new SingleObj12());
+            container.RegisterInstance(new SingleObj22());
+
+            // level 3
+            container.Register<Scoped13>(Reuse.InWebRequest);
+            container.Register<Scoped23>(Reuse.InWebRequest);
+
+            container.Register<Single13>(Reuse.Singleton);
+            container.Register<Single23>(Reuse.Singleton);
+
+            container.Register<Trans13>(Reuse.Transient);
+            container.Register<Trans23>(Reuse.Transient);
+
+            container.RegisterDelegate<Single1, Scoped14, ScopedFac14, ScopedFac13>(
+                (single1, scoped14, scopedFac14) => new ScopedFac13(single1, scoped14, scopedFac14),
+                Reuse.InWebRequest);
+
+            container.RegisterDelegate<Single2, Scoped24, ScopedFac24, ScopedFac23>(
+                (single2, scoped24, scopedFac24) => new ScopedFac23(single2, scoped24, scopedFac24),
+                Reuse.InWebRequest);
+
+            container.RegisterInstance(new SingleObj13());
+            container.RegisterInstance(new SingleObj23());
+
+            // level 4
+            container.Register<Scoped14>(Reuse.Scoped);
+            container.Register<Scoped24>(Reuse.Scoped);
+
+            container.Register<Single14>(Reuse.Singleton);
+            container.Register<Single24>(Reuse.Singleton);
+
+            container.Register<Trans14>(Reuse.Transient);
+            container.Register<Trans24>(Reuse.Transient);
+
+            container.RegisterDelegate(r => new ScopedFac14(), Reuse.InWebRequest);
+            container.RegisterDelegate(r => new ScopedFac24(), Reuse.InWebRequest);
+
+            container.RegisterInstance(new SingleObj14());
+            container.RegisterInstance(new SingleObj24());
+
+            ResolveDummyPopulation(container);
+            return container;
+        }
+
         public static object Measure(IContainer container)
         {
             using (var scope = container.OpenScope())
+                return scope.Resolve<R>();
+        }
+
+        public static object Measure_WebRequestScoped(IContainer container)
+        {
+            using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
                 return scope.Resolve<R>();
         }
 
@@ -1124,6 +1229,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
   [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
   DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
 
+
 |                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |-------------------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
 |                      MsDI |  3.352 us | 0.0195 us | 0.0163 us |  1.00 |    0.00 |  0.9460 | 0.0153 |     - |   4.35 KB |
@@ -1134,11 +1240,27 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |         Grace_MsDIAdapter |  2.228 us | 0.0279 us | 0.0261 us |  0.67 |    0.01 |  0.7401 | 0.0076 |     - |   3.41 KB |
 |                   Autofac | 37.386 us | 0.2686 us | 0.2513 us | 11.13 |    0.04 | 10.5591 | 0.6714 |     - |  48.66 KB |
 |       Autofac_MsDIAdapter | 44.416 us | 0.1591 us | 0.1488 us | 13.25 |    0.06 | 12.5732 | 0.7324 |     - |  57.78 KB |
+
+|            Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|------------------ |----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+|              MsDI |  3.854 us | 0.0309 us | 0.0258 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
+|            DryIoc |  1.699 us | 0.0030 us | 0.0028 us |  0.44 |    0.00 | 0.6409 |     - |     - |   2.96 KB |
+| DryIoc_WithoutFEC | 16.344 us | 0.1252 us | 0.1045 us |  4.24 |    0.05 | 1.0681 |     - |     - |   4.93 KB |
+
+                
+|                             Method |      Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|----------------------------------- |----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+|                               MsDI |  3.852 us | 0.0255 us | 0.0239 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
+|            DryIoc_WebRequestScoped |  2.128 us | 0.0113 us | 0.0106 us |  0.55 |    0.00 | 0.6866 |     - |     - |   3.17 KB |
+| DryIoc_WebRequestScoped_WithoutFEC | 17.713 us | 0.1377 us | 0.1288 us |  4.60 |    0.04 | 1.0986 |     - |     - |   5.14 KB |
+
 */
 
             private IServiceProvider _msDi;
             private IContainer _dryIoc;
             private IContainer _dryIocWithoutFEC;
+            private IContainer _dryIocWebRequestScoped;
+            private IContainer _dryIocWebRequestScopedWithoutFEC;
             private IContainer _dryIocInterpretationOnly;
             private IServiceProvider _dryIocMsDi;
             private DependencyInjectionContainer _grace;
@@ -1152,6 +1274,8 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
                 Measure(_msDi = PrepareMsDi());
                 Measure(_dryIoc = PrepareDryIoc());
                 Measure(_dryIocWithoutFEC = PrepareDryIocWithoutFEC());
+                Measure_WebRequestScoped(_dryIocWebRequestScoped = PrepareDryIoc_WebRequestScoped());
+                Measure_WebRequestScoped(_dryIocWebRequestScopedWithoutFEC = PrepareDryIoc_WebRequestScoped_WithoutFEC());
                 Measure(_dryIocInterpretationOnly = PrepareDryIocInterpretationOnly());
                 Measure(_dryIocMsDi = PrepareDryIocMsDi());
                 Measure(_grace = PrepareGrace());
@@ -1164,16 +1288,22 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             public object MsDI() => Measure(_msDi);
 
             [Benchmark]
-            public object DryIoc() => Measure(_dryIoc);
+            public object DryIoc_WebRequestScoped() => Measure_WebRequestScoped(_dryIocWebRequestScoped);
 
             [Benchmark]
+            public object DryIoc_WebRequestScoped_WithoutFEC() => Measure_WebRequestScoped(_dryIocWebRequestScopedWithoutFEC);
+
+            //[Benchmark]
+            public object DryIoc() => Measure(_dryIoc);
+
+            //[Benchmark]
             public object DryIoc_WithoutFEC() => Measure(_dryIocWithoutFEC);
 
             //[Benchmark]
-            public object DryIoc_MsDIAdapter() => Measure(_dryIocMsDi);
+            public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
             //[Benchmark]
-            public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
+            public object DryIoc_MsDIAdapter() => Measure(_dryIocMsDi);
 
             //[Benchmark]
             public object Grace() => Measure(_grace);

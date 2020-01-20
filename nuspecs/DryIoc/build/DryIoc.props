@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+    <PropertyGroup>
+        <DryIocVersion>4.1.0</DryIocVersion>
+
+        <NugetPackageCache>$(USERPROFILE)\.nuget\packages</NugetPackageCache>
+
+        <DryIocCompileTimeDeps Condition="Exists('$(NugetPackageCache)')">$(NugetPackageCache)\DryIoc\$(DryIocVersion)\tools</DryIocCompileTimeDeps>
+        <DryIocCompileTimeDeps Condition="!Exists('$(NugetPackageCache)')">$(SolutionDir)\packages\DryIoc.$(DryIocVersion)\tools</DryIocCompileTimeDeps>
+
+        <ExpressionToCodeLibAssembly>$(DryIocCompileTimeDeps)\ExpressionToCodeLib.2.6.0\ExpressionToCodeLib.dll</ExpressionToCodeLibAssembly>
+    </PropertyGroup>
+</Project>

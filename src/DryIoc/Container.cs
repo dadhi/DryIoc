@@ -79,7 +79,9 @@ namespace DryIoc
     {
         /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
         public Container() : this(Rules.Default, Ref.Of(Registry.Default), NewSingletonScope())
-        { }
+        {
+            SetInitialFactoryID();
+        }
 
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
         /// <param name="rules">(optional) Rules to modify container default resolution behavior.
@@ -87,7 +89,9 @@ namespace DryIoc
         /// <param name="scopeContext">(optional) Scope context to use for scoped reuse.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
             : this(rules ?? Rules.Default, Ref.Of(Registry.Default), NewSingletonScope(), scopeContext)
-        { }
+        {
+            SetInitialFactoryID();
+        }
 
         /// <summary>Creates new container with configured rules.</summary>
         /// <param name="configure">Allows to modify <see cref="DryIoc.Rules.Default"/> rules.</param>
@@ -99,7 +103,7 @@ namespace DryIoc
         /// <summary>Helper to create singleton scope</summary>
         public static IScope NewSingletonScope() => new Scope(name: "<sigletons>");
 
-        /// <summary>Outputs info about container disposal state and current scopes.</summary>
+        /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
         {
             var s = _scopeContext == null ? "Container" : "Container with ambient ScopeContext " + _scopeContext;
@@ -162,6 +166,71 @@ namespace DryIoc
                 _scopeContext?.Dispose();
             }
         }
+
+        #region Compile-time generated parts - former DryIocZero
+
+        partial void GetLastGeneratedFactoryID(ref int lastFactoryID);
+
+        partial void ResolveGenerated(ref object service, Type serviceType);
+
+        partial void ResolveGenerated(ref object service,
+            Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
+
+        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType);
+
+        /// <summary>Identifies the service when resolving collection</summary>
+        public struct ResolveManyResult
+        {
+            /// <summary>Factory, the required part</summary>
+            public FactoryDelegate FactoryDelegate;
+
+            /// <summary>Optional key</summary>
+            public object ServiceKey;
+
+            /// <summary>Optional required service type, can be an open-generic type.</summary>
+            public Type RequiredServiceType;
+
+            /// <summary>Constructs the struct.</summary>
+            public static ResolveManyResult Of(FactoryDelegate factoryDelegate,
+                object serviceKey = null, Type requiredServiceType = null) =>
+                new ResolveManyResult
+                {
+                    FactoryDelegate = factoryDelegate,
+                    ServiceKey = serviceKey,
+                    RequiredServiceType = requiredServiceType
+                };
+        }
+
+        /// <summary>Directly uses generated factories to resolve service. Or returns the default if service does not have generated factory.</summary>
+        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
+        [SuppressMessage("ReSharper", "ExpressionIsAlwaysNull", Justification = "Per design")]
+        public object ResolveCompileTimeGeneratedOrDefault(Type serviceType)
+        {
+            object service = null;
+            ResolveGenerated(ref service, serviceType);
+            return service;
+        }
+
+        /// <summary>Directly uses generated factories to resolve service. Or returns the default if service does not have generated factory.</summary>
+        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
+        [SuppressMessage("ReSharper", "ExpressionIsAlwaysNull", Justification = "Per design")]
+        public object ResolveCompileTimeGeneratedOrDefault(Type serviceType, object serviceKey)
+        {
+            object service = null;
+            ResolveGenerated(ref service, serviceType, serviceKey,
+                requiredServiceType: null, preRequestParent: null, args: null);
+            return service;
+        }
+
+        /// <summary>Resolves many generated only services. Ignores runtime registrations.</summary>
+        public IEnumerable<ResolveManyResult> ResolveManyCompileTimeGeneratedOrEmpty(Type serviceType)
+        {
+            IEnumerable<ResolveManyResult> manyGenerated = ArrayTools.Empty<ResolveManyResult>();
+            ResolveManyGenerated(ref manyGenerated, serviceType);
+            return manyGenerated;
+        }
+
+        #endregion
 
         #region IRegistrator
 
@@ -235,9 +304,13 @@ namespace DryIoc
             ((IResolver)this).Resolve(serviceType, IfUnresolved.ReturnDefaultIfNotRegistered);
 #endif
 
-        [MethodImpl((MethodImplOptions)256)]
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
+            object service = null;
+            ResolveGenerated(ref service, serviceType);
+            if (service != null)
+                return service;
+
             var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
             var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
             if (cacheEntry != null)
@@ -302,10 +375,13 @@ namespace DryIoc
             var rules = Rules;
             FactoryDelegate factoryDelegate;
 
-            // todo: in v5.0 there should be no check nor the InstanceFactory
-            if (factory is InstanceFactory || !rules.UseInterpretationForTheFirstResolution)
+            // todo: [Obsolete] - in v5.0 there should be no check nor the InstanceFactory
+            if (factory is InstanceFactory || 
+                !rules.UseInterpretationForTheFirstResolution)
             {
                 factoryDelegate = factory.GetDelegateOrDefault(request);
+                if (factoryDelegate == null)
+                    return null;
             }
             else 
             {
@@ -329,13 +405,9 @@ namespace DryIoc
                 // 1) First try to interpret
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
                     return instance;
-
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
             }
-
-            if (factoryDelegate == null)
-                return null;
 
             if (factory.Caching != FactoryCaching.DoNotCache)
                 _registry.Value.TryCacheDefaultFactory(serviceTypeHash, serviceType, factoryDelegate);
@@ -360,6 +432,11 @@ namespace DryIoc
             object serviceKey, IfUnresolved ifUnresolved, object scopeName, Type requiredServiceType, Request preResolveParent, 
             object[] args)
         {
+            object service = null;
+            ResolveGenerated(ref service, serviceType, serviceKey, requiredServiceType, preResolveParent, args);
+            if (service != null)
+                return service;
+
             object cacheKey = null;
             if (requiredServiceType == null && preResolveParent.IsEmpty && args.IsNullOrEmpty())
             {
@@ -406,6 +483,8 @@ namespace DryIoc
             if (factory is InstanceFactory || !Rules.UseInterpretationForTheFirstResolution)
             {
                 factoryDelegate = factory.GetDelegateOrDefault(request);
+                if (factoryDelegate == null)
+                    return null;
             }
             else
             {
@@ -434,9 +513,6 @@ namespace DryIoc
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(useFec, Rules.UseInterpretation);
             }
-
-            if (factoryDelegate == null)
-                return null;
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
@@ -481,6 +557,17 @@ namespace DryIoc
             Type requiredServiceType, Request preResolveParent, object[] args)
         {
             var requiredItemType = requiredServiceType ?? serviceType;
+
+            // first return compile-time generated factories if any
+            var generatedFactories = Enumerable.Empty<ResolveManyResult>();
+            ResolveManyGenerated(ref generatedFactories, serviceType);
+            if (serviceKey != null)
+                generatedFactories = generatedFactories.Where(x => serviceKey.Equals(x.ServiceKey));
+            if (requiredServiceType != null)
+                generatedFactories = generatedFactories.Where(x => requiredServiceType == x.RequiredServiceType);
+
+            foreach (var generated in generatedFactories)
+                yield return generated.FactoryDelegate(this);
 
             // Emulating the collection parent so that collection related rules and conditions were applied
             // the same way as if resolving IEnumerable<T>
@@ -2463,7 +2550,15 @@ namespace DryIoc
             _parent = parent;
         }
 
-#endregion
+        private void SetInitialFactoryID()
+        {
+            var lastGeneratedId = 0;
+            GetLastGeneratedFactoryID(ref lastGeneratedId);
+            if (lastGeneratedId > Factory._lastFactoryID)
+                Factory._lastFactoryID = lastGeneratedId + 1;
+        }
+
+        #endregion
     }
 
     /// Special service key with info about open-generic service type
@@ -9298,7 +9393,7 @@ namespace DryIoc
 
 #region Implementation
 
-        private static int _lastFactoryID;
+        internal static int _lastFactoryID;
         private IReuse _reuse;
         private Setup _setup;
 

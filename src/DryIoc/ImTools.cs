@@ -3342,11 +3342,6 @@ namespace ImTools
             if (delta == 1)
                 return new ImMapTree<V>(Entry, newLeftTree, Right, newLeftTree.TreeHeight + 1);
 
-            if (delta > 2)
-            {
-
-            }
-
             // here is the balancing art comes into place
             if (rightHeight == 1)
             {
@@ -3414,11 +3409,6 @@ namespace ImTools
                 return new ImMapTree<V>(Entry, Left, newRightTree, TreeHeight);
             if (delta == 1)
                 return new ImMapTree<V>(Entry, Left, newRightTree, newRightTree.TreeHeight + 1);
-
-            if (delta > 2)
-            {
-
-            }
 
             if (leftHeight == 1)
             {
