@@ -1,13 +1,15 @@
 Hello Sailor,
 
-DryIoc is adding *optional* COMPILE-TIME dependency injection with the source package.
+DryIoc now has an *optional* COMPILE-TIME dependency injection with the source package.
 (previously it was available as a separate DryIocZero package)
 
+You may ignore this information if you don't want to use the compile-time DI.
+Everything will work without it!
 
 How to use:
 
-1. Copy "Container.Generated.tt" and "CompileTimeRegistrations.ttinclude" from the 
-"%USERPROFILE%\.nuget\packages\DryIoc\<version>\CompileTimeDI\" folder.
+1. Copy contents of "%USERPROFILE%\.nuget\packages\DryIoc\<version>\CompileTimeDI\" folder
+to your project - e.g. "Container.Generated.tt", "CompileTimeRegistrations.ttinclude", and "CompileTimeRegistrations.Example.cs".
 2. Add your registrations into the "CompileTimeRegistrations.ttinclude" file - the file already contains
 the registrations from the "CompileTimeGenerate.Example.cs", you may remove them later.
 3. Save (or re-save) the "Container.Generated.tt" file in the Visual Studio or JetBrains Rider 
