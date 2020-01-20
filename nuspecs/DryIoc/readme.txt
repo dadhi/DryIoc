@@ -33,5 +33,5 @@ the DryIoc package installation.
 https://stackoverflow.com/questions/51550265/t4-template-could-not-load-file-or-assembly-system-runtime-version-4-2-0-0
 
 
-For editing and viewing the T4 text template files you may use ForTea plugin JetBrains ReSharper
-https://plugins.jetbrains.com/plugin/11634-fortea
+For editing and viewing the T4 text template files you may use ForTea plugin for JetBrains ReSharper
+https://plugins.jetbrains.com/plugin/11634-fortea (or JetBrains Rider with the native T4 support)
