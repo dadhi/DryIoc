@@ -9141,19 +9141,6 @@ namespace DryIoc
                     ((Container)container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheSlot);
             }
             else Container.TryThrowUnableToResolve(request);
-
-            //// todo: split the expression by wrapping it in a FactoryDelegate
-            //if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
-            //    request.FactoryType == FactoryType.Service &&
-            //    request.DependencyDepth > container.Rules.DependencyDepthToSplitObjectGraph)
-            //{
-            //    var serviceExprType = serviceExpr.Type;
-            //    serviceExpr = Invoke(Lambda<FactoryDelegate>(serviceExpr, 
-            //            FactoryDelegateCompiler.ResolverContextParamExpr), FactoryDelegateCompiler.ResolverContextParamExpr);
-            //    if (serviceExprType != typeof(object))
-            //        serviceExpr = Convert(serviceExpr, serviceExprType);
-            //}
-
             return serviceExpr;
         }
 
