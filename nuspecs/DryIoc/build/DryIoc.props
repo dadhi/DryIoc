@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
     <PropertyGroup>
-        <DryIocVersion>4.1.0-preview-05</DryIocVersion>
+        <DryIocVersion>4.1.0</DryIocVersion>
 
         <NugetPackageCache>$(USERPROFILE)\.nuget\packages</NugetPackageCache>
 
