@@ -1967,45 +1967,43 @@ namespace DryIoc
             public ImMap<ExpressionCacheSlot>[] FactoryExpressionCache;
 
             public Expression GetCachedFactoryExpression(
-                int factoryId, Request request, out ImMapEntry<Registry.ExpressionCacheSlot> slot)
+                int factoryId, Request request, out ImMapEntry<Registry.ExpressionCacheSlot> entry)
             {
-                slot = null;
-
-                // copy to local `cache` will prevent NRE if cache is set to null from outside
+                entry = null;
                 var cache = FactoryExpressionCache;
-                if (cache == null)
-                    return null;
-
-                var map = cache[factoryId & CACHE_SLOT_COUNT_MASK];
-                if (map == null)
-                    return null;
-
-                slot = map.GetEntryOrDefault(factoryId);
-                if (slot != null)
+                if (cache != null)
                 {
-                    var reuse = request.Reuse;
-                    if (reuse == Reuse.Transient)
-                        return slot.Value.Transient;
-
-                    if (reuse is CurrentScopeReuse scoped)
+                    var map = cache[factoryId & CACHE_SLOT_COUNT_MASK];
+                    if (map != null)
                     {
-                        if (scoped.Name == null)
-                            return slot.Value.Scoped;
+                        entry = map.GetEntryOrDefault(factoryId);
+                        if (entry != null)
+                        {
+                            var reuse = request.Reuse;
+                            if (reuse == Reuse.Transient)
+                                return entry.Value.Transient;
 
-                        var named = slot.Value.ScopedToName;
-                        if (named != null)
-                            for (var i = 0; i < named.Length; i++)
-                                if (Equals(named[i].Key, scoped.Name))
-                                    return named[i].Value;
+                            if (reuse is CurrentScopeReuse scoped)
+                            {
+                                if (scoped.Name == null)
+                                    return entry.Value.Scoped;
+
+                                var named = entry.Value.ScopedToName;
+                                if (named != null)
+                                    for (var i = 0; i < named.Length; i++)
+                                        if (Equals(named[i].Key, scoped.Name))
+                                            return named[i].Value;
+                            }
+                        }
                     }
                 }
 
                 return null;
             }
 
-            internal void CacheFactoryExpression(int factoryId, Request request, Expression expr, ImMapEntry<ExpressionCacheSlot> slot = null)
+            internal void CacheFactoryExpression(int factoryId, Request request, Expression expr, ImMapEntry<ExpressionCacheSlot> entry = null)
             {
-                if (slot == null)
+                if (entry == null)
                 {
                     if (FactoryExpressionCache == null)
                         Interlocked.CompareExchange(ref FactoryExpressionCache,
@@ -2015,31 +2013,31 @@ namespace DryIoc
                     if (map == null)
                         Interlocked.CompareExchange(ref map, ImMap<ExpressionCacheSlot>.Empty, null);
 
-                    slot = map.GetEntryOrDefault(factoryId);
-                    if (slot == null)
+                    entry = map.GetEntryOrDefault(factoryId);
+                    if (entry == null)
                     {
                         var m = map;
                         if (Interlocked.CompareExchange(ref map, m.AddOrKeep(factoryId), m) != m)
                             Ref.Swap(ref map, factoryId, (x, id) => x.AddOrKeep(id));
-                        slot = map.GetEntryOrDefault(factoryId);
+                        entry = map.GetEntryOrDefault(factoryId);
                     }
                 }
 
                 var reuse = request.Reuse;
                 if (reuse == Reuse.Transient)
                 {
-                    slot.Value.Transient = expr;
+                    entry.Value.Transient = expr;
                 }
                 else if (reuse is CurrentScopeReuse scoped)
                 {
                     if (scoped.Name == null)
-                        slot.Value.Scoped = expr;
+                        entry.Value.Scoped = expr;
                     else
                     {
-                        var named = slot.Value.ScopedToName;
+                        var named = entry.Value.ScopedToName;
                         if (named == null)
                         {
-                            slot.Value.ScopedToName = scoped.Name.Pair(expr).One();
+                            entry.Value.ScopedToName = scoped.Name.Pair(expr).One();
                         }
                         else
                         {
@@ -2052,7 +2050,7 @@ namespace DryIoc
                                 var newNamed = new KeyValuePair<object, Expression>[named.Length + 1];
                                 Array.Copy(named, 0, newNamed, 0, named.Length);
                                 newNamed[named.Length] = scoped.Name.Pair(expr);
-                                slot.Value.ScopedToName = newNamed;
+                                entry.Value.ScopedToName = newNamed;
                             }
                         }
                     }
@@ -9184,7 +9182,9 @@ namespace DryIoc
             {
                 var itemRef = ((Scope)container.SingletonScope)._maps[FactoryID & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(FactoryID);
                 if (itemRef != null && itemRef.Value != Scope.NoItem)
+                {
                     return Constant(itemRef.Value);
+                }
             }
 
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
@@ -9209,10 +9209,10 @@ namespace DryIoc
                 !setup.UseParentReuse &&
                 !Made.IsConditional;
 
-            ImMapEntry<Container.Registry.ExpressionCacheSlot> cacheSlot = null;
+            ImMapEntry<Container.Registry.ExpressionCacheSlot> cacheEntry = null;
             if (mayCache)
             {
-                var cachedExpr = ((Container)container).GetCachedFactoryExpression(FactoryID, request, out cacheSlot);
+                var cachedExpr = ((Container)container).GetCachedFactoryExpression(FactoryID, request, out cacheEntry);
                 if (cachedExpr != null)
                     return cachedExpr;
             }
@@ -9233,22 +9233,9 @@ namespace DryIoc
                 }
 
                 if (mayCache)
-                    ((Container)container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheSlot);
+                    ((Container)container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheEntry);
             }
             else Container.TryThrowUnableToResolve(request);
-
-            //// todo: split the expression by wrapping it in a FactoryDelegate
-            //if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
-            //    request.FactoryType == FactoryType.Service &&
-            //    request.DependencyDepth > container.Rules.DependencyDepthToSplitObjectGraph)
-            //{
-            //    var serviceExprType = serviceExpr.Type;
-            //    serviceExpr = Invoke(Lambda<FactoryDelegate>(serviceExpr, 
-            //            FactoryDelegateCompiler.ResolverContextParamExpr), FactoryDelegateCompiler.ResolverContextParamExpr);
-            //    if (serviceExprType != typeof(object))
-            //        serviceExpr = Convert(serviceExpr, serviceExprType);
-            //}
-
             return serviceExpr;
         }
 
