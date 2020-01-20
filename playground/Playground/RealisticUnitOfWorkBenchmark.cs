@@ -17,6 +17,9 @@ namespace PerformanceTests
         public static IContainer PrepareDryIoc() => 
             PrepareDryIoc(new Container());
 
+        public static IContainer PrepareDryIocWithoutFEC() => 
+            PrepareDryIoc(new Container(Rules.Default.WithoutFastExpressionCompiler()));
+
         public static IContainer PrepareDryIocInterpretationOnly() => 
             PrepareDryIoc(new Container(Rules.Default.WithUseInterpretation()));
 
@@ -1121,7 +1124,6 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
   [Host]     : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
   DefaultJob : .NET Core 3.1.0 (CoreCLR 4.700.19.56402, CoreFX 4.700.19.56404), X64 RyuJIT
 
-
 |                    Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |-------------------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
 |                      MsDI |  3.352 us | 0.0195 us | 0.0163 us |  1.00 |    0.00 |  0.9460 | 0.0153 |     - |   4.35 KB |
@@ -1136,6 +1138,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 
             private IServiceProvider _msDi;
             private IContainer _dryIoc;
+            private IContainer _dryIocWithoutFEC;
             private IContainer _dryIocInterpretationOnly;
             private IServiceProvider _dryIocMsDi;
             private DependencyInjectionContainer _grace;
@@ -1148,6 +1151,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             {
                 Measure(_msDi = PrepareMsDi());
                 Measure(_dryIoc = PrepareDryIoc());
+                Measure(_dryIocWithoutFEC = PrepareDryIocWithoutFEC());
                 Measure(_dryIocInterpretationOnly = PrepareDryIocInterpretationOnly());
                 Measure(_dryIocMsDi = PrepareDryIocMsDi());
                 Measure(_grace = PrepareGrace());
@@ -1163,21 +1167,24 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             public object DryIoc() => Measure(_dryIoc);
 
             [Benchmark]
+            public object DryIoc_WithoutFEC() => Measure(_dryIocWithoutFEC);
+
+            //[Benchmark]
             public object DryIoc_MsDIAdapter() => Measure(_dryIocMsDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace() => Measure(_grace);
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace_MsDIAdapter() => Measure(_graceMsDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            [Benchmark]
+            //[Benchmark]
             public object Autofac_MsDIAdapter() => Measure(_autofacMsDi);
         }
     }
