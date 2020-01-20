@@ -21,7 +21,7 @@ namespace LoadTest
         {
             var config = new HttpConfiguration();
             var container = new Container(rules => rules
-                .WithoutFastExpressionCompiler()
+                //.WithoutFastExpressionCompiler()
                 //.WithUseInterpretation()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
