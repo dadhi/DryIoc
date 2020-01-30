@@ -721,16 +721,16 @@ __Note:__ Resolving as `LambdaExpression` does not create an actual service.
 
 #### DryIoc is not a magic
 
-Looking how resolved `LambdaExpression` is look like, you see that what DryIoc does is not a magic.
+Examining the resolved `LambdaExpression` you won't see any magic -
 
-It is just automates the generation of the object graph taking lifetime into consideration.
+DryIoc just automates the generation of the object graph taking lifetime into consideration.
 
-Given that you now have an expression, you may even `Compile` (and cache) it yourself :-) doing the last "magical" part.
+Given that you now have the resolved expression you may even `Compile` (and cache) it yourself :-) doing the last "magical" part.
 
-It may open some new possibilities:
+This opens the additional possibilities:
 
 For instance, below is the example which is "normally" won't work without shared `scopeContext`. 
-Specifically we have a singleton holding on the `Func` of scoped service. Now we are getting an expression out 
+Specifically we have a singleton holding onto the `Func` of scoped service. Now we are getting the expression out 
 of container, compiling it and providing it with the scope (or any other container we want) 
 as a `IResolverContext` argument to the compiled factory.
 
