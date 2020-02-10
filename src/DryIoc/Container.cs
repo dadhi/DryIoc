@@ -6953,7 +6953,8 @@ namespace DryIoc
                         .Type(initialize.ToFunc<Request, Action<TTarget, IResolverContext>>)),
                 setup: Setup.DecoratorWith(
                     r => r.ServiceType.IsAssignableTo<TTarget>() && (condition == null || condition(r)),
-                    useDecorateeReuse: true));
+                    useDecorateeReuse: true, // issue BitBucket #230 - ensures the intitialization to happen once on construction 
+                    preventDisposal: true)); // issue #215 - ensures that the initialized / decorated object does not added for the disposal twice
         }
 
         private static readonly MethodInfo _initializerMethod =
