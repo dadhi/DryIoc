@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Autofac.Core;
 using ImTools;
 using NUnit.Framework;
 
