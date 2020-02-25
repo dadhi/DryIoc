@@ -282,8 +282,7 @@ namespace DryIoc
         public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
             ThrowIfContainerDisposed();
-            var factories = _registry.Value.GetRegisteredFactories(serviceType.ThrowIfNull(), serviceKey, factoryType, condition);
-            return !factories.IsNullOrEmpty();
+            return _registry.Value.IsRegistered(serviceType, serviceKey, factoryType, condition);
         }
 
         /// <inheritdoc />
@@ -2062,7 +2061,7 @@ namespace DryIoc
 
             private Registry(ImMap<ImMap.KValue<Type>> wrapperFactories = null)
                 : this(ImMap<ImMap.KValue<Type>>.Empty, ImMap<ImMap.KValue<Type>>.Empty, wrapperFactories ?? ImMap<ImMap.KValue<Type>>.Empty,
-                    null, null, null, // todo: initialize with empty slots
+                    null, null, null, // caches are initialized to `null` to quickly check that they 
                     IsChangePermitted.Permitted)
             { }
 
@@ -2181,6 +2180,55 @@ namespace DryIoc
 
                         factory = factories.GetValueOrDefault(serviceKey);
                         return factory != null && (condition == null || condition(factory)) ? factory.One() : null;
+                }
+            }
+
+            public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType,
+                Func<Factory, bool> condition)
+            {
+                serviceType = serviceType.ThrowIfNull();
+                switch (factoryType)
+                {
+                    case FactoryType.Wrapper:
+                        var arrayElementType = serviceType.GetArrayElementTypeOrNull();
+                        if (arrayElementType != null)
+                            serviceType = typeof(IEnumerable<>).MakeGenericType(arrayElementType);
+
+                        serviceType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
+                        var wrapper = Wrappers.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType) as Factory;
+                        return wrapper != null && (condition == null || condition(wrapper));
+
+                    case FactoryType.Decorator:
+                        var decorators = Decorators.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType) as Factory[];
+                        var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
+                        if (openGenServiceType != null)
+                            decorators = decorators.Append(
+                                Decorators.GetValueOrDefault(RuntimeHelpers.GetHashCode(openGenServiceType), openGenServiceType) as Factory[]);
+                        return !decorators.IsNullOrEmpty()
+                            ? condition == null ? true : decorators.FindFirst(condition) != null
+                            : false;
+
+                    default:
+                        var entry = Services.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType);
+                        if (entry == null)
+                        {
+                            // note: We are not checking the open-generic for the closed-generic service type
+                            // to be able to ecplicitly understand what registration is available - open or the closed-generic
+                            return false;
+                        }
+
+                        var factory = entry as Factory;
+                        if (factory != null)
+                            return serviceKey == null || DefaultKey.Value.Equals(serviceKey)
+                                ? condition == null || condition(factory)
+                                : false;
+
+                        var factories = ((FactoriesEntry)entry).Factories;
+                        if (serviceKey == null)
+                            return condition == null || factories.FindFirstOrDefault(f => condition(f.Value)) != null;
+
+                        factory = factories.GetValueOrDefault(serviceKey);
+                        return factory != null && (condition == null || condition(factory));
                 }
             }
 

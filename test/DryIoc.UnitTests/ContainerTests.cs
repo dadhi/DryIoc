@@ -204,7 +204,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void IsRegistered_Should_return_false_for_concrete_generic_In_case_of_only_open_generic_registered_()
+        public void IsRegistered_Should_return_false_for_concrete_generic_In_case_of_only_open_generic_registered()
         {
             var container = new Container();
             container.Register(typeof(ServiceWithTwoGenericParameters<,>));

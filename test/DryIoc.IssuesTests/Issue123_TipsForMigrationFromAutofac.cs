@@ -314,6 +314,8 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.Register<NoDep>();
 
+            Assert.IsTrue(container.IsRegistered<NoDep>());
+
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<NoDep>(IfUnresolved.ReturnDefaultIfNotRegistered));
         }
