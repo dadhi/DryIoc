@@ -731,7 +731,7 @@ namespace DryIoc
 
             _registry.Swap(r =>
             {
-                var entry = r.Services.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType);
+                var entry = r.Services.GetValueOrDefault(serviceType);
                 var oldEntry = entry;
 
                 // no entries, first registration, usual/hot path
@@ -1065,13 +1065,12 @@ namespace DryIoc
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
         {
             var serviceType = GetServiceTypeAndKeyForFactoryLookup(request, out var serviceKey);
-            var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
 
             if (Rules.FactorySelector != null && serviceKey == null)
-                return GetRuleSelectedServiceFactoryOrDefault(request, serviceTypeHash, serviceType);
+                return GetRuleSelectedServiceFactoryOrDefault(request, serviceType);
 
             var serviceFactories = _registry.Value.Services;
-            var entry = serviceFactories.GetValueOrDefault(serviceTypeHash, serviceType);
+            var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             // For closed-generic type, when the entry is not found or the key in entry is not found,
             // go for the open-generic services
@@ -1079,11 +1078,7 @@ namespace DryIoc
                 if (entry == null || serviceKey != null && (
                     entry is Factory && !serviceKey.Equals(DefaultKey.Value) ||
                     entry is FactoriesEntry factoriesEntry && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null))
-                {
-                    var openGenericServiceType = serviceType.GetGenericTypeDefinition();
-                    var openGenericDefHash = RuntimeHelpers.GetHashCode(openGenericServiceType);
-                    entry = serviceFactories.GetValueOrDefault(openGenericDefHash, openGenericServiceType) ?? entry;
-                }
+                    entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) ?? entry;
 
             // Most common case when we have a single default factory and no dynamic rules in addition
             if (entry is Factory singleDefaultFactory && 
@@ -1189,10 +1184,10 @@ namespace DryIoc
             return null;
         }
 
-        private Factory GetRuleSelectedServiceFactoryOrDefault(Request request, int serviceTypeHash, Type serviceType)
+        private Factory GetRuleSelectedServiceFactoryOrDefault(Request request, Type serviceType)
         {
             var serviceFactories = _registry.Value.Services;
-            var entry = serviceFactories.GetValueOrDefault(serviceTypeHash, serviceType);
+            var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             KV<object, Factory>[] factories;
             if (entry is Factory singleDefaultFactory)
@@ -1217,7 +1212,7 @@ namespace DryIoc
                 if (serviceType.IsClosedGeneric())
                 {
                     var openGenericServiceType = serviceType.GetGenericTypeDefinition();
-                    openGenericEntry = serviceFactories.GetValueOrDefault(RuntimeHelpers.GetHashCode(openGenericServiceType), openGenericServiceType);
+                    openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
                     if (openGenericEntry != null)
                         factories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf();
                 }
@@ -1342,15 +1337,14 @@ namespace DryIoc
         IEnumerable<KV<object, Factory>> IContainer.GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics)
         {
             var serviceFactories = _registry.Value.Services;
-            var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
-            var entry = serviceFactories.GetValueOrDefault(serviceTypeHash, serviceType);
+            var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             var factories = GetRegistryEntryKeyFactoryPairs(entry).ToArrayOrSelf();
 
             if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
             {
                 var openGenericServiceType  = serviceType.GetGenericTypeDefinition();
-                var openGenericEntry = serviceFactories.GetValueOrDefault(RuntimeHelpers.GetHashCode(openGenericServiceType), openGenericServiceType);
+                var openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
                 if (openGenericEntry != null)
                     factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
             }
@@ -1508,7 +1502,7 @@ namespace DryIoc
             // searches for open-generic wrapper, otherwise for concrete one
             // note: currently impossible to have both open and closed generic wrapper of the same generic type
             serviceType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
-            return (Factory)_registry.Value.Wrappers.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType);
+            return (Factory)_registry.Value.Wrappers.GetValueOrDefault(serviceType);
         }
 
         Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
@@ -1517,7 +1511,7 @@ namespace DryIoc
 
             var allDecorators = _registry.Value.Decorators;
             if (!allDecorators.IsEmpty)
-                decorators = (Factory[])allDecorators.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType) ?? Empty<Factory>();
+                decorators = (Factory[])allDecorators.GetValueOrDefault(serviceType) ?? Empty<Factory>();
 
             if (!decorators.IsNullOrEmpty() && Rules.UseDynamicRegistrationsAsFallbackOnly ||
                 Rules.DynamicRegistrationProviders.IsNullOrEmpty())
@@ -2148,21 +2142,21 @@ namespace DryIoc
                             serviceType = typeof(IEnumerable<>).MakeGenericType(arrayElementType);
 
                         serviceType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
-                        var wrapper = Wrappers.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType) as Factory;
+                        var wrapper = Wrappers.GetValueOrDefault(serviceType) as Factory;
                         return wrapper != null && (condition == null || condition(wrapper)) ? wrapper.One() : null;
 
                     case FactoryType.Decorator:
-                        var decorators = Decorators.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType) as Factory[];
+                        var decorators = Decorators.GetValueOrDefault(serviceType) as Factory[];
                         var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
                         if (openGenServiceType != null)
                             decorators = decorators.Append(
-                                Decorators.GetValueOrDefault(RuntimeHelpers.GetHashCode(openGenServiceType), openGenServiceType) as Factory[]);
+                                Decorators.GetValueOrDefault(openGenServiceType) as Factory[]);
                         return decorators != null && decorators.Length != 0
                             ? condition == null ? decorators : decorators.Match(condition)
                             : null;
 
                     default:
-                        var entry = Services.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType);
+                        var entry = Services.GetValueOrDefault(serviceType);
                         if (entry == null)
                             return null;
 
@@ -2195,21 +2189,21 @@ namespace DryIoc
                             serviceType = typeof(IEnumerable<>).MakeGenericType(arrayElementType);
 
                         serviceType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
-                        var wrapper = Wrappers.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType) as Factory;
+                        var wrapper = Wrappers.GetValueOrDefault(serviceType) as Factory;
                         return wrapper != null && (condition == null || condition(wrapper));
 
                     case FactoryType.Decorator:
-                        var decorators = Decorators.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType) as Factory[];
+                        var decorators = Decorators.GetValueOrDefault(serviceType) as Factory[];
                         var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
                         if (openGenServiceType != null)
                             decorators = decorators.Append(
-                                Decorators.GetValueOrDefault(RuntimeHelpers.GetHashCode(openGenServiceType), openGenServiceType) as Factory[]);
+                                Decorators.GetValueOrDefault(openGenServiceType) as Factory[]);
                         return !decorators.IsNullOrEmpty()
                             ? condition == null ? true : decorators.FindFirst(condition) != null
                             : false;
 
                     default:
-                        var entry = Services.GetValueOrDefault(RuntimeHelpers.GetHashCode(serviceType), serviceType);
+                        var entry = Services.GetValueOrDefault(serviceType);
                         if (entry == null)
                         {
                             // note: We are not checking the open-generic for the closed-generic service type
@@ -2341,8 +2335,7 @@ namespace DryIoc
             {
                 object newEntry = null;
                 var services = Services;
-                var hash = RuntimeHelpers.GetHashCode(serviceType);
-                var oldEntry = services.GetValueOrDefault(hash, serviceType);
+                var oldEntry = services.GetValueOrDefault(serviceTypeHash, serviceType);
                 if (oldEntry != null)
                 {
                     switch (ifAlreadyRegistered)
@@ -2393,7 +2386,7 @@ namespace DryIoc
                 if (oldEntry != null && ifAlreadyRegistered == IfAlreadyRegistered.Replace &&
                     oldEntry is FactoriesEntry updatedOldFactories &&
                     updatedOldFactories.Factories.TryFind(serviceKey, out var droppedFactory))
-                    newRegistry.DropFactoryCache(droppedFactory, hash, serviceType, serviceKey);
+                    newRegistry.DropFactoryCache(droppedFactory, serviceTypeHash, serviceType, serviceKey);
 
                 return newRegistry;
             }
@@ -5282,8 +5275,7 @@ namespace DryIoc
                     return null;
 
                 var openGenericServiceType = concreteType.GetGenericDefinitionOrNull();
-                if (openGenericServiceType != null &&
-                    WrappersSupport.Wrappers.GetValueOrDefault(RuntimeHelpers.GetHashCode(openGenericServiceType), openGenericServiceType) != null)
+                if (openGenericServiceType != null && WrappersSupport.Wrappers.GetValueOrDefault(openGenericServiceType) != null)
                     return null;
 
                 var factory = new ReflectionFactory(concreteType,
@@ -5310,8 +5302,7 @@ namespace DryIoc
 
                 // exclude concrete service types which are pre-defined DryIoc wrapper types
                 var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
-                if (openGenericServiceType != null &&
-                    WrappersSupport.Wrappers.GetValueOrDefault(RuntimeHelpers.GetHashCode(openGenericServiceType), openGenericServiceType) != null)
+                if (openGenericServiceType != null && WrappersSupport.Wrappers.GetValueOrDefault(openGenericServiceType) != null)
                     return null;
 
                 return serviceType.One(); // use concrete service type as implementation type
@@ -5369,12 +5360,13 @@ namespace DryIoc
                     implType => implType.ImplementsServiceType(serviceType),
                     implType =>
                     {
-                        var implFactory = factories.Value.GetValueOrDefault(implType);
+                        var implTypeHash = RuntimeHelpers.GetHashCode(implType);
+                        var implFactory = factories.Value.GetValueOrDefault(implTypeHash, implType);
                         if (implFactory == null)
                         {
                             factories.Swap(existingFactories =>
                             {
-                                implFactory = existingFactories.GetValueOrDefault(implType);
+                                implFactory = existingFactories.GetValueOrDefault(implTypeHash, implType);
                                 if (implFactory != null)
                                     return existingFactories;
 
@@ -5382,7 +5374,7 @@ namespace DryIoc
                                     ? factory(implType).ThrowIfNull()
                                     : new ReflectionFactory(implType);
 
-                                return existingFactories.AddOrUpdate(implType, implFactory);
+                                return existingFactories.AddOrUpdate(implTypeHash, implType, implFactory);
                             });
                         }
 

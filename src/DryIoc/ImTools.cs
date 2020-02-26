@@ -25,7 +25,6 @@ THE SOFTWARE.
 
 // ReSharper disable once InconsistentNaming
 
-// todo: review when to Spin - maybe better to Spin after a number of failed updates
 #if !NET35 && !PCL
 #define SUPPORTS_SPIN_WAIT
 #endif
@@ -4474,10 +4473,15 @@ namespace ImTools
                 : null;
         }
 
-        /// <summary> Returns the value if key is found or default value otherwise. </summary>
+        /// <summary> Returns the value if the Type key is found or default value otherwise. </summary>
         [MethodImpl((MethodImplOptions)256)]
         public static object GetValueOrDefault(this ImMap<KValue<Type>> map, int hash, Type typeKey) =>
             map.GetEntryOrDefault(hash, typeKey)?.Value.Value;
+
+        /// <summary> Returns the value if the Type key is found or default value otherwise. </summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static object GetValueOrDefault(this ImMap<KValue<Type>> map, Type typeKey) =>
+            map.GetEntryOrDefault(RuntimeHelpers.GetHashCode(typeKey), typeKey)?.Value.Value;
 
         internal static ImMapEntry<KValue<K>> GetConflictedEntryOrDefault<K>(ImMapEntry<KValue<K>> entry, K key)
         {
@@ -5905,7 +5909,7 @@ namespace ImTools
             if (map.Height == 0)
                 return defaultValue;
 
-            var hash = key.GetHashCode();
+            var hash = RuntimeHelpers.GetHashCode(key);
             while (hash != map.Hash)
             {
                 map = hash < map.Hash ? map.Left : map.Right;
@@ -5993,7 +5997,7 @@ namespace ImTools
         {
             if (map.Height != 0)
             {
-                var hash = key.GetHashCode();
+                var hash = RuntimeHelpers.GetHashCode(key);
                 while (hash != map.Hash && map.Height != 0)
                     map = hash < map.Hash ? map.Left : map.Right;
 
@@ -6038,6 +6042,10 @@ namespace ImTools
             value = default;
             return false;
         }
+
+        /// <summary>Uses `RuntimeHelpers.GetHashCode()`<summary>
+        public static ImHashMap<Type, V> AddOrUpdate<V>(this ImHashMap<Type, V> map, Type key, V value) =>
+            map.AddOrUpdate(RuntimeHelpers.GetHashCode(key), key, value);
     }
 
     /// The array of ImHashMap slots where the key first bits are used for FAST slot location
