@@ -6043,7 +6043,7 @@ namespace ImTools
             return false;
         }
 
-        /// <summary>Uses `RuntimeHelpers.GetHashCode()`<summary>
+        /// <summary>Uses `RuntimeHelpers.GetHashCode()`</summary>
         public static ImHashMap<Type, V> AddOrUpdate<V>(this ImHashMap<Type, V> map, Type key, V value) =>
             map.AddOrUpdate(RuntimeHelpers.GetHashCode(key), key, value);
     }
