@@ -2187,19 +2187,22 @@ namespace DryIoc
                         var arrayElementType = serviceType.GetArrayElementTypeOrNull();
                         if (arrayElementType != null)
                             serviceType = typeof(IEnumerable<>).MakeGenericType(arrayElementType);
-
                         serviceType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
-                        var wrapper = Wrappers.GetValueOrDefault(serviceType) as Factory;
-                        return wrapper != null && (condition == null || condition(wrapper));
+                        return Wrappers.GetValueOrDefault(serviceType) is Factory wrapper &&
+                            (condition == null || condition(wrapper));
 
                     case FactoryType.Decorator:
-                        var decorators = Decorators.GetValueOrDefault(serviceType) as Factory[];
+                        if (Decorators.GetValueOrDefault(serviceType) is Factory[] decorators && decorators.Length != 0 &&
+                            (condition == null || decorators.FindFirst(condition) != null))
+                            return true;
+
                         var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
-                        if (openGenServiceType != null)
-                            decorators = decorators.Append(Decorators.GetValueOrDefault(openGenServiceType) as Factory[]);
-                        return !decorators.IsNullOrEmpty()
-                            ? condition == null ? true : decorators.FindFirst(condition) != null
-                            : false;
+                        if (openGenServiceType != null &&
+                            Decorators.GetValueOrDefault(openGenServiceType) is Factory[] openGenDecorators && openGenDecorators.Length != 0 &&
+                            (condition == null || openGenDecorators.FindFirst(condition) != null))
+                            return true;
+
+                        return false;
 
                     default:
                         var entry = Services.GetValueOrDefault(serviceType);
@@ -2236,7 +2239,6 @@ namespace DryIoc
 
                 return true;
             }
-
             private Registry WithDefaultService(Factory factory, int serviceTypeHash, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered)
             {
                 var services = Services;
