@@ -2,7 +2,7 @@
 setlocal EnableDelayedExpansion
 
 dotnet clean -v:m
-dotnet build -c:Release -v:m -p:DevMode=false;LocalBuild=true
+dotnet build -c:Release -v:m -p:DevMode=false;NoLegacy=true
 if %ERRORLEVEL% neq 0 goto :error
 
 echo:
@@ -11,7 +11,7 @@ echo:
 echo:## Starting: TESTS...
 echo: 
 
-dotnet test -c:Release -p:GeneratePackageOnBuild=false;DevMode=false;LocalBuild=true
+dotnet test -c:Release -p:GeneratePackageOnBuild=false;DevMode=false;NoLegacy=true
 
 if %ERRORLEVEL% neq 0 goto :error
 echo:## Finished: TESTS
