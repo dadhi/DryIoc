@@ -2196,8 +2196,7 @@ namespace DryIoc
                         var decorators = Decorators.GetValueOrDefault(serviceType) as Factory[];
                         var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
                         if (openGenServiceType != null)
-                            decorators = decorators.Append(
-                                Decorators.GetValueOrDefault(openGenServiceType) as Factory[]);
+                            decorators = decorators.Append(Decorators.GetValueOrDefault(openGenServiceType) as Factory[]);
                         return !decorators.IsNullOrEmpty()
                             ? condition == null ? true : decorators.FindFirst(condition) != null
                             : false;
