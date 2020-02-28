@@ -1499,10 +1499,15 @@ namespace DryIoc
 
         Factory IContainer.GetWrapperFactoryOrDefault(Type serviceType)
         {
-            // searches for open-generic wrapper, otherwise for concrete one
-            // note: currently impossible to have both open and closed generic wrapper of the same generic type
-            serviceType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
-            return (Factory)_registry.Value.Wrappers.GetValueOrDefault(serviceType);
+            var wrappers = _registry.Value.Wrappers;
+            var wrapper = wrappers.GetValueOrDefault(serviceType);
+            if (wrapper == null)
+            {
+                serviceType = serviceType.GetGenericDefinitionOrNull();
+                if (serviceType != null)
+                    wrapper = wrappers.GetValueOrDefault(serviceType);
+            }
+            return wrapper as Factory;
         }
 
         Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
@@ -1725,8 +1730,8 @@ namespace DryIoc
 
         private Factory GetWrapperFactoryOrDefault(Request request)
         {
+            // note: wrapper ignores the service key, and propagate the service key to wrapped service
             var serviceType = request.GetActualServiceType();
-            // note: wrapper ignores the service key, and propagate service key to wrapped service
 
             var itemType = serviceType.GetArrayElementTypeOrNull();
             if (itemType != null)
@@ -2184,14 +2189,27 @@ namespace DryIoc
                 switch (factoryType)
                 {
                     case FactoryType.Wrapper:
-                        var arrayElementType = serviceType.GetArrayElementTypeOrNull();
-                        if (arrayElementType != null)
-                            serviceType = typeof(IEnumerable<>).MakeGenericType(arrayElementType);
-                        serviceType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
-                        return Wrappers.GetValueOrDefault(serviceType) is Factory wrapper &&
-                            (condition == null || condition(wrapper));
+                    {
+                        // first checking for the explicitly provided say `MyWrapper<IMyService>`
+                        if (Wrappers.GetValueOrDefault(serviceType) is Factory wrapper &&
+                            (condition == null || condition(wrapper)))
+                            return true;
 
+                        var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
+                        if (openGenServiceType != null &&
+                            Wrappers.GetValueOrDefault(openGenServiceType) is Factory openGenWrapper &&
+                            (condition == null || condition(openGenWrapper)))
+                            return true;
+
+                        if (serviceType.GetArrayElementTypeOrNull() != null &&
+                            Wrappers.GetValueOrDefault(typeof(IEnumerable<>)) is Factory collectionWrapper &&
+                            (condition == null || condition(collectionWrapper)))
+                            return true;
+
+                        return false;
+                    }
                     case FactoryType.Decorator:
+                    {
                         if (Decorators.GetValueOrDefault(serviceType) is Factory[] decorators && decorators.Length != 0 &&
                             (condition == null || decorators.FindFirst(condition) != null))
                             return true;
@@ -2203,8 +2221,9 @@ namespace DryIoc
                             return true;
 
                         return false;
-
+                    }
                     default:
+                    {
                         var entry = Services.GetValueOrDefault(serviceType);
                         if (entry == null)
                         {
@@ -2225,6 +2244,7 @@ namespace DryIoc
 
                         factory = factories.GetValueOrDefault(serviceKey);
                         return factory != null && (condition == null || condition(factory));
+                    }
                 }
             }
 
