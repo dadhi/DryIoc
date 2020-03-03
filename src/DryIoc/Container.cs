@@ -2397,7 +2397,7 @@ namespace DryIoc
                 if (newEntry == null)
                     newEntry = FactoriesEntry.Empty.With(factory, serviceKey);
 
-                var newServices = services.AddOrUpdate(serviceType, newEntry);
+                var newServices = services.AddOrUpdate(serviceTypeHash, serviceType, newEntry);
                 var newRegistry = new Registry(newServices, Decorators, Wrappers,
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
                     _isChangePermitted);

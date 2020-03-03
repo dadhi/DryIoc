@@ -4242,11 +4242,6 @@ namespace ImTools
         public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, K key, object value) =>
             map.AddOrUpdate(hash, CreateKValueEntry(hash, key, value));
 
-        /// <summary>Adds or updates the tree with passed key-value. Returns a new tree.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, K key, object value) =>
-            map.AddOrUpdate(key.GetHashCode(), key, value);
-
         /// <summary>Uses the provided hash and adds or updates the tree with the passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, ImMapEntry<KValue<K>> entry)
