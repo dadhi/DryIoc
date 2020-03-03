@@ -14,7 +14,6 @@ echo:
 dotnet test -c:Release -p:GeneratePackageOnBuild=false;DevMode=false;NoLegacy=true
 
 if %ERRORLEVEL% neq 0 goto :error
-echo:## Finished: TESTS
 
 echo: 
 echo:## Finished: TESTS
