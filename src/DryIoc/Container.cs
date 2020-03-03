@@ -239,6 +239,7 @@ namespace DryIoc
         public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations() =>
             _registry.Value.GetServiceRegistrations();
 
+        // todo: Make `serviceKey` and `factoryType` optional
         /// <summary>Searches for registered factories by type, and key (if specified),
         /// and by factory type (by default uses <see cref="FactoryType.Service"/>).
         /// May return empty, 1 or multiple factories.</summary>
