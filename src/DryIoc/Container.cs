@@ -2222,18 +2222,15 @@ namespace DryIoc
 
                         return false;
                     }
-                    default:
+                    default: // services
                     {
+                        // note: We are not checking the open-generic for the closed-generic service type
+                        // to be able to explicitly understand what registration is available - open or the closed-generic
                         var entry = Services.GetValueOrDefault(serviceType);
                         if (entry == null)
-                        {
-                            // note: We are not checking the open-generic for the closed-generic service type
-                            // to be able to ecplicitly understand what registration is available - open or the closed-generic
                             return false;
-                        }
 
-                        var factory = entry as Factory;
-                        if (factory != null)
+                        if (entry is Factory factory)
                             return serviceKey == null || DefaultKey.Value.Equals(serviceKey)
                                 ? condition == null || condition(factory)
                                 : false;
