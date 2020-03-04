@@ -7,11 +7,7 @@
         <TargetFrameworks Condition="'$(NoSupportForNetCore22)' == 'true'">netcoreapp2.1</TargetFrameworks>
         
         <Description>Benchmarks, sandbox for experiments.</Description>
-
-        <TieredCompilation>false</TieredCompilation>
-        <DebugType>pdbonly</DebugType>
-        <DebugSymbols>true</DebugSymbols>
-
+        
         <NoWarn>1701;1702;AD0001;NU1608</NoWarn>
     </PropertyGroup>
     <ItemGroup>

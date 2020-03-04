@@ -812,6 +812,7 @@ class User_defined_wrappers
 
         // Register a wrapper
         container.Register(typeof(MenuItem<>), setup: Setup.Wrapper);
+        Assert.IsTrue(container.IsRegistered(typeof(MenuItem<>), factoryType: FactoryType.Wrapper));
 
         var items = container.Resolve<MenuItem<ICmd>[]>();
         Assert.AreEqual(2, items.Length);
@@ -822,7 +823,7 @@ class User_defined_wrappers
     public class Y : ICmd { }
 
     // Here is the wrapper
-    public class MenuItem<T> where T : ICmd { }
+    public class MenuItem<TCmd> where TCmd : ICmd { }
 }/*md
 ```
 
@@ -850,8 +851,24 @@ class Non_generic_wrapper
         container.Register<IService, Foo>();
         container.Register<IService, Bar>();
         container.Register<MyWrapper>(setup: Setup.Wrapper);
+        Assert.IsTrue(container.IsRegistered(typeof(MyWrapper), factoryType: FactoryType.Wrapper));
 
         var items = container.Resolve<MyWrapper[]>(requiredServiceType: typeof(IService));
+        Assert.AreEqual(2, items.Length);
+    }
+
+    // The same should work with the closed-generic wrapper
+    [Test]
+    public void Example_with_closed_generic_wrapper()
+    {
+        var container = new Container();
+
+        container.Register<IService, Foo>();
+        container.Register<IService, Bar>();
+        container.Register<MyWrapper<IService>>(setup: Setup.Wrapper);
+        Assert.IsTrue(container.IsRegistered(typeof(MyWrapper<IService>), factoryType: FactoryType.Wrapper));
+
+        var items = container.Resolve<MyWrapper<IService>[]>(); // you dont need the `requiredServiceType` here
         Assert.AreEqual(2, items.Length);
     }
 
@@ -860,6 +877,8 @@ class Non_generic_wrapper
     class Bar : IService { }
 
     class MyWrapper { public MyWrapper(IService service) { } }
+
+    class MyWrapper<T> { public MyWrapper(T service) { } }
 }/*md
 ```
 md*/

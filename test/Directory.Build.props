@@ -4,15 +4,5 @@
     <PropertyGroup>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
-
-        <TieredCompilation>false</TieredCompilation>
-        <DebugType>pdbonly</DebugType>
-        <DebugSymbols>true</DebugSymbols>
     </PropertyGroup>
-
-    <ItemGroup>  
-        <PackageReference Include="NUnit" Version="3.12.0" />
-        <PackageReference Include="NUnit3TestAdapter" Version="3.15.1" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.2.0" />
-    </ItemGroup>
 </Project>

@@ -5,7 +5,6 @@
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp2.1;net45</TargetFrameworks>
 
         <IsPackable>false</IsPackable>
-        <IsTestProject>false</IsTestProject>
     </PropertyGroup>
 
     <ItemGroup>
