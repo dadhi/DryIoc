@@ -244,7 +244,7 @@ namespace DryIoc
         /// and by factory type (by default uses <see cref="FactoryType.Service"/>).
         /// May return empty, 1 or multiple factories.</summary>
         public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType) =>
-            _registry.Value.GetRegisteredFactories(serviceType, serviceKey, factoryType, Fun.Always);
+            _registry.Value.GetRegisteredFactories(serviceType.ThrowIfNull(), serviceKey, factoryType);
 
         /// <summary>Stores factory into container using <paramref name="serviceType"/> and <paramref name="serviceKey"/> as key
         /// for later lookup.</summary>
@@ -2136,50 +2136,51 @@ namespace DryIoc
                         : WithWrappers(Wrappers.AddOrUpdate(serviceTypeHash, serviceType, factory));
             }
 
-            public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType,
-                Func<Factory, bool> condition)
+            public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType)
             {
                 serviceType = serviceType.ThrowIfNull();
                 switch (factoryType)
                 {
                     case FactoryType.Wrapper:
-                        var arrayElementType = serviceType.GetArrayElementTypeOrNull();
-                        if (arrayElementType != null)
-                            serviceType = typeof(IEnumerable<>).MakeGenericType(arrayElementType);
+                    {
+                        // first checking for the explicitly provided say `MyWrapper<IMyService>`
+                        if (Wrappers.GetValueOrDefault(serviceType) is Factory wrapper)
+                            return wrapper.One();
 
-                        serviceType = serviceType.GetGenericDefinitionOrNull() ?? serviceType;
-                        var wrapper = Wrappers.GetValueOrDefault(serviceType) as Factory;
-                        return wrapper != null && (condition == null || condition(wrapper)) ? wrapper.One() : null;
+                        var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
+                        if (openGenServiceType != null &&
+                            Wrappers.GetValueOrDefault(openGenServiceType) is Factory openGenWrapper)
+                            return openGenWrapper.One();
 
+                        if (serviceType.GetArrayElementTypeOrNull() != null &&
+                            Wrappers.GetValueOrDefault(typeof(IEnumerable<>)) is Factory collectionWrapper)
+                            return collectionWrapper.One();
+
+                        return null;
+                    }
                     case FactoryType.Decorator:
+                    {
                         var decorators = Decorators.GetValueOrDefault(serviceType) as Factory[];
                         var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
                         if (openGenServiceType != null)
-                            decorators = decorators.Append(
-                                Decorators.GetValueOrDefault(openGenServiceType) as Factory[]);
-                        return decorators != null && decorators.Length != 0
-                            ? condition == null ? decorators : decorators.Match(condition)
-                            : null;
-
+                            decorators = decorators.Append(Decorators.GetValueOrDefault(openGenServiceType) as Factory[]);
+                        return decorators;
+                    }
                     default:
+                    {
                         var entry = Services.GetValueOrDefault(serviceType);
                         if (entry == null)
                             return null;
 
-                        var factory = entry as Factory;
-                        if (factory != null)
-                            return serviceKey == null || DefaultKey.Value.Equals(serviceKey)
-                                ? (condition == null || condition(factory) ? factory.One() : null)
-                                : null;
+                        if (entry is Factory factory)
+                            return serviceKey == null || DefaultKey.Value.Equals(serviceKey) ? factory.One() : null;
 
                         var factories = ((FactoriesEntry)entry).Factories;
-                        if (serviceKey == null)
-                            return condition == null
-                                ? factories.Enumerate().Map(f => f.Value).ToArrayOrSelf()
-                                : factories.Enumerate().Match(f => condition(f.Value), f => f.Value).ToArrayOrSelf();
+                        if (serviceKey == null) // get all the factories
+                            return factories.Visit(new List<Factory>(), (x, l) => l.Add(x.Value)).ToArray();
 
-                        factory = factories.GetValueOrDefault(serviceKey);
-                        return factory != null && (condition == null || condition(factory)) ? factory.One() : null;
+                        return factories.GetValueOrDefault(serviceKey)?.One();
+                    }
                 }
             }
 
@@ -2248,7 +2249,7 @@ namespace DryIoc
 
             public bool ClearCache(int hash, Type serviceType, object serviceKey, FactoryType factoryType)
             {
-                var factories = GetRegisteredFactories(serviceType, serviceKey, factoryType, null);
+                var factories = GetRegisteredFactories(serviceType, serviceKey, factoryType);
                 if (factories.IsNullOrEmpty())
                     return false;
 
