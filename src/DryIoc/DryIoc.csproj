@@ -5,8 +5,8 @@
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.1.0</VersionPrefix>
-        <VersionSuffix></VersionSuffix>
+        <VersionPrefix>4.1.1</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -17,6 +17,13 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v4.1.1 Bug-fix release
+
+- #215 RegisterInitializer<TService> causes additional call(s) to TService.Dispose when container is disposed
+- #220 Fix INavigationService resolution in Prizm extensions
+- #228 Updated DryIoc from 4.0.4.0 to 4.1.0 in Unity Engine project, keyed register/resolve wont work anymore
+
+
 ## v4.1.0 Feature release
 
 ### Highlights

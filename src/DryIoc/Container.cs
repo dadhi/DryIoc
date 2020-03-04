@@ -11302,7 +11302,8 @@ namespace DryIoc
         public const int DefaultLifespan = 100;
 
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan => DefaultLifespan;
+        public int Lifespan => _lifespan;
+        private readonly int _lifespan = DefaultLifespan;
 
         /// <inheritdoc />
         public object Name { get; }
