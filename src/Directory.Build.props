@@ -41,9 +41,10 @@
     </ItemGroup> 
 
     <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" Visible="false" />
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="license.txt" Visible="false" />
         <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="DryIoc.snk" Visible="false" />
-        <None Include="..\..\logo\logo128.png" Pack="true" PackagePath="logo128.png" Visible="false" />
+        <None Include="..\..\logo\logo128.png" Pack="true" PackagePath="logo.png" Visible="false" />
+        <None Include="..\..\nuspecs\DryIoc\readme.txt" Pack="true" PackagePath="readme.txt" Visible="false" />
     </ItemGroup>
 
     <!--Probing for portable targets, it could be either MS Visual Studio or 'dotnet\sdk' locations-->

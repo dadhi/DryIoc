@@ -7,7 +7,6 @@
         <copyright>Copyright © 2014-2020 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
-        <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for OWIN</description>
         <tags>Web ASP OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
@@ -41,6 +40,7 @@ v2.0.1
     <files>
         <file src="..\LICENSE.txt" />
         <file src="..\nuspecs\DryIoc.snk" />
+        <file src="..\logo\logo128.png" target="logo.png" />
 
         <!-- net45 -->
         <file src="..\src\DryIoc.Owin\DryIocOwin.cs" target="content\net45\DryIoc\Owin" />

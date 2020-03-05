@@ -5,7 +5,7 @@
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">netstandard1.0;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc.CommonServiceLocator</Product>
-        <VersionPrefix>4.0.0</VersionPrefix>
+        <VersionPrefix>4.1.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -17,6 +17,9 @@
         <PackageTags>Service-Locator CommonServiceLocator IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
             <![CDATA[
+v4.1.0:
+- Support for DryIoc v4.1
+- #226 Update DryIoc.CommonServiceLocator references
 v4.0.0:
 - Support for DryIoc v4.0
 v3.1.0:
@@ -29,7 +32,7 @@ v3.0.0:
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="CommonServiceLocator" Version="2.0.3" />
+        <PackageReference Include="CommonServiceLocator" Version="2.0.5" />
     </ItemGroup>
 
     <ItemGroup>

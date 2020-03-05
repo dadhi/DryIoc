@@ -7,7 +7,6 @@
     <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
     <license type="expression">MIT</license>
-    <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>DryIoc.MefAttributedModel is DryIoc extension to support Microsoft Managed Extensibility Framework for DryIoc container</description>
     <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
@@ -46,6 +45,8 @@ v4.0.0:
   <files>
     <file src="..\LICENSE.txt" />
     <file src="..\nuspecs\DryIoc.snk" />
+    <file src="..\logo\logo128.png" target="logo.png" />
+
 
     <!-- net35 -->
     <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net35\DryIoc\MefAttributedModel" />

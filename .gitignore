@@ -348,3 +348,5 @@ DryIoc.Internal/
 
 # NuGet
 ApiKey.txt
+
+.metals/
