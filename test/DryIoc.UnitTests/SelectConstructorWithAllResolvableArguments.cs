@@ -27,7 +27,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<AnotherClient>());
 
-            StringAssert.StartsWith("code: 'UnableToResolveUnknownService'", ex.Message);
+            StringAssert.StartsWith("code: UnableToResolveUnknownService", ex.Message);
         }
 
         [Test]
@@ -54,7 +54,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<InternalClient>());
 
-            StringAssert.StartsWith("code: 'UnableToSelectCtor'", ex.Message);
+            StringAssert.StartsWith("code: UnableToSelectCtor", ex.Message);
         }
 
         [Test]
