@@ -5525,8 +5525,8 @@ namespace DryIoc
         /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
         /// in the-per rules collection.</summary>
         public Rules ForValidate() =>
-            new Rules(GetSettingsForExpressionGeneration(allowRuntimeState: true), FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+            new Rules(GetSettingsForExpressionGeneration(allowRuntimeState: true) | Rules.Settings.UsedForValidation, 
+                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
                 null, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5750,7 +5750,8 @@ namespace DryIoc
             UseFastExpressionCompilerIfPlatformSupported = 1 << 17,
             UseInterpretationForTheFirstResolution = 1 << 18,
             UseInterpretation = 1 << 19,
-            UseDecorateeReuseForDecorators = 1 << 20
+            UseDecorateeReuseForDecorators = 1 << 20,
+            UsedForValidation = 1 << 21 // informational flag, will appear in exceptions during validation
         }
 
         private const Settings DEFAULT_SETTINGS
