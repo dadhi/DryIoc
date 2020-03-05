@@ -46,8 +46,6 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 Related issues are [#44](https://github.com/dadhi/DryIoc/issues/44#issuecomment-466440634) and [#26](https://github.com/dadhi/DryIoc/issues/26#issuecomment-466460255).
 
-The results are below
-
 #### Bootstrapping the container then opening scope and resolving the root scoped service (e.g. controller) for the first time
 
 DryIoc v4.1 and the libs updated (MsDI v3.1, Autofac v4.9.4, Grace v7.1.0):
@@ -126,7 +124,7 @@ DryIoc v4.0 and older libs - kept for comparison:
 
 * 1500+ of acceptance tests.
 * Thread-safe and lock-free registrations and resolutions. 
-* Detects recursive dependencies aka cycles in object graph.
+* Detects recursive dependencies (cycles) in object graph.
 * Throws exceptions as early as possible with a lot of details.
 * Provides diagnostics for potential resolution problems via `container.Validate()`.
 
