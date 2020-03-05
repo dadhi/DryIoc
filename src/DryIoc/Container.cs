@@ -12008,7 +12008,7 @@ namespace DryIoc
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
         public ContainerException(int errorCode, string message, Exception innerException)
-            : base($"code: '{DryIoc.Error.NameOf(errorCode)}', message: '{message}'", innerException)
+            : base($"code: {DryIoc.Error.NameOf(errorCode)}, message: {message}", innerException)
         {
             Error = errorCode;
         }
@@ -12113,7 +12113,7 @@ namespace DryIoc
             GenericWrapperTypeArgIndexOutOfBounds = Of(
                 "Registered generic wrapper {0} specified type argument index {1} is out of type argument list."),
             DependencyHasShorterReuseLifespan = Of(
-                "Dependency '{0}' with reuse '{1}' has shorter lifespan than its parent's '{2}'" + NewLine +
+                "Dependency {0} with reuse {1} has shorter lifespan than its parent's {2}" + NewLine +
                 "If you know what you're doing you may disable this error with the rule `new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan())`."),
             WeakRefReuseWrapperGCed = Of(
                 "Reused service wrapped in WeakReference is Garbage Collected and no longer available."),
