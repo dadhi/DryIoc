@@ -11302,8 +11302,7 @@ namespace DryIoc
         public const int DefaultLifespan = 100;
 
         /// <summary>Relative to other reuses lifespan value.</summary>
-        public int Lifespan => _lifespan;
-        private readonly int _lifespan = DefaultLifespan;
+        public int Lifespan { get; }
 
         /// <inheritdoc />
         public object Name { get; }
@@ -11401,11 +11400,18 @@ namespace DryIoc
             return s.Append("Lifespan=").Append(Lifespan).Append("}").ToString();
         }
 
-        /// <summary>Creates reuse optionally specifying its name.</summary>
-        public CurrentScopeReuse(object name = null, bool scopedOrSingleton = false)
+        /// <summary>Creates the reuse.</summary>
+        public CurrentScopeReuse(object name, bool scopedOrSingleton, int lifespan)
         {
             Name = name;
             ScopedOrSingleton = scopedOrSingleton;
+            Lifespan = lifespan;
+        }
+
+        /// <summary>Creates the reuse optionally specifying its name.</summary>
+        public CurrentScopeReuse(object name = null, bool scopedOrSingleton = false) 
+            : this(name, scopedOrSingleton, DefaultLifespan)
+        {
         }
 
         /// <summary>Flag indicating that it is a scope or singleton.</summary>
@@ -11577,12 +11583,18 @@ namespace DryIoc
         /// <summary>Same as InCurrentNamedScope. From now on will be the default name.</summary>
         public static IReuse ScopedTo(object name) => new CurrentScopeReuse(name);
 
+        /// <summary>Specifies all the scope details</summary>
+        public static IReuse ScopedTo(object name, bool scopedOrSingleton, int lifespan) =>
+            new CurrentScopeReuse(name, scopedOrSingleton, lifespan);
+
+        // todo: Should be renamed to `ScopedToMany` to prevent overload ambiguity
         /// <summary>Scoped to multiple names.</summary>
         public static IReuse ScopedTo(params object[] names) =>
             names.IsNullOrEmpty() ? Scoped
             : names.Length == 1 ? ScopedTo(names[0]) 
             : new CurrentScopeReuse(CompositeScopeName.Of(names));
 
+        // todo: Consider changing the name to remove the ambiguity
         /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
         public static IReuse ScopedTo(Type serviceType = null, object serviceKey = null) =>
             serviceType == null && serviceKey == null ? Scoped
@@ -11990,7 +12002,7 @@ namespace DryIoc
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
         public ContainerException(int errorCode, string message, Exception innerException)
-            : base(message, innerException)
+            : base($"code: '{errorCode}', message: '{message}'", innerException)
         {
             Error = errorCode;
         }

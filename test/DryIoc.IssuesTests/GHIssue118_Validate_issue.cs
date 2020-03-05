@@ -10,16 +10,19 @@ namespace DryIoc.IssuesTests
         {
             using (var container = new Container())
             {
-                container.Register<SomethingDefinedInOuterScope>(Reuse.ScopedTo("Outer"));
-                container.Register<SomethingDefinedInInnerScope>(Reuse.ScopedTo("Inner"));
+                var outerScoped = Reuse.ScopedTo("Outer");
+                container.Register<SomethingDefinedInOuterScope>(outerScoped);
+                
+                var innerScoped = Reuse.ScopedTo("Inner", false, outerScoped.Lifespan - 1);
+                container.Register<SomethingDefinedInInnerScope>(innerScoped);
                 container.Validate();
 
-                using (var outerScopedContainer = container.OpenScope("Outer"))
+                using (var outerScopedContainer = container.OpenScope(outerScoped.Name))
                 {
-                    using (var innerScopedContainer = outerScopedContainer.OpenScope("Inner"))
+                    using (var innerScopedContainer = outerScopedContainer.OpenScope(innerScoped.Name))
                     {
-                        var item = innerScopedContainer.Resolve<SomethingDefinedInOuterScope>();
-                        Assert.IsNotNull(item);
+                        var ex = Assert.Throws<ContainerException>(() => 
+                            innerScopedContainer.Resolve<SomethingDefinedInOuterScope>());
                     }
                 }
             }
