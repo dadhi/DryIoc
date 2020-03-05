@@ -4221,6 +4221,7 @@ namespace DryIoc
         /// <summary>Excluding open-generic registrations, cause you need to provide type arguments to actually create these types.</summary>
         public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
 
+        // todo: Should we have a version which is throws by default?
         /// <summary>Helps to find potential problems in service registration setup.
         /// Method tries to resolve the specified registrations, collects exceptions, and
         /// returns them to user. Does not create any actual service objects.
@@ -11397,7 +11398,12 @@ namespace DryIoc
             var s = new StringBuilder(ScopedOrSingleton ? "ScopedOrSingleton {" : "Scoped {");
             if (Name != null)
                 s.Append("Name=").Print(Name).Append(", ");
-            return s.Append("Lifespan=").Append(Lifespan).Append("}").ToString();
+            if (Lifespan != DefaultLifespan)
+                s.Append("NON DEFAULT LIFESPAN=").Append(Lifespan);
+            else
+                s.Append("Lifespan=").Append(Lifespan);
+
+            return s.Append("}").ToString();
         }
 
         /// <summary>Creates the reuse.</summary>
@@ -12002,7 +12008,7 @@ namespace DryIoc
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
         public ContainerException(int errorCode, string message, Exception innerException)
-            : base($"code: '{errorCode}', message: '{message}'", innerException)
+            : base($"code: '{DryIoc.Error.NameOf(errorCode)}', message: '{message}'", innerException)
         {
             Error = errorCode;
         }
@@ -12107,8 +12113,8 @@ namespace DryIoc
             GenericWrapperTypeArgIndexOutOfBounds = Of(
                 "Registered generic wrapper {0} specified type argument index {1} is out of type argument list."),
             DependencyHasShorterReuseLifespan = Of(
-                "Dependency {0} reuse {1} lifespan shorter than its parent's: {2}" + NewLine +
-                "To turn Off this error, specify the rule with new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan())."),
+                "Dependency '{0}' with reuse '{1}' has shorter lifespan than its parent's '{2}'" + NewLine +
+                "If you know what you're doing you may disable this error with the rule `new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan())`."),
             WeakRefReuseWrapperGCed = Of(
                 "Reused service wrapped in WeakReference is Garbage Collected and no longer available."),
             ServiceIsNotAssignableFromFactoryMethod = Of(
