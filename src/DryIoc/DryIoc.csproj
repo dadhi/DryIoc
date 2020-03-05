@@ -19,9 +19,12 @@
 <![CDATA[
 ## v4.1.1 Bug-fix release
 
+- #118 Validate issue
 - #215 RegisterInitializer<TService> causes additional call(s) to TService.Dispose when container is disposed
 - #220 Fix INavigationService resolution in Prizm extensions
+- #227 Optimize IsRegistered
 - #228 Updated DryIoc from 4.0.4.0 to 4.1.0 in Unity Engine project, keyed register/resolve wont work anymore
+- #230 Add the error code into the ContainerException message to simplify error finding
 
 
 ## v4.1.0 Feature release
