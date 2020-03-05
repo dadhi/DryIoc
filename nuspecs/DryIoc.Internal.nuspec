@@ -96,7 +96,7 @@
         
         <!--"build" is the special folder where you can put your .props or .targets files 
         named after the NuGet package to be INCLUDED by NuGet into the target project-->
-        <file src="..\nuspecs\DryIoc\build\DryIoc.props"              target="build" />
+        <file src="..\nuspecs\DryIoc\build\DryIoc.props"              target="build\DryIoc.Internal.props" />
         <file src="..\src\DryIoc\Container.Generated.tt"              target="CompileTimeDI" />
         <file src="..\src\DryIoc\CompileTimeRegistrations.ttinclude"  target="CompileTimeDI" />
         <file src="..\src\DryIoc\CompileTimeRegistrations.Example.cs" target="CompileTimeDI" />
