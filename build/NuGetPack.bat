@@ -13,9 +13,9 @@ if not exist %PACKAGEDIR% md %PACKAGEDIR%
 echo:
 echo:DryIoc source and internal packages
 echo:===================================
-%NUGET% pack %NUSPECS%\DryIoc.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive -Properties NoWarn=NU5128
 PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '.\build\MakeInternal.ps1'";
-%NUGET% pack %NUSPECS%\DryIoc.Internal.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
+%NUGET% pack %NUSPECS%\DryIoc.Internal.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive -Properties NoWarn=NU5128
 
 echo:
 echo:DryIocZero
