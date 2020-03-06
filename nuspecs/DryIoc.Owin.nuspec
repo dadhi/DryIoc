@@ -7,6 +7,7 @@
         <copyright>Copyright © 2014-2020 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
+        <icon>logo.png</icon>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc extension for OWIN</description>
         <tags>Web ASP OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>

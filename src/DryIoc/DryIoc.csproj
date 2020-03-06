@@ -80,6 +80,7 @@
 
     <ItemGroup>
         <None Include="DryIoc.props" />
+        <None Include="..\..\nuspecs\DryIoc\readme.txt" Pack="true" PackagePath="readme.txt" Visible="false" />
     </ItemGroup>
 
     <ItemGroup>

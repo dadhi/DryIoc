@@ -8,10 +8,16 @@
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
-        <PackageIcon>logo128.png</PackageIcon>
+        <PackageIcon>logo.png</PackageIcon>
         <RepositoryUrl>https://github.com/dadhi/DryIoc.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="license.txt" Visible="false" />
+        <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="DryIoc.snk" Visible="false" />
+        <None Include="..\..\logo\logo128.png" Pack="true" PackagePath="logo.png" Visible="false" />
+    </ItemGroup>
 
     <!--Signing all packages, oh boy-->
     <PropertyGroup>
@@ -39,13 +45,6 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-beta2-18618-05" PrivateAssets="All" />
     </ItemGroup> 
-
-    <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="license.txt" Visible="false" />
-        <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="DryIoc.snk" Visible="false" />
-        <None Include="..\..\logo\logo128.png" Pack="true" PackagePath="logo.png" Visible="false" />
-        <None Include="..\..\nuspecs\DryIoc\readme.txt" Pack="true" PackagePath="readme.txt" Visible="false" />
-    </ItemGroup>
 
     <!--Probing for portable targets, it could be either MS Visual Studio or 'dotnet\sdk' locations-->
     <PropertyGroup>

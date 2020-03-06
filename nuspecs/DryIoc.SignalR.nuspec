@@ -7,6 +7,7 @@
         <copyright>Copyright © 2016-2020 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
+        <icon>logo.png</icon>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>Source code for DryIoc integration with ASP.NET SignalR</description>
         <tags>Web ASPNET SignalR Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
