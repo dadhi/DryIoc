@@ -950,8 +950,18 @@ namespace DryIoc
         }
 
         /// Adding the factory directly to scope for resolution 
-        public void Use(Type serviceType, FactoryDelegate factory) => 
+        public void Use(Type serviceType, FactoryDelegate factory) 
+        {
             (CurrentScope ?? SingletonScope).SetUsedInstance(serviceType, factory);
+            
+            var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
+            var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
+            if (cacheEntry != null)
+            {
+                ref var entry = ref cacheEntry.Value;
+                entry.Value = null; // reset the cache if any
+            }
+        }
 
 #endregion
 
@@ -7044,52 +7054,56 @@ namespace DryIoc
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// Will become OBSOLETE! in the next major version:
+        /// <summary>
+        /// Will become OBSOLETE in the next major version!
         /// Please use `RegisterInstance` or `Use` method instead.
+        /// </summary>
         public static void UseInstance(this IContainer c, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
-        /// Adding the factory directly to scope for resolution 
+        /// <summary>Adding the factory directly to scope for resolution</summary> 
         public static void Use<TService>(this IResolverContext r, Func<IResolverContext, TService> factory) =>
             r.Use(typeof(TService), factory.ToFactoryDelegate);
 
-        /// Adding the instance directly to the scope for resolution
+        /// <summary>Adding the instance directly to the scope for resolution</summary>
         public static void Use(this IResolverContext r, Type serviceType, object instance) =>
             r.Use(serviceType, instance.ToFactoryDelegate);
 
-        /// Adding the instance directly to the scope for resolution 
+        /// <summary>Adding the instance directly to the scope for resolution</summary> 
         public static void Use<TService>(this IResolverContext r, TService instance) =>
             r.Use(typeof(TService), instance.ToFactoryDelegate);
 
-        /// Adding the factory directly to the scope for resolution 
+        /// <summary>Adding the factory directly to the scope for resolution</summary>
         public static void Use<TService>(this IRegistrator r, Func<IResolverContext, TService> factory) =>
             r.Use(typeof(TService), factory.ToFactoryDelegate);
 
-        /// Adding the instance directly to scope for resolution 
+        /// <summary>Adding the instance directly to scope for resolution</summary>
         public static void Use(this IRegistrator r, Type serviceType, object instance) =>
             r.Use(serviceType, instance.ToFactoryDelegate);
 
-        /// Adding the instance directly to scope for resolution 
+        /// <summary>Adding the instance directly to scope for resolution</summary> 
         public static void Use<TService>(this IRegistrator r, TService instance) =>
             r.Use(typeof(TService), instance.ToFactoryDelegate);
 
-        /// Adding the factory directly to scope for resolution 
+        /// <summary>Adding the factory directly to scope for resolution</summary> 
         public static void Use<TService>(this IContainer c, Func<IResolverContext, TService> factory) =>
             ((IResolverContext)c).Use(typeof(TService), factory.ToFactoryDelegate);
 
-        /// Adding the instance directly to scope for resolution 
+        /// <summary>Adding the instance directly to scope for resolution</summary>
         public static void Use(this IContainer c, Type serviceType, object instance) =>
             ((IResolverContext)c).Use(serviceType, instance.ToFactoryDelegate);
 
-        /// Adding the instance directly to scope for resolution 
+        /// <summary>Adding the instance directly to scope for resolution</summary>
         public static void Use<TService>(this IContainer c, TService instance) =>
             ((IResolverContext)c).Use(typeof(TService), instance.ToFactoryDelegate);
 
-        /// <summary>Registers initializing action that will be called after service is resolved 
+        /// <summary>
+        /// Registers initializing action that will be called after service is resolved 
         /// just before returning it to the caller.  You can register multiple initializers for single service.
         /// Or you can register initializer for <see cref="Object"/> type to be applied 
-        /// for all services and use <paramref name="condition"/> to specify the target services.</summary>
+        /// for all services and use <paramref name="condition"/> to specify the target services.
+        /// </summary>
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
             Action<TTarget, IResolverContext> initialize, Func<Request, bool> condition = null)
         {
@@ -7103,7 +7117,7 @@ namespace DryIoc
                         .Type(initialize.ToFunc<Request, Action<TTarget, IResolverContext>>)),
                 setup: Setup.DecoratorWith(
                     r => r.ServiceType.IsAssignableTo<TTarget>() && (condition == null || condition(r)),
-                    useDecorateeReuse: true, // issue BitBucket #230 - ensures the intitialization to happen once on construction 
+                    useDecorateeReuse: true, // issue BitBucket #230 - ensures the initialization to happen once on construction 
                     preventDisposal: true)); // issue #215 - ensures that the initialized / decorated object does not added for the disposal twice
         }
 
