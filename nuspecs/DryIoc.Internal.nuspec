@@ -17,6 +17,7 @@
 ## v4.1.2 Bug-fix release
 
 - #236 Additional default parameter for Made creation public API introduced binary incompatibility
+- #237 UseInstance with interface-based serviceType does not replace previous instance
 
 ## v4.1.1 Bug-fix release
 
