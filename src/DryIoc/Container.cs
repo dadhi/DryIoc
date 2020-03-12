@@ -3732,15 +3732,13 @@ namespace DryIoc
         public static object ConvertWithOperator(object source, Type targetType, Expression expr)
         {
             var sourceType = source.GetType();
-            //var sourceConvertOp = sourceType.GetSourceConversionOperatorToTarget(targetType);
             var sourceConvertOp = sourceType.FindConvertOperator(sourceType, targetType);
             if (sourceConvertOp != null)
                 return sourceConvertOp.Invoke(null, new[] { source });
 
-            //var targetConvertOp = sourceType.GetTargetConversionOperatorFromSource(targetType);
             var targetConvertOp = targetType.FindConvertOperator(sourceType, targetType);
             if (targetConvertOp == null)
-                Throw.It(Error.NoConversionOperatorFoundWhenInterpretingTheConvertExpression, expr);
+                Throw.It(Error.NoConversionOperatorFoundWhenInterpretingTheConvertExpression, source, targetType, expr);
             return targetConvertOp.Invoke(null, new[] { source });
         }
 
@@ -6557,15 +6555,19 @@ namespace DryIoc
             registrator.Register(new ReflectionFactory(default(Type), reuse, made, setup),
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
-        /// <summary>Registers service type returned by Made expression.</summary>
+        /// <summary>Registers service returned by Made expression.</summary>
         public static void Register<TService>(this IRegistrator registrator,
             Made.TypedMade<TService> made, IReuse reuse = null, Setup setup = null,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             registrator.Register<TService, TService>(made, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        /// It is always back, bit now the roles are split, this just a normal registration to the root container,
-        /// Look at `Use` method to put instance directly into Current Scope or Singletons Scope,
+        /// <summary>
+        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegestered`, 
+        /// apply wrappers and decorators, etc.
+        /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
+        /// NOTE: Look at the `Use` method to put instance directly into current or singleton scope,
         /// though without ability to use decorators and wrappers on it.
+        /// </summary>
         public static void RegisterInstance(this IRegistrator registrator, bool isChecked, Type serviceType, object instance, 
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
         {
@@ -6577,20 +6579,36 @@ namespace DryIoc
                 (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
         }
 
-        /// It is always back, bit now the roles are split, this just a normal registration to the root container,
-        /// Look at `Use` method to put instance directly into Current Scope or Singletons Scope,
+         /// <summary>
+        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegestered`, 
+        /// apply wrappers and decorators, etc.
+        /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
+        /// NOTE: Look at the `Use` method to put instance directly into current or singleton scope,
         /// though without ability to use decorators and wrappers on it.
+        /// </summary>
         public static void RegisterInstance(this IRegistrator registrator, Type serviceType, object instance, 
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>
             registrator.RegisterInstance(false, serviceType, instance, ifAlreadyRegistered, setup, serviceKey);
 
-        /// It is always back, bit now the roles are split, this just a normal registration to the root container,
-        /// Look at `Use` method to put instance directly into Current Scope or Singletons Scope,
+        /// <summary>
+        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegestered`, 
+        /// apply wrappers and decorators, etc.
+        /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
+        /// NOTE: Look at the `Use` method to put instance directly into current or singleton scope,
         /// though without ability to use decorators and wrappers on it.
+        /// </summary>
         public static void RegisterInstance<T>(this IRegistrator registrator, T instance,
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>
             registrator.RegisterInstance(true, typeof(T), instance, ifAlreadyRegistered, setup, serviceKey);
 
+        /// <summary>
+        /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
+        /// so you can check it via `IsRegestered` for each service type, 
+        /// apply wrappers and decorators, etc.
+        /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
+        /// NOTE: Look at the `Use` method to put instance directly into current or singleton scope,
+        /// though without ability to use decorators and wrappers on it.
+        /// </summary>
         public static void RegisterInstanceMany(this IRegistrator registrator, Type implType, object instance,
             bool nonPublicServiceTypes = false,
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
@@ -6614,12 +6632,28 @@ namespace DryIoc
                 (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
         }
 
+        /// <summary>
+        /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
+        /// so you can check it via `IsRegestered` for each service type, 
+        /// apply wrappers and decorators, etc.
+        /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
+        /// NOTE: Look at the `Use` method to put instance directly into current or singleton scope,
+        /// though without ability to use decorators and wrappers on it.
+        /// </summary>
         public static void RegisterInstanceMany<T>(this IRegistrator registrator, T instance,
             bool nonPublicServiceTypes = false,
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>
             registrator.RegisterInstanceMany(instance.GetType(), instance,
                 nonPublicServiceTypes, ifAlreadyRegistered, setup, serviceKey);
 
+        /// <summary>
+        /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
+        /// so you can check it via `IsRegestered` for each service type, 
+        /// apply wrappers and decorators, etc.
+        /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
+        /// NOTE: Look at the `Use` method to put instance directly into current or singleton scope,
+        /// though without ability to use decorators and wrappers on it.
+        /// </summary>
         public static void RegisterInstanceMany(this IRegistrator registrator, Type[] serviceTypes, object instance,
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
         {
@@ -6823,50 +6857,57 @@ namespace DryIoc
             registrator.Register(new DelegateFactory(factoryDelegate.ToFactoryDelegate, reuse, setup),
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
-        /// Registers delegate to be injected by container avoiding the ServiceLocator anti-pattern
+        /// <summary>Registers delegate to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TService>(
             this IRegistrator r, Func<TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TService>(
             this IRegistrator r, Func<TDep1, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
+        public static void RegisterDelegate<TDep1, TService>(
+            this IRegistrator r, Func<TDep1, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            RegisterDelegateFunc<Func<TDep1, object>>(r, typeof(TService),
+                dep1 => factory(dep1).ThrowIfNotInstanceOf(typeof(TService), Error.RegisteredDelegateResultIsNotOfServiceType),
+                reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        //,((Func<TDep1, TDep2, TDep3, TService>)factory.Invoke).Method);
-        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        /// Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern
+        /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
@@ -6906,7 +6947,7 @@ namespace DryIoc
                 Throw.It(Error.RegisteringOpenGenericRequiresFactoryProvider, serviceType);
 
             FactoryDelegate checkedDelegate = r => factoryDelegate(r)
-                .ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType, r);
+                .ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
 
             var factory = new DelegateFactory(checkedDelegate, reuse, setup);
 
@@ -12149,7 +12190,7 @@ namespace DryIoc
                 "Unable to find most resolvable constructor also including passed input arguments `{0}` " +
                 NewLine + " when resolving: {1}."),
             RegisteredDelegateResultIsNotOfServiceType = Of(
-                "Registered factory delegate returns service {0} is not assignable to {2}."),
+                "Registered factory delegate returns service {0} is not assignable to desired service {1}."),
             NotFoundSpecifiedWritablePropertyOrField = Of(
                 "Unable to find writable property or field {0} when resolving: {1}."),
             PushingToRequestWithoutFactory = Of(
@@ -12196,7 +12237,7 @@ namespace DryIoc
             InjectedCustomValueIsOfDifferentType = Of(
                 "Injected value {0} is not assignable to {1} when resolving: {2}"),
             NoConversionOperatorFoundWhenInterpretingTheConvertExpression = Of(
-                "There is no explicit or implicit conversion operator found when interpreting the expression: {0}"),
+                "There is no explicit or implicit conversion operator found when interpreting {0} to {1} in expression: {2}"),
             StateIsRequiredToUseItem = Of(
                 "Runtime state is required to inject (or use) the: {0}. " + NewLine +
                 "The reason is using RegisterDelegate, Use (or UseInstance), RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + NewLine +
@@ -12323,12 +12364,12 @@ namespace DryIoc
         private static string[] CreateDefaultMessages()
         {
             var messages = new string[(int)ErrorCheck.OperationThrows + 1];
-            messages[(int)ErrorCheck.Unspecified] = "The error reason is unspecified, which is bad thing.";
+            messages[(int)ErrorCheck.Unspecified]      = "The error reason is unspecified, which is bad thing.";
             messages[(int)ErrorCheck.InvalidCondition] = "Argument {0} of type {1} has invalid condition.";
-            messages[(int)ErrorCheck.IsNull] = "Argument of type {0} is null.";
-            messages[(int)ErrorCheck.IsNotOfType] = "Argument {0} is not of type {1}.";
-            messages[(int)ErrorCheck.TypeIsNotOfType] = "Type argument {0} is not assignable from type {1}.";
-            messages[(int)ErrorCheck.OperationThrows] = "Invoked operation throws the inner exception {0}.";
+            messages[(int)ErrorCheck.IsNull]           = "Argument of type {0} is null.";
+            messages[(int)ErrorCheck.IsNotOfType]      = "Argument {0} is not of type {1}.";
+            messages[(int)ErrorCheck.TypeIsNotOfType]  = "Type argument {0} is not assignable from type {1}.";
+            messages[(int)ErrorCheck.OperationThrows]  = "Invoked operation throws the inner exception {0}.";
             return messages;
         }
 
