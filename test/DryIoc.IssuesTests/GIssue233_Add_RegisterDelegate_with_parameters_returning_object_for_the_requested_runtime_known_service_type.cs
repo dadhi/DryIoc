@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
             container.Register<A>();
 
             object CreateObjectB(A a) => new B(a);
-            container.RegisterDelegate<A, B>(a => CreateObjectB(a));
+            container.RegisterDelegate(typeof(B), (A a) => CreateObjectB(a));
 
             Assert.IsTrue(container.IsRegistered<B>());
 
@@ -29,7 +29,7 @@ namespace DryIoc.IssuesTests
 
             container.Register<A>();
 
-            container.RegisterDelegate<A, B>(a => new Wrong());
+            container.RegisterDelegate(typeof(B), (A a) => new Wrong());
             Assert.IsTrue(container.IsRegistered<B>());
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<B>());
