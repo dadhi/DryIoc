@@ -6587,9 +6587,57 @@ namespace DryIoc
         /// It is always back, bit now the roles are split, this just a normal registration to the root container,
         /// Look at `Use` method to put instance directly into Current Scope or Singletons Scope,
         /// though without ability to use decorators and wrappers on it.
-        public static void RegisterInstance<T>(this IRegistrator registrator, T instance, 
+        public static void RegisterInstance<T>(this IRegistrator registrator, T instance,
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>
             registrator.RegisterInstance(true, typeof(T), instance, ifAlreadyRegistered, setup, serviceKey);
+
+        public static void RegisterInstanceMany(this IRegistrator registrator, Type implType, object instance,
+            bool nonPublicServiceTypes = false,
+            IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
+        {
+            instance.ThrowIfNull();
+            if (implType != null)
+                instance.ThrowIfNotInstanceOf(implType);
+            else
+                implType = instance.GetType();
+
+            var serviceTypes = implType.GetImplementedServiceTypes(nonPublicServiceTypes);
+
+            if (serviceTypes.Length == 0)
+                Throw.It(Error.NoServicesWereRegisteredByRegisterMany, implType.One());
+            
+            var factory = new RegisteredInstanceFactory(instance, DryIoc.Reuse.Singleton, setup);
+            foreach (var serviceType in serviceTypes)
+                registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+
+            if (instance is IDisposable && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
+                (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
+        }
+
+        public static void RegisterInstanceMany<T>(this IRegistrator registrator, T instance,
+            bool nonPublicServiceTypes = false,
+            IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>
+            registrator.RegisterInstanceMany(instance.GetType(), instance,
+                nonPublicServiceTypes, ifAlreadyRegistered, setup, serviceKey);
+
+        public static void RegisterInstanceMany(this IRegistrator registrator, Type[] serviceTypes, object instance,
+            IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
+        {
+            var instanceType = instance.GetType();
+            if (serviceTypes.IsNullOrEmpty())
+                Throw.It(Error.NoServicesWereRegisteredByRegisterMany, instance);
+
+            var factory = new RegisteredInstanceFactory(instance, DryIoc.Reuse.Singleton, setup);
+
+            foreach (var serviceType in serviceTypes)
+            {
+                serviceType.ThrowIfNotImplementedBy(instanceType);
+                registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+            }
+
+            if (instance is IDisposable && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
+                (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
+        }
 
         /// <summary>List of types excluded by default from RegisterMany convention.</summary>
         public static readonly string[] ExcludedGeneralPurposeServiceTypes =
@@ -6626,9 +6674,10 @@ namespace DryIoc
         {
             var implementedTypes = type.GetImplementedTypes(ReflectionTools.AsImplementedType.SourceType);
 
-            var serviceTypes = implementedTypes
-                .Match(nonPublicServiceTypes, (nonPublic, t) => (nonPublic || t.IsPublicOrNestedPublic()) && t.IsServiceType());
-
+            var serviceTypes = nonPublicServiceTypes
+                ? implementedTypes.Match(t => t.IsServiceType())
+                : implementedTypes.Match(t => t.IsPublicOrNestedPublic() && t.IsServiceType());
+            
             if (type.IsGenericDefinition())
                 serviceTypes = serviceTypes.Match(type,
                     (t, x) => x.ContainsAllGenericTypeParameters(t.GetGenericParamsAndArgs()),
@@ -6964,15 +7013,15 @@ namespace DryIoc
         public static void Use<TService>(this IResolverContext r, Func<IResolverContext, TService> factory) =>
             r.Use(typeof(TService), factory.ToFactoryDelegate);
 
-        /// Adding the instance directly to scope for resolution 
+        /// Adding the instance directly to the scope for resolution
         public static void Use(this IResolverContext r, Type serviceType, object instance) =>
             r.Use(serviceType, instance.ToFactoryDelegate);
 
-        /// Adding the instance directly to scope for resolution 
+        /// Adding the instance directly to the scope for resolution 
         public static void Use<TService>(this IResolverContext r, TService instance) =>
             r.Use(typeof(TService), instance.ToFactoryDelegate);
 
-        /// Adding the factory directly to scope for resolution 
+        /// Adding the factory directly to the scope for resolution 
         public static void Use<TService>(this IRegistrator r, Func<IResolverContext, TService> factory) =>
             r.Use(typeof(TService), factory.ToFactoryDelegate);
 
@@ -12216,12 +12265,12 @@ namespace DryIoc
                 "Unable to find a single constructor in Type {0} (including non-public={1})"),
             DisposerTrackForDisposeError = Of("Something is {0} already."),
             NoServicesWereRegisteredByRegisterMany = Of(
-                "No services were registered by RegisterMany for specified implementation types: " + NewLine +
+                "No service types were discovered in `RegisterMany` (or in `RegisterInstanceMany`) for the specified implementation types: " + NewLine +
                 "[{0}]" + NewLine +
-                "May be you missed the implementation or service types, " +
+                "Maybe you missed the implementation or service type(s), " +
                 "e.g. provided only abstract or compiler-generated implementation types, " +
-                "or specified a wrong @serviceTypeCondition," +
-                "or did not specify to use non-public service types, etc."),
+                "or specified a wrong `serviceTypeCondition`," +
+                "or did not specify to use `nonPublicServiceTypes`, etc."),
             FoundNoRootsToValidate = Of(
                 "No roots to Validate found. Check the `condition` passed to Validate method for container: {0}" + NewLine +
                 "You may also examine all container registrations via `container.container.GetServiceRegistrations()` method."),
