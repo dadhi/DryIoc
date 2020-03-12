@@ -6077,10 +6077,9 @@ namespace DryIoc
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         public static Made Of(FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            bool isConditionalImlementation = false, bool isImplMemberDependsOnRequest = false) =>
+            bool isConditionalImlementation = false) =>
             factoryMethod == null && parameters == null && propertiesAndFields == null && !isConditionalImlementation ? Default :
-            new Made(factoryMethod, parameters, propertiesAndFields,
-                isConditionalImlementation: isConditionalImlementation, isImplMemberDependsOnRequest: isImplMemberDependsOnRequest);
+            new Made(factoryMethod, parameters, propertiesAndFields, isConditionalImlementation: isConditionalImlementation);
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">Known factory method.</param>
@@ -6105,33 +6104,32 @@ namespace DryIoc
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
             Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo), parameters, propertiesAndFields);
 
+        /// <summary>Creates factory specification with implementation type, conditionally depending on request.</summary>
+        public static Made Of(Func<Request, Type> getImplType,
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
+            Of(r => DryIoc.FactoryMethod.Of(getImplType(r).SingleConstructor()),
+                parameters, propertiesAndFields, isConditionalImlementation: true);
+
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/> is method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo), parameters, propertiesAndFields,
-                isImplMemberDependsOnRequest: true);
-
-        /// <summary>Creates factory specification with implementation type, conditionally depending on request.</summary>
-        public static Made Of(Func<Request, Type> getImplType,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getImplType(r).SingleConstructor()), parameters, propertiesAndFields,
-                isConditionalImlementation: true);
+            new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo),
+                parameters, propertiesAndFields, isImplMemberDependsOnRequest: true);
 
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, Func<Request, ServiceInfo> factoryInfo,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)), parameters, propertiesAndFields,
-                isImplMemberDependsOnRequest: true);
+            new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)), 
+                parameters, propertiesAndFields, isImplMemberDependsOnRequest: true);
 
         /// <summary>Defines how to select constructor from implementation type.
         /// Where <paramref name="getConstructor"/> is delegate taking implementation type as input 
         /// and returning selected constructor info.</summary>
         public static Made Of(Func<Type, ConstructorInfo> getConstructor, ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(
-                    getConstructor(r.ImplementationType).ThrowIfNull(Error.GotNullConstructorFromFactoryMethod, r)),
+            Of(r => DryIoc.FactoryMethod.Of(getConstructor(r.ImplementationType).ThrowIfNull(Error.GotNullConstructorFromFactoryMethod, r)),
                 parameters, propertiesAndFields);
 
         /// <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
