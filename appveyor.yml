@@ -1,9 +1,14 @@
-version: 4.1.2-preview-{build}
-os: Visual Studio 2017
+version: 5.0.0-preview-1-{build}
+
+image:
+  - Visual Studio 2019
+  - Ubuntu
+  - macOS
+
 test: off
 
 build_script:
-  - .\build.bat
+  - dotnet build -c:Release -v:m -p:DevMode=false & dotnet test --no-build -c:Release -p:DevMode=false
 
 skip_commits:
   message: /skipci .*/

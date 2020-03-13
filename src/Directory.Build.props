@@ -37,42 +37,13 @@
         <PackageOutputPath>..\..\.dist\packages</PackageOutputPath>
 
         <DebugType>embedded</DebugType>
-        <!-- <DebugSymbols>true</DebugSymbols> -->
+        <DebugSymbols>true</DebugSymbols>
         <IncludeSymbols>false</IncludeSymbols>
     </PropertyGroup>
 
     <!-- SourceLink support -->
     <ItemGroup>
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-beta2-18618-05" PrivateAssets="All" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
     </ItemGroup> 
-
-    <!--Probing for portable targets, it could be either MS Visual Studio or 'dotnet\sdk' locations-->
-    <PropertyGroup>
-        <PortableTargetsDir>C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\MSBuild\Microsoft\Portable</PortableTargetsDir>
-        <PortableTargetsDir Condition="!Exists('$(PortableTargetsDir)')">C:\Program Files (x86)\Microsoft Visual Studio\2017\Professional\MSBuild\Microsoft\Portable</PortableTargetsDir>
-        <PortableTargetsDir Condition="!Exists('$(PortableTargetsDir)')">$(MSBuildExtensionsPath32)\Microsoft\Portable</PortableTargetsDir>
-    </PropertyGroup>
-
-    <!--PCL Profile259-->
-    <PropertyGroup Condition="'$(TargetFramework)' == 'portable-net45+win8+wpa81+wp8'">
-        <AssemblyTitle>$(AssemblyName) PCL259</AssemblyTitle>
-        <DefineConstants>PCL;PCL259</DefineConstants>
-        <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
-        <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-        <TargetFrameworkProfile>Profile259</TargetFrameworkProfile>
-        <NugetTargetMoniker>.NETPortable,Version=v0.0,Profile=Profile259</NugetTargetMoniker>
-        <LanguageTargets>$(PortableTargetsDir)\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets</LanguageTargets>
-    </PropertyGroup>
-
-    <!--PCL Profile328-->
-    <PropertyGroup Condition="'$(TargetFramework)' == 'portable-net40+win8+wpa81+wp8+sl5'">
-        <AssemblyTitle>$(AssemblyName) PCL328</AssemblyTitle>
-        <DefineConstants>PCL;PCL328</DefineConstants>
-        <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
-        <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-        <TargetFrameworkProfile>Profile328</TargetFrameworkProfile>
-        <NugetTargetMoniker>.NETPortable,Version=v0.0,Profile=Profile328</NugetTargetMoniker>
-        <LanguageTargets>$(PortableTargetsDir)\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets</LanguageTargets>
-    </PropertyGroup>
 
 </Project>
