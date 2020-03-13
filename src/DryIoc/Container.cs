@@ -23,28 +23,25 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#if !PCL && !NET35 && !NET40 && !NET403 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETCOREAPP1_0 && !NETCOREAPP1_1
+#if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETCOREAPP1_0 && !NETCOREAPP1_1
 #define SUPPORTS_FAST_EXPRESSION_COMPILER
 #endif
-#if !PCL && !NET35 && !NET40 && !NET403 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4 && !NETSTANDARD1_5 && !NETSTANDARD1_6 && !NETCOREAPP1_0 && !NETCOREAPP1_1
+#if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4 && !NETSTANDARD1_5 && !NETSTANDARD1_6 && !NETCOREAPP1_0 && !NETCOREAPP1_1
 #define SUPPORTS_ISERVICE_PROVIDER
 #endif
-#if !PCL && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4 && !NETSTANDARD1_5 && !NETSTANDARD1_6
+#if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4 && !NETSTANDARD1_5 && !NETSTANDARD1_6
 #define SUPPORTS_SERIALIZABLE
 #define SUPPORTS_STACK_TRACE
 #define SUPPORTS_MANAGED_THREAD_ID
 #endif
-#if !PCL && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_5 && !NET35 && !NET40 && !NET403 && !NET45 && !NET451 && !NET452
+#if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_5 && !NET45 && !NET451 && !NET452
 #define SUPPORTS_ASYNC_LOCAL
 #endif
-#if !PCL && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NET35 && !NET40 && !NET403
+#if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2
 #define SUPPORTS_VARIANCE
 #endif
-#if !PCL && !NET35 && !NET40 && !NET403 && !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 && !NET471 && !NET472 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4
+#if !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 && !NET471 && !NET472 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4
 #define SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
-#endif
-#if !PCL && !NET35 && !NET40 && !NET403
-#define SUPPORTS_DELEGATE_METHOD
 #endif
 
 namespace DryIoc
@@ -2925,9 +2922,6 @@ namespace DryIoc
                         return true;
                     }
 
-#if !SUPPORTS_DELEGATE_METHOD
-                    return false;
-#else
                     if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
                         return false;
                     var lambda = (Delegate)delegateObj;
@@ -2944,8 +2938,7 @@ namespace DryIoc
                         result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
                     }
                     return true;
-#endif
-                    }
+                }
                 case ExprType.Parameter:
                 {
                     if (expr == paramExprs)
@@ -3110,13 +3103,7 @@ namespace DryIoc
             var resultType = result.GetType();
             var lambdaType = lambdaExpr.Type;
             if ((resultType.GetGenericDefinitionOrNull() ?? resultType) != (lambdaType.GetGenericDefinitionOrNull() ?? lambdaType))
-            {
-#if SUPPORTS_DELEGATE_METHOD
                 result = ((Delegate)result).GetMethodInfo().CreateDelegate(lambdaType, ((Delegate)result).Target);
-#else
-                return false;
-#endif
-            }
 
             return true;
         }
@@ -11275,42 +11262,6 @@ namespace DryIoc
         IScope SetCurrent(SetCurrentScopeHandler setCurrentScope);
     }
 
-#if NET35 || NET40 || NET403 || PCL || PCL328 || PCL259
-
-    /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
-    /// if not yet tracked. Context actually stores scope references internally, so it should be disposed to free them.</summary>
-    public sealed class ThreadScopeContext : IScopeContext
-    {
-        /// <summary>Provides static name for context. It is OK because its constant.</summary>
-        public static readonly string ScopeContextName = "ThreadScopeContext";
-
-        /// <summary>Returns current scope in calling Thread or null, if no scope tracked.</summary>
-        public IScope GetCurrentOrDefault() =>
-            _scopes.GetValueOrDefault(Portable.GetCurrentManagedThreadID()) as IScope;
-
-        /// <summary>Change current scope for the calling Thread.</summary>
-        public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope)
-        {
-            var threadId = Portable.GetCurrentManagedThreadID();
-            IScope newScope = null;
-            Ref.Swap(ref _scopes, s => s.AddOrUpdate(threadId, 
-                newScope = setCurrentScope(s.GetValueOrDefault(threadId) as IScope)));
-            return newScope;
-        }
-
-        /// <summary>Disposes the scopes and empties internal scope storage.</summary>
-        public void Dispose()
-        {
-            if (!_scopes.IsEmpty) 
-                _scopes.Visit(d => d.Value?.Dispose());
-            _scopes = ImMap<IScope>.Empty;
-        }
-
-        /// Collection of scoped by their managed thread id
-        private ImMap<IScope> _scopes = ImMap<IScope>.Empty;
-    }
-
-#else
     /// <summary>Tracks one current scope per thread, so the current scope in different tread would be different or null,
     /// if not yet tracked. Context actually stores scope references internally, so it should be disposed to free them.</summary>
     public sealed class ThreadScopeContext : IScopeContext
@@ -11344,8 +11295,6 @@ namespace DryIoc
             }
         }
     }
-
-#endif
 
     /// <summary>Simplified scope agnostic reuse abstraction. More easy to implement,
     ///  and more powerful as can be based on other storage beside reuse.</summary>
@@ -13363,267 +13312,7 @@ namespace DryIoc
     }
 }
 #endif
-#if PCL328 || NET35 || NET40 || NET403
-namespace DryIoc
-{
-    using System.Threading;
 
-    /// Something for portability
-    public static partial class Portable
-    {
-        // ReSharper disable once RedundantAssignment
-        static partial void GetCurrentManagedThreadID(ref int threadID)
-        {
-            threadID = Thread.CurrentThread.ManagedThreadId;
-        }
-    }
-}
-
-namespace System.Reflection
-{
-    using Collections.Generic;
-    using Linq;
-
-    /// <summary>Provides <see cref="GetTypeInfo"/> for the type.</summary>
-    public static class TypeInfoTools
-    {
-        /// <summary>Wraps input type into <see cref="TypeInfo"/> structure.</summary>
-        /// <param name="type">Input type.</param> <returns>Type info wrapper.</returns>
-        public static TypeInfo GetTypeInfo(this Type type) => new TypeInfo(type);
-    }
-
-    /// <summary>Partial analog of TypeInfo existing in .NET 4.5 and higher.</summary>
-    public struct TypeInfo
-    {
-        private readonly Type _type;
-
-        /// <summary>Creates type info by wrapping input type.</summary> <param name="type">Type to wrap.</param>
-        public TypeInfo(Type type)
-        {
-            _type = type;
-        }
-
-#pragma warning disable 1591 // "Missing XML-comment"
-        public Type AsType() => _type;
-
-        public Assembly Assembly => _type.Assembly;
-
-        public MethodInfo GetDeclaredMethod(string name) => _type.GetMethod(name);
-        public PropertyInfo GetDeclaredProperty(string name) => _type.GetProperty(name);
-        public FieldInfo GetDeclaredField(string name) => _type.GetField(name);
-
-        public IEnumerable<ConstructorInfo> DeclaredConstructors =>
-            _type.GetConstructors(ALL_DECLARED ^ BindingFlags.Static);
-
-        public IEnumerable<MemberInfo> DeclaredMembers =>
-            _type.GetMembers(ALL_DECLARED);
-
-        public IEnumerable<MethodInfo> DeclaredMethods =>
-            _type.GetMethods(ALL_DECLARED);
-
-        public IEnumerable<FieldInfo> DeclaredFields =>
-            _type.GetFields(ALL_DECLARED);
-
-        public IEnumerable<PropertyInfo> DeclaredProperties =>
-            _type.GetProperties(ALL_DECLARED);
-
-        public IEnumerable<Type> ImplementedInterfaces =>
-            _type.GetInterfaces();
-
-        public IEnumerable<Attribute> GetCustomAttributes(Type attributeType, bool inherit) =>
-            _type.GetCustomAttributes(attributeType, inherit).Cast<Attribute>();
-
-        public Type BaseType => _type.BaseType;
-        public bool IsGenericType => _type.IsGenericType;
-        public bool IsGenericTypeDefinition => _type.IsGenericTypeDefinition;
-        public bool ContainsGenericParameters => _type.ContainsGenericParameters;
-        public Type[] GenericTypeParameters => _type.GetGenericArguments();
-        public Type[] GenericTypeArguments => _type.GetGenericArguments();
-
-        public bool IsClass => _type.IsClass;
-        public bool IsInterface => _type.IsInterface;
-        public bool IsValueType => _type.IsValueType;
-        public bool IsPrimitive => _type.IsPrimitive;
-        public bool IsArray => _type.IsArray;
-        public bool IsPublic => _type.IsPublic;
-        public bool IsNestedPublic => _type.IsNestedPublic;
-        public Type DeclaringType => _type.DeclaringType;
-        public bool IsAbstract => _type.IsAbstract;
-        public bool IsSealed => _type.IsSealed;
-        public bool IsEnum => _type.IsEnum;
-
-        public Type[] GetGenericParameterConstraints() => _type.GetGenericParameterConstraints();
-        public Type GetElementType() => _type.GetElementType();
-
-        public bool IsAssignableFrom(TypeInfo typeInfo) => _type.IsAssignableFrom(typeInfo.AsType());
-#pragma warning restore 1591 // "Missing XML-comment"
-
-        private const BindingFlags ALL_DECLARED =
-            BindingFlags.Instance | BindingFlags.Static |
-            BindingFlags.Public | BindingFlags.NonPublic |
-            BindingFlags.DeclaredOnly;
-    }
-}
-#endif
-
-#if NET35
-namespace System
-{
-    /// <summary>Func with 5 input parameters.</summary>
-    public delegate TResult Func<T1, T2, T3, T4, T5, TResult>(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5);
-
-    /// <summary>Func with 6 input parameters.</summary>
-    public delegate TResult Func<T1, T2, T3, T4, T5, T6, TResult>(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5,
-        T6 arg6);
-
-    /// <summary>Func with 7 input parameters.</summary>
-    public delegate TResult Func<T1, T2, T3, T4, T5, T6, T7, TResult>(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5,
-        T6 arg6,
-        T7 arg7);
-
-    /// <summary>Action with 5 input parameters.</summary>
-    public delegate void Action<T1, T2, T3, T4, T5>(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5);
-
-    /// <summary>Action with 6 input parameters.</summary>
-    public delegate void Action<T1, T2, T3, T4, T5, T6>(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5,
-        T6 arg6);
-
-    /// <summary>Action with 7 input parameters.</summary>
-    public delegate void Action<T1, T2, T3, T4, T5, T6, T7>(
-        T1 arg1,
-        T2 arg2,
-        T3 arg3,
-        T4 arg4,
-        T5 arg5,
-        T6 arg6,
-        T7 arg7);
-
-
-    /// <summary>Wrapper for value computation required on-demand. Since computed the same value will be returned over and over again.</summary>
-    /// <typeparam name="T">Type of value.</typeparam>
-    public sealed class Lazy<T>
-    {
-        /// <summary>Creates lazy object with passed value computation delegate.</summary>
-        /// <param name="valueFactory">Value computation. Will be stored until computation is done.</param>
-        /// <exception cref="ArgumentNullException">Throws for null computation.</exception>
-        public Lazy(Func<T> valueFactory)
-        {
-            if (valueFactory == null) throw new ArgumentNullException("valueFactory");
-            _valueFactory = valueFactory;
-        }
-
-        /// <summary>Indicates if value is computed already, or not.</summary>
-        public bool IsValueCreated { get; private set; }
-
-        /// <summary>Computes value if it was not before, and returns it. 
-        /// Value is guaranteed to be computed only once despite possible thread contention.</summary>
-        /// <exception cref="InvalidOperationException">Throws if value computation is recursive.</exception>
-        public T Value => IsValueCreated ? _value : Create();
-
-#region Implementation
-
-        private Func<T> _valueFactory;
-        private T _value;
-        private readonly object _valueCreationLock = new object();
-
-        private T Create()
-        {
-            lock (_valueCreationLock)
-            {
-                if (!IsValueCreated)
-                {
-                    if (_valueFactory == null) throw new InvalidOperationException("The initialization function tries to access Value on this instance.");
-                    var factory = _valueFactory;
-                    _valueFactory = null;
-                    _value = factory();
-                    IsValueCreated = true;
-                }
-            }
-
-            return _value;
-        }
-
-#endregion
-    }
-
-    /// <summary>Contains utility methods for creating and working with tuple.</summary>
-    public static class Tuple
-    {
-        /// <summary>Creates a new 2-tuple, or pair. </summary>
-        ///  <returns> A 2-tuple whose value is (<paramref name="item1"/>, <paramref name="item2"/>). </returns>
-        /// <param name="item1">The value of the first component of the tuple.</param><param name="item2">The value of the second component of the tuple.</param><typeparam name="T1">The type of the first component of the tuple.</typeparam><typeparam name="T2">The type of the second component of the tuple.</typeparam>
-        public static Tuple<T1, T2> Create<T1, T2>(T1 item1, T2 item2) => new Tuple<T1, T2>(item1, item2);
-    }
-
-    /// <summary>Represents a 2-tuple, or pair. </summary>
-    /// <typeparam name="T1">The type of the tuple's first component.</typeparam><typeparam name="T2">The type of the tuple's second component.</typeparam><filterpriority>2</filterpriority>
-    public sealed class Tuple<T1, T2>
-    {
-        private readonly T1 _item1;
-        private readonly T2 _item2;
-
-        /// <summary> Gets the value of the first component.</summary>
-        public T1 Item1 => _item1;
-
-        /// <summary> Gets the value of the current second component. </summary>
-        public T2 Item2 => _item2;
-
-        /// <summary>Initializes a new instance of the <see cref="T:System.Tuple`2"/> class.</summary>
-        /// <param name="item1">The value of the tuple's first component.</param><param name="item2">The value of the tuple's second component.</param>
-        public Tuple(T1 item1, T2 item2)
-        {
-            _item1 = item1;
-            _item2 = item2;
-        }
-
-        /// <summary> Returns a value that indicates whether the current <see cref="T:System.Tuple`2"/> object is equal to a specified object.</summary>
-        /// <param name="obj">The object to compare with this instance.</param>
-        /// <returns> true if the current instance is equal to the specified object; otherwise, false. </returns>
-        public override bool Equals(object obj)
-        {
-            var other = obj as Tuple<T1, T2>;
-            return other != null && Equals(other.Item1, Item1) && Equals(other.Item2, Item2);
-        }
-
-        /// <summary> Returns the hash code for the current <see cref="T:System.Tuple`2"/> object. </summary>
-        /// <returns> A 32-bit signed integer hash code.</returns>
-        public override int GetHashCode()
-        {
-            var h1 = _item1 == null ? 0 : _item1.GetHashCode();
-            var h2 = _item2 == null ? 0 : _item2.GetHashCode();
-            return (h1 << 5) + h1 ^ h2;
-        }
-
-        /// <summary> Returns a string that represents the value of this <see cref="T:System.Tuple`2"/> instance. </summary>
-        public override string ToString() => "(" + _item1 + ", " + _item2 + ")";
-    }
-}
-#endif
 #if SUPPORTS_VARIANCE
 namespace DryIoc.Messages
 {

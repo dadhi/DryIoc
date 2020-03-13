@@ -1814,7 +1814,7 @@ namespace DryIoc.MefAttributedModel
     #endregion
 }
 
-#if NET35 || NET40 || PCL || NETSTANDARD1_0 || NETSTANDARD1_3 
+#if NETSTANDARD1_0 || NETSTANDARD1_1 || NETSTANDARD1_2 || NETSTANDARD1_3
 namespace DryIoc.MefAttributedModel
 {
     using System;

@@ -28,7 +28,7 @@ THE SOFTWARE.
 // Lists the target platforms that are Not supported by FEC - simplifies the direct referencing of Expression.cs file
 // Don't forget to uncomment #endif at the end of file
 */
-#if !PCL && !NET35 && !NET40 && !NET403 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETCOREAPP1_0 && !NETCOREAPP1_1
+#if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETCOREAPP1_0 && !NETCOREAPP1_1
 #define SUPPORTS_FAST_EXPRESSION_COMPILER
 #endif
 
