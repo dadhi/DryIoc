@@ -319,7 +319,7 @@ namespace DryIoc
                 if (entry.Value is FactoryDelegate cachedDelegate)
                     return cachedDelegate(this);
 
-                if (ResolverContext.TryGetUsedInstance(this, serviceType, out var usedInstance))
+                if (ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var usedInstance))
                 {
                     entry.Value = null; // reset the cache
                     return usedInstance;
@@ -357,9 +357,10 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
 
-            if (ResolverContext.TryGetUsedInstance(this, serviceType, out var usedInstance))
+            if (ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var usedInstance))
                 return usedInstance;
 
+            // todo: should we add `serviceTypeHash` to Request?
             var request = Request.Create(this, serviceType, ifUnresolved: ifUnresolved);
             var factory = ((IContainer)this).ResolveFactory(request); // HACK: may mutate request, but it should be safe
 
@@ -952,15 +953,13 @@ namespace DryIoc
         /// Adding the factory directly to scope for resolution 
         public void Use(Type serviceType, FactoryDelegate factory) 
         {
-            (CurrentScope ?? SingletonScope).SetUsedInstance(serviceType, factory);
-            
             var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
+            (CurrentScope ?? SingletonScope).SetUsedInstance(serviceTypeHash, serviceType, factory);
+            
+             // reset the cache if any
             var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
             if (cacheEntry != null)
-            {
-                ref var entry = ref cacheEntry.Value;
-                entry.Value = null; // reset the cache if any
-            }
+                cacheEntry.Value.Value = null;
         }
 
 #endregion
@@ -4593,11 +4592,11 @@ namespace DryIoc
             return r.WithCurrentScope(null);
         }
 
-        internal static bool TryGetUsedInstance(this IResolverContext r, Type serviceType, out object instance)
+        internal static bool TryGetUsedInstance(this IResolverContext r, int serviceTypeHash, Type serviceType, out object instance)
         {
             instance = null;
-            return r.CurrentScope? .TryGetUsedInstance(r, serviceType, out instance) == true 
-                || r.SingletonScope.TryGetUsedInstance(r, serviceType, out instance);
+            return r.CurrentScope? .TryGetUsedInstance(r, serviceTypeHash, serviceType, out instance) == true 
+                || r.SingletonScope.TryGetUsedInstance(r, serviceTypeHash, serviceType, out instance);
         }
 
         /// A bit if sugar to track disposable in singleton or current scope
@@ -10110,9 +10109,10 @@ namespace DryIoc
             if (paramDetails == DryIoc.ServiceDetails.Default)
             {
                 // Generate the fast resolve call for used instances
-                if (request.Container.TryGetUsedInstance(paramRequest.ServiceType, out var instance))
+                var serviceType = paramRequest.ServiceType;
+                if (request.Container.TryGetUsedInstance(RuntimeHelpers.GetHashCode(serviceType), serviceType, out var instance))
                     return Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
-                        Constant(paramRequest.ServiceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
+                        Constant(serviceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
             }
 
             return null;
@@ -10816,8 +10816,14 @@ namespace DryIoc
         /// Sets (replaces) the factory for specified type.
         void SetUsedInstance(Type type, FactoryDelegate factory);
 
+        /// Sets (replaces) the factory for specified type.
+        void SetUsedInstance(int hash, Type type, FactoryDelegate factory);
+
         /// Looks up for stored item by type.
         bool TryGetUsedInstance(IResolverContext r, Type type, out object instance);
+
+        /// Looks up for stored item by type.
+        bool TryGetUsedInstance(IResolverContext r, int hash, Type type, out object instance);
 
         /// Clones the scope.
         IScope Clone();
@@ -11149,18 +11155,25 @@ namespace DryIoc
             typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.TrackDisposable));
 
         /// Add instance to the small registry via factory
-        public void SetUsedInstance(Type type, FactoryDelegate factory)
+        public void SetUsedInstance(Type type, FactoryDelegate factory) =>
+            SetUsedInstance(RuntimeHelpers.GetHashCode(type), type, factory);
+
+        /// Add instance to the small registry via factory
+        public void SetUsedInstance(int hash, Type type, FactoryDelegate factory)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
             var f = _factories;
-            var hash = RuntimeHelpers.GetHashCode(type);
             if (Interlocked.CompareExchange(ref _factories, f.AddOrUpdate(hash, type, factory), f) != f)
                 Ref.Swap(ref _factories, hash, type, factory, (x, h, t, fac) => x.AddOrUpdate(h, t, fac));
         }
 
         /// <summary>Try retrieve instance from the small registry.</summary>
-        public bool TryGetUsedInstance(IResolverContext r, Type type, out object instance)
+        public bool TryGetUsedInstance(IResolverContext r, Type type, out object instance) =>
+            TryGetUsedInstance(r, RuntimeHelpers.GetHashCode(type), type, out instance);
+
+        /// <summary>Try retrieve instance from the small registry.</summary>
+        public bool TryGetUsedInstance(IResolverContext r, int hash, Type type, out object instance)
         {
             instance = null;
             if (_disposed == 1)
@@ -11168,7 +11181,7 @@ namespace DryIoc
 
             if (!_factories.IsEmpty)
             {
-                var factory = _factories.GetValueOrDefault(RuntimeHelpers.GetHashCode(type), type);
+                var factory = _factories.GetValueOrDefault(hash, type);
                 if (factory != null)
                 {
                     instance = factory(r);
@@ -11176,7 +11189,7 @@ namespace DryIoc
                 }
             }
 
-            return Parent?.TryGetUsedInstance(r, type, out instance) ?? false;
+            return Parent?.TryGetUsedInstance(r, hash, type, out instance) ?? false;
         }
 
         /// <summary>Enumerates all the parent scopes upwards starting from this one.</summary>
