@@ -711,6 +711,7 @@ namespace DryIoc
         }
 
         /// [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public void UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey)
         {
@@ -908,10 +909,12 @@ namespace DryIoc
             });
         }
 
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey) =>
             UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         void IRegistrator.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey) =>
             UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
@@ -7031,48 +7034,56 @@ namespace DryIoc
 
         /// Will become OBSOLETE! in the next major version:
         /// Please use `RegisterInstance` or `Use` method instead.
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public static void UseInstance<TService>(this IRegistrator r, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
         /// Will become OBSOLETE! in the next major version:
         /// Please use `RegisterInstance` or `Use` method instead.
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public static void UseInstance<TService>(this IContainer c, TService instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
         /// Will become OBSOLETE! in the next major version:
         /// Please use `RegisterInstance` or `Use` method instead.
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public static void UseInstance(this IResolverContext r, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
         /// Will become OBSOLETE! in the next major version:
         /// Please use `RegisterInstance` or `Use` method instead.
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public static void UseInstance(this IRegistrator r, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
         /// Will become OBSOLETE! in the next major version:
         /// Please use `RegisterInstance` or `Use` method instead.
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public static void UseInstance(this IContainer c, Type serviceType, object instance,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
 
         /// Will become OBSOLETE! in the next major version:
         /// Please use `RegisterInstance` or `Use` method instead.
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public static void UseInstance<TService>(this IResolverContext r, TService instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(typeof(TService), instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         /// Will become OBSOLETE! in the next major version:
         /// Please use `RegisterInstance` or `Use` method instead.
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public static void UseInstance(this IResolverContext r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         /// Will become OBSOLETE! in the next major version:
         /// Please use `RegisterInstance` or `Use` method instead.
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public static void UseInstance(this IRegistrator r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
@@ -7081,6 +7092,7 @@ namespace DryIoc
         /// Will become OBSOLETE in the next major version!
         /// Please use `RegisterInstance` or `Use` method instead.
         /// </summary>
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public static void UseInstance(this IContainer c, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
             c.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
@@ -11926,6 +11938,7 @@ namespace DryIoc
         Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType);
 
         /// Puts instance into the current scope or singletons.
+        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey);
 
