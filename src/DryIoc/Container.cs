@@ -6865,12 +6865,20 @@ namespace DryIoc
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
+        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1>(
             this IRegistrator r, Type serviceType, Func<TDep1, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc<Func<TDep1, object>>(r, serviceType,
                 dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType),
+                reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
+        public static void RegisterDelegate<TDep1, TDep2>(
+            this IRegistrator r, Type serviceType, Func<TDep1, TDep2, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            RegisterDelegateFunc<Func<TDep1, TDep2, object>>(r, serviceType,
+                (dep1, dep2) => factory(dep1, dep2).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType),
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -6911,13 +6919,10 @@ namespace DryIoc
 
         private const string InvokeMethodName = "Invoke";
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
-            TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
-        {
-            var invokeMethod = typeof(TFunc).GetTypeInfo().GetDeclaredMethod(InvokeMethodName);
-            var made = new Made(new FactoryMethod(invokeMethod, Constant(factory)), serviceType);
-            r.Register(new ReflectionFactory(serviceType, reuse, made, setup),
-                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-        }
+            TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey) =>
+            r.Register(new ReflectionFactory(serviceType, reuse, 
+                new Made(new FactoryMethod(typeof(TFunc).GetTypeInfo().GetDeclaredMethod(InvokeMethodName), Constant(factory)), serviceType), 
+                setup), serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// Minimizes the number of allocations when converting from Func to named delegate
         public static object ToFactoryDelegate<TService>(this Func<IResolverContext, TService> f, IResolverContext r) => f(r);
