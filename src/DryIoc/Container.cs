@@ -2124,6 +2124,27 @@ namespace DryIoc
                 }
             }
 
+            // optimized for allocations
+            public IEnumerable<R> GetServiceRegistrations<R>(Func<Type, object, Factory, R> match) where R : class
+            {
+                R result = null;
+                foreach (var entry in Services.Enumerate())
+                {
+                    if (entry.Value.Value is Factory factory)
+                    {
+                        if ((result = match(entry.Value.Key, null, factory)) != null)
+                            yield return result;
+                    }
+                    else
+                    {
+                        var factories = ((FactoriesEntry)entry.Value.Value).Factories;
+                        foreach (var f in factories.Enumerate())
+                            if ((result = match(entry.Value.Key, f.Key, f.Value)) != null)
+                                yield return result;
+                    }
+                }
+            }
+
             public Registry Register(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
             {
                 if (_isChangePermitted != IsChangePermitted.Permitted)
@@ -4216,12 +4237,13 @@ namespace DryIoc
         public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
 
         // todo: Should we have a version which is throws by default?
+        // todo: Should we break it by making the condition a mandatory? - because it the pass to avoid problems of validating the unnecessary dependencies
         /// <summary>Helps to find potential problems in service registration setup.
         /// Method tries to resolve the specified registrations, collects exceptions, and
         /// returns them to user. Does not create any actual service objects.
         /// You must specify <paramref name="condition"/> to define your resolution roots,
         /// otherwise container will try to resolve all registrations, 
-        /// which usually is not realistic case to validate. </summary>
+        /// which usually is not realistic case to validate.</summary>
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container,
             Func<ServiceRegistrationInfo, bool> condition = null)
         {
@@ -5505,8 +5527,16 @@ namespace DryIoc
         /// <summary><see cref="WithExpressionGeneration"/>.</summary>
         public Ref<ImHashMap<Request, System.Linq.Expressions.Expression>> DependencyResolutionCallExprs { get; private set; }
 
-        /// Indicates that container is used for generation purposes, so it should use less runtime state
+        /// <summary>Indicates that container is used for generation purposes, so it should use less runtime state</summary>
         public bool UsedForExpressionGeneration => (_settings & Settings.UsedForExpressionGeneration) != 0;
+
+        private Settings GetSettingsForExpressionGeneration(bool allowRuntimeState = false) =>
+            _settings & ~Settings.EagerCachingSingletonForFasterAccess
+                      & ~Settings.ImplicitCheckForReuseMatchingScope
+                      & ~Settings.UseInterpretationForTheFirstResolution
+                      & ~Settings.UseInterpretation
+                      | Settings.UsedForExpressionGeneration
+                      | (allowRuntimeState ? 0 : Settings.ThrowIfRuntimeStateRequired);
 
         /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
         /// in the-per rules collection.</summary>
@@ -5516,12 +5546,22 @@ namespace DryIoc
                 Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty), ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
+        /// <summary>Indicates that rules are used for the validation, e.g. the rules created in `Validate` method</summary>
+        public bool UsedForValidation => (_settings & Settings.UsedForValidation) != 0;
+
+        private Settings GetSettingsForValidation() =>
+            _settings & ~Settings.EagerCachingSingletonForFasterAccess
+                      & ~Settings.ImplicitCheckForReuseMatchingScope
+                      | Settings.UsedForValidation;
+
         /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
         /// in the-per rules collection.</summary>
         public Rules ForValidate() =>
-            new Rules(GetSettingsForExpressionGeneration(allowRuntimeState: true) | Rules.Settings.UsedForValidation, 
-                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
-                null, ItemToExpressionConverter,
+            new Rules(GetSettingsForValidation(), 
+                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, 
+                int.MaxValue, // lifts the `DefaultDependencyDepthToSplitObjectGraph` to the Max, so we will construct the whole tree
+                null, 
+                ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="ImplicitCheckForReuseMatchingScope"/></summary>
@@ -5535,14 +5575,6 @@ namespace DryIoc
 
         /// <summary>Removes runtime optimizations preventing an expression generation.</summary>
         public Rules ForExpressionGeneration(bool allowRuntimeState = false) => WithSettings(GetSettingsForExpressionGeneration());
-
-        private Settings GetSettingsForExpressionGeneration(bool allowRuntimeState = false) =>
-            _settings & ~Settings.EagerCachingSingletonForFasterAccess
-                      & ~Settings.ImplicitCheckForReuseMatchingScope
-                      & ~Settings.UseInterpretationForTheFirstResolution
-                      & ~Settings.UseInterpretation
-                      | Settings.UsedForExpressionGeneration
-                      | (allowRuntimeState ? 0 : Settings.ThrowIfRuntimeStateRequired);
 
         /// <summary><see cref="WithResolveIEnumerableAsLazyEnumerable"/>.</summary>
         public bool ResolveIEnumerableAsLazyEnumerable =>
@@ -8861,10 +8893,10 @@ namespace DryIoc
             return setupClone;
         }
 
-        /// Works `AsResolutionCall` only with `Rules.UsedForExpressionGeneration`
+        /// <summary>Works as `AsResolutionCall` but only with `Rules.UsedForExpressionGeneration`</summary>
         public bool AsResolutionCallForExpressionGeneration => (_settings & Settings.AsResolutionCallForExpressionGeneration) != 0;
 
-        /// Specifies to use `asResolutionCall` but only in expression generation context, e.g. DryIocZero
+        /// <summary>Specifies to use `asResolutionCall` but only in expression generation context, e.g. for compile-time generation</summary>
         internal static readonly Setup AsResolutionCallForGeneratedExpressionSetup =
             new ServiceSetup { _settings = Settings.AsResolutionCallForExpressionGeneration };
 
@@ -9338,28 +9370,26 @@ namespace DryIoc
             {
                 var itemRef = ((Scope)container.SingletonScope)._maps[FactoryID & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(FactoryID);
                 if (itemRef != null && itemRef.Value != Scope.NoItem)
-                {
                     return Constant(itemRef.Value);
-                }
             }
 
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
-                !request.OpensResolutionScope && // preventing recursion
-                (setup.OpenResolutionScope ||
-                 !request.IsResolutionCall && // preventing recursion
-                 (setup.AsResolutionCall ||
-                  (setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration) ||
-                  setup.UseParentReuse
-                  || request.FactoryType == FactoryType.Service && request.DependencyDepth > rules.DependencyDepthToSplitObjectGraph
-                  ) &&
-                 request.GetActualServiceType() != typeof(void)))
-            {
+                !request.OpensResolutionScope && (
+                    setup.OpenResolutionScope || 
+                    !request.IsResolutionCall && (
+                      setup.AsResolutionCall || 
+                      setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration ||
+                      setup.UseParentReuse ||
+                      request.FactoryType == FactoryType.Service && request.DependencyDepth > rules.DependencyDepthToSplitObjectGraph
+                    ) &&
+                    request.GetActualServiceType() != typeof(void))
+                )
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
-            }
 
-            var mayCache = Caching != FactoryCaching.DoNotCache && FactoryType == FactoryType.Service &&
+            var mayCache = Caching != FactoryCaching.DoNotCache && 
+                FactoryType == FactoryType.Service &&
                 !request.IsResolutionRoot &&
-                !request.IsSingletonOrDependencyOfSingleton && // it will be evaluated to constant anyway
+                (!request.IsSingletonOrDependencyOfSingleton || rules.UsedForValidation) &&
                 !request.IsDirectlyWrappedInFunc() && 
                 !request.IsWrappedInFuncWithArgs() &&
                 !setup.UseParentReuse &&
@@ -9378,7 +9408,9 @@ namespace DryIoc
             if (serviceExpr != null)
             {
                 if (request.Reuse != DryIoc.Reuse.Transient &&
-                    request.GetActualServiceType() != typeof(void))
+                    request.GetActualServiceType() != typeof(void) &&
+                    // we don't need the reuse expression when we are validating the object graph
+                    !rules.UsedForValidation) 
                 {
                     var originalServiceExprType = serviceExpr.Type;
 
@@ -10668,8 +10700,7 @@ namespace DryIoc
         {
             if (// preventing recursion
                 (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 && !request.IsResolutionCall && 
-                 (Setup.AsResolutionCall || 
-                  Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
+                 (Setup.AsResolutionCall || Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
                 return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), Setup.OpenResolutionScope);
 
             // First look for decorators if it is not already a decorator
@@ -12730,13 +12761,15 @@ namespace DryIoc
             if (ctors.Length == 0)
                 return ctors;
 
-            var skip0 = DoSkipCtor(ctors[0], includeNonPublic, includeStatic);
+            var ctor0 = ctors[0];
+            var skip0 = !includeNonPublic && !ctor0.IsPublic || !includeStatic && ctor0.IsStatic;
             if (ctors.Length == 1)
                 return skip0 ? ArrayTools.Empty<ConstructorInfo>() : ctors;
 
             if (ctors.Length == 2)
             {
-                var skip1 = DoSkipCtor(ctors[1], includeNonPublic, includeStatic);
+                var ctor1 = ctors[1];
+                var skip1 = !includeNonPublic && !ctor1.IsPublic || !includeStatic && ctor1.IsStatic;
                 if (skip0 && skip1)
                     return ArrayTools.Empty<ConstructorInfo>();
                 if (skip0)
@@ -12755,10 +12788,7 @@ namespace DryIoc
             return ctors;
         }
 
-        private static bool DoSkipCtor(ConstructorInfo ctor, bool includeNonPublic, bool includeStatic) =>
-            !includeNonPublic && !ctor.IsPublic || !includeStatic && ctor.IsStatic;
-
-        /// <summary>Searches and returns constructor by its signature.</summary>
+        /// <summary>Searches and returns the first constructor by its signature, e.g. with the same number of parameters of the same type.</summary>
         public static ConstructorInfo GetConstructorOrNull(this Type type, bool includeNonPublic = false, params Type[] args)
         {
             var argsLength = args.Length;
@@ -12766,22 +12796,19 @@ namespace DryIoc
             for (var c = 0; c < ctors.Length; c++)
             {
                 var ctor = ctors[c];
-                if (includeNonPublic || ctor.IsPublic)
+                var ctorParams = ctor.GetParameters();
+                if (ctorParams.Length == argsLength)
                 {
-                    var ctorParams = ctor.GetParameters();
-                    if (ctorParams.Length == argsLength)
+                    var i = 0;
+                    for (; i < argsLength; ++i)
                     {
-                        var i = 0;
-                        for (; i < argsLength; ++i)
-                        {
-                            var paramType = ctorParams[i].ParameterType;
-                            if (paramType != args[i] && paramType.GetGenericDefinitionOrNull() != args[i])
-                                break;
-                        }
-
-                        if (i == argsLength)
-                            return ctor;
+                        var paramType = ctorParams[i].ParameterType;
+                        if (paramType != args[i] && paramType.GetGenericDefinitionOrNull() != args[i])
+                            break;
                     }
+
+                    if (i == argsLength)
+                        return ctor;
                 }
             }
 

@@ -582,7 +582,7 @@ namespace LoadTest
                     }
                 ).ToArray();
 
-                container.RegisterMany(serviceTypes, Reuse.Transient, serviceTypeCondition: s => s.IsInterface,
+                container.RegisterMany(serviceTypes, Reuse.Singleton, serviceTypeCondition: s => s.IsInterface,
                     ifAlreadyRegistered: IfAlreadyRegistered.Replace);
                 container.Register<IGuidService, GuidService>(reuse: Reuse.Singleton,
                     ifAlreadyRegistered: IfAlreadyRegistered.Throw);
