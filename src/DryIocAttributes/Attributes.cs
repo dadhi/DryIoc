@@ -30,7 +30,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 
-#if NET40 || NET45
+#if NET45
 using System.Runtime.CompilerServices;
 [assembly: TypeForwardedTo(typeof(ExportAttribute))]
 [assembly: TypeForwardedTo(typeof(InheritedExportAttribute))]
@@ -43,9 +43,6 @@ using System.Runtime.CompilerServices;
 [assembly: TypeForwardedTo(typeof(MetadataAttributeAttribute))]
 [assembly: TypeForwardedTo(typeof(ExportMetadataAttribute))]
 [assembly: TypeForwardedTo(typeof(IPartImportsSatisfiedNotification))]
-#endif
-
-#if NET45
 [assembly: TypeForwardedTo(typeof(ExportFactory<>))]
 [assembly: TypeForwardedTo(typeof(ExportFactory<,>))]
 [assembly: TypeForwardedTo(typeof(ExportLifetimeContext<>))]
