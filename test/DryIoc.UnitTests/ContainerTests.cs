@@ -1,7 +1,7 @@
 using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace DryIoc.UnitTests
 {

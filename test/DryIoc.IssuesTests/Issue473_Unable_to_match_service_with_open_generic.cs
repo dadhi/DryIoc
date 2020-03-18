@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using ImTools;
+using DryIoc.ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests

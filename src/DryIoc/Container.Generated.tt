@@ -34,7 +34,7 @@ THE SOFTWARE.
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="DryIoc" #>
-<#@ import Namespace="ImTools" #>
+<#@ import Namespace="DryIoc.ImTools" #>
 <#@ include File="CompileTimeRegistrations.ttinclude" #>
 <#
 var container = GetContainerWithRegistrations().With(rules => rules.ForExpressionGeneration());
@@ -107,7 +107,7 @@ using System;
 using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
-using ImTools;
+using DryIoc.ImTools;
 
 // Specified `NamespaceUsings` if any:
 <# foreach (var ns in NamespaceUsings) {#>

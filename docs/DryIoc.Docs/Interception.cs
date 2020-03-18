@@ -17,7 +17,7 @@ Let's define an extension method for intercepting interfaces and classes:
 ```cs md*/
 
 using DryIoc;
-using ImTools;
+using DryIoc.ImTools;
 using Castle.DynamicProxy;
 using IInterceptor = Castle.DynamicProxy.IInterceptor;
 using LinFu.DynamicProxy;

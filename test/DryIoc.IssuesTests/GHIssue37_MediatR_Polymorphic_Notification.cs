@@ -1,6 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
-using ImTools;
+using DryIoc.ImTools;
 using MediatR;
 using NUnit.Framework;
 using DryIoc.Messages;

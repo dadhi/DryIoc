@@ -1,6 +1,6 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Reflection;
-using ImTools;
+using DryIoc.ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests.Samples

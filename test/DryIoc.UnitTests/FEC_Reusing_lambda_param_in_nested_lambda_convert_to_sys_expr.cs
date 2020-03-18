@@ -3,8 +3,8 @@
 #endif
 
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-using FastExpressionCompiler.LightExpression;
-using static FastExpressionCompiler.LightExpression.Expression;
+using DryIoc.FastExpressionCompiler.LightExpression;
+using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 #else
 using System.Linq.Expressions;
 using static System.Linq.Expressions.Expression;

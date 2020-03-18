@@ -57,15 +57,15 @@ namespace DryIoc
     using System.Diagnostics;               // for StackTrace
     using System.Runtime.CompilerServices;  // for MethodImplAttribute
 
-    using ImTools;
-    using static ImTools.ArrayTools;
+    using DryIoc.ImTools;
+    using static DryIoc.ImTools.ArrayTools;
     using static System.Environment;
 
     using ExprType = System.Linq.Expressions.ExpressionType;
 
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-    using FastExpressionCompiler.LightExpression;
-    using static FastExpressionCompiler.LightExpression.Expression;
+    using DryIoc.FastExpressionCompiler.LightExpression;
+    using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 #else
     using System.Linq.Expressions;
     using static System.Linq.Expressions.Expression;

@@ -2,8 +2,8 @@ using System;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
-using FastExpressionCompiler.LightExpression;
-using static FastExpressionCompiler.LightExpression.Expression;
+using DryIoc.FastExpressionCompiler.LightExpression;
+using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 
 namespace DryIoc.IssuesTests.FastExpressionCompiler
 {

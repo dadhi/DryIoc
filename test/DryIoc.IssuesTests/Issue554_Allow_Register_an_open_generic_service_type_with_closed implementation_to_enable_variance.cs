@@ -1,4 +1,4 @@
-﻿using ImTools;
+using DryIoc.ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests

@@ -25,7 +25,7 @@ THE SOFTWARE.
 
 // ReSharper disable once InconsistentNaming
 
-namespace ImTools
+namespace DryIoc.ImTools
 {
     using System;
     using System.Collections.Generic;
@@ -101,7 +101,7 @@ namespace ImTools
     /// e.g. `()` in Haskell https://en.wikipedia.org/wiki/Unit_type
     public struct Unit : IEquatable<Unit>
     {
-        /// Singleton unit value - making it a lower-case so you could import `using static ImTools.Unit;` and write `return unit;`
+        /// Singleton unit value - making it a lower-case so you could import `using static DryIoc.ImTools.Unit;` and write `return unit;`
         public static readonly Unit unit = new Unit();
 
         /// <inheritdoc />

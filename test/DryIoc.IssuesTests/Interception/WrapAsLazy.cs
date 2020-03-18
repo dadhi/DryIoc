@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Linq;
 using Castle.DynamicProxy;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace DryIoc.IssuesTests.Interception
 {

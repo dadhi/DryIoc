@@ -1,6 +1,6 @@
 using System;
 using Castle.DynamicProxy;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace DryIoc.Interception
 {

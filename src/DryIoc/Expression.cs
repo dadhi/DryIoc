@@ -44,7 +44,7 @@ using System.Text;
 using static System.Environment;
 using SysExpr = System.Linq.Expressions.Expression;
 
-namespace FastExpressionCompiler.LightExpression
+namespace DryIoc.FastExpressionCompiler.LightExpression
 {
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 

@@ -9,7 +9,7 @@ using System.Runtime.Serialization;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using DryIoc;
-using ImTools;
+using DryIoc.ImTools;
 using PerformanceTests;
 
 namespace Playground
