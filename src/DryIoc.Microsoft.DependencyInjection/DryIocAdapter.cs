@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2016-2020 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -84,7 +84,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 container.Populate(descriptors, registerDescriptor);
 
 #if NETSTANDARD1_0
-            container.UseInstance<IServiceProvider>(new DryIocServiceProvider(container));
+            container.RegisterInstance<IServiceProvider>(new DryIocServiceProvider(container));
 #endif
 
             return container;
