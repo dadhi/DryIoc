@@ -891,18 +891,18 @@ namespace DryIoc
                     }
                 }
 
-                var hash = RuntimeHelpers.GetHashCode(serviceType);
-                var registry = r.WithServices(r.Services.AddOrUpdate(hash, serviceType, entry));
+                var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
+                var registry = r.WithServices(r.Services.AddOrUpdate(serviceTypeHash, serviceType, entry));
 
                 // clearing the resolution cache for the updated factory if any
                 if (oldEntry != null && oldEntry != entry)
                 {
                     var oldFactory = oldEntry as Factory;
                     if (oldFactory != null)
-                        registry.DropFactoryCache(oldFactory, hash, serviceType);
+                        registry.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
                     else
                         ((FactoriesEntry)oldEntry).Factories.Enumerate().ToArray()
-                            .ForEach(x => registry.DropFactoryCache(x.Value, hash, serviceType, serviceKey));
+                            .ForEach(x => registry.DropFactoryCache(x.Value, serviceTypeHash, serviceType, serviceKey));
                 }
 
                 return registry;
@@ -4671,41 +4671,42 @@ namespace DryIoc
 
             var arrayInterfaces = SupportedCollectionTypes;
             for (var i = 0; i < arrayInterfaces.Length; i++)
-                wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(arrayInterfaces[i]), arrayInterfaces[i], arrayExpr);
+                wrappers = wrappers.AddOrUpdate(arrayInterfaces[i], arrayExpr);
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(LazyEnumerable<>)), typeof(LazyEnumerable<>),
+            wrappers = wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
                 new ExpressionFactory(GetLazyEnumerableExpressionOrDefault, setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Lazy<>)), typeof(Lazy<>),
+            wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
                 new ExpressionFactory(r => GetLazyExpressionOrDefault(r), setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(KeyValuePair<,>)), typeof(KeyValuePair<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
                 new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Meta<,>)), typeof(Meta<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(Meta<,>),
                 new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Tuple<,>)), typeof(Tuple<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(Tuple<,>),
                 new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(System.Linq.Expressions.LambdaExpression)), typeof(System.Linq.Expressions.LambdaExpression),
+            wrappers = wrappers.AddOrUpdate(typeof(System.Linq.Expressions.LambdaExpression),
                 new ExpressionFactory(GetLambdaExpressionExpressionOrDefault, setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(FactoryDelegate)), typeof(FactoryDelegate),
+            wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate),
                 new ExpressionFactory(GetFactoryDelegateExpressionOrDefault, setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(FactoryDelegate<>)), typeof(FactoryDelegate<>),
+            wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate<>),
                 new ExpressionFactory(GetFactoryDelegateExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Func<>)), typeof(Func<>),
+            wrappers = wrappers.AddOrUpdate(typeof(Func<>),
                 new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.Wrapper));
 
-            for (var i = 0; i < FuncTypes.Length; i++)
-                wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(FuncTypes[i]), FuncTypes[i],
+            // Skip the `i == 0` because `Func<>` type was added above
+            for (var i = 1; i < FuncTypes.Length; i++)
+                wrappers = wrappers.AddOrUpdate(FuncTypes[i],
                     new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.WrapperWith(i)));
 
             for (var i = 0; i < ActionTypes.Length; i++)
-                wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(ActionTypes[i]), ActionTypes[i],
+                wrappers = wrappers.AddOrUpdate(ActionTypes[i],
                     new ExpressionFactory(GetFuncOrActionExpressionOrDefault,
                     setup: Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
 
@@ -4724,12 +4725,12 @@ namespace DryIoc
                 Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
 
             wrappers = wrappers
-                .AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(IResolverContext)), typeof(IResolverContext), resolverContextExpr)
-                .AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(IResolver)), typeof(IResolver), resolverContextExpr)
-                .AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(IContainer)), typeof(IContainer), containerExpr)
-                .AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(IRegistrator)), typeof(IRegistrator), containerExpr)
+                .AddOrUpdate(typeof(IResolverContext), resolverContextExpr)
+                .AddOrUpdate(typeof(IResolver), resolverContextExpr)
+                .AddOrUpdate(typeof(IContainer), containerExpr)
+                .AddOrUpdate(typeof(IRegistrator), containerExpr)
 #if SUPPORTS_ISERVICE_PROVIDER
-                .AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(IServiceProvider)), typeof(IServiceProvider), resolverContextExpr)
+                .AddOrUpdate(typeof(IServiceProvider), resolverContextExpr)
 #endif
                 ;
 
@@ -4894,23 +4895,26 @@ namespace DryIoc
                 ));
         }
 
-        private static Expression GetFuncOrActionExpressionOrDefault(Request request)
+        /// <summary>Exposing for creation of custom delegates #243</summary>
+        public static Expression GetFuncOrActionExpressionOrDefault(Request request)
         {
             var wrapperType = request.GetActualServiceType();
             var isAction = wrapperType == typeof(Action);
             if (!isAction)
             {
-                var openGenericWrapperType = wrapperType.GetGenericDefinitionOrNull().ThrowIfNull();
-                var funcIndex = FuncTypes.IndexOf(openGenericWrapperType);
-                if (funcIndex == -1)
-                    Throw.If(!(isAction = ActionTypes.IndexOf(openGenericWrapperType) != -1));
+                var openGenericWrapperType = wrapperType.GetGenericDefinitionOrNull()
+                    .ThrowIfNull(Error.FuncOrActionDelegateWithSuchAmountOfArgumentsIsNotSupported, wrapperType);
+
+                if (FuncTypes.IndexOf(openGenericWrapperType) == -1 &&
+                    !(isAction = ActionTypes.IndexOf(openGenericWrapperType) != -1))
+                    Throw.It(Error.FuncOrActionDelegateWithSuchAmountOfArgumentsIsNotSupported, wrapperType);
             }
 
-            var argTypes = wrapperType.GetGenericParamsAndArgs();
+            var argTypes = wrapperType.GetTypeInfo().GenericTypeArguments;
             var argCount = isAction ? argTypes.Length : argTypes.Length - 1;
             var serviceType = isAction ? typeof(void) : argTypes[argCount];
 
-            var argExprs = Empty<ParameterExpression>(); // may be empty, that's OK
+            var argExprs = Empty<ParameterExpression>();
             if (argCount != 0)
             {
                 argExprs = new ParameterExpression[argCount];
@@ -4922,21 +4926,16 @@ namespace DryIoc
 
             var serviceRequest = request.Push(serviceType, flags: RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
             var container = request.Container;
-            var serviceExpr = container.Rules.FuncAndLazyWithoutRegistration && !isAction
+            var serviceExpr = !isAction && container.Rules.FuncAndLazyWithoutRegistration
                 ? Resolver.CreateResolutionExpression(serviceRequest)
                 : container.ResolveFactory(serviceRequest)?.GetExpressionOrDefault(serviceRequest);
 
             if (serviceExpr == null)
                 return null;
 
-            // The conversion to handle lack of covariance for Func<out T> in .NET 3.5
-            // So that Func<Derived> may be used for Func<Base>
-            if (!isAction && serviceExpr.Type != serviceType)
-                serviceExpr = Convert(serviceExpr, serviceType);
-
             return Lambda(wrapperType, serviceExpr, argExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                , isAction ? typeof(void) : serviceType
+                , serviceType
 #endif
                 );
         }
@@ -7769,11 +7768,13 @@ namespace DryIoc
 
         /// <summary>Returns required service type if it is specified and assignable to service type,
         /// otherwise returns service type.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static Type GetActualServiceType(this IServiceInfo info)
         {
             var requiredServiceType = info.Details.RequiredServiceType;
-            return requiredServiceType != null && requiredServiceType.IsAssignableTo(info.ServiceType)
-                ? requiredServiceType : info.ServiceType;
+            if (requiredServiceType != null && requiredServiceType.IsAssignableTo(info.ServiceType))
+                return requiredServiceType;
+            return info.ServiceType;
         }
 
         /// <summary>Appends info string representation into provided builder.</summary>
@@ -8199,6 +8200,7 @@ namespace DryIoc
         /// <summary>Persisted request conditions</summary>
         public RequestFlags Flags;
 
+        // todo: should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
         /// mutable, so that the ServiceKey or IfUnresolved can be changed in place.
         internal IServiceInfo _serviceInfo;
 
@@ -12342,8 +12344,9 @@ namespace DryIoc
                 "You may also examine all container registrations via `container.container.GetServiceRegistrations()` method."),
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine +
-                "{0}")
-            ;
+                "{0}"),
+            FuncOrActionDelegateWithSuchAmountOfArgumentsIsNotSupported = Of(
+                "The type '{0}' is not supported by Action or Func wrappers, maybe it has too many arguments or the wrong type is registered");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

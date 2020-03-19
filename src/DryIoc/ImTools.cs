@@ -4188,34 +4188,33 @@ namespace DryIoc.ImTools
                 newConflicts = new[] { oldEntry, CreateKValueEntry(hash, key, value) };
             }
 
-            var conflictsEntry = new ImMapEntry<KValue<K>>(hash);
-            conflictsEntry.Value.Value = newConflicts;
-            return map.UpdateEntryUnsafe(conflictsEntry);
+            return map.UpdateEntryUnsafe(new ImMapEntry<KValue<K>>(hash) { Value = { Value = newConflicts }});
         }
 
-        /// <summary>Efficiently creates the new entry</summary>
+        /// <summary>Creates the new entry</summary>
         [MethodImpl((MethodImplOptions)256)]
-        private static ImMapEntry<KValue<K>> CreateKValueEntry<K>(int hash, K key, object value)
-        {
-            var newEntry = new ImMapEntry<KValue<K>>(hash);
-            newEntry.Value.Key = key;
-            newEntry.Value.Value = value;
-            return newEntry;
-        }
+        private static ImMapEntry<KValue<K>> CreateKValueEntry<K>(int hash, K key, object value) =>
+            new ImMapEntry<KValue<K>>(hash) { Value = { Key = key, Value = value } };
 
-        /// <summary>Efficiently creates the new entry</summary>
+        /// <summary>Creates the new entry with the conflicts - the Key for the new entry is not set, but the value contains the actual conflict entries array</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMapEntry<KValue<K>> CreateKValueEntry<K>(int hash, K key)
-        {
-            var newEntry = new ImMapEntry<KValue<K>>(hash);
-            newEntry.Value.Key = key;
-            return newEntry;
-        }
+        private static ImMapEntry<KValue<K>> CreateConflictsKValueEntry<K>(int hash, ImMapEntry<KValue<K>>[] conflicts) =>
+            new ImMapEntry<KValue<K>>(hash) { Value = { Value = conflicts } };
+
+        /// <summary>Creates the new entry</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMapEntry<KValue<K>> CreateKValueEntry<K>(int hash, K key) =>
+            new ImMapEntry<KValue<K>>(hash) { Value = { Key = key } };
 
         /// <summary>Uses the user provided hash and adds or updates the tree with passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, K key, object value) =>
             map.AddOrUpdate(hash, CreateKValueEntry(hash, key, value));
+
+        /// <summary>Adds or updates the tree with passed Type key and the value. Returns a new tree.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<KValue<Type>> AddOrUpdate(this ImMap<KValue<Type>> map, Type key, object value) =>
+            map.AddOrUpdate(RuntimeHelpers.GetHashCode(key), key, value);
 
         /// <summary>Uses the provided hash and adds or updates the tree with the passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -4264,7 +4263,7 @@ namespace DryIoc.ImTools
                 newConflicts = new[] { oldEntry, newEntry };
             }
 
-            return map.UpdateEntryUnsafe(CreateKValueEntry(hash, default(K), newConflicts));
+            return map.UpdateEntryUnsafe(CreateConflictsKValueEntry(hash, newConflicts));
         }
 
         /// <summary>Adds the new entry or keeps the current map if entry key is already present</summary>
@@ -4316,7 +4315,7 @@ namespace DryIoc.ImTools
                 newConflicts = new[] { oldEntry, CreateKValueEntry(hash, key, value) };
             }
 
-            return map.UpdateEntryUnsafe(CreateKValueEntry(hash, default(K), newConflicts));
+            return map.UpdateEntryUnsafe(CreateConflictsKValueEntry(hash, newConflicts));
         }
 
         /// <summary>Updates the map with the new value if key is found, otherwise returns the same unchanged map.</summary>
@@ -4359,7 +4358,7 @@ namespace DryIoc.ImTools
                 return map;
             }
 
-            return map.UpdateEntryUnsafe(CreateKValueEntry(hash, default(K), newConflicts));
+            return map.UpdateEntryUnsafe(CreateConflictsKValueEntry(hash, newConflicts));
         }
 
         /// <summary>Updates the map with the default value if the key is found, otherwise returns the same unchanged map.</summary>
