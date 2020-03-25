@@ -7535,7 +7535,7 @@ namespace DryIoc
 
     /// <summary>Provides optional service resolution details: service key, required service type, what return when service is unresolved,
     /// default value if service is unresolved, custom service value.</summary>
-    public class ServiceDetails
+    public sealed class ServiceDetails
     {
         /// Default details if not specified, use default setting values, e.g. <see cref="DryIoc.IfUnresolved.Throw"/>
         public static readonly ServiceDetails Default = 
@@ -7916,19 +7916,15 @@ namespace DryIoc
 
         private class WithDetails : ParameterServiceInfo
         {
-            public override ServiceDetails Details { get { return _details; } }
-            public WithDetails(ParameterInfo parameter, ServiceDetails details)
-                : base(parameter)
-            { _details = details; }
+            public override ServiceDetails Details => _details;
+            public WithDetails(ParameterInfo parameter, ServiceDetails details) : base(parameter) => _details = details;
             private readonly ServiceDetails _details;
         }
 
         private sealed class TypeWithDetails : WithDetails
         {
-            public override Type ServiceType { get { return _serviceType; } }
-            public TypeWithDetails(ParameterInfo parameter, Type serviceType, ServiceDetails details)
-                : base(parameter, details)
-            { _serviceType = serviceType; }
+            public override Type ServiceType => _serviceType;
+            public TypeWithDetails(ParameterInfo parameter, Type serviceType, ServiceDetails details) : base(parameter, details) => _serviceType = serviceType;
             private readonly Type _serviceType;
         }
 
