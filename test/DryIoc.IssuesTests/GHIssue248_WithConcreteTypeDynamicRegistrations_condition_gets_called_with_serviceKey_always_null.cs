@@ -3,7 +3,6 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    //[Ignore("fixme")]
     public class GHIssue248_WithConcreteTypeDynamicRegistrations_condition_gets_called_with_serviceKey_always_null
     {
         [Test]
