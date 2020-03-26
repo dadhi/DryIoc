@@ -3,7 +3,7 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    [Ignore("fixme")]
+    //[Ignore("fixme")]
     public class GHIssue248_WithConcreteTypeDynamicRegistrations_condition_gets_called_with_serviceKey_always_null
     {
         [Test]
@@ -11,15 +11,13 @@ namespace DryIoc.IssuesTests
         {
             const string serviceKey = "some service key here, probably a cat (meow)";
 
-            var container = new Container(rules => rules.WithConcreteTypeDynamicRegistrations((_, s) =>
-            {
-                Assert.AreEqual(serviceKey, s);
-                return true;
-            }));
+            var container = new Container(rules => rules
+                .WithConcreteTypeDynamicRegistrations((_, key) => serviceKey.Equals(key)));
 
             container.Resolve<A>(serviceKey);
 
         }
+
         public class A { }
     }
 }

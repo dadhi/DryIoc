@@ -1535,8 +1535,8 @@ namespace DryIoc
 
             return CombineRegisteredWithDynamicFactories(
                     decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)), 
-                    true, FactoryType.Decorator, serviceType)
-                   .Map(x => x.Value);
+                    true, FactoryType.Decorator, serviceType
+                ).Map(x => x.Value);
         }
 
         Type IContainer.GetWrappedType(Type serviceType, Type requiredServiceType)
@@ -1646,12 +1646,16 @@ namespace DryIoc
             var resultFactories = registeredFactories;
             var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
 
-            // assign unique continuous keys across all of dynamic providers,
+            // Assign unique continious keys across all of dynamic providers,
             // to prevent duplicate keys and peeking the wrong factory by collection wrappers
+            // NOTE: Given that dynamic registration always return the same implementation types in the same order
+            // then the dynamic key will be assigned deterministically, so that even if `CombineRegisteredWithDynamicFactories`
+            // is called multiple times during the resolution (like for `ResolveMany`) it is possible to match the required factory by its order.
             var dynamicKey = DefaultDynamicKey.Value;
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
-            {
+            { 
                 var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
+
                 var dynamicRegistrations = dynamicRegistrationProvider(serviceType, serviceKey).ToArrayOrSelf();
                 if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
                 {
@@ -1724,7 +1728,8 @@ namespace DryIoc
                         }
 
                         return true;
-                    }, x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
+                    }, 
+                    x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
 
                 resultFactories = resultFactories.Append(remainingDynamicFactories);
             }
@@ -5096,7 +5101,6 @@ namespace DryIoc
         public readonly object ServiceKey;
 
         /// <summary>Constructs the info</summary>
-
         public DynamicRegistration(Factory factory,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, object serviceKey = null)
         {
@@ -5343,8 +5347,7 @@ namespace DryIoc
                 // the condition checks that factory is resolvable
                 factory = new ReflectionFactory(implType, reuse,
                     DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic,
-                    Setup.With(condition: r1 => r1.WithIfUnresolved(IfUnresolved.ReturnDefault)
-                                                  .To(r2 => factory?.GetExpressionOrDefault(r2)) != null));
+                    Setup.With(condition: req => factory?.GetExpressionOrDefault(req.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null));
 
                 return factory;
             });
@@ -5393,21 +5396,27 @@ namespace DryIoc
                         var implFactory = factories.Value.GetValueOrDefault(implTypeHash, implType);
                         if (implFactory == null)
                         {
-                            factories.Swap(existingFactories =>
+                            factories.Swap(fs =>
                             {
-                                implFactory = existingFactories.GetValueOrDefault(implTypeHash, implType);
+                                implFactory = fs.GetValueOrDefault(implTypeHash, implType);
                                 if (implFactory != null)
-                                    return existingFactories;
+                                    return fs;
 
                                 implFactory = factory != null
                                     ? factory(implType).ThrowIfNull()
                                     : new ReflectionFactory(implType);
 
-                                return existingFactories.AddOrUpdate(implTypeHash, implType, implFactory);
+                                return fs.AddOrUpdate(implTypeHash, implType, implFactory);
                             });
                         }
 
-                        return new DynamicRegistration(implFactory, IfAlreadyRegistered.Keep);
+                        // We nullify default keys (usually passed by ResolveMany to resolve the specific factory in order)
+                        // so that `CombineRegisteredWithDynamicFactories` may assign the key again.
+                        // Given that the implementation types are unchanged then the new keys assignement will be the same the last one,
+                        // so that the factory resolution will correctly match the required factory by key.
+                        // e.g. bitbucket issue #396
+                        var theKey = serviceKey is DefaultDynamicKey ? null : serviceKey;
+                        return new DynamicRegistration(implFactory, IfAlreadyRegistered.Keep, theKey);
                     });
             };
         }
@@ -6723,11 +6732,59 @@ namespace DryIoc
                 : implementedTypes.Match(t => t.IsPublicOrNestedPublic() && t.IsServiceType());
             
             if (type.IsGenericDefinition())
-                serviceTypes = serviceTypes.Match(type,
-                    (t, x) => x.ContainsAllGenericTypeParameters(t.GetGenericParamsAndArgs()),
+                serviceTypes = serviceTypes.Match(type.GetGenericParamsAndArgs(),
+                    (paramsAndArgs, x) => x.ContainsAllGenericTypeParameters(paramsAndArgs),
                     (_, x) => x.GetGenericDefinitionOrNull());
 
             return serviceTypes;
+        }
+
+        /// <summary>The same `GetImplementedServiceTypes` but instead of collecting the service types just check the <paramref name="serviceType"/> is implemented</summary>
+        public static bool IsImplementingServiceType(this Type type, Type serviceType)
+        {
+            if (serviceType == type || serviceType == typeof(object))
+                return true;
+
+            // todo: check that serviceType is interface first
+            var interfaces = type.GetImplementedInterfaces();
+            var baseType = type.GetTypeInfo().BaseType;
+            if (!type.IsGenericDefinition())
+            {
+                if (serviceType.IsInterface())
+                {
+                    foreach (var iface in interfaces)
+                        if (iface == serviceType)
+                            return true;
+                }
+                else
+                {
+                    for (; baseType == null || baseType == typeof(object); baseType = baseType.GetTypeInfo().BaseType)
+                        if (serviceType == baseType)
+                            return true;
+                }
+            }
+            else if (serviceType.IsGeneric())
+            {
+                var implTypeParamsAndArgs  = type.GetGenericParamsAndArgs();
+                var openGenericServiceType = serviceType.GetGenericTypeDefinition();
+
+                if (serviceType.IsInterface())
+                {
+                    foreach (var iface in interfaces)
+                        if (iface.GetGenericDefinitionOrNull() == openGenericServiceType &&
+                            iface.ContainsAllGenericTypeParameters(implTypeParamsAndArgs))
+                            return true;
+                }
+                else
+                {
+                    for (; baseType == null || baseType == typeof(object); baseType = baseType.GetTypeInfo().BaseType)
+                        if (baseType.GetGenericDefinitionOrNull() == openGenericServiceType &&
+                            baseType.ContainsAllGenericTypeParameters(implTypeParamsAndArgs))
+                            return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>Returns the sensible services automatically discovered for RegisterMany implementation type.
