@@ -1004,6 +1004,7 @@ Frequency=2156251 Hz, Resolution=463.7679 ns, Timer=TSC
                       BmarkAutofac |    696.3 us |   4.9448 us |   4.3834 us |   4.71 |    0.07 |    102.5391 |      2.9297 |           - |            472.8 KB |
                   BmarkAutofacMsDi |    688.8 us |   7.1206 us |   6.6606 us |   4.66 |    0.07 |    105.4688 |      0.9766 |           - |           489.97 KB |
 
+
             ### FEC v3.0 and multiple improvements: fan-out cache, and scope storage, per container expression cache, etc.
 
 BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
@@ -1017,10 +1018,29 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |         MsDI |     76.74 us |   0.570 us |   0.505 us |   1.00 |    0.00 |  16.1133 |  0.2441 |     - |  74.23 KB |
 |       DryIoc |     92.62 us |   0.763 us |   0.714 us |   1.21 |    0.02 |  15.1367 |  1.3428 |     - |  69.55 KB |
 |  DryIoc_MsDI |    116.60 us |   1.849 us |   1.544 us |   1.52 |    0.03 |  19.2871 |  1.8311 |     - |  88.85 KB |
-|      Autofac |    517.68 us |   1.748 us |   1.635 us |   6.75 |    0.06 | 101.5625 | 24.4141 |     - | 468.08 KB |
-| Autofac_MsDI |    524.51 us |   2.640 us |   2.340 us |   6.84 |    0.06 | 101.5625 | 24.4141 |     - |  466.9 KB |
 |        Grace | 15,844.41 us |  72.839 us |  64.570 us | 206.48 |    1.70 | 156.2500 | 62.5000 |     - | 729.29 KB |
 |   Grace_MsDI | 19,203.81 us | 139.461 us | 130.452 us | 250.25 |    2.78 | 187.5000 | 93.7500 |     - | 899.61 KB |
+|      Autofac |    517.68 us |   1.748 us |   1.635 us |   6.75 |    0.06 | 101.5625 | 24.4141 |     - | 468.08 KB |
+| Autofac_MsDI |    524.51 us |   2.640 us |   2.340 us |   6.84 |    0.06 | 101.5625 | 24.4141 |     - |  466.9 KB |
+
+
+            ### DryIoc v4.1.3 and the latest libs
+
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
+Intel Core i7-7600U CPU 2.80GHz (Kaby Lake), 1 CPU, 4 logical and 2 physical cores
+.NET Core SDK=3.1.200
+  [Host]     : .NET Core 3.1.2 (CoreCLR 4.700.20.6602, CoreFX 4.700.20.6702), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.2 (CoreCLR 4.700.20.6602, CoreFX 4.700.20.6702), X64 RyuJIT
+
+|       Method |        Mean |     Error |    StdDev |      Median |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
+|------------- |------------:|----------:|----------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
+|         MsDI |    251.4 us |   4.92 us |   7.95 us |    252.0 us |   1.00 |    0.00 |  36.6211 |       - |     - |  74.38 KB |
+|       DryIoc |    158.7 us |   9.80 us |  28.44 us |    143.2 us |   0.74 |    0.06 |  34.1797 |       - |     - |  69.94 KB |
+|  DryIoc_MsDI |    164.0 us |   3.26 us |   5.17 us |    163.3 us |   0.65 |    0.03 |  43.7012 |       - |     - |  89.48 KB |
+|        Grace | 22,621.9 us | 452.00 us | 618.70 us | 22,592.9 us |  89.91 |    4.10 | 187.5000 | 93.7500 |     - | 727.79 KB |
+|   Grace_MsDI | 26,632.1 us | 514.99 us | 528.85 us | 26,621.9 us | 105.22 |    4.27 | 281.2500 | 62.5000 |     - |  898.4 KB |
+|      Autofac |    783.1 us |  15.52 us |  28.38 us |    781.4 us |   3.13 |    0.16 | 208.0078 | 13.6719 |     - | 445.42 KB |
+| Autofac_MsDI |    799.1 us |  15.76 us |  31.47 us |    798.3 us |   3.19 |    0.17 | 226.5625 |  5.8594 |     - | 473.43 KB |
 
              */
 
@@ -1050,7 +1070,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
         }
 
-        [MemoryDiagnoser]//, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        [MemoryDiagnoser]
         public class OpenScopeAndResolve
         {
             /*
@@ -1254,6 +1274,19 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |            DryIoc_WebRequestScoped |  2.128 us | 0.0113 us | 0.0106 us |  0.55 |    0.00 | 0.6866 |     - |     - |   3.17 KB |
 | DryIoc_WebRequestScoped_WithoutFEC | 17.713 us | 0.1377 us | 0.1288 us |  4.60 |    0.04 | 1.0986 |     - |     - |   5.14 KB |
 
+            
+            ## DryIoc v4.1.3
+
+|              Method |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD |   Gen 0 | Gen 1 | Gen 2 | Allocated |
+|-------------------- |----------:|----------:|----------:|----------:|------:|--------:|--------:|------:|------:|----------:|
+|                MsDI |  6.805 us | 0.1719 us | 0.4959 us |  6.719 us |  1.00 |    0.00 |  2.1210 |     - |     - |   4.35 KB |
+|              DryIoc |  3.069 us | 0.2188 us | 0.6452 us |  2.881 us |  0.46 |    0.11 |  1.4496 |     - |     - |   2.96 KB |
+|  DryIoc_MsDIAdapter |  3.388 us | 0.0672 us | 0.0774 us |  3.380 us |  0.51 |    0.03 |  1.4610 |     - |     - |   2.98 KB |
+|               Grace |  2.583 us | 0.0510 us | 0.0763 us |  2.562 us |  0.39 |    0.02 |  1.5526 |     - |     - |   3.17 KB |
+|   Grace_MsDIAdapter |  3.397 us | 0.0674 us | 0.1126 us |  3.372 us |  0.52 |    0.03 |  1.6708 |     - |     - |   3.41 KB |
+|             Autofac | 72.129 us | 1.4373 us | 2.7692 us | 71.604 us | 10.86 |    0.74 | 22.7051 |     - |     - |  46.49 KB |
+| Autofac_MsDIAdapter | 97.925 us | 1.9065 us | 2.7342 us | 97.716 us | 14.85 |    1.18 | 30.0293 |     - |     - |  61.51 KB |
+
 */
 
             private IServiceProvider _msDi;
@@ -1287,14 +1320,17 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             [Benchmark(Baseline = true)]
             public object MsDI() => Measure(_msDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object DryIoc_WebRequestScoped() => Measure_WebRequestScoped(_dryIocWebRequestScoped);
 
-            [Benchmark]
+            //[Benchmark]
             public object DryIoc_WebRequestScoped_WithoutFEC() => Measure_WebRequestScoped(_dryIocWebRequestScopedWithoutFEC);
 
-            //[Benchmark]
+            [Benchmark]
             public object DryIoc() => Measure(_dryIoc);
+
+            [Benchmark]
+            public object DryIoc_MsDIAdapter() => Measure(_dryIocMsDi);
 
             //[Benchmark]
             public object DryIoc_WithoutFEC() => Measure(_dryIocWithoutFEC);
@@ -1302,19 +1338,16 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            //[Benchmark]
-            public object DryIoc_MsDIAdapter() => Measure(_dryIocMsDi);
-
-            //[Benchmark]
+            [Benchmark]
             public object Grace() => Measure(_grace);
 
-            //[Benchmark]
+            [Benchmark]
             public object Grace_MsDIAdapter() => Measure(_graceMsDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            //[Benchmark]
+            [Benchmark]
             public object Autofac_MsDIAdapter() => Measure(_autofacMsDi);
         }
     }
