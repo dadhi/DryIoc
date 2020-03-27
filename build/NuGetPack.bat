@@ -17,10 +17,10 @@ echo:===================================
 PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '.\build\MakeInternal.ps1'";
 %NUGET% pack %NUSPECS%\DryIoc.Internal.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive -Properties NoWarn=NU5128
 
-echo:
-echo:DryIocZero
-echo:============================
-%NUGET% pack %NUSPECS%\DryIocZero.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
+rem echo:
+rem echo:DryIocZero
+rem echo:============================
+rem %NUGET% pack %NUSPECS%\DryIocZero.nuspec -OutputDirectory %PACKAGEDIR% -NonInteractive
 
 echo:
 echo:DryIocAttributes
