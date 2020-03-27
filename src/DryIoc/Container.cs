@@ -10088,7 +10088,7 @@ namespace DryIoc
             }
 
             if (rules.UsedForValidation) 
-                return Default(request.GetActualServiceType());
+                return request.GetActualServiceType().GetDefaultValueExpression();
 
             var ctor = ctorOrMethod as ConstructorInfo;
             Expression serviceExpr;
@@ -12833,9 +12833,9 @@ namespace DryIoc
                 if (skip0 && skip1)
                     return ArrayTools.Empty<ConstructorInfo>();
                 if (skip0)
-                    return new[] { ctors[1] };
+                    return new[] { ctor1 };
                 if (skip1)
-                    return new[] { ctors[0] };
+                    return new[] { ctor0 };
                 return ctors;
             }
 
