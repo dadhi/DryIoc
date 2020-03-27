@@ -42,7 +42,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 * [Features](http://featuretests.apphb.com/DependencyInjection.html)
 * [Performance overview](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
 
-### Realistic performance of unit-of-work with the modest size object graph 
+### Performance of the *realistic* unit-of-work object graph with 40 dependencies on 4 levels
 
 Related issues are [#44](https://github.com/dadhi/DryIoc/issues/44#issuecomment-466440634) and [#26](https://github.com/dadhi/DryIoc/issues/26#issuecomment-466460255).
 
