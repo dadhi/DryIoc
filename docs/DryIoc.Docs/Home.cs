@@ -166,7 +166,7 @@ Get from NuGet:
 
 ### v4.1.2 / 2020-03-12
 
-[Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.1.2)
+[Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.1.3)
 
 ### [Previous Versions](VersionHistory.md)
 

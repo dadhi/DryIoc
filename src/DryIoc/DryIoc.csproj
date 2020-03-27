@@ -1,11 +1,11 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0;netstandard1.0</TargetFrameworks>
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.1.2</VersionPrefix>
+        <VersionPrefix>4.1.3</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -17,6 +17,10 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v4.1.3 Bug-fix releases
+
+- #248 WithConcreteTypeDynamicRegistrations condition gets called with serviceKey always null
+
 ## v4.1.2 Bug-fix release
 
 - #236 Additional default parameter for Made creation public API introduced binary incompatibility

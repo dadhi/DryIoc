@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.1.3 Bug-fix releases
+
+- #248 WithConcreteTypeDynamicRegistrations condition gets called with serviceKey always null
+
 ## v4.1.2 Bug-fix release
 
 - #236 Additional default parameter for Made creation public API introduced binary incompatibility
