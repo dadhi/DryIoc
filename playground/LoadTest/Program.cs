@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.Http.Controllers;
 using DryIoc;
@@ -37,7 +38,7 @@ namespace LoadTest
             return container;
         }
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             Console.WriteLine("Starting up!");
 
@@ -48,7 +49,23 @@ namespace LoadTest
             Console.WriteLine("Validate started");
 
             // Validate IoC registrations
-            var results = container.Validate(x => x.ServiceType.Name.EndsWith("Controller"));
+
+            bool IsController(ServiceRegistrationInfo x) => x.ServiceType.Name.EndsWith("Controller");
+
+            // Paralleling the Validation
+            //var controllers = container.GetServiceRegistrations()
+            //    .Where(IsController).Select(x => x.ToServiceInfo()).ToArray();
+            //var controllersPerCpu = new List<ServiceInfo>[Environment.ProcessorCount];
+            //for (var i = 0; i < controllers.Length;)
+            //    for (var j = 0; j < Environment.ProcessorCount && i < controllers.Length; j++, i++)
+            //        (controllersPerCpu[j] ?? (controllersPerCpu[j] = new List<ServiceInfo>())).Add(controllers[i]);
+            //var validationTasks = controllersPerCpu
+            //    .Select(x => Task.Run(() => container.Validate(x.ToArray()))).ToArray();
+            //var results = (await Task.WhenAll(validationTasks))
+            //    .SelectMany(x => x).ToArray();
+
+            var results = container.Validate(IsController);
+            //var results = container.Validate();
             if (results.Length > 0)
             {
                 foreach (var kvp in results)
