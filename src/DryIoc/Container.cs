@@ -10086,6 +10086,9 @@ namespace DryIoc
                 }
             }
 
+            if (rules.UsedForValidation) 
+                return Default(request.GetActualServiceType());
+
             var ctor = ctorOrMethod as ConstructorInfo;
             Expression serviceExpr;
             if (arg0 == null)
