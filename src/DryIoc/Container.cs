@@ -2132,6 +2132,7 @@ namespace DryIoc
                 }
             }
 
+            // todo: use instead of GetServiceRegistrations above
             // optimized for allocations
             public IEnumerable<R> GetServiceRegistrations<R>(Func<Type, object, Factory, R> match) where R : class
             {
