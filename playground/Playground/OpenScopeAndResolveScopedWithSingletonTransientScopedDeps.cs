@@ -106,31 +106,28 @@ namespace PerformanceTests
 
             return c;
         }
-
         public static object Measure(LightInject.ServiceContainer container)
         {
             using (var scope = container.BeginScope())
                 return scope.GetInstance<ScopedBlah>();
         }
 
-        //public static Lamar.Container PrepareLamar()
-        //{
-        //    return new Lamar.Container(c =>
-        //    {
-        //        c.AddTransient<Parameter1>();
-        //        c.AddSingleton<Parameter2>();
-        //        c.AddScoped<Parameter3>();
+        public static Lamar.Container PrepareLamar()
+        {
+            return new Lamar.Container(c =>
+            {
+                c.AddTransient<Parameter1>();
+                c.AddSingleton<Parameter2>();
+                c.AddScoped<Parameter3>();
 
-        //        c.AddScoped<ScopedBlah>();
-        //    });
-        //}
-
-        //public static object Measure(Lamar.Container container)
-        //{
-        //    using (var scope = container.CreateScope())
-        //        return scope.ServiceProvider.GetRequiredService<ScopedBlah>();
-        //}
-
+                c.AddScoped<ScopedBlah>();
+            });
+        }
+        public static object Measure(Lamar.Container container)
+        {
+            using (var scope = container.CreateScope())
+                return scope.ServiceProvider.GetRequiredService<ScopedBlah>();
+        }
         public static SimpleInjector.Container PrepareSimpleInjector()
         {
             var c = new SimpleInjector.Container();
@@ -257,76 +254,6 @@ namespace PerformanceTests
 
 
         /*
-        ## 28.11.2018
-        BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.407 (1803/April2018Update/Redstone4)
-Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
-Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
-.NET Core SDK=2.1.500
-  [Host]     : .NET Core 2.1.6 (CoreCLR 4.6.27019.06, CoreFX 4.6.27019.05), 64bit RyuJIT
-  DefaultJob : .NET Core 2.1.6 (CoreCLR 4.6.27019.06, CoreFX 4.6.27019.05), 64bit RyuJIT
-
-
-                             Method |       Mean |     Error |     StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
------------------------------------ |-----------:|----------:|-----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
-                       BmarkAutofac | 1,970.3 ns | 11.519 ns | 10.7747 ns |  7.17 |    0.06 |      0.6676 |           - |           - |              3152 B |
-                        BmarkDryIoc |   207.0 ns |  1.062 ns |  0.9931 ns |  0.75 |    0.01 |      0.0966 |           - |           - |               456 B |
- BmarkMicrosoftSDependencyInjection |   274.9 ns |  2.064 ns |  1.9308 ns |  1.00 |    0.00 |      0.0758 |           - |           - |               360 B |
-                         BmarkGrace |   264.8 ns |  1.653 ns |  1.5462 ns |  0.96 |    0.01 |      0.1216 |           - |           - |               576 B |
-                   BmarkLightInject |   998.6 ns |  4.589 ns |  4.0676 ns |  3.64 |    0.02 |      0.2422 |           - |           - |              1144 B |
-
-# 25.01.2019
-                             Method |       Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
------------------------------------ |-----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
-                        BmarkDryIoc |   172.6 ns |  1.664 ns |  1.556 ns |  0.61 |    0.01 |      0.0896 |           - |           - |               424 B |
-                         BmarkGrace |   301.3 ns |  4.890 ns |  4.574 ns |  1.06 |    0.02 |      0.1216 |           - |           - |               576 B |
- BmarkMicrosoftSDependencyInjection |   285.0 ns |  1.564 ns |  1.463 ns |  1.00 |    0.00 |      0.0758 |           - |           - |               360 B |
-                   BmarkLightInject | 1,079.8 ns | 14.331 ns | 13.406 ns |  3.79 |    0.05 |      0.2422 |           - |           - |              1144 B |
-                       BmarkAutofac | 2,017.9 ns |  9.589 ns |  8.501 ns |  7.08 |    0.05 |      0.6676 |           - |           - |              3152 B |
-
-# 06.08.2019
-
-                             Method |       Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
------------------------------------ |-----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
-                        BmarkDryIoc |   247.9 ns |  1.768 ns |  1.654 ns |  0.79 |    0.01 | 0.1135 |     - |     - |     536 B |
-                         BmarkGrace |   234.3 ns |  1.369 ns |  1.280 ns |  0.75 |    0.00 | 0.0575 |     - |     - |     272 B |
- BmarkMicrosoftSDependencyInjection |   313.2 ns |  1.092 ns |  1.022 ns |  1.00 |    0.00 | 0.0811 |     - |     - |     384 B |
-                   BmarkLightInject | 1,025.1 ns | 19.367 ns | 23.055 ns |  3.26 |    0.08 | 0.2403 |     - |     - |    1136 B |
-                       BmarkAutofac | 2,640.2 ns | 30.274 ns | 25.280 ns |  8.43 |    0.08 | 0.8965 |     - |     - |    4232 B |
-        */
-        [MemoryDiagnoser]
-        public class FirstTimeOpenScopeResolve
-        {
-            private readonly IContainer _autofac = PrepareAutofac();
-            private readonly DryIoc.IContainer _dryioc = PrepareDryIoc();
-            private readonly IServiceProvider _msDi = PrepareMsDi();
-            private readonly DependencyInjectionContainer _grace = PrepareGrace();
-            private readonly ServiceContainer _lightInject = PrepareLightInject();
-            //private readonly Lamar.Container _lamar = PrepareLamar();
-            private readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
-
-            [Benchmark]
-            public object BmarkAutofac() => Measure(_autofac);
-
-            [Benchmark]
-            public object BmarkDryIoc() => Measure(_dryioc);
-
-            [Benchmark(Baseline = true)]
-            public object BmarkMicrosoftSDependencyInjection() => Measure(_msDi);
-
-            [Benchmark]
-            public object BmarkGrace() => Measure(_grace);
-
-            [Benchmark]
-            public object BmarkLightInject() => Measure(_lightInject);
-
-            //[Benchmark]
-            //public object BmarkLamar() => Measure(_lamar);
-
-            //[Benchmark]
-            public object BmarkSimpleInjector() => Measure(_simpleInjector);
-        }
-
-        /*
 ## 28.11.2018: Starting point - no scoped dependency interpretation for DryIoc yet
 
 BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.407 (1803/April2018Update/Redstone4)
@@ -443,30 +370,42 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
 ---------------------------------- |---------:|----------:|----------:|------:|------------:|------------:|------------:|--------------------:|
  BmarkMicrosoftDependencyInjection | 4.671 us | 0.0223 us | 0.0208 us |  1.00 |      1.0529 |           - |           - |             4.87 KB |
                        BmarkDryIoc | 5.147 us | 0.0237 us | 0.0198 us |  1.10 |      1.0986 |           - |           - |             5.08 KB |
+
+## 26.03.2020 DryIoc v4.1.3 and the latest versions of the libs
+
+|      Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |-------------:|-----------:|-----------:|-------:|--------:|--------:|-------:|------:|----------:|
+|        MsDI |    10.318 us |  0.2056 us |  0.4887 us |   1.00 |    0.00 |  2.9755 |      - |     - |   6.08 KB |
+|      DryIoc |     5.877 us |  0.1172 us |  0.2572 us |   0.57 |    0.04 |  1.8921 |      - |     - |   3.87 KB |
+|       Grace | 1,024.766 us | 20.0509 us | 27.4459 us | 100.13 |    5.54 | 19.5313 | 7.8125 |     - |  41.54 KB |
+| LightInject | 1,003.605 us | 19.8416 us | 35.2684 us |  97.78 |    5.77 | 17.5781 | 7.8125 |     - |  37.71 KB |
+|       Lamar |   710.639 us | 14.8208 us | 28.5546 us |  69.47 |    4.39 | 32.2266 |      - |     - |  66.66 KB |
+|     Autofac |    62.786 us |  1.2542 us |  1.7582 us |   6.14 |    0.37 | 18.1885 |      - |     - |  37.26 KB |
+
 */
-        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        [MemoryDiagnoser]
         public class CreateContainerAndRegister_FirstTimeOpenScopeResolve
         {
-            //[Benchmark]
-            public object BmarkAutofac() => Measure(PrepareAutofac());
+            [Benchmark(Baseline = true)]
+            public object MsDI() => Measure(PrepareMsDi());
 
             [Benchmark]
-            public object BmarkDryIoc() => Measure(PrepareDryIoc());
+            public object DryIoc() => Measure(PrepareDryIoc());
 
-            [Benchmark(Baseline = true)]
-            public object BmarkMicrosoftDependencyInjection() => Measure(PrepareMsDi());
+            [Benchmark]
+            public object Grace() => Measure(PrepareGrace());
+
+            [Benchmark]
+            public object LightInject() => Measure(PrepareLightInject());
+
+            [Benchmark]
+            public object Lamar() => Measure(PrepareLamar());
+
+            [Benchmark]
+            public object Autofac() => Measure(PrepareAutofac());
 
             //[Benchmark]
-            public object BmarkGrace() => Measure(PrepareGrace());
-
-            //[Benchmark]
-            public object BmarkLightInject() => Measure(PrepareLightInject());
-
-            //[Benchmark]
-            //public object BmarkLamar() => Measure(PrepareLamar());
-
-            //[Benchmark]
-            public object BmarkSimpleInjector() => Measure(PrepareSimpleInjector());
+            //public object SimpleInjector() => Measure(PrepareSimpleInjector());
         }
 
         /*
@@ -520,17 +459,14 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
                   BmarkLightInject |  5.821 us | 0.0285 us | 0.0253 us |  5.61 |    0.04 |      3.8376 |      0.0076 |           - |             17.7 KB |
                       BmarkAutofac | 23.733 us | 0.5465 us | 0.6506 us | 22.85 |    0.60 |      4.5166 |      0.0610 |           - |            20.96 KB |
              */
-        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        [MemoryDiagnoser]
         public class CreateContainerAndRegister
         {
-            [Benchmark]
-            public object BmarkAutofac() => PrepareAutofac();
+            [Benchmark(Baseline = true)]
+            public object BmarkMicrosoftDependencyInjection() => PrepareMsDi();
 
             [Benchmark]
             public object BmarkDryIoc() => PrepareDryIoc();
-
-            [Benchmark(Baseline = true)]
-            public object BmarkMicrosoftDependencyInjection() => PrepareMsDi();
 
             [Benchmark]
             public object BmarkGrace() => PrepareGrace();
@@ -538,14 +474,108 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             [Benchmark]
             public object BmarkLightInject() => PrepareLightInject();
 
-            //[Benchmark]
-            //public object BmarkLamar() => Measure(PrepareLamar());
+            [Benchmark]
+            public object BmarkLamar() => PrepareLamar();
+
+            [Benchmark]
+            public object BmarkAutofac() => PrepareAutofac();
 
             //[Benchmark]
-            public object BmarkSimpleInjector() => Measure(PrepareSimpleInjector());
+            //public object BmarkSimpleInjector() => Measure(PrepareSimpleInjector());
         }
 
-        [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]
+        /*
+## 28.11.2018
+BenchmarkDotNet=v0.11.3, OS=Windows 10.0.17134.407 (1803/April2018Update/Redstone4)
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+Frequency=2156248 Hz, Resolution=463.7685 ns, Timer=TSC
+.NET Core SDK=2.1.500
+[Host]     : .NET Core 2.1.6 (CoreCLR 4.6.27019.06, CoreFX 4.6.27019.05), 64bit RyuJIT
+DefaultJob : .NET Core 2.1.6 (CoreCLR 4.6.27019.06, CoreFX 4.6.27019.05), 64bit RyuJIT
+
+
+                     Method |       Mean |     Error |     StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+----------------------------------- |-----------:|----------:|-----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+               BmarkAutofac | 1,970.3 ns | 11.519 ns | 10.7747 ns |  7.17 |    0.06 |      0.6676 |           - |           - |              3152 B |
+                BmarkDryIoc |   207.0 ns |  1.062 ns |  0.9931 ns |  0.75 |    0.01 |      0.0966 |           - |           - |               456 B |
+BmarkMicrosoftSDependencyInjection |   274.9 ns |  2.064 ns |  1.9308 ns |  1.00 |    0.00 |      0.0758 |           - |           - |               360 B |
+                 BmarkGrace |   264.8 ns |  1.653 ns |  1.5462 ns |  0.96 |    0.01 |      0.1216 |           - |           - |               576 B |
+           BmarkLightInject |   998.6 ns |  4.589 ns |  4.0676 ns |  3.64 |    0.02 |      0.2422 |           - |           - |              1144 B |
+
+
+## 25.01.2019
+                     Method |       Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
+--------------------------- |-----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
+                       MsDI |   285.0 ns |  1.564 ns |  1.463 ns |  1.00 |    0.00 |      0.0758 |           - |           - |               360 B |
+                BmarkDryIoc |   172.6 ns |  1.664 ns |  1.556 ns |  0.61 |    0.01 |      0.0896 |           - |           - |               424 B |
+                 BmarkGrace |   301.3 ns |  4.890 ns |  4.574 ns |  1.06 |    0.02 |      0.1216 |           - |           - |               576 B |
+           BmarkLightInject | 1,079.8 ns | 14.331 ns | 13.406 ns |  3.79 |    0.05 |      0.2422 |           - |           - |              1144 B |
+               BmarkAutofac | 2,017.9 ns |  9.589 ns |  8.501 ns |  7.08 |    0.05 |      0.6676 |           - |           - |              3152 B |
+
+
+## 06.08.2019
+                     Method |       Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+--------------------------- |-----------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+                       MsDI |   313.2 ns |  1.092 ns |  1.022 ns |  1.00 |    0.00 | 0.0811 |     - |     - |     384 B |
+                BmarkDryIoc |   247.9 ns |  1.768 ns |  1.654 ns |  0.79 |    0.01 | 0.1135 |     - |     - |     536 B |
+                 BmarkGrace |   234.3 ns |  1.369 ns |  1.280 ns |  0.75 |    0.00 | 0.0575 |     - |     - |     272 B |
+           BmarkLightInject | 1,025.1 ns | 19.367 ns | 23.055 ns |  3.26 |    0.08 | 0.2403 |     - |     - |    1136 B |
+               BmarkAutofac | 2,640.2 ns | 30.274 ns | 25.280 ns |  8.43 |    0.08 | 0.8965 |     - |     - |    4232 B |
+
+
+## 26.03.2020
+
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
+Intel Core i7-7600U CPU 2.80GHz (Kaby Lake), 1 CPU, 4 logical and 2 physical cores
+.NET Core SDK=3.1.200
+  [Host]     : .NET Core 3.1.2 (CoreCLR 4.700.20.6602, CoreFX 4.700.20.6702), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.2 (CoreCLR 4.700.20.6602, CoreFX 4.700.20.6702), X64 RyuJIT
+
+
+|      Method |       Mean |    Error |    StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 |  Gen 2 | Allocated |
+|------------ |-----------:|---------:|----------:|------:|--------:|-------:|-------:|-------:|----------:|
+|        MsDI |   608.7 ns | 27.16 ns |  80.08 ns |  1.00 |    0.00 | 0.1774 |      - |      - |     376 B |
+|      DryIoc |   351.1 ns |  8.53 ns |  19.07 ns |  0.61 |    0.06 | 0.2284 |      - |      - |     480 B |
+|       Grace |   183.6 ns |  3.62 ns |   6.24 ns |  0.31 |    0.03 | 0.1371 |      - |      - |     288 B |
+| LightInject |   397.1 ns |  7.81 ns |   7.31 ns |  0.66 |    0.06 | 0.2065 |      - |      - |     432 B |
+|       Lamar | 2,752.9 ns | 54.07 ns | 118.68 ns |  4.78 |    0.52 | 0.3242 | 0.1068 | 0.0114 |     680 B |
+|     Autofac | 3,886.0 ns | 76.31 ns | 147.02 ns |  6.62 |    0.72 | 1.8082 |      - |      - |    3792 B |
+
+*/
+        [MemoryDiagnoser]
+        public class FirstTimeOpenScopeResolve
+        {
+            private readonly IContainer _autofac = PrepareAutofac();
+            private readonly DryIoc.IContainer _dryioc = PrepareDryIoc();
+            private readonly IServiceProvider _msDi = PrepareMsDi();
+            private readonly DependencyInjectionContainer _grace = PrepareGrace();
+            private readonly ServiceContainer _lightInject = PrepareLightInject();
+            private readonly Lamar.Container _lamar = PrepareLamar();
+            //private readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
+
+            [Benchmark(Baseline = true)]
+            public object MsDI() => Measure(_msDi);
+
+            [Benchmark]
+            public object DryIoc() => Measure(_dryioc);
+
+            [Benchmark]
+            public object Grace() => Measure(_grace);
+
+            [Benchmark]
+            public object LightInject() => Measure(_lightInject);
+
+            [Benchmark]
+            public object Lamar() => Measure(_lamar);
+
+            [Benchmark]
+            public object Autofac() => Measure(_autofac);
+
+            //[Benchmark]
+            //public object BmarkSimpleInjector() => Measure(_simpleInjector);
+        }
+
+        [MemoryDiagnoser]
         public class SecondOpenScopeResolve
         {
             /*
@@ -564,8 +594,8 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             private static readonly IServiceProvider _msDi = PrepareMsDi();
             private static readonly DependencyInjectionContainer _grace = PrepareGrace();
             private static readonly ServiceContainer _lightInject = PrepareLightInject();
-            //private static readonly Lamar.Container _lamar = PrepareLamar();
-            private static readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
+            private static readonly Lamar.Container _lamar = PrepareLamar();
+            //private static readonly SimpleInjector.Container _simpleInjector = PrepareSimpleInjector();
 
             [GlobalSetup]
             public void WarmUp()
@@ -577,7 +607,7 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
                     Measure(_msDi);
                     Measure(_grace);
                     Measure(_lightInject);
-                    //Measure(_lamar);
+                    Measure(_lamar);
                 }
             }
 
@@ -600,7 +630,7 @@ NO DIFFERENCE FROM Asp.NET / Core 2.2
             //public object BmarkLamar() => Measure(_lamar);
 
             //[Benchmark]
-            public object BmarkSimpleInjector() => Measure(_simpleInjector);
+            //public object BmarkSimpleInjector() => Measure(_simpleInjector);
         }
 
         [MemoryDiagnoser, Orderer(SummaryOrderPolicy.FastestToSlowest)]

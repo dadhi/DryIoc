@@ -1645,12 +1645,16 @@ namespace DryIoc
             var resultFactories = registeredFactories;
             var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
 
-            // assign unique continuous keys across all of dynamic providers,
+            // Assign unique continious keys across all of dynamic providers,
             // to prevent duplicate keys and peeking the wrong factory by collection wrappers
+            // NOTE: Given that dynamic registration always return the same implementation types in the same order
+            // then the dynamic key will be assigned deterministically, so that even if `CombineRegisteredWithDynamicFactories`
+            // is called multiple times during the resolution (like for `ResolveMany`) it is possible to match the required factory by its order.
             var dynamicKey = DefaultDynamicKey.Value;
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
-            {
+            { 
                 var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
+
                 var dynamicRegistrations = dynamicRegistrationProvider(serviceType, serviceKey).ToArrayOrSelf();
                 if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
                 {
@@ -1723,7 +1727,8 @@ namespace DryIoc
                         }
 
                         return true;
-                    }, x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
+                    }, 
+                    x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
 
                 resultFactories = resultFactories.Append(remainingDynamicFactories);
             }
@@ -4654,7 +4659,7 @@ namespace DryIoc
         public static bool IsFunc(this Type type)
         {
             var genericDefinition = type.GetGenericDefinitionOrNull();
-            return genericDefinition != null && FuncTypes.IndexOf(genericDefinition) != -1;
+            return genericDefinition != null && FuncTypes.IndexOfReference(genericDefinition) != -1;
         }
 
         internal static int CollectionWrapperID { get; private set; }
@@ -4902,12 +4907,9 @@ namespace DryIoc
             var isAction = wrapperType == typeof(Action);
             if (!isAction)
             {
-                var openGenericWrapperType = wrapperType.GetGenericDefinitionOrNull()
-                    .ThrowIfNull(Error.FuncOrActionDelegateWithSuchAmountOfArgumentsIsNotSupported, wrapperType);
-
-                if (FuncTypes.IndexOf(openGenericWrapperType) == -1 &&
-                    !(isAction = ActionTypes.IndexOf(openGenericWrapperType) != -1))
-                    Throw.It(Error.FuncOrActionDelegateWithSuchAmountOfArgumentsIsNotSupported, wrapperType);
+                var openGenericWrapperType = wrapperType.GetGenericDefinitionOrNull().ThrowIfNull();
+                if (FuncTypes.IndexOfReference(openGenericWrapperType) == -1)
+                    Throw.If(!(isAction = ActionTypes.IndexOfReference(openGenericWrapperType) != -1));
             }
 
             var argTypes = wrapperType.GetTypeInfo().GenericTypeArguments;
@@ -5353,8 +5355,7 @@ namespace DryIoc
                 // the condition checks that factory is resolvable
                 factory = new ReflectionFactory(implType, reuse,
                     DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic,
-                    Setup.With(condition: r1 => r1.WithIfUnresolved(IfUnresolved.ReturnDefault)
-                                                  .To(r2 => factory?.GetExpressionOrDefault(r2)) != null));
+                    Setup.With(condition: req => factory?.GetExpressionOrDefault(req.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null));
 
                 return factory;
             });
@@ -5396,28 +5397,28 @@ namespace DryIoc
                 var implementationTypes = getImplementationTypes(serviceType, serviceKey);
 
                 return implementationTypes.Match(
-                    implType => implType.ImplementsServiceType(serviceType),
+                    implType => implType.IsImplementingServiceType(serviceType),
                     implType =>
                     {
                         var implTypeHash = RuntimeHelpers.GetHashCode(implType);
                         var implFactory = factories.Value.GetValueOrDefault(implTypeHash, implType);
                         if (implFactory == null)
                         {
-                            factories.Swap(existingFactories =>
-                            {
-                                implFactory = existingFactories.GetValueOrDefault(implTypeHash, implType);
-                                if (implFactory != null)
-                                    return existingFactories;
-
-                                implFactory = factory != null
-                                    ? factory(implType).ThrowIfNull()
-                                    : new ReflectionFactory(implType);
-
-                                return existingFactories.AddOrUpdate(implTypeHash, implType, implFactory);
-                            });
+                            if (factory == null)
+                                factories.Swap(fs => (implFactory = fs.GetValueOrDefault(implTypeHash, implType)) != null ? fs 
+                                    : fs.AddOrUpdate(implTypeHash, implType, implFactory = new ReflectionFactory(implType)));
+                            else
+                                factories.Swap(fs => (implFactory = fs.GetValueOrDefault(implTypeHash, implType)) != null ? fs
+                                    : fs.AddOrUpdate(implTypeHash, implType, implFactory = factory.Invoke(implType).ThrowIfNull()));
                         }
 
-                        return new DynamicRegistration(implFactory, IfAlreadyRegistered.Keep);
+                        // We nullify default keys (usually passed by ResolveMany to resolve the specific factory in order)
+                        // so that `CombineRegisteredWithDynamicFactories` may assign the key again.
+                        // Given that the implementation types are unchanged then the new keys assignement will be the same the last one,
+                        // so that the factory resolution will correctly match the required factory by key.
+                        // e.g. bitbucket issue #396
+                        var theKey = serviceKey is DefaultDynamicKey ? null : serviceKey;
+                        return new DynamicRegistration(implFactory, IfAlreadyRegistered.Keep, theKey);
                     });
             };
         }
@@ -6743,11 +6744,57 @@ namespace DryIoc
                 : implementedTypes.Match(t => t.IsPublicOrNestedPublic() && t.IsServiceType());
             
             if (type.IsGenericDefinition())
-                serviceTypes = serviceTypes.Match(type,
-                    (t, x) => x.ContainsAllGenericTypeParameters(t.GetGenericParamsAndArgs()),
+                serviceTypes = serviceTypes.Match(type.GetGenericParamsAndArgs(),
+                    (paramsAndArgs, x) => x.ContainsAllGenericTypeParameters(paramsAndArgs),
                     (_, x) => x.GetGenericDefinitionOrNull());
 
             return serviceTypes;
+        }
+
+        /// <summary>The same `GetImplementedServiceTypes` but instead of collecting the service types just check the <paramref name="serviceType"/> is implemented</summary>
+        public static bool IsImplementingServiceType(this Type type, Type serviceType)
+        {
+            if (serviceType == type || serviceType == typeof(object))
+                return true;
+
+            var implTypeInfo = type.GetTypeInfo();
+            if (!implTypeInfo.IsGenericTypeDefinition)
+            {
+                if (serviceType.IsInterface())
+                {
+                    foreach (var iface in implTypeInfo.ImplementedInterfaces)
+                        if (iface == serviceType)
+                            return true;
+                }
+                else
+                {
+                    var baseType = implTypeInfo.BaseType;
+                    for (; baseType != null && baseType != typeof(object); baseType = baseType.GetTypeInfo().BaseType)
+                        if (serviceType == baseType)
+                            return true;
+                }
+            }
+            else if (serviceType.IsGenericDefinition())
+            {
+                var implTypeParams = implTypeInfo.GenericTypeParameters;
+                if (serviceType.IsInterface())
+                {
+                    foreach (var iface in implTypeInfo.ImplementedInterfaces)
+                        if (iface.GetGenericDefinitionOrNull() == serviceType &&
+                            iface.ContainsAllGenericTypeParameters(implTypeParams))
+                            return true;
+                }
+                else
+                {
+                    var baseType = implTypeInfo.BaseType;
+                    for (; baseType != null && baseType != typeof(object); baseType = baseType.GetTypeInfo().BaseType)
+                        if (baseType.GetGenericDefinitionOrNull() == serviceType &&
+                            baseType.ContainsAllGenericTypeParameters(implTypeParams))
+                            return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>Returns the sensible services automatically discovered for RegisterMany implementation type.
@@ -6755,7 +6802,7 @@ namespace DryIoc
         /// generic definition.</summary>
         public static Type[] GetRegisterManyImplementedServiceTypes(this Type type, bool nonPublicServiceTypes = false) =>
             GetImplementedServiceTypes(type, nonPublicServiceTypes)
-                .Match(t => !t.IsGenericDefinition() || WrappersSupport.SupportedCollectionTypes.IndexOf(t) == -1);
+                .Match(t => !t.IsGenericDefinition() || WrappersSupport.SupportedCollectionTypes.IndexOfReference(t) == -1);
 
         /// <summary>Returns the types suitable to be an implementation types for <see cref="ReflectionFactory"/>:
         /// actually a non abstract and not compiler generated classes.</summary>
@@ -6771,11 +6818,9 @@ namespace DryIoc
         public static Func<Type, bool> Interfaces = ReflectionTools.IsInterface;
 
         /// <summary>Checks if <paramref name="type"/> implements a service type,
-        /// along the checking if <paramref name="type"/> and service type
-        /// are valid implementation and service types.</summary>
+        /// along the checking if <paramref name="type"/> is a valid implementation type.</summary>
         public static bool ImplementsServiceType(this Type type, Type serviceType) =>
-            type.IsImplementationType() &&
-            type.GetImplementedServiceTypes(nonPublicServiceTypes: true).IndexOf(serviceType) != -1;
+            type.IsImplementationType() && type.IsImplementingServiceType(serviceType);
 
         /// <summary>Checks if <paramref name="type"/> implements a service type,
         /// along the checking if <paramref name="type"/> and service type
@@ -10186,13 +10231,21 @@ namespace DryIoc
             if (!implType.IsGenericDefinition())
             {
                 if (implType.IsOpenGeneric())
-                    Throw.It(Error.RegisteringNotAGenericTypedefImplType,
-                        implType, implType.GetGenericDefinitionOrNull());
+                    Throw.It(Error.RegisteringNotAGenericTypedefImplType, implType, implType.GetGenericDefinitionOrNull());
 
-                else if (implType != serviceType && serviceType != typeof(object)
-                      && implType.GetImplementedTypes()
-                          .IndexOf(serviceType, (st, t) => t == st || t.GetGenericDefinitionOrNull() == st) == -1)
-                    Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
+                else if (implType != serviceType && serviceType != typeof(object))
+                {
+                    if (!serviceType.IsGenericDefinition())
+                    {
+                        if (!implType.IsImplementingServiceType(serviceType))
+                            Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
+                    }
+                    else
+                    {
+                        if (implType.GetImplementedTypes().IndexOf(serviceType, (st, t) => t == st || t.GetGenericDefinitionOrNull() == st) == -1)
+                            Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
+                    }
+                }
             }
             else if (implType != serviceType)
             {
@@ -10206,17 +10259,8 @@ namespace DryIoc
                 else if (!serviceType.IsGeneric())
                     Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
 
-                else
-                {
-                    var serviceTypeGenericDefinition = serviceType.GetGenericTypeDefinition();
-                    var implementedServiceTypes = implType.GetImplementedServiceTypes();
-                    var implServiceTypeIndex = implementedServiceTypes.Length - 1;
-                    while (implServiceTypeIndex != -1 &&
-                           !ReferenceEquals(implementedServiceTypes[implServiceTypeIndex], serviceTypeGenericDefinition))
-                        --implServiceTypeIndex;
-                    if (implServiceTypeIndex == -1)
-                        Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
-                }
+                else if (!implType.IsImplementingServiceType(serviceType.GetGenericTypeDefinition()))
+                    Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
             }
 
             return true;
@@ -12576,7 +12620,7 @@ namespace DryIoc
                 return false;
 
             var matchedParams = new Type[genericParameters.Length];
-            Array.Copy(genericParameters, matchedParams, genericParameters.Length);
+            Array.Copy(genericParameters, 0, matchedParams, 0, genericParameters.Length);
 
             ClearGenericParametersReferencedInConstraints(matchedParams);
             ClearMatchesFoundInGenericParameters(matchedParams, openGenericType.GetGenericParamsAndArgs());
@@ -13047,9 +13091,12 @@ namespace DryIoc
                             var constraintGenericParam = constraintGenericParams[k];
                             if (constraintGenericParam != genericParam)
                             {
-                                var genericParamIndex = genericParams.IndexOf(constraintGenericParam);
-                                if (genericParamIndex != -1)
-                                    genericParams[genericParamIndex] = null;
+                                for (var g = 0; g < genericParams.Length; ++g)
+                                    if (genericParams[g] == constraintGenericParam)
+                                    {
+                                        genericParams[g] = null; // match
+                                        break;
+                                    }
                             }
                         }
                     }
@@ -13064,9 +13111,12 @@ namespace DryIoc
                 var genericParam = genericParams[i];
                 if (genericParam.IsGenericParameter)
                 {
-                    var matchedIndex = matchedParams.IndexOf(genericParam);
-                    if (matchedIndex != -1)
-                        matchedParams[matchedIndex] = null;
+                    for (var j = 0; j < matchedParams.Length; ++j)
+                        if (matchedParams[j] == genericParam)
+                        {
+                            matchedParams[j] = null; // match
+                            break;
+                        }
                 }
                 else if (genericParam.IsOpenGeneric())
                     ClearMatchesFoundInGenericParameters(matchedParams, genericParam.GetGenericParamsAndArgs());

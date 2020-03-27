@@ -1589,11 +1589,19 @@ namespace DryIoc.ImTools
         {
             if (source != null && source.Length != 0)
                 for (var i = 0; i < source.Length; ++i)
-                {
-                    var item = source[i];
-                    if (Equals(item, value))
+                    if (Equals(source[i], value))
                         return i;
-                }
+
+            return -1;
+        }
+
+        /// <summary>The same as `IndexOf` but searching the item by reference</summary>
+        public static int IndexOfReference<T>(this T[] source, T reference) where T : class
+        {
+            if (source != null && source.Length != 0)
+                for (var i = 0; i < source.Length; ++i)
+                    if (ReferenceEquals(source[i], reference))
+                        return i;
 
             return -1;
         }
@@ -2054,6 +2062,11 @@ namespace DryIoc.ImTools
         public T Swap(Func<T, T> getNewValue) =>
             Ref.Swap(ref _value, getNewValue);
 
+        // todo: A good candidate to implement
+        // <summary>The same as `Swap` but instead of old known value it returns the new one</summary>
+        //public T SwapAndGetNewValue(Func<T, T> getNewValue) =>
+        //    Ref.Swap(ref _value, getNewValue);
+
         /// Option without allocation for capturing `a` in closure of `getNewValue`
         public T Swap<A>(A a, Func<T, A, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
 
@@ -2128,9 +2141,8 @@ namespace DryIoc.ImTools
             throw new InvalidOperationException(
                 $"Ref retried to Update for {retryCountExceeded} times But there is always someone else intervened.");
 
-        /// <summary>
-        /// Option without allocation for capturing `a` in closure of `getNewValue`
-        /// </summary>
+        /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
+        /// May prevent closure creation for the delegate</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue,
             int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
@@ -2150,7 +2162,8 @@ namespace DryIoc.ImTools
             }
         }
 
-        /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
+        /// <summary>Swap with the additional state <paramref name="a"/>, <paramref name="b"/> required for the delegate <paramref name="getNewValue"/>.
+        /// May prevent closure creation for the delegate</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static T Swap<T, A, B>(ref T value, A a, B b, Func<T, A, B, T> getNewValue,
             int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
@@ -2172,7 +2185,8 @@ namespace DryIoc.ImTools
             }
         }
 
-        /// Option without allocation for capturing `a`, `b`, `c` in closure of `getNewValue`
+        /// <summary>Swap with the additional state <paramref name="a"/>, <paramref name="b"/>, <paramref name="c"/> required for the delegate <paramref name="getNewValue"/>.
+        /// May prevent closure creation for the delegate</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static T Swap<T, A, B, C>(ref T value, A a, B b, C c, Func<T, A, B, C, T> getNewValue,
             int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
