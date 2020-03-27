@@ -48,7 +48,7 @@ namespace LoadTest
             Console.WriteLine("Validate started");
 
             // Validate IoC registrations
-            var results = container.Validate();
+            var results = container.Validate(x => x.ServiceType.Name.EndsWith("Controller"));
             if (results.Length > 0)
             {
                 foreach (var kvp in results)
