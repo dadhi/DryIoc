@@ -38,7 +38,7 @@ namespace LoadTest
             return container;
         }
 
-        static async Task Main(string[] args)
+        static /*async Task*/void Main(string[] args)
         {
             Console.WriteLine("Starting up!");
 
