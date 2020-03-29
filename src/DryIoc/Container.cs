@@ -100,8 +100,15 @@ namespace DryIoc
             : this(configure.ThrowIfNull()(Rules.Default) ?? Rules.Default, scopeContext)
         { }
 
+        private sealed class SinlgetonScopeName
+        {
+            public static readonly SinlgetonScopeName Name = new SinlgetonScopeName();
+            private SinlgetonScopeName() { }
+            public override string ToString() => nameof(SinlgetonScopeName);
+        }
+
         /// <summary>Helper to create singleton scope</summary>
-        public static IScope NewSingletonScope() => new Scope(name: "<sigletons>");
+        public static IScope NewSingletonScope() => new Scope(name: SinlgetonScopeName.Name);
 
         /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
@@ -7728,6 +7735,7 @@ namespace DryIoc
                 : (T)serviceInfo.Create(serviceType, details);
         }
 
+        // todo: May operate directly on ServiceType and ServiceDetails instead of IServiceInfo interface
         /// <summary>Enables propagation/inheritance of info between dependency and its owner:
         /// for instance <see cref="ServiceDetails.RequiredServiceType"/> for wrappers.</summary>
         public static IServiceInfo InheritInfoFromDependencyOwner(this IServiceInfo dependency,
@@ -7774,7 +7782,7 @@ namespace DryIoc
                 requiredServiceType == null) // if only dependency does not have its own
                 requiredServiceType = ownerRequiredServiceType;
 
-            if (serviceType == dependency.ServiceType && serviceKey == dependencyDetails.ServiceKey &&
+            if (serviceKey == dependencyDetails.ServiceKey &&
                 metadataKey == dependencyDetails.MetadataKey && metadata == dependencyDetails.Metadata &&
                 ifUnresolved == dependencyDetails.IfUnresolved && requiredServiceType == dependencyDetails.RequiredServiceType)
                 return dependency;
@@ -8217,12 +8225,13 @@ namespace DryIoc
         internal RequestStack RequestStack;
         internal int IndexInStack => DependencyDepth - 1;
 
-        // mutable because of RequestFlags.AddedToResolutionExpressions
+        // note: mutable because of RequestFlags.AddedToResolutionExpressions
         /// <summary>Persisted request conditions</summary>
         public RequestFlags Flags;
 
         /// mutable, so that the ServiceKey or IfUnresolved can be changed in place.
         internal IServiceInfo _serviceInfo;
+        //internal IServiceInfo _serviceDetails; // todo: use this as much as possible instead of `_serviceInfo` to avoid virtual calls
 
         /// <summary>Input arguments provided with `Resolve`</summary>
         internal Expression[] InputArgExprs;
@@ -8378,7 +8387,6 @@ namespace DryIoc
                 req  = new Request(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
             else
                 req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
-            
             return req;
         }
 
@@ -8493,25 +8501,20 @@ namespace DryIoc
         public Request WithResolvedFactory(Factory factory,
             bool skipRecursiveDependencyCheck = false, bool skipCaptiveDependencyCheck = false, bool copyRequest = false)
         {
-            var factoryId = factory.FactoryID;
+            var factoryId   = factory.FactoryID;
+            var factoryType = factory.FactoryType;
             var decoratedFactoryID = 0;
             if (Factory != null) // resolving the factory for the second time, usually happens in decorators
             {
                 if (Factory.FactoryID == factoryId)
                     return this; // stop resolving to the same factory twice
 
-                if (Factory.FactoryType != FactoryType.Decorator &&
-                    factory.FactoryType == FactoryType.Decorator)
+                if (factoryType == FactoryType.Decorator && Factory.FactoryType != FactoryType.Decorator)
                     decoratedFactoryID = FactoryID;
             }
 
-            // checking the service types only cause wrapper and decorators may be used multiple times
-            if (!skipRecursiveDependencyCheck &&
-                factory.FactoryType == FactoryType.Service &&
-                HasRecursiveParent(factoryId))
-                Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
-
-            // It is required to nullify the TD tracking when factory is resolved multiple times, e.g. for decorator
+            // It is required to nullify the transient disposable tracking when factory is resolved multiple times,
+            // e.g. for the decorator
             var flags = Flags & ~RequestFlags.TracksTransientDisposable;
             if (skipRecursiveDependencyCheck)
                 flags |= RequestFlags.StopRecursiveDependencyCheck;
@@ -8520,13 +8523,38 @@ namespace DryIoc
                 ? DryIoc.Reuse.Transient
                 : factory.Reuse ?? CalculateDefaultReuse(factory);
 
-            if (!skipCaptiveDependencyCheck &&
-                !DirectParent.IsEmpty &&
-                !factory.Setup.OpenResolutionScope &&
-                reuse.Lifespan != 0 &&
-                Rules.ThrowIfDependencyHasShorterReuseLifespan)
+            var reuseLifespan = reuse.Lifespan;
+            skipCaptiveDependencyCheck = skipCaptiveDependencyCheck
+                || reuseLifespan == 0 || !Rules.ThrowIfDependencyHasShorterReuseLifespan || factory.Setup.OpenResolutionScope;
+
+            skipRecursiveDependencyCheck = skipRecursiveDependencyCheck 
+                || factoryType != FactoryType.Service;
+
+            // For the dependency we nned to check the recursive and the captive dependency
+            for (var parent = DirectParent; 
+                !parent.IsEmpty && (!skipCaptiveDependencyCheck || !skipRecursiveDependencyCheck); 
+                parent = parent.DirectParent)
             {
-                ThrowIfReuseHasShorterLifespanThanParent(reuse);
+                if (!skipCaptiveDependencyCheck)
+                {
+                    if (parent.OpensResolutionScope ||
+                        // ignores the ScopedOrSingleton inside Scoped or Singleton
+                        (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true && parent.Reuse is SingletonReuse ||
+                        parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFunc())
+                        skipCaptiveDependencyCheck = true;
+                    else if (
+                        parent.FactoryType == FactoryType.Service &&
+                        parent.ReuseLifespan > reuseLifespan)
+                        Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, parent);
+                }
+
+                if (!skipRecursiveDependencyCheck)
+                {
+                    if ((parent.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+                        skipRecursiveDependencyCheck = true; // stops further upward checking
+                    else if (parent.FactoryID == factoryId)
+                        Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
+                }
             }
 
             if (reuse == DryIoc.Reuse.Singleton)
@@ -8543,23 +8571,23 @@ namespace DryIoc
             if (copyRequest)
             {
                 IsolateRequestChain();
-                return new Request(Container, DirectParent, DependencyDepth, null, flags, _serviceInfo, 
-                    InputArgExprs, null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
+                return new Request(Container, DirectParent, DependencyDepth, null, flags, _serviceInfo,
+                    InputArgExprs, null, factory, factoryId, factoryType, reuse, decoratedFactoryID);
             }
 
             Flags = flags;
-            SetResolvedFactory(null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
+            SetResolvedFactory(null, factory, factoryId, factoryType, reuse, decoratedFactoryID);
             return this;
         }
 
         /// <summary>Check for the parents.</summary>
         public bool HasRecursiveParent(int factoryID)
         {
-            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+            for (var parent = DirectParent; !parent.IsEmpty; parent = parent.DirectParent)
             {
-                if ((p.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+                if ((parent.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
                     break; // stops further upward checking
-                if (p.FactoryID == factoryID)
+                if (parent.FactoryID == factoryID)
                     return true;
             }
             return false;
@@ -8604,30 +8632,14 @@ namespace DryIoc
             return DryIoc.Reuse.ScopedOrSingleton;
         }
 
-        private void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse)
-        {
-            for (var parent = DirectParent; !parent.IsEmpty; parent = parent.DirectParent)
-            {
-                if (parent.OpensResolutionScope ||
-                    // ignores the ScopedOrSingleton inside Scoped or Singleton
-                    (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true && parent.Reuse is SingletonReuse ||
-                    parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFunc())
-                    break;
-
-                if (parent.FactoryType == FactoryType.Service &&
-                    parent.ReuseLifespan > reuse.Lifespan)
-                    Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, parent);
-            }
-        }
-
         private IReuse GetFirstParentNonTransientReuseUntilFunc()
         {
-            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+            for (var parent = DirectParent; parent.DirectParent != null; parent = parent.DirectParent)
             {
-                if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
+                if (parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFunc())
                     break;
-                if (p.FactoryType != FactoryType.Wrapper && p.Reuse != DryIoc.Reuse.Transient)
-                    return p.Reuse;
+                if (parent.FactoryType != FactoryType.Wrapper && parent.Reuse != DryIoc.Reuse.Transient)
+                    return parent.Reuse;
             }
 
             return DryIoc.Reuse.Transient;
