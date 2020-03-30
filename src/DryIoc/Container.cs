@@ -1082,7 +1082,33 @@ namespace DryIoc
 
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
         {
-            var serviceType = GetServiceTypeAndKeyForFactoryLookup(request, out var serviceKey);
+            var details = request.ServiceDetails;
+            var serviceKey = details.ServiceKey;
+            var requiredServiceType = details.RequiredServiceType;
+
+            Type serviceType;
+            bool isServiceTypeClosedGeneric;
+            if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
+            {
+                serviceType = requiredServiceType;
+                isServiceTypeClosedGeneric = false;
+            }
+            else
+            {
+                // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServiceType, ServiceKey }
+                // presumes that required service type is closed generic
+                serviceType = request.GetActualServiceType();
+                isServiceTypeClosedGeneric = serviceType.IsClosedGeneric();
+                if (isServiceTypeClosedGeneric && serviceKey is OpenGenericTypeKey openGenericTypeKey)
+                {
+                    var openGenericType = openGenericTypeKey.RequiredServiceType;
+                    if (openGenericType == serviceType.GetGenericTypeDefinition())
+                    {
+                        serviceType = openGenericType;
+                        serviceKey = openGenericTypeKey.ServiceKey;
+                    }
+                }
+            }
 
             if (Rules.FactorySelector != null && serviceKey == null)
                 return GetRuleSelectedServiceFactoryOrDefault(request, serviceType);
@@ -1092,11 +1118,10 @@ namespace DryIoc
 
             // For closed-generic type, when the entry is not found or the key in entry is not found,
             // go for the open-generic services
-            if (serviceType.IsClosedGeneric())
-                if (entry == null || serviceKey != null && (
-                    entry is Factory && !serviceKey.Equals(DefaultKey.Value) ||
-                    entry is FactoriesEntry factoriesEntry && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null))
-                    entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) ?? entry;
+            if (isServiceTypeClosedGeneric && (entry == null || serviceKey != null && (
+                entry is Factory && !serviceKey.Equals(DefaultKey.Value) ||
+                entry is FactoriesEntry factoriesEntry && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null)))
+                entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) ?? entry;
 
             // Most common case when we have a single default factory and no dynamic rules in addition
             if (entry is Factory singleDefaultFactory && 
@@ -1104,8 +1129,8 @@ namespace DryIoc
             {
                 if (serviceKey != null && serviceKey != DefaultKey.Value || 
                     !singleDefaultFactory.CheckCondition(request) ||
-                    (request.MetadataKey != null || request.Metadata != null) && 
-                    !singleDefaultFactory.Setup.MatchesMetadata(request.MetadataKey, request.Metadata))
+                    (details.MetadataKey != null || details.Metadata != null) && 
+                    !singleDefaultFactory.Setup.MatchesMetadata(details.MetadataKey, details.Metadata))
                     return null;
                 return singleDefaultFactory;
             }
@@ -1127,13 +1152,9 @@ namespace DryIoc
             // just lookup for the key and return whatever the result
             if (serviceKey != null)
             {
-                for (var i = 0; i < factories.Length; i++)
-                {
-                    var f = factories[i];
+                foreach (var f in factories)
                     if (serviceKey.Equals(f.Key) && f.Value.CheckCondition(request))
                         return f.Value;
-                }
-
                 return null;
             }
 
@@ -1170,7 +1191,7 @@ namespace DryIoc
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
             // so there should not be repeating of the check, and not match of Performance decrease.
             if (matchedFactories.Length > 1)
-                matchedFactories = matchedFactories.Match(request.MatchGeneratedFactory);
+                matchedFactories = matchedFactories.Match(x => request.MatchGeneratedFactory(x));
 
             if (matchedFactories.Length > 1)
             {
@@ -1296,37 +1317,6 @@ namespace DryIoc
             return selectedFactory;
         }
 
-        private static Type GetServiceTypeAndKeyForFactoryLookup(Request request, out object serviceKey)
-        {
-            serviceKey = request.ServiceKey;
-
-            Type serviceType;
-            var requiredServiceType = request.RequiredServiceType;
-            if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
-                serviceType = requiredServiceType;
-            else
-            {
-                // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServiceType, ServiceKey }
-                // presumes that required service type is closed generic
-                serviceType = request.GetActualServiceType();
-                if (serviceType.IsClosedGeneric())
-                {
-                    var openGenericTypeKey = serviceKey as OpenGenericTypeKey;
-                    if (openGenericTypeKey != null)
-                    {
-                        var openGenericType = openGenericTypeKey.RequiredServiceType;
-                        if (openGenericType == serviceType.GetGenericDefinitionOrNull())
-                        {
-                            serviceType = openGenericType;
-                            serviceKey = openGenericTypeKey.ServiceKey;
-                        }
-                    }
-                }
-            }
-
-            return serviceType;
-        }
-
         private static KV<object, Factory> FindFactoryWithTheMinReuseLifespan(KV<object, Factory>[] factories)
         {
             var minLifespan = int.MaxValue;
@@ -1394,7 +1384,6 @@ namespace DryIoc
 
             var container = request.Container;
             var serviceType = request.ServiceType;
-
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
 
             // Combine with required service type if different from service type
@@ -1413,14 +1402,14 @@ namespace DryIoc
 
             // Append open-generic decorators
             var genericDecorators = Empty<Factory>();
-            var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
-            if (openGenericServiceType != null)
-                genericDecorators = container.GetDecoratorFactoriesOrDefault(openGenericServiceType);
+            Type openGenericServiceType = null;
+            if (serviceType.GetTypeInfo().IsGenericType)
+                genericDecorators = container.GetDecoratorFactoriesOrDefault(openGenericServiceType = serviceType.GetGenericTypeDefinition());
 
             // Combine with open-generic required type if they are different from service type
             if (requiredServiceType != serviceType)
             {
-                var openGenericRequiredType = requiredServiceType.GetGenericDefinitionOrNull();
+                var openGenericRequiredType = requiredServiceType.GetTypeInfo().IsGenericType ? requiredServiceType.GetGenericTypeDefinition() : null;
                 if (openGenericRequiredType != null && openGenericRequiredType != openGenericServiceType)
                     genericDecorators = genericDecorators.Append(
                         container.GetDecoratorFactoriesOrDefault(openGenericRequiredType));
@@ -1519,12 +1508,8 @@ namespace DryIoc
         {
             var wrappers = _registry.Value.Wrappers;
             var wrapper = wrappers.GetValueOrDefault(serviceType);
-            if (wrapper == null)
-            {
-                serviceType = serviceType.GetGenericDefinitionOrNull();
-                if (serviceType != null)
-                    wrapper = wrappers.GetValueOrDefault(serviceType);
-            }
+            if (wrapper == null && serviceType.GetTypeInfo().IsGenericType)
+                wrapper = wrappers.GetValueOrDefault(serviceType.GetGenericTypeDefinition());
             return wrapper as Factory;
         }
 
@@ -5817,7 +5802,8 @@ namespace DryIoc
         /// Where <paramref name="ctorOrMethodOrMember"/> is constructor, static or instance method, property or field.</summary>
         public static FactoryMethod Of(MemberInfo ctorOrMethodOrMember, ServiceInfo factoryInfo = null)
         {
-            ctorOrMethodOrMember.ThrowIfNull(Error.PassedCtorOrMemberIsNull);
+            if (ctorOrMethodOrMember == null)
+                Throw.It(Error.PassedCtorOrMemberIsNull);
 
             if (ctorOrMethodOrMember is ConstructorInfo == false && !ctorOrMethodOrMember.IsStatic())
             {
@@ -5847,7 +5833,7 @@ namespace DryIoc
         /// <summary>Discovers the static factory method or member by name in <typeparamref name="TFactory"/>.
         /// Should play nice with C# <see langword="nameof"/> operator.</summary>
         public static FactoryMethod Of<TFactory>(string methodOrMemberName) =>
-            Of(typeof(TFactory).GetAllMembers().FindFirst(m => m.Name == methodOrMemberName).ThrowIfNull());
+            Of(typeof(TFactory).GetAllMembers().FindFirst(m => m.Name == methodOrMemberName));
 
         /// <summary>Pretty prints wrapped method.</summary>
         public override string ToString()
@@ -5868,15 +5854,18 @@ namespace DryIoc
         /// <returns>Constructor or null if not found.</returns>
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) => request =>
         {
-            var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
-            var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
+            var implType = request.ImplementationType;
+            if (implType == null)
+                Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+            
+            var ctors = includeNonPublic ? implType.GetInstanceConstructors() : implType.GetPublicInstanceConstructors();
             var ctorCount = ctors.Length;
             if (ctorCount == 0)
                 return null;
 
             // if there is only one constructor then use it
             if (ctorCount == 1)
-                return Of(ctors[0]);
+                return new FactoryMethod(ctors[0]);
 
             // stop here if you need a lookup for most resolvable constructor
             if (!mostResolvable)
@@ -5983,7 +5972,8 @@ namespace DryIoc
         /// <summary>Easy way to specify default constructor to be used for resolution.</summary>
         public static FactoryMethodSelector DefaultConstructor(bool includeNonPublic = false) => request =>
             request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request)
-                .GetConstructorOrNull(includeNonPublic, Empty<Type>())?.To(ctor => Of(ctor));
+                .GetConstructorOrNull(includeNonPublic, Empty<Type>())
+                ?.To(ctor => new FactoryMethod(ctor));
 
         /// Better be named `ConstructorWithMostResolvableArguments`.
         /// Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
@@ -5996,6 +5986,9 @@ namespace DryIoc
         /// Works both for resolving service and Func{TArgs..., TService}</summary>
         public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublic =
             Constructor(mostResolvable: true, includeNonPublic: true);
+
+        /// <summary>Just creates a thingy from the constructor</summary>
+        public FactoryMethod(ConstructorInfo constructor) => ConstructorOrMethodOrMember = constructor;
 
         private FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
         {
@@ -7804,7 +7797,8 @@ namespace DryIoc
         public static Type GetActualServiceType(this IServiceInfo info)
         {
             var requiredServiceType = info.Details.RequiredServiceType;
-            return requiredServiceType != null && requiredServiceType.IsAssignableTo(info.ServiceType)
+            return requiredServiceType != null && 
+                info.ServiceType.GetTypeInfo().IsAssignableFrom(requiredServiceType.GetTypeInfo())
                 ? requiredServiceType : info.ServiceType;
         }
 
@@ -7909,19 +7903,14 @@ namespace DryIoc
         /// and setting resolution policy to <see cref="IfUnresolved.ReturnDefault"/> if parameter is optional.</summary>
         /// <param name="parameter">Parameter to create info for.</param>
         /// <returns>Parameter service info.</returns>
+        [MethodImpl((MethodImplOptions)256)]
         public static ParameterServiceInfo Of(ParameterInfo parameter)
         {
-            parameter.ThrowIfNull();
-
-            var isOptional = parameter.IsOptional;
-            var defaultValue = isOptional ? parameter.DefaultValue : null;
-            var hasDefaultValue = defaultValue != null && parameter.ParameterType.IsTypeOf(defaultValue);
-
-            return !isOptional
-                ? new ParameterServiceInfo(parameter)
-                : new WithDetails(parameter, !hasDefaultValue
-                    ? ServiceDetails.IfUnresolvedReturnDefault
-                    : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: defaultValue));
+            if (!parameter.IsOptional)
+                return new ParameterServiceInfo(parameter);
+            return new WithDetails(parameter, parameter.DefaultValue == null 
+                ? ServiceDetails.IfUnresolvedReturnDefault 
+                : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: parameter.DefaultValue));
         }
 
         /// <summary>Service type specified by <see cref="ParameterInfo.ParameterType"/>.</summary>
@@ -8233,6 +8222,10 @@ namespace DryIoc
 
         /// mutable, so that the ServiceKey or IfUnresolved can be changed in place.
         internal IServiceInfo _serviceInfo;
+
+        /// <summary>Service details part of service info</summary>
+        public ServiceDetails ServiceDetails => _serviceInfo.Details;
+
         //internal IServiceInfo _serviceDetails; // todo: use this as much as possible instead of `_serviceInfo` to avoid virtual calls
 
         /// <summary>Input arguments provided with `Resolve`</summary>
@@ -8267,16 +8260,16 @@ namespace DryIoc
         public bool IsEmpty => DirectParent == null;
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool IsResolutionRoot => !IsEmpty && DirectParent.IsEmpty;
+        public bool IsResolutionRoot => DirectParent != null && DirectParent.DirectParent == null;
 
         /// <summary>Returns true if request is First in Resolve call.</summary>
-        public bool IsResolutionCall => !IsEmpty && (Flags & RequestFlags.IsResolutionCall) != 0;
+        public bool IsResolutionCall => DirectParent != null && (Flags & RequestFlags.IsResolutionCall) != 0;
 
         /// <summary>Not the root resolution call.</summary>
-        public bool IsNestedResolutionCall => IsResolutionCall && !DirectParent.IsEmpty;
+        public bool IsNestedResolutionCall => IsResolutionCall && DirectParent.DirectParent != null;
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool OpensResolutionScope => !IsEmpty && (DirectParent.Flags & RequestFlags.OpensResolutionScope) != 0;
+        public bool OpensResolutionScope => DirectParent != null && (DirectParent.Flags & RequestFlags.OpensResolutionScope) != 0;
 
         /// <summary>Checks if the request Or its parent is wrapped in Func.
         /// Use <see cref="IsDirectlyWrappedInFunc"/> for the direct Func wrapper.</summary>
@@ -8510,7 +8503,6 @@ namespace DryIoc
             {
                 if (Factory.FactoryID == factoryId)
                     return this; // stop resolving to the same factory twice
-
                 if (factoryType == FactoryType.Decorator && Factory.FactoryType != FactoryType.Decorator)
                     decoratedFactoryID = FactoryID;
             }
@@ -9345,7 +9337,7 @@ namespace DryIoc
         }
 
         /// <summary>Checks that condition is met for request or there is no condition setup.</summary>
-        public bool CheckCondition(Request request) => (Setup.Condition == null || Setup.Condition(request));
+        public bool CheckCondition(Request request) => Setup.Condition?.Invoke(request) != false;
 
         /// <summary>Shortcut for <see cref="DryIoc.Setup.FactoryType"/>.</summary>
         public FactoryType FactoryType => Setup.FactoryType;
@@ -9959,7 +9951,7 @@ namespace DryIoc
             FactoryMethod factoryMethod;
             var factoryMethodSelector = Made.FactoryMethod ?? rules.FactoryMethod;
             if (factoryMethodSelector == null)
-                factoryMethod = FactoryMethod.Of(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
+                factoryMethod = new FactoryMethod(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
             else if ((factoryMethod = factoryMethodSelector(request)) == null)
                 return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
                     Error.UnableToSelectCtor, request.ImplementationType, request);
@@ -10161,6 +10153,15 @@ namespace DryIoc
 
         internal static Expression TryGetUsedInstanceOrCustomValueExpression(Request request, Request paramRequest, ServiceDetails paramDetails)
         {
+            if (paramDetails == DryIoc.ServiceDetails.Default)
+            {
+                // Generate the fast resolve call for used instances
+                if (request.Container.TryGetUsedInstance(paramRequest.ServiceType, out var instance))
+                    return Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
+                        Constant(paramRequest.ServiceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
+                return null;
+            }
+
             if (paramDetails.HasCustomValue)
             {
                 var serviceType = paramRequest.ServiceType;
@@ -10179,14 +10180,6 @@ namespace DryIoc
                 return hasConversionOperator
                     ? Convert(request.Container.GetConstantExpression(customValue), serviceType)
                     : request.Container.GetConstantExpression(customValue, serviceType);
-            }
-
-            if (paramDetails == DryIoc.ServiceDetails.Default)
-            {
-                // Generate the fast resolve call for used instances
-                if (request.Container.TryGetUsedInstance(paramRequest.ServiceType, out var instance))
-                    return Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
-                        Constant(paramRequest.ServiceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
             }
 
             return null;
@@ -10307,11 +10300,15 @@ namespace DryIoc
                 var openFactory = _openGenericFactory;
                 var implType = openFactory._implementationType;
                 var serviceType = request.GetActualServiceType();
+                var serviceTypeInfo = serviceType.GetTypeInfo();
 
-                var closedTypeArgs = implType == null || implType == serviceType.GetGenericDefinitionOrNull()
-                  ? serviceType.GetGenericParamsAndArgs()
-                  : implType.IsGenericParameter ? serviceType.One()
-                  : GetClosedTypeArgsOrNullForOpenGenericType(implType, serviceType, request, ifErrorReturnDefault);
+                Type[] closedTypeArgs;
+                if (implType == null || serviceTypeInfo.IsGenericType && serviceType.GetGenericTypeDefinition() == implType)
+                    closedTypeArgs = serviceTypeInfo.GenericTypeArguments;
+                else if (implType.IsGenericParameter)
+                    closedTypeArgs = serviceType.One();
+                else
+                    closedTypeArgs = GetClosedTypeArgsOrNullForOpenGenericType(implType, serviceType, request, ifErrorReturnDefault);
 
                 if (closedTypeArgs == null)
                     return null;
@@ -10428,21 +10425,27 @@ namespace DryIoc
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
             Type openImplType, Type closedServiceType, Request request, bool ifErrorReturnDefault)
         {
-            var serviceTypeArgs = closedServiceType.GetGenericParamsAndArgs();
-            var serviceTypeGenericDef = closedServiceType.GetGenericTypeDefinition();
-
-            var implTypeParams = openImplType.GetGenericParamsAndArgs();
+            var openImplTypeInfo = openImplType.GetTypeInfo();
+            var implTypeParams = openImplTypeInfo.GenericTypeParameters;
             var implTypeArgs = new Type[implTypeParams.Length];
-
             var implementedTypes = openImplType.GetImplementedTypes();
+
+            var closedServiceTypeInfo = closedServiceType.GetTypeInfo();
+            var serviceTypeArgs = closedServiceTypeInfo.GenericTypeArguments;
+            var serviceTypeGenericDef = closedServiceTypeInfo.GetGenericTypeDefinition();
 
             var matchFound = false;
             for (var i = 0; !matchFound && i < implementedTypes.Length; ++i)
             {
                 var implementedType = implementedTypes[i];
-                if (implementedType.IsOpenGeneric() && implementedType.GetGenericDefinitionOrNull() == serviceTypeGenericDef)
+                var implementedTypeInfo = implementedType.GetTypeInfo();
+                if (implementedTypeInfo.IsGenericType && 
+                    implementedTypeInfo.ContainsGenericParameters && 
+                    implementedType.GetGenericTypeDefinition() == serviceTypeGenericDef)
+                {
                     matchFound = MatchServiceWithImplementedTypeParams(
-                        implTypeArgs, implTypeParams, implementedType.GetGenericParamsAndArgs(), serviceTypeArgs);
+                        implTypeArgs, implTypeParams, implementedTypeInfo.GenericTypeArguments, serviceTypeArgs);
+                }
             }
 
             if (!matchFound)
@@ -12599,12 +12602,13 @@ namespace DryIoc
         {
             Type[] results;
 
-            var interfaces = sourceType.GetImplementedInterfaces();
+            var sourceTypeInfo = sourceType.GetTypeInfo();
+            var interfaces = sourceTypeInfo.ImplementedInterfaces.ToArrayOrSelf();
             var interfaceStartIndex = (asImplementedType & AsImplementedType.SourceType) == 0 ? 0 : 1;
             var includingObjectType = (asImplementedType & AsImplementedType.ObjectType) == 0 ? 0 : 1;
             var sourcePlusInterfaceCount = interfaceStartIndex + interfaces.Length;
 
-            var baseType = sourceType.GetTypeInfo().BaseType;
+            var baseType = sourceTypeInfo.BaseType;
             if (baseType == null || baseType == typeof(object))
                 results = new Type[sourcePlusInterfaceCount + includingObjectType];
             else
@@ -12685,7 +12689,22 @@ namespace DryIoc
         public static bool IsClosedGeneric(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
-            return typeInfo.IsGenericType && !typeInfo.ContainsGenericParameters;
+            return typeInfo.IsGenericType && typeInfo.IsClosedGeneric();
+        }
+
+        private static bool IsClosedGeneric(this TypeInfo typeInfo)
+        {
+            if (typeInfo.IsGenericParameter)
+                return false;
+
+            if (typeInfo.IsGenericTypeDefinition)
+                return false;
+
+            foreach (var arg in typeInfo.GenericTypeArguments)
+                if (!arg.GetTypeInfo().IsClosedGeneric())
+                    return false;
+
+            return true;
         }
 
         /// <summary>Returns true if type if open generic: contains at list one open generic parameter. Could be
@@ -12703,8 +12722,8 @@ namespace DryIoc
         /// <summary>Returns generic type parameters and arguments in order they specified. If type is not generic, returns empty array.</summary>
         public static Type[] GetGenericParamsAndArgs(this Type type)
         {
-            var ti = type.GetTypeInfo();
-            return ti.IsGenericTypeDefinition ? ti.GenericTypeParameters : ti.GenericTypeArguments;
+            var typeInfo = type.GetTypeInfo();
+            return typeInfo.IsGenericTypeDefinition ? typeInfo.GenericTypeParameters : typeInfo.GenericTypeArguments;
         }
 
         /// <summary>Returns array of interface and base class constraints for provider generic parameter type.</summary>
@@ -12846,6 +12865,7 @@ namespace DryIoc
                     yield return x;
         }
 
+        //todo: [Obsolete("Prefer to use `GetInstanceConstructors` and `GetPublicInstanceConstructors`")]
         /// <summary>Enumerates all constructors from input type.</summary>
         public static IEnumerable<ConstructorInfo> Constructors(this Type type,
             bool includeNonPublic = false, bool includeStatic = false)
@@ -12881,14 +12901,69 @@ namespace DryIoc
             return ctors;
         }
 
+        /// <summary>Returns public and non-public instance constructors.</summary>
+        public static ConstructorInfo[] GetInstanceConstructors(this Type type)
+        {
+            var ctorsEnumerable = type.GetTypeInfo().DeclaredConstructors;
+            var ctors = ctorsEnumerable as ConstructorInfo[] ?? ctorsEnumerable.ToArray(); 
+            if (ctors.Length == 0)
+                return ctors;
+
+            var ctor0 = ctors[0];
+            if (ctors.Length == 1)
+                return ctor0.IsStatic ? ArrayTools.Empty<ConstructorInfo>() : ctors;
+
+            if (ctors.Length == 2)
+            {
+                var ctor1 = ctors[1];
+                if (ctor0.IsStatic && ctor1.IsStatic)
+                    return ArrayTools.Empty<ConstructorInfo>();
+                if (ctor0.IsStatic)
+                    return new[] { ctor1 };
+                if (ctor1.IsStatic)
+                    return new[] { ctor0 };
+                return ctors;
+            }
+
+            return ctors.MatchUnsafe(x => !x.IsStatic);
+        }
+
+        /// <summary>Returns public-only instance constructors.</summary>
+        public static ConstructorInfo[] GetPublicInstanceConstructors(this Type type)
+        {
+            var ctorsEnumerable = type.GetTypeInfo().DeclaredConstructors;
+            var ctors = ctorsEnumerable as ConstructorInfo[] ?? ctorsEnumerable.ToArray();
+            if (ctors.Length == 0)
+                return ctors;
+
+            var ctor0 = ctors[0];
+            var skip0 = !ctor0.IsPublic || ctor0.IsStatic;
+            if (ctors.Length == 1)
+                return skip0 ? ArrayTools.Empty<ConstructorInfo>() : ctors;
+
+            if (ctors.Length == 2)
+            {
+                var ctor1 = ctors[1];
+                var skip1 = !ctor1.IsPublic || ctor1.IsStatic;
+                if (skip0 && skip1)
+                    return ArrayTools.Empty<ConstructorInfo>();
+                if (skip0)
+                    return new[] { ctor1 };
+                if (skip1)
+                    return new[] { ctor0 };
+                return ctors;
+            }
+
+            return ctors.MatchUnsafe(x => !x.IsStatic && x.IsPublic);
+        }
+
         /// <summary>Searches and returns the first constructor by its signature, e.g. with the same number of parameters of the same type.</summary>
         public static ConstructorInfo GetConstructorOrNull(this Type type, bool includeNonPublic = false, params Type[] args)
         {
             var argsLength = args.Length;
-            var ctors = Constructors(type, includeNonPublic, includeStatic: false).ToArrayOrSelf();
-            for (var c = 0; c < ctors.Length; c++)
+            var ctors = includeNonPublic ? type.GetInstanceConstructors() : type.GetPublicInstanceConstructors();
+            foreach (var ctor in ctors)
             {
-                var ctor = ctors[c];
                 var ctorParams = ctor.GetParameters();
                 if (ctorParams.Length == argsLength)
                 {
@@ -12919,18 +12994,32 @@ namespace DryIoc
         /// <summary>Returns single constructor otherwise (if no constructor or more than one) returns null.</summary>
         public static ConstructorInfo GetSingleConstructorOrNull(this Type type, bool includeNonPublic = false)
         {
-            ConstructorInfo ctor = null;
-            var ctors = Constructors(type, includeNonPublic, includeStatic: false).ToArrayOrSelf();
-            for (var i = 0; i < ctors.Length; i++)
+            ConstructorInfo foundCtor = null;
+            if (includeNonPublic)
             {
-                var x = ctors[i];
-                if (ctor != null) // if multiple constructors
-                    return null;
-                if (includeNonPublic || x.IsPublic)
-                    ctor = x;
+                foreach (var ctor in type.GetTypeInfo().DeclaredConstructors)
+                {
+                    if (!ctor.IsStatic)
+                    {
+                        if (foundCtor != null)
+                            return null;
+                        foundCtor = ctor;
+                    }
+                }
             }
-
-            return ctor;
+            else
+            {
+                foreach (var ctor in type.GetTypeInfo().DeclaredConstructors)
+                {
+                    if (!ctor.IsStatic && ctor.IsPublic)
+                    {
+                        if (foundCtor != null)
+                            return null;
+                        foundCtor = ctor;
+                    }
+                }
+            }
+            return foundCtor;
         }
 
         /// <summary>Returns single constructor otherwise (if no or more than one) throws an exception</summary>
@@ -12940,20 +13029,28 @@ namespace DryIoc
         /// <summary>Looks up for single declared method with the specified name. Returns null if method is not found.</summary>
         public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
         {
+            MethodInfo foundMethod = null;
             if (includeNonPublic)
             {
                 foreach (var method in type.GetTypeInfo().DeclaredMethods)
                     if (method.Name == name)
-                        return method;
+                    {
+                        if (foundMethod != null)
+                            return null;
+                        foundMethod = method;
+                    }
             }
             else
             {
                 foreach (var method in type.GetTypeInfo().DeclaredMethods)
                     if (method.IsPublic && method.Name == name)
-                        return method;
+                    {
+                        if (foundMethod != null)
+                            return null;
+                        foundMethod = method;
+                    }
             }
-
-            return null;
+            return foundMethod;
         }
 
         /// <summary>Looks for single declared (not inherited) method by name, and throws if not found.</summary>
