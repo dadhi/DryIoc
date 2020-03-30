@@ -10432,7 +10432,7 @@ namespace DryIoc
 
             var closedServiceTypeInfo = closedServiceType.GetTypeInfo();
             var serviceTypeArgs = closedServiceTypeInfo.GenericTypeArguments;
-            var serviceTypeGenericDef = closedServiceTypeInfo.GetGenericTypeDefinition();
+            var serviceTypeGenericDef = closedServiceType.GetGenericTypeDefinition();
 
             var matchFound = false;
             for (var i = 0; !matchFound && i < implementedTypes.Length; ++i)
@@ -12689,19 +12689,19 @@ namespace DryIoc
         public static bool IsClosedGeneric(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
-            return typeInfo.IsGenericType && typeInfo.IsClosedGeneric();
+            return typeInfo.IsGenericType && typeInfo.IsClosedGeneric(type);
         }
 
-        private static bool IsClosedGeneric(this TypeInfo typeInfo)
+        private static bool IsClosedGeneric(this TypeInfo typeInfo, Type type)
         {
-            if (typeInfo.IsGenericParameter)
+            if (type.IsGenericParameter)
                 return false;
 
             if (typeInfo.IsGenericTypeDefinition)
                 return false;
 
-            foreach (var arg in typeInfo.GenericTypeArguments)
-                if (!arg.GetTypeInfo().IsClosedGeneric())
+            foreach (var typeArg in typeInfo.GenericTypeArguments)
+                if (!typeArg.GetTypeInfo().IsClosedGeneric(typeArg))
                     return false;
 
             return true;
