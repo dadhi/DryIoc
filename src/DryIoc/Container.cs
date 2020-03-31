@@ -1373,13 +1373,16 @@ namespace DryIoc
             if (_registry.Value.Decorators.IsEmpty && request.Rules.DynamicRegistrationProviders.IsNullOrEmpty())
                 return null;
 
-            var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
+            var serviceType = request.ServiceType;
+            var arrayElementType = serviceType.GetArrayElementTypeOrNull();
             if (arrayElementType != null)
+            {
                 request = request.WithChangedServiceInfo(x =>
                     x.With(typeof(IEnumerable<>).MakeGenericType(arrayElementType)));
+                serviceType = request.ServiceType;
+            }
 
             var container = request.Container;
-            var serviceType = request.ServiceType;
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
 
             // Combine with required service type if different from service type
