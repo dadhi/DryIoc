@@ -1087,51 +1087,49 @@ namespace DryIoc
             var requiredServiceType = details.RequiredServiceType;
 
             Type serviceType;
-            bool isServiceTypeClosedGeneric;
             if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
-            {
                 serviceType = requiredServiceType;
-                isServiceTypeClosedGeneric = false;
-            }
             else
             {
+                serviceType = request.GetActualServiceType();
+
                 // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServiceType, ServiceKey }
                 // presumes that required service type is closed generic
-                serviceType = request.GetActualServiceType();
-                isServiceTypeClosedGeneric = serviceType.IsClosedGeneric();
-                if (isServiceTypeClosedGeneric && serviceKey is OpenGenericTypeKey openGenericTypeKey)
+                if (serviceKey is OpenGenericTypeKey openGenericTypeKey && 
+                    serviceType.GetTypeInfo().IsGenericType && 
+                    serviceType.GetGenericTypeDefinition() == openGenericTypeKey.RequiredServiceType)
                 {
-                    var openGenericType = openGenericTypeKey.RequiredServiceType;
-                    if (openGenericType == serviceType.GetGenericTypeDefinition())
-                    {
-                        serviceType = openGenericType;
-                        serviceKey = openGenericTypeKey.ServiceKey;
-                    }
+                    serviceType = openGenericTypeKey.RequiredServiceType;
+                    serviceKey = openGenericTypeKey.ServiceKey;
                 }
             }
 
-            if (Rules.FactorySelector != null && serviceKey == null)
+            if (serviceKey == null && Rules.FactorySelector != null)
                 return GetRuleSelectedServiceFactoryOrDefault(request, serviceType);
 
             var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-            // For closed-generic type, when the entry is not found or the key in entry is not found,
-            // go for the open-generic services
-            if (isServiceTypeClosedGeneric && (entry == null || serviceKey != null && (
-                entry is Factory && !serviceKey.Equals(DefaultKey.Value) ||
-                entry is FactoriesEntry factoriesEntry && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null)))
-                entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) ?? entry;
+            // If the entry is not found or the key in entry is not found go for the open-generic services
+            if (entry == null ||
+                serviceKey != null && (
+                    entry is Factory && !serviceKey.Equals(DefaultKey.Value) ||
+                    entry is FactoriesEntry facEntry && facEntry.Factories.GetValueOrDefault(serviceKey) == null))
+            {
+                if (serviceType.IsClosedGeneric())
+                    entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) ?? entry;
+            }
 
             // Most common case when we have a single default factory and no dynamic rules in addition
             if (entry is Factory singleDefaultFactory && 
                 Rules.DynamicRegistrationProviders.IsNullOrEmpty())
             {
                 if (serviceKey != null && serviceKey != DefaultKey.Value || 
-                    !singleDefaultFactory.CheckCondition(request) ||
+                    singleDefaultFactory.Setup.Condition?.Invoke(request) == false ||
                     (details.MetadataKey != null || details.Metadata != null) && 
                     !singleDefaultFactory.Setup.MatchesMetadata(details.MetadataKey, details.Metadata))
                     return null;
+
                 return singleDefaultFactory;
             }
 
@@ -1140,11 +1138,9 @@ namespace DryIoc
                 : entry.To<FactoriesEntry>().Factories
                        .Visit(new List<KV<object, Factory>>(2), (x, list) => list.Add(KV.Of(x.Key, x.Value))).ToArray(); // todo: optimize - we may not need ToArray here
 
-            if (!Rules.DynamicRegistrationProviders.IsNullOrEmpty() &&
-                (factories.IsNullOrEmpty() || !Rules.UseDynamicRegistrationsAsFallbackOnly))
-                factories = CombineRegisteredWithDynamicFactories(factories,
-                    true, FactoryType.Service, serviceType, serviceKey);
-
+            if ((factories.IsNullOrEmpty() || !Rules.UseDynamicRegistrationsAsFallbackOnly) &&
+                !Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+                factories = CombineRegisteredWithDynamicFactories(factories, true, FactoryType.Service, serviceType, serviceKey);
             if (factories.IsNullOrEmpty())
                 return null;
 
@@ -12689,20 +12685,23 @@ namespace DryIoc
         public static bool IsClosedGeneric(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
-            return typeInfo.IsGenericType && typeInfo.IsClosedGeneric(type);
+            return typeInfo.IsGenericType && 
+                   !typeInfo.IsGenericTypeDefinition && 
+                   AreAllTypeArgumentsClosed(typeInfo.GenericTypeArguments);
         }
 
-        private static bool IsClosedGeneric(this TypeInfo typeInfo, Type type)
+        private static bool AreAllTypeArgumentsClosed(Type[] typeArgs)
         {
-            if (type.IsGenericParameter)
-                return false;
-
-            if (typeInfo.IsGenericTypeDefinition)
-                return false;
-
-            foreach (var typeArg in typeInfo.GenericTypeArguments)
-                if (!typeArg.GetTypeInfo().IsClosedGeneric(typeArg))
+            foreach (var typeArg in typeArgs)
+            {
+                if (typeArg.IsGenericParameter)
                     return false;
+                var typeArgInfo = typeArg.GetTypeInfo();
+                if (!typeArgInfo.IsGenericType)
+                    continue;
+                if (!AreAllTypeArgumentsClosed(typeArgInfo.GenericTypeArguments))
+                    return false;
+            }
 
             return true;
         }
