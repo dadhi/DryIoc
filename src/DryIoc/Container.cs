@@ -1514,20 +1514,22 @@ namespace DryIoc
 
         Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
         {
-            var decorators = Empty<Factory>();
-
             var allDecorators = _registry.Value.Decorators;
-            if (!allDecorators.IsEmpty)
-                decorators = (Factory[])allDecorators.GetValueOrDefault(serviceType) ?? Empty<Factory>();
+            var decorators = allDecorators.IsEmpty ? null : (Factory[])allDecorators.GetValueOrDefault(serviceType);
+            if (decorators == null)
+            {
+                if (Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+                    return Empty<Factory>();
+                return CombineRegisteredWithDynamicFactories(null, true, FactoryType.Decorator, serviceType).Map(x => x.Value);
+            }
 
-            if (!decorators.IsNullOrEmpty() && Rules.UseDynamicRegistrationsAsFallbackOnly ||
+            if (Rules.UseDynamicRegistrationsAsFallbackOnly ||
                 Rules.DynamicRegistrationProviders.IsNullOrEmpty())
                 return decorators;
 
+            var decoratorsWithDefaultKey = decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d));
             return CombineRegisteredWithDynamicFactories(
-                    decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)), 
-                    true, FactoryType.Decorator, serviceType
-                ).Map(x => x.Value);
+                decoratorsWithDefaultKey, true, FactoryType.Decorator, serviceType).Map(x => x.Value);
         }
 
         Type IContainer.GetWrappedType(Type serviceType, Type requiredServiceType)
@@ -1664,8 +1666,7 @@ namespace DryIoc
                     resultFactories = dynamicRegistrations.Match(x =>
                         x.Factory.FactoryType == factoryType &&
                         x.Factory.ValidateAndNormalizeRegistration(serviceType, serviceKey, false, Rules),
-                        x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory))
-                        .ToArrayOrSelf();
+                        x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
                     continue;
                 }
 
