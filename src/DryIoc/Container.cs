@@ -10257,7 +10257,7 @@ namespace DryIoc
             if (!implTypeInfo.IsGenericTypeDefinition)
             {
                 if (implTypeInfo.IsGenericType && !ReflectionTools.AreAllTypeArgumentsClosed(implTypeInfo.GetGenericParamsAndArgsUnsafe()))
-                    Throw.It(Error.RegisteringNotAGenericTypedefImplType, implType, implType.GetGenericDefinitionOrNull());
+                    Throw.It(Error.RegisteringNotAGenericTypedefImplType, implType, implTypeInfo.GetGenericTypeDefinition());
 
                 else if (implType != serviceType && serviceType != typeof(object))
                 {
@@ -10273,47 +10273,43 @@ namespace DryIoc
                     }
                 }
             }
-            else if (implType != serviceType)
+            else if (implType != serviceType) // implTypeInfo.IsGenericTypeDefinition
             {
-                if (serviceType.IsGenericDefinition())
-                    ThrowIfImplementationAndServiceTypeParamsDontMatch(implType, serviceType);
+                var serviceTypeInfo = serviceType.GetTypeInfo();
+                if (serviceTypeInfo.IsGenericTypeDefinition)
+                {
+                    var implTypeParams = implTypeInfo.GetGenericParamsAndArgsUnsafe();
+                    var implementedTypes = implType.GetImplementedTypes();
 
-                else if (implTypeInfo.IsGenericType && serviceType.IsOpenGeneric())
+                    var implementedTypeFound = false;
+                    var containsAllTypeParams = false;
+                    for (var i = 0; !containsAllTypeParams && i < implementedTypes.Length; ++i)
+                    {
+                        var implementedType = implementedTypes[i];
+                        implementedTypeFound = implementedType.GetGenericDefinitionOrNull() == serviceType;
+                        containsAllTypeParams = implementedTypeFound && implementedType.ContainsAllGenericTypeParameters(implTypeParams);
+                    }
+
+                    if (!implementedTypeFound)
+                        Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
+
+                    if (!containsAllTypeParams)
+                        Throw.It(Error.RegisteringOpenGenericServiceWithMissingTypeArgs,
+                            implType, serviceType, implementedTypes.Match(t => t.GetGenericDefinitionOrNull() == serviceType));
+                }
+
+                else if (serviceTypeInfo.IsGenericType && !ReflectionTools.AreAllTypeArgumentsClosed(serviceTypeInfo.GetGenericParamsAndArgsUnsafe()))
                     Throw.It(Error.RegisteringNotAGenericTypedefServiceType,
-                        serviceType, serviceType.GetGenericTypeDefinition());
+                        serviceType, serviceTypeInfo.GetGenericTypeDefinition());
 
-                else if (!serviceType.IsGeneric())
+                else if (!serviceTypeInfo.IsGenericType)
                     Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
 
-                else if (!implType.IsImplementingServiceType(serviceType.GetGenericTypeDefinition()))
+                else if (!implType.IsImplementingServiceType(serviceTypeInfo.GetGenericTypeDefinition()))
                     Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
             }
 
             return true;
-        }
-
-        private static void ThrowIfImplementationAndServiceTypeParamsDontMatch(Type implType, Type serviceType)
-        {
-            var implTypeParams = implType.GetGenericParamsAndArgs();
-            var implementedTypes = implType.GetImplementedTypes();
-
-            var implementedTypeFound = false;
-            var containsAllTypeParams = false;
-            for (var i = 0; !containsAllTypeParams && i < implementedTypes.Length; ++i)
-            {
-                var implementedType = implementedTypes[i];
-                implementedTypeFound = implementedType.GetGenericDefinitionOrNull() == serviceType;
-                containsAllTypeParams = implementedTypeFound
-                    && implementedType.ContainsAllGenericTypeParameters(implTypeParams);
-            }
-
-            if (!implementedTypeFound)
-                Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
-
-            if (!containsAllTypeParams)
-                Throw.It(Error.RegisteringOpenGenericServiceWithMissingTypeArgs,
-                    implType, serviceType,
-                    implementedTypes.Where(t => t.GetGenericDefinitionOrNull() == serviceType));
         }
 
 #region Implementation
@@ -10328,10 +10324,7 @@ namespace DryIoc
         {
             public ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => _generatedFactories.Value;
 
-            public ClosedGenericFactoryGenerator(ReflectionFactory openGenericFactory)
-            {
-                _openGenericFactory = openGenericFactory;
-            }
+            public ClosedGenericFactoryGenerator(ReflectionFactory openGenericFactory) => _openGenericFactory = openGenericFactory;
 
             public Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false)
             {
@@ -10341,15 +10334,47 @@ namespace DryIoc
                 var serviceTypeInfo = serviceType.GetTypeInfo();
 
                 Type[] closedTypeArgs;
-                if (implType == null || serviceTypeInfo.IsGenericType && serviceType.GetGenericTypeDefinition() == implType)
-                    closedTypeArgs = serviceTypeInfo.GenericTypeArguments;
+                if (implType == null || serviceTypeInfo.IsGenericType && serviceTypeInfo.GetGenericTypeDefinition() == implType)
+                    closedTypeArgs = serviceTypeInfo.GetGenericParamsAndArgsUnsafe();
                 else if (implType.IsGenericParameter)
                     closedTypeArgs = serviceType.One();
                 else
-                    closedTypeArgs = GetClosedTypeArgsOrNullForOpenGenericType(implType, serviceType, request, ifErrorReturnDefault);
+                {
+                    var implTypeInfo = implType.GetTypeInfo();
+                    var implTypeParams = implTypeInfo.GetGenericParamsAndArgsUnsafe();
 
-                if (closedTypeArgs == null)
-                    return null;
+                    closedTypeArgs = new Type[implTypeParams.Length];
+                    var implementedTypes = implType.GetImplementedTypes();
+
+                    var serviceTypeArgs = serviceTypeInfo.GetGenericParamsAndArgsUnsafe();
+
+                    var matchFound = false;
+                    for (var i = 0; !matchFound && i < implementedTypes.Length; ++i)
+                    {
+                        var implementedType = implementedTypes[i];
+                        var implementedTypeInfo = implementedType.GetTypeInfo();
+                        if (implementedTypeInfo.IsGenericType && 
+                            implementedTypeInfo.GetGenericTypeDefinition() == serviceTypeInfo.GetGenericTypeDefinition())
+                        {
+                            var implementedTypeGenericParams = implementedTypeInfo.GetGenericParamsAndArgsUnsafe();
+                            if (!ReflectionTools.AreAllTypeArgumentsClosed(implementedTypeGenericParams))
+                                matchFound = MatchServiceWithImplementedTypeParams(
+                                    closedTypeArgs, implTypeParams, implementedTypeGenericParams, serviceTypeArgs);
+                        }
+                    }
+
+                    if (!matchFound)
+                        return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null : 
+                            Throw.For<Factory>(Error.NoMatchedImplementedTypesWithServiceType, implType, implementedTypes, request);
+
+                    MatchOpenGenericConstraints(implTypeParams, closedTypeArgs);
+
+                    for (var i = 0; i < closedTypeArgs.Length; i++)
+                        if (closedTypeArgs[i] == null)
+                            return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null : 
+                                Throw.For<Factory>(Error.NotFoundOpenGenericImplTypeArgInService,
+                                    implType, implTypeParams[i], request);
+                }
 
                 var made = openFactory.Made;
                 if (made.FactoryMethod != null)
@@ -10358,13 +10383,12 @@ namespace DryIoc
                     request = request.WithResolvedFactory(openFactory, ifErrorReturnDefault, ifErrorReturnDefault, copyRequest: true);
                     var factoryMethod = made.FactoryMethod(request);
                     if (factoryMethod == null)
-                        return ifErrorReturnDefault ? null : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
+                        return ifErrorReturnDefault ? null : // todo: should we check ifUnresolved here,
+                            Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
 
                     var checkMatchingType = implType != null && implType.IsGenericParameter;
                     var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request, checkMatchingType);
-
-                    // may be null only for `IfUnresolved.ReturnDefault` or if the check for matching type is failed
-                    if (closedFactoryMethod == null)
+                    if (closedFactoryMethod == null) // may be null only for `IfUnresolved.ReturnDefault` or if the check for matching type is failed
                         return null;
 
                     made = Made.Of(closedFactoryMethod, made.Parameters, made.PropertiesAndFields);
@@ -10372,9 +10396,8 @@ namespace DryIoc
 
                 if (implType != null)
                 {
-                    implType = implType.IsGenericParameter
-                        ? closedTypeArgs[0]
-                        : Throw.IfThrows<ArgumentException, Type>(() => implType.MakeGenericType(closedTypeArgs), 
+                    implType = implType.IsGenericParameter ? closedTypeArgs[0] : 
+                        Throw.IfThrows<ArgumentException, Type>(() => implType.MakeGenericType(closedTypeArgs), 
                             !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
                             Error.NoMatchedGenericParamConstraints, implType, request);
                     if (implType == null)
@@ -10464,39 +10487,38 @@ namespace DryIoc
             Type openImplType, Type closedServiceType, Request request, bool ifErrorReturnDefault)
         {
             var openImplTypeInfo = openImplType.GetTypeInfo();
-            var implTypeParams = openImplTypeInfo.GenericTypeParameters;
+            var implTypeParams = openImplTypeInfo.GetGenericParamsAndArgsUnsafe();
             var implTypeArgs = new Type[implTypeParams.Length];
             var implementedTypes = openImplType.GetImplementedTypes();
 
             var closedServiceTypeInfo = closedServiceType.GetTypeInfo();
-            var serviceTypeArgs = closedServiceTypeInfo.GenericTypeArguments;
-            var serviceTypeGenericDef = closedServiceType.GetGenericTypeDefinition();
+            var serviceTypeArgs = closedServiceTypeInfo.GetGenericParamsAndArgsUnsafe();
+            var serviceTypeGenericDef = closedServiceTypeInfo.GetGenericTypeDefinition();
 
             var matchFound = false;
             for (var i = 0; !matchFound && i < implementedTypes.Length; ++i)
             {
                 var implementedType = implementedTypes[i];
                 var implementedTypeInfo = implementedType.GetTypeInfo();
-                if (implementedTypeInfo.IsGenericType && implementedTypeInfo.ContainsGenericParameters && 
-                    implementedType.GetGenericTypeDefinition() == serviceTypeGenericDef)
+                if (implementedTypeInfo.IsGenericType && implementedTypeInfo.GetGenericTypeDefinition() == serviceTypeGenericDef)
                 {
-                    matchFound = MatchServiceWithImplementedTypeParams(
-                        implTypeArgs, implTypeParams, implementedTypeInfo.GenericTypeArguments, serviceTypeArgs);
+                    var implementedTypeGenericParams = implementedTypeInfo.GetGenericParamsAndArgsUnsafe();
+                    if (!ReflectionTools.AreAllTypeArgumentsClosed(implementedTypeGenericParams))
+                        matchFound = MatchServiceWithImplementedTypeParams(
+                            implTypeArgs, implTypeParams, implementedTypeGenericParams, serviceTypeArgs);
                 }
             }
 
             if (!matchFound)
-                return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
-                    : Throw.For<Type[]>(Error.NoMatchedImplementedTypesWithServiceType,
-                        openImplType, implementedTypes, request);
+                return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null : 
+                    Throw.For<Type[]>(Error.NoMatchedImplementedTypesWithServiceType, openImplType, implementedTypes, request);
 
             MatchOpenGenericConstraints(implTypeParams, implTypeArgs);
 
             for (var i = 0; i < implTypeArgs.Length; i++)
                 if (implTypeArgs[i] == null)
-                    return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
-                        : Throw.For<Type[]>(Error.NotFoundOpenGenericImplTypeArgInService,
-                            openImplType, implTypeParams[i], request);
+                    return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null : 
+                        Throw.For<Type[]>(Error.NotFoundOpenGenericImplTypeArgInService, openImplType, implTypeParams[i], request);
 
             return implTypeArgs;
         }
@@ -12742,7 +12764,7 @@ namespace DryIoc
         }
 
         /// <summary>Checks that all type args are closed.</summary>
-        internal static bool AreAllTypeArgumentsClosed(Type[] typeArgs)
+        internal static bool AreAllTypeArgumentsClosed(this Type[] typeArgs)
         {
             foreach (var typeArg in typeArgs)
             {
@@ -12766,7 +12788,9 @@ namespace DryIoc
         public static Type[] GetGenericParamsAndArgs(this Type type)
         {
             var typeInfo = type.GetTypeInfo();
-            return typeInfo.IsGenericTypeDefinition ? typeInfo.GenericTypeParameters : typeInfo.GenericTypeArguments;
+            return typeInfo.IsGenericTypeDefinition || typeInfo.IsGenericType 
+                ? typeInfo.GetGenericParamsAndArgsUnsafe()
+                : Empty<Type>();
         }
 
         [MethodImpl((MethodImplOptions)256)]
