@@ -5901,7 +5901,7 @@ namespace DryIoc
             // if there is only one constructor then use it
             if (ctorCount == 1)
                 return new FactoryMethod(ctors[0]);
-
+             
             // stop here if you need a lookup for most resolvable constructor
             if (!mostResolvable)
                 return null;
@@ -9986,7 +9986,9 @@ namespace DryIoc
             FactoryMethod factoryMethod;
             var factoryMethodSelector = Made.FactoryMethod ?? rules.FactoryMethod;
             if (factoryMethodSelector == null)
+            {
                 factoryMethod = new FactoryMethod(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
+            }
             else if ((factoryMethod = factoryMethodSelector(request)) == null)
                 return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
                     Error.UnableToSelectCtor, request.ImplementationType, request);
@@ -10251,9 +10253,10 @@ namespace DryIoc
             if (isStaticallyChecked || implType == null)
                 return true;
 
-            if (!implType.IsGenericDefinition())
+            var implTypeInfo = implType.GetTypeInfo();
+            if (!implTypeInfo.IsGenericTypeDefinition)
             {
-                if (implType.IsOpenGeneric())
+                if (implTypeInfo.IsGenericType && !ReflectionTools.AreAllTypeArgumentsClosed(implTypeInfo.GetGenericParamsAndArgsUnsafe()))
                     Throw.It(Error.RegisteringNotAGenericTypedefImplType, implType, implType.GetGenericDefinitionOrNull());
 
                 else if (implType != serviceType && serviceType != typeof(object))
@@ -10275,7 +10278,7 @@ namespace DryIoc
                 if (serviceType.IsGenericDefinition())
                     ThrowIfImplementationAndServiceTypeParamsDontMatch(implType, serviceType);
 
-                else if (implType.IsGeneric() && serviceType.IsOpenGeneric())
+                else if (implTypeInfo.IsGenericType && serviceType.IsOpenGeneric())
                     Throw.It(Error.RegisteringNotAGenericTypedefServiceType,
                         serviceType, serviceType.GetGenericTypeDefinition());
 
@@ -12725,7 +12728,7 @@ namespace DryIoc
             var typeInfo = type.GetTypeInfo();
             return typeInfo.IsGenericType && 
                    !typeInfo.IsGenericTypeDefinition && 
-                   AreAllTypeArgumentsClosed(typeInfo.GenericTypeArguments);
+                   AreAllTypeArgumentsClosed(typeInfo.GetGenericParamsAndArgsUnsafe());
         }
 
         /// <summary>Returns true if type if open generic: contains at list one open generic parameter. Could be
@@ -12735,10 +12738,11 @@ namespace DryIoc
             var typeInfo = type.GetTypeInfo();
             return typeInfo.IsGenericTypeDefinition || 
                    typeInfo.IsGenericType && 
-                   !AreAllTypeArgumentsClosed(typeInfo.GenericTypeArguments);
+                    !AreAllTypeArgumentsClosed(typeInfo.GetGenericParamsAndArgsUnsafe());
         }
 
-        private static bool AreAllTypeArgumentsClosed(Type[] typeArgs)
+        /// <summary>Checks that all type args are closed.</summary>
+        internal static bool AreAllTypeArgumentsClosed(Type[] typeArgs)
         {
             foreach (var typeArg in typeArgs)
             {
@@ -12747,7 +12751,7 @@ namespace DryIoc
                 var typeArgInfo = typeArg.GetTypeInfo();
                 if (!typeArgInfo.IsGenericType)
                     continue;
-                if (!AreAllTypeArgumentsClosed(typeArgInfo.GenericTypeArguments))
+                if (!AreAllTypeArgumentsClosed(typeArgInfo.GetGenericParamsAndArgsUnsafe()))
                     return false;
             }
 
@@ -12763,6 +12767,16 @@ namespace DryIoc
         {
             var typeInfo = type.GetTypeInfo();
             return typeInfo.IsGenericTypeDefinition ? typeInfo.GenericTypeParameters : typeInfo.GenericTypeArguments;
+        }
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal static Type[] GetGenericParamsAndArgsUnsafe(this TypeInfo typeInfo)
+        {
+#if PCL || PCL259 || PCL328 || NET35 || NET40 || NET403 || NETSTANDARD1_0 || NETSTANDARD1_1 || NETSTANDARD1_2 || NETSTANDARD1_3 || NETSTANDARD1_4
+            return typeInfo.IsGenericTypeDefinition ? typeInfo.GenericTypeParameters : typeInfo.GenericTypeArguments;
+#else
+            return typeInfo.GetGenericArguments();
+#endif
         }
 
         /// <summary>Returns array of interface and base class constraints for provider generic parameter type.</summary>
