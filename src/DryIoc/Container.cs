@@ -12728,6 +12728,16 @@ namespace DryIoc
                    AreAllTypeArgumentsClosed(typeInfo.GenericTypeArguments);
         }
 
+        /// <summary>Returns true if type if open generic: contains at list one open generic parameter. Could be
+        /// generic type definition as well.</summary>
+        public static bool IsOpenGeneric(this Type type)
+        {
+            var typeInfo = type.GetTypeInfo();
+            return typeInfo.IsGenericTypeDefinition || 
+                   typeInfo.IsGenericType && 
+                   !AreAllTypeArgumentsClosed(typeInfo.GenericTypeArguments);
+        }
+
         private static bool AreAllTypeArgumentsClosed(Type[] typeArgs)
         {
             foreach (var typeArg in typeArgs)
@@ -12742,14 +12752,6 @@ namespace DryIoc
             }
 
             return true;
-        }
-
-        /// <summary>Returns true if type if open generic: contains at list one open generic parameter. Could be
-        /// generic type definition as well.</summary>
-        public static bool IsOpenGeneric(this Type type)
-        {
-            var typeInfo = type.GetTypeInfo();
-            return typeInfo.IsGenericType && typeInfo.ContainsGenericParameters;
         }
 
         /// <summary>Returns generic type definition if type is generic and null otherwise.</summary>
