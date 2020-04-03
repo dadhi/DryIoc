@@ -1,6 +1,12 @@
 Version History
 ---------------
 
+## v4.1.4 Bug-fix release
+
+- #242 Validate call hangs when there are many singletons
+- #245 Validate may not create the actual expressions to be more performant
+- #250 Original stack trace is lost at Interpreter.TryInterpretAndUnwrapContainerException
+
 ## v4.1.3 Bug-fix releases
 
 - #248 WithConcreteTypeDynamicRegistrations condition gets called with serviceKey always null
