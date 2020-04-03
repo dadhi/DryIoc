@@ -10300,12 +10300,12 @@ namespace DryIoc
 
                 else if (serviceTypeInfo.IsGenericType && !ReflectionTools.AreAllTypeArgumentsClosed(serviceTypeInfo.GetGenericParamsAndArgsUnsafe()))
                     Throw.It(Error.RegisteringNotAGenericTypedefServiceType,
-                        serviceType, serviceTypeInfo.GetGenericTypeDefinition());
+                        serviceType, serviceType.GetGenericTypeDefinition());
 
                 else if (!serviceTypeInfo.IsGenericType)
                     Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
 
-                else if (!implType.IsImplementingServiceType(serviceTypeInfo.GetGenericTypeDefinition()))
+                else if (!implType.IsImplementingServiceType(serviceType.GetGenericTypeDefinition()))
                     Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
             }
 
