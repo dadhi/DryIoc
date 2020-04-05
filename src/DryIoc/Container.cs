@@ -7019,6 +7019,7 @@ namespace DryIoc
             registrator.Register(new DelegateFactory(factoryDelegate.ToFactoryDelegate, reuse, setup), 
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
+        //[Obsolete("Replaced with `RegisterDelegate<Dep1,...,Dep2, R>()`")]
         /// <summary>Registers decorator function that gets decorated value as input and returns decorator.
         /// Note: Delegate decorator will use <see cref="Reuse"/> of decoratee service.</summary>
         public static void RegisterDelegateDecorator<TService>(this IRegistrator registrator,
