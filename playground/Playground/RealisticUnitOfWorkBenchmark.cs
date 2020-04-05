@@ -1061,19 +1061,19 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             //[Benchmark] 
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace_MsDI() => Measure(PrepareGraceMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object Lamar_MsDI() => Measure(PrepareLamarMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            [Benchmark]
+            //[Benchmark]
             public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
         }
 
