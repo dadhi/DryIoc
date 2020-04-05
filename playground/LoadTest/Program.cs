@@ -38,6 +38,10 @@ namespace LoadTest
             return container;
         }
 
+        /*
+        Validation finished
+        00:01:29.20
+        */
         static /*async Task*/void Main(string[] args)
         {
             Console.WriteLine("Starting up!");

@@ -2705,8 +2705,10 @@ namespace DryIoc
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
-                // restore the original excpetion which is expected by the consumer code
-                throw tex.InnerException;
+                // restore the original exception which is expected by the consumer code
+                tex.InnerException.TryRethrowWithPreservedStackTrace();
+                result = null;
+                return false;
             }
         }
 
@@ -12170,7 +12172,7 @@ namespace DryIoc
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
         public ContainerException(int errorCode, string message, Exception innerException)
-            : base($"code: {DryIoc.Error.NameOf(errorCode)}, message: {message}", innerException)
+            : base($"code: {DryIoc.Error.NameOf(errorCode)}; message: {message}", innerException)
         {
             Error = errorCode;
         }
@@ -12548,6 +12550,25 @@ namespace DryIoc
     /// <summary>Contains helper methods to work with Type: for instance to find Type implemented base types and interfaces, etc.</summary>
     public static class ReflectionTools
     {
+#if SUPPORTS_DELEGATE_METHOD
+        private static Lazy<Action<Exception>> _preserveExceptionStackTraceAction = new Lazy<Action<Exception>>(() =>
+            typeof(Exception).GetSingleMethodOrNull("InternalPreserveStackTrace", true)
+            ?.To(x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));
+
+        /// <summary>Preserves the stack trace becfore re-throwing.</summary>
+        public static void TryRethrowWithPreservedStackTrace(this Exception ex)
+        {
+            _preserveExceptionStackTraceAction.Value?.Invoke(ex);
+            throw ex;
+        }
+#else
+        /// <summary>Preserves the stack trace becfore re-throwing.</summary>
+        public static void TryRethrowWithPreservedStackTrace(this Exception ex)
+        {
+            throw ex;
+        }
+#endif
+
         /// <summary>Flags for <see cref="GetImplementedTypes"/> method.</summary>
         [Flags]
         public enum AsImplementedType
