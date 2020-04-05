@@ -5869,7 +5869,7 @@ namespace DryIoc
 
             // if there is only one constructor then use it
             if (ctorCount == 1)
-                return Of(ctors[0]);
+                return new FactoryMethod(ctors[0]);
 
             // stop here if you need a lookup for most resolvable constructor
             if (!mostResolvable)
@@ -5976,7 +5976,7 @@ namespace DryIoc
         /// <summary>Easy way to specify default constructor to be used for resolution.</summary>
         public static FactoryMethodSelector DefaultConstructor(bool includeNonPublic = false) => request =>
             request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request)
-                .GetConstructorOrNull(includeNonPublic, Empty<Type>())?.To(ctor => Of(ctor));
+                .GetConstructorOrNull(includeNonPublic, Empty<Type>())?.To(ctor => new FactoryMethod(ctor));
 
         /// Better be named `ConstructorWithMostResolvableArguments`.
         /// Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
@@ -5989,6 +5989,10 @@ namespace DryIoc
         /// Works both for resolving service and Func{TArgs..., TService}</summary>
         public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublic =
             Constructor(mostResolvable: true, includeNonPublic: true);
+
+        /// <summary>Just creates a thingy from the constructor</summary>
+        public FactoryMethod(ConstructorInfo constructor) => 
+            ConstructorOrMethodOrMember = constructor;
 
         private FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
         {
@@ -9946,7 +9950,7 @@ namespace DryIoc
             FactoryMethod factoryMethod;
             var factoryMethodSelector = Made.FactoryMethod ?? rules.FactoryMethod;
             if (factoryMethodSelector == null)
-                factoryMethod = FactoryMethod.Of(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
+                factoryMethod = new FactoryMethod(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
             else if ((factoryMethod = factoryMethodSelector(request)) == null)
                 return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
                     Error.UnableToSelectCtor, request.ImplementationType, request);
