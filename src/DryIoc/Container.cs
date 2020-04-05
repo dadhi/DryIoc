@@ -1673,8 +1673,7 @@ namespace DryIoc
                     resultFactories = dynamicRegistrations.Match(x =>
                         x.Factory.FactoryType == factoryType &&
                         x.Factory.ValidateAndNormalizeRegistration(serviceType, serviceKey, false, Rules),
-                        x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory))
-                        .ToArrayOrSelf();
+                        x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
                     continue;
                 }
 
@@ -7779,7 +7778,7 @@ namespace DryIoc
                 requiredServiceType == null) // if only dependency does not have its own
                 requiredServiceType = ownerRequiredServiceType;
 
-            if (serviceType == dependency.ServiceType && serviceKey == dependencyDetails.ServiceKey &&
+            if (serviceKey == dependencyDetails.ServiceKey &&
                 metadataKey == dependencyDetails.MetadataKey && metadata == dependencyDetails.Metadata &&
                 ifUnresolved == dependencyDetails.IfUnresolved && requiredServiceType == dependencyDetails.RequiredServiceType)
                 return dependency;
