@@ -2133,27 +2133,6 @@ namespace DryIoc
                 }
             }
 
-            // optimized for allocations
-            public IEnumerable<R> GetServiceRegistrations<R>(Func<Type, object, Factory, R> match) where R : class
-            {
-                R result = null;
-                foreach (var entry in Services.Enumerate())
-                {
-                    if (entry.Value.Value is Factory factory)
-                    {
-                        if ((result = match(entry.Value.Key, null, factory)) != null)
-                            yield return result;
-                    }
-                    else
-                    {
-                        var factories = ((FactoriesEntry)entry.Value.Value).Factories;
-                        foreach (var f in factories.Enumerate())
-                            if ((result = match(entry.Value.Key, f.Key, f.Value)) != null)
-                                yield return result;
-                    }
-                }
-            }
-
             public Registry Register(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
             {
                 if (_isChangePermitted != IsChangePermitted.Permitted)
