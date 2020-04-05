@@ -7902,21 +7902,13 @@ namespace DryIoc
     {
         /// <summary>Creates service info from parameter alone, setting service type to parameter type,
         /// and setting resolution policy to <see cref="IfUnresolved.ReturnDefault"/> if parameter is optional.</summary>
-        /// <param name="parameter">Parameter to create info for.</param>
-        /// <returns>Parameter service info.</returns>
         public static ParameterServiceInfo Of(ParameterInfo parameter)
         {
-            parameter.ThrowIfNull();
-
-            var isOptional = parameter.IsOptional;
-            var defaultValue = isOptional ? parameter.DefaultValue : null;
-            var hasDefaultValue = defaultValue != null && parameter.ParameterType.IsTypeOf(defaultValue);
-
-            return !isOptional
-                ? new ParameterServiceInfo(parameter)
-                : new WithDetails(parameter, !hasDefaultValue
-                    ? ServiceDetails.IfUnresolvedReturnDefault
-                    : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: defaultValue));
+            if (!parameter.IsOptional)
+                return new ParameterServiceInfo(parameter);
+            return new WithDetails(parameter, parameter.DefaultValue == null
+                ? ServiceDetails.IfUnresolvedReturnDefault
+                : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: parameter.DefaultValue));
         }
 
         /// <summary>Service type specified by <see cref="ParameterInfo.ParameterType"/>.</summary>
@@ -7936,29 +7928,21 @@ namespace DryIoc
         public override string ToString() =>
             new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name).ToString();
 
-#region Implementation
-
         private ParameterServiceInfo(ParameterInfo parameter) { Parameter = parameter; }
 
         private class WithDetails : ParameterServiceInfo
         {
             public override ServiceDetails Details { get { return _details; } }
-            public WithDetails(ParameterInfo parameter, ServiceDetails details)
-                : base(parameter)
-            { _details = details; }
+            public WithDetails(ParameterInfo parameter, ServiceDetails details) : base(parameter) => _details = details;
             private readonly ServiceDetails _details;
         }
 
         private sealed class TypeWithDetails : WithDetails
         {
             public override Type ServiceType { get { return _serviceType; } }
-            public TypeWithDetails(ParameterInfo parameter, Type serviceType, ServiceDetails details)
-                : base(parameter, details)
-            { _serviceType = serviceType; }
+            public TypeWithDetails(ParameterInfo parameter, Type serviceType, ServiceDetails details) : base(parameter, details) => _serviceType = serviceType;
             private readonly Type _serviceType;
         }
-
-#endregion
     }
 
     /// <summary>Base class for property and field dependency info.</summary>

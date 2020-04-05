@@ -1054,7 +1054,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             [Benchmark]
             public object DryIoc() => Measure(PrepareDryIoc());
 
-            [Benchmark]
+            //[Benchmark]
             public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark
