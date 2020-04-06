@@ -1131,15 +1131,14 @@ namespace DryIoc
             }
 
             // First, filter out non default normal and dynamic factories
-            factories = factories.UpdateItemOrShrinkUnsafe(0, 
-                (_, f) => f.Key is DefaultKey || f.Key is DefaultDynamicKey ? f : null);
+            factories = factories.Match(f => f.Key is DefaultKey || f.Key is DefaultDynamicKey);
 
             var defaultFactoriesCount = factories.Length;
             if (defaultFactoriesCount == 0)
                 return null;
 
             // For multiple matched factories, if the single one has a condition, then use it
-            factories = factories.UpdateItemOrShrinkUnsafe(request, (r, x) => r.MatchFactoryConditionAndMetadata(x) ? x : null);
+            factories = factories.Match(request, (r, x) => r.MatchFactoryConditionAndMetadata(x));
 
             // Check the for matching scopes. Only for more than 1 factory, 
             // for the single factory the check will be down the road
@@ -1166,7 +1165,7 @@ namespace DryIoc
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
             // so there should not be repeating of the check, and not match of Performance decrease.
             if (factories.Length > 1)
-                factories = factories.UpdateItemOrShrinkUnsafe(request, (r, x) => r.MatchGeneratedFactory(x) ? x : null);
+                factories = factories.Match(request, (r, x) => r.MatchGeneratedFactory(x));
 
             if (factories.Length > 1)
             {
@@ -12937,11 +12936,11 @@ namespace DryIoc
             }
 
             if (!includeNonPublic && !includeStatic)
-                return ctors.UpdateItemOrShrinkUnsafe(0, (_, x) => !x.IsStatic && x.IsPublic ? x : null);
+                return ctors.Match(x => !x.IsStatic && x.IsPublic);
             if (!includeNonPublic)
-                return ctors.UpdateItemOrShrinkUnsafe(0, (_, x) => x.IsPublic ? x : null);
+                return ctors.Match(x => x.IsPublic);
             if (!includeStatic)
-                return ctors.UpdateItemOrShrinkUnsafe(0, (_, x) => !x.IsStatic ? x : null);
+                return ctors.Match(x => !x.IsStatic);
             return ctors;
         }
 
