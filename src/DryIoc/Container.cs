@@ -1131,65 +1131,68 @@ namespace DryIoc
             }
 
             // First, filter out non default normal and dynamic factories
-            var defaultFactories = factories.Match(f => f.Key is DefaultKey || f.Key is DefaultDynamicKey);
-            if (defaultFactories.Length == 0)
+            factories = factories.UpdateItemOrShrinkUnsafe(0, 
+                (_, f) => f.Key is DefaultKey || f.Key is DefaultDynamicKey ? f : null);
+
+            var defaultFactoriesCount = factories.Length;
+            if (defaultFactoriesCount == 0)
                 return null;
 
             // For multiple matched factories, if the single one has a condition, then use it
-            var matchedFactories = defaultFactories.Match(request.MatchFactoryConditionAndMetadata);
+            factories = factories.UpdateItemOrShrinkUnsafe(request, (r, x) => r.MatchFactoryConditionAndMetadata(x) ? x : null);
 
             // Check the for matching scopes. Only for more than 1 factory, 
             // for the single factory the check will be down the road
             // BitBucket issue: #175
-            if (matchedFactories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
+            if (factories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
             {
-                var reuseMatchedFactories = matchedFactories.Match(request.MatchFactoryReuse);
+                var reuseMatchedFactories = factories.Match(request, (r, x) => r.MatchFactoryReuse(x));
                 if (reuseMatchedFactories.Length == 1)
-                    matchedFactories = reuseMatchedFactories;
+                    factories = reuseMatchedFactories;
                 else if (reuseMatchedFactories.Length > 1)
-                    matchedFactories = FindFactoryWithTheMinReuseLifespan(matchedFactories)?.One() ?? matchedFactories;
+                    factories = FindFactoryWithTheMinReuseLifespan(factories)?.One() ?? factories;
 
-                if (matchedFactories.Length == 1)
+                if (factories.Length == 1)
                 {
                     // Issue: #382
                     // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
                     if (request.IsResolutionCall)
-                        request.ChangeServiceKey(matchedFactories[0].Key);
+                        request.ChangeServiceKey(factories[0].Key);
                     else // for injected dependency
-                        matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
+                        factories[0].Value.Setup = factories[0].Value.Setup.WithAsResolutionCall();
                 }
             }
 
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
             // so there should not be repeating of the check, and not match of Performance decrease.
-            if (matchedFactories.Length > 1)
-                matchedFactories = matchedFactories.Match(request.MatchGeneratedFactory);
+            if (factories.Length > 1)
+                factories = factories.UpdateItemOrShrinkUnsafe(request, (r, x) => r.MatchGeneratedFactory(x) ? x : null);
 
-            if (matchedFactories.Length > 1)
+            if (factories.Length > 1)
             {
-                var conditionedFactories = matchedFactories.Match(f => f.Value.Setup.Condition != null);
+                var conditionedFactories = factories.Match(f => f.Value.Setup.Condition != null);
                 if (conditionedFactories.Length == 1)
-                    matchedFactories = conditionedFactories;
+                    factories = conditionedFactories;
             }
 
-            if (matchedFactories.Length > 1)
+            if (factories.Length > 1)
             {
-                var preferedFactories = matchedFactories.Match(f => f.Value.Setup.PreferInSingleServiceResolve);
+                var preferedFactories = factories.Match(f => f.Value.Setup.PreferInSingleServiceResolve);
                 if (preferedFactories.Length == 1)
-                    matchedFactories = preferedFactories;
+                    factories = preferedFactories;
             }
 
             // The result is a single matched factory
-            if (matchedFactories.Length == 1)
+            if (factories.Length == 1)
             {
                 // Changes service key for resolution call to identify single factory in cache and prevent wrong hit
-                if (defaultFactories.Length > 1 && request.IsResolutionCall)
-                    request.ChangeServiceKey(matchedFactories[0].Key);
-                return matchedFactories[0].Value;
+                if (defaultFactoriesCount > 1 && request.IsResolutionCall)
+                    request.ChangeServiceKey(factories[0].Key);
+                return factories[0].Value;
             }
 
-            if (matchedFactories.Length > 1 && request.IfUnresolved == IfUnresolved.Throw)
-                Throw.It(Error.ExpectedSingleDefaultFactory, matchedFactories, request);
+            if (factories.Length > 1 && request.IfUnresolved == IfUnresolved.Throw)
+                Throw.It(Error.ExpectedSingleDefaultFactory, factories, request);
 
             // Return null to allow fallback strategies
             return null;
@@ -1468,12 +1471,34 @@ namespace DryIoc
             if (decorators.IsNullOrEmpty())
                 return null;
 
-            Factory decorator;
+            Factory decorator = null;
             if (decorators.Length == 1)
             {
                 decorator = decorators[0];
                 if (!decorator.CheckCondition(request))
                     return null;
+            }
+            else if (decorators.Length == 2)
+            {
+                var d0 = decorators[0];
+                var d0Setup = (Setup.DecoratorSetup)d0.Setup;
+                var d1 = decorators[1];
+                var d1Setup = (Setup.DecoratorSetup)d1.Setup;
+                if (d1Setup.Order >  d0Setup.Order ||
+                    d1Setup.Order == d0Setup.Order && d1.RegistrationOrder > d0.RegistrationOrder)
+                {
+                    if (d1.CheckCondition(request))
+                        decorator = d1;
+                    else if (d0.CheckCondition(request))
+                        decorator = d0;
+                }
+                else
+                {
+                    if (d0.CheckCondition(request))
+                        decorator = d0;
+                    else if (d1.CheckCondition(request))
+                        decorator = d1;
+                }
             }
             else
             {
@@ -5854,6 +5879,33 @@ namespace DryIoc
             return s.Append('}').ToString();
         }
 
+        private struct CtorWithParameters
+        {
+            public ConstructorInfo Ctor;
+            public ParameterInfo[] Params;
+        }
+
+        private static void OrderByParamsLengthDescendingViaInsertionSort(CtorWithParameters[] items)
+        {
+            int i, j;
+            for (i = 1; i < items.Length; i++)
+            {
+                var tmp = items[i];
+
+                for (j = i; j >= 1 && tmp.Params.Length > items[j - 1].Params.Length; j--)
+                {
+                    ref var target = ref items[j];
+                    var source = items[j - 1];
+                    target.Ctor = source.Ctor;
+                    target.Params = source.Params;
+                }
+
+                ref var x = ref items[j];
+                x.Ctor   = tmp.Ctor;
+                x.Params = tmp.Params;
+            }
+        }
+
         /// <summary>Easy way to specify non-public and most resolvable constructor.</summary>
         /// <param name="mostResolvable">(optional) Instructs to select constructor with max number of params which all are resolvable.</param>
         /// <param name="includeNonPublic">(optional) Consider the non-public constructors.</param>
@@ -5884,18 +5936,51 @@ namespace DryIoc
             if (throwIfCtorNotFound)
                 request = request.WithIfUnresolved(IfUnresolved.ReturnDefault);
 
-            // todo: optimize `OrderByDescending` away, at least for two items
-            var manyToFewParamCtors = ctors.OrderByDescending(x => x.GetParameters().Length);
+            var ctorsWithParameters = new CtorWithParameters[ctors.Length];
+            if (ctors.Length == 2)
+            {
+                ref var pos0 = ref ctorsWithParameters[0];
+                ref var pos1 = ref ctorsWithParameters[1];
+
+                var ctor0Params = ctors[0].GetParameters();
+                var ctor1Params = ctors[1].GetParameters();
+                if (ctor1Params.Length > ctor0Params.Length)
+                {
+                    pos0.Ctor   = ctors[1];
+                    pos0.Params = ctor1Params;
+                    pos1.Ctor   = ctors[0];
+                    pos1.Params = ctor0Params;
+                }
+                else
+                {
+                    pos0.Ctor = ctors[0];
+                    pos0.Params = ctor0Params;
+                    pos1.Ctor = ctors[1];
+                    pos1.Params = ctor1Params;
+                }
+            }
+            else
+            {
+                for (var i = 0; i < ctors.Length; i++)
+                {
+                    var x = ctors[i];
+                    ref var pos = ref ctorsWithParameters[i];
+                    pos.Ctor   = x;
+                    pos.Params = x.GetParameters();
+                }
+
+                OrderByParamsLengthDescendingViaInsertionSort(ctorsWithParameters);
+            }
 
             var mostUsedArgCount = -1;
             ConstructorInfo mostResolvedCtor = null;
             Expression[] mostResolvedExprs   = null;
-            foreach (var ctor in manyToFewParamCtors)
+            for (var c = 0; c < ctorsWithParameters.Length; ++c)
             {
-                var parameters = ctor.GetParameters();
+                var parameters = ctorsWithParameters[c].Params;
                 if (parameters.Length == 0)
                 {
-                    mostResolvedCtor = mostResolvedCtor ?? ctor;
+                    mostResolvedCtor = mostResolvedCtor ?? ctorsWithParameters[c].Ctor;
                     break;
                 }
 
@@ -5915,7 +6000,9 @@ namespace DryIoc
                     var param = parameters[i];
                     if (inputArgs != null)
                     {
-                        var inputArgExpr = ReflectionFactory.TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
+                        var inputArgExpr =
+                            ReflectionFactory.TryGetExpressionFromInputArgs(param.ParameterType, inputArgs,
+                                ref argsUsedMask);
                         if (inputArgExpr != null)
                         {
                             ++usedInputArgOrUsedOrCustomValueCount;
@@ -5927,7 +6014,9 @@ namespace DryIoc
                     var paramInfo = paramSelector(param) ?? ParameterServiceInfo.Of(param);
                     var paramRequest = request.Push(paramInfo);
                     var paramDetails = paramInfo.Details;
-                    var usedOrCustomValExpr = ReflectionFactory.TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
+                    var usedOrCustomValExpr =
+                        ReflectionFactory.TryGetUsedInstanceOrCustomValueExpression(request, paramRequest,
+                            paramDetails);
                     if (usedOrCustomValExpr != null)
                     {
                         ++usedInputArgOrUsedOrCustomValueCount;
@@ -5940,7 +6029,7 @@ namespace DryIoc
                         // When param is an empty array / collection, then we may use a default value instead (#581)
                         paramDetails.DefaultValue != null &&
                         injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
-                        ((NewArrayExpression)injectedExpr).Expressions.Count == 0)
+                        ((NewArrayExpression) injectedExpr).Expressions.Count == 0)
                     {
                         // Check if parameter dependency itself (without propagated parent details)
                         // does not allow default, then stop checking the rest of parameters.
@@ -5954,13 +6043,14 @@ namespace DryIoc
                             ? request.Container.GetConstantExpression(paramDetails.DefaultValue)
                             : paramRequest.ServiceType.GetDefaultValueExpression();
                     }
+
                     paramExprs[i] = injectedExpr;
                 }
 
                 if (paramExprs != null && usedInputArgOrUsedOrCustomValueCount > mostUsedArgCount)
                 {
                     mostUsedArgCount = usedInputArgOrUsedOrCustomValueCount;
-                    mostResolvedCtor = ctor;
+                    mostResolvedCtor = ctorsWithParameters[c].Ctor;
                     mostResolvedExprs = paramExprs;
                 }
             }
@@ -12847,11 +12937,11 @@ namespace DryIoc
             }
 
             if (!includeNonPublic && !includeStatic)
-                return ctors.Match(x => !x.IsStatic && x.IsPublic);
+                return ctors.UpdateItemOrShrinkUnsafe(0, (_, x) => !x.IsStatic && x.IsPublic ? x : null);
             if (!includeNonPublic)
-                return ctors.Match(x => x.IsPublic);
+                return ctors.UpdateItemOrShrinkUnsafe(0, (_, x) => x.IsPublic ? x : null);
             if (!includeStatic)
-                return ctors.Match(x => !x.IsStatic);
+                return ctors.UpdateItemOrShrinkUnsafe(0, (_, x) => !x.IsStatic ? x : null);
             return ctors;
         }
 

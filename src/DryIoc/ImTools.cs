@@ -1494,16 +1494,13 @@ namespace ImTools
         public static IList<T> ToListOrSelf<T>(this IEnumerable<T> source) =>
             source == null ? Empty<T>() : source as IList<T> ?? source.ToList();
 
-        /// <summary>
-        /// Array copy
-        /// </summary>
+        /// <summary>Array copy</summary>
         public static T[] Copy<T>(this T[] items)
         {
             if (items == null)
                 return null;
             var copy = new T[items.Length];
-            for (var i = 0; i < copy.Length; i++)
-                copy[i] = items[i];
+            Array.Copy(items, 0, copy, 0, copy.Length);
             return copy;
         }
 
@@ -1792,6 +1789,59 @@ namespace ImTools
             }
 
             return appendedResults;
+        }
+
+        /// <summary>MUTATES the source by updating its item or creates another array with the copies,
+        /// the source then maybe a partially updated</summary>
+        public static T[] UpdateItemOrShrinkUnsafe<T, S>(this T[] source, S state, Func<S, T, T> tryMap) where T : class
+        {
+            if (source.Length == 1)
+            {
+                var result0 = tryMap(state, source[0]);
+                if (result0 == null)
+                    return Empty<T>();
+                source[0] = result0;
+                return source;
+            }
+
+            if (source.Length == 2)
+            {
+                var result0 = tryMap(state, source[0]);
+                var result1 = tryMap(state, source[1]);
+                if (result0 == null && result1 == null)
+                    return Empty<T>();
+                if (result0 == null)
+                    return new[] { result1 };
+                if (result1 == null)
+                    return new[] { result0 };
+                source[0] = result0;
+                source[1] = result1;
+                return source;
+            }
+
+            var matchStart = 0;
+            T[] matches = null;
+            T   result = null;
+            var i = 0;
+            for (; i < source.Length; ++i)
+            {
+                result = tryMap(state, source[i]);
+                if (result != null)
+                    source[i] = result;
+                else
+                {
+                    // for accumulated matched items
+                    if (i != 0 && i > matchStart)
+                        matches = AppendTo(source, matchStart, i - matchStart, matches);
+                    matchStart = i + 1; // guess the next match start will be after the non-matched item
+                }
+            }
+
+            // when last match was found but not all items are matched (hence matchStart != 0)
+            if (result != null && matchStart != 0)
+                return AppendTo(source, matchStart, i - matchStart, matches);
+
+            return matches ?? (matchStart != 0 ? Empty<T>() : source);
         }
 
         /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
