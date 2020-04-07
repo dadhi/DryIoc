@@ -4299,9 +4299,7 @@ namespace DryIoc
                 try
                 {
                     var request = Request.Create(validatingContainer, root);
-                    var expr = validatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
-                    if (expr == null)
-                        continue;
+                    validatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                 }
                 catch (ContainerException ex)
                 {
@@ -8235,7 +8233,7 @@ namespace DryIoc
         public static Request Create(IContainer container, IServiceInfo serviceInfo,
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null)
         {
-            var serviceType = serviceInfo.ThrowIfNull().ServiceType;
+            var serviceType = serviceInfo.ServiceType;
             if (serviceType != null && serviceType.IsOpenGeneric())
                 Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
 
@@ -10984,18 +10982,18 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope(IScope parent = null, object name = null)
-            : this(parent, name, /*_mapsPool.RentOrDefault() ??*/ CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, 
+            : this(parent, name, CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, 
                 ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty)
         { }
 
-        private Scope(IScope parent, object name, ImMap<object>[] maps, ImHashMap<Type, FactoryDelegate> instances, 
+        private Scope(IScope parent, object name, ImMap<object>[] maps, ImHashMap<Type, FactoryDelegate> factories, 
             ImList<IDisposable> unorderedDisposables, ImMap<IDisposable> disposables)
         {
             Parent = parent;
             Name = name;
             _unorderedDisposables = unorderedDisposables;
             _disposables = disposables;
-            _factories = ImHashMap<Type, FactoryDelegate>.Empty;
+            _factories = factories;
             _maps = maps;
         }
 
