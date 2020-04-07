@@ -7244,6 +7244,7 @@ namespace DryIoc
             Action<TTarget, IResolverContext> initialize, Func<Request, bool> condition = null)
         {
             initialize.ThrowIfNull();
+
             registrator.Register<object>(
                 made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
                     // specify ResolverContext as parameter to prevent applying initializer for injected resolver too
@@ -9469,7 +9470,7 @@ namespace DryIoc
             {
                 var itemRef = ((Scope)container.SingletonScope)._maps[FactoryID & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(FactoryID);
                 if (itemRef != null && itemRef.Value != Scope.NoItem)
-                    return Constant(itemRef.Value);
+                    return Constant(itemRef.Value); // todo: we need the way to reuse Constant for the value
             }
 
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
@@ -10969,8 +10970,6 @@ namespace DryIoc
         internal ImMap<object>[] _maps;
 
         internal static readonly object NoItem = new object();
-
-        private static StackPool<ImMap<object>[]> _mapsPool = new StackPool<ImMap<object>[]>();
 
         private static ImMap<object>[] _emptySlots = CreateEmptyMaps();
 
