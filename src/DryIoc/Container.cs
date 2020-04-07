@@ -5889,9 +5889,9 @@ namespace DryIoc
             int i, j;
             for (i = 1; i < items.Length; i++)
             {
-                var tmp = items[i];
+                var it = items[i];
 
-                for (j = i; j >= 1 && tmp.Params.Length > items[j - 1].Params.Length; j--)
+                for (j = i; j >= 1 && it.Params.Length > items[j - 1].Params.Length; j--)
                 {
                     ref var target = ref items[j];
                     var source = items[j - 1];
@@ -5900,8 +5900,8 @@ namespace DryIoc
                 }
 
                 ref var x = ref items[j];
-                x.Ctor   = tmp.Ctor;
-                x.Params = tmp.Params;
+                x.Ctor   = it.Ctor;
+                x.Params = it.Params;
             }
         }
 
@@ -7129,25 +7129,11 @@ namespace DryIoc
             Func<IResolverContext, Func<TService, TService>> getDecorator, Func<Request, bool> condition = null)
         {
             getDecorator.ThrowIfNull();
-
-            // unique key to bind decorator factory and decorator registrations
-            var factoryKey = new object();
-
-            registrator.RegisterDelegate(
-                _ => new DecoratorDelegateFactory<TService>(getDecorator),
-                serviceKey: factoryKey);
-
-            registrator.Register(Made.Of(
-                _ => ServiceInfo.Of<DecoratorDelegateFactory<TService>>(serviceKey: factoryKey),
-                f => f.Decorate(Arg.Of<TService>(), Arg.Of<IResolverContext>())),
-                setup: Setup.DecoratorWith(condition, useDecorateeReuse: true));
-        }
-
-        internal sealed class DecoratorDelegateFactory<TDecoratee>
-        {
-            private readonly Func<IResolverContext, Func<TDecoratee, TDecoratee>> _getDecorator;
-            public DecoratorDelegateFactory(Func<IResolverContext, Func<TDecoratee, TDecoratee>> getDecorator) { _getDecorator = getDecorator; }
-            public TDecoratee Decorate(TDecoratee decoratee, IResolverContext r) => _getDecorator(r).Invoke(decoratee);
+            registrator.RegisterDelegate<IResolverContext, TService, TService>(
+                (r, service) => getDecorator(r)(service),
+                setup: condition == null 
+                    ? Setup.DecoratorWith(useDecorateeReuse: true) 
+                    : Setup.DecoratorWith(condition, useDecorateeReuse: true));
         }
 
         /// Will become OBSOLETE! in the next major version:
@@ -9473,9 +9459,11 @@ namespace DryIoc
                     return decoratorExpr;
             }
 
-            // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
             var setup = Setup;
             var rules = container.Rules;
+
+            // todo: how should we handle singleton decorators?
+            // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
             if (rules.EagerCachingSingletonForFasterAccess &&
                 request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
             {
