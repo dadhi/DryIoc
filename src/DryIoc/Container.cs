@@ -5178,6 +5178,16 @@ namespace DryIoc
         public bool OverrideRegistrationMade =>
             (_settings & Settings.OverrideRegistrationMade) != 0;
 
+        /// <summary>Returns the parameter selector based on <see cref="OverrideRegistrationMade"/></summary>
+        public ParameterSelector TryGetParameterSelector(Made made) =>
+            OverrideRegistrationMade ? made.Parameters.OverrideWith(Parameters) : Parameters.OverrideWith(made.Parameters);
+
+        /// <summary>Returns the properties and fields selectorbased on <see cref="OverrideRegistrationMade"/></summary>
+        public PropertiesAndFieldsSelector TryGetPropertiesAndFieldsSelector(Made made) =>
+            OverrideRegistrationMade 
+                ? made.PropertiesAndFields.OverrideWith(PropertiesAndFields) 
+                : PropertiesAndFields.OverrideWith(made.PropertiesAndFields);
+
         /// <summary>Returns new instance of the rules new Made composed out of
         /// provided factory method, parameters, propertiesAndFields.</summary>
         public Rules With(
@@ -5923,11 +5933,7 @@ namespace DryIoc
             if (!mostResolvable)
                 return null;
 
-            var rules = request.Rules;
-            var selector = rules.OverrideRegistrationMade
-                ? request.Made.Parameters.OverrideWith(rules.Parameters)
-                : rules.Parameters.OverrideWith(request.Made.Parameters);
-            var paramSelector = selector(request);
+            var paramSelector = request.Rules.TryGetParameterSelector(request.Made)(request);
 
             var throwIfCtorNotFound = request.IfUnresolved != IfUnresolved.ReturnDefault;
             if (throwIfCtorNotFound)
@@ -10024,9 +10030,12 @@ namespace DryIoc
             var factoryMethodSelector = Made.FactoryMethod ?? rules.FactoryMethod;
             if (factoryMethodSelector == null)
                 factoryMethod = new FactoryMethod(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
-            else if ((factoryMethod = factoryMethodSelector(request)) == null)
-                return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
-                    Error.UnableToSelectCtor, request.ImplementationType, request);
+            else
+            {
+                if ((factoryMethod = factoryMethodSelector(request)) == null)
+                    return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
+                        Error.UnableToSelectCtor, request.ImplementationType, request);
+            }
 
             // If factory method is the method of some registered service, then resolve factory service first.
             var factoryExpr = factoryMethod.FactoryExpression;
@@ -10035,112 +10044,134 @@ namespace DryIoc
                 var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
                 factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
                 if (factoryExpr == null)
-                    return null;
+                    return null; // todo: should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
             }
 
+            // return earlier if already have the parameters resolved, e.g. when using `ConstructorWithResolvableArguments`
             var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
-            var ctorOrMethod = ctorOrMember as MethodBase;
-            if (ctorOrMethod == null) // return early when factory is Property or Field
+            if (factoryMethod.ResolvedParameterExpressions != null)
             {
-                var memberExpr = ctorOrMember is PropertyInfo 
-                    ? Property(factoryExpr, (PropertyInfo)ctorOrMember)
+                if (rules.UsedForValidation)
+                {
+                    TryGetMemberAssignments(request, container, rules);
+                    return request.GetActualServiceType().GetDefaultValueExpression();
+                }
+
+                var newExpr = New((ConstructorInfo)ctorOrMember, factoryMethod.ResolvedParameterExpressions);
+                var assignements = TryGetMemberAssignments(request, container, rules);
+                if (assignements != null)
+                    return MemberInit(newExpr, assignements);
+                return newExpr;
+            }
+
+            var ctorOrMethod = ctorOrMember as MethodBase;
+            if (ctorOrMethod == null) // return earlier when factory is Property or Field
+            {
+                var memberExpr = ctorOrMember is PropertyInfo p ? Property(factoryExpr, p)
                     : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember);
                 return ConvertExpressionIfNeeded(memberExpr, request, ctorOrMember);
             }
 
-            Expression arg0 = null, arg1 = null, arg2 = null, arg3 = null, arg4 = null;
-            Expression[] paramExprs = Empty<Expression>();
             var parameters = ctorOrMethod.GetParameters();
-            if (parameters.Length != 0)
+            if (parameters.Length == 0)
             {
-                paramExprs = factoryMethod.ResolvedParameterExpressions;
-                if (paramExprs == null)
+                if (rules.UsedForValidation)
                 {
-                    if (parameters.Length > 5)
-                        paramExprs = new Expression[parameters.Length];
-                 
-                    var paramSelector = rules.OverrideRegistrationMade
-                        ? Made.Parameters.OverrideWith(rules.Parameters)
-                        : rules.Parameters.OverrideWith(Made.Parameters);
-                    var paramServiceInfoSelector = paramSelector(request);
+                    if (ctorOrMember is ConstructorInfo)
+                        TryGetMemberAssignments(request, container, rules);
+                    return request.GetActualServiceType().GetDefaultValueExpression();
+                }
 
-                    var inputArgs = request.InputArgExprs;
-                    var argsUsedMask = 0;
-                    for (var i = 0; i < parameters.Length; i++)
+                if (ctorOrMember is MethodInfo method)
+                    return ConvertExpressionIfNeeded(Call(factoryExpr, method), request, ctorOrMember);
+
+                var newExpr = New((ConstructorInfo)ctorOrMember, Empty<Expression>());
+                var assignements = TryGetMemberAssignments(request, request.Container, request.Container.Rules);
+                if (assignements != null)
+                    return MemberInit(newExpr, assignements);
+
+                return newExpr;
+            }
+
+            Expression arg0 = null, arg1 = null, arg2 = null, arg3 = null, arg4 = null;
+            var paramExprs = parameters.Length > 5 ? new Expression[parameters.Length] : null;
+            var paramServiceInfoSelector = rules.TryGetParameterSelector(Made)(request);
+
+            var inputArgs = request.InputArgExprs;
+            var argsUsedMask = 0;
+            for (var i = 0; i < parameters.Length; i++)
+            {
+                var param = parameters[i];
+                if (inputArgs != null)
+                {
+                    var inputArgExpr = TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
+                    if (inputArgExpr != null)
                     {
-                        var param = parameters[i];
-                        if (inputArgs != null)
-                        {
-                            var inputArgExpr = TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
-                            if (inputArgExpr != null)
-                            {
-                                if (paramExprs != null)
-                                    paramExprs[i] = inputArgExpr;
-                                else if (i == 0)
-                                    arg0 = inputArgExpr;
-                                else if (i == 1)
-                                    arg1 = inputArgExpr;
-                                else if (i == 2)
-                                    arg2 = inputArgExpr;
-                                else if (i == 3)
-                                    arg3 = inputArgExpr;
-                                else
-                                    arg4 = inputArgExpr;
-                                continue;
-                            }
-                        }
-
-                        var paramInfo = paramServiceInfoSelector(param) ?? ParameterServiceInfo.Of(param);
-                        var paramRequest = request.Push(paramInfo);
-                        var paramDetails = paramInfo.Details;
-                        var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
-                        if (usedOrCustomValExpr != null)
-                        {
-                            if (paramExprs != null)
-                                paramExprs[i] = usedOrCustomValExpr;
-                            else if (i == 0)
-                                arg0 = usedOrCustomValExpr;
-                            else if (i == 1)
-                                arg1 = usedOrCustomValExpr;
-                            else if (i == 2)
-                                arg2 = usedOrCustomValExpr;
-                            else if (i == 3)
-                                arg3 = usedOrCustomValExpr;
-                            else
-                                arg4 = usedOrCustomValExpr;
-                            continue;
-                        }
-
-                        var injectedExpr = container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
-                        if (injectedExpr == null ||
-                            // When param is an empty array / collection, then we may use a default value instead (#581)
-                            paramDetails.DefaultValue != null &&
-                            injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
-                            ((NewArrayExpression) injectedExpr).Expressions.Count == 0)
-                        {
-                            // Check if parameter dependency itself (without propagated parent details)
-                            // does not allow default, then stop checking the rest of parameters.
-                            if (paramDetails.IfUnresolved == IfUnresolved.Throw)
-                                return null;
-                            injectedExpr = paramDetails.DefaultValue != null
-                                ? container.GetConstantExpression(paramDetails.DefaultValue)
-                                : paramRequest.ServiceType.GetDefaultValueExpression();
-                        }
-
                         if (paramExprs != null)
-                            paramExprs[i] = injectedExpr;
+                            paramExprs[i] = inputArgExpr;
                         else if (i == 0)
-                            arg0 = injectedExpr;
+                            arg0 = inputArgExpr;
                         else if (i == 1)
-                            arg1 = injectedExpr;
+                            arg1 = inputArgExpr;
                         else if (i == 2)
-                            arg2 = injectedExpr;
+                            arg2 = inputArgExpr;
                         else if (i == 3)
-                            arg3 = injectedExpr;
+                            arg3 = inputArgExpr;
                         else
-                            arg4 = injectedExpr;
+                            arg4 = inputArgExpr;
+                        continue;
                     }
                 }
+
+                var paramInfo = paramServiceInfoSelector(param) ?? ParameterServiceInfo.Of(param);
+                var paramRequest = request.Push(paramInfo);
+                var paramDetails = paramInfo.Details;
+                var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
+                if (usedOrCustomValExpr != null)
+                {
+                    if (paramExprs != null)
+                        paramExprs[i] = usedOrCustomValExpr;
+                    else if (i == 0)
+                        arg0 = usedOrCustomValExpr;
+                    else if (i == 1)
+                        arg1 = usedOrCustomValExpr;
+                    else if (i == 2)
+                        arg2 = usedOrCustomValExpr;
+                    else if (i == 3)
+                        arg3 = usedOrCustomValExpr;
+                    else
+                        arg4 = usedOrCustomValExpr;
+                    continue;
+                }
+
+                var injectedExpr = container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
+                if (injectedExpr == null ||
+                    // When param is an empty array / collection, then we may use a default value instead (#581)
+                    paramDetails.DefaultValue != null &&
+                    injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
+                    ((NewArrayExpression) injectedExpr).Expressions.Count == 0)
+                {
+                    // Check if parameter dependency itself (without propagated parent details)
+                    // does not allow default, then stop checking the rest of parameters.
+                    if (paramDetails.IfUnresolved == IfUnresolved.Throw)
+                        return null;
+                    injectedExpr = paramDetails.DefaultValue != null
+                        ? container.GetConstantExpression(paramDetails.DefaultValue)
+                        : paramRequest.ServiceType.GetDefaultValueExpression();
+                }
+
+                if (paramExprs != null)
+                    paramExprs[i] = injectedExpr;
+                else if (i == 0)
+                    arg0 = injectedExpr;
+                else if (i == 1)
+                    arg1 = injectedExpr;
+                else if (i == 2)
+                    arg2 = injectedExpr;
+                else if (i == 3)
+                    arg3 = injectedExpr;
+                else
+                    arg4 = injectedExpr;
             }
 
             if (rules.UsedForValidation) 
@@ -10164,24 +10195,23 @@ namespace DryIoc
             if (ctor == null)
                 return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMember);
 
-            if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
+            var assignments = TryGetMemberAssignments(request, container, rules);
+            if (assignments == null)
                 return serviceExpr;
 
-            return CreateMemberInitExpression(serviceExpr, request);
+            return MemberInit((NewExpression)serviceExpr, assignments);
         }
 
-        private Expression CreateMemberInitExpression(Expression serviceExpr, Request request)
+        private MemberAssignment[] TryGetMemberAssignments(Request request, IContainer container, Rules rules)
         {
-            var container = request.Container;
-            var rules = container.Rules;
-            var propertiesAndFieldsSelector = rules.OverrideRegistrationMade
-                ? Made.PropertiesAndFields.OverrideWith(rules.PropertiesAndFields)
-                : rules.PropertiesAndFields.OverrideWith(Made.PropertiesAndFields);
-            var propertiesAndFields = propertiesAndFieldsSelector.Invoke(request);
-            if (propertiesAndFields == null)
-                return serviceExpr;
+            if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
+                return null;
 
-            var assignments = Empty<MemberAssignment>();
+            var propertiesAndFields = rules.TryGetPropertiesAndFieldsSelector(Made).Invoke(request);
+            if (propertiesAndFields == null)
+                return null;
+
+            MemberAssignment[] assignments = null;
             foreach (var member in propertiesAndFields)
                 if (member != null)
                 {
@@ -10190,25 +10220,28 @@ namespace DryIoc
                         TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, member.Details)
                         ?? container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
                     if (memberExpr != null)
-                        assignments = assignments.AppendOrUpdate(Bind(member.Member, memberExpr));
+                        assignments = ArrayTools.AppendOrUpdate(assignments, Bind(member.Member, memberExpr));
                     else if (request.IfUnresolved == IfUnresolved.ReturnDefault)
                         return null;
                 }
 
-            return assignments.Length == 0 ? serviceExpr : MemberInit((NewExpression) serviceExpr, assignments);
+            return assignments;
         }
 
         private static Expression ConvertExpressionIfNeeded(Expression serviceExpr, Request request, MemberInfo ctorOrMember)
         {
             var actualServiceType = request.GetActualServiceType();
             var serviceExprType = serviceExpr.Type;
-            if (serviceExprType == typeof(object))
-                return Convert(serviceExpr, actualServiceType);
-            return serviceExprType == actualServiceType || serviceExprType.IsAssignableTo(actualServiceType) ? serviceExpr
-                : serviceExprType.HasConversionOperatorTo(actualServiceType) ? Convert(serviceExpr, actualServiceType)
-                : request.IfUnresolved != IfUnresolved.Throw ? null
-                : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, actualServiceType, ctorOrMember,
-                    request);
+            return serviceExprType == actualServiceType || serviceExprType.IsAssignableTo(actualServiceType) 
+                    ? serviceExpr
+                : serviceExprType == typeof(object) 
+                    ? Convert(serviceExpr, actualServiceType)
+                : serviceExprType.HasConversionOperatorTo(actualServiceType) 
+                    ? Convert(serviceExpr, actualServiceType)
+                : request.IfUnresolved != IfUnresolved.Throw 
+                        ? null
+                        : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, actualServiceType, ctorOrMember,
+                            request);
         }
 
         // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
