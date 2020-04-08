@@ -1467,11 +1467,10 @@ namespace DryIoc
             else if (decorators.Length == 2)
             {
                 var d0 = decorators[0];
-                var d0Setup = (Setup.DecoratorSetup)d0.Setup;
+                var d0Order = ((Setup.DecoratorSetup)d0.Setup).Order;
                 var d1 = decorators[1];
-                var d1Setup = (Setup.DecoratorSetup)d1.Setup;
-                if (d1Setup.Order >  d0Setup.Order ||
-                    d1Setup.Order == d0Setup.Order && d1.RegistrationOrder > d0.RegistrationOrder)
+                var d1Order = ((Setup.DecoratorSetup)d1.Setup).Order;
+                if (d1Order >  d0Order || d1Order == d0Order && d1.RegistrationOrder > d0.RegistrationOrder)
                 {
                     if (d1.CheckCondition(request))
                         decorator = d1;
@@ -1488,12 +1487,11 @@ namespace DryIoc
             }
             else
             {
-                // Within the remaining decorators find one with the maximum Order
-                // or if no Order for all decorators, then find the last registered - with the biggest FactoryID
-                decorator = decorators
-                    .OrderByDescending(d => ((Setup.DecoratorSetup)d.Setup).Order)
-                    .ThenByDescending(d => d.RegistrationOrder)
-                    .FirstOrDefault(d => d.CheckCondition(request));
+                // todo: maybe optimized for already sorted array to get rid off copy
+                var sortedDecorators = SortBySetupOrderDescendingThenByRegistrationDescending(decorators.Copy());
+                for (int i = sortedDecorators.Length - 1; decorator == null && i >= 0; i--)
+                    if (sortedDecorators[i].CheckCondition(request))
+                        decorator = sortedDecorators[i];
             }
 
             var decoratorExpr = decorator?.GetExpressionOrDefault(request);
@@ -1505,6 +1503,30 @@ namespace DryIoc
                 decoratorExpr = Call(WrappersSupport.ToArrayMethod.MakeGenericMethod(arrayElementType), decoratorExpr);
 
             return decoratorExpr;
+        }
+
+        private static Factory[] SortBySetupOrderDescendingThenByRegistrationDescending(Factory[] ds)
+        {
+            int i, j;
+            for (i = 1; i < ds.Length; ++i)
+            {
+                var d = ds[i];
+                var order = ((Setup.DecoratorSetup)d.Setup).Order;
+                j = i;
+                while (j >= 1)
+                {
+                    var prevOrder = ((Setup.DecoratorSetup)ds[j - 1].Setup).Order;
+                    if ((order < prevOrder ||
+                         order == prevOrder && d.RegistrationOrder < ds[j - 1].RegistrationOrder) == false)
+                        break;
+                    ds[j] = ds[j - 1];
+                    --j;
+                }
+
+                //if (ds[j] != d)
+                ds[j] = d;
+            }
+            return ds;
         }
 
         private static int[] GetAppliedDecoratorIDs(Request request)
@@ -5895,11 +5917,13 @@ namespace DryIoc
         private static void OrderByParamsLengthDescendingViaInsertionSort(CtorWithParameters[] items)
         {
             int i, j;
-            for (i = 1; i < items.Length; i++)
+            for (i = 1; i < items.Length; ++i)
             {
                 var it = items[i];
-
-                for (j = i; j >= 1 && it.Params.Length > items[j - 1].Params.Length; j--)
+                for (j = i; 
+                    j >= 1 && 
+                    it.Params.Length > items[j - 1].Params.Length; 
+                    --j)
                 {
                     ref var target = ref items[j];
                     var source = items[j - 1];
