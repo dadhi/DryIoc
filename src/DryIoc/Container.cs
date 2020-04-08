@@ -1075,7 +1075,25 @@ namespace DryIoc
 
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
         {
-            var serviceType = GetServiceTypeAndKeyForFactoryLookup(request, out var serviceKey);
+            Type serviceType;
+            var serviceKey = request.ServiceKey;
+            var requiredServiceType = request.RequiredServiceType;
+            if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
+                serviceType = requiredServiceType;
+            else
+            {
+                serviceType = request.GetActualServiceType();
+
+                // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServiceType, ServiceKey }
+                // presumes that required service type is closed generic
+                if (serviceKey is OpenGenericTypeKey openGenericTypeKey && 
+                    serviceType.IsClosedGeneric() && 
+                    openGenericTypeKey.RequiredServiceType == serviceType.GetGenericTypeDefinition())
+                {
+                    serviceType = openGenericTypeKey.RequiredServiceType;
+                    serviceKey  = openGenericTypeKey.ServiceKey;
+                }
+            }
 
             if (Rules.FactorySelector != null && serviceKey == null)
                 return GetRuleSelectedServiceFactoryOrDefault(request, serviceType);
@@ -1289,37 +1307,6 @@ namespace DryIoc
             }
 
             return selectedFactory;
-        }
-
-        private static Type GetServiceTypeAndKeyForFactoryLookup(Request request, out object serviceKey)
-        {
-            serviceKey = request.ServiceKey;
-
-            Type serviceType;
-            var requiredServiceType = request.RequiredServiceType;
-            if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
-                serviceType = requiredServiceType;
-            else
-            {
-                // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServiceType, ServiceKey }
-                // presumes that required service type is closed generic
-                serviceType = request.GetActualServiceType();
-                if (serviceType.IsClosedGeneric())
-                {
-                    var openGenericTypeKey = serviceKey as OpenGenericTypeKey;
-                    if (openGenericTypeKey != null)
-                    {
-                        var openGenericType = openGenericTypeKey.RequiredServiceType;
-                        if (openGenericType == serviceType.GetGenericDefinitionOrNull())
-                        {
-                            serviceType = openGenericType;
-                            serviceKey = openGenericTypeKey.ServiceKey;
-                        }
-                    }
-                }
-            }
-
-            return serviceType;
         }
 
         private static KV<object, Factory> FindFactoryWithTheMinReuseLifespan(KV<object, Factory>[] factories)
@@ -1653,14 +1640,23 @@ namespace DryIoc
             public static readonly FactoriesEntry Empty =
                 new FactoriesEntry(null, ImHashMap<object, Factory>.Empty);
 
-            public FactoriesEntry With(Factory factory, object serviceKey = null)
+            public FactoriesEntry With(Factory factory)
             {
-                var lastDefaultKey = serviceKey == null
-                    ? LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next()
-                    : LastDefaultKey;
-
-                return new FactoriesEntry(lastDefaultKey, Factories.AddOrUpdate(serviceKey ?? lastDefaultKey, factory));
+                var lastDefaultKey = LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next();
+                return new FactoriesEntry(lastDefaultKey, Factories.AddOrUpdate(lastDefaultKey, factory));
             }
+
+            public FactoriesEntry WithTwo(Factory oldFactory, Factory newFactory)
+            {
+                var lastDefaultKey = LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next();
+                var factories = Factories
+                    .AddOrUpdate(lastDefaultKey, oldFactory)
+                    .AddOrUpdate(lastDefaultKey = lastDefaultKey.Next(), newFactory);
+                return new FactoriesEntry(lastDefaultKey, factories);
+            }
+
+            public FactoriesEntry With(Factory factory, object serviceKey) => 
+                new FactoriesEntry(LastDefaultKey, Factories.AddOrUpdate(serviceKey, factory));
         }
 
         private KV<object, Factory>[] CombineRegisteredWithDynamicFactories(
@@ -2306,7 +2302,9 @@ namespace DryIoc
                     switch (ifAlreadyRegistered)
                     {
                         case IfAlreadyRegistered.AppendNotKeyed:
-                            newEntry = (oldEntry as FactoriesEntry ?? FactoriesEntry.Empty.With((Factory)oldEntry)).With(factory);
+                            newEntry = oldEntry is FactoriesEntry fe
+                                ? fe.With(factory)
+                                : FactoriesEntry.Empty.WithTwo((Factory)oldEntry, factory);
                             break;
                         case IfAlreadyRegistered.Throw:
                             newEntry = oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
@@ -4292,13 +4290,15 @@ namespace DryIoc
         {
             var validatingContainer = container.With(rules => rules.ForValidate());
 
+            var stack = RequestStack.Create(16);
+
             List<KeyValuePair<ServiceInfo, ContainerException>> errors = null;
             for (var i = 0; i < roots.Length; i++)
             {
                 var root = roots[i];
                 try
                 {
-                    var request = Request.Create(validatingContainer, root);
+                    var request = Request.CreateForValidation(validatingContainer, root, stack);
                     validatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                 }
                 catch (ContainerException ex)
@@ -8178,6 +8178,9 @@ namespace DryIoc
             return new RequestStack(capacity);
         }
 
+        public static RequestStack Create(int capacityPowerOfTwo) => 
+            new RequestStack(capacityPowerOfTwo);
+
         public Request[] Items;
         private RequestStack(int capacity) => Items = new Request[capacity];
 
@@ -8228,6 +8231,17 @@ namespace DryIoc
 
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
             Field(null, typeof(Request).Field(nameof(EmptyOpensResolutionScope)));
+
+        internal static Request CreateForValidation(IContainer container, IServiceInfo serviceInfo, RequestStack stack)
+        {
+            // we are re-starting the dependency depth count from `1`
+            ref var req = ref stack.GetOrPushRef(0);
+            if (req == null)
+                req =  new Request(container, Empty, 1, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
+            else
+                req.SetServiceInfo(container, Empty, 1, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
+            return req;
+        }
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored with request.</summary>
         public static Request Create(IContainer container, IServiceInfo serviceInfo,
