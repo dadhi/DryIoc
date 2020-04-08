@@ -10086,7 +10086,7 @@ namespace DryIoc
                     return ConvertExpressionIfNeeded(Call(factoryExpr, method), request, ctorOrMember);
 
                 var newExpr = New((ConstructorInfo)ctorOrMember, Empty<Expression>());
-                var assignements = TryGetMemberAssignments(request, request.Container, request.Container.Rules);
+                var assignements = TryGetMemberAssignments(request, container, rules);
                 if (assignements != null)
                     return MemberInit(newExpr, assignements);
 
@@ -10095,7 +10095,7 @@ namespace DryIoc
 
             Expression arg0 = null, arg1 = null, arg2 = null, arg3 = null, arg4 = null;
             var paramExprs = parameters.Length > 5 ? new Expression[parameters.Length] : null;
-            var paramServiceInfoSelector = rules.TryGetParameterSelector(Made)(request);
+            var paramSelector = rules.TryGetParameterSelector(Made)(request);
 
             var inputArgs = request.InputArgExprs;
             var argsUsedMask = 0;
@@ -10123,7 +10123,7 @@ namespace DryIoc
                     }
                 }
 
-                var paramInfo = paramServiceInfoSelector(param) ?? ParameterServiceInfo.Of(param);
+                var paramInfo = paramSelector(param) ?? ParameterServiceInfo.Of(param);
                 var paramRequest = request.Push(paramInfo);
                 var paramDetails = paramInfo.Details;
                 var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
