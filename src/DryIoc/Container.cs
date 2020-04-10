@@ -2776,21 +2776,9 @@ namespace DryIoc
             }
         }
 
-        //private static object GetPoolOrNewObjects(object[][] objsPool, int count) =>
-        //    count < 8 ? objsPool[count - 1] ?? new object[count] : new object[count];
-
-        //private static void ReturnObjecstsToPool(object[][] objsPool, object[] objs)
-        //{
-        //    var length = objs.Length;
-        //    if (length < 8)
-        //        objsPool[length - 1] = objs;
-        //}
-
         /// <summary>Interprets passed expression</summary>
         public static bool TryInterpret(IResolverContext r, Expression expr, 
-            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result
-            //, object[][] objsPools = null
-            )
+            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result)
         {
             result = null;
             switch (expr.NodeType)
