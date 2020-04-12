@@ -12,14 +12,34 @@ namespace DryIoc.IssuesTests
         {
             using (var c = new Container(Rules.Default.WithoutFastExpressionCompiler()))
             {
-                c.Register<CancellationTokenSource>(Made.Of(() => new CancellationTokenSource()), Reuse.Singleton);
-                c.Register<CancellationToken>(Made.Of(r => ServiceInfo.Of<CancellationTokenSource>(), cts => cts.Token), Reuse.Singleton);
+                c.Register(Made.Of(() => new CancellationTokenSource()), Reuse.Singleton);
+                c.Register(Made.Of(r => ServiceInfo.Of<CancellationTokenSource>(), 
+                    cts => cts.Token), Reuse.Singleton);
 
                 c.Register<IAlpha, Alpha>();
 
                 var f = c.Resolve<Func<IAlpha>>();
                 var a = f();
                 Assert.IsNotNull(a);
+            }
+        }
+
+        [Test]
+        public void Should_be_able_to_resolve_Func_of_scoped()
+        {
+            using (var c = new Container(Rules.Default.WithoutFastExpressionCompiler()))
+            {
+                c.Register(Made.Of(() => new CancellationTokenSource()), Reuse.Scoped);
+                c.Register(Made.Of(r => ServiceInfo.Of<CancellationTokenSource>(),
+                    cts => cts.Token), Reuse.Scoped);
+
+                c.Register<IAlpha, Alpha>();
+
+                using (var scope = c.OpenScope())
+                {
+                    var a = scope.Resolve<Func<IAlpha>>().Invoke();
+                    Assert.IsNotNull(a);
+                }
             }
         }
 

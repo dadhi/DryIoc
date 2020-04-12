@@ -8334,6 +8334,10 @@ namespace DryIoc
         /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
         public FactoryType FactoryType { get; private set; }
 
+        /// <summary>Combines decorator and <see cref="DecoratedFactoryID"/></summary>
+        public int CombineDecoratorWithDecoratedFactoryID() =>
+            FactoryID | (DecoratedFactoryID << 16);
+
         /// <summary>Service implementation type if known.</summary>
         public Type ImplementationType => _factoryImplType ?? Factory?.ImplementationType;
         private Type _factoryImplType;
@@ -9499,7 +9503,10 @@ namespace DryIoc
             if (rules.EagerCachingSingletonForFasterAccess &&
                 request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
             {
-                var itemRef = ((Scope)container.SingletonScope)._maps[FactoryID & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(FactoryID);
+                var factoryId = request.FactoryType == FactoryType.Decorator
+                    ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
+
+                var itemRef = ((Scope)container.SingletonScope)._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(factoryId);
                 if (itemRef != null && itemRef.Value != Scope.NoItem)
                     return Constant(itemRef.Value); // todo: we need the way to reuse Constant for the value
             }
@@ -9573,7 +9580,9 @@ namespace DryIoc
                 if (scope.IsDisposed)
                     Throw.It(Error.ScopeIsDisposed, scope.ToString());
 
-                var factoryId = FactoryID;
+                var factoryId = request.FactoryType == FactoryType.Decorator
+                    ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
+
                 ref var map = ref scope._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK];
 
                 var m = map;
@@ -11560,8 +11569,11 @@ namespace DryIoc
                 return Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
                     serviceFactoryExpr, Constant(request.Factory.Setup.DisposalOrder));
 
+            var factoryId = request.FactoryType == FactoryType.Decorator
+                ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
+
             return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
-                Constant(request.FactoryID), Lambda<FactoryDelegate>(serviceFactoryExpr,
+                Constant(factoryId), Lambda<FactoryDelegate>(serviceFactoryExpr,
                     FactoryDelegateCompiler.FactoryDelegateParamExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                     , typeof(object)
@@ -11625,7 +11637,8 @@ namespace DryIoc
             }
             else
             {
-                var idExpr = Constant(request.FactoryID);
+                var idExpr = Constant(request.FactoryType == FactoryType.Decorator ?
+                    request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID);
 
                 Expression factoryDelegateExpr;
                 if (serviceFactoryExpr is InvocationExpression ie &&
