@@ -5932,6 +5932,7 @@ namespace DryIoc
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) => request =>
         {
             var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+            // todo: we can inline this because we do double checking on the number of constructors
             var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
             var ctorCount = ctors.Length;
             if (ctorCount == 0)
@@ -10038,50 +10039,56 @@ namespace DryIoc
             var container = request.Container;
             var rules = container.Rules;
 
-            FactoryMethod factoryMethod;
             var factoryMethodSelector = Made.FactoryMethod ?? rules.FactoryMethod;
-            if (factoryMethodSelector == null)
-                factoryMethod = new FactoryMethod(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
+            var factoryMethod = factoryMethodSelector?.Invoke(request);
+            if (factoryMethod == null && factoryMethodSelector != null)
+                return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
+                    Error.UnableToSelectCtor, request.ImplementationType, request);
+
+            ConstructorInfo ctor;
+            MethodBase ctorOrMethod;
+            Expression factoryExpr = null;
+            if (factoryMethod == null)
+            {
+                if (_knownSingleCtor == null)
+                {
+
+                }
+                ctorOrMethod = ctor = _knownSingleCtor ?? request.ImplementationType.SingleConstructor();
+            }
             else
             {
-                if ((factoryMethod = factoryMethodSelector(request)) == null)
-                    return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
-                        Error.UnableToSelectCtor, request.ImplementationType, request);
-            }
-
-            // If factory method is the method of some registered service, then resolve factory service first.
-            var factoryExpr = factoryMethod.FactoryExpression;
-            if (factoryExpr == null && factoryMethod.FactoryServiceInfo != null)
-            {
-                var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
-                factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
-                if (factoryExpr == null)
-                    return null; // todo: should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
-            }
-
-            // return earlier if already have the parameters resolved, e.g. when using `ConstructorWithResolvableArguments`
-            var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
-            if (factoryMethod.ResolvedParameterExpressions != null)
-            {
-                if (rules.UsedForValidation)
+                // If factory method is the method of some registered service, then resolve factory service first.
+                factoryExpr = factoryMethod.FactoryExpression;
+                if (factoryExpr == null && factoryMethod.FactoryServiceInfo != null)
                 {
-                    TryGetMemberAssignments(request, container, rules);
-                    return request.GetActualServiceType().GetDefaultValueExpression();
+                    var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
+                    factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
+                    if (factoryExpr == null)
+                        return null; // todo: should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
                 }
 
-                var newExpr = New((ConstructorInfo)ctorOrMember, factoryMethod.ResolvedParameterExpressions);
-                var assignements = TryGetMemberAssignments(request, container, rules);
-                if (assignements != null)
-                    return MemberInit(newExpr, assignements);
-                return newExpr;
-            }
+                // return earlier if already have the parameters resolved, e.g. when using `ConstructorWithResolvableArguments`
+                var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
+                if (factoryMethod.ResolvedParameterExpressions != null)
+                {
+                    if (rules.UsedForValidation)
+                    {
+                        TryGetMemberAssignments(request, container, rules);
+                        return request.GetActualServiceType().GetDefaultValueExpression();
+                    }
 
-            var ctorOrMethod = ctorOrMember as MethodBase;
-            if (ctorOrMethod == null) // return earlier when factory is Property or Field
-            {
-                var memberExpr = ctorOrMember is PropertyInfo p ? Property(factoryExpr, p)
-                    : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember);
-                return ConvertExpressionIfNeeded(memberExpr, request, ctorOrMember);
+                    var newExpr = New((ConstructorInfo)ctorOrMember, factoryMethod.ResolvedParameterExpressions);
+                    var assignements = TryGetMemberAssignments(request, container, rules);
+                    return assignements == null ? newExpr : (Expression)MemberInit(newExpr, assignements);
+                }
+
+                ctorOrMethod = ctorOrMember as MethodBase;
+                if (ctorOrMethod == null) // return earlier when factory is Property or Field
+                    return ConvertExpressionIfNeeded(ctorOrMember is PropertyInfo p ? Property(factoryExpr, p)
+                        : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember), request, ctorOrMember);
+                
+                ctor = ctorOrMember as ConstructorInfo;
             }
 
             var parameters = ctorOrMethod.GetParameters();
@@ -10089,20 +10096,17 @@ namespace DryIoc
             {
                 if (rules.UsedForValidation)
                 {
-                    if (ctorOrMember is ConstructorInfo)
+                    if (ctor != null)
                         TryGetMemberAssignments(request, container, rules);
                     return request.GetActualServiceType().GetDefaultValueExpression();
                 }
 
-                if (ctorOrMember is MethodInfo method)
-                    return ConvertExpressionIfNeeded(Call(factoryExpr, method), request, ctorOrMember);
-
-                var newExpr = New((ConstructorInfo)ctorOrMember, Empty<Expression>());
+                if (ctor == null)
+                    return ConvertExpressionIfNeeded(Call(factoryExpr, (MethodInfo)ctorOrMethod), request, ctorOrMethod);
                 var assignements = TryGetMemberAssignments(request, container, rules);
-                if (assignements != null)
-                    return MemberInit(newExpr, assignements);
-
-                return newExpr;
+                return assignements != null
+                    ? (Expression)MemberInit(New(ctor, Empty<Expression>()), assignements)
+                    : New(ctor, Empty<Expression>());
             }
 
             Expression arg0 = null, arg1 = null, arg2 = null, arg3 = null, arg4 = null;
@@ -10189,7 +10193,6 @@ namespace DryIoc
             if (rules.UsedForValidation) 
                 return request.GetActualServiceType().GetDefaultValueExpression();
 
-            var ctor = ctorOrMethod as ConstructorInfo;
             Expression serviceExpr;
             if (arg0 == null)
                 serviceExpr = ctor != null ? New(ctor, paramExprs) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, paramExprs);
@@ -10205,7 +10208,7 @@ namespace DryIoc
                 serviceExpr = ctor != null ? New(ctor, arg0, arg1, arg2, arg3, arg4) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, arg0, arg1, arg2, arg3, arg4);
 
             if (ctor == null)
-                return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMember);
+                return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMethod);
 
             var assignments = TryGetMemberAssignments(request, container, rules);
             if (assignments == null)

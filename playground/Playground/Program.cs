@@ -20,7 +20,7 @@ namespace Playground
         {
             //var bm = new ManualInserttionSortVsOrderBy();
             //bm.SortViaInsertion();
-            BenchmarkRunner.Run<ManualInserttionSortVsOrderBy>();
+            //BenchmarkRunner.Run<ManualInserttionSortVsOrderBy>();
 
             //BenchmarkRunner.Run<MatchCaseOrder>();
 
@@ -43,7 +43,7 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
-            //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.Measure(

@@ -1046,6 +1046,14 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |      Autofac |    583.26 us | 18.342 us | 17.157 us |   5.84 |    0.21 | 102.5391 | 28.3203 |     - | 472.86 KB |
 | Autofac_MsDI |    561.82 us |  4.129 us |  3.862 us |   5.63 |    0.20 | 101.5625 | 27.3438 |     - | 467.85 KB |
 
+## DryIoc v4.1.5
+
+| Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------- |---------:|--------:|--------:|------:|--------:|--------:|-------:|------:|----------:|
+|   MsDI | 142.8 us | 4.00 us | 7.51 us |  1.00 |    0.00 | 16.8457 | 0.2441 |     - |  73.16 KB |
+| DryIoc | 102.3 us | 0.82 us | 0.77 us |  0.69 |    0.05 | 14.4043 |      - |     - |  66.87 KB |
+
+/
              */
 
             [Benchmark(Baseline = true)]
