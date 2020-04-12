@@ -106,10 +106,10 @@ namespace DryIoc
         /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
         {
-            var s = _scopeContext == null ? "Container" : "Container with ambient ScopeContext " + _scopeContext;
+            var s = _scopeContext == null ? "container" : "container with ambient ScopeContext " + _scopeContext;
 
             var scope = CurrentScope;
-            s += scope == null ? " without Scope" : " with Scope " + scope;
+            s += scope == null ? " without scope" : " with scope " + scope;
 
             if (Rules != Rules.Default)
                 s += NewLine + " with " + Rules;
@@ -8786,9 +8786,10 @@ namespace DryIoc
             if (IsEmpty)
                 return s.Append("<empty request>");
 
-            if (IsNestedResolutionCall)
+            var isResolutionCall = false;
+            if (isResolutionCall = IsNestedResolutionCall)
                 s.Append("Resolution call dependency ");
-            else if (IsResolutionRoot)
+            else if (isResolutionCall = IsResolutionRoot)
                 s.Append("Resolution root ");
 
             if (FactoryID != 0) // request is with resolved factory
@@ -8818,7 +8819,9 @@ namespace DryIoc
             if (!InputArgExprs.IsNullOrEmpty())
                 s.AppendFormat(" with passed arguments [{0}]", InputArgExprs);
 
-            // todo: exclude IsResolutionCall cause it is printed by above
+            if (isResolutionCall) // excluding the doubled info
+                Flags |= ~RequestFlags.IsResolutionCall;
+
             if (Flags != default(RequestFlags))
                 s.Append(" (").Append(Flags).Append(')');
 
