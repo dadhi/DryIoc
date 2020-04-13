@@ -19,6 +19,7 @@ using Financials;
 using Framework;
 using Integrations;
 using Logic;
+using Monitor;
 using OrganizationBase;
 using Organizations;
 using ScheduledWork;
@@ -13056,5 +13057,13 @@ namespace Web.Rest.API
 
     public class MassUpdateControl<TReport, TContext>
     {
+    }
+
+
+    public class CalendarSyncLogConfiguration : LogConfiguration
+    {
+        public CalendarSyncLogConfiguration(string logName) : base(logName)
+        {
+        }
     }
 }

@@ -19,6 +19,8 @@ using Shop;
 using Pdf;
 using Users;
 using Utilities;
+using Monitor;
+using Conn;
 using File = Entities.File;
 using IInvoicingContactService = Organizations.IInvoicingContactService;
 using Invoice = Entities.Invoice;
@@ -26,6 +28,7 @@ using IOrganizationService = CUsers.ApplicationServices.IOrganizationService;
 using Organization = Organizations.Organization;
 using SearchCriteria = Search.SearchCriteria;
 using Settings = OrganizationBase.Settings;
+using User = Framework.User;
 
 namespace Logic
 {
@@ -353,7 +356,10 @@ namespace Logic
             ITravelReimbursementDefinition arg10,
             IPdfTravelReimbursementDocumentService arg11,
             ITravelReimbursementBreakdownDefinition arg12,
-            IUserRepository arg13
+            IUserRepository arg13,
+            ICaseRepository arg14,
+            IPdfDocumentService arg15,
+            IHttpClientFactory arg16
         )
         {
             field0 = arg0;
@@ -2231,7 +2237,8 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IContextService<IPsaContext> arg0,
             IActivityContactMemberRepository arg1,
             IValidator<ActivityContactMember> arg2,
-            IAuthorization<IPsaContext, ActivityContactMember> arg3
+            IAuthorization<IPsaContext, ActivityContactMember> arg3,
+            IActivityLoggerService arg4
         ) : base(arg0, arg1, arg2, arg3)
         {
             field0 = arg0;
@@ -2459,7 +2466,9 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             ITemporaryHourService arg11,
             IReimbursedHourRepository arg12,
             IOrganizationCompanyRepository arg13,
-            IUserRepository arg14
+            IUserRepository arg14,
+            IWorkdayService arg15,
+            ITimingRepository arg16
         ) : base()
         {
             field0 = arg0;
@@ -2999,6 +3008,29 @@ public class AccountOverviewReportHandler : AccountListReportHandler
     }
 
 
+    public interface IActivityLoggerService
+    {
+    }
+
+
+    public class ActivityLoggerService : IActivityLoggerService
+    {
+        private readonly IContextService<IPsaContext> _ContextService;
+        private readonly IMessageLogger _MessageLogger;
+        private readonly CalendarSyncLogConfiguration LogConfig;
+
+        public ActivityLoggerService(
+            IContextService<IPsaContext> contextService,
+            IMessageLogger messageLogger = null,
+            CalendarSyncLogConfiguration logConfig = null
+        )
+        {
+            _ContextService = contextService;
+            _MessageLogger = messageLogger;
+            LogConfig = logConfig;
+        }
+    }
+
     public class ActivityService : OrganizationEntityService<Activity, IActivityRepository, User, IPsaContext>
         , IActivityService
     {
@@ -3021,7 +3053,8 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IActivityResourceMemberRepository arg15,
             ICalendarSyncActivityNonAppParticipantRepository arg16, IAuditTrail<Activity> arg17,
             IBackgroundExecutorService arg18,
-            IUserService arg19
+            IUserService arg19,
+            IActivityLoggerService arg20
         ) : base(arg0, arg1, arg2, arg3)
         {
             field0 = arg0;
@@ -3128,7 +3161,8 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IContextService<IPsaContext> arg0,
             IActivityUserMemberRepository arg1,
             IValidator<ActivityUserMember> arg2,
-            IAuthorization<IPsaContext, ActivityUserMember> arg3
+            IAuthorization<IPsaContext, ActivityUserMember> arg3,
+            IActivityLoggerService arg4
         ) : base(arg0, arg1, arg2, arg3)
         {
             field0 = arg0;
@@ -5426,9 +5460,11 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             ICaseCopyHandlerService arg43,
             IHourRepository arg44,
             IItemRepository arg45,
-            IRecurringItemRepository arg46, IAuditTrail<Case> arg47,
+            IRecurringItemRepository arg46, 
+            IAuditTrail<Case> arg47,
             IActivityContactMemberRepository arg49,
-            IUserWeeklyViewRowRepository arg50
+            IUserWeeklyViewRowRepository arg50,
+            ITimingRepository arg51
         ) : base()
         {
             field0 = arg0;
@@ -5900,7 +5936,17 @@ public class AccountOverviewReportHandler : AccountListReportHandler
         private readonly IPsaOrganizationService _OrganizationService;
         private readonly IOrganizationCompanyRepository _OrganizationCompanyRepository;
 
-        public AccountService(IContextService<IPsaContext> contextService, IAccountRepository repository, IValidator<Account> validator, IAuthorization<IPsaContext, Account> authorization, ICompanyService companyService, IPsaOrganizationService organizationService, IOrganizationCompanyRepository organizationCompanyRepository) : base(contextService, repository, validator, authorization)
+        public AccountService(
+            IContextService<IPsaContext> contextService, 
+            IAccountRepository repository, 
+            IValidator<Account> validator, 
+            IAuthorization<IPsaContext, Account> authorization, 
+            ICompanyService companyService, 
+            IPsaOrganizationService organizationService,
+            ICaseRepository caseRpository ,
+            IActivityService activityService,
+            IOrganizationCompanyRepository organizationCompanyRepository
+        ) : base(contextService, repository, validator, authorization)
         {
             _CompanyService = companyService;
             _OrganizationService = organizationService;
@@ -7593,7 +7639,9 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IInvoiceHtmlService arg28,
             IInvoiceTemplateService arg29,
             ICaseBillingAccountService arg30,
-            IBusinessUnitRepository arg31, IAuditTrail<InvoiceCase> arg32, IAuditTrail<Invoice> arg33,
+            IBusinessUnitRepository arg31, 
+            IAuditTrail<InvoiceCase> arg32, 
+            IAuditTrail<Invoice> arg33,
             IInvoiceRowService arg34,
             IContactService arg35,
             IOrganizationCompanyRepository arg36,
@@ -9893,7 +9941,11 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IHourRepository arg6,
             ICaseWorkTypeRepository arg7,
             IWorkPriceService arg8,
-            IUserRepository arg9
+            IUserRepository arg9,
+            IUserWeeklyViewRowRepository arg10,
+            IWorkPriceRepository arg11,
+            ICaseMemberRepository arg12,
+            IOrganizationCompanyRepository arg13
         ) : base(arg0, arg1, arg2, arg3)
         {
             field0 = arg0;
@@ -10396,7 +10448,8 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IProposalStatusRepository arg1,
             IValidator<ProposalStatus> arg2,
             IAuthorization<IPsaContext, ProposalStatus> arg3,
-            IOrganizationRepository arg4
+            IOrganizationRepository arg4,
+            IOfferRepository arg5
         ) : base(arg0, arg1, arg2, arg3)
         {
             field0 = arg0;
@@ -10773,7 +10826,8 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IAccountRepository arg1,
             IPricelistRepository arg2,
             ILanguageService arg3,
-            IOrganizationPermissionService arg4
+            IOrganizationPermissionService arg4,
+            IUserRepository arg5
         ) : base()
         {
             field4 = arg4;
@@ -10880,7 +10934,8 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IActivityTypeRepository arg1,
             ICaseRepository arg2,
             IContextService<IPsaContext> arg3,
-            IHourRepository arg4
+            IHourRepository arg4,
+            IUserRepository arg5
         ) : base()
         {
             field0 = arg0;
@@ -11937,7 +11992,8 @@ public class AccountOverviewReportHandler : AccountListReportHandler
         public TravelReimbursementValidator(
             ITravelReimbursementRepository arg0,
             IContextService<IPsaContext> arg1,
-            ITravelReimbursementStatusRepository arg2
+            ITravelReimbursementStatusRepository arg2,
+            IUserRepository arg3
         ) : base()
         {
             field0 = arg0;

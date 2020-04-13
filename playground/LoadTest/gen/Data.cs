@@ -3253,6 +3253,29 @@ namespace Data
         public readonly ICustomerDatabaseRepository Field3;
     }
 
+    public class TimingRepository : ITimingRepository
+    {
+        public TimingRepository(
+            IContextService<IPsaContext> arg0,
+            IConfiguration arg1,
+            ICustomerDatabaseRepository arg3
+        ) : base()
+        {
+            Field0 = arg0;
+            Field1 = arg1;
+            Field3 = arg3;
+        }
+
+        public readonly IContextService<IPsaContext> Field0;
+        public readonly IConfiguration Field1;
+        public readonly DbProviderFactory Field2;
+        public readonly ICustomerDatabaseRepository Field3;
+    }
+
+    public interface ITimingRepository
+    {
+    }
+
 
     public class UserSettingsRepository : OrganizationEntityRepository<UserSettingsFields, UserSettings, IPsaContext>
         , IUserSettingsRepository
