@@ -21,6 +21,7 @@ using Web.Rest.API;
 using CustomerDatabase = Databases.CustomerDatabase;
 using IUserService = Conn.IUserService;
 using Mega;
+using Monitor;
 
 namespace LoadTest
 {
@@ -355,6 +356,7 @@ namespace LoadTest
                 RegisterMail(container);
                 RegisterBackgroundTasks(container);
                 RegisterScanner(container);
+                RegMonitor(container);
             }
 
             private static void RegisterBackgroundTasks(IContainer container)
@@ -507,6 +509,12 @@ namespace LoadTest
                 );
             }
 
+            private static void RegMonitor(IContainer container)
+            {
+                container.RegisterInstance(new LogConfiguration("my-log"));
+                container.RegisterInstance(new AsynchronousDataCollectorClient());
+            }
+
             private static void RegisterDataObjects(IContainer container)
             {
                 var apiAssembly = typeof(ActivityRepository).Assembly;
@@ -582,7 +590,7 @@ namespace LoadTest
                     }
                 ).ToArray();
 
-                container.RegisterMany(serviceTypes, Reuse.Singleton, serviceTypeCondition: s => s.IsInterface,
+                container.RegisterMany(serviceTypes, Reuse.Transient, serviceTypeCondition: s => s.IsInterface,
                     ifAlreadyRegistered: IfAlreadyRegistered.Replace);
                 container.Register<IGuidService, GuidService>(reuse: Reuse.Singleton,
                     ifAlreadyRegistered: IfAlreadyRegistered.Throw);
