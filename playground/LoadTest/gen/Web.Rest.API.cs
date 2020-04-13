@@ -13058,4 +13058,12 @@ namespace Web.Rest.API
     public class MassUpdateControl<TReport, TContext>
     {
     }
+
+
+    public class CalendarSyncLogConfiguration : LogConfiguration
+    {
+        public CalendarSyncLogConfiguration(string logName) : base(logName)
+        {
+        }
+    }
 }
