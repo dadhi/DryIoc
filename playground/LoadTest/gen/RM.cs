@@ -794,28 +794,6 @@ namespace RM
     }
 
 
-    public class AccountValidator : Validator<Account>
-    {
-        public AccountValidator(
-            IContextService<IPsaContext> arg0,
-            IAccountRepository arg1,
-            ILanguageService arg2,
-            IOrganizationPermissionService arg3
-        ) : base()
-        {
-            field0 = arg0;
-            field1 = arg1;
-            field2 = arg2;
-            field3 = arg3;
-        }
-
-        public readonly IContextService<IPsaContext> field0;
-        public readonly IAccountRepository field1;
-        public readonly ILanguageService field2;
-        public readonly IOrganizationPermissionService field3;
-    }
-
-
     public class AddressValidator : Validator<Address>
     {
         public AddressValidator(

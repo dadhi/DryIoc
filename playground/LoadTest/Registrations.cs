@@ -513,6 +513,10 @@ namespace LoadTest
             {
                 container.RegisterInstance(new LogConfiguration("my-log"));
                 container.RegisterInstance(new AsynchronousDataCollectorClient());
+                container.RegisterInstance<IDataCollectorClient>(new AsynchronousDataCollectorClient());
+
+                container.RegisterInstance<CalendarSyncLogConfiguration>(new CalendarSyncLogConfiguration("foo"));
+                container.Register<IMessageLogger, MessageLogger>(Reuse.Singleton);
             }
 
             private static void RegisterDataObjects(IContainer container)
@@ -521,7 +525,8 @@ namespace LoadTest
                 var ns = typeof(ActivityRepository).Namespace;
                 var types = apiAssembly.GetLoadedTypes().Where(i =>
                     {
-                        return i.Namespace == ns && !i.IsInterface && !i.IsAbstract && i.Name.EndsWith("Repository");
+                        return i.Namespace == ns && !i.IsInterface && !i.IsAbstract &&
+                               (i.Name.EndsWith("Repository") || i.Name.EndsWith("Search"));
                     }
                 );
                 container.RegisterMany(types, Reuse.Singleton,
