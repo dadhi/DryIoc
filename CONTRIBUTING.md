@@ -34,7 +34,7 @@ Thank you.
 
 ### Build from the command line 
 
-Before sending a Pull Request, please build solution with `build_no_legacy.bat` located in the root folder.
+Before sending a Pull Request, please build solution with `build.bat` located in the root folder.
 
 It will build all projects for __all platforms__ in Release configuration, run unit tests, and create NuGet packages.
 Make sure that there are no project build errors or failing tests.
