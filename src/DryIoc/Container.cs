@@ -9501,7 +9501,6 @@ namespace DryIoc
             var setup = Setup;
             var rules = container.Rules;
 
-            // todo: how should we handle singleton decorators?
             // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
             if (rules.EagerCachingSingletonForFasterAccess &&
                 request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
@@ -9512,7 +9511,7 @@ namespace DryIoc
                 var itemRef = ((Scope)container.SingletonScope)._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(factoryId);
                 if (itemRef != null && itemRef.Value != Scope.NoItem)
                     return Constant(itemRef.Value); // todo: we need the way to reuse Constant for the value
-            }
+                }
 
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
                 !request.OpensResolutionScope && (
@@ -9522,7 +9521,7 @@ namespace DryIoc
                       setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration ||
                       setup.UseParentReuse ||
                       request.FactoryType == FactoryType.Service && request.DependencyDepth > rules.DependencyDepthToSplitObjectGraph
-                    ) &&
+                  ) &&
                     request.GetActualServiceType() != typeof(void))
                 )
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
@@ -10062,10 +10061,6 @@ namespace DryIoc
             Expression factoryExpr = null;
             if (factoryMethod == null)
             {
-                if (_knownSingleCtor == null)
-                {
-
-                }
                 ctorOrMethod = ctor = _knownSingleCtor ?? request.ImplementationType.SingleConstructor();
             }
             else
@@ -10077,7 +10072,7 @@ namespace DryIoc
                     var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
                     factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
                     if (factoryExpr == null)
-                        return null; // todo: should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
+                            return null; // todo: should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
                 }
 
                 // return earlier if already have the parameters resolved, e.g. when using `ConstructorWithResolvableArguments`
@@ -10112,7 +10107,7 @@ namespace DryIoc
                         TryGetMemberAssignments(request, container, rules);
                     return request.GetActualServiceType().GetDefaultValueExpression();
                 }
-
+                 
                 if (ctor == null)
                     return ConvertExpressionIfNeeded(Call(factoryExpr, (MethodInfo)ctorOrMethod), request, ctorOrMethod);
                 var assignements = TryGetMemberAssignments(request, container, rules);
@@ -13066,12 +13061,17 @@ namespace DryIoc
         /// <summary>Looks up for single declared method with the specified name. Returns null if method is not found.</summary>
         public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
         {
-            var methods = type.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
-            for (var i = 0; i < methods.Length; i++)
+            if (includeNonPublic)
             {
-                var m = methods[i];
-                if ((includeNonPublic || m.IsPublic) && m.Name == name)
-                    return m;
+                foreach (var method in type.GetTypeInfo().DeclaredMethods)
+                    if (method.Name == name)
+                        return method;
+            }
+            else
+            {
+                foreach (var method in type.GetTypeInfo().DeclaredMethods)
+                    if (method.IsPublic && method.Name == name)
+                        return method;
             }
 
             return null;
