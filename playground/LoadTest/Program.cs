@@ -9,9 +9,7 @@ using System.Web.Http;
 using System.Web.Http.Controllers;
 using DryIoc;
 using DryIoc.WebApi;
-using ImTools;
 using Mega;
-using Web.Rest.API;
 using ThreadState = System.Threading.ThreadState;
 
 namespace LoadTest
@@ -40,7 +38,7 @@ namespace LoadTest
             return container;
         }
 
-        static async Task Main(string[] args)
+        static /*async Task*/void Main(string[] args)
         {
             Console.WriteLine("Starting up!");
 
@@ -54,15 +52,7 @@ namespace LoadTest
 
             bool IsController(ServiceRegistrationInfo x) => x.ServiceType.Name.EndsWith("Controller");
 
-            // 1. - Validate each controller individually in parallel with Parallel Query - 37 sec
-            //var results = container.GetServiceRegistrations()
-            //    .Where(IsController)
-            //    .Select(x => x.ToServiceInfo())
-            //    .AsParallel()
-            //    .Select(x => container.Validate(x))
-            //    .Aggregate((x, y) => x.Append(y));
-
-            // 2. Validate in batches of number of controllers / number of processors with Task.Run - 31 sec
+            // Paralleling the Validation
             //var controllers = container.GetServiceRegistrations()
             //    .Where(IsController).Select(x => x.ToServiceInfo()).ToArray();
             //var controllersPerCpu = new List<ServiceInfo>[Environment.ProcessorCount];
@@ -74,11 +64,8 @@ namespace LoadTest
             //var results = (await Task.WhenAll(validationTasks))
             //    .SelectMany(x => x).ToArray();
 
-            // 3. Controllers only sequentially - 1 min 16 sec
-            //var results = container.Validate(IsController);
-
-            // 4. 
-            var results = container.Validate();
+            var results = container.Validate(IsController);
+            //var results = container.Validate();
             if (results.Length > 0)
             {
                 foreach (var kvp in results)
