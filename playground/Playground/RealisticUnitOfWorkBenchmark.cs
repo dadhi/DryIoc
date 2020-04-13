@@ -280,7 +280,7 @@ namespace PerformanceTests
             }
         }
 
-        public static ServiceCollection GetServices()
+        public static ServiceCollection AddServices()
         {
             var services = new ServiceCollection();
 
@@ -360,7 +360,7 @@ namespace PerformanceTests
 
         public static IServiceProvider PrepareMsDi()
         {
-            var serviceProvider = GetServices().BuildServiceProvider();
+            var serviceProvider = AddServices().BuildServiceProvider();
             ResolveDummyPopulation(serviceProvider);
             return serviceProvider;
         }
@@ -427,7 +427,7 @@ namespace PerformanceTests
 
         public static IServiceProvider PrepareDryIocMsDi()
         {
-            var serviceProvider = DryIocAdapter.Create(GetServices());
+            var serviceProvider = DryIocAdapter.Create(AddServices());
             ResolveDummyPopulation(serviceProvider);
             return serviceProvider;
         }
@@ -579,23 +579,9 @@ namespace PerformanceTests
         {
             var container = new DependencyInjectionContainer();
 
-            container.Populate(GetServices());
+            container.Populate(AddServices());
 
             var serviceProvider = container.Locate<IServiceProvider>();
-
-            ResolveDummyPopulation(serviceProvider);
-            return serviceProvider;
-        }
-
-        public static IServiceProvider PrepareAutofacMsDi()
-        {
-            var containerBuilder = new ContainerBuilder();
-
-            containerBuilder.Populate(GetServices());
-
-            var container = containerBuilder.Build();
-
-            var serviceProvider = new AutofacServiceProvider(container);
 
             ResolveDummyPopulation(serviceProvider);
             return serviceProvider;
@@ -699,6 +685,20 @@ namespace PerformanceTests
             return container;
         }
 
+        public static IServiceProvider PrepareAutofacMsDi()
+        {
+            var containerBuilder = new ContainerBuilder();
+
+            containerBuilder.Populate(AddServices());
+
+            var container = containerBuilder.Build();
+
+            var serviceProvider = new AutofacServiceProvider(container);
+
+            ResolveDummyPopulation(serviceProvider);
+            return serviceProvider;
+        }
+
         private static void RegisterDummyPopulation(ContainerBuilder builder)
         {
             builder.RegisterType<D1> ().AsSelf().InstancePerLifetimeScope();
@@ -757,6 +757,9 @@ namespace PerformanceTests
             using (var scope = container.BeginLifetimeScope())
                 return scope.Resolve<R>();
         }
+
+        public static IServiceProvider PrepareLamarMsDi() => 
+            new Lamar.Container(AddServices());
 
         [MemoryDiagnoser]
         public class CreateContainerAndRegisterServices
@@ -1024,24 +1027,33 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 | Autofac_MsDI |    524.51 us |   2.640 us |   2.340 us |   6.84 |    0.06 | 101.5625 | 24.4141 |     - |  466.9 KB |
 
 
-            ### DryIoc v4.1.3 and the latest libs
+### DryIoc 4.1.3 (.MsDI 3.0.3), MsDI 3.1.3, Grace 7.1.0 (.MsDI 7.0.1), Autofac 5.1.2 (.MsDI 6.0.0), Lamar 4.2.1
 
 BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
-Intel Core i7-7600U CPU 2.80GHz (Kaby Lake), 1 CPU, 4 logical and 2 physical cores
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
 .NET Core SDK=3.1.200
   [Host]     : .NET Core 3.1.2 (CoreCLR 4.700.20.6602, CoreFX 4.700.20.6702), X64 RyuJIT
   DefaultJob : .NET Core 3.1.2 (CoreCLR 4.700.20.6602, CoreFX 4.700.20.6702), X64 RyuJIT
 
-|       Method |        Mean |     Error |    StdDev |      Median |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
-|------------- |------------:|----------:|----------:|------------:|-------:|--------:|---------:|--------:|------:|----------:|
-|         MsDI |    251.4 us |   4.92 us |   7.95 us |    252.0 us |   1.00 |    0.00 |  36.6211 |       - |     - |  74.38 KB |
-|       DryIoc |    158.7 us |   9.80 us |  28.44 us |    143.2 us |   0.74 |    0.06 |  34.1797 |       - |     - |  69.94 KB |
-|  DryIoc_MsDI |    164.0 us |   3.26 us |   5.17 us |    163.3 us |   0.65 |    0.03 |  43.7012 |       - |     - |  89.48 KB |
-|        Grace | 22,621.9 us | 452.00 us | 618.70 us | 22,592.9 us |  89.91 |    4.10 | 187.5000 | 93.7500 |     - | 727.79 KB |
-|   Grace_MsDI | 26,632.1 us | 514.99 us | 528.85 us | 26,621.9 us | 105.22 |    4.27 | 281.2500 | 62.5000 |     - |  898.4 KB |
-|      Autofac |    783.1 us |  15.52 us |  28.38 us |    781.4 us |   3.13 |    0.16 | 208.0078 | 13.6719 |     - | 445.42 KB |
-| Autofac_MsDI |    799.1 us |  15.76 us |  31.47 us |    798.3 us |   3.19 |    0.17 | 226.5625 |  5.8594 |     - | 473.43 KB |
+|       Method |         Mean |     Error |    StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 | Gen 2 | Allocated |
+|------------- |-------------:|----------:|----------:|-------:|--------:|---------:|--------:|------:|----------:|
+|         MsDI |     99.02 us |  1.956 us |  2.806 us |   1.00 |    0.00 |  16.1133 |  0.2441 |     - |  74.24 KB |
+|       DryIoc |     97.25 us |  0.493 us |  0.461 us |   0.97 |    0.03 |  15.1367 |  1.3428 |     - |  69.79 KB |
+|  DryIoc_MsDI |    124.04 us |  1.770 us |  1.655 us |   1.24 |    0.04 |  19.2871 |  1.8311 |     - |   89.1 KB |
+|        Grace | 16,869.55 us | 80.435 us | 75.239 us | 168.94 |    5.72 | 156.2500 | 62.5000 |     - | 727.59 KB |
+|   Grace_MsDI | 20,468.19 us | 66.869 us | 62.549 us | 204.98 |    7.02 | 187.5000 | 93.7500 |     - | 898.37 KB |
+|   Lamar_MsDI |  6,060.29 us | 23.102 us | 20.479 us |  60.55 |    2.06 | 140.6250 | 23.4375 |     - | 646.33 KB |
+|      Autofac |    583.26 us | 18.342 us | 17.157 us |   5.84 |    0.21 | 102.5391 | 28.3203 |     - | 472.86 KB |
+| Autofac_MsDI |    561.82 us |  4.129 us |  3.862 us |   5.63 |    0.20 | 101.5625 | 27.3438 |     - | 467.85 KB |
 
+## DryIoc v4.1.5
+
+|      Method |      Mean |    Error |   StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|---------:|------:|--------:|-------:|------:|----------:|
+|        MsDI | 141.78 us | 1.687 us | 1.578 us |  1.00 | 16.8457 | 0.2441 |     - |  73.16 KB |
+|      DryIoc |  98.96 us | 0.203 us | 0.180 us |  0.70 | 14.4043 |      - |     - |  66.87 KB |
+| DryIoc_MsDI | 123.55 us | 1.721 us | 1.526 us |  0.87 | 19.1650 |      - |     - |  88.35 KB |
+/
              */
 
             [Benchmark(Baseline = true)]
@@ -1057,16 +1069,19 @@ Intel Core i7-7600U CPU 2.80GHz (Kaby Lake), 1 CPU, 4 logical and 2 physical cor
             //[Benchmark] 
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace_MsDI() => Measure(PrepareGraceMsDi());
 
-            [Benchmark]
+            //[Benchmark]
+            public object Lamar_MsDI() => Measure(PrepareLamarMsDi());
+
+            //[Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            [Benchmark]
+            //[Benchmark]
             public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
         }
 
@@ -1275,17 +1290,24 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 | DryIoc_WebRequestScoped_WithoutFEC | 17.713 us | 0.1377 us | 0.1288 us |  4.60 |    0.04 | 1.0986 |     - |     - |   5.14 KB |
 
             
-            ## DryIoc v4.1.3
+### DryIoc 4.1.3 (.MsDI 3.0.3), MsDI 3.1.3, Grace 7.1.0 (.MsDI 7.0.1), Autofac 5.1.2 (.MsDI 6.0.0), Lamar 4.2.1
 
-|              Method |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD |   Gen 0 | Gen 1 | Gen 2 | Allocated |
-|-------------------- |----------:|----------:|----------:|----------:|------:|--------:|--------:|------:|------:|----------:|
-|                MsDI |  6.805 us | 0.1719 us | 0.4959 us |  6.719 us |  1.00 |    0.00 |  2.1210 |     - |     - |   4.35 KB |
-|              DryIoc |  3.069 us | 0.2188 us | 0.6452 us |  2.881 us |  0.46 |    0.11 |  1.4496 |     - |     - |   2.96 KB |
-|  DryIoc_MsDIAdapter |  3.388 us | 0.0672 us | 0.0774 us |  3.380 us |  0.51 |    0.03 |  1.4610 |     - |     - |   2.98 KB |
-|               Grace |  2.583 us | 0.0510 us | 0.0763 us |  2.562 us |  0.39 |    0.02 |  1.5526 |     - |     - |   3.17 KB |
-|   Grace_MsDIAdapter |  3.397 us | 0.0674 us | 0.1126 us |  3.372 us |  0.52 |    0.03 |  1.6708 |     - |     - |   3.41 KB |
-|             Autofac | 72.129 us | 1.4373 us | 2.7692 us | 71.604 us | 10.86 |    0.74 | 22.7051 |     - |     - |  46.49 KB |
-| Autofac_MsDIAdapter | 97.925 us | 1.9065 us | 2.7342 us | 97.716 us | 14.85 |    1.18 | 30.0293 |     - |     - |  61.51 KB |
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18362
+Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=3.1.200
+  [Host]     : .NET Core 3.1.2 (CoreCLR 4.700.20.6602, CoreFX 4.700.20.6702), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.2 (CoreCLR 4.700.20.6602, CoreFX 4.700.20.6702), X64 RyuJIT
+
+|              Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|-------------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|                MsDI |  3.551 us | 0.0142 us | 0.0126 us |  1.00 |    0.00 |  0.9460 | 0.0153 |     - |   4.35 KB |
+|              DryIoc |  1.647 us | 0.0050 us | 0.0042 us |  0.46 |    0.00 |  0.6428 |      - |     - |   2.96 KB |
+|  DryIoc_MsDIAdapter |  2.400 us | 0.0172 us | 0.0161 us |  0.68 |    0.01 |  0.6485 | 0.0076 |     - |   2.98 KB |
+|               Grace |  1.699 us | 0.0047 us | 0.0037 us |  0.48 |    0.00 |  0.6886 |      - |     - |   3.17 KB |
+|   Grace_MsDIAdapter |  2.322 us | 0.0163 us | 0.0136 us |  0.65 |    0.00 |  0.7401 | 0.0076 |     - |   3.41 KB |
+|          Lamar_MsDI |  7.281 us | 0.0586 us | 0.0520 us |  2.05 |    0.02 |  0.9308 | 0.4654 |     - |    5.7 KB |
+|             Autofac | 50.146 us | 0.5242 us | 0.4377 us | 14.13 |    0.14 | 10.4980 |      - |     - |  48.54 KB |
+| Autofac_MsDIAdapter | 62.118 us | 0.1595 us | 0.1492 us | 17.50 |    0.07 | 12.9395 | 0.8545 |     - |  59.89 KB |
 
 */
 
@@ -1300,6 +1322,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             private IServiceProvider _graceMsDi;
             private Autofac.IContainer _autofac;
             private IServiceProvider _autofacMsDi;
+            private IServiceProvider _lamarMsDi;
 
             [GlobalSetup]
             public void WarmUp()
@@ -1315,6 +1338,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
                 Measure(_graceMsDi = PrepareGraceMsDi());
                 Measure(_autofac = PrepareAutofac());
                 Measure(_autofacMsDi = PrepareAutofacMsDi());
+                Measure(_lamarMsDi = PrepareLamarMsDi());
             }
 
             [Benchmark(Baseline = true)]
@@ -1343,6 +1367,9 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 
             [Benchmark]
             public object Grace_MsDIAdapter() => Measure(_graceMsDi);
+
+            [Benchmark]
+            public object Lamar_MsDI() => Measure(_lamarMsDi);
 
             [Benchmark]
             public object Autofac() => Measure(_autofac);

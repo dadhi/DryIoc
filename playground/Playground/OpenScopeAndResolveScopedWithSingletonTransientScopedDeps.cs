@@ -128,6 +128,7 @@ namespace PerformanceTests
             using (var scope = container.CreateScope())
                 return scope.ServiceProvider.GetRequiredService<ScopedBlah>();
         }
+
         public static SimpleInjector.Container PrepareSimpleInjector()
         {
             var c = new SimpleInjector.Container();
