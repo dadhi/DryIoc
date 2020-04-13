@@ -1838,29 +1838,6 @@ namespace ImTools
             return matches ?? (matchStart != 0 ? Empty<T>() : source);
         }
 
-        /// <summary>The same as `Match` but assumes that <paramref name="source"/> is not null and not empty</summary>
-        public static T[] MatchUnsafe<T>(this T[] source, Func<T, bool> condition)
-        {
-            var matchStart = 0;
-            T[] matches = null;
-            var matchFound = false;
-            var i = 0;
-            for (; i < source.Length; ++i)
-                if (!(matchFound = condition(source[i])))
-                {
-                    // for accumulated matched items
-                    if (i != 0 && i > matchStart)
-                        matches = AppendTo(source, matchStart, i - matchStart, matches);
-                    matchStart = i + 1; // guess the next match start will be after the non-matched item
-                }
-
-            // when last match was found but not all items are matched (hence matchStart != 0)
-            if (matchFound && matchStart != 0)
-                return AppendTo(source, matchStart, i - matchStart, matches);
-
-            return matches ?? (matchStart != 0 ? Empty<T>() : source);
-        }
-
         /// Match with the additional state to use in <paramref name="condition"/> to minimize the allocations in <paramref name="condition"/> lambda closure 
         public static T[] Match<T, S>(this T[] source, S state, Func<S, T, bool> condition)
         {
