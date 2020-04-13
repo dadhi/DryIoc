@@ -1048,12 +1048,20 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 
 ## DryIoc v4.1.5
 
+### .net core 2.2
 |      Method |      Mean |    Error |   StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------ |----------:|---------:|---------:|------:|--------:|-------:|------:|----------:|
 |        MsDI | 141.78 us | 1.687 us | 1.578 us |  1.00 | 16.8457 | 0.2441 |     - |  73.16 KB |
 |      DryIoc |  98.96 us | 0.203 us | 0.180 us |  0.70 | 14.4043 |      - |     - |  66.87 KB |
 | DryIoc_MsDI | 123.55 us | 1.721 us | 1.526 us |  0.87 | 19.1650 |      - |     - |  88.35 KB |
-/
+
+### .net core 3.1
+|      Method |      Mean |    Error |   StdDev | Ratio |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|---------:|------:|--------:|-------:|------:|----------:|
+|        MsDI | 107.44 us | 0.877 us | 0.777 us |  1.00 | 16.2354 | 0.1221 |     - |  74.23 KB |
+|      DryIoc |  98.70 us | 1.443 us | 1.127 us |  0.92 | 14.5264 | 1.2207 |     - |  66.86 KB |
+| DryIoc_MsDI | 122.38 us | 1.214 us | 1.014 us |  1.14 | 19.0430 | 1.9531 |     - |  88.31 KB |
+
              */
 
             [Benchmark(Baseline = true)]

@@ -2,16 +2,15 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>netcoreapp3.1</TargetFramework>
-        
         <Description>Benchmarks, sandbox for experiments.</Description>
-        
         <NoWarn>1701;1702;AD0001;NU1608</NoWarn>
+        <TieredCompilation>false</TieredCompilation>
     </PropertyGroup>
     <ItemGroup>
-      <Compile Remove="ImHashMapBenchmarks.cs" />
+        <Compile Remove="ImHashMapBenchmarks.cs" />
     </ItemGroup>
     <ItemGroup>
-      <Compile Include="..\..\test\DryIoc.IssuesTests\GHIssue44_Real_world_benchmarks.Setup.cs" Link="GHIssue44_Real_world_benchmarks.Setup.cs" />
+        <Compile Include="..\..\test\DryIoc.IssuesTests\GHIssue44_Real_world_benchmarks.Setup.cs" Link="GHIssue44_Real_world_benchmarks.Setup.cs" />
     </ItemGroup>
 
     <ItemGroup>
@@ -31,5 +30,4 @@
         <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" />
         <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
     </ItemGroup>
-
 </Project>
