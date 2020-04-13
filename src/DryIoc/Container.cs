@@ -2314,6 +2314,7 @@ namespace DryIoc
 
                 return true;
             }
+
             private Registry WithDefaultService(Factory factory, int serviceTypeHash, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered)
             {
                 var services = Services;
@@ -2637,10 +2638,13 @@ namespace DryIoc
 
                 if (FactoryExpressionCache != null)
                 {
-                    var e = FactoryExpressionCache;
-                    if (e != null)
-                        Ref.Swap(ref e[factory.FactoryID & CACHE_SLOT_COUNT_MASK],
-                            factory.FactoryID, (x, i) => (x ?? ImMap<ExpressionCacheSlot>.Empty).UpdateToDefault(i));
+                    var exprCache = FactoryExpressionCache;
+                    if (exprCache != null)
+                    {
+                        var factoryId = factory.FactoryID;
+                        Ref.Swap(ref exprCache[factoryId & CACHE_SLOT_COUNT_MASK],
+                            factoryId, (x, i) => (x ?? ImMap<ExpressionCacheSlot>.Empty).UpdateToDefault(i));
+                    }
                 }
             }
 
@@ -8819,10 +8823,11 @@ namespace DryIoc
             if (!InputArgExprs.IsNullOrEmpty())
                 s.AppendFormat(" with passed arguments [{0}]", InputArgExprs);
 
+            var flags = Flags;
             if (isResolutionCall) // excluding the doubled info
-                Flags |= ~RequestFlags.IsResolutionCall;
+                flags &= ~RequestFlags.IsResolutionCall;
 
-            if (Flags != default(RequestFlags))
+            if (flags != default(RequestFlags))
                 s.Append(" (").Append(Flags).Append(')');
 
             return s;
