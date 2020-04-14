@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016 Maksim Volkau
+Copyright (c) 2016-2020 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -83,10 +83,6 @@ namespace DryIoc.Microsoft.DependencyInjection
             if (descriptors != null)
                 container.Populate(descriptors, registerDescriptor);
 
-#if NETSTANDARD1_0
-            container.UseInstance<IServiceProvider>(new DryIocServiceProvider(container));
-#endif
-
             return container;
         }
 
@@ -108,12 +104,7 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// Just gets the `IServiceProvider` from the container.
         public static IServiceProvider GetServiceProvider(this IResolver container) =>
-#if NETSTANDARD1_0
-            container.Resolve<IServiceProvider>();
-#else
             container;
-#endif
-
 
         /// <summary>Facade to consolidate DryIoc registrations in <typeparamref name="TCompositionRoot"/></summary>
         /// <typeparam name="TCompositionRoot">The class will be created by container on Startup 
@@ -186,11 +177,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                     : Reuse.Transient;
 
                 container.RegisterDelegate(true, descriptor.ServiceType,
-#if NETSTANDARD1_0
-                    r => descriptor.ImplementationFactory(r.Resolve<IServiceProvider>()),
-#else
                     descriptor.ImplementationFactory,
-#endif
                     reuse);
             }
             else
@@ -199,24 +186,6 @@ namespace DryIoc.Microsoft.DependencyInjection
             }
         }
     }
-
-#if NETSTANDARD1_0
-    /// Bare-bones IServiceScope implementations
-    public sealed class DryIocServiceProvider : IServiceProvider
-    {
-        private readonly IResolverContext _resolverContext;
-
-        /// Creating from resolver context
-        public DryIocServiceProvider(IResolverContext resolverContext)
-        {
-            _resolverContext = resolverContext;
-        }
-
-        /// <inheritdoc />
-        public object GetService(Type serviceType) => 
-            _resolverContext.Resolve(serviceType, IfUnresolved.ReturnDefaultIfNotRegistered);
-    }
-#endif
 
     /// <summary>Creates/opens new scope in passed scoped container.</summary>
     public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
@@ -244,27 +213,17 @@ namespace DryIoc.Microsoft.DependencyInjection
     public sealed class DryIocServiceScope : IServiceScope
     {
         /// <inheritdoc />
-        public IServiceProvider ServiceProvider
-        {
-            get
-            {
-#if NETSTANDARD1_0
-                return new DryIocServiceProvider(_resolverContext);
-#else
-                return _resolverContext;
-#endif
-            }
-        }
+        public IServiceProvider ServiceProvider => _resolverContext;
 
         private readonly IResolverContext _resolverContext;
 
-        /// Creating from resolver context
+        /// <summary>Creating from resolver context</summary>
         public DryIocServiceScope(IResolverContext resolverContext)
         {
             _resolverContext = resolverContext;
         }
 
-        /// Disposes the underlying resolver context 
+        /// <summary>Disposes the underlying resolver context</summary>
         public void Dispose() => _resolverContext.Dispose();
     }
 
