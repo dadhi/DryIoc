@@ -681,11 +681,10 @@ class Specify_to_use_LazyEnumerable_for_all_IEnumerable
 
 ### LambdaExpression
 
-Allows getting an actual [ExpressionTree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) composed by container to resolve a service. 
+DryIoc allows to get an actual [ExpressionTree](https://docs.microsoft.com/en-us/dotnet/csharp/expression-trees) composed by container to resolve a service. An expression may be used:
 
-- It may be used either for diagnostics, to check if container creates the service in an expected way.
-- In code generation scenarios, by converting the expression to C# code with something like [ExpressionToCode](https://github.com/EamonNerbonne/ExpressionToCode) library. 
-It may be done even at compile-time.
+- For diagnostics to check if container creates a service in an expected way.
+- In code generation scenarios by converting an expression to C# code via [ExpressionToCode](https://github.com/EamonNerbonne/ExpressionToCode) during compile or build time.
 - To understand how DryIoc works internally.
 
 ```cs 
@@ -704,6 +703,8 @@ class Resolve_expression
 
         // The result expression is of type `Expression<FactoryDelegate>`, like this:
         Expression<FactoryDelegate> f = (IResolverContext r) => new Service();
+        
+        Assert.True(expr is Expression<DryIoc.FactoryDelegate>);
     }
 
     interface IService { }
@@ -711,21 +712,14 @@ class Resolve_expression
 }
 ```
 
-The actual type of returned `LambdaExpression` is `Expression<DryIoc.FactoryDelegate>` which has a signature as in the example.
-
-__Note:__ Resolving as `LambdaExpression` does not create an actual service.
+__Note:__ Resolving as `LambdaExpression` does not instantiate any services.
 
 
-#### DryIoc is not a magic
+#### Internals
 
-Looking how resolved `LambdaExpression` is look like, you see that what DryIoc does is not a magic.
+DryIoc automates the creation of the object graph taking lifetime into consideration via same generated expression we resolved earlier. You may `Compile`(and cache) and invoke expression to instantiate an object.
 
-It is just automates the generation of the object graph taking lifetime into consideration.
-
-Given that you now have an expression, you may even `Compile` (and cache) it yourself :-) doing the last "magical" part.
-
-It may open some new possibilities:
-
+That allows for scenarios not simply possible with default container interface. 
 For instance, below is the example which is "normally" won't work without shared `scopeContext`. 
 Specifically we have a singleton holding on the `Func` of scoped service. Now we are getting an expression out 
 of container, compiling it and providing it with the scope (or any other container we want) 
