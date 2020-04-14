@@ -1,5 +1,5 @@
 using System;
-using DryIoc.MefAttributedModel;
+//using DryIoc.MefAttributedModel;
 using DryIoc.Microsoft.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -12,7 +12,7 @@ namespace DryIoc.AspNetCore.Sample
     {
         // This method gets called by the runtime. Use this method to add services to the container.
         // For more information on how to configure your application, visit http://go.microsoft.com/fwlink/?LinkID=398940
-        public IServiceProvider ConfigureServices(IServiceCollection services)
+        public void ConfigureServices(IServiceCollection services)
         {
             services
                 .AddLogging(logging => logging.AddConsole())
@@ -29,7 +29,7 @@ namespace DryIoc.AspNetCore.Sample
                         : null)
                 )
                 // optional: support for MEF Exported services
-                .WithMef()
+                //.WithMef()
                 .WithDependencyInjectionAdapter(services,
                     // optional: You may Log or Customize the infrastructure components registrations
                     MyCustomRegisterDescriptor)
