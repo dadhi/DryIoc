@@ -9,6 +9,7 @@
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
         <PackageIcon>logo.png</PackageIcon>
+        <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/logo128.png</PackageIconUrl>
         <RepositoryUrl>https://github.com/dadhi/DryIoc.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
     </PropertyGroup>
@@ -39,6 +40,7 @@
         <DebugType>embedded</DebugType>
         <!-- <DebugSymbols>true</DebugSymbols> -->
         <IncludeSymbols>false</IncludeSymbols>
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     </PropertyGroup>
 
     <!-- SourceLink support -->
