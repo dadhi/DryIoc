@@ -1,4 +1,3 @@
-﻿using System.ComponentModel.Composition;
 using DryIoc.AspNetCore.Sample.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -9,10 +8,10 @@ namespace DryIoc.AspNetCore.Sample.Controllers
     {
         private readonly ILogger<LoggingController> _logger;
 
-        [Import]
+        //[Import]
         public ITransientService Transient { get; set; }
 
-        public LoggingController(ILoggerFactory loggingFactory)
+        public LoggingController(ILoggerFactory loggingFactory, ITransientService Transient)
         {
             _logger = loggingFactory.CreateLogger<LoggingController>();
         }

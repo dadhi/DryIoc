@@ -1,5 +1,5 @@
 using System;
-using DryIoc.MefAttributedModel;
+//using DryIoc.MefAttributedModel;
 using DryIoc.Microsoft.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -29,7 +29,7 @@ namespace DryIoc.AspNetCore.Sample
                         : null)
                 )
                 // optional: support for MEF Exported services
-                .WithMef()
+                //.WithMef()
                 .WithDependencyInjectionAdapter(services,
                     // optional: You may Log or Customize the infrastructure components registrations
                     MyCustomRegisterDescriptor)
