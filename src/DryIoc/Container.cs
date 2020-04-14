@@ -106,10 +106,10 @@ namespace DryIoc
         /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
         {
-            var s = _scopeContext == null ? "Container" : "Container with ambient ScopeContext " + _scopeContext;
+            var s = _scopeContext == null ? "container" : "container with ambient ScopeContext " + _scopeContext;
 
             var scope = CurrentScope;
-            s += scope == null ? " without Scope" : " with Scope " + scope;
+            s += scope == null ? " without scope" : " with scope " + scope;
 
             if (Rules != Rules.Default)
                 s += NewLine + " with " + Rules;
@@ -2314,6 +2314,7 @@ namespace DryIoc
 
                 return true;
             }
+
             private Registry WithDefaultService(Factory factory, int serviceTypeHash, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered)
             {
                 var services = Services;
@@ -2637,10 +2638,13 @@ namespace DryIoc
 
                 if (FactoryExpressionCache != null)
                 {
-                    var e = FactoryExpressionCache;
-                    if (e != null)
-                        Ref.Swap(ref e[factory.FactoryID & CACHE_SLOT_COUNT_MASK],
-                            factory.FactoryID, (x, i) => (x ?? ImMap<ExpressionCacheSlot>.Empty).UpdateToDefault(i));
+                    var exprCache = FactoryExpressionCache;
+                    if (exprCache != null)
+                    {
+                        var factoryId = factory.FactoryID;
+                        Ref.Swap(ref exprCache[factoryId & CACHE_SLOT_COUNT_MASK],
+                            factoryId, (x, i) => (x ?? ImMap<ExpressionCacheSlot>.Empty).UpdateToDefault(i));
+                    }
                 }
             }
 
@@ -2776,21 +2780,9 @@ namespace DryIoc
             }
         }
 
-        //private static object GetPoolOrNewObjects(object[][] objsPool, int count) =>
-        //    count < 8 ? objsPool[count - 1] ?? new object[count] : new object[count];
-
-        //private static void ReturnObjecstsToPool(object[][] objsPool, object[] objs)
-        //{
-        //    var length = objs.Length;
-        //    if (length < 8)
-        //        objsPool[length - 1] = objs;
-        //}
-
         /// <summary>Interprets passed expression</summary>
         public static bool TryInterpret(IResolverContext r, Expression expr, 
-            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result
-            //, object[][] objsPools = null
-            )
+            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result)
         {
             result = null;
             switch (expr.NodeType)
@@ -5944,6 +5936,7 @@ namespace DryIoc
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) => request =>
         {
             var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+            // todo: we can inline this because we do double checking on the number of constructors
             var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
             var ctorCount = ctors.Length;
             if (ctorCount == 0)
@@ -8345,6 +8338,10 @@ namespace DryIoc
         /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
         public FactoryType FactoryType { get; private set; }
 
+        /// <summary>Combines decorator and <see cref="DecoratedFactoryID"/></summary>
+        public int CombineDecoratorWithDecoratedFactoryID() =>
+            FactoryID | (DecoratedFactoryID << 16);
+
         /// <summary>Service implementation type if known.</summary>
         public Type ImplementationType => _factoryImplType ?? Factory?.ImplementationType;
         private Type _factoryImplType;
@@ -8793,9 +8790,10 @@ namespace DryIoc
             if (IsEmpty)
                 return s.Append("<empty request>");
 
-            if (IsNestedResolutionCall)
+            var isResolutionCall = false;
+            if (isResolutionCall = IsNestedResolutionCall)
                 s.Append("Resolution call dependency ");
-            else if (IsResolutionRoot)
+            else if (isResolutionCall = IsResolutionRoot)
                 s.Append("Resolution root ");
 
             if (FactoryID != 0) // request is with resolved factory
@@ -8825,8 +8823,11 @@ namespace DryIoc
             if (!InputArgExprs.IsNullOrEmpty())
                 s.AppendFormat(" with passed arguments [{0}]", InputArgExprs);
 
-            // todo: exclude IsResolutionCall cause it is printed by above
-            if (Flags != default(RequestFlags))
+            var flags = Flags;
+            if (isResolutionCall) // excluding the doubled info
+                flags &= ~RequestFlags.IsResolutionCall;
+
+            if (flags != default(RequestFlags))
                 s.Append(" (").Append(Flags).Append(')');
 
             return s;
@@ -9505,12 +9506,14 @@ namespace DryIoc
             var setup = Setup;
             var rules = container.Rules;
 
-            // todo: how should we handle singleton decorators?
             // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
             if (rules.EagerCachingSingletonForFasterAccess &&
                 request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
             {
-                var itemRef = ((Scope)container.SingletonScope)._maps[FactoryID & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(FactoryID);
+                var factoryId = request.FactoryType == FactoryType.Decorator
+                    ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
+
+                var itemRef = ((Scope)container.SingletonScope)._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(factoryId);
                 if (itemRef != null && itemRef.Value != Scope.NoItem)
                     return Constant(itemRef.Value); // todo: we need the way to reuse Constant for the value
             }
@@ -9523,7 +9526,7 @@ namespace DryIoc
                       setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration ||
                       setup.UseParentReuse ||
                       request.FactoryType == FactoryType.Service && request.DependencyDepth > rules.DependencyDepthToSplitObjectGraph
-                    ) &&
+                  ) &&
                     request.GetActualServiceType() != typeof(void))
                 )
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
@@ -9584,7 +9587,9 @@ namespace DryIoc
                 if (scope.IsDisposed)
                     Throw.It(Error.ScopeIsDisposed, scope.ToString());
 
-                var factoryId = FactoryID;
+                var factoryId = request.FactoryType == FactoryType.Decorator
+                    ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
+
                 ref var map = ref scope._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK];
 
                 var m = map;
@@ -10050,50 +10055,52 @@ namespace DryIoc
             var container = request.Container;
             var rules = container.Rules;
 
-            FactoryMethod factoryMethod;
             var factoryMethodSelector = Made.FactoryMethod ?? rules.FactoryMethod;
-            if (factoryMethodSelector == null)
-                factoryMethod = new FactoryMethod(_knownSingleCtor ?? request.ImplementationType.SingleConstructor());
+            var factoryMethod = factoryMethodSelector?.Invoke(request);
+            if (factoryMethod == null && factoryMethodSelector != null)
+                return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
+                    Error.UnableToSelectCtor, request.ImplementationType, request);
+
+            ConstructorInfo ctor;
+            MethodBase ctorOrMethod;
+            Expression factoryExpr = null;
+            if (factoryMethod == null)
+            {
+                ctorOrMethod = ctor = _knownSingleCtor ?? request.ImplementationType.SingleConstructor();
+            }
             else
             {
-                if ((factoryMethod = factoryMethodSelector(request)) == null)
-                    return Throw.For<Expression>(request.IfUnresolved != IfUnresolved.ReturnDefault,
-                        Error.UnableToSelectCtor, request.ImplementationType, request);
-            }
-
-            // If factory method is the method of some registered service, then resolve factory service first.
-            var factoryExpr = factoryMethod.FactoryExpression;
-            if (factoryExpr == null && factoryMethod.FactoryServiceInfo != null)
-            {
-                var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
-                factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
-                if (factoryExpr == null)
-                    return null; // todo: should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
-            }
-
-            // return earlier if already have the parameters resolved, e.g. when using `ConstructorWithResolvableArguments`
-            var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
-            if (factoryMethod.ResolvedParameterExpressions != null)
-            {
-                if (rules.UsedForValidation)
+                // If factory method is the method of some registered service, then resolve factory service first.
+                factoryExpr = factoryMethod.FactoryExpression;
+                if (factoryExpr == null && factoryMethod.FactoryServiceInfo != null)
                 {
-                    TryGetMemberAssignments(request, container, rules);
-                    return request.GetActualServiceType().GetDefaultValueExpression();
+                    var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
+                    factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
+                    if (factoryExpr == null)
+                            return null; // todo: should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
                 }
 
-                var newExpr = New((ConstructorInfo)ctorOrMember, factoryMethod.ResolvedParameterExpressions);
-                var assignements = TryGetMemberAssignments(request, container, rules);
-                if (assignements != null)
-                    return MemberInit(newExpr, assignements);
-                return newExpr;
-            }
+                // return earlier if already have the parameters resolved, e.g. when using `ConstructorWithResolvableArguments`
+                var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
+                if (factoryMethod.ResolvedParameterExpressions != null)
+                {
+                    if (rules.UsedForValidation)
+                    {
+                        TryGetMemberAssignments(request, container, rules);
+                        return request.GetActualServiceType().GetDefaultValueExpression();
+                    }
 
-            var ctorOrMethod = ctorOrMember as MethodBase;
-            if (ctorOrMethod == null) // return earlier when factory is Property or Field
-            {
-                var memberExpr = ctorOrMember is PropertyInfo p ? Property(factoryExpr, p)
-                    : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember);
-                return ConvertExpressionIfNeeded(memberExpr, request, ctorOrMember);
+                    var newExpr = New((ConstructorInfo)ctorOrMember, factoryMethod.ResolvedParameterExpressions);
+                    var assignements = TryGetMemberAssignments(request, container, rules);
+                    return assignements == null ? newExpr : (Expression)MemberInit(newExpr, assignements);
+                }
+
+                ctorOrMethod = ctorOrMember as MethodBase;
+                if (ctorOrMethod == null) // return earlier when factory is Property or Field
+                    return ConvertExpressionIfNeeded(ctorOrMember is PropertyInfo p ? Property(factoryExpr, p)
+                        : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember), request, ctorOrMember);
+                
+                ctor = ctorOrMember as ConstructorInfo;
             }
 
             var parameters = ctorOrMethod.GetParameters();
@@ -10101,20 +10108,17 @@ namespace DryIoc
             {
                 if (rules.UsedForValidation)
                 {
-                    if (ctorOrMember is ConstructorInfo)
+                    if (ctor != null)
                         TryGetMemberAssignments(request, container, rules);
                     return request.GetActualServiceType().GetDefaultValueExpression();
                 }
-
-                if (ctorOrMember is MethodInfo method)
-                    return ConvertExpressionIfNeeded(Call(factoryExpr, method), request, ctorOrMember);
-
-                var newExpr = New((ConstructorInfo)ctorOrMember, Empty<Expression>());
+                 
+                if (ctor == null)
+                    return ConvertExpressionIfNeeded(Call(factoryExpr, (MethodInfo)ctorOrMethod), request, ctorOrMethod);
                 var assignements = TryGetMemberAssignments(request, container, rules);
-                if (assignements != null)
-                    return MemberInit(newExpr, assignements);
-
-                return newExpr;
+                return assignements != null
+                    ? (Expression)MemberInit(New(ctor, Empty<Expression>()), assignements)
+                    : New(ctor, Empty<Expression>());
             }
 
             Expression arg0 = null, arg1 = null, arg2 = null, arg3 = null, arg4 = null;
@@ -10201,7 +10205,6 @@ namespace DryIoc
             if (rules.UsedForValidation) 
                 return request.GetActualServiceType().GetDefaultValueExpression();
 
-            var ctor = ctorOrMethod as ConstructorInfo;
             Expression serviceExpr;
             if (arg0 == null)
                 serviceExpr = ctor != null ? New(ctor, paramExprs) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, paramExprs);
@@ -10217,7 +10220,7 @@ namespace DryIoc
                 serviceExpr = ctor != null ? New(ctor, arg0, arg1, arg2, arg3, arg4) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, arg0, arg1, arg2, arg3, arg4);
 
             if (ctor == null)
-                return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMember);
+                return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMethod);
 
             var assignments = TryGetMemberAssignments(request, container, rules);
             if (assignments == null)
@@ -11569,8 +11572,11 @@ namespace DryIoc
                 return Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
                     serviceFactoryExpr, Constant(request.Factory.Setup.DisposalOrder));
 
+            var factoryId = request.FactoryType == FactoryType.Decorator
+                ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
+
             return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
-                Constant(request.FactoryID), Lambda<FactoryDelegate>(serviceFactoryExpr,
+                Constant(factoryId), Lambda<FactoryDelegate>(serviceFactoryExpr,
                     FactoryDelegateCompiler.FactoryDelegateParamExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                     , typeof(object)
@@ -11634,7 +11640,8 @@ namespace DryIoc
             }
             else
             {
-                var idExpr = Constant(request.FactoryID);
+                var idExpr = Constant(request.FactoryType == FactoryType.Decorator ?
+                    request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID);
 
                 Expression factoryDelegateExpr;
                 if (serviceFactoryExpr is InvocationExpression ie &&
@@ -13059,12 +13066,17 @@ namespace DryIoc
         /// <summary>Looks up for single declared method with the specified name. Returns null if method is not found.</summary>
         public static MethodInfo GetSingleMethodOrNull(this Type type, string name, bool includeNonPublic = false)
         {
-            var methods = type.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
-            for (var i = 0; i < methods.Length; i++)
+            if (includeNonPublic)
             {
-                var m = methods[i];
-                if ((includeNonPublic || m.IsPublic) && m.Name == name)
-                    return m;
+                foreach (var method in type.GetTypeInfo().DeclaredMethods)
+                    if (method.Name == name)
+                        return method;
+            }
+            else
+            {
+                foreach (var method in type.GetTypeInfo().DeclaredMethods)
+                    if (method.IsPublic && method.Name == name)
+                        return method;
             }
 
             return null;

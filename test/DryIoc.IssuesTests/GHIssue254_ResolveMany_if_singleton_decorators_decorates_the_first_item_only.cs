@@ -22,7 +22,7 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<B>(((D)ii[1]).Inner);
         }
 
-        [Test][Ignore("todo: fixme")]
+        [Test]
         public void Test_RegisterDelegate_with_singleton_Decorator()
         {
             var c = new Container();
@@ -38,7 +38,7 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<B>(((D)ii[1]).Inner);
         }
 
-        [Test][Ignore("todo: fixme")]
+        [Test]
         public void Test_RegisterDelegateDecorator_with_useDecorateeReuse_set_to_true_by_convention()
         {
             var c = new Container();
@@ -52,6 +52,43 @@ namespace DryIoc.IssuesTests
 
             Assert.IsInstanceOf<A>(((D)ii[0]).Inner);
             Assert.IsInstanceOf<B>(((D)ii[1]).Inner);
+        }
+
+        [Test]
+        public void Test_Resolve_a_single_RegisterDelegate_with_scoped_Decorator()
+        {
+            var c = new Container();
+
+            c.Register<I, A>(Reuse.Scoped);
+
+            c.RegisterDelegate<I, I>(i => new D(i), Reuse.Scoped, Setup.Decorator);
+
+            using (var scope = c.OpenScope())
+            {
+                var i = scope.Resolve<I>();
+                Assert.IsInstanceOf<A>(((D)i).Inner);
+            }
+        }
+
+
+        [Test]
+        public void Test_RegisterDelegate_with_scoped_Decorator()
+        {
+            var c = new Container();
+
+            c.Register<I, A>(Reuse.Scoped);
+            c.Register<I, B>(Reuse.Scoped);
+
+            c.RegisterDelegate<I, I>(i => new D(i), Reuse.Scoped, Setup.Decorator);
+
+            using (var scope = c.OpenScope())
+            {
+                var ii = scope.ResolveMany<I>().ToArray();
+
+                Assert.AreEqual(2, ii.Length);
+                Assert.IsInstanceOf<A>(((D)ii[0]).Inner);
+                Assert.IsInstanceOf<B>(((D)ii[1]).Inner);
+            }
         }
 
         interface I { }
