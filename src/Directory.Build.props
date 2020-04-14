@@ -2,22 +2,21 @@
     <Import Project="..\Directory.Build.props"/>
 
     <!--Packages details-->
+    <ItemGroup>
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="license.txt" Visible="false" />
+        <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="DryIoc.snk" Visible="false" />
+        <None Include="..\..\logo\logo128.png" Pack="true" PackagePath="logo.png" Visible="false" />
+    </ItemGroup>
     <PropertyGroup>
         <NeutralLanguage>en-US</NeutralLanguage>
         <PackageLicense>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</PackageLicense>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
         <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
-        <Icon>logo.png</Icon>
         <RepositoryUrl>https://github.com/dadhi/DryIoc.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
+        <PackageIcon>logo.png</PackageIcon>
     </PropertyGroup>
-
-    <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="license.txt" Visible="false" />
-        <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="DryIoc.snk" Visible="false" />
-        <None Include="..\..\logo\logo128.png" Pack="true" PackagePath="logo.png" Visible="false" />
-    </ItemGroup>
 
     <!--Signing all packages, oh boy-->
     <PropertyGroup>
