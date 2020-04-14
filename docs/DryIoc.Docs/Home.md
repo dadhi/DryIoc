@@ -143,8 +143,8 @@ for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs
 
 Located in this repo:
 
+- [DryIoc.AspNetCore31.WebApi.Sample](https://github.com/dadhi/DryIoc/tree/master/samples/DryIoc.AspNetCore31.WebApi.Sample)
 - [DryIoc.WebApi.Owin.Sample](https://bitbucket.org/dadhi/dryioc/src/8e609b011beafd71236f9cfe3bb2d3e0589e76ae/Extensions/DryIoc.WebApi.Owin.Sample/?at=default)
-- [DryIoc.AspNetCore.Sample](https://bitbucket.org/dadhi/dryioc/src/8e609b011beafd71236f9cfe3bb2d3e0589e76ae/NetCore/src/DryIoc.AspNetCore.Sample/?at=default)
 
 External links:
 
