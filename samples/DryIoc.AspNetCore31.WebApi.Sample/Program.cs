@@ -21,8 +21,7 @@ namespace DryIoc.AspNetCore31.WebApi.Sample
                 {
                     logging.ClearProviders(); // removes all providers from LoggerFactory
                     logging.AddConfiguration(hostingContext.Configuration.GetSection("Logging"));
-                    logging.AddConsole();
-                    logging.AddTraceSource("Information, ActivityTracing"); // Add Trace listener provider
+                    logging.AddDebug();
                 })
                 .UseServiceProviderFactory(new DryIocServiceProviderFactory())
                 .ConfigureWebHostDefaults(webBuilder =>
