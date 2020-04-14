@@ -15,6 +15,9 @@ namespace DryIoc.AspNetCore31.WebApi.Sample.Controllers
         public ITransientService Transient { get; }
         public IExportedService Imported { get; }
 
+        /// <summary> Example of injected property, <see cref="Startup.CreateMyPreConfiguredContainer"/> for how to setup this. </summary>
+        public IScopedService ScopedServiceInjectedProperty { get; set; }
+
         public HomeController(ILogger<HomeController> logger,
             IScopedService scoped, ITransientService transient, IExportedService imported = null)
         {
@@ -44,8 +47,8 @@ namespace DryIoc.AspNetCore31.WebApi.Sample.Controllers
         [Route("/api/greet/{name}")]
         public string Get(string name)
         {
-            _logger.LogInformation($"Greeted {name}");
-            return $"Hi {name}!";
+            _logger.LogInformation($"Greeted {name}, Injected property '{ScopedServiceInjectedProperty?.GetType().Name}'");
+            return $"Hi {name}! Courtesy to injected property '{ScopedServiceInjectedProperty?.GetType().Name}'";
         }
     }
 }

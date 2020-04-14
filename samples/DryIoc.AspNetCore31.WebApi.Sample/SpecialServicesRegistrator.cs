@@ -2,7 +2,7 @@ using DryIoc.AspNetCore31.WebApi.Sample.Services;
 
 namespace DryIoc.AspNetCore31.WebApi.Sample
 {
-    public static class ExportedServicesRegistrator
+    public static class SpecialServicesRegistrator
     {
         public static void Register(IRegistrator r)
         {
