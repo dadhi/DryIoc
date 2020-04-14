@@ -2992,7 +2992,8 @@ public class AccountOverviewReportHandler : AccountListReportHandler
             IContextService<IPsaContext> arg0,
             IActivityResourceMemberRepository arg1,
             IValidator<ActivityResourceMember> arg2,
-            IAuthorization<IPsaContext, ActivityResourceMember> arg3
+            IAuthorization<IPsaContext, ActivityResourceMember> arg3,
+            IActivityLoggerService arg4
         ) : base(arg0, arg1, arg2, arg3)
         {
             field0 = arg0;
@@ -3021,8 +3022,8 @@ public class AccountOverviewReportHandler : AccountListReportHandler
 
         public ActivityLoggerService(
             IContextService<IPsaContext> contextService,
-            IMessageLogger messageLogger = null,
-            CalendarSyncLogConfiguration logConfig = null
+            IMessageLogger messageLogger,
+            CalendarSyncLogConfiguration logConfig
         )
         {
             _ContextService = contextService;
@@ -5237,65 +5238,53 @@ public class AccountOverviewReportHandler : AccountListReportHandler
     public class CaseCopyHandlerService
         : ICaseCopyHandlerService
     {
+        private readonly IContextService<IPsaContext> _field0;
+        private readonly ITaskMemberRepository _field1;
+        private readonly IFileService _field2;
+        private readonly IItemService _field3;
+        private readonly IItemSalesAccountRepository _field4;
+        private readonly ISalesAccountRepository _field5;
+        private readonly IOrganizationRepository _field6;
+        private readonly ITaskService _field7;
+        private readonly ICaseMemberService _field8;
+        private readonly IActivityService _field9;
+        private readonly ICaseProductRepository _field10;
+        private readonly ICostCenterRepository _field11;
+        private readonly IRecurringItemService _field12;
+        private readonly ICaseWorkTypeRepository _field13;
+        private readonly IWorkTypeRepository _field14;
+        private readonly IUserRepository _field15;
+        private readonly ICaseRepository _field16;
+        private readonly ITagService _field17;
+        private readonly ICaseTagRepository _field18;
+        private readonly IResourceAllocationService _field19;
+        private readonly IFeatureToggleService _field20;
+
         public CaseCopyHandlerService(
             IContextService<IPsaContext> arg0,
             ITaskMemberRepository arg1,
             IFileService arg2,
             IItemService arg3,
             IItemSalesAccountRepository arg4,
-            ISalesAccountRepository arg5,
+            ISalesAccountRepository arg5, 
             IOrganizationRepository arg6,
             ITaskService arg7,
-            ICaseMemberService arg8,
-            IActivityService arg9,
-            ICaseProductRepository arg10,
+            ICaseMemberService arg8, 
+            IActivityService arg9, 
+            ICaseProductRepository arg10, 
             ICostCenterRepository arg11,
-            IRecurringItemService arg12,
-            ICaseWorkTypeService arg13,
-            IUserRepository arg14,
-            ICaseRepository arg15,
-            ITagService arg16,
-            ICaseTagRepository arg17
-        )
+            IRecurringItemService arg12, 
+            ICaseWorkTypeRepository arg13,
+            IWorkTypeRepository arg14, 
+            IUserRepository arg15, 
+            ICaseRepository arg16,
+            ITagService arg17, 
+            ICaseTagRepository arg18,
+            IFeatureToggleService arg19, 
+            IResourceAllocationService arg20
+            )
         {
-            field0 = arg0;
-            field1 = arg1;
-            field2 = arg2;
-            field3 = arg3;
-            field4 = arg4;
-            field5 = arg5;
-            field6 = arg6;
-            field7 = arg7;
-            field8 = arg8;
-            field9 = arg9;
-            field10 = arg10;
-            field11 = arg11;
-            field12 = arg12;
-            field13 = arg13;
-            field14 = arg14;
-            field15 = arg15;
-            field16 = arg16;
-            field17 = arg17;
         }
-
-        public readonly IContextService<IPsaContext> field0;
-        public readonly ITaskMemberRepository field1;
-        public readonly IFileService field2;
-        public readonly IItemService field3;
-        public readonly IItemSalesAccountRepository field4;
-        public readonly ISalesAccountRepository field5;
-        public readonly IOrganizationRepository field6;
-        public readonly ITaskService field7;
-        public readonly ICaseMemberService field8;
-        public readonly IActivityService field9;
-        public readonly ICaseProductRepository field10;
-        public readonly ICostCenterRepository field11;
-        public readonly IRecurringItemService field12;
-        public readonly ICaseWorkTypeService field13;
-        public readonly IUserRepository field14;
-        public readonly ICaseRepository field15;
-        public readonly ITagService field16;
-        public readonly ICaseTagRepository field17;
     }
 
 
@@ -8685,57 +8674,55 @@ public class AccountOverviewReportHandler : AccountListReportHandler
     }
 
 
-    public class ResourceAllocationService : OrganizationEntityService<ResourceAllocation, IResourceAllocationRepository
-            , User, IPsaContext>
-        , IResourceAllocationService
+    public class ResourceAllocationService : OrganizationEntityService<ResourceAllocation, IResourceAllocationRepository, User, IPsaContext>, IResourceAllocationService
     {
-        public ResourceAllocationService(
-            IContextService<IPsaContext> arg0,
-            IResourceAllocationRepository arg1,
-            IValidator<ResourceAllocation> arg2,
-            IAuthorization<IPsaContext, ResourceAllocation> arg3,
-            ITaskRepository arg4,
-            IEmploymentService arg5,
-            IOrganizationWorkweekService arg6,
-            IWorkingDayExceptionService arg7,
-            IGuidService arg8,
-            IHourRepository arg9,
-            IOrganizationCompanyRepository arg10,
-            ICaseRepository arg11,
-            IUserCostPerCaseService arg12,
-            ICurrencyRepository arg13
-        ) : base(arg0)
+        private const decimal DefaultDailyWorkHours = 0;
+
+        private readonly IGuidService _GuidService;
+        private readonly ITaskRepository _TaskRepository;
+        private readonly IEmploymentService _EmploymentService;
+        private readonly IContextService<IPsaContext> _ContextService;
+        private readonly IWorkingDayExceptionService _WorkingDayExceptionService;
+        private readonly IOrganizationWorkweekService _OrganizationWorkweekService;
+        private readonly IHourRepository _HourRepository;
+        private readonly IResourceAllocationRepository _Repository;
+        private readonly IOrganizationCompanyRepository _OrganizationCompanyRepository;
+        private readonly ICaseRepository _CaseRepository;
+        private readonly IAuthorization<IPsaContext, Case> _CaseAuthorization;
+        private readonly IUserCostPerCaseService _UserCostPerCaseService;
+        private readonly ICurrencyRepository _CurrencyRepository;
+        private readonly IResourceAllocationSearch _ResourceAllocationSearch;
+        private readonly IActivitySearch _ActivitySearch;
+        private readonly IUserSearch _UserSearch;
+        private readonly ITaskSearch _TaskSearch;
+
+        public enum ResourceAllocationAction
         {
-            field0 = arg0;
-            field1 = arg1;
-            field2 = arg2;
-            field3 = arg3;
-            field4 = arg4;
-            field5 = arg5;
-            field6 = arg6;
-            field7 = arg7;
-            field8 = arg8;
-            field9 = arg9;
-            field10 = arg10;
-            field11 = arg11;
-            field12 = arg12;
-            field13 = arg13;
+            None,
+            Delete,
+            Transfer
         }
 
-        public readonly IContextService<IPsaContext> field0;
-        public readonly IResourceAllocationRepository field1;
-        public readonly IValidator<ResourceAllocation> field2;
-        public readonly IAuthorization<IPsaContext, ResourceAllocation> field3;
-        public readonly ITaskRepository field4;
-        public readonly IEmploymentService field5;
-        public readonly IOrganizationWorkweekService field6;
-        public readonly IWorkingDayExceptionService field7;
-        public readonly IGuidService field8;
-        public readonly IHourRepository field9;
-        public readonly IOrganizationCompanyRepository field10;
-        public readonly ICaseRepository field11;
-        public readonly IUserCostPerCaseService field12;
-        public readonly ICurrencyRepository field13;
+        public ResourceAllocationService(IContextService<IPsaContext> contextService, IResourceAllocationRepository repository, IValidator<ResourceAllocation> validator, IAuthorization<IPsaContext, ResourceAllocation> authorization, ITaskRepository taskRepository, IEmploymentService employmentService, IOrganizationWorkweekService organizationWorkweekService, IWorkingDayExceptionService workingDayExceptionService, IGuidService guidservice, IHourRepository hourRepository, IOrganizationCompanyRepository organizationCompanyRepository, ICaseRepository caseRepository, IUserCostPerCaseService userCostPerCaseService, ICurrencyRepository currencyRepository, IAuthorization<IPsaContext, Case> caseAuthorization, IResourceAllocationSearch resourceAllocationSearch, IActivitySearch activitySearch, IUserSearch userSearch, ITaskSearch taskSearch) : base(contextService, repository, validator, authorization)
+        {
+            this._Repository = repository;
+            this._TaskRepository = taskRepository;
+            this._ContextService = contextService;
+            this._EmploymentService = employmentService;
+            this._WorkingDayExceptionService = workingDayExceptionService;
+            this._GuidService = guidservice;
+            this._HourRepository = hourRepository;
+            this._OrganizationCompanyRepository = organizationCompanyRepository;
+            this._CaseRepository = caseRepository;
+            this._UserCostPerCaseService = userCostPerCaseService;
+            this._CurrencyRepository = currencyRepository;
+            this._OrganizationWorkweekService = organizationWorkweekService;
+            this._CaseAuthorization = caseAuthorization;
+            this._ResourceAllocationSearch = resourceAllocationSearch;
+            this._ActivitySearch = activitySearch;
+            this._UserSearch = userSearch;
+            this._TaskSearch = taskSearch;
+        }
     }
 
 
@@ -10819,7 +10806,7 @@ public class AccountOverviewReportHandler : AccountListReportHandler
     }
 
 
-    public class AccountValidator
+    public class AccountValidator : Validator<Account>
     {
         public AccountValidator(
             IContextService<IPsaContext> arg0,
@@ -12197,7 +12184,8 @@ public class AccountOverviewReportHandler : AccountListReportHandler
         public WorkTypeValidator(
             IContextService<IPsaContext> arg0,
             IWorkTypeRepository arg1,
-            IProductRepository arg2
+            IProductRepository arg2,
+            ISettingsRepository arg3
         ) : base()
         {
             field0 = arg0;

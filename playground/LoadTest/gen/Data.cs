@@ -6378,4 +6378,41 @@ namespace Data
         {
         }
     }
+
+
+    public class UserSearch : IUserSearch
+    {
+
+    }
+
+    public class TaskSearch : ITaskSearch
+    {
+
+    }
+
+    public class ActivitySearch : IActivitySearch
+    {
+
+    }
+
+    public interface IActivitySearch
+    {
+    }
+
+    public class ResourceAllocationSearch : IResourceAllocationSearch
+    {
+
+    }
+
+    public interface IResourceAllocationSearch
+    {
+    }
+
+    public interface ITaskSearch
+    {
+    }
+
+    public interface IUserSearch
+    {
+    }
 }
