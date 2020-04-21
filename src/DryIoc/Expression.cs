@@ -740,9 +740,16 @@ namespace FastExpressionCompiler.LightExpression
         public static BinaryExpression DivideAssign(Expression left, Expression right) =>
             new AssignBinaryExpression(ExpressionType.DivideAssign, left, right, left.Type);
 
-        public static InvocationExpression Invoke(Expression lambda, IEnumerable<Expression> args) =>
-            new InvocationExpression(lambda, args.AsReadOnlyList(),
-                (lambda as LambdaExpression)?.ReturnType ?? lambda.Type.FindDelegateInvokeMethod().ReturnType);
+        public static InvocationExpression Invoke(LambdaExpression expression, Expression arg0) =>
+            new InvocationExpression(expression, new[] { arg0 }, expression.ReturnType);
+
+        public static InvocationExpression Invoke(Expression expression, Expression arg0) =>
+            new InvocationExpression(expression, new[] { arg0 },
+                (expression as LambdaExpression)?.ReturnType ?? expression.Type.FindDelegateInvokeMethod().ReturnType);
+
+        public static InvocationExpression Invoke(Expression expression, IEnumerable<Expression> args) =>
+            new InvocationExpression(expression, args.AsReadOnlyList(),
+                (expression as LambdaExpression)?.ReturnType ?? expression.Type.FindDelegateInvokeMethod().ReturnType);
 
         public static InvocationExpression Invoke(Expression lambda, params Expression[] args) =>
             Invoke(lambda, (IEnumerable<Expression>)args);
@@ -2321,6 +2328,7 @@ namespace FastExpressionCompiler.LightExpression
         }
     }
 
+    // todo: Make a single argument / no arguments overload
     public sealed class InvocationExpression : ArgumentsExpression
     {
         public override ExpressionType NodeType => ExpressionType.Invoke;

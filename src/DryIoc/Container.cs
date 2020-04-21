@@ -2968,6 +2968,12 @@ namespace DryIoc
                         return true;
                     }
 
+					// todo: may as well speed-up Func<object> interpretation
+                    //if (delegateExpr.Type == typeof(Func<object>))
+                    //{
+					//
+                    //}
+
 #if !SUPPORTS_DELEGATE_METHOD
                     return false;
 #else
@@ -8165,7 +8171,10 @@ namespace DryIoc
         IsGeneratedResolutionDependencyExpression = 1 << 8,
 
         /// <summary>Non inherited. Indicates the root service inside the function.</summary>
-        IsDirectlyWrappedInFunc = 1 << 9
+        IsDirectlyWrappedInFunc = 1 << 9,
+
+        /// <summary>Marks the request to split the object graph</summary>
+        //SplitObjectGraph = 1 << 10
     }
 
     /// Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations
@@ -8609,10 +8618,17 @@ namespace DryIoc
             }
 
             // checking the service types only cause wrapper and decorators may be used multiple times
-            if (!skipRecursiveDependencyCheck &&
-                factory.FactoryType == FactoryType.Service &&
-                HasRecursiveParent(factoryId))
-                Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
+            if (!skipRecursiveDependencyCheck && 
+                factory.FactoryType == FactoryType.Service)
+            {
+                for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                {
+                    if ((p.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+                        break; // stops further upward checking
+                    if (p.FactoryID == factoryId)
+                        Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
+                }
+            }
 
             // It is required to nullify the TD tracking when factory is resolved multiple times, e.g. for decorator
             var flags = Flags & ~RequestFlags.TracksTransientDisposable;
@@ -9564,6 +9580,15 @@ namespace DryIoc
                     if (serviceExpr.Type != originalServiceExprType)
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
+                //else if ((request.Flags & RequestFlags.SplitObjectGraph) != 0)
+                //{
+                    //if (FactoryType == FactoryType.Service)
+                    //{
+                    //serviceExpr = Convert(
+                    //    Invoke(Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()), Empty<Expression>()),
+                    //    serviceExpr.Type);
+                    //}
+                //}
 
                 if (mayCache)
                     ((Container)container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheEntry);
@@ -12391,7 +12416,7 @@ namespace DryIoc
             ResolvingOpenGenericServiceTypeIsNotPossible = Of(
                 "Resolving open-generic service type is not possible for type: {0}."),
             RecursiveDependencyDetected = Of(
-                "Recursive dependency is detected when resolving" + NewLine + "{0}."),
+                "Recursive dependency is detected when resolving " + NewLine + "{0}."),
             ScopeIsDisposed = Of(
                 "Scope {0} is disposed and scoped instances are disposed and no longer available."),
             NotFoundOpenGenericImplTypeArgInService = Of(
