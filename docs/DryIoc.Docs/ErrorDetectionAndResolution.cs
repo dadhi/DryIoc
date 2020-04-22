@@ -181,12 +181,17 @@ class Recursive_dependency_detected
 
         Assert.AreEqual(Error.NameOf(Error.RecursiveDependencyDetected), ex.ErrorName);
 
-        // ex.Message:
-        // Recursive dependency is detected when resolving
-        // A as parameter "a" < --recursive
-        //  in B as parameter "b" #28
-        //  in A #27 <--recursive
-        //  from container without scope.
+        // contains recursive twice
+        StringAssert.Contains(@"<--recursive", ex.Message);
+
+        // ex.Message example:
+
+        // code: RecursiveDependencyDetected;
+        // message: Recursive dependency is detected when resolving
+        // A as parameter "a" <--recursive
+        //  in B as parameter "b" FactoryID=28
+        //  in A FactoryID=27 <--recursive
+        // from container without scope.
     }
 }/*md
 ```
