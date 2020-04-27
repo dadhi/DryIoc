@@ -3833,6 +3833,7 @@ namespace DryIoc
         /// Strips the unnecessary or adds the necessary cast to expression return result
         public static Expression NormalizeExpression(this Expression expr)
         {
+            // System.Linq.Expressions.ExpressionType is used by FEC as well 
             if (expr.NodeType == System.Linq.Expressions.ExpressionType.Convert)
             {
                 var operandExpr = ((UnaryExpression)expr).Operand;
@@ -4709,41 +4710,46 @@ namespace DryIoc
 
             var arrayInterfaces = SupportedCollectionTypes;
             for (var i = 0; i < arrayInterfaces.Length; i++)
-                wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(arrayInterfaces[i]), arrayInterfaces[i], arrayExpr);
+                wrappers = wrappers.AddOrUpdate(arrayInterfaces[i], arrayExpr);
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(LazyEnumerable<>)), typeof(LazyEnumerable<>),
+            wrappers = wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
                 new ExpressionFactory(GetLazyEnumerableExpressionOrDefault, setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Lazy<>)), typeof(Lazy<>),
+            wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
                 new ExpressionFactory(r => GetLazyExpressionOrDefault(r), setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(KeyValuePair<,>)), typeof(KeyValuePair<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
                 new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Meta<,>)), typeof(Meta<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(Meta<,>),
                 new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Tuple<,>)), typeof(Tuple<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(Tuple<,>),
                 new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(System.Linq.Expressions.LambdaExpression)), typeof(System.Linq.Expressions.LambdaExpression),
+            wrappers = wrappers.AddOrUpdate(typeof(System.Linq.Expressions.LambdaExpression),
                 new ExpressionFactory(GetLambdaExpressionExpressionOrDefault, setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(FactoryDelegate)), typeof(FactoryDelegate),
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+            wrappers = wrappers.AddOrUpdate(typeof(FastExpressionCompiler.LightExpression.LambdaExpression),
+                new ExpressionFactory(GetFastExpressionCompilerLambdaExpressionExpressionOrDefault, setup: Setup.Wrapper));
+#endif
+
+            wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate),
                 new ExpressionFactory(GetFactoryDelegateExpressionOrDefault, setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(FactoryDelegate<>)), typeof(FactoryDelegate<>),
+            wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate<>),
                 new ExpressionFactory(GetFactoryDelegateExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Func<>)), typeof(Func<>),
+            wrappers = wrappers.AddOrUpdate(typeof(Func<>),
                 new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.Wrapper));
 
             for (var i = 0; i < FuncTypes.Length; i++)
-                wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(FuncTypes[i]), FuncTypes[i],
+                wrappers = wrappers.AddOrUpdate(FuncTypes[i],
                     new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.WrapperWith(i)));
 
             for (var i = 0; i < ActionTypes.Length; i++)
-                wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(ActionTypes[i]), ActionTypes[i],
+                wrappers = wrappers.AddOrUpdate(ActionTypes[i],
                     new ExpressionFactory(GetFuncOrActionExpressionOrDefault,
                     setup: Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
 
@@ -4980,9 +4986,7 @@ namespace DryIoc
 
         private static Expression GetLambdaExpressionExpressionOrDefault(Request request)
         {
-            var serviceType = request.RequiredServiceType
-                .ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request);
-            request = request.Push(serviceType);
+            request = request.Push(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)
                 return null;
@@ -4990,8 +4994,19 @@ namespace DryIoc
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                 .ToLambdaExpression()
 #endif
-                , typeof(LambdaExpression));
+                , typeof(System.Linq.Expressions.LambdaExpression));
         }
+
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+        private static Expression GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(Request request)
+        {
+            request = request.Push(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
+            var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
+            if (expr == null)
+                return null;
+            return Constant(expr.WrapInFactoryExpression(), typeof(FastExpressionCompiler.LightExpression.LambdaExpression));
+        }
+#endif
 
         private static Expression GetFactoryDelegateExpressionOrDefault(Request request)
         {
@@ -8308,7 +8323,7 @@ namespace DryIoc
             return req;
         }
 
-        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored with request.</summary>
+        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
         public static Request Create(IContainer container, Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null) =>
@@ -8883,6 +8898,7 @@ namespace DryIoc
                 && (DirectParent == null && other.DirectParent == null
                 || (DirectParent != null && DirectParent.EqualsWithoutParent(other.DirectParent)));
 
+        // todo: Seems like Equals and GetHashCode are not used anymore - can we remove them
         // todo: Should we include InputArgs and DecoratedFactoryID and what about flags? 
         // todo: Should we add and rely on Equals of ServiceInfo and Reuse?
         // todo: The equals calculated differently comparing to HashCode, may be we can use FactoryID for Equals as well?
