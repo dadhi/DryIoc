@@ -8187,9 +8187,6 @@ namespace DryIoc
 
         /// <summary>Non inherited. Indicates the root service inside the function.</summary>
         IsDirectlyWrappedInFunc = 1 << 9,
-
-        /// <summary>Marks the request to split the object graph</summary>
-        //SplitObjectGraph = 1 << 10
     }
 
     /// Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations
