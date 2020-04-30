@@ -36,14 +36,15 @@ namespace LoadTest
                 var expr = scope.Resolve<LambdaExpression>(typeof(EmailController));
                 Assert.IsNotNull(expr);
 
-                var code = expr.ToCodeString(new StringBuilder(1000), 0, true, Abbreviate).ToString();
+                var code = expr.ToCodeString(new StringBuilder(100000), 2, true, Abbreviate).ToString();
                 var nestedLambdas = code.Count(c => c == '$');
                 Assert.AreEqual(2, nestedLambdas);
             }
 
             string Abbreviate(Type t, string s)
             {
-                if (s.EndsWith("Controller") || s.EndsWith("Decorator") || s == "FactoryDelegate")
+                if (t.Namespace == "DryIoc" ||
+                    s.EndsWith("Controller") || s.EndsWith("Decorator"))
                     return s;
 
                 var abbr = string.Empty;

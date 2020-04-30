@@ -1332,8 +1332,8 @@ namespace FastExpressionCompiler.LightExpression
     {
         /// <summary>Converts the `typeof(<paramref name="type"/>)` into the proper C# representation.</summary>
         public static StringBuilder AppendTypeof(this StringBuilder sb, Type type, bool stripNamespace = false, Func<Type, string, string> printType = null) =>
-            type == null 
-                ? sb.Append("null") 
+            type == null
+                ? sb.Append("null")
                 : sb.Append("typeof(").Append(type.ToCode(stripNamespace, printType)).Append(')');
 
         /// <summary>Converts the <paramref name="type"/> into the proper C# representation.</summary>
@@ -1402,8 +1402,14 @@ namespace FastExpressionCompiler.LightExpression
         private static Type[] GetGenericTypeParametersOrArguments(this TypeInfo typeInfo) => 
             typeInfo.IsGenericTypeDefinition ? typeInfo.GenericTypeParameters : typeInfo.GenericTypeArguments;
 
+        public interface IObjectToCode
+        {
+            public string ToCode(object x, bool stripNamespace = false, Func<Type, string, string> printType = null);
+        }
+
         /// Prints many code items as array initializer.
-        public static string ToCommaSeparatedCode(this IEnumerable items, Func<object, string> notRecognizedToCode)
+        public static string ToCommaSeparatedCode(this IEnumerable items, IObjectToCode notRecognizedToCode,
+            bool stripNamespace = false, Func<Type, string, string> printType = null)
         {
             var s = new StringBuilder();
             var count = 0;
@@ -1411,19 +1417,22 @@ namespace FastExpressionCompiler.LightExpression
             {
                 if (count++ != 0)
                     s.Append(", ");
-                s.Append(item.ToCode(notRecognizedToCode));
+                s.Append(item.ToCode(notRecognizedToCode, stripNamespace, printType));
             }
             return s.ToString();
         }
 
-        /// Prints many code items as array initializer.
-        public static string ToArrayInitializerCode(this IEnumerable items, Type itemType, Func<object, string> notRecognizedToCode) => 
-            $"new {itemType.ToCode()}[]{{{items.ToCommaSeparatedCode(notRecognizedToCode)}}}";
+        /// <summary>Prints many code items as array initializer.</summary>
+        public static string ToArrayInitializerCode(this IEnumerable items, Type itemType, IObjectToCode notRecognizedToCode,
+            bool stripNamespace = false, Func<Type, string, string> printType = null) => 
+            $"new {itemType.ToCode(stripNamespace, printType)}[]{{{items.ToCommaSeparatedCode(notRecognizedToCode, stripNamespace, printType)}}}";
 
-        /// Prints valid C# for known <paramref name="x"/> type,
-        /// otherwise uses <paramref name="notRecognizedToCode"/>,
-        /// otherwise falls back to `ToString()`
-        public static string ToCode(this object x, Func<object, string> notRecognizedToCode)
+        /// <summary>
+        /// Prints a valid C# for known <paramref name="x"/>,
+        /// otherwise uses passed <paramref name="notRecognizedToCode"/> or falls back to `ToString()`.
+        /// </summary>
+        public static string ToCode(this object x, IObjectToCode notRecognizedToCode,
+            bool stripNamespace = false, Func<Type, string, string> printType = null)
         {
             if (x == null)
                 return "null";
@@ -1435,7 +1444,7 @@ namespace FastExpressionCompiler.LightExpression
                 return s.ToCode();
 
             if (x is Type t)
-                return t.ToCode();
+                return t.ToCode(stripNamespace, printType);
 
             var xTypeInfo = x.GetType().GetTypeInfo();
             if (xTypeInfo.IsEnum)
@@ -1453,10 +1462,7 @@ namespace FastExpressionCompiler.LightExpression
             if (xTypeInfo.IsPrimitive)
                 return x.ToString();
 
-            if (notRecognizedToCode != null)
-                return notRecognizedToCode(x);
-            
-            return x.ToString();
+            return notRecognizedToCode?.ToCode(x, stripNamespace, printType) ?? x.ToString();
         }
     }
 
@@ -1885,16 +1891,22 @@ namespace FastExpressionCompiler.LightExpression
             SysExpr.Constant(Value, Type);
 
         /// <summary>
-        /// Change to your method to use in <see cref="ToCodeString"/> for spitting the C# code for the <see cref="Value"/>
+        /// Change the method to convert the <see cref="Value"/> to code as you want it globally.
         /// You may try to use `ObjectToCode` from `https://www.nuget.org/packages/ExpressionToCodeLib`
         /// </summary>
-        public static Func<object, string> NotRecognizedValueToCode = x => x.ToString();
+        public static CodePrinter.IObjectToCode ValueToCode = new ValueToDefault();
+
+        private class ValueToDefault : CodePrinter.IObjectToCode
+        {
+            public string ToCode(object x, bool stripNamespace = false, Func<Type, string, string> printType = null) =>
+                $"default({x.GetType().ToCode(stripNamespace, printType)})";
+        }
 
         public override StringBuilder ToCodeString(StringBuilder sb, int lineIdent = 0,
             bool stripNamespace = false, Func<Type, string, string> printType = null, int identSpaces = 2)
         {
             sb.Append("Constant(");
-            sb.Append(Value.ToCode(NotRecognizedValueToCode));
+            sb.Append(Value.ToCode(ValueToCode, stripNamespace, printType));
 
             if (Value != null && Value.GetType() != Type ||
                 Value == null && Type != typeof(object))
@@ -1903,6 +1915,7 @@ namespace FastExpressionCompiler.LightExpression
             return sb.Append(')');
         }
     }
+
 
     public sealed class TypedConstantExpression : ConstantExpression
     {
