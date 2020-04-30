@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text;
 using System.Web.Http;
 using Web.Rest.API;
@@ -32,15 +33,20 @@ namespace LoadTest
                 var expr = scope.Resolve<LambdaExpression>(typeof(EmailController));
                 Assert.IsNotNull(expr);
 
-                var sb = expr.ToCodeString(new StringBuilder(1000), 0, true);
+                var code = expr.ToCodeString(new StringBuilder(1000), 0, true, Abbreviate).ToString();
+                var nestedLambdas = code.Count(c => c == '$');
+                Assert.AreEqual(2, nestedLambdas);
             }
 
-            string KeepAbbr(string s)
+            string Abbreviate(Type t, string s)
             {
+                if (s.EndsWith("Controller") || s.EndsWith("Decorator") || s == "FactoryDelegate")
+                    return s;
+
                 var abbr = string.Empty;
                 foreach (var c in s)
                 {
-                    if (Char.IsUpper(c))
+                    if (char.IsUpper(c))
                         abbr += c;
                 }
 

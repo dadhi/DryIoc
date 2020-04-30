@@ -1939,11 +1939,12 @@ namespace FastExpressionCompiler.LightExpression
         public override StringBuilder ToCodeString(StringBuilder sb, int lineIdent = 0,
             bool stripNamespace = false, Func<Type, string, string> printType = null, int identSpaces = 2)
         {
-            sb.Append("New(");
+            var args = Arguments;
+            sb.Append("New(/*").Append(args.Count).Append(" args*/");
             var ctorIndex = Constructor.DeclaringType.GetTypeInfo().GetConstructors().ToArray().GetFirstIndex(Constructor);
             sb.AppendLineIdent(lineIdent).AppendTypeof(Type, stripNamespace, printType)
                 .Append(".GetTypeInfo().DeclaredConstructors.ToArray()[").Append(ctorIndex).Append("],");
-            sb.AppendLineIdent(Arguments, lineIdent, stripNamespace, printType, identSpaces);
+            sb.AppendLineIdent(args, lineIdent, stripNamespace, printType, identSpaces);
             return sb.Append(')');
         }
     }
@@ -2904,6 +2905,7 @@ namespace FastExpressionCompiler.LightExpression
             bool stripNamespace = false, Func<Type, string, string> printType = null, int identSpaces = 2)
         {
             sb.Append("Lambda(");
+            sb.AppendLine().Append("/*$*/"); // bookmark the nested lambda without ident
             sb.AppendLineIdent(lineIdent).AppendTypeof(Type, stripNamespace, printType).Append(',');
             sb.AppendLineIdent(Body, lineIdent, stripNamespace, printType, identSpaces).Append(',');
             sb.AppendLineIdent(Parameters, lineIdent, stripNamespace, printType, identSpaces);
