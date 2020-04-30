@@ -2889,7 +2889,9 @@ namespace DryIoc
                     if (!TryInterpret(r, convertExpr.Operand, paramExprs, paramValues, parentArgs, useFec, out var instance))
                         return false;
                     // skip conversion for null and for directly assignable type
-                    if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
+                    if (instance == null)
+                        result = instance;
+                    else if (convertExpr.Type.GetTypeInfo().IsAssignableFrom(instance.GetType().GetTypeInfo()))
                         result = instance;
                     else
                         result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
@@ -9593,15 +9595,6 @@ namespace DryIoc
                     if (serviceExpr.Type != originalServiceExprType)
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
-                //else if ((request.Flags & RequestFlags.SplitObjectGraph) != 0)
-                //{
-                    //if (FactoryType == FactoryType.Service)
-                    //{
-                    //serviceExpr = Convert(
-                    //    Invoke(Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()), Empty<Expression>()),
-                    //    serviceExpr.Type);
-                    //}
-                //}
 
                 if (mayCache)
                     ((Container)container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheEntry);
@@ -9614,7 +9607,9 @@ namespace DryIoc
         /// and producing the result expression.
         protected virtual Expression ApplyReuse(Expression serviceExpr, Request request)
         {
-            // Optimization: eagerly creates a singleton during the construction of object graph
+            // This optimization eagerly creates singleton during the construction of object graph
+            // Singleton is created once and then is stred for the container lifetime (until Сontainer.SingletonScope is disposed).
+            // That's why we are always intepreting them even if `Rules.WithoutInterpretationForTheFirstResolution()` is set.
             if (request.Reuse is SingletonReuse && 
                 request.Rules.EagerCachingSingletonForFasterAccess &&
                 !request.TracksTransientDisposable &&
