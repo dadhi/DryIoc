@@ -1404,7 +1404,7 @@ namespace FastExpressionCompiler.LightExpression
 
         public interface IObjectToCode
         {
-            public string ToCode(object x, bool stripNamespace = false, Func<Type, string, string> printType = null);
+            string ToCode(object x, bool stripNamespace = false, Func<Type, string, string> printType = null);
         }
 
         /// Prints many code items as array initializer.
