@@ -1,3 +1,5 @@
+using System;
+using System.Text;
 using System.Web.Http;
 using Web.Rest.API;
 
@@ -18,7 +20,7 @@ namespace LoadTest
         public void Test_with_UseDecorateeReuse_decorators_Examine_expression_and_the_split_graph()
         {
             var container = new Container(rules => rules
-                    .WithoutInterpretationForTheFirstResolution()
+                    .WithoutInterpretationForTheFirstResolution() // compile on the first iteration
                     .WithUseDecorateeReuseForDecorators()
                     .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(new HttpConfiguration());
@@ -27,8 +29,22 @@ namespace LoadTest
 
             using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
             {
-                var x = scope.Resolve<LambdaExpression>(typeof(EmailController));
-                Assert.IsNotNull(x);
+                var expr = scope.Resolve<LambdaExpression>(typeof(EmailController));
+                Assert.IsNotNull(expr);
+
+                var sb = expr.ToCodeString(new StringBuilder(1000), 0, true);
+            }
+
+            string KeepAbbr(string s)
+            {
+                var abbr = string.Empty;
+                foreach (var c in s)
+                {
+                    if (Char.IsUpper(c))
+                        abbr += c;
+                }
+
+                return abbr;
             }
         }
 
