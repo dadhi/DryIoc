@@ -1958,7 +1958,7 @@ namespace FastExpressionCompiler.LightExpression
         {
             var args = Arguments;
             sb.Append("New(/*").Append(args.Count).Append(" args*/");
-            var ctorIndex = Constructor.DeclaringType.GetTypeInfo().GetConstructors().ToArray().GetFirstIndex(Constructor);
+            var ctorIndex = Constructor.DeclaringType.GetTypeInfo().DeclaredConstructors.ToArray().GetFirstIndex(Constructor);
             sb.AppendLineIdent(lineIdent).AppendTypeof(Type, stripNamespace, printType)
                 .Append(".GetTypeInfo().DeclaredConstructors.ToArray()[").Append(ctorIndex).Append("],");
             sb.AppendLineIdent(args, lineIdent, stripNamespace, printType, identSpaces);
@@ -2383,9 +2383,14 @@ namespace FastExpressionCompiler.LightExpression
             bool stripNamespace = false, Func<Type, string, string> printType = null, int identSpaces = 2)
         {
             sb.Append("Bind(");
-            var memberIndex = Member.DeclaringType.GetTypeInfo().GetMember(Member.Name).AsArray().GetFirstIndex(Member);
-            sb.AppendLineIdent(lineIdent).AppendTypeof(Member.DeclaringType, stripNamespace, printType)
-                .Append(".GetTypeInfo().GetMember(\"").Append(Member.Name).Append("\")[").Append(memberIndex).Append("],");
+
+            if (Member is FieldInfo)
+                sb.AppendLineIdent(lineIdent).AppendTypeof(Member.DeclaringType, stripNamespace, printType)
+                    .Append(".GetTypeInfo().GetDeclaredField(\"").Append(Member.Name).Append("\"),");
+            else // or the property to assign
+                sb.AppendLineIdent(lineIdent).AppendTypeof(Member.DeclaringType, stripNamespace, printType)
+                    .Append(".GetTypeInfo().GetDeclaredProperty(\"").Append(Member.Name).Append("\"),");
+
             sb.AppendLineIdent(Expression, lineIdent, stripNamespace, printType, identSpaces);
             return sb.Append(")");
         }
