@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq.Expressions;
+using FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -20,8 +20,8 @@ namespace DryIoc.IssuesTests
             using (var scope = c.OpenScope())
             {
                 var rootExpr = scope.Resolve<LambdaExpression>(typeof(Root));
-                var rootStr = rootExpr.ToString();
-                var resolveCallIndex = rootStr.IndexOf("Resolve(", StringComparison.Ordinal);
+                var rootStr = rootExpr.CodeString;
+                var resolveCallIndex = rootStr.IndexOf("\"Resolve\"", StringComparison.InvariantCulture);
                 Assert.AreNotEqual(-1, resolveCallIndex);
             }
         }
@@ -39,7 +39,7 @@ namespace DryIoc.IssuesTests
             {
                 var rootExpr = scope.Resolve<LambdaExpression>(typeof(Root));
                 var rootStr = rootExpr.ToString();
-                var resolveCallIndex = rootStr.IndexOf("Resolve(", StringComparison.Ordinal);
+                var resolveCallIndex = rootStr.IndexOf("\"Resolve\"", StringComparison.InvariantCulture);
                 Assert.AreEqual(-1, resolveCallIndex);
             }
         }

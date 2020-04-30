@@ -1894,8 +1894,12 @@ namespace FastExpressionCompiler.LightExpression
             bool stripNamespace = false, Func<Type, string, string> printType = null, int identSpaces = 2)
         {
             sb.Append("Constant(");
-            sb.Append(Value.ToCode(NotRecognizedValueToCode)).Append(',');
-            sb.AppendTypeof(Type, stripNamespace, printType);
+            sb.Append(Value.ToCode(NotRecognizedValueToCode));
+
+            if (Value != null && Value.GetType() != Type ||
+                Value == null && Type != typeof(object))
+                sb.Append(',').AppendTypeof(Type, stripNamespace, printType);
+
             return sb.Append(')');
         }
     }
@@ -2904,8 +2908,7 @@ namespace FastExpressionCompiler.LightExpression
         public override StringBuilder ToCodeString(StringBuilder sb, int lineIdent = 0,
             bool stripNamespace = false, Func<Type, string, string> printType = null, int identSpaces = 2)
         {
-            sb.Append("Lambda(");
-            sb.AppendLine().Append("/*$*/"); // bookmark the nested lambda without ident
+            sb.Append("Lambda(/*$*/"); // bookmark the lambdas - $ means it casts something
             sb.AppendLineIdent(lineIdent).AppendTypeof(Type, stripNamespace, printType).Append(',');
             sb.AppendLineIdent(Body, lineIdent, stripNamespace, printType, identSpaces).Append(',');
             sb.AppendLineIdent(Parameters, lineIdent, stripNamespace, printType, identSpaces);
