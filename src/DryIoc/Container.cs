@@ -8265,14 +8265,14 @@ namespace DryIoc
 
         /// <summary>Empty terminal request.</summary>
         public static readonly Request Empty =
-            new Request(null, null, 0, null, DefaultFlags, ServiceInfo.Empty, null);
+            new Request(null, null, 0, 0, null, DefaultFlags, ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyRequestExpr =
             Field(null, typeof(Request).Field(nameof(Empty)));
 
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
-            new Request(null, null, 0, null, DefaultFlags | RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, 
+            new Request(null, null, 0, 0, null, DefaultFlags | RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, 
                 ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
@@ -8283,9 +8283,9 @@ namespace DryIoc
             // we are re-starting the dependency depth count from `1`
             ref var req = ref stack.GetOrPushRef(0);
             if (req == null)
-                req =  new Request(container, Empty, 1, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
+                req =  new Request(container, Empty, 1, 1, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
             else
-                req.SetServiceInfo(container, Empty, 1, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
+                req.SetServiceInfo(container, Empty, 1, 1, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
             return req;
         }
 
@@ -8316,9 +8316,9 @@ namespace DryIoc
 
             // we are re-starting the dependency depth count from `1`
             if (req == null)
-                req =  new Request(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
+                req =  new Request(container, preResolveParent, 1, 0, stack, flags, serviceInfo, inputArgExprs);
             else
-                req.SetServiceInfo(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
+                req.SetServiceInfo(container, preResolveParent, 1, 0, stack, flags, serviceInfo, inputArgExprs);
             return req;
         }
 
@@ -8377,6 +8377,9 @@ namespace DryIoc
 
         /// <summary>Number of nested dependencies. Set with each new Push.</summary>
         public int DependencyDepth;
+
+        /// <summary>The total dependency count</summary>
+        public int DependencyCount;
 
         /// <summary>Indicates that request is empty initial request.</summary>
         public bool IsEmpty => DirectParent == null;
@@ -8501,9 +8504,11 @@ namespace DryIoc
 
             ref var req = ref stack.GetOrPushRef(indexInStack);
             if (req == null)
-                req  = new Request(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
+                req  = new Request(Container, this, DependencyDepth + 1, 0,
+                    RequestStack, flags, serviceInfo, InputArgExprs);
             else
-                req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
+                req.SetServiceInfo(Container, this, DependencyDepth + 1, 0,
+                    RequestStack, flags, serviceInfo, InputArgExprs);
             
             return req;
         }
@@ -8551,7 +8556,7 @@ namespace DryIoc
             Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved, 
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags, int decoratedFactoryID)
         {
-            return new Request(Container, this, DependencyDepth + 1, null, flags,
+            return new Request(Container, this, DependencyDepth + 1, 0, null, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
                 InputArgExprs, implementationType, null, // factory cannot be supplied in generated code
                 factoryID, factoryType, reuse, decoratedFactoryID);
@@ -8570,24 +8575,23 @@ namespace DryIoc
         {
             var newServiceInfo = getInfo(_serviceInfo);
             return newServiceInfo == _serviceInfo ? this
-                : new Request(Container, 
-                    DirectParent, DependencyDepth, RequestStack, Flags, newServiceInfo, InputArgExprs,
+                : new Request(Container, DirectParent, DependencyDepth, DependencyCount, 
+                    RequestStack, Flags, newServiceInfo, InputArgExprs,
                     _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
         /// Produces the new request with the changed `ifUnresolved` or returns original request otherwise
         public Request WithIfUnresolved(IfUnresolved ifUnresolved) =>
             IfUnresolved == ifUnresolved ? this
-                : new Request(Container,
-                    DirectParent, DependencyDepth, RequestStack, Flags, 
-                    _serviceInfo.WithIfUnresolved(ifUnresolved), InputArgExprs,
+                : new Request(Container, DirectParent, DependencyDepth, DependencyCount, 
+                    RequestStack, Flags, _serviceInfo.WithIfUnresolved(ifUnresolved), InputArgExprs,
                     _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // todo: in place mutation?
         /// <summary>Updates the flags</summary>
         public Request WithFlags(RequestFlags newFlags) =>
-            new Request(Container,
-                DirectParent, DependencyDepth, RequestStack, newFlags, _serviceInfo, InputArgExprs,
+            new Request(Container, DirectParent, DependencyDepth, DependencyCount,
+                RequestStack, newFlags, _serviceInfo, InputArgExprs,
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // note: Mutates the request, required for proper caching
@@ -8605,8 +8609,8 @@ namespace DryIoc
         /// nested Func/Action input argument has a priority over outer argument.
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expression[] inputArgs) =>
-            new Request(Container, 
-                DirectParent, DependencyDepth, RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs),
+            new Request(Container, DirectParent, DependencyDepth, DependencyCount,
+                RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs),
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -8676,11 +8680,26 @@ namespace DryIoc
             if (copyRequest)
             {
                 IsolateRequestChain();
-                return new Request(Container, DirectParent, DependencyDepth, null, flags, _serviceInfo, 
-                    InputArgExprs, null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
+                return new Request(Container, DirectParent, DependencyDepth, DependencyCount, null, flags, 
+                    _serviceInfo, InputArgExprs, null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             }
 
             Flags = flags;
+
+            //const int dependencyCountToSplitIntoSeparateCompilationUnit = 100;
+            //for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+            //{
+            //    if (p.DependencyCount < dependencyCountToSplitIntoSeparateCompilationUnit)
+            //    {
+            //        if (p.DependencyCount > -1) // don't touch -1 once it is set
+            //            p.DependencyCount += 1;
+            //    }
+            //    else if (p.DependencyCount == dependencyCountToSplitIntoSeparateCompilationUnit)
+            //        p.DependencyCount = -1;
+            //    else 
+            //        p.DependencyCount -= dependencyCountToSplitIntoSeparateCompilationUnit;
+            //}
+
             SetResolvedFactory(null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             return this;
         }
@@ -8923,16 +8942,15 @@ namespace DryIoc
         public override int GetHashCode() => _hashCode;
 
         // Initial request without factory info yet
-        private Request(IContainer container, Request parent, 
-            int dependencyDepth, RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
+        private Request(IContainer container, Request parent, int dependencyDepth, int dependencyCount,
+            RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
+            DependencyCount = dependencyCount;
             RequestStack = stack;
-
             _serviceInfo = serviceInfo;
             _actualServiceType = serviceInfo.GetActualServiceType();
-
             Flags = flags;
 
             // runtime state
@@ -8942,10 +8960,10 @@ namespace DryIoc
 
         // Request with resolved factory state
         private Request(IContainer container, 
-            Request parent, int dependencyDepth, RequestStack stack,
+            Request parent, int dependencyDepth, int dependencyCount, RequestStack stack,
             RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs,
             Type factoryImplType, Factory factory, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
-            : this(container, parent, dependencyDepth, stack, flags, serviceInfo, inputArgExprs)
+            : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, inputArgExprs)
         {
             SetResolvedFactory(factoryImplType, factory , factoryID, factoryType, reuse, decoratedFactoryID);
         }
@@ -8969,16 +8987,15 @@ namespace DryIoc
             return this;
         }
 
-        private void SetServiceInfo(IContainer container, Request parent, 
-            int dependencyDepth, RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
+        private void SetServiceInfo(IContainer container, Request parent, int dependencyDepth, int dependencyCount,
+            RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
+            DependencyCount = dependencyCount;
             RequestStack = stack;
-
             _serviceInfo = serviceInfo;
             _actualServiceType = serviceInfo.GetActualServiceType();
-
             Flags = flags;
 
             // runtime state
@@ -8997,7 +9014,6 @@ namespace DryIoc
             Reuse = reuse;
             DecoratedFactoryID = decoratedFactoryID;
             _hashCode = Hasher.Combine(DirectParent?._hashCode ?? 0, FactoryID);
-
             _factoryImplType = factoryImplType; // should be set from the runtime known `Factory` object
             Factory = factory; // runtime state
         }
@@ -9556,7 +9572,8 @@ namespace DryIoc
                       setup.AsResolutionCall || 
                       setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration ||
                       setup.UseParentReuse ||
-                      request.FactoryType == FactoryType.Service && request.DependencyDepth > rules.DependencyDepthToSplitObjectGraph
+                      request.FactoryType == FactoryType.Service && 
+                      request.DependencyDepth > rules.DependencyDepthToSplitObjectGraph
                   ) &&
                     request.GetActualServiceType() != typeof(void))
                 )
@@ -9592,7 +9609,8 @@ namespace DryIoc
 
                     serviceExpr = ApplyReuse(serviceExpr, request);
 
-                    if (serviceExpr.Type != originalServiceExprType)
+                    if (serviceExpr.Type != originalServiceExprType && 
+                        !originalServiceExprType.GetTypeInfo().IsAssignableFrom(serviceExpr.Type.GetTypeInfo()))
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
 
