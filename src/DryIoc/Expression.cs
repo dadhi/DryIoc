@@ -93,7 +93,7 @@ namespace FastExpressionCompiler.LightExpression
         /// 
         /// NOTE: It is trying hard but the Parameter expression are not consolidated into one. Hopefully R# will help you to re-factor them into a single variable.
         /// </summary>
-        public string CodeString => ToCodeString(new StringBuilder(1024)).ToString();
+        public string CodeString => ToCodeString(new StringBuilder(1024), 2).ToString();
 
         /// <summary>Code printer with the provided configuration</summary>
         public abstract StringBuilder ToCodeString(StringBuilder sb, int lineIdent = 0,
