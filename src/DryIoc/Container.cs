@@ -8283,9 +8283,9 @@ namespace DryIoc
             // we are re-starting the dependency depth count from `1`
             ref var req = ref stack.GetOrPushRef(0);
             if (req == null)
-                req =  new Request(container, Empty, 1, 1, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
+                req =  new Request(container, Empty, 1, 0, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
             else
-                req.SetServiceInfo(container, Empty, 1, 1, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
+                req.SetServiceInfo(container, Empty, 1, 0, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
             return req;
         }
 
@@ -8635,20 +8635,22 @@ namespace DryIoc
                     decoratedFactoryID = FactoryID;
             }
 
-            // checking the service types only cause wrapper and decorators may be used multiple times
-            if (!skipRecursiveDependencyCheck && 
-                factory.FactoryType == FactoryType.Service)
+            var doRecursiveDependencyCheck = !skipRecursiveDependencyCheck && factory.FactoryType == FactoryType.Service;
+
+            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
             {
-                for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                if (doRecursiveDependencyCheck)
                 {
                     if ((p.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
-                        break; // stops further upward checking
-                    if (p.FactoryID == factoryId)
+                        doRecursiveDependencyCheck = false;
+                    else if (p.FactoryID == factoryId)
                         Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
                 }
+
+                p.DependencyCount += 1;
             }
 
-            // It is required to nullify the TD tracking when factory is resolved multiple times, e.g. for decorator
+            // it is required to nullify the TD tracking when factory is resolved multiple times, e.g. for decorator
             var flags = Flags & ~RequestFlags.TracksTransientDisposable;
             if (skipRecursiveDependencyCheck)
                 flags |= RequestFlags.StopRecursiveDependencyCheck;
@@ -8685,21 +8687,6 @@ namespace DryIoc
             }
 
             Flags = flags;
-
-            //const int dependencyCountToSplitIntoSeparateCompilationUnit = 100;
-            //for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
-            //{
-            //    if (p.DependencyCount < dependencyCountToSplitIntoSeparateCompilationUnit)
-            //    {
-            //        if (p.DependencyCount > -1) // don't touch -1 once it is set
-            //            p.DependencyCount += 1;
-            //    }
-            //    else if (p.DependencyCount == dependencyCountToSplitIntoSeparateCompilationUnit)
-            //        p.DependencyCount = -1;
-            //    else 
-            //        p.DependencyCount -= dependencyCountToSplitIntoSeparateCompilationUnit;
-            //}
-
             SetResolvedFactory(null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             return this;
         }
