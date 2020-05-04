@@ -949,7 +949,7 @@ namespace FastExpressionCompiler.LightExpression
                             continue;
                         }
 
-						var methodArgs = callExpr.Arguments;
+                        var methodArgs = callExpr.Arguments;
                         var methodArgCount = methodArgs.Count;
                         if (methodArgCount == 0)
                         {
@@ -1105,19 +1105,22 @@ namespace FastExpressionCompiler.LightExpression
 
                     case ExpressionType.Invoke:
                         var invokeExpr = (InvocationExpression)expr;
+                        var invokeArgs = invokeExpr.Arguments;
+                        if (invokeArgs.Count == 0)
+                        {
+                            expr = invokeExpr.Expression;
+                            continue;
+                        }
+
                         if (!TryCollectBoundConstants(ref closure, invokeExpr.Expression, paramExprs, isNestedLambda, ref rootClosure))
                             return false;
 
-                        var invokeArgs = invokeExpr.Arguments;
-                        var invokeArgsCount = invokeArgs.Count;
-                        if (invokeArgsCount > 0)
-                        {
-                            if (invokeArgsCount > 1)
-                                for (var i = 0; i < invokeArgsCount - 1; i++)
-                                    if (!TryCollectBoundConstants(ref closure, invokeArgs[i], paramExprs, isNestedLambda, ref rootClosure))
-                                        return false;
-                            expr = invokeArgs[invokeArgsCount - 1];
-                        }
+                        var lastArgIndex = invokeArgs.Count - 1;
+                        if (lastArgIndex > 0)
+                            for (var i = 0; i < lastArgIndex; i++)
+                                if (!TryCollectBoundConstants(ref closure, invokeArgs[i], paramExprs, isNestedLambda, ref rootClosure))
+                                    return false;
+                        expr = invokeArgs[lastArgIndex];
                         continue;
 
                     case ExpressionType.Conditional:

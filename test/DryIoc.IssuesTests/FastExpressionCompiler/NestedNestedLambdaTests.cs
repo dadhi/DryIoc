@@ -42,6 +42,49 @@ namespace DryIoc.IssuesTests.FastExpressionCompiler
             Assert.IsNotNull(f);
         }
 
+        [Test]
+        public void I_can_compile_the_Expression_with_nested_lambda_with_pre_created_closure_constants()
+        {
+            var rParam = Parameter(typeof(IResolverContext), "r");
+
+            var cConst = Constant(new C());
+
+            var fExpr = Lambda<Func<IResolverContext, object>>(
+                New(typeof(A).GetTypeInfo().DeclaredConstructors.First(),
+                    Invoke(Lambda<Func<B>>(New(typeof(B).GetTypeInfo().DeclaredConstructors.First(), cConst))),
+                    cConst),
+                rParam);
+
+            var f = fExpr.CompileFast(true);
+            Assert.IsInstanceOf<A>(f(null));
+        }
+
+        public class A
+        {
+            public B B { get; }
+            public C C { get; }
+
+            public A(B b, C c)
+            {
+                B = b;
+                C = c;
+            }
+        }
+
+        public class B
+        {
+            public C C { get; }
+
+            public B(C c)
+            {
+                C = c;
+            }
+        }
+
+        public class C
+        {
+        }
+
         public class LogTableManagerConsumer2
         {
             public Func<string, ILogTableManager> GetLogTableManager { get; set; }
