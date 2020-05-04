@@ -419,6 +419,9 @@ namespace FastExpressionCompiler.LightExpression
 
             /// Constant expressions to find an index (by reference) of constant expression from compiled expression.
             public LiveCountArray<object> Constants;
+            // todo: combine Constants and Usage to save the memory
+            /// Constant usage count and variable index
+            public LiveCountArray<int> ConstantUsage;
 
             /// Parameters not passed through lambda parameter list But used inside lambda body.
             /// The top expression should Not contain not passed parameters. 
@@ -426,9 +429,6 @@ namespace FastExpressionCompiler.LightExpression
 
             /// All nested lambdas recursively nested in expression
             public NestedLambdaInfo[] NestedLambdas;
-
-            /// Constant usage count and variable index
-            public LiveCountArray<int> ConstantUsage;
 
             /// Populates info directly with provided closure object and constants.
             public ClosureInfo(ClosureStatus status, object[] constValues = null)
@@ -448,7 +448,7 @@ namespace FastExpressionCompiler.LightExpression
                 _blockStack = new LiveCountArray<BlockInfo>(Tools.Empty<BlockInfo>());
             }
 
-            public void AddConstantOrIncrementUsageCount(object value)
+            public void AddConstantOrIncrementUsageCount(object value, Type type)
             {
                 Status |= ClosureStatus.HasClosure;
 
@@ -851,8 +851,15 @@ namespace FastExpressionCompiler.LightExpression
                     case ExpressionType.Constant:
                         var constantExpr = (ConstantExpression)expr;
                         var value = constantExpr.Value;
-                        if (value != null && IsClosureBoundConstant(value, value.GetType().GetTypeInfo()))
-                            closure.AddConstantOrIncrementUsageCount(value); // todo: find the way to speed-up this, track the usage in constant itself?
+                        if (value != null)
+                        {
+                            // todo: find the way to speed-up this, track the usage in constant itself?
+
+                            var valueType = value.GetType();
+                            if (IsClosureBoundConstant(value, valueType.GetTypeInfo()))
+                                closure.AddConstantOrIncrementUsageCount(value, valueType);
+                        }
+
                         return true;
 
                     case ExpressionType.Quote:
@@ -4710,7 +4717,7 @@ namespace FastExpressionCompiler.LightExpression
 
         public void Pop() => --Count;
 
-        private static T[] Expand(T[] items)
+        public static T[] Expand(T[] items)
         {
             if (items.Length == 0)
                 return new T[4];
