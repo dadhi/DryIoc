@@ -11,7 +11,7 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included AddOrUpdateServiceFactory
+The above copyright notice and this permission notice shall be included
 all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -236,12 +236,18 @@ namespace FastExpressionCompiler.LightExpression
             params ConstantExpression[] closureConstantsExprs)
             where TDelegate : class
         {
-            var constValues = new object[closureConstantsExprs.Length];
-            for (var i = 0; i < constValues.Length; i++)
-                constValues[i] = closureConstantsExprs[i].Value;
+            var closureConstants = new object[closureConstantsExprs.Length];
+            for (var i = 0; i < closureConstants.Length; i++)
+                closureConstants[i] = closureConstantsExprs[i].Value;
 
-            var closureInfo = new ClosureInfo(ClosureStatus.UserProvided | ClosureStatus.HasClosure, constValues);
+            var closureInfo = new ClosureInfo(ClosureStatus.UserProvided | ClosureStatus.HasClosure, closureConstants);
+            return TryCompileWithPreCreatedClosure<TDelegate>(lambdaExpr, ref closureInfo);
+        }
 
+        internal static TDelegate TryCompileWithPreCreatedClosure<TDelegate>(this LambdaExpression lambdaExpr, 
+            ref ClosureInfo closureInfo)
+            where TDelegate : class
+        {
             var closurePlusParamTypes = GetClosureTypeToParamTypes(lambdaExpr.Parameters);
             var method = new DynamicMethod(string.Empty, lambdaExpr.ReturnType, closurePlusParamTypes,
                 typeof(ExpressionCompiler), skipVisibility: true);
@@ -256,7 +262,7 @@ namespace FastExpressionCompiler.LightExpression
             il.Emit(OpCodes.Ret);
 
             var delegateType = typeof(TDelegate) != typeof(Delegate) ? typeof(TDelegate) : lambdaExpr.Type;
-            var @delegate = (TDelegate)(object)method.CreateDelegate(delegateType, new ArrayClosure(constValues));
+            var @delegate = (TDelegate)(object)method.CreateDelegate(delegateType, new ArrayClosure(closureInfo.Constants.Items));
             ReturnClosureTypeToParamTypesToPool(closurePlusParamTypes);
             return @delegate;
         }
@@ -391,7 +397,7 @@ namespace FastExpressionCompiler.LightExpression
         }
 
         [Flags]
-        private enum ClosureStatus
+        internal enum ClosureStatus
         {
             ToBeCollected        = 1,
             UserProvided         = 1 << 1,
@@ -400,7 +406,7 @@ namespace FastExpressionCompiler.LightExpression
         }
 
         /// Track the info required to build a closure object + some context information not directly related to closure.
-        private struct ClosureInfo
+        internal struct ClosureInfo
         {
             public bool LastEmitIsAddress;
 
@@ -421,7 +427,7 @@ namespace FastExpressionCompiler.LightExpression
             public LiveCountArray<object> Constants;
             // todo: combine Constants and Usage to save the memory
             /// Constant usage count and variable index
-            public LiveCountArray<int> ConstantUsage;
+            public LiveCountArray<int> ConstantUsageThenVarIndex;
 
             /// Parameters not passed through lambda parameter list But used inside lambda body.
             /// The top expression should Not contain not passed parameters. 
@@ -430,13 +436,16 @@ namespace FastExpressionCompiler.LightExpression
             /// All nested lambdas recursively nested in expression
             public NestedLambdaInfo[] NestedLambdas;
 
-            /// Populates info directly with provided closure object and constants.
-            public ClosureInfo(ClosureStatus status, object[] constValues = null)
+            /// <summary>Populates info directly with provided closure object and constants.
+            /// If provided, the <paramref name="constUsage"/> should be the size of <paramref name="constValues"/>
+            /// </summary>
+            public ClosureInfo(ClosureStatus status, object[] constValues = null, int[] constUsage = null)
             {
                 Status = status;
 
                 Constants = new LiveCountArray<object>(constValues ?? Tools.Empty<object>());
-                ConstantUsage = new LiveCountArray<int>(constValues == null ? Tools.Empty<int>() : new int[constValues.Length]);
+                ConstantUsageThenVarIndex = new LiveCountArray<int>(
+                    constValues == null ? Tools.Empty<int>() : constUsage ?? new int[constValues.Length]);
 
                 NonPassedParameters = Tools.Empty<ParameterExpression>();
                 NestedLambdas = Tools.Empty<NestedLambdaInfo>();
@@ -460,11 +469,11 @@ namespace FastExpressionCompiler.LightExpression
                 if (constIndex == -1)
                 {
                     Constants.PushSlot(value);
-                    ConstantUsage.PushSlot(1);
+                    ConstantUsageThenVarIndex.PushSlot(1);
                 }
                 else
                 {
-                    ++ConstantUsage.Items[constIndex];
+                    ++ConstantUsageThenVarIndex.Items[constIndex];
                 }
             }
 
@@ -759,7 +768,7 @@ namespace FastExpressionCompiler.LightExpression
             }
         }
 
-        private sealed class NestedLambdaInfo
+        internal sealed class NestedLambdaInfo
         {
             public readonly LambdaExpression LambdaExpression;
             public ClosureInfo ClosureInfo;
@@ -2552,7 +2561,7 @@ namespace FastExpressionCompiler.LightExpression
                     if (constIndex == -1)
                         return false;
 
-                    var varIndex = closure.ConstantUsage.Items[constIndex] - 1;
+                    var varIndex = closure.ConstantUsageThenVarIndex.Items[constIndex] - 1;
                     if (varIndex > 0)
                         EmitLoadLocalVariable(il, varIndex);
                     else
@@ -2716,7 +2725,7 @@ namespace FastExpressionCompiler.LightExpression
 
                 var constItems = closure.Constants.Items;
                 var constCount = closure.Constants.Count;
-                var constUsage = closure.ConstantUsage.Items;
+                var constUsage = closure.ConstantUsageThenVarIndex.Items;
 
                 int varIndex;
                 for (var i = 0; i < constCount; i++)

@@ -12,7 +12,7 @@ namespace LoadTest
         {
             var container = new Container((rules) =>
                 rules
-                    .WithoutFastExpressionCompiler()
+                    //.WithoutFastExpressionCompiler()
                     .WithoutDependencyDepthToSplitObjectGraph()
                     .WithoutInterpretationForTheFirstResolution()
                     .WithoutUseInterpretation()
