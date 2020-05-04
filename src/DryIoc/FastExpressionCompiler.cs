@@ -448,7 +448,7 @@ namespace FastExpressionCompiler.LightExpression
                 _blockStack = new LiveCountArray<BlockInfo>(Tools.Empty<BlockInfo>());
             }
 
-            public void AddConstant(object value)
+            public void AddConstantOrIncrementUsageCount(object value)
             {
                 Status |= ClosureStatus.HasClosure;
 
@@ -456,6 +456,7 @@ namespace FastExpressionCompiler.LightExpression
                 var constIndex = Constants.Count - 1;
                 while (constIndex != -1 && !ReferenceEquals(constItems[constIndex], value))
                     --constIndex;
+
                 if (constIndex == -1)
                 {
                     Constants.PushSlot(value);
@@ -603,7 +604,10 @@ namespace FastExpressionCompiler.LightExpression
 
                 var constItems = Constants.Items;
                 if (nestedLambdas.Length == 0)
+                {
+                    Array.Resize(ref constItems, constCount);
                     return constItems;
+                }
 
                 var itemCount = constCount + nestedLambdas.Length;
 
@@ -613,6 +617,10 @@ namespace FastExpressionCompiler.LightExpression
                     closureItems = new object[itemCount];
                     for (var i = 0; i < constCount; ++i)
                         closureItems[i] = constItems[i];
+                }
+                else
+                {
+                    Array.Resize(ref constItems, itemCount);
                 }
 
                 for (var i = 0; i < nestedLambdas.Length; i++)
@@ -844,7 +852,7 @@ namespace FastExpressionCompiler.LightExpression
                         var constantExpr = (ConstantExpression)expr;
                         var value = constantExpr.Value;
                         if (value != null && IsClosureBoundConstant(value, value.GetType().GetTypeInfo()))
-                            closure.AddConstant(value);
+                            closure.AddConstantOrIncrementUsageCount(value); // todo: find the way to speed-up this, track the usage in constant itself?
                         return true;
 
                     case ExpressionType.Quote:

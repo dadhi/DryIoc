@@ -2970,16 +2970,10 @@ namespace DryIoc
                         return true;
                     }
 
-					// todo: may as well speed-up Func<object> interpretation
-                    //if (delegateExpr.Type == typeof(Func<object>))
-                    //{
-					//
-                    //}
-
 #if !SUPPORTS_DELEGATE_METHOD
                     return false;
 #else
-                    if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
+                        if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
                         return false;
                     var lambda = (Delegate)delegateObj;
 
@@ -9550,7 +9544,7 @@ namespace DryIoc
                 var itemRef = ((Scope)container.SingletonScope)._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(factoryId);
                 if (itemRef != null && itemRef.Value != Scope.NoItem)
                     return Constant(itemRef.Value); // todo: we need the way to reuse Constant for the value
-                }
+            }
 
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
                 !request.OpensResolutionScope && (
@@ -9602,7 +9596,23 @@ namespace DryIoc
                 }
 
                 if (mayCache)
+                {
+                    var depCount = request.DependencyCount;
+                    if (depCount >= 500)
+                    {
+                        for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
+                            p.DependencyCount -= depCount;
+
+//                        serviceExpr = Convert(Invoke(
+//                            Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()
+//#if SUPPORTS_FAST_EXPRESSION_COMPILER
+//                                , typeof(object)
+//#endif
+//                            ), Empty<Expression>()), serviceExpr.Type);
+                    }
+
                     ((Container)container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheEntry);
+                }
             }
             else Container.TryThrowUnableToResolve(request);
             return serviceExpr;
@@ -9665,6 +9675,12 @@ namespace DryIoc
                 }
 
                 serviceExpr = Constant(itemRef.Value);
+
+                var depCount = request.DependencyCount;
+                if (depCount > 0)
+                    for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
+                        p.DependencyCount -= depCount;
+
             }
             else
             {
