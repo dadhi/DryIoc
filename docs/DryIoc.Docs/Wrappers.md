@@ -353,7 +353,7 @@ __Note:__ Another way to use a `LazyEnumerable<T>` when resolving `IEnumerable<T
 
 There is an alternate way to `Resolve` rather than inject a collection: 
 via `IResolver.ResolveMany` method. `ResolveMany` may provide results as a fixed array or as a 
-`LazyEnumerable` based on the passed option. The default is the `LazyEnumerable` option.
+`LazyEnumerable` if you pass optional `ResolveManyBehavior.AsLazyEnumerable` argument, the **default value is the `ResolveManyBehavior.AsFixedArray`**.
 
 Due to the fact that .NET `Array` implements a number of collection interfaces: 
 `IEnumerable<>`, `IList<>`, `ICollection<>`, `IReadOnlyList<>`, `IReadOnlyCollection<>`, 
