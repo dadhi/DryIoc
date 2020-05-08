@@ -2961,22 +2961,32 @@ namespace DryIoc
                     var delegateExpr = invokeExpr.Expression;
 
                     // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
-                    if (delegateExpr.Type == typeof(FactoryDelegate) && 
-                        delegateExpr is ConstantExpression delegateConstExpr)
+                    if (delegateExpr is ConstantExpression delegateConstExpr)
                     {
-                        if (!TryInterpret(r, invokeExpr.Arguments[0], paramExprs, paramValues, parentArgs, useFec, out var resolver))
-                            return false;
-                        result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
-                        return true;
+                        if (delegateExpr.Type == typeof(FactoryDelegate))
+                        {
+                            if (!TryInterpret(r, invokeExpr.Arguments[0], paramExprs, paramValues, parentArgs, useFec, out var resolver))
+                                return false;
+                            result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
+                            return true;
+                        }
+                    }
+                    else if (delegateExpr.Type == typeof(Func<object>) &&
+                             delegateExpr is LambdaExpression funcExpr) 
+                    {
+                        // The Invocation of Func is used for splitting the big object graphs
+                        // so we can ignore this split and go directly to the body
+                        return TryInterpret(r, funcExpr.Body, paramExprs, paramValues, parentArgs, useFec,
+                            out result);
                     }
 
 #if !SUPPORTS_DELEGATE_METHOD
                     return false;
 #else
-                        if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
+                    if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
                         return false;
+                    
                     var lambda = (Delegate)delegateObj;
-
                     var argExprs = invokeExpr.Arguments.ToListOrSelf();
                     if (argExprs.Count == 0)
                         result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
@@ -2990,7 +3000,7 @@ namespace DryIoc
                     }
                     return true;
 #endif
-                    }
+                }
                 case ExprType.Parameter:
                 {
                     if (expr == paramExprs)
