@@ -38,7 +38,12 @@ namespace LoadTest
 
                 var code = expr.ToCodeString(new StringBuilder(100000), 2, true, Abbreviate).ToString();
                 var nestedLambdas = code.Count(c => c == '$');
-                Assert.AreEqual(2, nestedLambdas);
+
+                // the number of nested lambdas without graph split
+                //Assert.AreEqual(2, nestedLambdas);
+                
+                // the number when split by `dependencyCount >= 256`
+                Assert.AreEqual(41, nestedLambdas);
             }
 
             string Abbreviate(Type t, string s)

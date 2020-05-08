@@ -9544,7 +9544,7 @@ namespace DryIoc
                 var itemRef = ((Scope)container.SingletonScope)._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(factoryId);
                 if (itemRef != null && itemRef.Value != Scope.NoItem)
                     return Constant(itemRef.Value); // todo: we need the way to reuse Constant for the value
-            }
+                }
 
             if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
                 !request.OpensResolutionScope && (
@@ -9598,17 +9598,17 @@ namespace DryIoc
                 if (mayCache)
                 {
                     var depCount = request.DependencyCount;
-                    if (depCount >= 500)
+                    if (depCount >= 256)
                     {
                         for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
                             p.DependencyCount -= depCount;
 
-//                        serviceExpr = Convert(Invoke(
-//                            Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()
-//#if SUPPORTS_FAST_EXPRESSION_COMPILER
-//                                , typeof(object)
-//#endif
-//                            ), Empty<Expression>()), serviceExpr.Type);
+                        serviceExpr = Convert(Invoke(
+                            Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+                                , typeof(object)
+#endif
+                            ), Empty<Expression>()), serviceExpr.Type);
                     }
 
                     ((Container)container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheEntry);
