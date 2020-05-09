@@ -8650,21 +8650,24 @@ namespace DryIoc
             if (skipRecursiveDependencyCheck)
                 flags |= RequestFlags.StopRecursiveDependencyCheck;
 
+            var setup = factory.Setup;
+
             IReuse reuse = null;
             if (InputArgExprs != null && Rules.IgnoringReuseForFuncWithArgs)
                 reuse = DryIoc.Reuse.Transient;
             else if (factory.Reuse != null)
                 reuse = factory.Reuse;
-            else if (factory.Setup.UseParentReuse)
+            else if (setup.UseParentReuse)
                 reuse = DirectParent.IsEmpty ? Rules.DefaultReuse : null; // the `null` here signals to find the parent reuse
             else if (factory.FactoryType == FactoryType.Decorator &&
-                     (factory.Setup.To<Setup.DecoratorSetup>().UseDecorateeReuse || Rules.UseDecorateeReuseForDecorators))
+                     (setup.To<Setup.DecoratorSetup>().UseDecorateeReuse || Rules.UseDecorateeReuseForDecorators))
                 reuse = Reuse; // already resolved decoratee reuse
             else if (factory.FactoryType == FactoryType.Wrapper)
                 reuse = DryIoc.Reuse.Transient;
             else
                 reuse = Rules.DefaultReuse;
 
+            IReuse firstParentNonTransientReuseOrNull = null;
             if (!DirectParent.IsEmpty)
             {
                 var checkRecursiveDependency = !skipRecursiveDependencyCheck &&
@@ -8678,8 +8681,6 @@ namespace DryIoc
 
                 var scopedOrSingleton = checkCaptiveDependency &&
                     (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true;
-
-                IReuse firstParentNonTransientReuse = null;
 
                 for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
                 {
@@ -8701,33 +8702,46 @@ namespace DryIoc
                             Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
                     }
 
-                    if (firstParentNonTransientReuse == null)
+                    if (firstParentNonTransientReuseOrNull == null)
                     {
                         if (p.FactoryType != FactoryType.Wrapper)
                         {
                             if (p.Reuse != DryIoc.Reuse.Transient)
-                                firstParentNonTransientReuse = p.Reuse;
+                                firstParentNonTransientReuseOrNull = p.Reuse;
                         }
                         else if (p._actualServiceType.IsFunc())
-                            firstParentNonTransientReuse = Rules.DefaultReuse;
+                            firstParentNonTransientReuseOrNull = Rules.DefaultReuse;
                     }
 
                     p.DependencyCount += 1;
                 }
 
-                if (reuse == null)
-                    reuse = firstParentNonTransientReuse ?? Rules.DefaultReuse;
+                if (reuse == null) // for the `setup.UseParentReuse`
+                    reuse = firstParentNonTransientReuseOrNull ?? Rules.DefaultReuse;
             }
 
             if (reuse == DryIoc.Reuse.Singleton)
             {
                 flags |= RequestFlags.IsSingletonOrDependencyOfSingleton;
             }
-            else if (reuse == DryIoc.Reuse.Transient) // check for disposable transient
+            else if (reuse == DryIoc.Reuse.Transient) 
             {
-                reuse = GetTransientDisposableTrackingReuse(factory);
-                if (reuse != DryIoc.Reuse.Transient)
-                    flags |= RequestFlags.TracksTransientDisposable;
+                // check for disposable transient
+                if (!setup.PreventDisposal &&
+                    (setup.TrackDisposableTransient || !setup.AllowDisposableTransient && Rules.TrackingDisposableTransients) &&
+                    typeof(IDisposable).GetTypeInfo().IsAssignableFrom((factory.ImplementationType ?? _actualServiceType).GetTypeInfo()))
+                {
+                    if (firstParentNonTransientReuseOrNull != null)
+                    {
+                        reuse = firstParentNonTransientReuseOrNull;
+                        flags |= RequestFlags.TracksTransientDisposable;
+                    }
+                    else if (!IsWrappedInFunc())
+                    {
+                        reuse = DryIoc.Reuse.ScopedOrSingleton;
+                        flags |= RequestFlags.TracksTransientDisposable;
+                    }
+                }
             }
 
             if (copyRequest)
@@ -8753,42 +8767,6 @@ namespace DryIoc
                     return true;
             }
             return false;
-        }
-
-        private IReuse GetTransientDisposableTrackingReuse(Factory factory)
-        {
-            // Track transient disposable in parent scope (if any), or open scope (if any)
-            var setup = factory.Setup;
-            var tracksTransientDisposable =
-                !setup.PreventDisposal &&
-                (setup.TrackDisposableTransient || !setup.AllowDisposableTransient && Rules.TrackingDisposableTransients) &&
-                (factory.ImplementationType ?? GetActualServiceType()).IsAssignableTo<IDisposable>();
-
-            if (!tracksTransientDisposable)
-                return DryIoc.Reuse.Transient;
-
-            var parentReuse = GetFirstParentNonTransientReuseUntilFunc();
-            if (parentReuse != DryIoc.Reuse.Transient)
-                return parentReuse;
-
-            if (IsWrappedInFunc())
-                return DryIoc.Reuse.Transient;
-
-            // If no parent with reuse found, then track in current open scope or in singletons scope
-            return DryIoc.Reuse.ScopedOrSingleton;
-        }
-
-        private IReuse GetFirstParentNonTransientReuseUntilFunc()
-        {
-            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
-            {
-                if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
-                    break;
-                if (p.FactoryType != FactoryType.Wrapper && p.Reuse != DryIoc.Reuse.Transient)
-                    return p.Reuse;
-            }
-
-            return DryIoc.Reuse.Transient;
         }
 
         /// <summary>If request corresponds to dependency injected into parameter,
