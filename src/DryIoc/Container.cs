@@ -8639,37 +8639,76 @@ namespace DryIoc
                     decoratedFactoryID = FactoryID;
             }
 
-            var doRecursiveDependencyCheck = !skipRecursiveDependencyCheck && factory.FactoryType == FactoryType.Service;
-
-            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
-            {
-                if (doRecursiveDependencyCheck)
-                {
-                    if ((p.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
-                        doRecursiveDependencyCheck = false;
-                    else if (p.FactoryID == factoryId)
-                        Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
-                }
-
-                p.DependencyCount += 1;
-            }
-
             // it is required to nullify the TD tracking when factory is resolved multiple times, e.g. for decorator
             var flags = Flags & ~RequestFlags.TracksTransientDisposable;
             if (skipRecursiveDependencyCheck)
                 flags |= RequestFlags.StopRecursiveDependencyCheck;
 
-            var reuse = IsWrappedInFuncWithArgs() && Rules.IgnoringReuseForFuncWithArgs
-                ? DryIoc.Reuse.Transient
-                : factory.Reuse ?? CalculateDefaultReuse(factory);
+            IReuse reuse = null;
+            if (InputArgExprs != null && Rules.IgnoringReuseForFuncWithArgs)
+                reuse = DryIoc.Reuse.Transient;
+            else if (factory.Reuse != null)
+                reuse = factory.Reuse;
+            else if (factory.Setup.UseParentReuse && !DirectParent.IsEmpty)
+                reuse = null; // signals to find the parent reuse
+            else if (factory.FactoryType == FactoryType.Decorator &&
+                     (factory.Setup.To<Setup.DecoratorSetup>().UseDecorateeReuse || Rules.UseDecorateeReuseForDecorators))
+                reuse = Reuse; // already resolved decoratee reuse
+            else if (factory.FactoryType == FactoryType.Wrapper)
+                reuse = DryIoc.Reuse.Transient;
+            else
+                reuse = Rules.DefaultReuse;
 
-            if (!skipCaptiveDependencyCheck &&
-                !DirectParent.IsEmpty &&
-                !factory.Setup.OpenResolutionScope &&
-                reuse.Lifespan != 0 &&
-                Rules.ThrowIfDependencyHasShorterReuseLifespan)
+            if (!DirectParent.IsEmpty)
             {
-                ThrowIfReuseHasShorterLifespanThanParent(reuse);
+                var checkRecursiveDependency = !skipRecursiveDependencyCheck && factory.FactoryType == FactoryType.Service;
+                for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                {
+                    if (checkRecursiveDependency)
+                    {
+                        if ((p.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+                            checkRecursiveDependency = false;
+                        else if (p.FactoryID == factoryId)
+                            Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
+                    }
+
+                    if (reuse == null) // search for the parent reuse but stop on Func boundaries
+                    {
+                        if (p.FactoryType != FactoryType.Wrapper)
+                        {
+                            if (p.Reuse != DryIoc.Reuse.Transient) 
+                                reuse = p.Reuse;
+                        }
+                        else if (p._actualServiceType.IsFunc())
+                            reuse = Rules.DefaultReuse;
+                    }
+
+                    p.DependencyCount += 1;
+                }
+            }
+
+            if (reuse == null)
+                reuse = Rules.DefaultReuse;
+
+            var checkCaptiveDependency = !skipCaptiveDependencyCheck &&
+                                                                !DirectParent.IsEmpty &&
+                                                                !factory.Setup.OpenResolutionScope &&
+                                                                reuse.Lifespan != 0 &&
+                                                                Rules.ThrowIfDependencyHasShorterReuseLifespan;
+            if (checkCaptiveDependency)
+            {
+                for (var parent = DirectParent; !parent.IsEmpty; parent = parent.DirectParent)
+                {
+                    if (parent.OpensResolutionScope ||
+                        // ignores the ScopedOrSingleton inside Scoped or Singleton
+                        (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true && parent.Reuse is SingletonReuse ||
+                        parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFunc())
+                        break;
+
+                    if (parent.FactoryType == FactoryType.Service &&
+                        parent.ReuseLifespan > reuse.Lifespan)
+                        Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, parent);
+                }
             }
 
             if (reuse == DryIoc.Reuse.Singleton)
@@ -8708,22 +8747,6 @@ namespace DryIoc
             return false;
         }
 
-        private IReuse CalculateDefaultReuse(Factory factory)
-        {
-            if (factory.Setup.UseParentReuse)
-                return GetFirstParentNonTransientReuseUntilFunc();
-
-            if (factory.FactoryType == FactoryType.Decorator)
-            {
-                if (factory.Setup.To<Setup.DecoratorSetup>().UseDecorateeReuse ||
-                    Rules.UseDecorateeReuseForDecorators) 
-                    return Reuse; // use reuse of resolved service factory for decorator
-            }
-
-            return factory.FactoryType == FactoryType.Wrapper 
-                ? DryIoc.Reuse.Transient : Rules.DefaultReuse;
-        }
-
         private IReuse GetTransientDisposableTrackingReuse(Factory factory)
         {
             // Track transient disposable in parent scope (if any), or open scope (if any)
@@ -8745,22 +8768,6 @@ namespace DryIoc
 
             // If no parent with reuse found, then track in current open scope or in singletons scope
             return DryIoc.Reuse.ScopedOrSingleton;
-        }
-
-        private void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse)
-        {
-            for (var parent = DirectParent; !parent.IsEmpty; parent = parent.DirectParent)
-            {
-                if (parent.OpensResolutionScope ||
-                    // ignores the ScopedOrSingleton inside Scoped or Singleton
-                    (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true && parent.Reuse is SingletonReuse ||
-                    parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFunc())
-                    break;
-
-                if (parent.FactoryType == FactoryType.Service &&
-                    parent.ReuseLifespan > reuse.Lifespan)
-                    Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, parent);
-            }
         }
 
         private IReuse GetFirstParentNonTransientReuseUntilFunc()
@@ -9607,6 +9614,8 @@ namespace DryIoc
 
                 if (mayCache)
                 {
+                    // Split the expression with dependencies bigger than certain threshold by wrapping it in Func which is a
+                    // separate compilation unit and invoking it emmediately
                     var depCount = request.DependencyCount;
                     if (depCount >= 256)
                     {
@@ -9628,8 +9637,8 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        /// Applies reuse to created expression, by wrapping passed expression into scoped access
-        /// and producing the result expression.
+        /// <summary>Applies reuse to created expression, by wrapping passed expression into scoped access
+        /// and producing the result expression.</summary>
         protected virtual Expression ApplyReuse(Expression serviceExpr, Request request)
         {
             // This optimization eagerly creates singleton during the construction of object graph
