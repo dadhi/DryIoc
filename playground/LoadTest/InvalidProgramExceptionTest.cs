@@ -7,17 +7,15 @@ namespace LoadTest
 {
     static class InvalidProgramExceptionTest
     {
-
         public static IContainer GetContainerForTest()
         {
-            var container = new Container((rules) =>
-                rules
-                    //.WithoutFastExpressionCompiler()
-                    .WithoutDependencyDepthToSplitObjectGraph()
-                    .WithoutInterpretationForTheFirstResolution()
-                    .WithoutUseInterpretation()
-                    .With(FactoryMethod.ConstructorWithResolvableArguments)
-            ).WithWebApi(new HttpConfiguration());
+            var container = new Container(rules => rules
+                .WithoutFastExpressionCompiler()
+                .WithoutDependencyDepthToSplitObjectGraph()
+                .WithoutInterpretationForTheFirstResolution()
+                .WithoutUseInterpretation()
+                .With(FactoryMethod.ConstructorWithResolvableArguments))
+                .WithWebApi(new HttpConfiguration());
 
             Registrations.RegisterTypes(container, true);
 

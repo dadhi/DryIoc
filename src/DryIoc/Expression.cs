@@ -1906,11 +1906,24 @@ namespace FastExpressionCompiler.LightExpression
             bool stripNamespace = false, Func<Type, string, string> printType = null, int identSpaces = 2)
         {
             sb.Append("Constant(");
-            sb.Append(Value.ToCode(ValueToCode, stripNamespace, printType));
 
-            if (Value != null && Value.GetType() != Type ||
-                Value == null && Type != typeof(object))
-                sb.Append(',').AppendTypeof(Type, stripNamespace, printType);
+            if (Value == null)
+            {
+                sb.Append("null");
+                if (Type != typeof(object))
+                    sb.Append(',').AppendTypeof(Type, stripNamespace, printType);
+            }
+            else if (Value is Type t) // todo: move this to ValueToCode, we should output `typeof(T)` anyway
+            {
+                sb.AppendTypeof(t, stripNamespace, printType);
+            }
+            else 
+            {
+                sb.Append(Value.ToCode(ValueToCode, stripNamespace, printType));
+
+                if (Value.GetType() != Type)
+                    sb.Append(',').AppendTypeof(Type,   stripNamespace, printType);
+            }
 
             return sb.Append(')');
         }

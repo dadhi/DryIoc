@@ -21,9 +21,9 @@ namespace LoadTest
         public void Test_with_UseDecorateeReuse_decorators_Examine_expression_and_the_split_graph()
         {
             var container = new Container(rules => rules
-                    .WithoutInterpretationForTheFirstResolution() // compile on the first iteration
-                    .WithUseDecorateeReuseForDecorators()
-                    .With(FactoryMethod.ConstructorWithResolvableArguments))
+                .WithoutInterpretationForTheFirstResolution() // compile on the first iteration
+                .WithUseDecorateeReuseForDecorators()
+                .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(new HttpConfiguration());
 
             Registrations.RegisterTypes(container, false);
@@ -39,28 +39,53 @@ namespace LoadTest
                 var code = expr.ToCodeString(new StringBuilder(100000), 2, true, Abbreviate).ToString();
                 var nestedLambdas = code.Count(c => c == '$');
 
-                // the number of nested lambdas without graph split
-                //Assert.AreEqual(2, nestedLambdas);
-                
                 // the number when split by `dependencyCount >= 256`
                 Assert.AreEqual(41, nestedLambdas);
             }
+        }
 
-            string Abbreviate(Type t, string s)
+        [Test]
+        public void Test_with_UseDecorateeReuse_decorators_Examine_expression_and_the_split_graph_without_FEC()
+        {
+            var container = new Container(rules => rules
+                .WithoutFastExpressionCompiler()
+                .WithoutInterpretationForTheFirstResolution() // compile on the first iteration
+                .WithUseDecorateeReuseForDecorators()
+                .With(FactoryMethod.ConstructorWithResolvableArguments))
+                .WithWebApi(new HttpConfiguration());
+
+            Registrations.RegisterTypes(container, false);
+
+            using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
             {
-                if (t.Namespace == "DryIoc" ||
-                    s.EndsWith("Controller") || s.EndsWith("Decorator"))
-                    return s;
+                //var service = scope.Resolve(typeof(EmailController));
+                //Assert.IsNotNull(service);
 
-                var abbr = string.Empty;
-                foreach (var c in s)
-                {
-                    if (char.IsUpper(c))
-                        abbr += c;
-                }
+                var expr = scope.Resolve<LambdaExpression>(typeof(EmailController));
+                Assert.IsNotNull(expr);
 
-                return abbr;
+                var code = expr.ToCodeString(new StringBuilder(100000), 2, true, Abbreviate).ToString();
+                var nestedLambdas = code.Count(c => c == '$');
+                Assert.AreEqual(2, nestedLambdas);
+
+                StringAssert.Contains("\"Resolve\"", code);
             }
+        }
+
+        private static string Abbreviate(Type t, string s)
+        {
+            if (t.Namespace == "DryIoc" || t.Namespace.StartsWith("System") ||
+                s.EndsWith("Controller") || s.EndsWith("Decorator"))
+                return s;
+
+            var abbr = string.Empty;
+            foreach (var c in s)
+            {
+                if (char.IsUpper(c))
+                    abbr += c;
+            }
+
+            return abbr;
         }
 
         [Test]

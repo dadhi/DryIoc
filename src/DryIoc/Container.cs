@@ -9555,9 +9555,9 @@ namespace DryIoc
                     !request.IsResolutionCall && (
                       setup.AsResolutionCall || 
                       setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration ||
-                      setup.UseParentReuse ||
-                      request.FactoryType == FactoryType.Service && 
-                      request.DependencyDepth > rules.DependencyDepthToSplitObjectGraph
+                      setup.UseParentReuse 
+                      //|| request.FactoryType == FactoryType.Service && 
+                      //request.DependencyDepth > rules.DependencyDepthToSplitObjectGraph
                   ) &&
                     request.GetActualServiceType() != typeof(void))
                 )
@@ -9608,12 +9608,19 @@ namespace DryIoc
                         for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
                             p.DependencyCount -= depCount;
 
-                        serviceExpr = Convert(Invoke(
-                            Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()
+                        if (rules.UseFastExpressionCompiler)
+                        {
+                            serviceExpr = Convert(Invoke(
+                                Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                                , typeof(object)
+                                    , typeof(object)
 #endif
-                            ), Empty<Expression>()), serviceExpr.Type);
+                                ), Empty<Expression>()), serviceExpr.Type);
+                        }
+                        else
+                        {
+                            serviceExpr = Resolver.CreateResolutionExpression(request, false);
+                        }
                     }
 
                     ((Container)container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheEntry);

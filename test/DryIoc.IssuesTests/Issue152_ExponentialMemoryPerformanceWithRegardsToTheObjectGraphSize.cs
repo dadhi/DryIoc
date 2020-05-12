@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
@@ -11,7 +12,8 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Main()
         {
-            var c = new Container(rules => rules.WithDependencyDepthToSplitObjectGraph(3));
+            var c = new Container();
+
             c.Register<AggQ>(Reuse.InCurrentScope);
             c.Register<AggP>(Reuse.InCurrentScope);
             c.Register<Root>(Reuse.InCurrentScope);
@@ -20,9 +22,9 @@ namespace DryIoc.IssuesTests
             using (var scope = c.OpenScope())
             {
                 var rootExpr = scope.Resolve<LambdaExpression>(typeof(Root));
-                var rootStr = rootExpr.CodeString;
-                var resolveCallIndex = rootStr.IndexOf("\"Resolve\"", StringComparison.InvariantCulture);
-                Assert.AreNotEqual(-1, resolveCallIndex);
+                var rootCode = rootExpr.CodeString;
+                var nestedLambdas = rootCode.Count(ch => ch == '$');
+                Assert.AreEqual(2603, nestedLambdas);
             }
         }
 
