@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Web.Http;
 using DryIoc;
 using DryIoc.WebApi;
@@ -45,7 +46,11 @@ namespace LoadTest
             var controllerTypes = TestHelper.GetAllControllers();
             var container = GetContainerForTest();
 
+            Console.WriteLine("Validating everything...");
+            var sw = Stopwatch.StartNew();
             var validateResult = container.Validate();
+            Console.WriteLine($"Validated in {sw.Elapsed.TotalMilliseconds} ms");
+
 
             if (validateResult.Length != 0)
             {
