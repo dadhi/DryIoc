@@ -3360,15 +3360,7 @@ namespace DryIoc
 
                 if (method == Resolver.ResolveMethod)
                 {
-                    object serviceKey = null, preResolveParent = null, resolveArgs = null;
-                    if (!TryInterpret(resolver, callArgs[1], paramExprs, paramValues, parentArgs, useFec, out serviceKey) ||
-                        !TryInterpret(resolver, callArgs[4], paramExprs, paramValues, parentArgs, useFec, out preResolveParent) ||
-                        !TryInterpret(resolver, callArgs[5], paramExprs, paramValues, parentArgs, useFec, out resolveArgs))
-                        return false;
-
-                    result = resolver.Resolve((Type) ConstValue(callArgs[0]), serviceKey,
-                        (IfUnresolved) ConstValue(callArgs[2]),
-                        (Type) ConstValue(callArgs[3]), (Request) preResolveParent, (object[]) resolveArgs);
+                    InterpretResolveMethod(resolver, callArgs, paramExprs, paramValues, parentArgs, useFec, out result);
                     return true;
                 }
 
@@ -3478,8 +3470,24 @@ namespace DryIoc
             return true;
         }
 
+        public static void InterpretResolveMethod(IResolverContext resolver, IList<Expression> callArgs,
+            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result)
+        {
+            TryInterpret(resolver, callArgs[1], paramExprs, paramValues, parentArgs, useFec, out var serviceKey);
+            TryInterpret(resolver, callArgs[4], paramExprs, paramValues, parentArgs, useFec, out var preResolveParent);
+            TryInterpret(resolver, callArgs[5], paramExprs, paramValues, parentArgs, useFec, out var resolveArgs);
+
+            result = resolver.Resolve((Type)
+                ((ConstantExpression) callArgs[0]).Value,
+                serviceKey,
+                (IfUnresolved) ((ConstantExpression) callArgs[2]).Value,
+                (Type) ((ConstantExpression) callArgs[3]).Value,
+                (Request) preResolveParent,
+                (object[]) resolveArgs);
+        }
+
         private static object InterpretGetScopedViaFactoryDelegateNoDisposalIndex(IResolverContext resolver,
-    MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
+            MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
             var fewArgExpr = (FourArgumentsMethodCallExpression)callExpr;
@@ -3877,6 +3885,7 @@ namespace DryIoc
             {
                 if (callExpr.Method == Resolver.ResolveMethod)
                 {
+
                 }
             }
 
@@ -5986,7 +5995,7 @@ namespace DryIoc
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) => request =>
         {
             var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
-            // todo: we can inline this because we do double checking on the number of constructors
+            // todo: @perf we can inline this because we do double checking on the number of constructors
             var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
             var ctorCount = ctors.Length;
             if (ctorCount == 0)
@@ -8725,8 +8734,9 @@ namespace DryIoc
                 var scopedOrSingleton = checkCaptiveDependency &&
                     (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true;
 
-                // Means we are incrementing the count when resolving the Factory for the first time, and not twice for the decorators
-                var incrementDependencyCount = Factory == null; 
+                // Means we are incrementing the count when resolving the Factory for the first time,
+                // and not twice for the decorators
+                var dependencyCountIncrement = Factory == null ? 1 : 0; 
 
                 for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
                 {
@@ -8759,7 +8769,7 @@ namespace DryIoc
                             firstParentNonTransientReuseOrNull = Rules.DefaultReuse;
                     }
 
-                    p.DependencyCount += 1;
+                    p.DependencyCount += dependencyCountIncrement;
                 }
 
                 if (reuse == null) // for the `setup.UseParentReuse`
@@ -9598,7 +9608,6 @@ namespace DryIoc
             var cacheExpression = Caching != FactoryCaching.DoNotCache && 
                 FactoryType == FactoryType.Service &&
                 !request.IsResolutionRoot &&
-                //(!request.IsSingletonOrDependencyOfSingleton || rules.UsedForValidation) && // validating container may cache singleton constants for the faster access
                 !request.IsDirectlyWrappedInFunc() && 
                 !request.IsWrappedInFuncWithArgs() &&
                 !setup.UseParentReuse &&
@@ -9608,7 +9617,7 @@ namespace DryIoc
             ImMapEntry<Container.Registry.ExpressionCacheSlot> cacheEntry = null;
             if (cacheExpression)
             {
-                var cachedExpr = ((Container)container).GetCachedFactoryExpression(FactoryID, reuse, out cacheEntry);
+                var cachedExpr = ((Container)container).GetCachedFactoryExpression(request.FactoryID, reuse, out cacheEntry);
                 if (cachedExpr != null)
                     return cachedExpr;
             }
@@ -9616,14 +9625,14 @@ namespace DryIoc
                 !setup.PreventDisposal && !setup.WeaklyReferenced)
             {
                 // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
-                var factoryId = request.FactoryType == FactoryType.Decorator
+                var combinedFactoryId = request.FactoryType == FactoryType.Decorator
                     ? request.CombineDecoratorWithDecoratedFactoryID()
                     : request.FactoryID;
 
-                var itemRef = ((Scope) container.SingletonScope)._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK]
-                    .GetEntryOrDefault(factoryId);
+                var itemRef = ((Scope) container.SingletonScope)._maps[combinedFactoryId & Scope.MAP_COUNT_SUFFIX_MASK]
+                    .GetEntryOrDefault(combinedFactoryId);
                 if (itemRef != null && itemRef.Value != Scope.NoItem)
-                    return Constant(itemRef.Value); // todo: we need the way to reuse Constant for the value
+                    return itemRef.Value == null ? Constant(null, request.GetActualServiceType()) : Constant(itemRef.Value); 
             }
 
             // Creates an object graph expression with all of the dependencies created
