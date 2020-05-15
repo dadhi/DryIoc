@@ -1028,8 +1028,9 @@ namespace DryIoc
             _registry.Value.GetCachedFactoryExpression(factoryId, reuse, out slot);
 
         [MethodImpl((MethodImplOptions) 256)]
-        internal void CacheFactoryExpression(int factoryId, IReuse reuse, Expression expr, ImMapEntry<Registry.ExpressionCacheSlot> slot) =>
-            _registry.Value.CacheFactoryExpression(factoryId, reuse, expr, slot);
+        internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount,
+            ImMapEntry<Registry.ExpressionCacheSlot> slot) =>
+            _registry.Value.CacheFactoryExpression(factoryId, expr, reuse, dependencyCount, slot);
 
         Factory IContainer.ResolveFactory(Request request)
         {
@@ -2017,7 +2018,8 @@ namespace DryIoc
 
             internal struct ExpressionCacheSlot
             {
-                public Expression Transient;
+                public Expression SingletonOrTransient;
+                public int TransientDependencyCount; // because for the other reuses we know that it's 1
                 public Expression Scoped;
                 public KeyValuePair<object, Expression>[] ScopedToName;
             }
@@ -2039,7 +2041,7 @@ namespace DryIoc
                         if (entry != null)
                         {
                             if (reuse == Reuse.Transient || reuse is SingletonReuse)
-                                return entry.Value.Transient;
+                                return entry.Value.SingletonOrTransient;
 
                             if (reuse is CurrentScopeReuse scoped)
                             {
@@ -2059,7 +2061,8 @@ namespace DryIoc
                 return null;
             }
 
-            internal void CacheFactoryExpression(int factoryId, IReuse reuse, Expression expr, ImMapEntry<ExpressionCacheSlot> entry = null)
+            internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount,
+                ImMapEntry<ExpressionCacheSlot> entry = null)
             {
                 if (entry == null)
                 {
@@ -2081,9 +2084,14 @@ namespace DryIoc
                     }
                 }
 
-                if (reuse == Reuse.Transient || reuse is SingletonReuse)
+                if (reuse == Reuse.Transient)
                 {
-                    entry.Value.Transient = expr;
+                    entry.Value.SingletonOrTransient = expr;
+                    entry.Value.TransientDependencyCount = dependencyCount;
+                }
+                else if (reuse is SingletonReuse)
+                {
+                    entry.Value.SingletonOrTransient = expr;
                 }
                 else if (reuse is CurrentScopeReuse scoped)
                 {
@@ -3470,7 +3478,7 @@ namespace DryIoc
             return true;
         }
 
-        public static void InterpretResolveMethod(IResolverContext resolver, IList<Expression> callArgs,
+        internal static void InterpretResolveMethod(IResolverContext resolver, IList<Expression> callArgs,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result)
         {
             TryInterpret(resolver, callArgs[1], paramExprs, paramValues, parentArgs, useFec, out var serviceKey);
@@ -3879,15 +3887,6 @@ namespace DryIoc
             expression = expression.NormalizeExpression();
             if (expression is ConstantExpression constExpr)
                 return constExpr.Value.ToFactoryDelegate;
-
-            // todo: @remove We don't need to Compile the known method like Resolve as Reuse methods
-            if (expression is MethodCallExpression callExpr)
-            {
-                if (callExpr.Method == Resolver.ResolveMethod)
-                {
-
-                }
-            }
 
             if (!preferInterpretation && useFastExpressionCompiler)
             {
@@ -4400,7 +4399,7 @@ namespace DryIoc
             var serviceTypeExpr = Constant(serviceType);
             var factoryIdExpr = Constant(factoryID);
             var implTypeExpr = Constant(implementationType);
-            var reuseExpr = r.Reuse == null ? Constant(null)
+            var reuseExpr = r.Reuse == null ? Constant(null, typeof(IReuse))
                 : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
 
             if (ifUnresolved == IfUnresolved.Throw &&
@@ -7613,7 +7612,7 @@ namespace DryIoc
 
         private static readonly ConstantExpression _ifUnresolvedThrowExpr = Constant(IfUnresolved.Throw);
         private static readonly ConstantExpression _nullTypeExpr          = Constant(null, typeof(Type));
-        private static readonly ConstantExpression _nullExpr              = Constant(null);
+        private static readonly ConstantExpression _nullExpr              = Constant(null, typeof(object));
 
         internal static Expression CreateResolutionExpression(Request request, bool opensResolutionScope = false)
         {
@@ -7633,7 +7632,7 @@ namespace DryIoc
                 : Constant(details.IfUnresolved, typeof(IfUnresolved));
 
             var requiredServiceTypeExpr = details.RequiredServiceType == null 
-                ? _nullTypeExpr 
+                ? _nullTypeExpr
                 : Constant(details.RequiredServiceType, typeof(Type));
             
             var serviceKeyExpr = details.ServiceKey == null 
@@ -8360,7 +8359,7 @@ namespace DryIoc
                 flags |= preResolveParent.Flags & InheritedFlags;
             }
 
-            var inputArgExprs = inputArgs?.Map(a => Constant(a));
+            var inputArgExprs = inputArgs?.Map(a => Constant(a)); // todo: @check what happens if `a == null`, does the `object` type for is fine
 
             var stack = RequestStack.Get();
             ref var req = ref stack.GetOrPushRef(0);
@@ -9619,7 +9618,17 @@ namespace DryIoc
             {
                 var cachedExpr = ((Container)container).GetCachedFactoryExpression(request.FactoryID, reuse, out cacheEntry);
                 if (cachedExpr != null)
+                {
+                    if (reuse == DryIoc.Reuse.Transient && cacheEntry.Value.TransientDependencyCount > 0 &&
+                        !rules.UsedForValidation && !rules.UsedForExpressionGeneration)
+                    {
+                        var depCount = cacheEntry.Value.TransientDependencyCount;
+                        for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
+                            p.DependencyCount += depCount;
+
+                    }
                     return cachedExpr;
+                }
             }
             else if (reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess &&
                 !setup.PreventDisposal && !setup.WeaklyReferenced)
@@ -9632,7 +9641,7 @@ namespace DryIoc
                 var itemRef = ((Scope) container.SingletonScope)._maps[combinedFactoryId & Scope.MAP_COUNT_SUFFIX_MASK]
                     .GetEntryOrDefault(combinedFactoryId);
                 if (itemRef != null && itemRef.Value != Scope.NoItem)
-                    return itemRef.Value == null ? Constant(null, request.GetActualServiceType()) : Constant(itemRef.Value); 
+                    return itemRef.Value == null ? Constant(null, request.GetActualServiceType()) : Constant(itemRef.Value); // fixes #258
             }
 
             // Creates an object graph expression with all of the dependencies created
@@ -9655,7 +9664,10 @@ namespace DryIoc
                 }
                 else
                 {
-                    if (!rules.UsedForValidation && !rules.UsedForExpressionGeneration)
+                    // it does not make sense to split the scoped or singleton graphs
+                    // because former already includes the lambda and latter is a constant or lambda
+                    if (reuse == DryIoc.Reuse.Transient &&
+                        !rules.UsedForValidation && !rules.UsedForExpressionGeneration) 
                     {
                         // Split the expression with dependencies bigger than certain threshold by wrapping it in Func which is a
                         // separate compilation unit and invoking it emmediately
@@ -9678,7 +9690,8 @@ namespace DryIoc
                             {
                                 // cache expression if possible to minimize the double work for the generated Resolve call
                                 if (cacheExpression)
-                                    ((Container)container).CacheFactoryExpression(request.FactoryID, reuse, serviceExpr, cacheEntry);
+                                    ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
+                                        depCount, cacheEntry);
 
                                 return Resolver.CreateResolutionExpression(request, false);
                             }
@@ -9687,7 +9700,9 @@ namespace DryIoc
                 }
 
                 if (cacheExpression)
-                    ((Container)container).CacheFactoryExpression(request.FactoryID, reuse, serviceExpr, cacheEntry);
+                    ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
+                        reuse == DryIoc.Reuse.Transient ? request.DependencyCount : 0,
+                        cacheEntry);
             }
             else Container.TryThrowUnableToResolve(request);
             return serviceExpr;
@@ -9749,7 +9764,7 @@ namespace DryIoc
                     }
                 }
 
-                serviceExpr = itemRef.Value == null ? Constant(null, serviceExpr.Type) /* fixes #258 */  : Constant(itemRef.Value);
+                serviceExpr = itemRef.Value == null ? Constant(null, serviceExpr.Type) /* fixes #258 */ : Constant(itemRef.Value);
 
                 request.DecreaseTrackedDependencyCountForParents();
             }
@@ -10202,7 +10217,7 @@ namespace DryIoc
                     var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
                     factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
                     if (factoryExpr == null)
-                            return null; // todo: should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
+                            return null; // todo: @check should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
                 }
 
                 // return earlier if already have the parameters resolved, e.g. when using `ConstructorWithResolvableArguments`
@@ -10384,7 +10399,7 @@ namespace DryIoc
         {
             var actualServiceType = request.GetActualServiceType();
             var serviceExprType = serviceExpr.Type;
-            return serviceExprType == actualServiceType || serviceExprType.IsAssignableTo(actualServiceType) 
+            return serviceExprType == actualServiceType || actualServiceType.GetTypeInfo().IsAssignableFrom(serviceExprType.GetTypeInfo()) 
                     ? serviceExpr
                 : serviceExprType == typeof(object) 
                     ? Convert(serviceExpr, actualServiceType)

@@ -58,8 +58,8 @@ namespace LoadTest
 
             using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
             {
-                //var service = scope.Resolve(typeof(EmailController));
-                //Assert.IsNotNull(service);
+                var service = scope.Resolve(typeof(EmailController));
+                Assert.IsNotNull(service);
 
                 var expr = scope.Resolve<LambdaExpression>(typeof(EmailController));
                 Assert.IsNotNull(expr);

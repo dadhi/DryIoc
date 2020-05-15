@@ -68,7 +68,8 @@ namespace FastExpressionCompiler.LightExpression
             return ToExpression(ref exprsConverted);
         }
 
-        /// Converts back to respective System Expression, so you may Compile it by usual means.
+        /// <summary>Converts back to the respective System Expression
+        /// by first checking if `this` expression is already contained in the `exprsConverted` collection</summary>
         internal SysExpr ToExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted)
         {
             var i = exprsConverted.Count - 1;
@@ -312,11 +313,15 @@ namespace FastExpressionCompiler.LightExpression
 
         public static Expression CallIfNotNull(Expression instance, MethodInfo method, IEnumerable<Expression> arguments)
         {
-            var instanceVar = Parameter(instance.Type, "f");
-            return Block(instanceVar,
+            var instanceVar = Parameter(instance.Type, "x");
+            return Block(
+                instanceVar,
                 Assign(instanceVar, instance),
-                Condition(Equal(instanceVar, Constant(null)),
-                    Constant(null), Call(instanceVar, method, arguments)));
+                Condition(
+                    Equal(instanceVar, Constant(null, instance.Type)),
+                    Constant(null), 
+                    Call(instanceVar, method, arguments),
+                    method.ReturnType));
         }
 
         public static MemberExpression Property(PropertyInfo property) =>
@@ -1887,8 +1892,7 @@ namespace FastExpressionCompiler.LightExpression
 
         internal ConstantExpression(object value) => Value = value;
 
-        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> _) =>
-            SysExpr.Constant(Value, Type);
+        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> _) => SysExpr.Constant(Value, Type);
 
         /// <summary>
         /// Change the method to convert the <see cref="Value"/> to code as you want it globally.
