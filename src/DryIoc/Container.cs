@@ -306,9 +306,6 @@ namespace DryIoc
 
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
-#if DEBUG
-            _resolvedKeyed = new GrowingList<Type>();
-#endif
             object service = null;
             ResolveGenerated(ref service, serviceType);
             if (service != null)
@@ -418,10 +415,6 @@ namespace DryIoc
             return factoryDelegate(this);
         }
 
-#if DEBUG
-        GrowingList<Type> _resolvedKeyed;
-#endif
-
         object IResolver.Resolve(Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args)
         {
@@ -433,17 +426,6 @@ namespace DryIoc
 
             var service = ResolveAndCacheKeyed(RuntimeHelpers.GetHashCode(serviceType), serviceType, 
                 serviceKey, ifUnresolved, scopeName, requiredServiceType, preResolveParent ?? Request.Empty, args);
-
-#if DEBUG
-            if (service != null)
-            {
-                var index = _resolvedKeyed.Count - 1;
-                for (; index != -1; --index)
-                    if (service != null && service.GetType() == _resolvedKeyed.Items[index])
-                        Debug.WriteLine($"Seems like recursive dependency Type: '{service.GetType()}'");
-                _resolvedKeyed.PushSlot(service.GetType());
-            }
-#endif
 
             return service;
         }
@@ -3890,10 +3872,12 @@ namespace DryIoc
             if (expression is ConstantExpression constExpr)
                 return constExpr.Value.ToFactoryDelegate;
 
-            // todo: We don't need to Compile the known method like Resolve as well
-            if (expression is MethodCallExpression callExpr && callExpr.Method == Resolver.ResolveMethod)
+            // todo: @remove We don't need to Compile the known method like Resolve as Reuse methods
+            if (expression is MethodCallExpression callExpr)
             {
-
+                if (callExpr.Method == Resolver.ResolveMethod)
+                {
+                }
             }
 
             if (!preferInterpretation && useFastExpressionCompiler)
@@ -7618,6 +7602,10 @@ namespace DryIoc
         internal static readonly ConstructorInfo ResolutionScopeNameCtor =
             typeof(ResolutionScopeName).GetTypeInfo().DeclaredConstructors.First();
 
+        private static readonly ConstantExpression _ifUnresolvedThrowExpr = Constant(IfUnresolved.Throw);
+        private static readonly ConstantExpression _nullTypeExpr          = Constant(null, typeof(Type));
+        private static readonly ConstantExpression _nullExpr              = Constant(null);
+
         internal static Expression CreateResolutionExpression(Request request, bool opensResolutionScope = false)
         {
             if (request.Rules.DependencyResolutionCallExprs != null &&
@@ -7628,9 +7616,20 @@ namespace DryIoc
             var serviceType = request.ServiceType;
 
             var serviceTypeExpr = Constant(serviceType, typeof(Type));
-            var ifUnresolvedExpr = Constant(request.IfUnresolved, typeof(IfUnresolved));
-            var requiredServiceTypeExpr = Constant(request.RequiredServiceType, typeof(Type));
-            var serviceKeyExpr = container.GetConstantExpression(request.ServiceKey, typeof(object));
+
+            var details = request._serviceInfo.Details;
+
+            var ifUnresolvedExpr = details.IfUnresolved == IfUnresolved.Throw 
+                ? _ifUnresolvedThrowExpr 
+                : Constant(details.IfUnresolved, typeof(IfUnresolved));
+
+            var requiredServiceTypeExpr = details.RequiredServiceType == null 
+                ? _nullTypeExpr 
+                : Constant(details.RequiredServiceType, typeof(Type));
+            
+            var serviceKeyExpr = details.ServiceKey == null 
+                ? _nullExpr
+                : container.GetConstantExpression(details.ServiceKey, typeof(object));
 
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
 
@@ -8424,6 +8423,17 @@ namespace DryIoc
         /// <summary>The total dependency count</summary>
         public int DependencyCount;
 
+		// todo: @refactor move DependencyCount to parameter 
+        internal void DecreaseTrackedDependencyCountForParents()
+        {
+            if (DependencyCount > 0)
+            {
+                var depCount = DependencyCount;
+                for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                    p.DependencyCount -= depCount;
+            }
+        }
+
         /// <summary>Indicates that request is empty initial request.</summary>
         public bool IsEmpty => DirectParent == null;
 
@@ -8714,6 +8724,9 @@ namespace DryIoc
 
                 var scopedOrSingleton = checkCaptiveDependency &&
                     (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true;
+
+                // Means we are incrementing the count when resolving the Factory for the first time, and not twice for the decorators
+                var incrementDependencyCount = Factory == null; 
 
                 for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
                 {
@@ -9654,42 +9667,18 @@ namespace DryIoc
                             }
                             else
                             {
-                                serviceExpr = Resolver.CreateResolutionExpression(request, false);
+                                // cache expression if possible to minimize the double work for the generated Resolve call
+                                if (cacheExpression)
+                                    ((Container)container).CacheFactoryExpression(request.FactoryID, reuse, serviceExpr, cacheEntry);
+
+                                return Resolver.CreateResolutionExpression(request, false);
                             }
                         }
                     }
                 }
 
                 if (cacheExpression)
-                {
-//                    if (!rules.UsedForValidation && !rules.UsedForExpressionGeneration)
-//                    {
-//                        // Split the expression with dependencies bigger than certain threshold by wrapping it in Func which is a
-//                        // separate compilation unit and invoking it emmediately
-//                        var depCount = request.DependencyCount;
-//                        if (depCount >= 256)
-//                        {
-//                            for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
-//                                p.DependencyCount -= depCount;
-
-//                            if (rules.UseFastExpressionCompiler)
-//                            {
-//                                serviceExpr = Convert(Invoke(
-//                                    Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()
-//#if SUPPORTS_FAST_EXPRESSION_COMPILER
-//                                        , typeof(object)
-//#endif
-//                                    ), Empty<Expression>()), serviceExpr.Type);
-//                            }
-//                            else
-//                            {
-//                                serviceExpr = Resolver.CreateResolutionExpression(request, false);
-//                            }
-//                        }
-//                    }
-
-                    ((Container)container).CacheFactoryExpression(FactoryID, reuse, serviceExpr, cacheEntry);
-                }
+                    ((Container)container).CacheFactoryExpression(request.FactoryID, reuse, serviceExpr, cacheEntry);
             }
             else Container.TryThrowUnableToResolve(request);
             return serviceExpr;
@@ -9753,11 +9742,7 @@ namespace DryIoc
 
                 serviceExpr = Constant(itemRef.Value);
 
-                var depCount = request.DependencyCount;
-                if (depCount > 0)
-                    for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
-                        p.DependencyCount -= depCount;
-
+                request.DecreaseTrackedDependencyCountForParents();
             }
             else
             {
@@ -11706,15 +11691,16 @@ namespace DryIoc
             var factoryId = request.FactoryType == FactoryType.Decorator
                 ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
 
-            return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
-                Constant(factoryId), Lambda<FactoryDelegate>(serviceFactoryExpr,
-                    FactoryDelegateCompiler.FactoryDelegateParamExprs
+
+            var lambdaExpr = Lambda<FactoryDelegate>(serviceFactoryExpr,
+                FactoryDelegateCompiler.FactoryDelegateParamExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                    , typeof(object)
+                , typeof(object)
 #endif
-                ),
-                FactoryDelegateCompiler.ResolverContextParamExpr,
-                Constant(request.Factory.Setup.DisposalOrder));
+            );
+            request.DecreaseTrackedDependencyCountForParents();
+            return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
+                Constant(factoryId), lambdaExpr, FactoryDelegateCompiler.ResolverContextParamExpr, Constant(request.Factory.Setup.DisposalOrder));
         }
 
         private static readonly Lazy<Expression> _singletonReuseExpr = Lazy.Of<Expression>(() =>
@@ -11760,14 +11746,14 @@ namespace DryIoc
             if (request.TracksTransientDisposable)
             {
                 if (ScopedOrSingleton)
-                    return Call(TrackScopedOrSingletonMethod, new[] { resolverContextParamExpr, serviceFactoryExpr });
+                    return Call(TrackScopedOrSingletonMethod, resolverContextParamExpr, serviceFactoryExpr);
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
                 if (Name == null)
-                    return Call(TrackScopedMethod, new[] { resolverContextParamExpr, ifNoScopeThrowExpr, serviceFactoryExpr });
+                    return Call(TrackScopedMethod, resolverContextParamExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
 
                 var nameExpr = request.Container.GetConstantExpression(Name, typeof(object));
-                return Call(TrackNameScopedMethod, new[] { resolverContextParamExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr });
+                return Call(TrackNameScopedMethod, resolverContextParamExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
             }
             else
             {
@@ -11790,6 +11776,8 @@ namespace DryIoc
                         , typeof(object)
 #endif
                     );
+
+                    request.DecreaseTrackedDependencyCountForParents();
                 }
 
                 var disposalIndex = request.Factory.Setup.DisposalOrder;
