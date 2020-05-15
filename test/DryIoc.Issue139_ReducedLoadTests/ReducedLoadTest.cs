@@ -40,7 +40,7 @@ namespace LoadTest
                 var nestedLambdas = code.Count(c => c == '$');
 
                 // the number when split by `dependencyCount >= 256`
-                Assert.AreEqual(30, nestedLambdas);
+                Assert.AreEqual(356, nestedLambdas);
             }
         }
 
