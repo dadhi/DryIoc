@@ -9740,7 +9740,7 @@ namespace DryIoc
                     }
                 }
 
-                serviceExpr = Constant(itemRef.Value);
+                serviceExpr = Constant(itemRef.Value, serviceExpr.Type);
 
                 request.DecreaseTrackedDependencyCountForParents();
             }
