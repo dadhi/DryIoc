@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Web.Http;
 using DryIoc;
 using DryIoc.WebApi;
+using FastExpressionCompiler.LightExpression;
 
 namespace LoadTest
 {
@@ -29,6 +30,13 @@ namespace LoadTest
             {
                 using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
                 {
+#if DEBUG
+                    if (controllerType == typeof(Web.Rest.API.InvoicesController))
+                    {
+                        var controllerExpr = scope.Resolve<LambdaExpression>(controllerType);
+                    }
+#endif
+
                     var controller = scope.Resolve(controllerType);
 
                     if (controller == null)

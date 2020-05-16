@@ -8431,15 +8431,10 @@ namespace DryIoc
         /// <summary>The total dependency count</summary>
         public int DependencyCount;
 
-		// todo: @refactor move DependencyCount to parameter 
-        internal void DecreaseTrackedDependencyCountForParents()
+        internal void DecreaseTrackedDependencyCountForParents(int dependencyCount)
         {
-            if (DependencyCount > 0)
-            {
-                var depCount = DependencyCount;
-                for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
-                    p.DependencyCount -= depCount;
-            }
+            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                p.DependencyCount -= dependencyCount;
         }
 
         /// <summary>Indicates that request is empty initial request.</summary>
@@ -9672,10 +9667,9 @@ namespace DryIoc
                         // Split the expression with dependencies bigger than certain threshold by wrapping it in Func which is a
                         // separate compilation unit and invoking it emmediately
                         var depCount = request.DependencyCount;
-                        if (depCount >= 256)
+                        if (depCount >= 1024)
                         {
-                            for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
-                                p.DependencyCount -= depCount;
+                            request.DecreaseTrackedDependencyCountForParents(depCount);
 
                             if (rules.UseFastExpressionCompiler)
                             {
@@ -9766,7 +9760,8 @@ namespace DryIoc
 
                 serviceExpr = itemRef.Value == null ? Constant(null, serviceExpr.Type) /* fixes #258 */ : Constant(itemRef.Value);
 
-                request.DecreaseTrackedDependencyCountForParents();
+                if (request.DependencyCount > 0)
+                    request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
             }
             else
             {
@@ -11722,7 +11717,10 @@ namespace DryIoc
                 , typeof(object)
 #endif
             );
-            request.DecreaseTrackedDependencyCountForParents();
+
+            if (request.DependencyCount > 0)
+                request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
+
             return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
                 Constant(factoryId), lambdaExpr, FactoryDelegateCompiler.ResolverContextParamExpr, Constant(request.Factory.Setup.DisposalOrder));
         }
@@ -11801,7 +11799,8 @@ namespace DryIoc
 #endif
                     );
 
-                    request.DecreaseTrackedDependencyCountForParents();
+                    if (request.DependencyCount > 0)
+                        request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
                 }
 
                 var disposalIndex = request.Factory.Setup.DisposalOrder;
