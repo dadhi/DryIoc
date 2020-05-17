@@ -8493,6 +8493,7 @@ namespace DryIoc
         /// <summary>Indicates the request is singleton or has singleton upper in dependency chain.</summary>
         public bool IsSingletonOrDependencyOfSingleton => (Flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0;
 
+        /// <summary>Is not used</summary>
         [Obsolete("Is not used - hides more than abstracts")]
         public bool ShouldSplitObjectGraph() =>
             FactoryType == FactoryType.Service &&
