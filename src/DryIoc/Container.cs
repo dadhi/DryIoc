@@ -5218,7 +5218,7 @@ namespace DryIoc
             Rules.SelectLastRegisteredFactory(), Reuse.Transient,
             Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments), 
             IfAlreadyRegistered.AppendNotKeyed,
-            DefaultTotalDependencyCountInLambdaToSplitBigObjectGraph, null, null, null, null, null);
+            DefaultDependencyCountInLambdaToSplitBigObjectGraph, null, null, null, null, null);
          
         /// <summary>Does nothing</summary>
         [Obsolete("Is not used anymore to split the graph - instead use the `TotalDependencyCountInLambdaToSplitBigObjectGraph`")]
@@ -5229,10 +5229,24 @@ namespace DryIoc
         public int DependencyDepthToSplitObjectGraph { get; private set; }
 
         /// <summary>The default total dependency count - a expression tree node count to split the object graph</summary>
-        public const int DefaultTotalDependencyCountInLambdaToSplitBigObjectGraph = 1024;
+        public const int DefaultDependencyCountInLambdaToSplitBigObjectGraph = 1024;
 
-        /// <summary>The total dependency count - a expression tree node count to split the object graph</summary>
-        public int TotalDependencyCountInLambdaToSplitBigObjectGraph { get; private set; }
+        /// <summary>The total dependency count - the expression tree node count to split the object graph.
+        /// That does not mean the graph can be always split at this number, consider the example graph and
+        /// the dependency count threshold set to 3:
+        ///
+        /// `x = new X(new Y(A, new B(K), new C(new L(), new M())), new Z())`
+        /// 
+        /// The tree is resolved from the left to the right in the depth-first order:
+        /// A; then K, B (at this point Y is already has 3 dependencies but is not fully resolved until C is resolved);
+        /// then L, M, C (here Y is fully resolved with 6 dependencies) so we can split it only on 6 dependencies instead of 3.
+        ///
+        /// The split itseft just wraps the node in `Func{T}` delegate making it a separate compilation unit.
+        /// In our example it will be `Func{Y} f = () => new Y(A, new B(K), new C(new L(), new M()))` considering
+        /// that everything is transient.
+        ///
+        /// </summary>
+        public int DependencyCountInLambdaToSplitBigObjectGraph { get; private set; }
 
         /// <summary>Does nothing</summary>
         [Obsolete("It does not work - use `WithTotalDependencyCountInLambdaToSplitBigObjectGraph`")]
@@ -5242,7 +5256,7 @@ namespace DryIoc
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
-        /// <summary>Sets the <see cref="TotalDependencyCountInLambdaToSplitBigObjectGraph"/></summary>
+        /// <summary>Sets the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/></summary>
         public Rules WithTotalDependencyCountInLambdaToSplitBigObjectGraph(int dependencyCount) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, dependencyCount < 1 ? 1 : dependencyCount,
@@ -5253,7 +5267,7 @@ namespace DryIoc
         [Obsolete("It does not work - use `WithoutTotalDependencyCountInLambdaToSplitBigObjectGraph`")]
         public Rules WithoutDependencyDepthToSplitObjectGraph() => WithDependencyDepthToSplitObjectGraph(int.MaxValue);
 
-        /// <summary>Disables the <see cref="TotalDependencyCountInLambdaToSplitBigObjectGraph"/> limitation.</summary>
+        /// <summary>Disables the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/> limitation.</summary>
         public Rules WithoutTotalDependencyCountInLambdaToSplitBigObjectGraph() =>
             WithTotalDependencyCountInLambdaToSplitBigObjectGraph(int.MaxValue);
 
@@ -5302,7 +5316,7 @@ namespace DryIoc
                         made.FactoryMethod ?? _made.FactoryMethod,
                         made.Parameters ?? _made.Parameters,
                         made.PropertiesAndFields ?? _made.PropertiesAndFields),
-                DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5313,7 +5327,7 @@ namespace DryIoc
         public Rules WithDefaultRegistrationServiceKey(object serviceKey) =>
             serviceKey == null ? this :
                 new Rules(_settings, FactorySelector, DefaultReuse,
-                    _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                    _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                     DependencyResolutionCallExprs, ItemToExpressionConverter,
                     DynamicRegistrationProviders, UnknownServiceResolvers, serviceKey);
 
@@ -5331,7 +5345,7 @@ namespace DryIoc
         /// <summary>Sets <see cref="FactorySelector"/></summary>
         public Rules WithFactorySelector(FactorySelectorRule rule) =>
             new Rules(_settings | (rule == SelectLastRegisteredFactory ? Settings.SelectLastRegisteredFactory : default(Settings)),
-                rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5371,7 +5385,7 @@ namespace DryIoc
         /// <summary>Appends dynamic registration rules.</summary>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5380,7 +5394,7 @@ namespace DryIoc
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings | Settings.UseDynamicRegistrationsAsFallbackOnly, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5398,7 +5412,7 @@ namespace DryIoc
         /// <summary>Appends resolver to current unknown service resolvers.</summary>
         public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Append(rules),
                 DefaultRegistrationServiceKey);
@@ -5408,7 +5422,7 @@ namespace DryIoc
         /// so it could be check for remove success or fail.</summary>
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Remove(rule),
                 DefaultRegistrationServiceKey);
@@ -5486,7 +5500,7 @@ namespace DryIoc
         /// Replaced with `WithConcreteTypeDynamicRegistrations`
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
             new Rules(_settings | Settings.AutoConcreteTypeResolution, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Append(AutoResolveConcreteTypeRule(condition)),
                 DefaultRegistrationServiceKey);
@@ -5571,7 +5585,7 @@ namespace DryIoc
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
         public Rules WithDefaultReuse(IReuse reuse) =>
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
-                _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5593,7 +5607,7 @@ namespace DryIoc
         /// To enable non-primitive values support DryIoc need a way to recreate them as expression tree.</summary>
         public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, itemToExpressionOrDefault,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5662,7 +5676,7 @@ namespace DryIoc
         /// in the-per rules collection.</summary>
         public Rules WithExpressionGeneration(bool allowRuntimeState = false) =>
             new Rules(GetSettingsForExpressionGeneration(allowRuntimeState), FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty), ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5719,7 +5733,7 @@ namespace DryIoc
         /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
         public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, rule, TotalDependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
+                _made, rule, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
@@ -5809,8 +5823,8 @@ namespace DryIoc
                     s += (s != "" ? " and without {" : "Rules without {") + removedSettings + "}";
             }
 
-            if (TotalDependencyCountInLambdaToSplitBigObjectGraph != DefaultTotalDependencyCountInLambdaToSplitBigObjectGraph)
-                s += " with TotalDependencyCountInLambdaToSplitBigObjectGraph=" + TotalDependencyCountInLambdaToSplitBigObjectGraph;
+            if (DependencyCountInLambdaToSplitBigObjectGraph != DefaultDependencyCountInLambdaToSplitBigObjectGraph)
+                s += " with TotalDependencyCountInLambdaToSplitBigObjectGraph=" + DependencyCountInLambdaToSplitBigObjectGraph;
 
             if (DefaultReuse != null && DefaultReuse != Reuse.Transient)
                 s += (s != "" ? NewLine : "Rules ") + " with DefaultReuse=" + DefaultReuse;
@@ -5838,7 +5852,7 @@ namespace DryIoc
             _settings = DEFAULT_SETTINGS;
             DefaultReuse = Reuse.Transient;
             DefaultIfAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed;
-            TotalDependencyCountInLambdaToSplitBigObjectGraph = DefaultTotalDependencyCountInLambdaToSplitBigObjectGraph;
+            DependencyCountInLambdaToSplitBigObjectGraph = DefaultDependencyCountInLambdaToSplitBigObjectGraph;
         }
 
         private Rules(Settings settings,
@@ -5846,7 +5860,7 @@ namespace DryIoc
             IReuse defaultReuse,
             Made made,
             IfAlreadyRegistered defaultIfAlreadyRegistered,
-            int totalDependencyCountInLambdaToSplitBigObjectGraph,
+            int dependencyCountInLambdaToSplitBigObjectGraph,
             Ref<ImHashMap<Request, System.Linq.Expressions.Expression>> dependencyResolutionCallExprs,
             ItemToExpressionConverterRule itemToExpressionConverter,
             DynamicRegistrationProvider[] dynamicRegistrationProviders,
@@ -5858,7 +5872,7 @@ namespace DryIoc
             FactorySelector = factorySelector;
             DefaultReuse = defaultReuse;
             DefaultIfAlreadyRegistered = defaultIfAlreadyRegistered;
-            TotalDependencyCountInLambdaToSplitBigObjectGraph = totalDependencyCountInLambdaToSplitBigObjectGraph;
+            DependencyCountInLambdaToSplitBigObjectGraph = dependencyCountInLambdaToSplitBigObjectGraph;
             DependencyResolutionCallExprs = dependencyResolutionCallExprs;
             ItemToExpressionConverter = itemToExpressionConverter;
             DynamicRegistrationProviders = dynamicRegistrationProviders;
@@ -5868,7 +5882,7 @@ namespace DryIoc
 
         private Rules WithSettings(Settings newSettings) =>
             new Rules(newSettings,
-                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, TotalDependencyCountInLambdaToSplitBigObjectGraph,
+                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -8903,7 +8917,7 @@ namespace DryIoc
             if (FactoryID != 0) // request is with resolved factory
             {
                 if (Reuse != DryIoc.Reuse.Transient)
-                    s.Append(Reuse is SingletonReuse ? "singleton" : "scoped").Append(' ');
+                    s.Append(Reuse is SingletonReuse ? "Singleton" : "Scoped").Append(' ');
 
                 if (FactoryType != FactoryType.Service)
                     s.Append(FactoryType.ToString().ToLower()).Append(' ');
@@ -9662,64 +9676,63 @@ namespace DryIoc
 
             // Creates an object graph expression with all of the dependencies created
             var serviceExpr = CreateExpressionOrDefault(request);
-            if (serviceExpr != null)
+            if (serviceExpr == null)
             {
-                if (reuse != DryIoc.Reuse.Transient &&
-                    request.GetActualServiceType() != typeof(void) &&
-                    // we don't need the reuse expression when we are validating the object graph
-                    !rules.UsedForValidation) 
+                Container.TryThrowUnableToResolve(request);
+                return null;
+            }
+
+            if (reuse != DryIoc.Reuse.Transient)
+            {
+                if (!rules.UsedForValidation && 
+                    request.GetActualServiceType() != typeof(void))
                 {
                     var originalServiceExprType = serviceExpr.Type;
 
                     serviceExpr = ApplyReuse(serviceExpr, request);
 
                     if (serviceExpr.NodeType != ExprType.Constant &&
-                        serviceExpr.Type != originalServiceExprType && 
+                        serviceExpr.Type != originalServiceExprType &&
                         !originalServiceExprType.GetTypeInfo().IsAssignableFrom(serviceExpr.Type.GetTypeInfo()))
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
-                else
+            }
+            else if (!rules.UsedForValidation && 
+                     !rules.UsedForExpressionGeneration) 
+            {
+                // Split the expression with dependencies bigger than certain threshold by wrapping it in Func which is a
+                // separate compilation unit and invoking it emmediately
+                var depCount = request.DependencyCount;
+                if (depCount >= rules.DependencyCountInLambdaToSplitBigObjectGraph)
                 {
-                    // it does not make sense to split the scoped or singleton graphs
-                    // because former already includes the lambda and latter is a constant or lambda
-                    if (reuse == DryIoc.Reuse.Transient &&
-                        !rules.UsedForValidation && !rules.UsedForExpressionGeneration) 
+                    request.DecreaseTrackedDependencyCountForParents(depCount);
+
+                    if (rules.UseFastExpressionCompiler)
                     {
-                        // Split the expression with dependencies bigger than certain threshold by wrapping it in Func which is a
-                        // separate compilation unit and invoking it emmediately
-                        var depCount = request.DependencyCount;
-                        if (depCount >= rules.TotalDependencyCountInLambdaToSplitBigObjectGraph)
-                        {
-                            request.DecreaseTrackedDependencyCountForParents(depCount);
-
-                            if (rules.UseFastExpressionCompiler)
-                            {
-                                serviceExpr = Convert(Invoke(
-                                    Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()
+                        serviceExpr = Convert(Invoke(
+                            Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                                        , typeof(object)
+                                , typeof(object)
 #endif
-                                    ), Empty<Expression>()), serviceExpr.Type);
-                            }
-                            else
-                            {
-                                // cache expression if possible to minimize the double work for the generated Resolve call
-                                if (cacheExpression)
-                                    ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
-                                        depCount, cacheEntry);
+                            ), Empty<Expression>()), serviceExpr.Type);
+                    }
+                    else
+                    {
+                        // cache expression if possible to minimize the double work for the generated Resolve call
+                        if (cacheExpression)
+                            ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
+                                depCount, cacheEntry);
 
-                                return Resolver.CreateResolutionExpression(request, false);
-                            }
-                        }
+                        return Resolver.CreateResolutionExpression(request, false);
                     }
                 }
-
-                if (cacheExpression)
-                    ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
-                        reuse == DryIoc.Reuse.Transient ? request.DependencyCount : 0,
-                        cacheEntry);
             }
-            else Container.TryThrowUnableToResolve(request);
+
+            if (cacheExpression)
+                ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
+                    reuse == DryIoc.Reuse.Transient ? request.DependencyCount : 0,
+                    cacheEntry);
+
             return serviceExpr;
         }
 
@@ -10972,7 +10985,7 @@ namespace DryIoc
     /// Wraps the instance in registry
     public sealed class RegisteredInstanceFactory : Factory
     {
-        /// The registered pre-created object instance
+        /// <summary>The registered pre-created object instance</summary>
         public readonly object Instance;
 
         /// <summary>Non-abstract closed implementation type.</summary>
@@ -11004,7 +11017,7 @@ namespace DryIoc
             }
         }
 
-        /// Wraps the instance in expression constant
+        /// <summary>Wraps the instance in expression constant</summary>
         public override Expression CreateExpressionOrDefault(Request request)
         {
             // unpacks the weak-reference
@@ -11019,12 +11032,12 @@ namespace DryIoc
             // otherwise just return a constant
             var instanceExpr = request.Container.GetConstantExpression(Instance);
             var serviceType = request.GetActualServiceType();
-            if (ImplementationType.IsAssignableTo(serviceType))
+            if (serviceType.GetTypeInfo().IsAssignableFrom(ImplementationType.GetTypeInfo()))
                 return instanceExpr;
             return Convert(instanceExpr, serviceType);
         }
 
-        /// Simplified path for the registered instance
+        /// <summary>Simplified path for the registered instance</summary>
         public override Expression GetExpressionOrDefault(Request request)
         {
             if (// preventing recursion
@@ -11034,9 +11047,9 @@ namespace DryIoc
 
             // First look for decorators if it is not already a decorator
             var serviceType = request.ServiceType;
-            var elementType = serviceType.GetArrayElementTypeOrNull();
-            if (elementType != null)
-                serviceType = typeof(IEnumerable<>).MakeGenericType(elementType);
+            var serviceTypeInfo = serviceType.GetTypeInfo();
+            if (serviceTypeInfo.IsArray)
+                serviceType = typeof(IEnumerable<>).MakeGenericType(serviceTypeInfo.GetElementType());
             if (!request.Container.GetDecoratorFactoriesOrDefault(serviceType).IsNullOrEmpty())
             {
                 var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
@@ -11047,7 +11060,7 @@ namespace DryIoc
             return CreateExpressionOrDefault(request);
         }
 
-        /// Used at resolution root too simplify getting the actual instance
+        /// <summary>Used at resolution root too simplify getting the actual instance</summary>
         public override FactoryDelegate GetDelegateOrDefault(Request request)
         {
             request = request.WithResolvedFactory(this);
@@ -11808,7 +11821,6 @@ namespace DryIoc
                     ie.Expression is ConstantExpression registeredDelegateExpr &&
                     registeredDelegateExpr.Type == typeof(FactoryDelegate))
                 {
-                    // optimization for the registered delegate
                     factoryDelegateExpr = registeredDelegateExpr;
                 }
                 else
@@ -11820,6 +11832,7 @@ namespace DryIoc
 #endif
                     );
 
+                    // decrease the dependency count when wrapping into lambda
                     if (request.DependencyCount > 0)
                         request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
                 }
