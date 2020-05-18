@@ -22,6 +22,7 @@
 - fixed: #267 [MS.DI] Incorrect resolving for generic types.
 - fixed: #256 Memory usage increase up to 7 percent in real-case benchmark
 - fixed: #254 ResolveMany if singleton decorators decorates the first item onlys
+- fixed: #280 Possibility to make source files which are embedded to the project internal? 
 
 ## v4.1.4 Bug-fix release
 
@@ -122,64 +123,64 @@
         <!--"build" is the special folder where you can put your .props or .targets files 
         named after the NuGet package to be INCLUDED by NuGet into the target project-->
         <file src="..\nuspecs\DryIoc\build\DryIoc.props"              target="build\DryIoc.Internal.props" />
-        <file src="..\src\DryIoc\Container.Generated.tt"              target="CompileTimeDI" />
-        <file src="..\src\DryIoc\CompileTimeRegistrations.ttinclude"  target="CompileTimeDI" />
-        <file src="..\src\DryIoc\CompileTimeRegistrations.Example.cs" target="CompileTimeDI" />
+        <file src="..\src\DryIoc.Internal\Container.Generated.tt"              target="CompileTimeDI" />
+        <file src="..\src\DryIoc.Internal\CompileTimeRegistrations.ttinclude"  target="CompileTimeDI" />
+        <file src="..\src\DryIoc.Internal\CompileTimeRegistrations.Example.cs" target="CompileTimeDI" />
 
         <!--net35-->
-        <file src="..\src\DryIoc\Container.cs"                        target="content\net35\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="content\net35\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="content\net35\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="content\net35\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="content\net35\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="content\net35\DryIoc" />
 
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\net35\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\net35\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\net35\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\net35\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="contentFiles\cs\net35\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="contentFiles\cs\net35\DryIoc" />
 
         <!--net40-->
-        <file src="..\src\DryIoc\Container.cs"                        target="content\net40\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="content\net40\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="content\net40\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="content\net40\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="content\net40\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="content\net40\DryIoc" />
 
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\net40\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\net40\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\net40\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\net40\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="contentFiles\cs\net40\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="contentFiles\cs\net40\DryIoc" />
 
         <!--net45-->
-        <file src="..\src\DryIoc\Container.cs"                        target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Expression.cs"                       target="content\net45\DryIoc" />
 
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Expression.cs"                       target="contentFiles\cs\net45\DryIoc" />
 
         <!-- .netstandard 1.0 (based on PCL Profile259) -->
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\netstandard1.0\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\netstandard1.0\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard1.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\netstandard1.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="contentFiles\cs\netstandard1.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard1.0\DryIoc" />
 
         <!-- .netstandard 1.3 (based on PCL Profile259 except for FEC) -->
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\netstandard1.3\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\netstandard1.3\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard1.3\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\netstandard1.3\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\netstandard1.3\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="contentFiles\cs\netstandard1.3\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard1.3\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Expression.cs"                       target="contentFiles\cs\netstandard1.3\DryIoc" />
 
         <!-- .netstandard 2.0 (based on PCL Profile259 except for FEC) -->
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Expression.cs"                       target="contentFiles\cs\netstandard2.0\DryIoc" />
 
         <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-        <file src="..\src\DryIoc\Container.cs"                        target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
 
         <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-        <file src="..\src\DryIoc\Container.cs"                        target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc" />
     </files>
 </package>

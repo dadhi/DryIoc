@@ -10,6 +10,7 @@ Version History
 - fixed: #267 [MS.DI] Incorrect resolving for generic types.
 - fixed: #256 Memory usage increase up to 7 percent in real-case benchmark
 - fixed: #254 ResolveMany if singleton decorators decorates the first item only
+- fixed: #280 Possibility to make source files which are embedded to the project internal? 
 
 ## v4.1.4 Bug-fix release
 
