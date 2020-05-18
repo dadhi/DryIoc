@@ -61,31 +61,28 @@ ResolveAllControllersOnce of 156 controllers is done in 0.1478801 seconds
         {
             var config = new HttpConfiguration();
             var container = new Container(rules => rules
-                    //.WithoutFastExpressionCompiler()
-                    //.WithUseInterpretation()
-                    .With(FactoryMethod.ConstructorWithResolvableArguments))
+                .With(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithWebApi(config);
 
             Registrations.RegisterTypes(container, true);
             RootContainer = container;
 
-            Console.WriteLine("New container created");
-            Console.WriteLine("");
+            Console.WriteLine("New container created:");
+            Console.WriteLine();
             Console.WriteLine(container.ToString());
-            Console.WriteLine("");
+            Console.WriteLine();
 
             return container;
         }
 
         public static void Start()
         {
+            Console.WriteLine("# LoadTestBenchmark");
+
             var container = CreateContainer();
 
-            var stopWatch = new Stopwatch();
-            stopWatch.Start();
-            Console.WriteLine("Validate started");
-
-            // Validate IoC registrations
+            Console.WriteLine("Validating controllers only...");
+            var stopWatch = Stopwatch.StartNew();
 
             bool IsController(ServiceRegistrationInfo x) => x.ServiceType.Name.EndsWith("Controller");
 
@@ -102,7 +99,6 @@ ResolveAllControllersOnce of 156 controllers is done in 0.1478801 seconds
             //    .SelectMany(x => x).ToArray();
 
             var results = container.Validate(IsController);
-            //var results = container.Validate();
             if (results.Length > 0)
             {
                 foreach (var kvp in results)
@@ -116,10 +112,10 @@ ResolveAllControllersOnce of 156 controllers is done in 0.1478801 seconds
             stopWatch.Stop();
             var ts = stopWatch.Elapsed;
 
-            Console.WriteLine("");
+            Console.WriteLine();
             Console.WriteLine("Validation finished");
             Console.WriteLine($"{ts.Hours:00}:{ts.Minutes:00}:{ts.Seconds:00}.{ts.Milliseconds / 10:00}");
-            Console.WriteLine("");
+            Console.WriteLine();
 
             // Get Controllers which would normally be used for routing web requests
             var controllers = TestHelper.GetAllControllers();

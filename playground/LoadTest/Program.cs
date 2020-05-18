@@ -8,8 +8,10 @@ namespace LoadTest
         {
             Console.WriteLine("Starting up!");
 
-            InvalidProgramExceptionTest.Start();
+            // InvalidProgramExceptionTest.Start();
+
             SplitDependencyGraphTest.Start();
+
             LoadTestBenchmark.Start();
 
             Console.WriteLine("Success!");

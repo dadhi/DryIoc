@@ -424,8 +424,10 @@ namespace DryIoc
                 (preResolveParent == null || preResolveParent.IsEmpty) && args.IsNullOrEmpty())
                 return ((IResolver)this).Resolve(serviceType, ifUnresolved);
 
-            return ResolveAndCacheKeyed(RuntimeHelpers.GetHashCode(serviceType), serviceType, 
+            var service = ResolveAndCacheKeyed(RuntimeHelpers.GetHashCode(serviceType), serviceType, 
                 serviceKey, ifUnresolved, scopeName, requiredServiceType, preResolveParent ?? Request.Empty, args);
+
+            return service;
         }
 
         private object ResolveAndCacheKeyed(int serviceTypeHash, Type serviceType,
@@ -1022,12 +1024,13 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        internal Expression GetCachedFactoryExpression(int factoryId, Request request, out ImMapEntry<Registry.ExpressionCacheSlot> slot) => 
-            _registry.Value.GetCachedFactoryExpression(factoryId, request, out slot);
+        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<Registry.ExpressionCacheSlot> slot) => 
+            _registry.Value.GetCachedFactoryExpression(factoryId, reuse, out slot);
 
         [MethodImpl((MethodImplOptions) 256)]
-        internal void CacheFactoryExpression(int factoryId, Request request, Expression expr, ImMapEntry<Registry.ExpressionCacheSlot> slot) =>
-            _registry.Value.CacheFactoryExpression(factoryId, request, expr, slot);
+        internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount,
+            ImMapEntry<Registry.ExpressionCacheSlot> slot) =>
+            _registry.Value.CacheFactoryExpression(factoryId, expr, reuse, dependencyCount, slot);
 
         Factory IContainer.ResolveFactory(Request request)
         {
@@ -1963,7 +1966,9 @@ namespace DryIoc
                     var entry = cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
                     if (entry != null)
                         for (var x = (KeyedFactoryCacheEntry)entry.Value.Value; x != null && result == null; x = x.Rest)
-                            if (x.Key.Equals(key))
+                            if (ReferenceEquals(x.Key, key))
+                                result = x;
+                            else if (x.Key.Equals(key))
                                 result = x;
                 }
 
@@ -2011,52 +2016,60 @@ namespace DryIoc
                 return new KeyedFactoryCacheEntry((KeyedFactoryCacheEntry)x, k, f);
             }
 
+            // The cases to store
+            // | Singleton of (ConstantExpression e)
+            // | Transient of (Expression e, int dependencyCount)
+            // | Scoped    of (Expression e)
+            // | ScopedTo  of (Expression e, object name)
             internal struct ExpressionCacheSlot
             {
-                public Expression Transient;
-                public Expression Scoped;
-                public KeyValuePair<object, Expression>[] ScopedToName;
+                public Expression Expr;
+                public object ScopeNameOrDependencyCount; // null - singleton | NoNameForScoped - scoped | TransientDependencyCount - transient | scope name
+                public static readonly object NoNameForScoped = new object();
             }
 
-            /// The int key is the `FactoryID`
+            internal class TransientDependencyCount
+            {
+                public int Value;
+                public TransientDependencyCount(int value) => Value = value;
+            }
+
+            ///<summary>The int key is the `FactoryID`</summary>
             public ImMap<ExpressionCacheSlot>[] FactoryExpressionCache;
 
-            public Expression GetCachedFactoryExpression(
-                int factoryId, Request request, out ImMapEntry<Registry.ExpressionCacheSlot> entry)
+            internal Expression GetCachedFactoryExpression(int factoryId, 
+                IReuse reuse, out ImMapEntry<Registry.ExpressionCacheSlot> entry)
             {
-                entry = null;
-                var cache = FactoryExpressionCache;
-                if (cache != null)
+                entry = FactoryExpressionCache?[factoryId & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(factoryId);
+                if (entry == null) 
+                    return null;
+
+                var expr = entry.Value.Expr;
+                if (expr == null)
+                    return null; // could be null when the cache is reset by Unregister and IfAlreadyRegistered.Replace
+
+                var scopeNameOrDependencyCount = entry.Value.ScopeNameOrDependencyCount;
+
+                if (reuse is SingletonReuse)
+                    return scopeNameOrDependencyCount == null ? expr : null;
+
+                if (reuse == Reuse.Transient)
+                    return scopeNameOrDependencyCount is TransientDependencyCount ? expr : null;
+
+                if (reuse is CurrentScopeReuse scoped)
                 {
-                    var map = cache[factoryId & CACHE_SLOT_COUNT_MASK];
-                    if (map != null)
-                    {
-                        entry = map.GetEntryOrDefault(factoryId);
-                        if (entry != null)
-                        {
-                            var reuse = request.Reuse;
-                            if (reuse == Reuse.Transient)
-                                return entry.Value.Transient;
+                    if (scoped.Name == null)
+                        return scopeNameOrDependencyCount == Registry.ExpressionCacheSlot.NoNameForScoped ? expr : null;
 
-                            if (reuse is CurrentScopeReuse scoped)
-                            {
-                                if (scoped.Name == null)
-                                    return entry.Value.Scoped;
-
-                                var named = entry.Value.ScopedToName;
-                                if (named != null)
-                                    for (var i = 0; i < named.Length; i++)
-                                        if (Equals(named[i].Key, scoped.Name))
-                                            return named[i].Value;
-                            }
-                        }
-                    }
+                    if (ReferenceEquals(scoped.Name, scopeNameOrDependencyCount) || scoped.Name.Equals(scopeNameOrDependencyCount))
+                        return expr;
                 }
 
                 return null;
             }
 
-            internal void CacheFactoryExpression(int factoryId, Request request, Expression expr, ImMapEntry<ExpressionCacheSlot> entry = null)
+            internal void CacheFactoryExpression(int factoryId, 
+                Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<ExpressionCacheSlot> entry)
             {
                 if (entry == null)
                 {
@@ -2078,38 +2091,12 @@ namespace DryIoc
                     }
                 }
 
-                var reuse = request.Reuse;
+                entry.Value.Expr = expr;
+
                 if (reuse == Reuse.Transient)
-                {
-                    entry.Value.Transient = expr;
-                }
+                    entry.Value.ScopeNameOrDependencyCount = new TransientDependencyCount(dependencyCount);
                 else if (reuse is CurrentScopeReuse scoped)
-                {
-                    if (scoped.Name == null)
-                        entry.Value.Scoped = expr;
-                    else
-                    {
-                        var named = entry.Value.ScopedToName;
-                        if (named == null)
-                        {
-                            entry.Value.ScopedToName = scoped.Name.Pair(expr).One();
-                        }
-                        else
-                        {
-                            var i = named.Length - 1;
-                            for (; i >= 0; i--)
-                                if (Equals(named[i].Key, scoped.Name))
-                                    break;
-                            if (i == -1)
-                            {
-                                var newNamed = new KeyValuePair<object, Expression>[named.Length + 1];
-                                Array.Copy(named, 0, newNamed, 0, named.Length);
-                                newNamed[named.Length] = scoped.Name.Pair(expr);
-                                entry.Value.ScopedToName = newNamed;
-                            }
-                        }
-                    }
-                }
+                    entry.Value.ScopeNameOrDependencyCount = scoped.Name ?? ExpressionCacheSlot.NoNameForScoped;
             }
 
             private enum IsChangePermitted { Permitted, Error, Ignored }
@@ -2788,256 +2775,261 @@ namespace DryIoc
             switch (expr.NodeType)
             {
                 case ExprType.Constant:
-                {
-                    result = ((ConstantExpression)expr).Value;
-                    return true;
-                }
+                    {
+                        result = ((ConstantExpression)expr).Value;
+                        return true;
+                    }
                 case ExprType.New:
-                {
-                    var newExpr = (NewExpression)expr;
+                    {
+                        var newExpr = (NewExpression)expr;
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                    var fewArgCount = newExpr.FewArgumentCount;
-                    if (fewArgCount >= 0)
-                    {
-                        if (fewArgCount == 0)
+                        var fewArgCount = newExpr.FewArgumentCount;
+                        if (fewArgCount >= 0)
                         {
-                            result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
-                            return true;
-                        }
+                            if (fewArgCount == 0)
+                            {
+                                result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
+                                return true;
+                            }
 
-                        if (fewArgCount == 1)
-                        {
-                            var fewArgs = new object[1];
-                            var fewArgsExpr = ((OneArgumentNewExpression)newExpr).Argument;
-                            if (!TryInterpret(r, fewArgsExpr, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]))
-                                return false;
-                            result = newExpr.Constructor.Invoke(fewArgs);
-                            return true;
-                        }
+                            if (fewArgCount == 1)
+                            {
+                                var fewArgs = new object[1];
+                                var fewArgsExpr = ((OneArgumentNewExpression)newExpr).Argument;
+                                if (!TryInterpret(r, fewArgsExpr, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]))
+                                    return false;
+                                result = newExpr.Constructor.Invoke(fewArgs);
+                                return true;
+                            }
 
-                        if (fewArgCount == 2)
-                        {
-                            var fewArgs = new object[2];
-                            var fewArgsExpr = ((TwoArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]))
-                                return false;
-                            result = newExpr.Constructor.Invoke(fewArgs);
-                            return true;
-                        }
+                            if (fewArgCount == 2)
+                            {
+                                var fewArgs = new object[2];
+                                var fewArgsExpr = ((TwoArgumentsNewExpression)newExpr);
+                                if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]))
+                                    return false;
+                                result = newExpr.Constructor.Invoke(fewArgs);
+                                return true;
+                            }
 
-                        if (fewArgCount == 3)
-                        {
-                            var fewArgs = new object[3];
-                            var fewArgsExpr = ((ThreeArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]))
-                                return false;
-                            result = newExpr.Constructor.Invoke(fewArgs);
-                            return true;
-                        }
+                            if (fewArgCount == 3)
+                            {
+                                var fewArgs = new object[3];
+                                var fewArgsExpr = ((ThreeArgumentsNewExpression)newExpr);
+                                if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]))
+                                    return false;
+                                result = newExpr.Constructor.Invoke(fewArgs);
+                                return true;
+                            }
 
-                        if (fewArgCount == 4)
-                        {
-                            var fewArgs = new object[4];
-                            var fewArgsExpr = ((FourArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]))
-                                return false;
-                            result = newExpr.Constructor.Invoke(fewArgs);
-                            return true;
+                            if (fewArgCount == 4)
+                            {
+                                var fewArgs = new object[4];
+                                var fewArgsExpr = ((FourArgumentsNewExpression)newExpr);
+                                if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]))
+                                    return false;
+                                result = newExpr.Constructor.Invoke(fewArgs);
+                                return true;
+                            }
+                            if (fewArgCount == 5)
+                            {
+                                var fewArgs = new object[5];
+                                var fewArgsExpr = ((FiveArgumentsNewExpression)newExpr);
+                                if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument4, paramExprs, paramValues, parentArgs, useFec, out fewArgs[4]))
+                                    return false;
+                                result = newExpr.Constructor.Invoke(fewArgs);
+                                return true;
+                            }
                         }
-                        if (fewArgCount == 5)
-                        {
-                            var fewArgs = new object[5];
-                            var fewArgsExpr = ((FiveArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument4, paramExprs, paramValues, parentArgs, useFec, out fewArgs[4]))
-                                return false;
-                            result = newExpr.Constructor.Invoke(fewArgs);
-                            return true;
-                        }
-                    }
 #endif
-                    var newArgs = newExpr.Arguments.ToListOrSelf();
-                    var newArgCount = newArgs.Count;
-                    if (newArgCount == 0)
-                        result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
-                    else
-                    {
-                        var args = new object[newArgCount];
-                        for (var i = 0; i < args.Length; i++)
-                            if (!TryInterpret(r, newArgs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
-                                return false;
-                        result = newExpr.Constructor.Invoke(args);
-                    }
-                    return true;
-                }
-                case ExprType.Call:
-                {
-                    return TryInterpretMethodCall(r, expr, paramExprs, paramValues, parentArgs, useFec, ref result);
-                }
-                case ExprType.Convert:
-                {
-                    var convertExpr = (UnaryExpression)expr;
-                    if (!TryInterpret(r, convertExpr.Operand, paramExprs, paramValues, parentArgs, useFec, out var instance))
-                        return false;
-                    // skip conversion for null and for directly assignable type
-                    if (instance == null || instance.GetType().IsAssignableTo(convertExpr.Type))
-                        result = instance;
-                    else
-                        result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
-                    return true;
-                }
-                case ExprType.MemberAccess:
-                {
-                    var memberExpr = (MemberExpression)expr;
-                    var instanceExpr = memberExpr.Expression;
-                    object instance = null;
-                    if (instanceExpr != null && !TryInterpret(r, instanceExpr, paramExprs, paramValues, parentArgs, useFec, out instance))
-                        return false;
-
-                    if (memberExpr.Member is FieldInfo field)
-                    {
-                        result = field.GetValue(instance);
-                        return true;
-                    }
-
-                    if (memberExpr.Member is PropertyInfo prop)
-                    {
-                        result = prop.GetValue(instance, null);
-                        return true;
-                    }
-
-                    return false;
-                }
-                case ExprType.MemberInit:
-                {
-                    var memberInit = (MemberInitExpression)expr;
-                    if (!TryInterpret(r, memberInit.NewExpression, paramExprs, paramValues, parentArgs, useFec, out var instance))
-                        return false;
-
-                    var bindings = memberInit.Bindings;
-                    for (var i = 0; i < bindings.Count; i++)
-                    {
-                        var binding = (MemberAssignment)bindings[i];
-                        if (!TryInterpret(r, binding.Expression, paramExprs, paramValues, parentArgs, useFec, out var memberValue))
-                            return false;
-
-                        var field = binding.Member as FieldInfo;
-                        if (field != null)
-                            field.SetValue(instance, memberValue);
+                        var newArgs = newExpr.Arguments.ToListOrSelf();
+                        if (newArgs.Count == 0)
+                            result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                         else
-                            ((PropertyInfo)binding.Member).SetValue(instance, memberValue, null);
-                    }
-
-                    result = instance;
-                    return true;
-                }
-                case ExprType.NewArrayInit:
-                {
-                    var newArray = (NewArrayExpression)expr;
-                    var itemExprs = newArray.Expressions.ToListOrSelf();
-                    var items = new object[itemExprs.Count];
-
-                    for (var i = 0; i < items.Length; i++)
-                        if (!TryInterpret(r, itemExprs[i], paramExprs, paramValues, parentArgs, useFec, out items[i]))
-                            return false;
-
-                    result = Converter.ConvertMany(items, newArray.Type.GetElementType());
-                    return true;
-                }
-                case ExprType.Invoke:
-                {
-                    var invokeExpr = (InvocationExpression)expr;
-                    var delegateExpr = invokeExpr.Expression;
-
-                    // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
-                    if (delegateExpr.Type == typeof(FactoryDelegate) && 
-                        delegateExpr is ConstantExpression delegateConstExpr)
-                    {
-                        if (!TryInterpret(r, invokeExpr.Arguments[0], paramExprs, paramValues, parentArgs, useFec, out var resolver))
-                            return false;
-                        result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
+                        {
+                            var args = new object[newArgs.Count];
+                            for (var i = 0; i < args.Length; i++)
+                                if (!TryInterpret(r, newArgs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
+                                    return false;
+                            result = newExpr.Constructor.Invoke(args);
+                        }
                         return true;
                     }
+                case ExprType.Call:
+                    {
+                        return TryInterpretMethodCall(r, expr, paramExprs, paramValues, parentArgs, useFec, ref result);
+                    }
+                case ExprType.Convert:
+                    {
+                        var convertExpr = (UnaryExpression)expr;
+                        if (!TryInterpret(r, convertExpr.Operand, paramExprs, paramValues, parentArgs, useFec, out var instance))
+                            return false;
+                        // skip conversion for null and for directly assignable type
+                        if (instance == null)
+                            result = instance;
+                        else if (convertExpr.Type.GetTypeInfo().IsAssignableFrom(instance.GetType().GetTypeInfo()))
+                            result = instance;
+                        else
+                            result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
+                        return true;
+                    }
+                case ExprType.MemberAccess:
+                    {
+                        var memberExpr = (MemberExpression)expr;
+                        var instanceExpr = memberExpr.Expression;
+                        object instance = null;
+                        if (instanceExpr != null && !TryInterpret(r, instanceExpr, paramExprs, paramValues, parentArgs, useFec, out instance))
+                            return false;
+
+                        if (memberExpr.Member is FieldInfo field)
+                        {
+                            result = field.GetValue(instance);
+                            return true;
+                        }
+
+                        if (memberExpr.Member is PropertyInfo prop)
+                        {
+                            result = prop.GetValue(instance, null);
+                            return true;
+                        }
+
+                        return false;
+                    }
+                case ExprType.MemberInit:
+                    {
+                        var memberInit = (MemberInitExpression)expr;
+                        if (!TryInterpret(r, memberInit.NewExpression, paramExprs, paramValues, parentArgs, useFec, out var instance))
+                            return false;
+
+                        var bindings = memberInit.Bindings;
+                        for (var i = 0; i < bindings.Count; i++)
+                        {
+                            var binding = (MemberAssignment)bindings[i];
+                            if (!TryInterpret(r, binding.Expression, paramExprs, paramValues, parentArgs, useFec, out var memberValue))
+                                return false;
+
+                            var field = binding.Member as FieldInfo;
+                            if (field != null)
+                                field.SetValue(instance, memberValue);
+                            else
+                                ((PropertyInfo)binding.Member).SetValue(instance, memberValue, null);
+                        }
+
+                        result = instance;
+                        return true;
+                    }
+                case ExprType.NewArrayInit:
+                    {
+                        var newArray = (NewArrayExpression)expr;
+                        var itemExprs = newArray.Expressions.ToListOrSelf();
+                        var items = new object[itemExprs.Count];
+
+                        for (var i = 0; i < items.Length; i++)
+                            if (!TryInterpret(r, itemExprs[i], paramExprs, paramValues, parentArgs, useFec, out items[i]))
+                                return false;
+
+                        result = Converter.ConvertMany(items, newArray.Type.GetElementType());
+                        return true;
+                    }
+                case ExprType.Invoke:
+                    {
+                        var invokeExpr = (InvocationExpression)expr;
+                        var delegateExpr = invokeExpr.Expression;
+
+                        // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
+                        if (delegateExpr is ConstantExpression delegateConstExpr)
+                        {
+                            if (delegateExpr.Type == typeof(FactoryDelegate))
+                            {
+                                if (!TryInterpret(r, invokeExpr.Arguments[0], paramExprs, paramValues, parentArgs, useFec, out var resolver))
+                                    return false;
+                                result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
+                                return true;
+                            }
+                        }
+                        else if (delegateExpr.Type == typeof(Func<object>) &&
+                                 delegateExpr is LambdaExpression funcExpr)
+                        {
+                            // The Invocation of Func is used for splitting the big object graphs
+                            // so we can ignore this split and go directly to the body
+                            return TryInterpret(r, funcExpr.Body, paramExprs, paramValues, parentArgs, useFec,
+                                out result);
+                        }
 
 #if !SUPPORTS_DELEGATE_METHOD
-                    return false;
+                return false;
 #else
-                    if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
-                        return false;
-                    var lambda = (Delegate)delegateObj;
+                        if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
+                            return false;
 
-                    var argExprs = invokeExpr.Arguments.ToListOrSelf();
-                    if (argExprs.Count == 0)
-                        result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
-                    else
-                    {
-                        var args = new object[argExprs.Count];
-                        for (var i = 0; i < args.Length; i++)
-                            if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
-                                return false;
-                        result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
-                    }
-                    return true;
+                        var lambda = (Delegate)delegateObj;
+                        var argExprs = invokeExpr.Arguments.ToListOrSelf();
+                        if (argExprs.Count == 0)
+                            result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
+                        else
+                        {
+                            var args = new object[argExprs.Count];
+                            for (var i = 0; i < args.Length; i++)
+                                if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
+                                    return false;
+                            result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
+                        }
+                        return true;
 #endif
                     }
                 case ExprType.Parameter:
-                {
-                    if (expr == paramExprs)
                     {
-                        result = paramValues;
-                        return true;
-                    }
-
-                    if (paramExprs is IList<ParameterExpression> multipleParams)
-                        for (var i = 0; i < multipleParams.Count; i++)
-                            if (expr == multipleParams[i])
-                            {
-                                result = ((object[])paramValues)[i];
-                                return true;
-                            }
-
-                    if (parentArgs != null)
-                    {
-                        for (var p = parentArgs; p != null; p = p.ParentWithArgs)
+                        if (expr == paramExprs)
                         {
-                            if (expr == p.ParamExprs)
-                            {
-                                result = p.ParamValues;
-                                return true;
-                            }
+                            result = paramValues;
+                            return true;
+                        }
 
-                            multipleParams = p.ParamExprs as IList<ParameterExpression>;
-                            if (multipleParams != null)
+                        if (paramExprs is IList<ParameterExpression> multipleParams)
+                            for (var i = 0; i < multipleParams.Count; i++)
+                                if (expr == multipleParams[i])
+                                {
+                                    result = ((object[])paramValues)[i];
+                                    return true;
+                                }
+
+                        if (parentArgs != null)
+                        {
+                            for (var p = parentArgs; p != null; p = p.ParentWithArgs)
                             {
-                                for (var i = 0; i < multipleParams.Count; i++)
-                                    if (expr == multipleParams[i])
-                                    {
-                                        result = ((object[])paramValues)[i];
-                                        return true;
-                                    }
+                                if (expr == p.ParamExprs)
+                                {
+                                    result = p.ParamValues;
+                                    return true;
+                                }
+
+                                multipleParams = p.ParamExprs as IList<ParameterExpression>;
+                                if (multipleParams != null)
+                                    for (var i = 0; i < multipleParams.Count; i++)
+                                        if (expr == multipleParams[i])
+                                        {
+                                            result = ((object[]) paramValues)[i];
+                                            return true;
+                                        }
                             }
                         }
+                        return false;
                     }
-                    return false;
-                }
                 case ExprType.Lambda:
-                {
                     return TryInterpretNestedLambda(r, (LambdaExpression)expr, paramExprs, paramValues, parentArgs, useFec, ref result);
-                }
                 default:
-                    break;
+                    return false;
             }
- 
-            return false;
         }
 
         private static bool TryInterpretNestedLambda(IResolverContext r, LambdaExpression lambdaExpr,
@@ -3346,15 +3338,7 @@ namespace DryIoc
 
                 if (method == Resolver.ResolveMethod)
                 {
-                    object serviceKey = null, preResolveParent = null, resolveArgs = null;
-                    if (!TryInterpret(resolver, callArgs[1], paramExprs, paramValues, parentArgs, useFec, out serviceKey) ||
-                        !TryInterpret(resolver, callArgs[4], paramExprs, paramValues, parentArgs, useFec, out preResolveParent) ||
-                        !TryInterpret(resolver, callArgs[5], paramExprs, paramValues, parentArgs, useFec, out resolveArgs))
-                        return false;
-
-                    result = resolver.Resolve((Type) ConstValue(callArgs[0]), serviceKey,
-                        (IfUnresolved) ConstValue(callArgs[2]),
-                        (Type) ConstValue(callArgs[3]), (Request) preResolveParent, (object[]) resolveArgs);
+                    InterpretResolveMethod(resolver, callArgs, paramExprs, paramValues, parentArgs, useFec, out result);
                     return true;
                 }
 
@@ -3464,8 +3448,24 @@ namespace DryIoc
             return true;
         }
 
+        internal static void InterpretResolveMethod(IResolverContext resolver, IList<Expression> callArgs,
+            object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result)
+        {
+            TryInterpret(resolver, callArgs[1], paramExprs, paramValues, parentArgs, useFec, out var serviceKey);
+            TryInterpret(resolver, callArgs[4], paramExprs, paramValues, parentArgs, useFec, out var preResolveParent);
+            TryInterpret(resolver, callArgs[5], paramExprs, paramValues, parentArgs, useFec, out var resolveArgs);
+
+            result = resolver.Resolve((Type)
+                ((ConstantExpression) callArgs[0]).Value,
+                serviceKey,
+                (IfUnresolved) ((ConstantExpression) callArgs[2]).Value,
+                (Type) ((ConstantExpression) callArgs[3]).Value,
+                (Request) preResolveParent,
+                (object[]) resolveArgs);
+        }
+
         private static object InterpretGetScopedViaFactoryDelegateNoDisposalIndex(IResolverContext resolver,
-    MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
+            MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
             var fewArgExpr = (FourArgumentsMethodCallExpression)callExpr;
@@ -3827,6 +3827,7 @@ namespace DryIoc
         /// Strips the unnecessary or adds the necessary cast to expression return result
         public static Expression NormalizeExpression(this Expression expr)
         {
+            // System.Linq.Expressions.ExpressionType is used by FEC as well 
             if (expr.NodeType == System.Linq.Expressions.ExpressionType.Convert)
             {
                 var operandExpr = ((UnaryExpression)expr).Operand;
@@ -3869,15 +3870,22 @@ namespace DryIoc
             // fallback for platforms when FastExpressionCompiler is not supported,
             // or just in case when some expression is not supported (did not found one yet)
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-            return Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs, typeof(object)).ToLambdaExpression()
+            var lambda = Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs, typeof(object))
+                .ToLambdaExpression();
 #else
-            return Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs)
+            var lambda = Lambda<FactoryDelegate>(expression, FactoryDelegateParamExprs);
 #endif
-                .Compile(
+
+            if (preferInterpretation)
+            {
 #if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
-                    preferInterpretation
+                return lambda.Compile(preferInterpretation: true);
+#else
+                return lambda.Compile();
 #endif
-                );
+            }
+
+            return lambda.Compile();
         }
 
         /// <summary>Compiles lambda expression to actual `FactoryDelegate` wrapper.</summary>
@@ -4361,7 +4369,7 @@ namespace DryIoc
             var serviceTypeExpr = Constant(serviceType);
             var factoryIdExpr = Constant(factoryID);
             var implTypeExpr = Constant(implementationType);
-            var reuseExpr = r.Reuse == null ? Constant(null)
+            var reuseExpr = r.Reuse == null ? Constant(null, typeof(IReuse))
                 : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
 
             if (ifUnresolved == IfUnresolved.Throw &&
@@ -4685,8 +4693,14 @@ namespace DryIoc
         /// <summary>Returns true if type is supported <see cref="FuncTypes"/>, and false otherwise.</summary>
         public static bool IsFunc(this Type type)
         {
-            var genericDefinition = type.GetGenericDefinitionOrNull();
-            return genericDefinition != null && FuncTypes.IndexOfReference(genericDefinition) != -1;
+            if (type.GetTypeInfo().IsGenericType)
+            {
+                var typeDef = type.GetGenericTypeDefinition();
+                for (var i = 0; i < FuncTypes.Length; ++i)
+                    if (ReferenceEquals(FuncTypes[i], typeDef))
+                        return true;
+            }
+            return false;
         }
 
         internal static int CollectionWrapperID { get; private set; }
@@ -4703,41 +4717,46 @@ namespace DryIoc
 
             var arrayInterfaces = SupportedCollectionTypes;
             for (var i = 0; i < arrayInterfaces.Length; i++)
-                wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(arrayInterfaces[i]), arrayInterfaces[i], arrayExpr);
+                wrappers = wrappers.AddOrUpdate(arrayInterfaces[i], arrayExpr);
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(LazyEnumerable<>)), typeof(LazyEnumerable<>),
+            wrappers = wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
                 new ExpressionFactory(GetLazyEnumerableExpressionOrDefault, setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Lazy<>)), typeof(Lazy<>),
+            wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
                 new ExpressionFactory(r => GetLazyExpressionOrDefault(r), setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(KeyValuePair<,>)), typeof(KeyValuePair<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
                 new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Meta<,>)), typeof(Meta<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(Meta<,>),
                 new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Tuple<,>)), typeof(Tuple<,>),
+            wrappers = wrappers.AddOrUpdate(typeof(Tuple<,>),
                 new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(System.Linq.Expressions.LambdaExpression)), typeof(System.Linq.Expressions.LambdaExpression),
+            wrappers = wrappers.AddOrUpdate(typeof(System.Linq.Expressions.LambdaExpression),
                 new ExpressionFactory(GetLambdaExpressionExpressionOrDefault, setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(FactoryDelegate)), typeof(FactoryDelegate),
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+            wrappers = wrappers.AddOrUpdate(typeof(FastExpressionCompiler.LightExpression.LambdaExpression),
+                new ExpressionFactory(GetFastExpressionCompilerLambdaExpressionExpressionOrDefault, setup: Setup.Wrapper));
+#endif
+
+            wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate),
                 new ExpressionFactory(GetFactoryDelegateExpressionOrDefault, setup: Setup.Wrapper));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(FactoryDelegate<>)), typeof(FactoryDelegate<>),
+            wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate<>),
                 new ExpressionFactory(GetFactoryDelegateExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
-            wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(typeof(Func<>)), typeof(Func<>),
+            wrappers = wrappers.AddOrUpdate(typeof(Func<>),
                 new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.Wrapper));
 
             for (var i = 0; i < FuncTypes.Length; i++)
-                wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(FuncTypes[i]), FuncTypes[i],
+                wrappers = wrappers.AddOrUpdate(FuncTypes[i],
                     new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.WrapperWith(i)));
 
             for (var i = 0; i < ActionTypes.Length; i++)
-                wrappers = wrappers.AddOrUpdate(RuntimeHelpers.GetHashCode(ActionTypes[i]), ActionTypes[i],
+                wrappers = wrappers.AddOrUpdate(ActionTypes[i],
                     new ExpressionFactory(GetFuncOrActionExpressionOrDefault,
                     setup: Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
 
@@ -4913,7 +4932,8 @@ namespace DryIoc
 
             // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
             // So that Func<Derived> may be used for Func<Base>
-            if (serviceExpr.Type != serviceType)
+            if (serviceExpr.Type != serviceType && 
+                !serviceType.GetTypeInfo().IsAssignableFrom(serviceExpr.Type.GetTypeInfo()))
                 serviceExpr = Convert(serviceExpr, serviceType);
 
             var lazyValueFactoryType = typeof(Func<>).MakeGenericType(serviceType);
@@ -4962,7 +4982,9 @@ namespace DryIoc
 
             // The conversion to handle lack of covariance for Func<out T> in .NET 3.5
             // So that Func<Derived> may be used for Func<Base>
-            if (!isAction && serviceExpr.Type != serviceType)
+            if (!isAction && 
+                serviceExpr.Type != serviceType &&
+                !serviceType.GetTypeInfo().IsAssignableFrom(serviceExpr.Type.GetTypeInfo()))
                 serviceExpr = Convert(serviceExpr, serviceType);
 
             return Lambda(wrapperType, serviceExpr, argExprs
@@ -4974,9 +4996,7 @@ namespace DryIoc
 
         private static Expression GetLambdaExpressionExpressionOrDefault(Request request)
         {
-            var serviceType = request.RequiredServiceType
-                .ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request);
-            request = request.Push(serviceType);
+            request = request.Push(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)
                 return null;
@@ -4984,8 +5004,19 @@ namespace DryIoc
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                 .ToLambdaExpression()
 #endif
-                , typeof(LambdaExpression));
+                , typeof(System.Linq.Expressions.LambdaExpression));
         }
+
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+        private static Expression GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(Request request)
+        {
+            request = request.Push(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
+            var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
+            if (expr == null)
+                return null;
+            return Constant(expr.WrapInFactoryExpression(), typeof(FastExpressionCompiler.LightExpression.LambdaExpression));
+        }
+#endif
 
         private static Expression GetFactoryDelegateExpressionOrDefault(Request request)
         {
@@ -5155,29 +5186,63 @@ namespace DryIoc
 
         /// Default rules as staring point.
         public static readonly Rules MicrosoftDependencyInjectionRules = new Rules(
-            (DEFAULT_SETTINGS | Settings.TrackingDisposableTransients) & ~Settings.ThrowOnRegisteringDisposableTransient, 
+            (DEFAULT_SETTINGS | Settings.TrackingDisposableTransients) 
+            & ~Settings.ThrowOnRegisteringDisposableTransient & ~Settings.VariantGenericTypesInResolvedCollection, 
             Rules.SelectLastRegisteredFactory(), Reuse.Transient,
             Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments), 
-            IfAlreadyRegistered.AppendNotKeyed, 
-            DefaultDependencyDepthToSplitObjectGraph, null, null, null, null, null);
+            IfAlreadyRegistered.AppendNotKeyed,
+            DefaultDependencyCountInLambdaToSplitBigObjectGraph, null, null, null, null, null);
          
-        /// <summary>Default value for <see cref="DependencyDepthToSplitObjectGraph"/></summary>
+        /// <summary>Does nothing</summary>
+        [Obsolete("Is not used anymore to split the graph - instead use the `DependencyCountInLambdaToSplitBigObjectGraph`")]
         public const int DefaultDependencyDepthToSplitObjectGraph = 20;
 
-        /// <summary>Nested dependency depth to split an object graph</summary>
+        /// <summary>Does nothing</summary>
+        [Obsolete("Is not used anymore to split the graph - instead use the `DependencyCountInLambdaToSplitBigObjectGraph`")]
         public int DependencyDepthToSplitObjectGraph { get; private set; }
 
-        /// <summary>Sets <see cref="DependencyDepthToSplitObjectGraph"/>.
-        /// Set <see cref="int.MaxValue"/> to prevent split.
-        /// To disable the limit please use <see cref="WithoutDependencyDepthToSplitObjectGraph"/></summary>
+        /// <summary>The default total dependency count - a expression tree node count to split the object graph</summary>
+        public const int DefaultDependencyCountInLambdaToSplitBigObjectGraph = 1024;
+
+        /// <summary>The total dependency count - the expression tree node count to split the object graph.
+        /// That does not mean the graph can be always split at this number, consider the example graph and
+        /// the dependency count threshold set to 3:
+        ///
+        /// `x = new X(new Y(A, new B(K), new C(new L(), new M())), new Z())`
+        /// 
+        /// The tree is resolved from the left to the right in the depth-first order:
+        /// A; then K, B (at this point Y is already has 3 dependencies but is not fully resolved until C is resolved);
+        /// then L, M, C (here Y is fully resolved with 6 dependencies) so we can split it only on 6 dependencies instead of 3.
+        ///
+        /// The split itseft just wraps the node in `Func{T}` delegate making it a separate compilation unit.
+        /// In our example it will be `Func{Y} f = () => new Y(A, new B(K), new C(new L(), new M()))` considering
+        /// that everything is transient.
+        ///
+        /// </summary>
+        public int DependencyCountInLambdaToSplitBigObjectGraph { get; private set; }
+
+        /// <summary>Does nothing</summary>
+        [Obsolete("It does not work - use `WithDependencyCountInLambdaToSplitBigObjectGraph`")]
         public Rules WithDependencyDepthToSplitObjectGraph(int depth) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, depth < 1 ? 1 : depth,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
-        /// <summary>Disables the <see cref="DependencyDepthToSplitObjectGraph"/> limitation.</summary>
+        /// <summary>Sets the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/></summary>
+        public Rules WithDependencyCountInLambdaToSplitBigObjectGraph(int dependencyCount) =>
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, dependencyCount < 1 ? 1 : dependencyCount,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
+                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+
+        /// <summary>Does nothing</summary>
+        [Obsolete("It does not work - use `WithoutDependencyCountInLambdaToSplitBigObjectGraph`")]
         public Rules WithoutDependencyDepthToSplitObjectGraph() => WithDependencyDepthToSplitObjectGraph(int.MaxValue);
+
+        /// <summary>Disables the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/> limitation.</summary>
+        public Rules WithoutDependencyCountInLambdaToSplitBigObjectGraph() =>
+            WithDependencyCountInLambdaToSplitBigObjectGraph(int.MaxValue);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod => _made.FactoryMethod;
@@ -5224,7 +5289,7 @@ namespace DryIoc
                         made.FactoryMethod ?? _made.FactoryMethod,
                         made.Parameters ?? _made.Parameters,
                         made.PropertiesAndFields ?? _made.PropertiesAndFields),
-                DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5235,7 +5300,7 @@ namespace DryIoc
         public Rules WithDefaultRegistrationServiceKey(object serviceKey) =>
             serviceKey == null ? this :
                 new Rules(_settings, FactorySelector, DefaultReuse,
-                    _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                    _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                     DependencyResolutionCallExprs, ItemToExpressionConverter,
                     DynamicRegistrationProviders, UnknownServiceResolvers, serviceKey);
 
@@ -5253,7 +5318,7 @@ namespace DryIoc
         /// <summary>Sets <see cref="FactorySelector"/></summary>
         public Rules WithFactorySelector(FactorySelectorRule rule) =>
             new Rules(_settings | (rule == SelectLastRegisteredFactory ? Settings.SelectLastRegisteredFactory : default(Settings)),
-                rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5293,7 +5358,7 @@ namespace DryIoc
         /// <summary>Appends dynamic registration rules.</summary>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5302,7 +5367,7 @@ namespace DryIoc
         /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings | Settings.UseDynamicRegistrationsAsFallbackOnly, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5320,7 +5385,7 @@ namespace DryIoc
         /// <summary>Appends resolver to current unknown service resolvers.</summary>
         public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Append(rules),
                 DefaultRegistrationServiceKey);
@@ -5330,7 +5395,7 @@ namespace DryIoc
         /// so it could be check for remove success or fail.</summary>
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Remove(rule),
                 DefaultRegistrationServiceKey);
@@ -5408,7 +5473,7 @@ namespace DryIoc
         /// Replaced with `WithConcreteTypeDynamicRegistrations`
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
             new Rules(_settings | Settings.AutoConcreteTypeResolution, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers.Append(AutoResolveConcreteTypeRule(condition)),
                 DefaultRegistrationServiceKey);
@@ -5493,7 +5558,7 @@ namespace DryIoc
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
         public Rules WithDefaultReuse(IReuse reuse) =>
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
-                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5515,7 +5580,7 @@ namespace DryIoc
         /// To enable non-primitive values support DryIoc need a way to recreate them as expression tree.</summary>
         public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, itemToExpressionOrDefault,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5584,7 +5649,7 @@ namespace DryIoc
         /// in the-per rules collection.</summary>
         public Rules WithExpressionGeneration(bool allowRuntimeState = false) =>
             new Rules(GetSettingsForExpressionGeneration(allowRuntimeState), FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty), ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5601,7 +5666,7 @@ namespace DryIoc
         public Rules ForValidate() =>
             new Rules(GetSettingsForValidation(), 
                 FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, 
-                int.MaxValue, // lifts the `DefaultDependencyDepthToSplitObjectGraph` to the Max, so we will construct the whole tree
+                int.MaxValue,
                 null, 
                 ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -5641,7 +5706,7 @@ namespace DryIoc
         /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
         public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, rule, DependencyDepthToSplitObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
+                _made, rule, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
@@ -5731,8 +5796,8 @@ namespace DryIoc
                     s += (s != "" ? " and without {" : "Rules without {") + removedSettings + "}";
             }
 
-            if (DependencyDepthToSplitObjectGraph != DefaultDependencyDepthToSplitObjectGraph)
-                s += " with DepthToSplitObjectGraph=" + DependencyDepthToSplitObjectGraph;
+            if (DependencyCountInLambdaToSplitBigObjectGraph != DefaultDependencyCountInLambdaToSplitBigObjectGraph)
+                s += " with TotalDependencyCountInLambdaToSplitBigObjectGraph=" + DependencyCountInLambdaToSplitBigObjectGraph;
 
             if (DefaultReuse != null && DefaultReuse != Reuse.Transient)
                 s += (s != "" ? NewLine : "Rules ") + " with DefaultReuse=" + DefaultReuse;
@@ -5760,7 +5825,7 @@ namespace DryIoc
             _settings = DEFAULT_SETTINGS;
             DefaultReuse = Reuse.Transient;
             DefaultIfAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed;
-            DependencyDepthToSplitObjectGraph = DefaultDependencyDepthToSplitObjectGraph;
+            DependencyCountInLambdaToSplitBigObjectGraph = DefaultDependencyCountInLambdaToSplitBigObjectGraph;
         }
 
         private Rules(Settings settings,
@@ -5768,7 +5833,7 @@ namespace DryIoc
             IReuse defaultReuse,
             Made made,
             IfAlreadyRegistered defaultIfAlreadyRegistered,
-            int dependencyDepthToSplitObjectGraph,
+            int dependencyCountInLambdaToSplitBigObjectGraph,
             Ref<ImHashMap<Request, System.Linq.Expressions.Expression>> dependencyResolutionCallExprs,
             ItemToExpressionConverterRule itemToExpressionConverter,
             DynamicRegistrationProvider[] dynamicRegistrationProviders,
@@ -5780,7 +5845,7 @@ namespace DryIoc
             FactorySelector = factorySelector;
             DefaultReuse = defaultReuse;
             DefaultIfAlreadyRegistered = defaultIfAlreadyRegistered;
-            DependencyDepthToSplitObjectGraph = dependencyDepthToSplitObjectGraph;
+            DependencyCountInLambdaToSplitBigObjectGraph = dependencyCountInLambdaToSplitBigObjectGraph;
             DependencyResolutionCallExprs = dependencyResolutionCallExprs;
             ItemToExpressionConverter = itemToExpressionConverter;
             DynamicRegistrationProviders = dynamicRegistrationProviders;
@@ -5790,7 +5855,7 @@ namespace DryIoc
 
         private Rules WithSettings(Settings newSettings) =>
             new Rules(newSettings,
-                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyDepthToSplitObjectGraph,
+                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
@@ -5936,7 +6001,7 @@ namespace DryIoc
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) => request =>
         {
             var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
-            // todo: we can inline this because we do double checking on the number of constructors
+            // todo: @perf we can inline this because we do double checking on the number of constructors
             var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
             var ctorCount = ctors.Length;
             if (ctorCount == 0)
@@ -7552,6 +7617,10 @@ namespace DryIoc
         internal static readonly ConstructorInfo ResolutionScopeNameCtor =
             typeof(ResolutionScopeName).GetTypeInfo().DeclaredConstructors.First();
 
+        private static readonly ConstantExpression _ifUnresolvedThrowExpr = Constant(IfUnresolved.Throw);
+        private static readonly ConstantExpression _nullTypeExpr          = Constant(null, typeof(Type));
+        private static readonly ConstantExpression _nullExpr              = Constant(null, typeof(object));
+
         internal static Expression CreateResolutionExpression(Request request, bool opensResolutionScope = false)
         {
             if (request.Rules.DependencyResolutionCallExprs != null &&
@@ -7562,9 +7631,20 @@ namespace DryIoc
             var serviceType = request.ServiceType;
 
             var serviceTypeExpr = Constant(serviceType, typeof(Type));
-            var ifUnresolvedExpr = Constant(request.IfUnresolved, typeof(IfUnresolved));
-            var requiredServiceTypeExpr = Constant(request.RequiredServiceType, typeof(Type));
-            var serviceKeyExpr = container.GetConstantExpression(request.ServiceKey, typeof(object));
+
+            var details = request._serviceInfo.Details;
+
+            var ifUnresolvedExpr = details.IfUnresolved == IfUnresolved.Throw 
+                ? _ifUnresolvedThrowExpr 
+                : Constant(details.IfUnresolved, typeof(IfUnresolved));
+
+            var requiredServiceTypeExpr = details.RequiredServiceType == null 
+                ? _nullTypeExpr
+                : Constant(details.RequiredServiceType, typeof(Type));
+            
+            var serviceKeyExpr = details.ServiceKey == null 
+                ? _nullExpr
+                : container.GetConstantExpression(details.ServiceKey, typeof(object));
 
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
 
@@ -8165,7 +8245,7 @@ namespace DryIoc
         IsGeneratedResolutionDependencyExpression = 1 << 8,
 
         /// <summary>Non inherited. Indicates the root service inside the function.</summary>
-        IsDirectlyWrappedInFunc = 1 << 9
+        IsDirectlyWrappedInFunc = 1 << 9,
     }
 
     /// Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations
@@ -8242,14 +8322,14 @@ namespace DryIoc
 
         /// <summary>Empty terminal request.</summary>
         public static readonly Request Empty =
-            new Request(null, null, 0, null, DefaultFlags, ServiceInfo.Empty, null);
+            new Request(null, null, 0, 0, null, DefaultFlags, ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyRequestExpr =
             Field(null, typeof(Request).Field(nameof(Empty)));
 
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
-            new Request(null, null, 0, null, DefaultFlags | RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, 
+            new Request(null, null, 0, 0, null, DefaultFlags | RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, 
                 ServiceInfo.Empty, null);
 
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
@@ -8260,9 +8340,9 @@ namespace DryIoc
             // we are re-starting the dependency depth count from `1`
             ref var req = ref stack.GetOrPushRef(0);
             if (req == null)
-                req =  new Request(container, Empty, 1, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
+                req =  new Request(container, Empty, 1, 0, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
             else
-                req.SetServiceInfo(container, Empty, 1, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
+                req.SetServiceInfo(container, Empty, 1, 0, stack, DefaultFlags | RequestFlags.IsResolutionCall, serviceInfo, null);
             return req;
         }
 
@@ -8286,20 +8366,20 @@ namespace DryIoc
                 flags |= preResolveParent.Flags & InheritedFlags;
             }
 
-            var inputArgExprs = inputArgs?.Map(a => Constant(a));
+            var inputArgExprs = inputArgs?.Map(a => Constant(a)); // todo: @check what happens if `a == null`, does the `object` type for is fine
 
             var stack = RequestStack.Get();
             ref var req = ref stack.GetOrPushRef(0);
 
             // we are re-starting the dependency depth count from `1`
             if (req == null)
-                req =  new Request(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
+                req =  new Request(container, preResolveParent, 1, 0, stack, flags, serviceInfo, inputArgExprs);
             else
-                req.SetServiceInfo(container, preResolveParent, 1, stack, flags, serviceInfo, inputArgExprs);
+                req.SetServiceInfo(container, preResolveParent, 1, 0, stack, flags, serviceInfo, inputArgExprs);
             return req;
         }
 
-        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored with request.</summary>
+        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
         public static Request Create(IContainer container, Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null) =>
@@ -8355,6 +8435,15 @@ namespace DryIoc
         /// <summary>Number of nested dependencies. Set with each new Push.</summary>
         public int DependencyDepth;
 
+        /// <summary>The total dependency count</summary>
+        public int DependencyCount;
+
+        internal void DecreaseTrackedDependencyCountForParents(int dependencyCount)
+        {
+            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                p.DependencyCount -= dependencyCount;
+        }
+
         /// <summary>Indicates that request is empty initial request.</summary>
         public bool IsEmpty => DirectParent == null;
 
@@ -8391,7 +8480,8 @@ namespace DryIoc
         /// <summary>Indicates the request is singleton or has singleton upper in dependency chain.</summary>
         public bool IsSingletonOrDependencyOfSingleton => (Flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0;
 
-        /// [Obsolete("Unused - hides more than abstracts")]
+        /// <summary>Is not used</summary>
+        [Obsolete("Is not used - hides more than abstracts")]
         public bool ShouldSplitObjectGraph() =>
             FactoryType == FactoryType.Service &&
             DependencyDepth > Rules.DependencyDepthToSplitObjectGraph;
@@ -8478,9 +8568,11 @@ namespace DryIoc
 
             ref var req = ref stack.GetOrPushRef(indexInStack);
             if (req == null)
-                req  = new Request(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
+                req  = new Request(Container, this, DependencyDepth + 1, 0,
+                    RequestStack, flags, serviceInfo, InputArgExprs);
             else
-                req.SetServiceInfo(Container, this, DependencyDepth + 1, RequestStack, flags, serviceInfo, InputArgExprs);
+                req.SetServiceInfo(Container, this, DependencyDepth + 1, 0,
+                    RequestStack, flags, serviceInfo, InputArgExprs);
             
             return req;
         }
@@ -8528,7 +8620,7 @@ namespace DryIoc
             Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved, 
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags, int decoratedFactoryID)
         {
-            return new Request(Container, this, DependencyDepth + 1, null, flags,
+            return new Request(Container, this, DependencyDepth + 1, 0, null, flags,
                 ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata),
                 InputArgExprs, implementationType, null, // factory cannot be supplied in generated code
                 factoryID, factoryType, reuse, decoratedFactoryID);
@@ -8547,24 +8639,23 @@ namespace DryIoc
         {
             var newServiceInfo = getInfo(_serviceInfo);
             return newServiceInfo == _serviceInfo ? this
-                : new Request(Container, 
-                    DirectParent, DependencyDepth, RequestStack, Flags, newServiceInfo, InputArgExprs,
+                : new Request(Container, DirectParent, DependencyDepth, DependencyCount, 
+                    RequestStack, Flags, newServiceInfo, InputArgExprs,
                     _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
         /// Produces the new request with the changed `ifUnresolved` or returns original request otherwise
         public Request WithIfUnresolved(IfUnresolved ifUnresolved) =>
             IfUnresolved == ifUnresolved ? this
-                : new Request(Container,
-                    DirectParent, DependencyDepth, RequestStack, Flags, 
-                    _serviceInfo.WithIfUnresolved(ifUnresolved), InputArgExprs,
+                : new Request(Container, DirectParent, DependencyDepth, DependencyCount, 
+                    RequestStack, Flags, _serviceInfo.WithIfUnresolved(ifUnresolved), InputArgExprs,
                     _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // todo: in place mutation?
         /// <summary>Updates the flags</summary>
         public Request WithFlags(RequestFlags newFlags) =>
-            new Request(Container,
-                DirectParent, DependencyDepth, RequestStack, newFlags, _serviceInfo, InputArgExprs,
+            new Request(Container, DirectParent, DependencyDepth, DependencyCount,
+                RequestStack, newFlags, _serviceInfo, InputArgExprs,
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // note: Mutates the request, required for proper caching
@@ -8582,8 +8673,8 @@ namespace DryIoc
         /// nested Func/Action input argument has a priority over outer argument.
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expression[] inputArgs) =>
-            new Request(Container, 
-                DirectParent, DependencyDepth, RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs),
+            new Request(Container, DirectParent, DependencyDepth, DependencyCount,
+                RequestStack, Flags, _serviceInfo, inputArgs.Append(InputArgExprs),
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -8608,46 +8699,114 @@ namespace DryIoc
                     decoratedFactoryID = FactoryID;
             }
 
-            // checking the service types only cause wrapper and decorators may be used multiple times
-            if (!skipRecursiveDependencyCheck &&
-                factory.FactoryType == FactoryType.Service &&
-                HasRecursiveParent(factoryId))
-                Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
-
-            // It is required to nullify the TD tracking when factory is resolved multiple times, e.g. for decorator
+            // it is required to nullify the TD tracking when factory is resolved multiple times, e.g. for decorator
             var flags = Flags & ~RequestFlags.TracksTransientDisposable;
             if (skipRecursiveDependencyCheck)
                 flags |= RequestFlags.StopRecursiveDependencyCheck;
 
-            var reuse = IsWrappedInFuncWithArgs() && Rules.IgnoringReuseForFuncWithArgs
-                ? DryIoc.Reuse.Transient
-                : factory.Reuse ?? CalculateDefaultReuse(factory);
+            var setup = factory.Setup;
 
-            if (!skipCaptiveDependencyCheck &&
-                !DirectParent.IsEmpty &&
-                !factory.Setup.OpenResolutionScope &&
-                reuse.Lifespan != 0 &&
-                Rules.ThrowIfDependencyHasShorterReuseLifespan)
+            IReuse reuse = null;
+            if (InputArgExprs != null && Rules.IgnoringReuseForFuncWithArgs)
+                reuse = DryIoc.Reuse.Transient;
+            else if (factory.Reuse != null)
+                reuse = factory.Reuse;
+            else if (setup.UseParentReuse)
+                reuse = DirectParent.IsEmpty ? Rules.DefaultReuse : null; // the `null` here signals to find the parent reuse
+            else if (factory.FactoryType == FactoryType.Decorator &&
+                     (setup.To<Setup.DecoratorSetup>().UseDecorateeReuse || Rules.UseDecorateeReuseForDecorators))
+                reuse = Reuse; // already resolved decoratee reuse
+            else if (factory.FactoryType == FactoryType.Wrapper)
+                reuse = DryIoc.Reuse.Transient;
+            else
+                reuse = Rules.DefaultReuse;
+
+            IReuse firstParentNonTransientReuseOrNull = null;
+            if (!DirectParent.IsEmpty)
             {
-                ThrowIfReuseHasShorterLifespanThanParent(reuse);
+                var checkRecursiveDependency = !skipRecursiveDependencyCheck &&
+                    factory.FactoryType == FactoryType.Service;
+
+                var reuseLifespan = reuse?.Lifespan ?? 0;
+
+                var checkCaptiveDependency = !skipCaptiveDependencyCheck && 
+                    Rules.ThrowIfDependencyHasShorterReuseLifespan && reuse != null && reuseLifespan != 0 && 
+                    !factory.Setup.OpenResolutionScope;
+
+                var scopedOrSingleton = checkCaptiveDependency &&
+                    (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true;
+
+                // Means we are incrementing the count when resolving the Factory for the first time,
+                // and not twice for the decorators
+                var dependencyCountIncrement = Factory == null ? 1 : 0; 
+
+                for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                {
+                    if (checkRecursiveDependency)
+                    {
+                        if ((p.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+                            checkRecursiveDependency = false; // stop the check
+                        else if (p.FactoryID == factoryId)
+                            Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
+                    }
+
+                    if (checkCaptiveDependency)
+                    {
+                        if (p.OpensResolutionScope ||
+                            scopedOrSingleton && p.Reuse is SingletonReuse ||
+                            p.FactoryType == FactoryType.Wrapper && p._actualServiceType.IsFunc())
+                            checkCaptiveDependency = false; // stop the check
+                        else if (p.FactoryType == FactoryType.Service && p.ReuseLifespan > reuseLifespan)
+                            Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
+                    }
+
+                    if (firstParentNonTransientReuseOrNull == null)
+                    {
+                        if (p.FactoryType != FactoryType.Wrapper)
+                        {
+                            if (p.Reuse != DryIoc.Reuse.Transient)
+                                firstParentNonTransientReuseOrNull = p.Reuse;
+                        }
+                        else if (p._actualServiceType.IsFunc())
+                            firstParentNonTransientReuseOrNull = Rules.DefaultReuse;
+                    }
+
+                    p.DependencyCount += dependencyCountIncrement;
+                }
+
+                if (reuse == null) // for the `setup.UseParentReuse`
+                    reuse = firstParentNonTransientReuseOrNull ?? Rules.DefaultReuse;
             }
 
             if (reuse == DryIoc.Reuse.Singleton)
             {
                 flags |= RequestFlags.IsSingletonOrDependencyOfSingleton;
             }
-            else if (reuse == DryIoc.Reuse.Transient) // check for disposable transient
+            else if (reuse == DryIoc.Reuse.Transient) 
             {
-                reuse = GetTransientDisposableTrackingReuse(factory);
-                if (reuse != DryIoc.Reuse.Transient)
-                    flags |= RequestFlags.TracksTransientDisposable;
+                // check for disposable transient
+                if (!setup.PreventDisposal &&
+                    (setup.TrackDisposableTransient || !setup.AllowDisposableTransient && Rules.TrackingDisposableTransients) &&
+                    typeof(IDisposable).GetTypeInfo().IsAssignableFrom((factory.ImplementationType ?? _actualServiceType).GetTypeInfo()))
+                {
+                    if (firstParentNonTransientReuseOrNull != null)
+                    {
+                        reuse = firstParentNonTransientReuseOrNull;
+                        flags |= RequestFlags.TracksTransientDisposable;
+                    }
+                    else if (!IsWrappedInFunc())
+                    {
+                        reuse = DryIoc.Reuse.ScopedOrSingleton;
+                        flags |= RequestFlags.TracksTransientDisposable;
+                    }
+                }
             }
 
             if (copyRequest)
             {
                 IsolateRequestChain();
-                return new Request(Container, DirectParent, DependencyDepth, null, flags, _serviceInfo, 
-                    InputArgExprs, null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
+                return new Request(Container, DirectParent, DependencyDepth, DependencyCount, null, flags, 
+                    _serviceInfo, InputArgExprs, null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             }
 
             Flags = flags;
@@ -8666,74 +8825,6 @@ namespace DryIoc
                     return true;
             }
             return false;
-        }
-
-        private IReuse CalculateDefaultReuse(Factory factory)
-        {
-            if (factory.Setup.UseParentReuse)
-                return GetFirstParentNonTransientReuseUntilFunc();
-
-            if (factory.FactoryType == FactoryType.Decorator)
-            {
-                if (factory.Setup.To<Setup.DecoratorSetup>().UseDecorateeReuse ||
-                    Rules.UseDecorateeReuseForDecorators) 
-                    return Reuse; // use reuse of resolved service factory for decorator
-            }
-
-            return factory.FactoryType == FactoryType.Wrapper 
-                ? DryIoc.Reuse.Transient : Rules.DefaultReuse;
-        }
-
-        private IReuse GetTransientDisposableTrackingReuse(Factory factory)
-        {
-            // Track transient disposable in parent scope (if any), or open scope (if any)
-            var setup = factory.Setup;
-            var tracksTransientDisposable =
-                !setup.PreventDisposal &&
-                (setup.TrackDisposableTransient || !setup.AllowDisposableTransient && Rules.TrackingDisposableTransients) &&
-                (factory.ImplementationType ?? GetActualServiceType()).IsAssignableTo<IDisposable>();
-
-            if (!tracksTransientDisposable)
-                return DryIoc.Reuse.Transient;
-
-            var parentReuse = GetFirstParentNonTransientReuseUntilFunc();
-            if (parentReuse != DryIoc.Reuse.Transient)
-                return parentReuse;
-
-            if (IsWrappedInFunc())
-                return DryIoc.Reuse.Transient;
-
-            // If no parent with reuse found, then track in current open scope or in singletons scope
-            return DryIoc.Reuse.ScopedOrSingleton;
-        }
-
-        private void ThrowIfReuseHasShorterLifespanThanParent(IReuse reuse)
-        {
-            for (var parent = DirectParent; !parent.IsEmpty; parent = parent.DirectParent)
-            {
-                if (parent.OpensResolutionScope ||
-                    // ignores the ScopedOrSingleton inside Scoped or Singleton
-                    (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true && parent.Reuse is SingletonReuse ||
-                    parent.FactoryType == FactoryType.Wrapper && parent.GetActualServiceType().IsFunc())
-                    break;
-
-                if (parent.FactoryType == FactoryType.Service &&
-                    parent.ReuseLifespan > reuse.Lifespan)
-                    Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, parent);
-            }
-        }
-
-        private IReuse GetFirstParentNonTransientReuseUntilFunc()
-        {
-            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
-            {
-                if (p.FactoryType == FactoryType.Wrapper && p.GetActualServiceType().IsFunc())
-                    break;
-                if (p.FactoryType != FactoryType.Wrapper && p.Reuse != DryIoc.Reuse.Transient)
-                    return p.Reuse;
-            }
-
-            return DryIoc.Reuse.Transient;
         }
 
         /// <summary>If request corresponds to dependency injected into parameter,
@@ -8799,7 +8890,7 @@ namespace DryIoc
             if (FactoryID != 0) // request is with resolved factory
             {
                 if (Reuse != DryIoc.Reuse.Transient)
-                    s.Append(Reuse is SingletonReuse ? "singleton" : "scoped").Append(' ');
+                    s.Append(Reuse is SingletonReuse ? "Singleton" : "Scoped").Append(' ');
 
                 if (FactoryType != FactoryType.Service)
                     s.Append(FactoryType.ToString().ToLower()).Append(' ');
@@ -8867,6 +8958,7 @@ namespace DryIoc
                 && (DirectParent == null && other.DirectParent == null
                 || (DirectParent != null && DirectParent.EqualsWithoutParent(other.DirectParent)));
 
+        // todo: Seems like Equals and GetHashCode are not used anymore - can we remove them
         // todo: Should we include InputArgs and DecoratedFactoryID and what about flags? 
         // todo: Should we add and rely on Equals of ServiceInfo and Reuse?
         // todo: The equals calculated differently comparing to HashCode, may be we can use FactoryID for Equals as well?
@@ -8892,16 +8984,15 @@ namespace DryIoc
         public override int GetHashCode() => _hashCode;
 
         // Initial request without factory info yet
-        private Request(IContainer container, Request parent, 
-            int dependencyDepth, RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
+        private Request(IContainer container, Request parent, int dependencyDepth, int dependencyCount,
+            RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
+            DependencyCount = dependencyCount;
             RequestStack = stack;
-
             _serviceInfo = serviceInfo;
             _actualServiceType = serviceInfo.GetActualServiceType();
-
             Flags = flags;
 
             // runtime state
@@ -8911,10 +9002,10 @@ namespace DryIoc
 
         // Request with resolved factory state
         private Request(IContainer container, 
-            Request parent, int dependencyDepth, RequestStack stack,
+            Request parent, int dependencyDepth, int dependencyCount, RequestStack stack,
             RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs,
             Type factoryImplType, Factory factory, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
-            : this(container, parent, dependencyDepth, stack, flags, serviceInfo, inputArgExprs)
+            : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, inputArgExprs)
         {
             SetResolvedFactory(factoryImplType, factory , factoryID, factoryType, reuse, decoratedFactoryID);
         }
@@ -8938,16 +9029,15 @@ namespace DryIoc
             return this;
         }
 
-        private void SetServiceInfo(IContainer container, Request parent, 
-            int dependencyDepth, RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
+        private void SetServiceInfo(IContainer container, Request parent, int dependencyDepth, int dependencyCount,
+            RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
+            DependencyCount = dependencyCount;
             RequestStack = stack;
-
             _serviceInfo = serviceInfo;
             _actualServiceType = serviceInfo.GetActualServiceType();
-
             Flags = flags;
 
             // runtime state
@@ -8966,7 +9056,6 @@ namespace DryIoc
             Reuse = reuse;
             DecoratedFactoryID = decoratedFactoryID;
             _hashCode = Hasher.Combine(DirectParent?._hashCode ?? 0, FactoryID);
-
             _factoryImplType = factoryImplType; // should be set from the runtime known `Factory` object
             Factory = factory; // runtime state
         }
@@ -9506,77 +9595,127 @@ namespace DryIoc
             var setup = Setup;
             var rules = container.Rules;
 
-            // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
-            if (rules.EagerCachingSingletonForFasterAccess &&
-                request.Reuse is SingletonReuse && !setup.PreventDisposal && !setup.WeaklyReferenced)
-            {
-                var factoryId = request.FactoryType == FactoryType.Decorator
-                    ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
-
-                var itemRef = ((Scope)container.SingletonScope)._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(factoryId);
-                if (itemRef != null && itemRef.Value != Scope.NoItem)
-                    return Constant(itemRef.Value); // todo: we need the way to reuse Constant for the value
-                }
-
-            if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
+            var splitAsRsolutionCall = 
+                (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
                 !request.OpensResolutionScope && (
-                    setup.OpenResolutionScope || 
-                    !request.IsResolutionCall && (
-                      setup.AsResolutionCall || 
-                      setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration ||
-                      setup.UseParentReuse ||
-                      request.FactoryType == FactoryType.Service && request.DependencyDepth > rules.DependencyDepthToSplitObjectGraph
-                  ) &&
-                    request.GetActualServiceType() != typeof(void))
-                )
+                setup.OpenResolutionScope || 
+                !request.IsResolutionCall && (
+                setup.AsResolutionCall || 
+                setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration ||
+                setup.UseParentReuse) && request.GetActualServiceType() != typeof(void));
+
+            if (splitAsRsolutionCall)
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
 
-            var mayCache = Caching != FactoryCaching.DoNotCache && 
+            var cacheExpression = Caching != FactoryCaching.DoNotCache && 
                 FactoryType == FactoryType.Service &&
                 !request.IsResolutionRoot &&
-                (!request.IsSingletonOrDependencyOfSingleton || rules.UsedForValidation) &&
                 !request.IsDirectlyWrappedInFunc() && 
                 !request.IsWrappedInFuncWithArgs() &&
                 !setup.UseParentReuse &&
                 !Made.IsConditional;
 
+            var reuse = request.Reuse;
             ImMapEntry<Container.Registry.ExpressionCacheSlot> cacheEntry = null;
-            if (mayCache)
+            if (cacheExpression)
             {
-                var cachedExpr = ((Container)container).GetCachedFactoryExpression(FactoryID, request, out cacheEntry);
+                var cachedExpr = ((Container)container).GetCachedFactoryExpression(request.FactoryID, reuse, out cacheEntry);
                 if (cachedExpr != null)
+                {
+                    if (reuse == DryIoc.Reuse.Transient &&
+                        cacheEntry.Value.ScopeNameOrDependencyCount is Container.Registry.TransientDependencyCount depCount && 
+                        depCount.Value > 0 &&
+                        !rules.UsedForValidation && !rules.UsedForExpressionGeneration)
+                    {
+                        for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
+                            p.DependencyCount += depCount.Value;
+                    }
                     return cachedExpr;
+                }
+            }
+            else if (reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess &&
+                !setup.PreventDisposal && !setup.WeaklyReferenced)
+            {
+                // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
+                var combinedFactoryId = request.FactoryType == FactoryType.Decorator
+                    ? request.CombineDecoratorWithDecoratedFactoryID()
+                    : request.FactoryID;
+
+                var itemRef = ((Scope) container.SingletonScope)._maps[combinedFactoryId & Scope.MAP_COUNT_SUFFIX_MASK]
+                    .GetEntryOrDefault(combinedFactoryId);
+                if (itemRef != null && itemRef.Value != Scope.NoItem)
+                    return itemRef.Value == null ? Constant(null, request.GetActualServiceType()) : Constant(itemRef.Value); // fixes #258
             }
 
             // Creates an object graph expression with all of the dependencies created
             var serviceExpr = CreateExpressionOrDefault(request);
-            if (serviceExpr != null)
+            if (serviceExpr == null)
             {
-                if (request.Reuse != DryIoc.Reuse.Transient &&
-                    request.GetActualServiceType() != typeof(void) &&
-                    // we don't need the reuse expression when we are validating the object graph
-                    !rules.UsedForValidation) 
+                Container.TryThrowUnableToResolve(request);
+                return null;
+            }
+
+            if (reuse != DryIoc.Reuse.Transient)
+            {
+                if (!rules.UsedForValidation && 
+                    request.GetActualServiceType() != typeof(void))
                 {
                     var originalServiceExprType = serviceExpr.Type;
 
                     serviceExpr = ApplyReuse(serviceExpr, request);
 
-                    if (serviceExpr.Type != originalServiceExprType)
+                    if (serviceExpr.NodeType != ExprType.Constant &&
+                        serviceExpr.Type != originalServiceExprType &&
+                        !originalServiceExprType.GetTypeInfo().IsAssignableFrom(serviceExpr.Type.GetTypeInfo()))
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
-
-                if (mayCache)
-                    ((Container)container).CacheFactoryExpression(FactoryID, request, serviceExpr, cacheEntry);
             }
-            else Container.TryThrowUnableToResolve(request);
+            else if (!rules.UsedForValidation && 
+                     !rules.UsedForExpressionGeneration) 
+            {
+                // Split the expression with dependencies bigger than certain threshold by wrapping it in Func which is a
+                // separate compilation unit and invoking it emmediately
+                var depCount = request.DependencyCount;
+                if (depCount >= rules.DependencyCountInLambdaToSplitBigObjectGraph)
+                {
+                    request.DecreaseTrackedDependencyCountForParents(depCount);
+
+                    if (rules.UseFastExpressionCompiler)
+                    {
+                        serviceExpr = Convert(Invoke(
+                            Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>()
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+                                , typeof(object)
+#endif
+                            ), Empty<Expression>()), serviceExpr.Type);
+                    }
+                    else
+                    {
+                        // cache expression if possible to minimize the double work for the generated Resolve call
+                        if (cacheExpression)
+                            ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
+                                depCount, cacheEntry);
+
+                        return Resolver.CreateResolutionExpression(request, false);
+                    }
+                }
+            }
+
+            if (cacheExpression)
+                ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
+                    reuse == DryIoc.Reuse.Transient ? request.DependencyCount : 0,
+                    cacheEntry);
+
             return serviceExpr;
         }
 
-        /// Applies reuse to created expression, by wrapping passed expression into scoped access
-        /// and producing the result expression.
+        /// <summary>Applies reuse to created expression, by wrapping passed expression into scoped access
+        /// and producing the result expression.</summary>
         protected virtual Expression ApplyReuse(Expression serviceExpr, Request request)
         {
-            // Optimization: eagerly creates a singleton during the construction of object graph
+            // This optimization eagerly creates singleton during the construction of object graph
+            // Singleton is created once and then is stred for the container lifetime (until Сontainer.SingletonScope is disposed).
+            // That's why we are always intepreting them even if `Rules.WithoutInterpretationForTheFirstResolution()` is set.
             if (request.Reuse is SingletonReuse && 
                 request.Rules.EagerCachingSingletonForFasterAccess &&
                 !request.TracksTransientDisposable &&
@@ -9626,7 +9765,10 @@ namespace DryIoc
                     }
                 }
 
-                serviceExpr = Constant(itemRef.Value);
+                serviceExpr = itemRef.Value == null ? Constant(null, serviceExpr.Type) /* fixes #258 */ : Constant(itemRef.Value);
+
+                if (request.DependencyCount > 0)
+                    request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
             }
             else
             {
@@ -10077,7 +10219,7 @@ namespace DryIoc
                     var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
                     factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
                     if (factoryExpr == null)
-                            return null; // todo: should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
+                            return null; // todo: @check should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
                 }
 
                 // return earlier if already have the parameters resolved, e.g. when using `ConstructorWithResolvableArguments`
@@ -10259,7 +10401,7 @@ namespace DryIoc
         {
             var actualServiceType = request.GetActualServiceType();
             var serviceExprType = serviceExpr.Type;
-            return serviceExprType == actualServiceType || serviceExprType.IsAssignableTo(actualServiceType) 
+            return serviceExprType == actualServiceType || actualServiceType.GetTypeInfo().IsAssignableFrom(serviceExprType.GetTypeInfo()) 
                     ? serviceExpr
                 : serviceExprType == typeof(object) 
                     ? Convert(serviceExpr, actualServiceType)
@@ -10816,7 +10958,7 @@ namespace DryIoc
     /// Wraps the instance in registry
     public sealed class RegisteredInstanceFactory : Factory
     {
-        /// The registered pre-created object instance
+        /// <summary>The registered pre-created object instance</summary>
         public readonly object Instance;
 
         /// <summary>Non-abstract closed implementation type.</summary>
@@ -10848,7 +10990,7 @@ namespace DryIoc
             }
         }
 
-        /// Wraps the instance in expression constant
+        /// <summary>Wraps the instance in expression constant</summary>
         public override Expression CreateExpressionOrDefault(Request request)
         {
             // unpacks the weak-reference
@@ -10863,12 +11005,12 @@ namespace DryIoc
             // otherwise just return a constant
             var instanceExpr = request.Container.GetConstantExpression(Instance);
             var serviceType = request.GetActualServiceType();
-            if (ImplementationType.IsAssignableTo(serviceType))
+            if (serviceType.GetTypeInfo().IsAssignableFrom(ImplementationType.GetTypeInfo()))
                 return instanceExpr;
             return Convert(instanceExpr, serviceType);
         }
 
-        /// Simplified path for the registered instance
+        /// <summary>Simplified path for the registered instance</summary>
         public override Expression GetExpressionOrDefault(Request request)
         {
             if (// preventing recursion
@@ -10878,9 +11020,9 @@ namespace DryIoc
 
             // First look for decorators if it is not already a decorator
             var serviceType = request.ServiceType;
-            var elementType = serviceType.GetArrayElementTypeOrNull();
-            if (elementType != null)
-                serviceType = typeof(IEnumerable<>).MakeGenericType(elementType);
+            var serviceTypeInfo = serviceType.GetTypeInfo();
+            if (serviceTypeInfo.IsArray)
+                serviceType = typeof(IEnumerable<>).MakeGenericType(serviceTypeInfo.GetElementType());
             if (!request.Container.GetDecoratorFactoriesOrDefault(serviceType).IsNullOrEmpty())
             {
                 var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
@@ -10891,7 +11033,7 @@ namespace DryIoc
             return CreateExpressionOrDefault(request);
         }
 
-        /// Used at resolution root too simplify getting the actual instance
+        /// <summary>Used at resolution root too simplify getting the actual instance</summary>
         public override FactoryDelegate GetDelegateOrDefault(Request request)
         {
             request = request.WithResolvedFactory(this);
@@ -10930,7 +11072,7 @@ namespace DryIoc
         /// <summary>Create expression by wrapping call to stored delegate with provided request.</summary>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            // GetConstant here is needed to check the state
+            // GetConstant here is needed to check the runtime state rule
             var delegateExpr = request.Container.GetConstantExpression(_factoryDelegate);
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             return Convert(Invoke(delegateExpr, resolverExpr), request.GetActualServiceType());
@@ -11575,15 +11717,19 @@ namespace DryIoc
             var factoryId = request.FactoryType == FactoryType.Decorator
                 ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
 
-            return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
-                Constant(factoryId), Lambda<FactoryDelegate>(serviceFactoryExpr,
-                    FactoryDelegateCompiler.FactoryDelegateParamExprs
+
+            var lambdaExpr = Lambda<FactoryDelegate>(serviceFactoryExpr,
+                FactoryDelegateCompiler.FactoryDelegateParamExprs
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                    , typeof(object)
+                , typeof(object)
 #endif
-                ),
-                FactoryDelegateCompiler.ResolverContextParamExpr,
-                Constant(request.Factory.Setup.DisposalOrder));
+            );
+
+            if (request.DependencyCount > 0)
+                request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
+
+            return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
+                Constant(factoryId), lambdaExpr, FactoryDelegateCompiler.ResolverContextParamExpr, Constant(request.Factory.Setup.DisposalOrder));
         }
 
         private static readonly Lazy<Expression> _singletonReuseExpr = Lazy.Of<Expression>(() =>
@@ -11629,14 +11775,14 @@ namespace DryIoc
             if (request.TracksTransientDisposable)
             {
                 if (ScopedOrSingleton)
-                    return Call(TrackScopedOrSingletonMethod, new[] { resolverContextParamExpr, serviceFactoryExpr });
+                    return Call(TrackScopedOrSingletonMethod, resolverContextParamExpr, serviceFactoryExpr);
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
                 if (Name == null)
-                    return Call(TrackScopedMethod, new[] { resolverContextParamExpr, ifNoScopeThrowExpr, serviceFactoryExpr });
+                    return Call(TrackScopedMethod, resolverContextParamExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
 
                 var nameExpr = request.Container.GetConstantExpression(Name, typeof(object));
-                return Call(TrackNameScopedMethod, new[] { resolverContextParamExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr });
+                return Call(TrackNameScopedMethod, resolverContextParamExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
             }
             else
             {
@@ -11648,7 +11794,6 @@ namespace DryIoc
                     ie.Expression is ConstantExpression registeredDelegateExpr &&
                     registeredDelegateExpr.Type == typeof(FactoryDelegate))
                 {
-                    // optimization for the registered delegate
                     factoryDelegateExpr = registeredDelegateExpr;
                 }
                 else
@@ -11659,6 +11804,10 @@ namespace DryIoc
                         , typeof(object)
 #endif
                     );
+
+                    // decrease the dependency count when wrapping into lambda
+                    if (request.DependencyCount > 0)
+                        request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
                 }
 
                 var disposalIndex = request.Factory.Setup.DisposalOrder;
@@ -12391,7 +12540,7 @@ namespace DryIoc
             ResolvingOpenGenericServiceTypeIsNotPossible = Of(
                 "Resolving open-generic service type is not possible for type: {0}."),
             RecursiveDependencyDetected = Of(
-                "Recursive dependency is detected when resolving" + NewLine + "{0}."),
+                "Recursive dependency is detected when resolving " + NewLine + "{0}."),
             ScopeIsDisposed = Of(
                 "Scope {0} is disposed and scoped instances are disposed and no longer available."),
             NotFoundOpenGenericImplTypeArgInService = Of(
