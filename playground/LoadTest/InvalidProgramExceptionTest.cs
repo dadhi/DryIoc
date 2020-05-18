@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Web.Http;
 using DryIoc;
 using DryIoc.WebApi;
-using FastExpressionCompiler.LightExpression;
 
 namespace LoadTest
 {

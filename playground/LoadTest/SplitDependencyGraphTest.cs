@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Web.Http;
 using DryIoc;
 using DryIoc.WebApi;
@@ -25,6 +26,8 @@ namespace LoadTest
 
         private static void ResolveAllControllers(IContainer container, Type[] controllerTypes)
         {
+            Console.WriteLine($"Starting resolving all {controllerTypes.Length} controllers...");
+            var sw = Stopwatch.StartNew();
             foreach (var controllerType in controllerTypes)
             {
                 using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
@@ -37,6 +40,9 @@ namespace LoadTest
                     }
                 }
             }
+            
+            Console.WriteLine($"Finished resolving controllers in '{sw.Elapsed.TotalMilliseconds}' ms");
+            sw.Stop();
         }
 
         public static void Start()
