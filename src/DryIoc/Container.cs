@@ -5237,11 +5237,11 @@ namespace DryIoc
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Does nothing</summary>
-        [Obsolete("It does not work - use `WithoutTotalDependencyCountInLambdaToSplitBigObjectGraph`")]
+        [Obsolete("It does not work - use `WithoutDependencyCountInLambdaToSplitBigObjectGraph`")]
         public Rules WithoutDependencyDepthToSplitObjectGraph() => WithDependencyDepthToSplitObjectGraph(int.MaxValue);
 
         /// <summary>Disables the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/> limitation.</summary>
-        public Rules WithoutTotalDependencyCountInLambdaToSplitBigObjectGraph() =>
+        public Rules WithoutDependencyCountInLambdaToSplitBigObjectGraph() =>
             WithDependencyCountInLambdaToSplitBigObjectGraph(int.MaxValue);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>

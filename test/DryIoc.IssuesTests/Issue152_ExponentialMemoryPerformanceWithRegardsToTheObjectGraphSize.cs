@@ -31,7 +31,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Main_negative()
         {
-            var c = new Container(rules => rules.WithoutDependencyDepthToSplitObjectGraph());
+            var c = new Container(rules => rules.WithoutDependencyCountInLambdaToSplitBigObjectGraph());
             c.Register<AggQ>(Reuse.InCurrentScope);
             c.Register<AggP>(Reuse.InCurrentScope);
             c.Register<Root>(Reuse.InCurrentScope);

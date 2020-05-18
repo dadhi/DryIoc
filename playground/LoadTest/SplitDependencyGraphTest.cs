@@ -41,17 +41,19 @@ namespace LoadTest
 
         public static void Start()
         {
-            Console.WriteLine("Starting Object Graph split test");
+            Console.WriteLine("# Starting Object Graph split test");
 
             var controllerTypes = TestHelper.GetAllControllers();
 
-            for (var depth = 10; depth < 1000; depth+=10)
+            for (var depth = 5; depth < 2000; depth+=200)
             {
-                Console.WriteLine("Depth " + depth);
+                Console.WriteLine("## DependencyCount - " + depth);
 
                 var container = GetContainerForTest(depth);
 
+                Console.WriteLine("### Resolving 1st time:");
                 ResolveAllControllers(container, controllerTypes);
+                Console.WriteLine("### Resolving 2nd time:");
                 ResolveAllControllers(container, controllerTypes);
             }
         }

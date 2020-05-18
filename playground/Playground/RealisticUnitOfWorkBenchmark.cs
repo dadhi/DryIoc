@@ -1326,6 +1326,14 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |             Autofac | 50.146 us | 0.5242 us | 0.4377 us | 14.13 |    0.14 | 10.4980 |      - |     - |  48.54 KB |
 | Autofac_MsDIAdapter | 62.118 us | 0.1595 us | 0.1492 us | 17.50 |    0.07 | 12.9395 | 0.8545 |     - |  59.89 KB |
 
+
+### DryIoc v4.2
+
+|             Method |     Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+|               MsDI | 3.890 us | 0.0158 us | 0.0140 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
+|             DryIoc | 1.701 us | 0.0014 us | 0.0013 us |  0.44 |    0.00 | 0.6409 |     - |     - |   2.96 KB |
+| DryIoc_MsDIAdapter | 2.629 us | 0.0523 us | 0.0603 us |  0.68 |    0.02 | 0.6447 |     - |     - |   2.98 KB |
 */
 
             private IServiceProvider _msDi;
@@ -1379,19 +1387,19 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace() => Measure(_grace);
 
-            [Benchmark]
+            //[Benchmark]
             public object Grace_MsDIAdapter() => Measure(_graceMsDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object Lamar_MsDI() => Measure(_lamarMsDi);
 
-            [Benchmark]
+            //[Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            [Benchmark]
+            //[Benchmark]
             public object Autofac_MsDIAdapter() => Measure(_autofacMsDi);
         }
     }

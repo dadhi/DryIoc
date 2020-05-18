@@ -13,7 +13,6 @@ namespace LoadTest
         {
             var container = new Container(rules => rules
                 .WithoutFastExpressionCompiler()
-                .WithoutDependencyDepthToSplitObjectGraph()
                 .WithoutInterpretationForTheFirstResolution()
                 .WithoutUseInterpretation()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))
@@ -26,17 +25,12 @@ namespace LoadTest
 
         private static void ResolveAllControllers(IContainer container, Type[] controllerTypes)
         {
+            Console.WriteLine($"Starting resolving all {controllerTypes.Length} controllers...");
+            var sw = Stopwatch.StartNew();
             foreach (var controllerType in controllerTypes)
             {
                 using (var scope = container.OpenScope(Reuse.WebRequestScopeName))
                 {
-#if DEBUG
-                    if (controllerType == typeof(Web.Rest.API.InvoicesController))
-                    {
-                        var controllerExpr = scope.Resolve<LambdaExpression>(controllerType);
-                    }
-#endif
-
                     var controller = scope.Resolve(controllerType);
 
                     if (controller == null)
@@ -45,16 +39,20 @@ namespace LoadTest
                     }
                 }
             }
+            
+            Console.WriteLine($"Finished resolving controllers in '{sw.Elapsed.TotalMilliseconds}' ms");
+            sw.Stop();
         }
 
         public static void Start()
         {
-            Console.WriteLine("Starting InvalidProgramException test");
+            Console.WriteLine("# Starting InvalidProgramException test");
 
             var controllerTypes = TestHelper.GetAllControllers();
             var container = GetContainerForTest();
+            Console.WriteLine($"## Using container: {container}");
 
-            Console.WriteLine("Validating everything...");
+            Console.WriteLine("## Validating everything...");
             var sw = Stopwatch.StartNew();
             var validateResult = container.Validate();
             Console.WriteLine($"Validated in {sw.Elapsed.TotalMilliseconds} ms");
@@ -65,7 +63,9 @@ namespace LoadTest
                 throw new Exception(validateResult.ToString());
             }
 
+            Console.WriteLine("### Resolving 1st time:");
             ResolveAllControllers(container, controllerTypes);
+            Console.WriteLine("### Resolving 2nd time:");
             ResolveAllControllers(container, controllerTypes);
         }
     }
