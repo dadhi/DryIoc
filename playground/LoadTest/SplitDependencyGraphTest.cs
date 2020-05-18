@@ -12,7 +12,7 @@ namespace LoadTest
         {
             var container = new Container((rules) =>
                 rules
-                    .WithDependencyDepthToSplitObjectGraph(depth)
+                    .WithDependencyCountInLambdaToSplitBigObjectGraph(depth)
                     .WithoutInterpretationForTheFirstResolution()
                     .WithoutUseInterpretation()
                     .With(FactoryMethod.ConstructorWithResolvableArguments)
@@ -41,11 +41,11 @@ namespace LoadTest
 
         public static void Start()
         {
-            Console.WriteLine("Starting WithDependencyDepthToSplitObjectGraph test");
+            Console.WriteLine("Starting Object Graph split test");
 
             var controllerTypes = TestHelper.GetAllControllers();
 
-            for (var depth = 1; depth < 50; depth++)
+            for (var depth = 10; depth < 1000; depth+=10)
             {
                 Console.WriteLine("Depth " + depth);
 

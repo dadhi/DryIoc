@@ -2016,53 +2016,60 @@ namespace DryIoc
                 return new KeyedFactoryCacheEntry((KeyedFactoryCacheEntry)x, k, f);
             }
 
+            // The cases to store
+            // | Singleton of (ConstantExpression e)
+            // | Transient of (Expression e, int dependencyCount)
+            // | Scoped    of (Expression e)
+            // | ScopedTo  of (Expression e, object name)
             internal struct ExpressionCacheSlot
             {
-                public Expression SingletonOrTransient;
-                public int TransientDependencyCount; // because for the other reuses we know that it's 1
-                public Expression Scoped;
-                public KeyValuePair<object, Expression>[] ScopedToName;
+                public Expression Expr;
+                public object ScopeNameOrDependencyCount; // null - singleton | NoNameForScoped - scoped | TransientDependencyCount - transient | scope name
+                public static readonly object NoNameForScoped = new object();
             }
 
-            /// The int key is the `FactoryID`
+            internal class TransientDependencyCount
+            {
+                public int Value;
+                public TransientDependencyCount(int value) => Value = value;
+            }
+
+            ///<summary>The int key is the `FactoryID`</summary>
             public ImMap<ExpressionCacheSlot>[] FactoryExpressionCache;
 
-            public Expression GetCachedFactoryExpression(
-                int factoryId, IReuse reuse, out ImMapEntry<Registry.ExpressionCacheSlot> entry)
+            internal Expression GetCachedFactoryExpression(int factoryId, 
+                IReuse reuse, out ImMapEntry<Registry.ExpressionCacheSlot> entry)
             {
-                entry = null;
-                var cache = FactoryExpressionCache;
-                if (cache != null)
+                entry = FactoryExpressionCache?[factoryId & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(factoryId);
+                if (entry == null) 
+                    return null;
+
+                var expr = entry.Value.Expr;
+                if (expr == null)
+                    return null; // could be null when the cache is reset by Unregister and IfAlreadyRegistered.Replace
+
+                var scopeNameOrDependencyCount = entry.Value.ScopeNameOrDependencyCount;
+
+                if (reuse is SingletonReuse)
+                    return scopeNameOrDependencyCount == null ? expr : null;
+
+                if (reuse == Reuse.Transient)
+                    return scopeNameOrDependencyCount is TransientDependencyCount ? expr : null;
+
+                if (reuse is CurrentScopeReuse scoped)
                 {
-                    var map = cache[factoryId & CACHE_SLOT_COUNT_MASK];
-                    if (map != null)
-                    {
-                        entry = map.GetEntryOrDefault(factoryId);
-                        if (entry != null)
-                        {
-                            if (reuse == Reuse.Transient || reuse is SingletonReuse)
-                                return entry.Value.SingletonOrTransient;
+                    if (scoped.Name == null)
+                        return scopeNameOrDependencyCount == Registry.ExpressionCacheSlot.NoNameForScoped ? expr : null;
 
-                            if (reuse is CurrentScopeReuse scoped)
-                            {
-                                if (scoped.Name == null)
-                                    return entry.Value.Scoped;
-
-                                var named = entry.Value.ScopedToName;
-                                if (named != null)
-                                    for (var i = 0; i < named.Length; i++)
-                                        if (Equals(named[i].Key, scoped.Name))
-                                            return named[i].Value;
-                            }
-                        }
-                    }
+                    if (ReferenceEquals(scoped.Name, scopeNameOrDependencyCount) || scoped.Name.Equals(scopeNameOrDependencyCount))
+                        return expr;
                 }
 
                 return null;
             }
 
-            internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount,
-                ImMapEntry<ExpressionCacheSlot> entry = null)
+            internal void CacheFactoryExpression(int factoryId, 
+                Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<ExpressionCacheSlot> entry)
             {
                 if (entry == null)
                 {
@@ -2084,42 +2091,12 @@ namespace DryIoc
                     }
                 }
 
+                entry.Value.Expr = expr;
+
                 if (reuse == Reuse.Transient)
-                {
-                    entry.Value.SingletonOrTransient = expr;
-                    entry.Value.TransientDependencyCount = dependencyCount;
-                }
-                else if (reuse is SingletonReuse)
-                {
-                    entry.Value.SingletonOrTransient = expr;
-                }
+                    entry.Value.ScopeNameOrDependencyCount = new TransientDependencyCount(dependencyCount);
                 else if (reuse is CurrentScopeReuse scoped)
-                {
-                    if (scoped.Name == null)
-                        entry.Value.Scoped = expr;
-                    else
-                    {
-                        var named = entry.Value.ScopedToName;
-                        if (named == null)
-                        {
-                            entry.Value.ScopedToName = scoped.Name.Pair(expr).One();
-                        }
-                        else
-                        {
-                            var i = named.Length - 1;
-                            for (; i >= 0; i--)
-                                if (Equals(named[i].Key, scoped.Name))
-                                    break;
-                            if (i == -1)
-                            {
-                                var newNamed = new KeyValuePair<object, Expression>[named.Length + 1];
-                                Array.Copy(named, 0, newNamed, 0, named.Length);
-                                newNamed[named.Length] = scoped.Name.Pair(expr);
-                                entry.Value.ScopedToName = newNamed;
-                            }
-                        }
-                    }
-                }
+                    entry.Value.ScopeNameOrDependencyCount = scoped.Name ?? ExpressionCacheSlot.NoNameForScoped;
             }
 
             private enum IsChangePermitted { Permitted, Error, Ignored }
@@ -5221,11 +5198,11 @@ namespace DryIoc
             DefaultDependencyCountInLambdaToSplitBigObjectGraph, null, null, null, null, null);
          
         /// <summary>Does nothing</summary>
-        [Obsolete("Is not used anymore to split the graph - instead use the `TotalDependencyCountInLambdaToSplitBigObjectGraph`")]
+        [Obsolete("Is not used anymore to split the graph - instead use the `DependencyCountInLambdaToSplitBigObjectGraph`")]
         public const int DefaultDependencyDepthToSplitObjectGraph = 20;
 
         /// <summary>Does nothing</summary>
-        [Obsolete("Is not used anymore to split the graph - instead use the `TotalDependencyCountInLambdaToSplitBigObjectGraph`")]
+        [Obsolete("Is not used anymore to split the graph - instead use the `DependencyCountInLambdaToSplitBigObjectGraph`")]
         public int DependencyDepthToSplitObjectGraph { get; private set; }
 
         /// <summary>The default total dependency count - a expression tree node count to split the object graph</summary>
@@ -5249,7 +5226,7 @@ namespace DryIoc
         public int DependencyCountInLambdaToSplitBigObjectGraph { get; private set; }
 
         /// <summary>Does nothing</summary>
-        [Obsolete("It does not work - use `WithTotalDependencyCountInLambdaToSplitBigObjectGraph`")]
+        [Obsolete("It does not work - use `WithDependencyCountInLambdaToSplitBigObjectGraph`")]
         public Rules WithDependencyDepthToSplitObjectGraph(int depth) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, depth < 1 ? 1 : depth,
@@ -5257,7 +5234,7 @@ namespace DryIoc
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Sets the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/></summary>
-        public Rules WithTotalDependencyCountInLambdaToSplitBigObjectGraph(int dependencyCount) =>
+        public Rules WithDependencyCountInLambdaToSplitBigObjectGraph(int dependencyCount) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, dependencyCount < 1 ? 1 : dependencyCount,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
@@ -5269,7 +5246,7 @@ namespace DryIoc
 
         /// <summary>Disables the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/> limitation.</summary>
         public Rules WithoutTotalDependencyCountInLambdaToSplitBigObjectGraph() =>
-            WithTotalDependencyCountInLambdaToSplitBigObjectGraph(int.MaxValue);
+            WithDependencyCountInLambdaToSplitBigObjectGraph(int.MaxValue);
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
         public FactoryMethodSelector FactoryMethod => _made.FactoryMethod;
@@ -9649,13 +9626,13 @@ namespace DryIoc
                 var cachedExpr = ((Container)container).GetCachedFactoryExpression(request.FactoryID, reuse, out cacheEntry);
                 if (cachedExpr != null)
                 {
-                    if (reuse == DryIoc.Reuse.Transient && cacheEntry.Value.TransientDependencyCount > 0 &&
+                    if (reuse == DryIoc.Reuse.Transient &&
+                        cacheEntry.Value.ScopeNameOrDependencyCount is Container.Registry.TransientDependencyCount depCount && 
+                        depCount.Value > 0 &&
                         !rules.UsedForValidation && !rules.UsedForExpressionGeneration)
                     {
-                        var depCount = cacheEntry.Value.TransientDependencyCount;
                         for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
-                            p.DependencyCount += depCount;
-
+                            p.DependencyCount += depCount.Value;
                     }
                     return cachedExpr;
                 }
