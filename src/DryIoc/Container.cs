@@ -2775,268 +2775,261 @@ namespace DryIoc
             switch (expr.NodeType)
             {
                 case ExprType.Constant:
-                {
-                    result = ((ConstantExpression)expr).Value;
-                    return true;
-                }
+                    {
+                        result = ((ConstantExpression)expr).Value;
+                        return true;
+                    }
                 case ExprType.New:
-                {
-                    var newExpr = (NewExpression)expr;
+                    {
+                        var newExpr = (NewExpression)expr;
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                    var fewArgCount = newExpr.FewArgumentCount;
-                    if (fewArgCount >= 0)
-                    {
-                        if (fewArgCount == 0)
+                        var fewArgCount = newExpr.FewArgumentCount;
+                        if (fewArgCount >= 0)
                         {
-                            result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
-                            return true;
-                        }
+                            if (fewArgCount == 0)
+                            {
+                                result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
+                                return true;
+                            }
 
-                        if (fewArgCount == 1)
-                        {
-                            var fewArgs = new object[1];
-                            var fewArgsExpr = ((OneArgumentNewExpression)newExpr).Argument;
-                            if (!TryInterpret(r, fewArgsExpr, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]))
-                                return false;
-                            result = newExpr.Constructor.Invoke(fewArgs);
-                            return true;
-                        }
+                            if (fewArgCount == 1)
+                            {
+                                var fewArgs = new object[1];
+                                var fewArgsExpr = ((OneArgumentNewExpression)newExpr).Argument;
+                                if (!TryInterpret(r, fewArgsExpr, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]))
+                                    return false;
+                                result = newExpr.Constructor.Invoke(fewArgs);
+                                return true;
+                            }
 
-                        if (fewArgCount == 2)
-                        {
-                            var fewArgs = new object[2];
-                            var fewArgsExpr = ((TwoArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]))
-                                return false;
-                            result = newExpr.Constructor.Invoke(fewArgs);
-                            return true;
-                        }
+                            if (fewArgCount == 2)
+                            {
+                                var fewArgs = new object[2];
+                                var fewArgsExpr = ((TwoArgumentsNewExpression)newExpr);
+                                if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]))
+                                    return false;
+                                result = newExpr.Constructor.Invoke(fewArgs);
+                                return true;
+                            }
 
-                        if (fewArgCount == 3)
-                        {
-                            var fewArgs = new object[3];
-                            var fewArgsExpr = ((ThreeArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]))
-                                return false;
-                            result = newExpr.Constructor.Invoke(fewArgs);
-                            return true;
-                        }
+                            if (fewArgCount == 3)
+                            {
+                                var fewArgs = new object[3];
+                                var fewArgsExpr = ((ThreeArgumentsNewExpression)newExpr);
+                                if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]))
+                                    return false;
+                                result = newExpr.Constructor.Invoke(fewArgs);
+                                return true;
+                            }
 
-                        if (fewArgCount == 4)
-                        {
-                            var fewArgs = new object[4];
-                            var fewArgsExpr = ((FourArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]))
-                                return false;
-                            result = newExpr.Constructor.Invoke(fewArgs);
-                            return true;
+                            if (fewArgCount == 4)
+                            {
+                                var fewArgs = new object[4];
+                                var fewArgsExpr = ((FourArgumentsNewExpression)newExpr);
+                                if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]))
+                                    return false;
+                                result = newExpr.Constructor.Invoke(fewArgs);
+                                return true;
+                            }
+                            if (fewArgCount == 5)
+                            {
+                                var fewArgs = new object[5];
+                                var fewArgsExpr = ((FiveArgumentsNewExpression)newExpr);
+                                if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]) ||
+                                    !TryInterpret(r, fewArgsExpr.Argument4, paramExprs, paramValues, parentArgs, useFec, out fewArgs[4]))
+                                    return false;
+                                result = newExpr.Constructor.Invoke(fewArgs);
+                                return true;
+                            }
                         }
-                        if (fewArgCount == 5)
-                        {
-                            var fewArgs = new object[5];
-                            var fewArgsExpr = ((FiveArgumentsNewExpression)newExpr);
-                            if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument3, paramExprs, paramValues, parentArgs, useFec, out fewArgs[3]) ||
-                                !TryInterpret(r, fewArgsExpr.Argument4, paramExprs, paramValues, parentArgs, useFec, out fewArgs[4]))
-                                return false;
-                            result = newExpr.Constructor.Invoke(fewArgs);
-                            return true;
-                        }
-                    }
 #endif
-                    var newArgs = newExpr.Arguments.ToListOrSelf();
-                    var newArgCount = newArgs.Count;
-                    if (newArgCount == 0)
-                        result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
-                    else
-                    {
-                        var args = new object[newArgCount];
-                        for (var i = 0; i < args.Length; i++)
-                            if (!TryInterpret(r, newArgs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
-                                return false;
-                        result = newExpr.Constructor.Invoke(args);
-                    }
-                    return true;
-                }
-                case ExprType.Call:
-                {
-                    return TryInterpretMethodCall(r, expr, paramExprs, paramValues, parentArgs, useFec, ref result);
-                }
-                case ExprType.Convert:
-                {
-                    var convertExpr = (UnaryExpression)expr;
-                    if (!TryInterpret(r, convertExpr.Operand, paramExprs, paramValues, parentArgs, useFec, out var instance))
-                        return false;
-                    // skip conversion for null and for directly assignable type
-                    if (instance == null)
-                        result = instance;
-                    else if (convertExpr.Type.GetTypeInfo().IsAssignableFrom(instance.GetType().GetTypeInfo()))
-                        result = instance;
-                    else
-                        result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
-                    return true;
-                }
-                case ExprType.MemberAccess:
-                {
-                    var memberExpr = (MemberExpression)expr;
-                    var instanceExpr = memberExpr.Expression;
-                    object instance = null;
-                    if (instanceExpr != null && !TryInterpret(r, instanceExpr, paramExprs, paramValues, parentArgs, useFec, out instance))
-                        return false;
-
-                    if (memberExpr.Member is FieldInfo field)
-                    {
-                        result = field.GetValue(instance);
-                        return true;
-                    }
-
-                    if (memberExpr.Member is PropertyInfo prop)
-                    {
-                        result = prop.GetValue(instance, null);
-                        return true;
-                    }
-
-                    return false;
-                }
-                case ExprType.MemberInit:
-                {
-                    var memberInit = (MemberInitExpression)expr;
-                    if (!TryInterpret(r, memberInit.NewExpression, paramExprs, paramValues, parentArgs, useFec, out var instance))
-                        return false;
-
-                    var bindings = memberInit.Bindings;
-                    for (var i = 0; i < bindings.Count; i++)
-                    {
-                        var binding = (MemberAssignment)bindings[i];
-                        if (!TryInterpret(r, binding.Expression, paramExprs, paramValues, parentArgs, useFec, out var memberValue))
-                            return false;
-
-                        var field = binding.Member as FieldInfo;
-                        if (field != null)
-                            field.SetValue(instance, memberValue);
+                        var newArgs = newExpr.Arguments.ToListOrSelf();
+                        if (newArgs.Count == 0)
+                            result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                         else
-                            ((PropertyInfo)binding.Member).SetValue(instance, memberValue, null);
+                        {
+                            var args = new object[newArgs.Count];
+                            for (var i = 0; i < args.Length; i++)
+                                if (!TryInterpret(r, newArgs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
+                                    return false;
+                            result = newExpr.Constructor.Invoke(args);
+                        }
+                        return true;
                     }
-
-                    result = instance;
-                    return true;
-                }
-                case ExprType.NewArrayInit:
-                {
-                    var newArray = (NewArrayExpression)expr;
-                    var itemExprs = newArray.Expressions.ToListOrSelf();
-                    var items = new object[itemExprs.Count];
-
-                    for (var i = 0; i < items.Length; i++)
-                        if (!TryInterpret(r, itemExprs[i], paramExprs, paramValues, parentArgs, useFec, out items[i]))
+                case ExprType.Call:
+                    {
+                        return TryInterpretMethodCall(r, expr, paramExprs, paramValues, parentArgs, useFec, ref result);
+                    }
+                case ExprType.Convert:
+                    {
+                        var convertExpr = (UnaryExpression)expr;
+                        if (!TryInterpret(r, convertExpr.Operand, paramExprs, paramValues, parentArgs, useFec, out var instance))
+                            return false;
+                        // skip conversion for null and for directly assignable type
+                        if (instance == null)
+                            result = instance;
+                        else if (convertExpr.Type.GetTypeInfo().IsAssignableFrom(instance.GetType().GetTypeInfo()))
+                            result = instance;
+                        else
+                            result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
+                        return true;
+                    }
+                case ExprType.MemberAccess:
+                    {
+                        var memberExpr = (MemberExpression)expr;
+                        var instanceExpr = memberExpr.Expression;
+                        object instance = null;
+                        if (instanceExpr != null && !TryInterpret(r, instanceExpr, paramExprs, paramValues, parentArgs, useFec, out instance))
                             return false;
 
-                    result = Converter.ConvertMany(items, newArray.Type.GetElementType());
-                    return true;
-                }
-                case ExprType.Invoke:
-                {
-                    var invokeExpr = (InvocationExpression)expr;
-                    var delegateExpr = invokeExpr.Expression;
-
-                    // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
-                    if (delegateExpr is ConstantExpression delegateConstExpr)
-                    {
-                        if (delegateExpr.Type == typeof(FactoryDelegate))
+                        if (memberExpr.Member is FieldInfo field)
                         {
-                            if (!TryInterpret(r, invokeExpr.Arguments[0], paramExprs, paramValues, parentArgs, useFec, out var resolver))
-                                return false;
-                            result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
+                            result = field.GetValue(instance);
                             return true;
                         }
+
+                        if (memberExpr.Member is PropertyInfo prop)
+                        {
+                            result = prop.GetValue(instance, null);
+                            return true;
+                        }
+
+                        return false;
                     }
-                    else if (delegateExpr.Type == typeof(Func<object>) &&
-                             delegateExpr is LambdaExpression funcExpr) 
+                case ExprType.MemberInit:
                     {
-                        // The Invocation of Func is used for splitting the big object graphs
-                        // so we can ignore this split and go directly to the body
-                        return TryInterpret(r, funcExpr.Body, paramExprs, paramValues, parentArgs, useFec,
-                            out result);
+                        var memberInit = (MemberInitExpression)expr;
+                        if (!TryInterpret(r, memberInit.NewExpression, paramExprs, paramValues, parentArgs, useFec, out var instance))
+                            return false;
+
+                        var bindings = memberInit.Bindings;
+                        for (var i = 0; i < bindings.Count; i++)
+                        {
+                            var binding = (MemberAssignment)bindings[i];
+                            if (!TryInterpret(r, binding.Expression, paramExprs, paramValues, parentArgs, useFec, out var memberValue))
+                                return false;
+
+                            var field = binding.Member as FieldInfo;
+                            if (field != null)
+                                field.SetValue(instance, memberValue);
+                            else
+                                ((PropertyInfo)binding.Member).SetValue(instance, memberValue, null);
+                        }
+
+                        result = instance;
+                        return true;
                     }
+                case ExprType.NewArrayInit:
+                    {
+                        var newArray = (NewArrayExpression)expr;
+                        var itemExprs = newArray.Expressions.ToListOrSelf();
+                        var items = new object[itemExprs.Count];
+
+                        for (var i = 0; i < items.Length; i++)
+                            if (!TryInterpret(r, itemExprs[i], paramExprs, paramValues, parentArgs, useFec, out items[i]))
+                                return false;
+
+                        result = Converter.ConvertMany(items, newArray.Type.GetElementType());
+                        return true;
+                    }
+                case ExprType.Invoke:
+                    {
+                        var invokeExpr = (InvocationExpression)expr;
+                        var delegateExpr = invokeExpr.Expression;
+
+                        // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
+                        if (delegateExpr is ConstantExpression delegateConstExpr)
+                        {
+                            if (delegateExpr.Type == typeof(FactoryDelegate))
+                            {
+                                if (!TryInterpret(r, invokeExpr.Arguments[0], paramExprs, paramValues, parentArgs, useFec, out var resolver))
+                                    return false;
+                                result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
+                                return true;
+                            }
+                        }
+                        else if (delegateExpr.Type == typeof(Func<object>) &&
+                                 delegateExpr is LambdaExpression funcExpr)
+                        {
+                            // The Invocation of Func is used for splitting the big object graphs
+                            // so we can ignore this split and go directly to the body
+                            return TryInterpret(r, funcExpr.Body, paramExprs, paramValues, parentArgs, useFec,
+                                out result);
+                        }
 
 #if !SUPPORTS_DELEGATE_METHOD
-                    return false;
+                return false;
 #else
-                    if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
-                        return false;
-                    
-                    var lambda = (Delegate)delegateObj;
-                    var argExprs = invokeExpr.Arguments.ToListOrSelf();
-                    if (argExprs.Count == 0)
-                        result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
-                    else
-                    {
-                        var args = new object[argExprs.Count];
-                        for (var i = 0; i < args.Length; i++)
-                            if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
-                                return false;
-                        result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
-                    }
-                    return true;
-#endif
-                }
-                case ExprType.Parameter:
-                {
-                    if (expr == paramExprs)
-                    {
-                        result = paramValues;
-                        return true;
-                    }
+                        if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
+                            return false;
 
-                    if (paramExprs is IList<ParameterExpression> multipleParams)
-                        for (var i = 0; i < multipleParams.Count; i++)
-                            if (expr == multipleParams[i])
-                            {
-                                result = ((object[])paramValues)[i];
-                                return true;
-                            }
-
-                    if (parentArgs != null)
-                    {
-                        for (var p = parentArgs; p != null; p = p.ParentWithArgs)
+                        var lambda = (Delegate)delegateObj;
+                        var argExprs = invokeExpr.Arguments.ToListOrSelf();
+                        if (argExprs.Count == 0)
+                            result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
+                        else
                         {
-                            if (expr == p.ParamExprs)
-                            {
-                                result = p.ParamValues;
-                                return true;
-                            }
+                            var args = new object[argExprs.Count];
+                            for (var i = 0; i < args.Length; i++)
+                                if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
+                                    return false;
+                            result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
+                        }
+                        return true;
+#endif
+                    }
+                case ExprType.Parameter:
+                    {
+                        if (expr == paramExprs)
+                        {
+                            result = paramValues;
+                            return true;
+                        }
 
-                            multipleParams = p.ParamExprs as IList<ParameterExpression>;
-                            if (multipleParams != null)
+                        if (paramExprs is IList<ParameterExpression> multipleParams)
+                            for (var i = 0; i < multipleParams.Count; i++)
+                                if (expr == multipleParams[i])
+                                {
+                                    result = ((object[])paramValues)[i];
+                                    return true;
+                                }
+
+                        if (parentArgs != null)
+                        {
+                            for (var p = parentArgs; p != null; p = p.ParentWithArgs)
                             {
-                                for (var i = 0; i < multipleParams.Count; i++)
-                                    if (expr == multipleParams[i])
-                                    {
-                                        result = ((object[])paramValues)[i];
-                                        return true;
-                                    }
+                                if (expr == p.ParamExprs)
+                                {
+                                    result = p.ParamValues;
+                                    return true;
+                                }
+
+                                multipleParams = p.ParamExprs as IList<ParameterExpression>;
+                                if (multipleParams != null)
+                                    for (var i = 0; i < multipleParams.Count; i++)
+                                        if (expr == multipleParams[i])
+                                        {
+                                            result = ((object[]) paramValues)[i];
+                                            return true;
+                                        }
                             }
                         }
+                        return false;
                     }
-                    return false;
-                }
                 case ExprType.Lambda:
-                {
                     return TryInterpretNestedLambda(r, (LambdaExpression)expr, paramExprs, paramValues, parentArgs, useFec, ref result);
-                }
                 default:
-                    break;
+                    return false;
             }
- 
-            return false;
         }
 
         private static bool TryInterpretNestedLambda(IResolverContext r, LambdaExpression lambdaExpr,
@@ -4939,7 +4932,8 @@ namespace DryIoc
 
             // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
             // So that Func<Derived> may be used for Func<Base>
-            if (serviceExpr.Type != serviceType)
+            if (serviceExpr.Type != serviceType && 
+                !serviceType.GetTypeInfo().IsAssignableFrom(serviceExpr.Type.GetTypeInfo()))
                 serviceExpr = Convert(serviceExpr, serviceType);
 
             var lazyValueFactoryType = typeof(Func<>).MakeGenericType(serviceType);
@@ -4988,7 +4982,9 @@ namespace DryIoc
 
             // The conversion to handle lack of covariance for Func<out T> in .NET 3.5
             // So that Func<Derived> may be used for Func<Base>
-            if (!isAction && serviceExpr.Type != serviceType)
+            if (!isAction && 
+                serviceExpr.Type != serviceType &&
+                !serviceType.GetTypeInfo().IsAssignableFrom(serviceExpr.Type.GetTypeInfo()))
                 serviceExpr = Convert(serviceExpr, serviceType);
 
             return Lambda(wrapperType, serviceExpr, argExprs
@@ -11076,7 +11072,7 @@ namespace DryIoc
         /// <summary>Create expression by wrapping call to stored delegate with provided request.</summary>
         public override Expression CreateExpressionOrDefault(Request request)
         {
-            // GetConstant here is needed to check the state
+            // GetConstant here is needed to check the runtime state rule
             var delegateExpr = request.Container.GetConstantExpression(_factoryDelegate);
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             return Convert(Invoke(delegateExpr, resolverExpr), request.GetActualServiceType());
