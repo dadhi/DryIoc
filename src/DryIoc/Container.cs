@@ -2782,6 +2782,7 @@ namespace DryIoc
                 case ExprType.New:
                     {
                         var newExpr = (NewExpression)expr;
+                        ConstantExpression a;
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
                         var fewArgCount = newExpr.FewArgumentCount;
                         if (fewArgCount >= 0)
@@ -2792,11 +2793,14 @@ namespace DryIoc
                                 return true;
                             }
 
+                            object[] fewArgs;
                             if (fewArgCount == 1)
                             {
-                                var fewArgs = new object[1];
-                                var fewArgsExpr = ((OneArgumentNewExpression)newExpr).Argument;
-                                if (!TryInterpret(r, fewArgsExpr, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]))
+                                fewArgs = new object[1];
+                                var singleArgExpr = ((OneArgumentNewExpression)newExpr).Argument;
+                                if ((a = singleArgExpr as ConstantExpression) != null)
+                                    fewArgs[0] = a.Value;
+                                else if (!TryInterpret(r, singleArgExpr, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]))
                                     return false;
                                 result = newExpr.Constructor.Invoke(fewArgs);
                                 return true;
@@ -2804,10 +2808,15 @@ namespace DryIoc
 
                             if (fewArgCount == 2)
                             {
-                                var fewArgs = new object[2];
-                                var fewArgsExpr = ((TwoArgumentsNewExpression)newExpr);
-                                if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
-                                    !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]))
+                                var fewArgsExpr = (TwoArgumentsNewExpression)newExpr;
+                                fewArgs = new object[2];
+                                if ((a = fewArgsExpr.Argument0 as ConstantExpression) != null)
+                                    fewArgs[0] = a.Value;
+                                else if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]))
+                                    return false;
+                                if ((a = fewArgsExpr.Argument1 as ConstantExpression) != null)
+                                    fewArgs[1] = a.Value;
+                                else if (!TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]))
                                     return false;
                                 result = newExpr.Constructor.Invoke(fewArgs);
                                 return true;
@@ -2815,11 +2824,19 @@ namespace DryIoc
 
                             if (fewArgCount == 3)
                             {
-                                var fewArgs = new object[3];
-                                var fewArgsExpr = ((ThreeArgumentsNewExpression)newExpr);
-                                if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
-                                    !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
-                                    !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]))
+                                var fewArgsExpr = (ThreeArgumentsNewExpression)newExpr;
+                                fewArgs = new object[3];
+                                if ((a = fewArgsExpr.Argument0 as ConstantExpression) != null)
+                                    fewArgs[0] = a.Value;
+                                else if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]))
+                                    return false;
+                                if ((a = fewArgsExpr.Argument1 as ConstantExpression) != null)
+                                    fewArgs[1] = a.Value;
+                                else if (!TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]))
+                                    return false;
+                                if ((a = fewArgsExpr.Argument2 as ConstantExpression) != null)
+                                    fewArgs[2] = a.Value;
+                                else if (!TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]))
                                     return false;
                                 result = newExpr.Constructor.Invoke(fewArgs);
                                 return true;
@@ -2827,8 +2844,8 @@ namespace DryIoc
 
                             if (fewArgCount == 4)
                             {
-                                var fewArgs = new object[4];
-                                var fewArgsExpr = ((FourArgumentsNewExpression)newExpr);
+                                fewArgs = new object[4];
+                                var fewArgsExpr = (FourArgumentsNewExpression)newExpr;
                                 if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
                                     !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
                                     !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
@@ -2839,8 +2856,8 @@ namespace DryIoc
                             }
                             if (fewArgCount == 5)
                             {
-                                var fewArgs = new object[5];
-                                var fewArgsExpr = ((FiveArgumentsNewExpression)newExpr);
+                                fewArgs = new object[5];
+                                var fewArgsExpr = (FiveArgumentsNewExpression)newExpr;
                                 if (!TryInterpret(r, fewArgsExpr.Argument0, paramExprs, paramValues, parentArgs, useFec, out fewArgs[0]) ||
                                     !TryInterpret(r, fewArgsExpr.Argument1, paramExprs, paramValues, parentArgs, useFec, out fewArgs[1]) ||
                                     !TryInterpret(r, fewArgsExpr.Argument2, paramExprs, paramValues, parentArgs, useFec, out fewArgs[2]) ||
@@ -2859,8 +2876,12 @@ namespace DryIoc
                         {
                             var args = new object[newArgs.Count];
                             for (var i = 0; i < args.Length; i++)
-                                if (!TryInterpret(r, newArgs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
+                            {
+                                if ((a = newArgs[i] as ConstantExpression) != null)
+                                    args[i] = a.Value;
+                                else if (!TryInterpret(r, newArgs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
                                     return false;
+                            }
                             result = newExpr.Constructor.Invoke(args);
                         }
                         return true;
@@ -2871,9 +2892,32 @@ namespace DryIoc
                     }
                 case ExprType.Convert:
                     {
+                        object instance = null;
                         var convertExpr = (UnaryExpression)expr;
-                        if (!TryInterpret(r, convertExpr.Operand, paramExprs, paramValues, parentArgs, useFec, out var instance))
+                        var operandExpr = convertExpr.Operand;
+                        if (operandExpr is MethodCallExpression m)
+                        {
+                            if (!TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, useFec, ref instance))
+                                return false;
+                        }
+                        else if (operandExpr is InvocationExpression i &&
+                             i.Expression is ConstantExpression cd &&
+                             cd.Value is FactoryDelegate d)
+                        {
+                            // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
+                            if (i.Arguments[0] == FactoryDelegateCompiler.ResolverContextParamExpr)
+                                result = d(r);
+                            else if (i.Arguments[0] == ResolverContext.RootOrSelfExpr)
+                                result = d(r.Root ?? r);
+                            else if (TryInterpret(r, i.Arguments[0], paramExprs, paramValues, parentArgs, useFec,
+                                out var resolver))
+                                result = d((IResolverContext) resolver);
+                            else return false;
+                            return true;
+                        }
+                        else if (!TryInterpret(r, operandExpr, paramExprs, paramValues, parentArgs, useFec, out instance))
                             return false;
+
                         // skip conversion for null and for directly assignable type
                         if (instance == null)
                             result = instance;
@@ -2946,25 +2990,10 @@ namespace DryIoc
                         var invokeExpr = (InvocationExpression)expr;
                         var delegateExpr = invokeExpr.Expression;
 
-                        // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
-                        if (delegateExpr is ConstantExpression delegateConstExpr)
-                        {
-                            if (delegateExpr.Type == typeof(FactoryDelegate))
-                            {
-                                if (!TryInterpret(r, invokeExpr.Arguments[0], paramExprs, paramValues, parentArgs, useFec, out var resolver))
-                                    return false;
-                                result = ((FactoryDelegate)delegateConstExpr.Value)((IResolverContext)resolver);
-                                return true;
-                            }
-                        }
-                        else if (delegateExpr.Type == typeof(Func<object>) &&
-                                 delegateExpr is LambdaExpression funcExpr)
-                        {
-                            // The Invocation of Func is used for splitting the big object graphs
-                            // so we can ignore this split and go directly to the body
-                            return TryInterpret(r, funcExpr.Body, paramExprs, paramValues, parentArgs, useFec,
-                                out result);
-                        }
+                        // The Invocation of Func is used for splitting the big object graphs
+                        // so we can ignore this split and go directly to the body
+                        if (delegateExpr.Type == typeof(Func<object>) && delegateExpr is LambdaExpression f)
+                            return TryInterpret(r, f.Body, paramExprs, paramValues, parentArgs, useFec, out result);
 
 #if !SUPPORTS_DELEGATE_METHOD
                 return false;

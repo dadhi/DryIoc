@@ -1,14 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Web.Http;
-using System.Web.Http.Controllers;
 using DryIoc;
 using DryIoc.WebApi;
-using Mega;
 using ThreadState = System.Threading.ThreadState;
 
 namespace LoadTest
