@@ -16,8 +16,8 @@ namespace LoadTest
 
     public class LoadTestBenchmark
     {
-        /*
-## v4.1.5 - Singleton decorators 
+/*
+# v4.1.5 - Singleton decorators 
 
 Validation finished
 00:01:24.33
@@ -35,24 +35,32 @@ container with ambient ScopeContext DryIoc.AsyncExecutionFlowScopeContext withou
 
 ResolveAllControllersOnce of 156 controllers is done in 0.0073486 seconds
 ResolveAllControllersOnce of 156 controllers is done in 0.1591292 seconds
--- Starting Load test --
-32 Threads.
 
--- Load Test Finished --
-00:00:00.16
+# v4.2.0 - Singleton decorators 
 
-New container created
+New container created:
 
 container with ambient ScopeContext DryIoc.AsyncExecutionFlowScopeContext without scope
  with Rules  with Made={FactoryMethod=ConstructorWithResolvableArguments}
 
-ResolveAllControllersOnce of 156 controllers is done in 0.0080617 seconds
-ResolveAllControllersOnce of 156 controllers is done in 0.1478801 seconds
--- Starting Randomized Load test --
-155 Threads.
+Validating controllers only...
 
--- Randomized Load Finished --
-00:00:00.36
+Validation finished
+00:00:00.08
+
+ResolveAllControllersOnce of 156 controllers is done in 0.3410844 seconds
+
+New container created:
+
+container with ambient ScopeContext DryIoc.AsyncExecutionFlowScopeContext without scope
+ with Rules  with Made={FactoryMethod=ConstructorWithResolvableArguments}
+
+## Interpreting...
+ResolveAllControllersOnce of 156 controllers is done in 0.1624977 seconds
+## Compiling and caching the delegate...
+ResolveAllControllersOnce of 156 controllers is done in 13.0481077 seconds
+## Invoking the cached delegate...
+ResolveAllControllersOnce of 156 controllers is done in 0.0262042 seconds
 */
 
         public static IContainer RootContainer = null;
@@ -81,10 +89,8 @@ ResolveAllControllersOnce of 156 controllers is done in 0.1478801 seconds
 
             var container = CreateContainer();
 
-            Console.WriteLine("Validating controllers only...");
             var stopWatch = Stopwatch.StartNew();
-
-            bool IsController(ServiceRegistrationInfo x) => x.ServiceType.Name.EndsWith("Controller");
+            Console.WriteLine("Validating controllers only...");
 
             // Paralleling the Validation
             //var controllers = container.GetServiceRegistrations()
@@ -98,6 +104,7 @@ ResolveAllControllersOnce of 156 controllers is done in 0.1478801 seconds
             //var results = (await Task.WhenAll(validationTasks))
             //    .SelectMany(x => x).ToArray();
 
+            bool IsController(ServiceRegistrationInfo x) => x.ServiceType.Name.EndsWith("Controller");
             var results = container.Validate(IsController);
             if (results.Length > 0)
             {
@@ -131,16 +138,26 @@ ResolveAllControllersOnce of 156 controllers is done in 0.1478801 seconds
 
             container = CreateContainer();
             ForceGarbageCollector();
-            ResolveAllControllersOnce(container, controllers); // Interpret
-            ResolveAllControllersOnce(container, controllers); // Compile, cache
+
+            Console.WriteLine("## Interpreting...");
+            ResolveAllControllersOnce(container, controllers);
+            Console.WriteLine("## Compiling and caching the delegate...");
+            ResolveAllControllersOnce(container, controllers);
+            Console.WriteLine("## Invoking the cached delegate...");
+            ResolveAllControllersOnce(container, controllers);
+
             IterateInOrder(container, controllers);
+
             container = CreateContainer();
             ForceGarbageCollector();
-            ResolveAllControllersOnce(container, controllers); // Interpret
-            ResolveAllControllersOnce(container, controllers); // Compile, cache
+            Console.WriteLine("## Interpreting...");
+            ResolveAllControllersOnce(container, controllers);
+            Console.WriteLine("## Compiling and caching the delegate...");
+            ResolveAllControllersOnce(container, controllers);
+            Console.WriteLine("## Invoking the cached delegate...");
+            ResolveAllControllersOnce(container, controllers);
+
             StartRandomOrderTest(container, controllers);
-
-
 
             Console.WriteLine("");
             Console.WriteLine("---------------------------------------");

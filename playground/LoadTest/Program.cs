@@ -10,7 +10,7 @@ namespace LoadTest
 
             // InvalidProgramExceptionTest.Start();
 
-            SplitDependencyGraphTest.Start();
+            // SplitDependencyGraphTest.Start();
 
             LoadTestBenchmark.Start();
 
