@@ -341,7 +341,17 @@ namespace Shared
         protected readonly IBillingService BillingService;
         protected readonly IBilledRowRepository BilledRowRepository;
 
-        public UserLicensesService(ICurrentUserService currentUserService, IOrganizationAddonService organizationAddonService, IMasterUserRepository masterUserRepository, IBillingService billingService, IBilledRowRepository billedRowRepository)
+        public UserLicensesService(
+            ICurrentUserService currentUserService, 
+            IOrganizationAddonService organizationAddonService, 
+            IMasterUserRepository masterUserRepository, 
+            IBillingService billingService, 
+            IBilledRowRepository billedRowRepository,
+            IOrganizationBillingRuleService billingRule,
+            IBilledPaymentRepository billedPaymentRepo,
+            IOrderConfirmationEmailBuilder emailBuilder,
+            IMailClient mailClient
+        )
         {
             CurrentUserService = currentUserService;
             OrganizationAddonService = organizationAddonService;

@@ -249,7 +249,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_service_with_recursive_dependency_with_Func_on_road_should_throw()
+        public void Resolving_service_with_recursive_dependency_with_the_Func_on_the_road_should_throw()
         {
             var container = new Container();
 

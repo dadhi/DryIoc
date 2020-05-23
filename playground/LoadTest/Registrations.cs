@@ -21,6 +21,7 @@ using Web.Rest.API;
 using CustomerDatabase = Databases.CustomerDatabase;
 using IUserService = Conn.IUserService;
 using Mega;
+using Monitor;
 
 namespace LoadTest
 {
@@ -355,6 +356,7 @@ namespace LoadTest
                 RegisterMail(container);
                 RegisterBackgroundTasks(container);
                 RegisterScanner(container);
+                RegMonitor(container);
             }
 
             private static void RegisterBackgroundTasks(IContainer container)
@@ -507,13 +509,24 @@ namespace LoadTest
                 );
             }
 
+            private static void RegMonitor(IContainer container)
+            {
+                container.RegisterInstance(new LogConfiguration("my-log"));
+                container.RegisterInstance(new AsynchronousDataCollectorClient());
+                container.RegisterInstance<IDataCollectorClient>(new AsynchronousDataCollectorClient());
+
+                container.RegisterInstance<CalendarSyncLogConfiguration>(new CalendarSyncLogConfiguration("foo"));
+                container.Register<IMessageLogger, MessageLogger>(Reuse.Singleton);
+            }
+
             private static void RegisterDataObjects(IContainer container)
             {
                 var apiAssembly = typeof(ActivityRepository).Assembly;
                 var ns = typeof(ActivityRepository).Namespace;
                 var types = apiAssembly.GetLoadedTypes().Where(i =>
                     {
-                        return i.Namespace == ns && !i.IsInterface && !i.IsAbstract && i.Name.EndsWith("Repository");
+                        return i.Namespace == ns && !i.IsInterface && !i.IsAbstract &&
+                               (i.Name.EndsWith("Repository") || i.Name.EndsWith("Search"));
                     }
                 );
                 container.RegisterMany(types, Reuse.Singleton,
@@ -582,7 +595,7 @@ namespace LoadTest
                     }
                 ).ToArray();
 
-                container.RegisterMany(serviceTypes, Reuse.Singleton, serviceTypeCondition: s => s.IsInterface,
+                container.RegisterMany(serviceTypes, Reuse.Transient, serviceTypeCondition: s => s.IsInterface,
                     ifAlreadyRegistered: IfAlreadyRegistered.Replace);
                 container.Register<IGuidService, GuidService>(reuse: Reuse.Singleton,
                     ifAlreadyRegistered: IfAlreadyRegistered.Throw);

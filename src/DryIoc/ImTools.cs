@@ -4270,15 +4270,18 @@ namespace DryIoc.ImTools
         public static ImMapEntry<KValue<K>> CreateKValueEntry<K>(int hash, K key) =>
             new ImMapEntry<KValue<K>>(hash) { Value = { Key = key } };
 
+        /// <summary>Adds or updates the Type-keyed entry with the value. Returns a new tree.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<KValue<Type>> AddOrUpdate(this ImMap<KValue<Type>> map, Type type, object value)
+        {
+            var hash = RuntimeHelpers.GetHashCode(type);
+            return map.AddOrUpdate(hash, CreateKValueEntry(hash, type, value));
+        }
+
         /// <summary>Uses the user provided hash and adds or updates the tree with passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, K key, object value) =>
             map.AddOrUpdate(hash, CreateKValueEntry(hash, key, value));
-
-        /// <summary>Adds or updates the tree with passed Type key and the value. Returns a new tree.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KValue<Type>> AddOrUpdate(this ImMap<KValue<Type>> map, Type key, object value) =>
-            map.AddOrUpdate(RuntimeHelpers.GetHashCode(key), key, value);
 
         /// <summary>Uses the provided hash and adds or updates the tree with the passed key-value. Returns a new tree.</summary>
         [MethodImpl((MethodImplOptions)256)]

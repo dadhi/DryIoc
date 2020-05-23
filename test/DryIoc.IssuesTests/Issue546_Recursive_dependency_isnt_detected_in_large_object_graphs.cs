@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
 using DryIoc.MefAttributedModel;
@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
         public void Circular_dependencies_in_large_object_graphs_should_be_detected()
         {
             // ordinary registration — simulate large object graph by lowering the max size
-            var nonLazyContainer = new Container().WithMef().With(r => r.WithDependencyDepthToSplitObjectGraph(1));
+            var nonLazyContainer = new Container().WithMef().With(r => r.WithDependencyCountInLambdaToSplitBigObjectGraph(1));
             nonLazyContainer.RegisterExports(new[] { typeof(Issue546_Recursive_dependency_isnt_detected_in_large_object_graphs).Assembly });
 
             // check that importing as non-lazy actually detects the circular dependency
@@ -49,7 +49,7 @@ namespace DryIoc.IssuesTests
             // simulate large object graph by lowering the max size
             var container = new Container().WithMef()
                 .With(rules => rules.WithDynamicRegistrations(dynamicRegistrations)
-                .WithDependencyDepthToSplitObjectGraph(1));
+                .WithDependencyCountInLambdaToSplitBigObjectGraph(1));
 
             // make sure that CircularDependencyRoot itself is available without loading the lazy assembly
             container.RegisterExports(typeof(CircularDependencyRoot));

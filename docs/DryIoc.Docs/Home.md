@@ -143,8 +143,8 @@ for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs
 
 Located in this repo:
 
+- [DryIoc.AspNetCore31.WebApi.Sample](https://github.com/dadhi/DryIoc/tree/master/samples/DryIoc.AspNetCore31.WebApi.Sample)
 - [DryIoc.WebApi.Owin.Sample](https://bitbucket.org/dadhi/dryioc/src/8e609b011beafd71236f9cfe3bb2d3e0589e76ae/Extensions/DryIoc.WebApi.Owin.Sample/?at=default)
-- [DryIoc.AspNetCore.Sample](https://bitbucket.org/dadhi/dryioc/src/8e609b011beafd71236f9cfe3bb2d3e0589e76ae/NetCore/src/DryIoc.AspNetCore.Sample/?at=default)
 
 External links:
 
@@ -163,9 +163,9 @@ Get from NuGet:
   - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
   - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-### v4.1.2 / 2020-03-12
+### v4.2.0 / 2020-05-18
 
-[Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.1.4)
+[Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.2.0)
 
 ### [Previous Versions](VersionHistory.md)
 

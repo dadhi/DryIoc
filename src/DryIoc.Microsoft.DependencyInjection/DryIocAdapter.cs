@@ -32,6 +32,55 @@ namespace DryIoc.Microsoft.DependencyInjection
     /// to simplify work with adapted container.</summary>
     public static class DryIocAdapter
     {
+        /// <summary>This DryIoc is supposed to be used with `IHostBuilder` like this:
+        /// <code><![CDATA[
+        /// public class Program
+        /// {
+        ///     public static async Task Main(string[] args) => 
+        ///         await CreateHostBuilder(args).Build().RunAsync();
+        ///
+        ///     public static IHostBuilder CreateHostBuilder(string[] args) =>
+        ///         Host.CreateDefaultBuilder(args)
+        ///             .UseServiceProviderFactory(new DryIocServiceProviderFactory(new Container(rules => WithMyRules(rules))))
+        ///             .ConfigureWebHostDefaults(webBuilder =>
+        ///             {
+        ///                 webBuilder.UseStartup<Startup>();
+        ///             });
+        /// }
+        /// ]]></code>
+        /// 
+        /// Then register your services in `Startup.ConfigureContainer`.
+        /// 
+        /// DON'T try to change the container rules there - they will be lost, 
+        /// instead pass the pre-configured container to `DryIocServiceProviderFactory` as in example above.
+        /// 
+        /// DON'T forget to add `services.AddControllers().AddControllersAsServices` in `Startup.ConfigureServices` 
+        /// in order to access DryIoc diagnostics for controllers, property-injection, etc.
+        /// 
+        /// That's probably ALL YOU NEED to do.
+        /// </summary>
+        public class DryIocServiceProviderFactory : IServiceProviderFactory<IContainer>
+        {
+            private readonly IContainer _container;
+            private readonly Func<IRegistrator, ServiceDescriptor, bool> _registerDescriptor;
+
+            /// Some options to push to `.WithDependencyInjectionAdapter(...)`
+            public DryIocServiceProviderFactory(
+                IContainer container = null,
+                Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
+            {
+                _container = container;
+                _registerDescriptor = registerDescriptor;
+            }
+
+            /// <inheritdoc />
+            public IContainer CreateBuilder(IServiceCollection services) =>
+                (_container ?? new Container()).WithDependencyInjectionAdapter(services, _registerDescriptor);
+
+            /// <inheritdoc />
+            public IServiceProvider CreateServiceProvider(IContainer container) => 
+                container.BuildServiceProvider();
+        }
         /// Creates the container and the `IServiceProvider` because its implemented by `IContainer` -
         /// you get simply the best of both worlds.
         public static IContainer Create(
@@ -83,10 +132,6 @@ namespace DryIoc.Microsoft.DependencyInjection
             if (descriptors != null)
                 container.Populate(descriptors, registerDescriptor);
 
-#if NETSTANDARD1_0
-            container.RegisterInstance<IServiceProvider>(new DryIocServiceProvider(container));
-#endif
-
             return container;
         }
 
@@ -102,39 +147,34 @@ namespace DryIoc.Microsoft.DependencyInjection
         public static IContainer WithCompositionRoot<TCompositionRoot>(this IContainer container) =>
             container.WithCompositionRoot(typeof(TCompositionRoot));
 
-        /// It does not really build anything, it just gets the `IServiceProvider` from the container.
+        /// <summary>It does not really build anything, it just gets the `IServiceProvider` from the container.</summary>
         public static IServiceProvider BuildServiceProvider(this IContainer container) =>
             container.GetServiceProvider();
 
-        /// Just gets the `IServiceProvider` from the container.
+        /// <summary>Just gets the `IServiceProvider` from the container.</summary>
         public static IServiceProvider GetServiceProvider(this IResolver container) =>
-#if NETSTANDARD1_0
-            container.Resolve<IServiceProvider>();
-#else
             container;
-#endif
 
-
-        /// <summary>Facade to consolidate DryIoc registrations in <typeparamref name="TCompositionRoot"/></summary>
-        /// <typeparam name="TCompositionRoot">The class will be created by container on Startup 
-        /// to enable registrations with injected <see cref="IRegistrator"/> or full <see cref="IContainer"/>.</typeparam>
-        /// <param name="container">Adapted container</param> <returns>Service provider</returns>
-        /// <example>
-        /// <code><![CDATA[
-        /// public class ExampleCompositionRoot
-        /// {
-        ///    // if you need the whole container then change parameter type from IRegistrator to IContainer
-        ///    public ExampleCompositionRoot(IRegistrator r)
-        ///    {
-        ///        r.Register<ISingletonService, SingletonService>(Reuse.Singleton);
-        ///        r.Register<ITransientService, TransientService>(Reuse.Transient);
-        ///        r.Register<IScopedService, ScopedService>(Reuse.InCurrentScope);
-        ///    }
-        /// }
-        /// ]]></code>
-        /// </example>
-        public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this IContainer container) =>
-            container.WithCompositionRoot<TCompositionRoot>().GetServiceProvider();
+/// <summary>Facade to consolidate DryIoc registrations in <typeparamref name="TCompositionRoot"/></summary>
+/// <typeparam name="TCompositionRoot">The class will be created by container on Startup 
+/// to enable registrations with injected <see cref="IRegistrator"/> or full <see cref="IContainer"/>.</typeparam>
+/// <param name="container">Adapted container</param> <returns>Service provider</returns>
+/// <example>
+/// <code><![CDATA[
+/// public class ExampleCompositionRoot
+/// {
+///    // if you need the whole container then change parameter type from IRegistrator to IContainer
+///    public ExampleCompositionRoot(IRegistrator r)
+///    {
+///        r.Register<ISingletonService, SingletonService>(Reuse.Singleton);
+///        r.Register<ITransientService, TransientService>(Reuse.Transient);
+///        r.Register<IScopedService, ScopedService>(Reuse.InCurrentScope);
+///    }
+/// }
+/// ]]></code>
+/// </example>
+public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this IContainer container) =>
+    container.WithCompositionRoot<TCompositionRoot>().GetServiceProvider();
 
         /// <summary>Registers service descriptors into container. May be called multiple times with different service collections.</summary>
         /// <param name="container">The container.</param>
@@ -186,11 +226,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                     : Reuse.Transient;
 
                 container.RegisterDelegate(true, descriptor.ServiceType,
-#if NETSTANDARD1_0
-                    r => descriptor.ImplementationFactory(r.Resolve<IServiceProvider>()),
-#else
                     descriptor.ImplementationFactory,
-#endif
                     reuse);
             }
             else
@@ -200,27 +236,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
     }
 
-#if NETSTANDARD1_0
-    /// Bare-bones IServiceScope implementations
-    public sealed class DryIocServiceProvider : IServiceProvider
-    {
-        private readonly IResolverContext _resolverContext;
-
-        /// Creating from resolver context
-        public DryIocServiceProvider(IResolverContext resolverContext)
-        {
-            _resolverContext = resolverContext;
-        }
-
-        /// <inheritdoc />
-        public object GetService(Type serviceType) => 
-            _resolverContext.Resolve(serviceType, IfUnresolved.ReturnDefaultIfNotRegistered);
-    }
-#endif
-
-    /// <summary>Creates/opens new scope in passed scoped container.</summary>
-    public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
-    {
+/// <summary>Creates/opens new scope in passed scoped container.</summary>
+public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
+{
         private readonly IResolverContext _scopedResolver;
 
         /// <summary>Stores passed scoped container to open nested scope.</summary>
@@ -238,76 +256,23 @@ namespace DryIoc.Microsoft.DependencyInjection
             var scope = r.ScopeContext == null ? new Scope(r.CurrentScope) : r.ScopeContext.SetCurrent(p => new Scope(p));
             return new DryIocServiceScope(r.WithCurrentScope(scope));
         }
-    }
+}
 
-    /// Bare-bones IServiceScope implementations
+    /// <summary>Bare-bones IServiceScope implementations</summary>
     public sealed class DryIocServiceScope : IServiceScope
     {
         /// <inheritdoc />
-        public IServiceProvider ServiceProvider
-        {
-            get
-            {
-#if NETSTANDARD1_0
-                return new DryIocServiceProvider(_resolverContext);
-#else
-                return _resolverContext;
-#endif
-            }
-        }
+        public IServiceProvider ServiceProvider => _resolverContext;
 
         private readonly IResolverContext _resolverContext;
 
-        /// Creating from resolver context
+        /// <summary>Creating from resolver context</summary>
         public DryIocServiceScope(IResolverContext resolverContext)
         {
             _resolverContext = resolverContext;
         }
 
-        /// Disposes the underlying resolver context 
+        /// <summary>Disposes the underlying resolver context</summary>
         public void Dispose() => _resolverContext.Dispose();
-    }
-
-    /// This is a implementation supposed to be used with the `HostBuilder` like this:
-    /// <code><![CDATA[
-    /// static async Task Main()
-    /// {
-    ///     var host = new HostBuilder()
-    ///         .ConfigureServices(services =>
-    ///         {
-    ///             services.AddHostedService<MyBootstrapService>();
-    ///         })
-    ///         .UseServiceProviderFactory(  new DryIocServiceProviderFactory()  )
-    ///         .ConfigureContainer<Container>((hostContext, container) =>
-    ///         {
-    ///             container.Register<FooService>(Reuse.Scoped);
-    ///             // etc.
-    ///         })
-    ///         .Build();
-    ///
-    ///     await host.RunAsync(); 
-    /// }
-    /// ]]></code>
-    public class DryIocServiceProviderFactory : IServiceProviderFactory<IContainer>
-    {
-        private readonly IContainer _container;
-        private readonly Func<IRegistrator, ServiceDescriptor, bool> _registerDescriptor;
-
-        /// Some options to push to `.WithDependencyInjectionAdapter(...)`
-        public DryIocServiceProviderFactory(
-            IContainer container = null,
-            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
-        {
-            _container = container;
-            _registerDescriptor = registerDescriptor;
-        }
-
-        /// <inheritdoc />
-        public IContainer CreateBuilder(IServiceCollection services) =>
-            (_container ?? new Container()).WithDependencyInjectionAdapter(services, _registerDescriptor);
-
-        /// <inheritdoc />
-        public IServiceProvider CreateServiceProvider(IContainer container) => 
-            container.BuildServiceProvider();
     }
 }

@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>4.1.4</version>
+        <version>4.2.0</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,68 +13,17 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
-## v4.1.4 Bug-fix release
+## v4.2.0 Feature release
 
-- #242 Validate call hangs when there are many singletons
-- #245 Validate may not create the actual expressions to be more performant
-- #250 Original stack trace is lost at Interpreter.TryInterpretAndUnwrapContainerException
+- feature: #270 Add FEC.LightExpression.LambdaExpression wrapper to work the same as System LambdaExpression  
 
-## v4.1.3 Bug-fix release
+- fixed: #258 System Invalid program exception when removing dependency
+- fixed: #265 Improve the case with splitting the big object graph
+- fixed: #267 [MS.DI] Incorrect resolving for generic types.
+- fixed: #256 Memory usage increase up to 7 percent in real-case benchmark
+- fixed: #254 ResolveMany if singleton decorators decorates the first item only
+- fixed: #280 Possibility to make source files which are embedded to the project internal? 
 
-- #248 WithConcreteTypeDynamicRegistrations condition gets called with serviceKey always null
-
-## v4.1.2 Bug-fix release
-
-- #236 Additional default parameter for Made creation public API introduced binary incompatibility
-- #237 UseInstance with interface-based serviceType does not replace previous instance
-
-## v4.1.1 Bug-fix release
-
-- #118 Validate issue
-- #215 RegisterInitializer<TService> causes additional call(s) to TService.Dispose when container is disposed
-- #220 Fix INavigationService resolution in Prizm extensions
-- #227 Optimize IsRegistered
-- #228 Updated DryIoc from 4.0.4.0 to 4.1.0 in Unity Engine project, keyed register/resolve wont work anymore
-- #230 Add the error code into the ContainerException message to simplify error finding
-
-
-## v4.1.0 Feature release
-
-### Highlights
-
-- Better memory use and massively improved performance for the real-world applications - big object graphs and the unit-of-work scenarios. See the updated benchmark results in [readme.md].(https://github.com/dadhi/DryIoc/blob/master/README.md#creating-the-container-registering-the-services-then-opening-a-scope-and-resolving-the-scoped-service-eg-controller-for-the-first-time))
-- Improve parallelism / reduce thread blocking #137
-- Full and fast DryIoc own Interpretation support via `Rules.WithUseInterpretation()` - useful for iOS and other platforms without compilation support #90
-- Add DryIocZero capabilities to the DryIoc source package #101
-- Copied DryIoc sample project from the MediatR but with DryIoc.Messages #117 
-
-### Features
-
-- Interpretation only option #90 
-- Add RegisterDelegate with the list of dependencies to Inject and not to Resolve #147
-- Lift restrictions for Scope disposal when using ambient ScopeContext #168 
-- FactoryDelegate<T> wrapper support #191
-- Add Rules.UseDecorateeReuseForDecorators #201
-
-### Fixes
-
-- Resolving a component for the second time throws #130
-- Stackoverflow exception #139
-- Xamarin Forms iOS: Operation is not supported on this platform. #156
-- DryIoc 4.0.5 withoutFastExpressionCompiler deadlock issue #157
-- Rules.WithDependencyDepthToSplitObjectGraph is not propagated through most of `Rules.With` methods #163
-- Rules.WithDependencyDepthToSplitObjectGraph was not applied in some cases with Decorators in graph #164
-- Made.Of() Parameters don't follow Reuse setting #179
-- ThreadScopeContext not working in DryIoc.dll 4.1.0-preview-02? #183
-- ReflectionTools methods unexpectedly return static constructors #184
-- Container creates multiple instances if TryInterpret fails #188
-- Open-generic implementation may be wrongly considered for service with many type args #190
-- DryIOC new Transient Disposable #192
-- Private and public Constructors in generic classes #196
-- Fix documentation regarding implicitly injected scope as IDisposable #197
-- Open generics resolve fails if there is a static constructor #198
-- 4.1.0 Unhandled Exception: System.NullReferenceException: Object reference not set to an instance of an object. #205
-- Avoid wasteful compilation of the same cached expression by multiple threads #208
 ]]>
         </releaseNotes>
         <contentFiles>

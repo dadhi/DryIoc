@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30002.166
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.AspNetCore31.WebApi.Sample", "DryIoc.AspNetCore31.WebApi.Sample.csproj", "{35C4F34D-3B3A-4348-99AD-E6B7B3BF037C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{35C4F34D-3B3A-4348-99AD-E6B7B3BF037C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{35C4F34D-3B3A-4348-99AD-E6B7B3BF037C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{35C4F34D-3B3A-4348-99AD-E6B7B3BF037C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{35C4F34D-3B3A-4348-99AD-E6B7B3BF037C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {BEDA6778-24D2-4FBE-9B5A-01DFC9DDA5FD}
+	EndGlobalSection
+EndGlobal
