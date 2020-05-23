@@ -1334,6 +1334,20 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |               MsDI | 3.890 us | 0.0158 us | 0.0140 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
 |             DryIoc | 1.701 us | 0.0014 us | 0.0013 us |  0.44 |    0.00 | 0.6409 |     - |     - |   2.96 KB |
 | DryIoc_MsDIAdapter | 2.629 us | 0.0523 us | 0.0603 us |  0.68 |    0.02 | 0.6447 |     - |     - |   2.98 KB |
+
+### DryIoc v5
+
+.NET Core SDK=3.1.202
+  [Host]     : .NET Core 3.1.4 (CoreCLR 4.700.20.20201, CoreFX 4.700.20.22101), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.4 (CoreCLR 4.700.20.20201, CoreFX 4.700.20.22101), X64 RyuJIT
+
+|             Method |     Mean |     Error |    StdDev | Ratio |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|----------:|----------:|------:|-------:|-------:|------:|----------:|
+|               MsDI | 3.432 us | 0.0298 us | 0.0249 us |  1.00 | 0.9460 | 0.0153 |     - |   4.35 KB |
+|             DryIoc | 1.611 us | 0.0077 us | 0.0068 us |  0.47 | 0.6428 | 0.0076 |     - |   2.96 KB |
+| DryIoc_MsDIAdapter | 2.168 us | 0.0130 us | 0.0109 us |  0.63 | 0.6485 | 0.0076 |     - |   2.98 KB |
+|              Grace | 1.665 us | 0.0081 us | 0.0076 us |  0.49 | 0.6886 |      - |     - |   3.17 KB |
+|  Grace_MsDIAdapter | 2.258 us | 0.0108 us | 0.0096 us |  0.66 | 0.7401 | 0.0076 |     - |   3.41 KB |
 */
 
             private IServiceProvider _msDi;
@@ -1387,10 +1401,10 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            //[Benchmark]
+            [Benchmark]
             public object Grace() => Measure(_grace);
 
-            //[Benchmark]
+            [Benchmark]
             public object Grace_MsDIAdapter() => Measure(_graceMsDi);
 
             //[Benchmark]
