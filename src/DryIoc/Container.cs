@@ -98,7 +98,7 @@ namespace DryIoc
         { }
 
         /// <summary>Helper to create singleton scope</summary>
-        public static IScope NewSingletonScope() => new Scope(name: "<sigletons>");
+        public static IScope NewSingletonScope() => new Scope(name: "<singletons>");
 
         /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
@@ -983,7 +983,7 @@ namespace DryIoc
 
         /// <inheritdoc />
         public IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
-            RegistrySharing registrySharing, IScope singletonScope, IScope curentScope)
+            RegistrySharing registrySharing, IScope singletonScope, IScope currentScope)
         {
             ThrowIfContainerDisposed();
 
@@ -993,7 +993,7 @@ namespace DryIoc
                 : Ref.Of(_registry.Value.WithoutCache());
 
             return new Container(rules ?? Rules, registry, singletonScope ?? NewSingletonScope(), scopeContext,
-                curentScope ?? _ownCurrentScope, _disposed, _disposeStackTrace, parent ?? _parent);
+                currentScope ?? _ownCurrentScope, _disposed, _disposeStackTrace, parent ?? _parent);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
@@ -1196,9 +1196,9 @@ namespace DryIoc
 
             if (factories.Length > 1)
             {
-                var preferedFactories = factories.Match(f => f.Value.Setup.PreferInSingleServiceResolve);
-                if (preferedFactories.Length == 1)
-                    factories = preferedFactories;
+                var preferredFactories = factories.Match(f => f.Value.Setup.PreferInSingleServiceResolve);
+                if (preferredFactories.Length == 1)
+                    factories = preferredFactories;
             }
 
             // The result is a single matched factory
@@ -1690,7 +1690,7 @@ namespace DryIoc
             var resultFactories = registeredFactories;
             var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
 
-            // Assign unique continious keys across all of dynamic providers,
+            // Assign unique continuous keys across all of dynamic providers,
             // to prevent duplicate keys and peeking the wrong factory by collection wrappers
             // NOTE: Given that dynamic registration always return the same implementation types in the same order
             // then the dynamic key will be assigned deterministically, so that even if `CombineRegisteredWithDynamicFactories`
@@ -1838,7 +1838,7 @@ namespace DryIoc
             /// Switched off until I (or someone) will figure it out.
             public override bool UseInterpretation(Request request) => false;
 
-            /// Tries to return instance directly from scope or sigleton, and fallbacks to expression for decorator.
+            /// Tries to return instance directly from scope or singleton, and fallbacks to expression for decorator.
             public override FactoryDelegate GetDelegateOrDefault(Request request)
             {
                 if (request.IsResolutionRoot)
@@ -5561,7 +5561,7 @@ namespace DryIoc
 
                         // We nullify default keys (usually passed by ResolveMany to resolve the specific factory in order)
                         // so that `CombineRegisteredWithDynamicFactories` may assign the key again.
-                        // Given that the implementation types are unchanged then the new keys assignement will be the same the last one,
+                        // Given that the implementation types are unchanged then the new keys assignment will be the same the last one,
                         // so that the factory resolution will correctly match the required factory by key.
                         // e.g. bitbucket issue #396
                         var theKey = serviceKey is DefaultDynamicKey ? null : serviceKey;
@@ -5742,7 +5742,7 @@ namespace DryIoc
         public Rules WithoutVariantGenericTypesInResolvedCollection() =>
             WithSettings(_settings & ~Settings.VariantGenericTypesInResolvedCollection);
 
-        /// <summary><seew cref="WithDefaultIfAlreadyRegistered"/>.</summary>
+        /// <summary><see cref="WithDefaultIfAlreadyRegistered"/>.</summary>
         public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; }
 
         /// <summary>Specifies default setting for container. By default is <see cref="IfAlreadyRegistered.AppendNotKeyed"/>.
@@ -6321,9 +6321,9 @@ namespace DryIoc
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         public static Made Of(FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            bool isConditionalImlementation = false) =>
-            factoryMethod == null && parameters == null && propertiesAndFields == null && !isConditionalImlementation ? Default :
-            new Made(factoryMethod, parameters, propertiesAndFields, isConditionalImlementation: isConditionalImlementation);
+            bool isConditionalImplementation = false) =>
+            factoryMethod == null && parameters == null && propertiesAndFields == null && !isConditionalImplementation ? Default :
+            new Made(factoryMethod, parameters, propertiesAndFields, isConditionalImplementation: isConditionalImplementation);
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         /// <param name="factoryMethod">Known factory method.</param>
@@ -6352,7 +6352,7 @@ namespace DryIoc
         public static Made Of(Func<Request, Type> getImplType,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
             Of(r => DryIoc.FactoryMethod.Of(getImplType(r).SingleConstructor()),
-                parameters, propertiesAndFields, isConditionalImlementation: true);
+                parameters, propertiesAndFields, isConditionalImplementation: true);
 
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/> is method, or constructor, or member selector.</summary>
@@ -6500,7 +6500,7 @@ namespace DryIoc
 
         internal Made(
             FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false, 
+            Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImplementation = false, 
             bool isImplMemberDependsOnRequest = false)
         {
             FactoryMethod = factoryMethod;
@@ -6511,7 +6511,7 @@ namespace DryIoc
             var details = default(MadeDetails);
             if (hasCustomValue)
                 details |= MadeDetails.HasCustomDependencyValue;
-            if (isConditionalImlementation)
+            if (isConditionalImplementation)
                 details |= MadeDetails.ImplTypeDependsOnRequest;
             if (isImplMemberDependsOnRequest)
                 details |= MadeDetails.ImplMemberDependsOnRequest;
@@ -6759,7 +6759,7 @@ namespace DryIoc
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
     public static class Registrator
     {
-        /// <summary>The base method for registering servce with its implementation factory. Allows to specify all possible options.</summary>
+        /// <summary>The base method for registering service with its implementation factory. Allows to specify all possible options.</summary>
         public static void Register(this IRegistrator registrator, Type serviceType, Factory factory,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
@@ -7249,8 +7249,10 @@ namespace DryIoc
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
         }
 
+        /// <summary>
         /// A special performant version mostly for integration with other libraries,
-        /// that already check compatiblity between delegate result and the service type
+        /// that already check compatibility between delegate result and the service type
+        /// </summary>
         public static void RegisterDelegate(this IRegistrator registrator,
             bool isChecked, Type serviceType, Func<IResolverContext, object> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
@@ -7620,7 +7622,7 @@ namespace DryIoc
             object[] args = null) =>
             resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType, Request.Empty, args);
 
-        /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
+        /// <summary>Returns instance of <typeparamref name="TService"/> type.</summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <returns>The requested service instance.</returns>
         /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
@@ -9069,7 +9071,7 @@ private ParameterServiceInfo(ParameterInfo parameter) { Parameter = parameter; }
             SetResolvedFactory(factoryImplType, factory , factoryID, factoryType, reuse, decoratedFactoryID);
         }
 
-        /// Severe the connection with the request pool up to the parent so that noone can change the Request state
+        /// Severe the connection with the request pool up to the parent so that no one can change the Request state
         internal Request IsolateRequestChain()
         {
             Request r = null;
