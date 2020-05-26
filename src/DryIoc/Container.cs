@@ -2747,7 +2747,7 @@ namespace DryIoc
         public HiddenDisposable(object value) { Value = value; }
     }
 
-    /// Interpreter of expression - where possible uses knowledge of DryIoc internals to avoid reflection
+    /// <summary>Interpreter of expression - where possible uses knowledge of DryIoc internals to avoid reflection</summary>
     public static class Interpreter
     {
         /// Calls `TryInterpret` inside try-catch and unwraps/re-throws `ContainerException` from the reflection `TargetInvocationException`
@@ -6014,29 +6014,6 @@ namespace DryIoc
             public ParameterInfo[] Params;
         }
 
-        private static void OrderByParamsLengthDescendingViaInsertionSort(CtorWithParameters[] items)
-        {
-            int i, j;
-            for (i = 1; i < items.Length; ++i)
-            {
-                var it = items[i];
-                for (j = i; 
-                    j >= 1 && 
-                    it.Params.Length > items[j - 1].Params.Length; 
-                    --j)
-                {
-                    ref var target = ref items[j];
-                    var source = items[j - 1];
-                    target.Ctor = source.Ctor;
-                    target.Params = source.Params;
-                }
-
-                ref var x = ref items[j];
-                x.Ctor   = it.Ctor;
-                x.Params = it.Params;
-            }
-        }
-
         /// <summary>Easy way to specify non-public and most resolvable constructor.</summary>
         /// <param name="mostResolvable">(optional) Instructs to select constructor with max number of params which all are resolvable.</param>
         /// <param name="includeNonPublic">(optional) Consider the non-public constructors.</param>
@@ -6044,15 +6021,35 @@ namespace DryIoc
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) => request =>
         {
             var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
-            // todo: @perf we can inline this because we do double checking on the number of constructors
-            var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
-            var ctorCount = ctors.Length;
-            if (ctorCount == 0)
+
+            var ctors = implType.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
+            if (ctors.Length == 0)
                 return null;
 
-            // if there is only one constructor then use it
-            if (ctorCount == 1)
-                return new FactoryMethod(ctors[0]);
+            var ctor0 = ctors[0];
+            var skip0 = !includeNonPublic && !ctor0.IsPublic;
+            if (ctors.Length == 1)
+                return skip0 ? null : new FactoryMethod(ctor0);
+
+            if (ctors.Length == 2)
+            {
+                var ctor1 = ctors[1];
+                var skip1 = !includeNonPublic && !ctor1.IsPublic;
+                if (skip0 && skip1)
+                    return null;
+                if (skip0)
+                    return new FactoryMethod(ctor1);
+                if (skip1)
+                    return new FactoryMethod(ctor0);
+            }
+            else if (!includeNonPublic)
+            {
+                ctors = ctors.Match(x => x.IsPublic);
+                if (ctors.Length == 0)
+                    return null;
+                if (ctors.Length == 1)
+                    return new FactoryMethod(ctors[0]);
+            }
 
             // stop here if you need a lookup for most resolvable constructor
             if (!mostResolvable)
@@ -6064,51 +6061,71 @@ namespace DryIoc
             if (throwIfCtorNotFound)
                 request = request.WithIfUnresolved(IfUnresolved.ReturnDefault);
 
-            var ctorsWithParameters = new CtorWithParameters[ctors.Length];
+            // Consider the constructor with maximum number of parameters first
+            var ctorsWithParams = new CtorWithParameters[ctors.Length];
+            var maxParamsIndex = 0;
             if (ctors.Length == 2)
             {
-                ref var pos0 = ref ctorsWithParameters[0];
-                ref var pos1 = ref ctorsWithParameters[1];
+                ctorsWithParams[0].Ctor = ctors[0];
+                ctorsWithParams[0].Params = ctors[0].GetParameters();
 
-                var ctor0Params = ctors[0].GetParameters();
-                var ctor1Params = ctors[1].GetParameters();
-                if (ctor1Params.Length > ctor0Params.Length)
-                {
-                    pos0.Ctor   = ctors[1];
-                    pos0.Params = ctor1Params;
-                    pos1.Ctor   = ctors[0];
-                    pos1.Params = ctor0Params;
-                }
-                else
-                {
-                    pos0.Ctor = ctors[0];
-                    pos0.Params = ctor0Params;
-                    pos1.Ctor = ctors[1];
-                    pos1.Params = ctor1Params;
-                }
+                ctorsWithParams[1].Ctor = ctors[1];
+                ctorsWithParams[1].Params = ctors[1].GetParameters();
+
+                if (ctorsWithParams[1].Params.Length > ctorsWithParams[0].Params.Length)
+                    maxParamsIndex = 1;
             }
             else
             {
                 for (var i = 0; i < ctors.Length; i++)
                 {
-                    var x = ctors[i];
-                    ref var pos = ref ctorsWithParameters[i];
-                    pos.Ctor   = x;
-                    pos.Params = x.GetParameters();
+                    ref var ctorWithParam = ref ctorsWithParams[i];
+                    ctorWithParam.Ctor   = ctors[i];
+                    ctorWithParam.Params = ctors[i].GetParameters();
+                    if (i != maxParamsIndex && ctorWithParam.Params.Length > ctorsWithParams[maxParamsIndex].Params.Length)
+                        maxParamsIndex = i;
                 }
-
-                OrderByParamsLengthDescendingViaInsertionSort(ctorsWithParameters);
             }
 
             var mostUsedArgCount = -1;
             ConstructorInfo mostResolvedCtor = null;
             Expression[] mostResolvedExprs   = null;
-            for (var c = 0; c < ctorsWithParameters.Length; ++c)
+            for (var c = 0; c < ctorsWithParams.Length; ++c)
             {
-                var parameters = ctorsWithParameters[c].Params;
+                if (c > 0) // second and more tries
+                {
+                    if (c == ctorsWithParams.Length - 1)
+                    {
+                        // For the last constructor it is either the max-one or the previous is the max-one,
+                        // so we don't need to swap
+                        maxParamsIndex = maxParamsIndex == c ? c - 1 : c;
+                    }
+                    else
+                    {
+                        // Find the next-to-max parameters constructor using the Selection sort.
+                        // First, swap the previous max ctor (which is not resolved) into the first position which we have already iterated.
+                        // Don't need to swap if max entry is already a previous entry.
+                        if (maxParamsIndex != c - 1)
+                        {
+                            ref var prevEntry = ref ctorsWithParams[c - 1];
+                            var prevEntryCopy = prevEntry;
+                            ref var maxEntry = ref ctorsWithParams[maxParamsIndex];
+                            prevEntry = maxEntry;
+                            maxEntry = prevEntryCopy;
+                        }
+
+                        // Find the next max thing starting from the current index `c` comparing with next `c + 1` 
+                        maxParamsIndex = c;
+                        for (var n = c + 1; n < ctorsWithParams.Length; ++n)
+                            if (ctorsWithParams[n].Params.Length >= ctorsWithParams[maxParamsIndex].Params.Length)
+                                maxParamsIndex = n;
+                    }
+                } 
+
+                var parameters = ctorsWithParams[maxParamsIndex].Params;
                 if (parameters.Length == 0)
                 {
-                    mostResolvedCtor = mostResolvedCtor ?? ctorsWithParameters[c].Ctor;
+                    mostResolvedCtor = mostResolvedCtor ?? ctorsWithParams[maxParamsIndex].Ctor;
                     break;
                 }
 
@@ -6121,16 +6138,14 @@ namespace DryIoc
                 var usedInputArgOrUsedOrCustomValueCount = 0;
                 var inputArgs = request.InputArgExprs;
                 var argsUsedMask = 0;
-                var paramExprs = new Expression[parameters.Length];
+                var paramExprs = new Expression[parameters.Length]; // todo: @perf opportunity for reusing the array as it is dropped when constructor is unresolved
 
                 for (var i = 0; i < parameters.Length; i++)
                 {
                     var param = parameters[i];
                     if (inputArgs != null)
                     {
-                        var inputArgExpr =
-                            ReflectionFactory.TryGetExpressionFromInputArgs(param.ParameterType, inputArgs,
-                                ref argsUsedMask);
+                        var inputArgExpr = ReflectionFactory.TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
                         if (inputArgExpr != null)
                         {
                             ++usedInputArgOrUsedOrCustomValueCount;
@@ -6142,9 +6157,7 @@ namespace DryIoc
                     var paramInfo = paramSelector(param) ?? ParameterServiceInfo.Of(param);
                     var paramRequest = request.Push(paramInfo);
                     var paramDetails = paramInfo.Details;
-                    var usedOrCustomValExpr =
-                        ReflectionFactory.TryGetUsedInstanceOrCustomValueExpression(request, paramRequest,
-                            paramDetails);
+                    var usedOrCustomValExpr = ReflectionFactory.TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
                     if (usedOrCustomValExpr != null)
                     {
                         ++usedInputArgOrUsedOrCustomValueCount;
@@ -6178,7 +6191,7 @@ namespace DryIoc
                 if (paramExprs != null && usedInputArgOrUsedOrCustomValueCount > mostUsedArgCount)
                 {
                     mostUsedArgCount = usedInputArgOrUsedOrCustomValueCount;
-                    mostResolvedCtor = ctorsWithParameters[c].Ctor;
+                    mostResolvedCtor = ctorsWithParams[maxParamsIndex].Ctor;
                     mostResolvedExprs = paramExprs;
                 }
             }
