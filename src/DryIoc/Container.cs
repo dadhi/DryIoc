@@ -1365,6 +1365,63 @@ namespace DryIoc
                 // todo: optimize
                 : entry.To<FactoriesEntry>().Factories.Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray();
 
+        internal static Factory[] MergeSortedByLatestOrderOrRegistration(Factory[] source, params Factory[] added)
+        {
+            if (added == null || added.Length == 0)
+                return source;
+
+            if (source == null || source.Length == 0)
+                return added;
+
+            var sourceLength = source.Length;
+            var addedLength  = added.Length;
+            if (sourceLength == 1 && addedLength == 1)
+            {
+                var s = source[0];
+                var a = added[0];
+                var sOrder = ((Setup.DecoratorSetup)s.Setup).Order;
+                var aOrder = ((Setup.DecoratorSetup)a.Setup).Order;
+                if (sOrder > aOrder || sOrder == aOrder && s.RegistrationOrder > a.RegistrationOrder)
+                    return new Factory[] { s, a };
+                return new Factory[] { a, s };
+            }
+
+            var result = new Factory[sourceLength + addedLength];
+
+            var i = 0;
+            var j = 0;
+            for (var k = 0; k < result.Length; ++k)
+            {
+                if (i < sourceLength && j < addedLength)
+                {
+                    var s = source[i];
+                    var a = added[j];
+                    var sOrder = ((Setup.DecoratorSetup)s.Setup).Order;
+                    var aOrder = ((Setup.DecoratorSetup)a.Setup).Order;
+                    if (sOrder > aOrder || sOrder == aOrder && s.RegistrationOrder > a.RegistrationOrder)
+                    {
+                        result[k] = s;
+                        ++i;
+                    }
+                    else
+                    {
+                        result[k] = a;
+                        ++j;
+                    }
+                }
+                else if (i < sourceLength)
+                {
+                    result[k] = source[i++];
+                }
+                else
+                {
+                    result[k] = added[j++];
+                }
+            }
+            
+            return result;
+        }
+
         Expression IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
             // return early if no decorators registered
@@ -1380,11 +1437,13 @@ namespace DryIoc
             var serviceType = request.ServiceType;
 
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
+            var originalDecorators = decorators;
 
             // Combine with required service type if different from service type
             var requiredServiceType = request.GetActualServiceType();
             if (requiredServiceType != serviceType)
-                decorators = decorators.Append(container.GetDecoratorFactoriesOrDefault(requiredServiceType));
+                decorators = Container.MergeSortedByLatestOrderOrRegistration(decorators, 
+                    container.GetDecoratorFactoriesOrDefault(requiredServiceType));
 
             // Define the list of ids for the already applied decorators
             int[] appliedDecoratorIDs = null;
@@ -1406,7 +1465,7 @@ namespace DryIoc
             {
                 var openGenericRequiredType = requiredServiceType.GetGenericDefinitionOrNull();
                 if (openGenericRequiredType != null && openGenericRequiredType != openGenericServiceType)
-                    genericDecorators = genericDecorators.Append(
+                    genericDecorators = Container.MergeSortedByLatestOrderOrRegistration(genericDecorators,
                         container.GetDecoratorFactoriesOrDefault(openGenericRequiredType));
             }
 
@@ -1414,7 +1473,7 @@ namespace DryIoc
             // Note: the condition for type arguments should be checked before generating the closed generic version
             var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
             if (!typeArgDecorators.IsNullOrEmpty())
-                genericDecorators = genericDecorators.Append(
+                genericDecorators = Container.MergeSortedByLatestOrderOrRegistration(genericDecorators,
                     typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r)));
 
             // Filter out already applied generic decorators
@@ -1446,7 +1505,7 @@ namespace DryIoc
                     genericDecorators = genericDecorators
                         .Map(request, (r, d) => d.FactoryGenerator == null ? d : d.FactoryGenerator.GetGeneratedFactory(r, ifErrorReturnDefault: true))
                         .Match(d => d != null);
-                    decorators = decorators.Append(genericDecorators);
+                    decorators = Container.MergeSortedByLatestOrderOrRegistration(decorators, genericDecorators);
                 }
             }
 
@@ -1466,34 +1525,16 @@ namespace DryIoc
                 if (!decorator.CheckCondition(request))
                     return null;
             }
-            else if (decorators.Length == 2)
-            {
-                var d0 = decorators[0];
-                var d0Order = ((Setup.DecoratorSetup)d0.Setup).Order;
-                var d1 = decorators[1];
-                var d1Order = ((Setup.DecoratorSetup)d1.Setup).Order;
-                if (d1Order >  d0Order || d1Order == d0Order && d1.RegistrationOrder > d0.RegistrationOrder)
-                {
-                    if (d1.CheckCondition(request))
-                        decorator = d1;
-                    else if (d0.CheckCondition(request))
-                        decorator = d0;
-                }
-                else
-                {
-                    if (d0.CheckCondition(request))
-                        decorator = d0;
-                    else if (d1.CheckCondition(request))
-                        decorator = d1;
-                }
-            }
             else
             {
-                // todo: maybe optimized for already sorted array to get rid off copy
-                var sortedDecorators = SortBySetupOrderDescendingThenByRegistrationDescending(decorators.Copy());
-                for (int i = sortedDecorators.Length - 1; decorator == null && i >= 0; i--)
-                    if (sortedDecorators[i].CheckCondition(request))
-                        decorator = sortedDecorators[i];
+                foreach (var d in decorators)
+                {
+                    if (d.CheckCondition(request))
+                    {
+                        decorator = d;
+                        break;
+                    }
+                }
             }
 
             var decoratorExpr = decorator?.GetExpressionOrDefault(request);
@@ -1505,30 +1546,6 @@ namespace DryIoc
                 decoratorExpr = Call(WrappersSupport.ToArrayMethod.MakeGenericMethod(arrayElementType), decoratorExpr);
 
             return decoratorExpr;
-        }
-
-        private static Factory[] SortBySetupOrderDescendingThenByRegistrationDescending(Factory[] ds)
-        {
-            int i, j;
-            for (i = 1; i < ds.Length; ++i)
-            {
-                var d = ds[i];
-                var order = ((Setup.DecoratorSetup)d.Setup).Order;
-                j = i;
-                while (j >= 1)
-                {
-                    var prevOrder = ((Setup.DecoratorSetup)ds[j - 1].Setup).Order;
-                    if ((order < prevOrder ||
-                         order == prevOrder && d.RegistrationOrder < ds[j - 1].RegistrationOrder) == false)
-                        break;
-                    ds[j] = ds[j - 1];
-                    --j;
-                }
-
-                //if (ds[j] != d)
-                ds[j] = d;
-            }
-            return ds;
         }
 
         private static int[] GetAppliedDecoratorIDs(Request request)
@@ -2190,13 +2207,14 @@ namespace DryIoc
                             serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factory);
 
                 var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
+
                 return factory.FactoryType == FactoryType.Service
                         ? serviceKey == null 
                             ? WithDefaultService(factory, serviceTypeHash, serviceType, ifAlreadyRegistered) 
                             : WithKeyedService(factory, serviceTypeHash, serviceType, ifAlreadyRegistered, serviceKey)
                     : factory.FactoryType == FactoryType.Decorator
                         ? WithDecorators(Decorators.AddOrUpdate(serviceTypeHash, serviceType, factory.One(), 
-                            (_, oldf, newf) => oldf.To<Factory[]>().Append((Factory[])newf)))
+                            (_, oldf, newf) => Container.MergeSortedByLatestOrderOrRegistration((Factory[])oldf, (Factory[])newf)))
                         : WithWrappers(Wrappers.AddOrUpdate(serviceTypeHash, serviceType, factory));
             }
 
@@ -6064,7 +6082,7 @@ namespace DryIoc
             // Consider the constructor with maximum number of parameters first
             var ctorsWithParams = new CtorWithParameters[ctors.Length];
             var maxParamsIndex = 0;
-            if (ctors.Length == 2)
+            if (ctors.Length == 2) // todo: @perf we don't need an array for two items, right
             {
                 ctorsWithParams[0].Ctor = ctors[0];
                 ctorsWithParams[0].Params = ctors[0].GetParameters();
