@@ -11052,8 +11052,13 @@ namespace DryIoc
             var serviceTypeInfo = serviceType.GetTypeInfo();
             if (serviceTypeInfo.IsArray)
                 serviceType = typeof(IEnumerable<>).MakeGenericType(serviceTypeInfo.GetElementType());
-            if (!request.Container.GetDecoratorFactoriesOrDefault(serviceType).IsNullOrEmpty())
+
+            // todo: @perf Prevents from costly `WithResolvedFactory` call
+            // todo: @hack with IContainer cast - move to the interface
+            var decorators = ((Container)request.Container)._registry.Value.Decorators;
+            if (!decorators.IsEmpty)
             {
+                // todo: @perf optimize WithResolvedFactory for registered instance
                 var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                 if (decoratorExpr != null)
                     return decoratorExpr;
