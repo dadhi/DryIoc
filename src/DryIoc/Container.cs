@@ -712,7 +712,7 @@ namespace DryIoc
                 scope, _disposed, _disposeStackTrace, parent: this);
         }
 
-        /// [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
+        /// <summary>Obsolete - Please use `RegisterInstance` or `Use` method instead</summary>
         [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
         public void UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey)
@@ -1581,14 +1581,14 @@ namespace DryIoc
             if (!allDecorators.IsEmpty)
                 decorators = (Factory[])allDecorators.GetValueOrDefault(serviceType) ?? Empty<Factory>();
 
-            if (!decorators.IsNullOrEmpty() && Rules.UseDynamicRegistrationsAsFallbackOnly ||
+            if (decorators.Length > 0 && Rules.UseDynamicRegistrationsAsFallbackOnly ||
                 Rules.DynamicRegistrationProviders.IsNullOrEmpty())
                 return decorators;
 
             return CombineRegisteredWithDynamicFactories(
-                    decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)), 
-                    true, FactoryType.Decorator, serviceType)
-                   .Map(x => x.Value);
+                decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)), 
+                true, FactoryType.Decorator, serviceType)
+               .Map(x => x.Value);
         }
 
         Type IContainer.GetWrappedType(Type serviceType, Type requiredServiceType)
@@ -1733,7 +1733,7 @@ namespace DryIoc
                 {
                     resultFactories = dynamicRegistrations.Match(x =>
                         x.Factory.FactoryType == factoryType &&
-                        x.Factory.ValidateAndNormalizeRegistration(serviceType, serviceKey, false, Rules),
+                        x.Factory.ValidateAndNormalizeRegistration(serviceType, serviceKey, isStaticallyChecked: false, rules: Rules),
                         x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
                     continue;
                 }
@@ -1914,7 +1914,7 @@ namespace DryIoc
 
             // Factories:
             public readonly ImMap<ImMap.KValue<Type>> Services;
-            // todo: we may use Factory or Factory[] as a value for decorators
+            // todo: @perf make it Factory or Factory[]
             public readonly ImMap<ImMap.KValue<Type>> Decorators; // value is Factory[] 
             public readonly ImMap<ImMap.KValue<Type>> Wrappers;   // value is Factory
 
@@ -3877,6 +3877,7 @@ namespace DryIoc
         public static readonly ParameterExpression ResolverContextParamExpr = Parameter(typeof(IResolverContext), "r");
 
         /// [Obsolete("Not used anymore")]
+        [Obsolete("Not used anymore")]
         public static readonly Type[] FactoryDelegateParamTypes = { typeof(IResolverContext) };
 
         /// Optimization: singleton array with the parameter expression of IResolverContext
@@ -3974,6 +3975,7 @@ namespace DryIoc
         }
 
         /// [Obsolete("Use the version with `preferInterpretation` parameter instead")]
+        [Obsolete("Use the version with `preferInterpretation` parameter instead")]
         public static FactoryDelegate CompileToFactoryDelegate(this Expression expression, 
             bool useFastExpressionCompiler = false)
         {
@@ -4129,51 +4131,7 @@ namespace DryIoc
             RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
             (T)container.New(typeof(T), made, registrySharing);
 
-        // todo: vNext: remove, replaced by Registrator.RegisterMapping
-        /// <summary>Registers new service type with factory for registered service type.
-        /// Throw if no such registered service type in container.</summary>
-        /// <param name="container">Container</param> <param name="serviceType">New service type.</param>
-        /// <param name="registeredServiceType">Existing registered service type.</param>
-        /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
-        /// <remarks>Does nothing if registration is already exists.</remarks>
-        public static void RegisterMapping(this IContainer container, Type serviceType, Type registeredServiceType,
-            object serviceKey = null, object registeredServiceKey = null) =>
-            Registrator.RegisterMapping(container,
-                serviceType, registeredServiceType, serviceKey, registeredServiceKey);
-
-        // todo: vNext: remove, replaced by Registrator.RegisterMapping
-        /// <summary>Registers new service type with factory for registered service type.
-        /// Throw if no such registered service type in container.</summary>
-        /// <param name="container">Container</param>
-        /// <typeparam name="TService">New service type.</typeparam>
-        /// <typeparam name="TRegisteredService">Existing registered service type.</typeparam>
-        /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
-        /// <remarks>Does nothing if registration is already exists.</remarks>
-        public static void RegisterMapping<TService, TRegisteredService>(this IContainer container,
-            object serviceKey = null, object registeredServiceKey = null) =>
-            Registrator.RegisterMapping(container,
-                typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
-
-        // todo: Remove in VNext?
-        /// <summary>Forwards to <see cref="Registrator.RegisterPlaceholder"/>.</summary>
-        public static void RegisterPlaceholder(this IContainer container, Type serviceType,
-            IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            Registrator.RegisterPlaceholder(container, serviceType, ifAlreadyRegistered, serviceKey);
-
-        // todo: vNext: Remove, replaced by Registrator.RegisterPlaceholder
-        /// <summary>Register a service without implementation which can be provided later in terms
-        /// of normal registration with IfAlreadyRegistered.Replace parameter.
-        /// When the implementation is still not provided when the placeholder service is accessed,
-        /// then the exception will be thrown.
-        /// This feature allows you to postpone decision on implementation until it is later known.</summary>
-        /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
-        /// That means, instead of placing service instance into graph expression we put here redirecting call to
-        /// container Resolve.</remarks>
-        public static void RegisterPlaceholder<TService>(this IContainer container,
-            IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            container.RegisterPlaceholder(typeof(TService), ifAlreadyRegistered, serviceKey);
-
-        /// Obsolete: please use WithAutoFallbackDynamicRegistration
+        /// <summary>Obsolete: please use WithAutoFallbackDynamicRegistration</summary>
         [Obsolete("Please use WithAutoFallbackDynamicRegistration instead")]
         public static IContainer WithAutoFallbackResolution(this IContainer container,
             IEnumerable<Type> implTypes,
@@ -7571,6 +7529,18 @@ namespace DryIoc
         public static void RegisterPlaceholder(this IRegistrator registrator, Type serviceType,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             registrator.Register(FactoryPlaceholder.Default, serviceType, serviceKey, ifAlreadyRegistered, true);
+
+        /// <summary>Register a service without implementation which can be provided later in terms
+        /// of normal registration with IfAlreadyRegistered.Replace parameter.
+        /// When the implementation is still not provided when the placeholder service is accessed,
+        /// then the exception will be thrown.
+        /// This feature allows you to postpone decision on implementation until it is later known.</summary>
+        /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
+        /// That means, instead of placing service instance into graph expression we put here redirecting call to
+        /// container Resolve.</remarks>
+        public static void RegisterPlaceholder<TService>(this IRegistrator registrator,
+            IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            registrator.RegisterPlaceholder(typeof(TService), ifAlreadyRegistered, serviceKey);
     }
 
     /// <summary>Extension methods for <see cref="IResolver"/>.</summary>
@@ -11110,13 +11080,16 @@ private ParameterServiceInfo(ParameterInfo parameter) { Parameter = parameter; }
             if (// preventing recursion
                 (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 && !request.IsResolutionCall && 
                  (Setup.AsResolutionCall || Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
-                return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), Setup.OpenResolutionScope);
+                return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), false);
 
             // First look for decorators if it is not already a decorator
             var serviceType = request.ServiceType;
             var serviceTypeInfo = serviceType.GetTypeInfo();
             if (serviceTypeInfo.IsArray)
                 serviceType = typeof(IEnumerable<>).MakeGenericType(serviceTypeInfo.GetElementType());
+
+            // todo: @perf does `GetDecoratorFactoriesOrDefault` twice to check if decorator factories exist
+            // todo: @bug it is potentially a bug so that open-generic and object decorators are not applied
             if (!request.Container.GetDecoratorFactoriesOrDefault(serviceType).IsNullOrEmpty())
             {
                 var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
@@ -12448,10 +12421,11 @@ private ParameterServiceInfo(ParameterInfo parameter) { Parameter = parameter; }
         /// <returns>True if target service was found, false - otherwise.</returns>
         bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey);
 
-        /// Puts instance created via the passed factory on demand into the current or singleton scope
+        /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope<summary>
         new void Use(Type serviceType, FactoryDelegate factory);
 
-        /// [Obsolete("Replaced by `Use` to put runtime data into container scopes and with `RegisterInstance` as a sugar for `RegisterDelegate(_ => instance)`")]
+        ///<summary>Obsolete - replaced by `Use` to put runtime data into container scopes and with `RegisterInstance` as a sugar for `RegisterDelegate(_ => instance)`")</summary>
+        [Obsolete("Replaced by `Use` to put runtime data into container scopes and with `RegisterInstance` as a sugar for `RegisterDelegate(_ => instance)`")]
         new void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey);
     }
