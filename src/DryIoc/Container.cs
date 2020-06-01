@@ -11088,10 +11088,12 @@ private ParameterServiceInfo(ParameterInfo parameter) { Parameter = parameter; }
             if (serviceTypeInfo.IsArray)
                 serviceType = typeof(IEnumerable<>).MakeGenericType(serviceTypeInfo.GetElementType());
 
-            // todo: @perf does `GetDecoratorFactoriesOrDefault` twice to check if decorator factories exist
-            // todo: @bug it is potentially a bug so that open-generic and object decorators are not applied
-            if (!request.Container.GetDecoratorFactoriesOrDefault(serviceType).IsNullOrEmpty())
+            // todo: @perf Prevents from costly `WithResolvedFactory` call
+            // todo: @hack with IContainer cast - move to the interface
+            var decorators = ((Container)request.Container)._registry.Value.Decorators;
+            if (!decorators.IsEmpty)
             {
+                // todo: @perf optimize WithResolvedFactory for registered instance
                 var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                 if (decoratorExpr != null)
                     return decoratorExpr;
