@@ -12423,7 +12423,7 @@ private ParameterServiceInfo(ParameterInfo parameter) { Parameter = parameter; }
         /// <returns>True if target service was found, false - otherwise.</returns>
         bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey);
 
-        /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope<summary>
+        /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
         new void Use(Type serviceType, FactoryDelegate factory);
 
         ///<summary>Obsolete - replaced by `Use` to put runtime data into container scopes and with `RegisterInstance` as a sugar for `RegisterDelegate(_ => instance)`")</summary>
