@@ -6044,7 +6044,6 @@ namespace DryIoc
 
             var maxParamsCtor       = firstCtor       = ctors[0];
             var maxParamsCtorParams = firstCtorParams = firstCtor.GetParameters();
-
             var ctorCount  = ctors.Length;
             lastCtor       = ctors[ctorCount - 1];
             lastCtorParams = lastCtor.GetParameters();
@@ -6058,19 +6057,23 @@ namespace DryIoc
             var maxParamsCtorIndex = -1;
             if (ctorCount > 2)
             {
-                // put internal constructors into the array to not allocate and spend time for all the GetParameters calls
-                ctorsWithParams = new CtorWithParameters[ctorCount - 2];
-                for (var i = 0; i < ctorsWithParams.Length; ++i)
+                // put internal constructors into the array (if required) to not allocate and spend time for all the GetParameters calls
+                for (var i = 0; i < ctorCount - 2; ++i)
                 {
-                    ref var ctorWithParam = ref ctorsWithParams[i];
-                    ctorWithParam.Ctor    = ctors[i + 1];
-                    ctorWithParam.Params  = ctorWithParam.Ctor.GetParameters();
-                    if (ctorWithParam.Params.Length > maxParamsCtorParams.Length)
+                    var ctor = ctors[i + 1];
+                    var ctorParams = ctor.GetParameters();
+                    if (ctorParams.Length > maxParamsCtorParams.Length)
                     {
-                        maxParamsCtor       = ctorWithParam.Ctor;
-                        maxParamsCtorParams = ctorWithParam.Params;
+                        maxParamsCtor       = ctor;
+                        maxParamsCtorParams = ctorParams;
                         maxParamsCtorIndex  = i;
+                        if (ctorCount == 3) // haha - no need to create an array for middle constructor if it is the max constructor from the start
+                            break;
                     }
+
+                    ctorsWithParams ??= new CtorWithParameters[ctorCount - 2];
+                    ctorsWithParams[i].Ctor   = ctor;
+                    ctorsWithParams[i].Params = ctorParams;
                 }
             }
 
@@ -6079,7 +6082,7 @@ namespace DryIoc
                 firstCtor = null;
             else if (maxParamsCtor == lastCtor)
                 lastCtor = null;
-            else
+            else if (ctorsWithParams != null)
                 ctorsWithParams[maxParamsCtorIndex].Ctor = null;
 
             var mostUsedArgCount = -1;
@@ -6121,7 +6124,7 @@ namespace DryIoc
                         firstCtor = null;
                     else if (maxParamsCtor == lastCtor) 
                         lastCtor = null;
-                    else
+                    else if (ctorsWithParams != null)
                         ctorsWithParams[maxParamsCtorIndex].Ctor = null;
                 }
                 
