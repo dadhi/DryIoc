@@ -6007,14 +6007,14 @@ namespace DryIoc
             if (ctors.Length == 1)
                 return skipFirst ? null : new FactoryMethod(firstCtor);
 
-            var lastCtor = ctors[1];
+            var secondCtor = ctors[1];
             if (ctors.Length == 2)
             {
-                var skipLast = !includeNonPublic && !lastCtor.IsPublic;
+                var skipLast = !includeNonPublic && !secondCtor.IsPublic;
                 if (skipFirst && skipLast)
                     return null;
                 if (skipFirst)
-                    return new FactoryMethod(lastCtor);
+                    return new FactoryMethod(secondCtor);
                 if (skipLast)
                     return new FactoryMethod(firstCtor);
             }
@@ -6025,6 +6025,8 @@ namespace DryIoc
                     return null;
                 if (ctors.Length == 1)
                     return new FactoryMethod(ctors[0]);
+                firstCtor  = ctors[0];
+                secondCtor = ctors[1];
             }
 
             // stop here if you need a lookup for most resolvable constructor
@@ -6040,92 +6042,89 @@ namespace DryIoc
             // Consider the constructor with the maximum number of parameters first, 
             // If there are more than one constructor with the same number of parameters,
             // then we should consider the one with most of passed input aarguments and custom values provided
-            ParameterInfo[] firstCtorParams, lastCtorParams;
-
-            var maxParamsCtor       = firstCtor       = ctors[0];
-            var maxParamsCtorParams = firstCtorParams = firstCtor.GetParameters();
-            var ctorCount  = ctors.Length;
-            lastCtor       = ctors[ctorCount - 1];
-            lastCtorParams = lastCtor.GetParameters();
-            if (lastCtorParams.Length > maxParamsCtorParams.Length)
-            {
-                maxParamsCtor       = lastCtor;
-                maxParamsCtorParams = lastCtorParams;
-            }
+            var firstCtorParams  = firstCtor.GetParameters();
+            var secondCtorParams = secondCtor.GetParameters();
+            var maxParamsCtor       = firstCtorParams.Length > secondCtorParams.Length ? firstCtor : secondCtor;
+            var maxParamsCtorParams = maxParamsCtor == firstCtor ? firstCtorParams : secondCtorParams;
 
             CtorWithParameters[] ctorsWithParams = null;
             var maxParamsCtorIndex = -1;
+            var ctorCount = ctors.Length;
             if (ctorCount > 2)
             {
-                // put internal constructors into the array (if required) to not allocate and spend time for all the GetParameters calls
+                // put the rest into the array (if required) to not allocate and spend time for all the GetParameters calls
+                ctorsWithParams = new CtorWithParameters[ctorCount - 2];
                 for (var i = 0; i < ctorCount - 2; ++i)
                 {
-                    var ctor = ctors[i + 1];
+                    var ctor       = ctors[i + 2];
                     var ctorParams = ctor.GetParameters();
                     if (ctorParams.Length > maxParamsCtorParams.Length)
                     {
                         maxParamsCtor       = ctor;
                         maxParamsCtorParams = ctorParams;
                         maxParamsCtorIndex  = i;
-                        if (ctorCount == 3) // haha - no need to create an array for middle constructor if it is the max constructor from the start
-                            break;
                     }
 
-                    ctorsWithParams ??= new CtorWithParameters[ctorCount - 2];
                     ctorsWithParams[i].Ctor   = ctor;
                     ctorsWithParams[i].Params = ctorParams;
                 }
-            }
 
-            // nullify the constructor which is the max-one
-            if (maxParamsCtor == firstCtor)
-                firstCtor = null;
-            else if (maxParamsCtor == lastCtor)
-                lastCtor = null;
-            else if (ctorsWithParams != null)
-                ctorsWithParams[maxParamsCtorIndex].Ctor = null;
+                // nullify the constructor which is the max-one to exclude it from the sorting for the next time
+                if (maxParamsCtor == firstCtor)
+                    firstCtor = null;
+                else if (maxParamsCtor == secondCtor)
+                    secondCtor = null;
+                else
+                    ctorsWithParams[maxParamsCtorIndex].Ctor = null;
+            }
 
             var mostUsedArgCount = -1;
             ConstructorInfo resolvedCtor = null;
             Expression[] resolvedCtorParamExprs = null;
             for (var c = 0; c < ctorCount; ++c)
             {
-                if (c > 0) // second and more tries
+                if (c > 0) // second and more tries to find the new max-param constructor
                 {
-                    if (firstCtor != null)
+                    if (ctorCount == 2)
                     {
-                        maxParamsCtor = firstCtor;
-                        maxParamsCtorParams = firstCtorParams;
+                        maxParamsCtor =       maxParamsCtor == firstCtor ? secondCtor : firstCtor;
+                        maxParamsCtorParams = maxParamsCtor == firstCtor ? firstCtorParams : secondCtorParams;
                     }
-                    
-                    if (lastCtor != null &&
-                        (firstCtor == null || lastCtorParams.Length > firstCtorParams.Length))
+                    else
                     {
-                        maxParamsCtor = lastCtor;
-                        maxParamsCtorParams = lastCtorParams;
-                    }
+                        maxParamsCtor = null;
+                        if (firstCtor != null)
+                        {
+                            maxParamsCtor = firstCtor;
+                            maxParamsCtorParams = firstCtorParams;
+                        }
 
-                    if (ctorsWithParams != null)
-                    {
+                        if (secondCtor != null &&
+                            (firstCtor == null || secondCtorParams.Length > firstCtorParams.Length))
+                        {
+                            maxParamsCtor = secondCtor;
+                            maxParamsCtorParams = secondCtorParams;
+                        }
+
                         maxParamsCtorIndex = -1;
                         for (var i = 0; i < ctorsWithParams.Length; ++i)
                         {
                             if (ctorsWithParams[i].Ctor != null &&
                                 (maxParamsCtor == null || ctorsWithParams[i].Params.Length > maxParamsCtorParams.Length))
                             {
-                                maxParamsCtor = ctorsWithParams[i].Ctor;
+                                maxParamsCtor       = ctorsWithParams[i].Ctor;
                                 maxParamsCtorParams = ctorsWithParams[i].Params;
-                                maxParamsCtorIndex = i;
+                                maxParamsCtorIndex  = i;
                             }
                         }
-                    }
 
-                    if (maxParamsCtor == firstCtor)
-                        firstCtor = null;
-                    else if (maxParamsCtor == lastCtor) 
-                        lastCtor = null;
-                    else if (ctorsWithParams != null)
-                        ctorsWithParams[maxParamsCtorIndex].Ctor = null;
+                        if (maxParamsCtor == firstCtor)
+                            firstCtor = null;
+                        else if (maxParamsCtor == secondCtor)
+                            secondCtor = null;
+                        else
+                            ctorsWithParams[maxParamsCtorIndex].Ctor = null;
+                    }
                 }
                 
                 // Use already resolved constructor or the default one without parameters
