@@ -787,6 +787,7 @@ container.Resolve<Meta<Func<Arg1, Arg2, IA>, object>>();
 // etc.
 ```
 
+<div id="markdown-header-user-defined-wrappers"></div>
 ## User-defined wrappers
 
 To register your own wrapper just specify setup parameter as `Setup.Wrapper` or `Setup.WrapperWith`:
