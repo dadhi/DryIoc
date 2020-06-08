@@ -1,6 +1,11 @@
 Version History
 ---------------
 
+## v4.2.1 Bug-fix release
+
+- fixed: #156 Xamarin Forms iOS System.PlatformNotSupportedException: Operation is not supported on this platform.
+- fixed: #283 Open-generic decorators are no applied to the service registered via RegisterInstance
+
 ## v4.2.0 Feature release
 
 - feature: #270 Add FEC.LightExpression.LambdaExpression wrapper to work the same as System LambdaExpression  

@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.2.0</version>
+        <version>4.2.1</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,12 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v4.2.1 Bug-fix release
+
+- fixed: #156 Xamarin Forms iOS System.PlatformNotSupportedException: Operation is not supported on this platform.
+- fixed: #283 Open-generic decorators are no applied to the service registered via RegisterInstance
+
+
 ## v4.2.0 Feature release
 
 - feature: #270 Add FEC.LightExpression.LambdaExpression wrapper to work the same as System LambdaExpression  
