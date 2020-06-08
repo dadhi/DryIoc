@@ -13594,19 +13594,17 @@ namespace DryIoc
         {
             var asmExpr = Parameter(typeof(Assembly), "a");
 
-            var asmDefinedTypesProperty = typeof(Assembly).GetPropertyOrNull("DefinedTypes");
+            var definedTypesProperty = typeof(Assembly).GetTypeInfo().GetDeclaredProperty("DefinedTypes");
+            if (definedTypesProperty != null)
+            {
+                if (definedTypesProperty.PropertyType == typeof(IEnumerable<TypeInfo>))
+                    return a => ((IEnumerable<TypeInfo>)definedTypesProperty.GetValue(a)).Select(t => t.AsType());
+                return a => (IEnumerable<Type>)definedTypesProperty.GetValue(a);
+            }
 
-            var typesExpr = asmDefinedTypesProperty == null
-                ? Call(asmExpr, typeof(Assembly).SingleMethod("GetTypes"), Empty<Expression>())
-                : asmDefinedTypesProperty.PropertyType == typeof(IEnumerable<TypeInfo>)
-                    ? Call(typeof(Portable).SingleMethod(nameof(ToTypes), true), Property(asmExpr, asmDefinedTypesProperty))
-                    : (Expression)Property(asmExpr, asmDefinedTypesProperty);
-
-            return FastExpressionCompiler.LightExpression.ExpressionCompiler.CompileFast(
-                Lambda<Func<Assembly, IEnumerable<Type>>>(typesExpr, asmExpr));
+            var getTypesMethod = typeof(Assembly).GetTypeInfo().GetDeclaredMethod("GetTypes");
+            return a => (IEnumerable<Type>) getTypesMethod.Invoke(a, Empty<object>());
         }
-
-        internal static IEnumerable<Type> ToTypes(IEnumerable<TypeInfo> x) => x.Select(t => t.AsType());
 
         /// <summary>Portable version of PropertyInfo.GetGetMethod.</summary>
         public static MethodInfo GetGetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
