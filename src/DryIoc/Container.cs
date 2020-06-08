@@ -13636,17 +13636,12 @@ namespace DryIoc
             return null;
         }
 
-        private static readonly Lazy<Func<int>> _getEnvCurrentManagedThreadId = Lazy.Of(() =>
+        private static readonly Lazy<Func<int>> _getEnvCurrentManagedThreadId = Lazy.Of<Func<int>>(() =>
         {
             var method = typeof(Environment).GetMethodOrNull("get_CurrentManagedThreadId", Empty<Type>());
             if (method == null)
                 return null;
-
-            return Lambda<Func<int>>(Call(method, Empty<Expression>()), Empty<ParameterExpression>())
-#if SUPPORTS_FAST_EXPRESSION_COMPILER
-                .ToLambdaExpression()
-#endif
-                .Compile();
+            return () => (int)method.Invoke(null, (Empty<object>()));
         });
 
         /// <summary>Returns managed Thread ID either from Environment or Thread.CurrentThread whichever is available.</summary>
