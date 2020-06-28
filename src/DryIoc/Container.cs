@@ -2000,7 +2000,7 @@ namespace DryIoc
                             entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
                     }
                     else 
-                        entry = Ref.SwapAndGetNewValue(ref map, entry, (x, e) => x.AddOrKeepEntry(e)).GetEntryOrDefault(serviceTypeHash, serviceType);
+                        entry = Ref.SwapAndGetNewValue(ref map, entry, (x, en) => x.AddOrKeepEntry(en)).GetEntryOrDefault(serviceTypeHash, serviceType);
                 }
 
                 var e = entry.Value.Value;
