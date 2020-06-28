@@ -1334,6 +1334,15 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |               MsDI | 3.890 us | 0.0158 us | 0.0140 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
 |             DryIoc | 1.701 us | 0.0014 us | 0.0013 us |  0.44 |    0.00 | 0.6409 |     - |     - |   2.96 KB |
 | DryIoc_MsDIAdapter | 2.629 us | 0.0523 us | 0.0603 us |  0.68 |    0.02 | 0.6447 |     - |     - |   2.98 KB |
+
+#### Trying modify TryGetOrAddViaFactoryDelegate to create an entry and put it into map - memory and performance is degrading
+
+|             Method |     Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|----------:|----------:|------:|--------:|-------:|-------:|------:|----------:|
+|               MsDI | 4.013 us | 0.0801 us | 0.1294 us |  1.00 |    0.00 | 0.9460 | 0.0153 |     - |   4.35 KB |
+|             DryIoc | 1.847 us | 0.0222 us | 0.0186 us |  0.47 |    0.01 | 0.7401 | 0.0114 |     - |   3.41 KB |
+| DryIoc_MsDIAdapter | 2.761 us | 0.0510 us | 0.0426 us |  0.71 |    0.02 | 0.7439 | 0.0114 |     - |   3.43 KB |
+
 */
 
             private IServiceProvider _msDi;
