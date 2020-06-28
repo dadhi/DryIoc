@@ -2213,9 +2213,33 @@ namespace ImTools
             while (true)
             {
                 var oldValue = value;
+                if (Interlocked.CompareExchange(ref value, getNewValue(oldValue, a), oldValue) == oldValue)
+                    return oldValue;
+                if (++retryCount > retryCountUntilThrow)
+                    ThrowRetryCountExceeded(retryCountUntilThrow);
+#if SUPPORTS_SPIN_WAIT
+                spinWait.SpinOnce();
+#endif
+            }
+        }
+
+        /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
+        /// May prevent closure creation for the delegate</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static T SwapAndGetNewValue<T, A>(ref T value, A a, Func<T, A, T> getNewValue,
+            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+            where T : class
+        {
+#if SUPPORTS_SPIN_WAIT
+            var spinWait = new SpinWait();
+#endif
+            var retryCount = 0;
+            while (true)
+            {
+                var oldValue = value;
                 var newValue = getNewValue(oldValue, a);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return oldValue;
+                    return newValue;
                 if (++retryCount > retryCountUntilThrow)
                     ThrowRetryCountExceeded(retryCountUntilThrow);
 #if SUPPORTS_SPIN_WAIT
@@ -3631,9 +3655,7 @@ namespace ImTools
                      : map;
 
             var tree = (ImMapTree<V>)map;
-            return key != tree.Entry.Key
-                ? tree.AddOrKeepLeftOrRight(key, value)
-                : map;
+            return key != tree.Entry.Key ? tree.AddOrKeepLeftOrRight(key, value) : map;
         }
 
         /// <summary> Adds the entry with default value for the key or returns the un-modified map if key is already present </summary>

@@ -1991,10 +1991,16 @@ namespace DryIoc
                 var entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
                 if (entry == null)
                 {
-                    var m = map;
-                    if (Interlocked.CompareExchange(ref map, m.AddOrKeep(serviceTypeHash, serviceType), m) != m)
-                        Ref.Swap(ref map, serviceTypeHash, serviceType, (x, h, t) => x.AddOrKeep(h, t));
-                    entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
+                    entry = new ImMapEntry<ImMap.KValue<Type>>(serviceTypeHash, new ImMap.KValue<Type>(serviceType, null));
+                    var oldMap = map;
+                    var newMap = oldMap.AddOrKeepEntry(entry);
+                    if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
+                    {
+                        if (newMap == oldMap)
+                            entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
+                    }
+                    else 
+                        entry = Ref.SwapAndGetNewValue(ref map, entry, (x, e) => x.AddOrKeepEntry(e)).GetEntryOrDefault(serviceTypeHash, serviceType);
                 }
 
                 var e = entry.Value.Value;
@@ -2084,10 +2090,17 @@ namespace DryIoc
                     entry = map.GetEntryOrDefault(factoryId);
                     if (entry == null)
                     {
-                        var m = map;
-                        if (Interlocked.CompareExchange(ref map, m.AddOrKeep(factoryId), m) != m)
-                            Ref.Swap(ref map, factoryId, (x, id) => x.AddOrKeep(id));
-                        entry = map.GetEntryOrDefault(factoryId);
+                        entry = new ImMapEntry<ExpressionCacheSlot>(factoryId);
+                        var oldMap = map;
+                        var newMap = oldMap.AddOrKeepEntry(entry);
+                        if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
+                        {
+                            if (newMap == oldMap) 
+                                entry = map.GetEntryOrDefault(factoryId);
+                        }
+                        else 
+                            entry = Ref.SwapAndGetNewValue(ref map, entry, (x, e) => x.AddOrKeepEntry(e))
+                                .GetEntryOrDefault(factoryId);
                     }
                 }
 
@@ -3535,40 +3548,46 @@ namespace DryIoc
             if (scope.IsDisposed)
                 Throw.It(Error.ScopeIsDisposed, scope.ToString());
 
-            // add only, keep old item if it already exists
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
-                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, Scope.NoItem));
-
-            itemRef = map.GetEntryOrDefault(id);
-            if (itemRef.Value == Scope.NoItem)
+            itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
             {
-#if SUPPORTS_FAST_EXPRESSION_COMPILER
-                var lambdaArg = fewArgExpr.Argument3;
-#else
-                var lambdaArg = args[3];
-#endif
-                object result = null;
-                lock (itemRef)
+                if (newMap == oldMap)
                 {
+                    itemRef = map.GetEntryOrDefault(id);
                     if (itemRef.Value != Scope.NoItem)
                         return itemRef.Value;
+                }
+            }
+            else 
+                itemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i)).GetEntryOrDefault(id);
 
-                    if (lambdaArg is ConstantExpression lambdaConstExpr)
-                        result = ((FactoryDelegate)lambdaConstExpr.Value)(resolver);
-                    else
-                    {
-                        var body = ((LambdaExpression)lambdaArg).Body;
-                        if (!TryInterpret(resolver, body, paramExprs, paramValues, parentArgs, useFec, out result))
-                            result = body.CompileToFactoryDelegate(useFec, ((IContainer)resolver).Rules.UseInterpretation)(resolver);
-                    }
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+            var lambdaArg = fewArgExpr.Argument3;
+#else
+            var lambdaArg = args[3];
+#endif
+            object result = null;
+            lock (itemRef)
+            {
+                if (itemRef.Value != Scope.NoItem)
+                    return itemRef.Value;
 
-                    itemRef.Value = result;
+                if (lambdaArg is ConstantExpression lambdaConstExpr)
+                    result = ((FactoryDelegate)lambdaConstExpr.Value)(resolver);
+                else
+                {
+                    var body = ((LambdaExpression)lambdaArg).Body;
+                    if (!TryInterpret(resolver, body, paramExprs, paramValues, parentArgs, useFec, out result))
+                        result = body.CompileToFactoryDelegate(useFec, ((IContainer)resolver).Rules.UseInterpretation)(resolver);
                 }
 
-                if (result is IDisposable disp && disp != scope) 
-                    scope.AddUnorderedDisposable(disp);
+                itemRef.Value = result;
             }
+
+            if (result is IDisposable disp && disp != scope) 
+                scope.AddUnorderedDisposable(disp);
 
             return itemRef.Value;
         }
@@ -3615,57 +3634,63 @@ namespace DryIoc
             if (scope.IsDisposed)
                 Throw.It(Error.ScopeIsDisposed, scope.ToString());
 
-            // add only, keep old item if it already exists
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
-                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, Scope.NoItem));
-
-            itemRef = map.GetEntryOrDefault(id);
-            if (itemRef.Value == Scope.NoItem)
+            itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
             {
-#if SUPPORTS_FAST_EXPRESSION_COMPILER
-                var lambdaArg = fewArgExpr.Argument3;
-#else
-                var lambdaArg = args[3];
-#endif
-                object result = null;
-                lock (itemRef)
+                if (newMap == oldMap)
                 {
+                    itemRef = map.GetEntryOrDefault(id);
                     if (itemRef.Value != Scope.NoItem)
                         return itemRef.Value;
-
-                    if (lambdaArg is ConstantExpression lambdaConstExpr)
-                        result = ((FactoryDelegate)lambdaConstExpr.Value)(resolver);
-                    else if (!TryInterpret(resolver, ((LambdaExpression)lambdaArg).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                        result = ((LambdaExpression)lambdaArg).Body.CompileToFactoryDelegate(useFec,
-                            ((IContainer)resolver).Rules.UseInterpretation)(resolver);
-
-                    itemRef.Value = result;
                 }
+            }
+            else
+                itemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i)).GetEntryOrDefault(id);
 
-                if (result is IDisposable disp && disp != scope)
-                {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                    var disposalOrderArg = fewArgExpr.Argument4;
+            var lambdaArg = fewArgExpr.Argument3;
 #else
-                    var disposalOrderArg = args[4];
+            var lambdaArg = args[3];
 #endif
-                    var disposalOrder = (int)((ConstantExpression)disposalOrderArg).Value;
-                    if (disposalOrder == 0)
-                        scope.AddUnorderedDisposable(disp);
-                    else
-                        scope.AddDisposable(disp, disposalOrder);
-                }
+            object result = null;
+            lock (itemRef)
+            {
+                if (itemRef.Value != Scope.NoItem)
+                    return itemRef.Value;
+
+                if (lambdaArg is ConstantExpression lambdaConstExpr)
+                    result = ((FactoryDelegate)lambdaConstExpr.Value)(resolver);
+                else if (!TryInterpret(resolver, ((LambdaExpression)lambdaArg).Body, paramExprs, paramValues, parentArgs, useFec, out result))
+                    result = ((LambdaExpression)lambdaArg).Body.CompileToFactoryDelegate(useFec,
+                        ((IContainer)resolver).Rules.UseInterpretation)(resolver);
+
+                itemRef.Value = result;
+            }
+
+            if (result is IDisposable disp && disp != scope)
+            {
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+                var disposalOrderArg = fewArgExpr.Argument4;
+#else
+                var disposalOrderArg = args[4];
+#endif
+                var disposalOrder = (int)((ConstantExpression)disposalOrderArg).Value;
+                if (disposalOrder == 0)
+                    scope.AddUnorderedDisposable(disp);
+                else
+                    scope.AddDisposable(disp, disposalOrder);
             }
 
             return itemRef.Value;
         }
 
+        // todo: @perf create the overload without disposal index so we could use FiveArgumentsMethodCall expression from the FEC
         private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, 
             MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
             var args = callExpr.Arguments.ToListOrSelf();
-
             if (!ReferenceEquals(args[0], FactoryDelegateCompiler.ResolverContextParamExpr))
             {
                 if (!TryInterpret(r, args[0], paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
@@ -3687,38 +3712,44 @@ namespace DryIoc
             if (itemRef != null && itemRef.Value != Scope.NoItem)
                 return itemRef.Value;
 
-            // add only, keep old item if it already exists
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
-                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, Scope.NoItem));
-
-            itemRef = map.GetEntryOrDefault(id);
-            if (itemRef.Value == Scope.NoItem)
+            itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
             {
-                var lambda = args[4];
-                object result = null;
-                lock (itemRef)
+                if (newMap == oldMap)
                 {
+                    itemRef = map.GetEntryOrDefault(id);
                     if (itemRef.Value != Scope.NoItem)
                         return itemRef.Value;
-
-                    if (lambda is ConstantExpression lambdaConstExpr)
-                        result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-                    else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                        result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec,
-                            ((IContainer)r).Rules.UseInterpretation)(r);
-
-                    itemRef.Value = result;
                 }
+            }
+            else
+                itemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i)).GetEntryOrDefault(id);
 
-                if (result is IDisposable disp && disp != scope)
-                {
-                    var disposalOrder = (int)((ConstantExpression)args[5]).Value;
-                    if (disposalOrder == 0)
-                        scope.AddUnorderedDisposable(disp);
-                    else
-                        scope.AddDisposable(disp, disposalOrder);
-                }
+            var lambda = args[4];
+            object result = null;
+            lock (itemRef)
+            {
+                if (itemRef.Value != Scope.NoItem)
+                    return itemRef.Value;
+
+                if (lambda is ConstantExpression lambdaConstExpr)
+                    result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
+                else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
+                    result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec,
+                        ((IContainer)r).Rules.UseInterpretation)(r);
+
+                itemRef.Value = result;
+            }
+
+            if (result is IDisposable disp && disp != scope)
+            {
+                var disposalOrder = (int)((ConstantExpression)args[5]).Value;
+                if (disposalOrder == 0)
+                    scope.AddUnorderedDisposable(disp);
+                else
+                    scope.AddDisposable(disp, disposalOrder);
             }
 
             return itemRef.Value;
@@ -3758,47 +3789,53 @@ namespace DryIoc
             if (scope.IsDisposed)
                 Throw.It(Error.ScopeIsDisposed, scope.ToString());
 
-            // add only, keep old item if it already exists
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, Scope.NoItem), m) != m)
-                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, Scope.NoItem));
-
-            itemRef = map.GetEntryOrDefault(id);
-            if (itemRef.Value == Scope.NoItem)
+            itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
             {
-#if SUPPORTS_FAST_EXPRESSION_COMPILER
-                var lambda = fewArgExpr.Argument2;
-#else
-                var lambda = args[2];
-#endif
-                object result = null;
-                lock (itemRef)
+                if (newMap == oldMap)
                 {
+                    itemRef = map.GetEntryOrDefault(id);
                     if (itemRef.Value != Scope.NoItem)
                         return itemRef.Value;
-
-                    if (lambda is ConstantExpression lambdaConstExpr)
-                        result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-                    else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                        result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec,
-                            ((IContainer)r).Rules.UseInterpretation)(r);
-
-                    itemRef.Value = result;
                 }
+            }
+            else
+                itemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i)).GetEntryOrDefault(id);
 
-                if (result is IDisposable disp && disp != scope)
-                {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-                    var disposalOrderArg = fewArgExpr.Argument3;
+            var lambda = fewArgExpr.Argument2;
 #else
-                    var disposalOrderArg = args[3];
+            var lambda = args[2];
 #endif
-                    var disposalOrder = (int)((ConstantExpression)disposalOrderArg).Value;
-                    if (disposalOrder == 0)
-                        scope.AddUnorderedDisposable(disp);
-                    else
-                        scope.AddDisposable(disp, disposalOrder);
-                }
+            object result = null;
+            lock (itemRef)
+            {
+                if (itemRef.Value != Scope.NoItem)
+                    return itemRef.Value;
+
+                if (lambda is ConstantExpression lambdaConstExpr)
+                    result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
+                else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
+                    result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec,
+                        ((IContainer)r).Rules.UseInterpretation)(r);
+
+                itemRef.Value = result;
+            }
+
+            if (result is IDisposable disp && disp != scope)
+            {
+#if SUPPORTS_FAST_EXPRESSION_COMPILER
+                var disposalOrderArg = fewArgExpr.Argument3;
+#else
+                var disposalOrderArg = args[3];
+#endif
+                var disposalOrder = (int)((ConstantExpression)disposalOrderArg).Value;
+                if (disposalOrder == 0)
+                    scope.AddUnorderedDisposable(disp);
+                else
+                    scope.AddDisposable(disp, disposalOrder);
             }
 
             return itemRef.Value;
@@ -5176,7 +5213,7 @@ namespace DryIoc
             {
                 var resultMetadataDict = resultMetadata as IDictionary<string, object>;
                 if (resultMetadataDict != null && metadataType != typeof(IDictionary<string, object>))
-                    resultMetadata = resultMetadataDict.Values.FirstOrDefault(m => metadataType.IsTypeOf(m));
+                    resultMetadata = resultMetadataDict.Values.FirstOrDefault(oldMap => metadataType.IsTypeOf(oldMap));
             }
 
             var metadataExpr = container.GetConstantExpression(resultMetadata, metadataType);
@@ -9758,42 +9795,51 @@ namespace DryIoc
                 var factoryId = request.FactoryType == FactoryType.Decorator
                     ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
 
+                var itemRef = new ImMapEntry<object>(factoryId, Scope.NoItem);
                 ref var map = ref scope._maps[factoryId & Scope.MAP_COUNT_SUFFIX_MASK];
-
-                var m = map;
-                if (Interlocked.CompareExchange(ref map, m.AddOrKeep(factoryId, Scope.NoItem), m) != m)
-                    Ref.Swap(ref map, factoryId, (x, i) => x.AddOrKeep(i, Scope.NoItem));
-
-                var itemRef = map.GetEntryOrDefault(factoryId);
-                if (itemRef.Value == Scope.NoItem)
+                var oldMap = map;
+                var newMap = oldMap.AddOrKeepEntry(itemRef);
+                if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
                 {
-                    object singleton = null;
-                    lock (itemRef)
+                    if (newMap == oldMap)
                     {
-                        if (itemRef.Value == Scope.NoItem)
-                        {
-                            var useFec = container.Rules.UseFastExpressionCompiler;
-                            if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, useFec, out singleton))
-                                singleton = serviceExpr.CompileToFactoryDelegate(useFec, container.Rules.UseInterpretation)(container);
-
-                            if (Setup.WeaklyReferenced)
-                                singleton = new WeakReference(singleton);
-                            else if (Setup.PreventDisposal) // todo: we don't need it here because because we just don't need to AddDisposable
-                                singleton = new HiddenDisposable(singleton);
-
-                            itemRef.Value = singleton;
-                        }
-                    }
-
-                    if (singleton is IDisposable disp && disp != this)
-                    {
-                        if (Setup.DisposalOrder == 0)
-                            scope.AddUnorderedDisposable(disp);
-                        else
-                            scope.AddDisposable(disp, Setup.DisposalOrder);
+                        itemRef = map.GetEntryOrDefault(factoryId);
+                        if (itemRef.Value != Scope.NoItem)
+                            goto createExpression;
                     }
                 }
+                else
+                    itemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i)).GetEntryOrDefault(factoryId);
 
+                object singleton = null;
+                lock (itemRef)
+                {
+                    if (itemRef.Value != Scope.NoItem)
+                        goto createExpression;
+
+                    // todo: @perf inline the useFec
+                    var useFec = container.Rules.UseFastExpressionCompiler;
+                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, useFec, out singleton))
+                        singleton = serviceExpr.CompileToFactoryDelegate(useFec, container.Rules.UseInterpretation)(container);
+
+                    if (Setup.WeaklyReferenced)
+                        singleton = new WeakReference(singleton);
+                    else if (Setup.PreventDisposal)
+                        // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
+                        singleton = new HiddenDisposable(singleton);
+
+                    itemRef.Value = singleton;
+                }
+
+                if (singleton is IDisposable disp && disp != this)
+                {
+                    if (Setup.DisposalOrder == 0)
+                        scope.AddUnorderedDisposable(disp);
+                    else
+                        scope.AddDisposable(disp, Setup.DisposalOrder);
+                }
+
+                createExpression:
                 serviceExpr = itemRef.Value == null ? Constant(null, serviceExpr.Type) /* fixes #258 */ : Constant(itemRef.Value);
 
                 if (request.DependencyCount > 0)
@@ -11270,6 +11316,7 @@ namespace DryIoc
             return TryGetOrAdd(ref map, id, createValue, disposalOrder);
         }
 
+        //[Obsolete("Not used - remove")]
         private object TryGetOrAdd(ref ImMap<object> map, int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             if (_disposed == 1)
@@ -11314,6 +11361,7 @@ namespace DryIoc
         internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
             typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAddViaFactoryDelegate));
 
+        //[Obsolete("Not used - remove")]
         internal ImMapEntry<object> TryAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
         {
             if (_disposed == 1)
@@ -11346,14 +11394,24 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
+            var itemRef = new ImMapEntry<object>(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
-                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));
-
-            var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef.Value != NoItem)
-                return itemRef.Value;
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap) 
+            {
+                // If the map did not change that means someone else added the new item in parallel,
+                // so we need to lookup for it, otherwise out own item was added and we can operate on it.
+                if (newMap == oldMap)
+                {
+                    itemRef = map.GetEntryOrDefault(id);
+                    // if someone added the item already there is a chance that it has a created value, so let's check it
+                    if (itemRef.Value != NoItem)
+                        return itemRef.Value;
+                }
+            }
+            else 
+                itemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i)).GetEntryOrDefault(id);
 
             lock (itemRef)
             {
@@ -11381,14 +11439,21 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
+            var itemRef = new ImMapEntry<object>(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
-                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));
-
-            var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef.Value != NoItem)
-                return itemRef.Value;
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
+            {
+                if (newMap == oldMap)
+                {
+                    itemRef = map.GetEntryOrDefault(id);
+                    if (itemRef.Value != NoItem)
+                        return itemRef.Value;
+                }
+            }
+            else
+                itemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i)).GetEntryOrDefault(id);
 
             lock (itemRef)
             {

@@ -1335,13 +1335,15 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |             DryIoc | 1.701 us | 0.0014 us | 0.0013 us |  0.44 |    0.00 | 0.6409 |     - |     - |   2.96 KB |
 | DryIoc_MsDIAdapter | 2.629 us | 0.0523 us | 0.0603 us |  0.68 |    0.02 | 0.6447 |     - |     - |   2.98 KB |
 
-#### Trying modify TryGetOrAddViaFactoryDelegate to create an entry and put it into map - memory and performance is degrading
 
-|             Method |     Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|----------:|----------:|------:|--------:|-------:|-------:|------:|----------:|
-|               MsDI | 4.013 us | 0.0801 us | 0.1294 us |  1.00 |    0.00 | 0.9460 | 0.0153 |     - |   4.35 KB |
-|             DryIoc | 1.847 us | 0.0222 us | 0.0186 us |  0.47 |    0.01 | 0.7401 | 0.0114 |     - |   3.41 KB |
-| DryIoc_MsDIAdapter | 2.761 us | 0.0510 us | 0.0426 us |  0.71 |    0.02 | 0.7439 | 0.0114 |     - |   3.43 KB |
+### DryIoc v4.2.2 - replacing the AddOrKeep with AddOrKeepEntry and getting rid off GetEntryOrDefault afterwards and getting rid of created value check
+
+
+|             Method |     Mean |     Error |    StdDev |   Median | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|----------:|----------:|---------:|------:|--------:|-------:|-------:|------:|----------:|
+|               MsDI | 3.944 us | 0.0817 us | 0.2108 us | 3.867 us |  1.00 |    0.00 | 0.9460 | 0.0153 |     - |   4.35 KB |
+|             DryIoc | 1.663 us | 0.0354 us | 0.0408 us | 1.654 us |  0.42 |    0.03 | 0.6428 | 0.0076 |     - |   2.96 KB |
+| DryIoc_MsDIAdapter | 2.521 us | 0.0488 us | 0.0542 us | 2.498 us |  0.63 |    0.04 | 0.6485 | 0.0076 |     - |   2.98 KB |
 
 */
 
