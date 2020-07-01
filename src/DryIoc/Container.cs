@@ -106,7 +106,7 @@ namespace DryIoc
         /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
         {
-            var s = _scopeContext == null ? "container" : "container with ambient ScopeContext " + _scopeContext;
+            var s = _scopeContext == null ? "container" : "container with ambient " + _scopeContext;
 
             var scope = CurrentScope;
             s += scope == null ? " without scope" : " with scope " + scope;
@@ -956,13 +956,11 @@ namespace DryIoc
         {
             (CurrentScope ?? SingletonScope).SetUsedInstance(serviceType, factory);
             
+            // todo: @perf calculate the hash once - currently it is also calculated in `SetUsedInstance` above
             var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
             var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
             if (cacheEntry != null)
-            {
-                ref var entry = ref cacheEntry.Value;
-                entry.Value = null; // reset the cache if any
-            }
+                cacheEntry.Value.Value = null;
         }
 
 #endregion
