@@ -2,8 +2,10 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.2.1</version>
+        <version>4.2.2</version>
+
         <authors>Maksim Volkau</authors>
+
         <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
@@ -13,6 +15,12 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v4.2.2 Bug-fix release
+
+- fixed: #288 Recursive resolution ignores current scope .Use() instance 
+- small perf improvements
+
+
 ## v4.2.1 Bug-fix release
 
 - fixed: #156 Xamarin Forms iOS System.PlatformNotSupportedException: Operation is not supported on this platform.

@@ -1,7 +1,12 @@
 Version History
 ---------------
 
-## v4.2.1 Bug-fix release
+## v4.2.2 Bug-fix release / 2020-07-02
+
+- fixed: #288 Recursive resolution ignores current scope .Use() instance 
+- small perf improvements
+
+## v4.2.1 Bug-fix release / 2020-06-08
 
 - fixed: #156 Xamarin Forms iOS System.PlatformNotSupportedException: Operation is not supported on this platform.
 - fixed: #283 Open-generic decorators are no applied to the service registered via RegisterInstance
