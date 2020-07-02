@@ -11236,7 +11236,7 @@ namespace DryIoc
         ///[Obsolete("Removing because it is not used")]
         void SetUsedInstance(Type type, FactoryDelegate factory);
 
-        /// <summary>Sets (replaces) the factory for specified type.<summary>
+        /// <summary>Sets (replaces) the factory for specified type.</summary>
         void SetUsedInstance(int typeHash, Type type, FactoryDelegate factory);
 
         /// Looks up for stored item by type.
