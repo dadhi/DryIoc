@@ -11228,7 +11228,7 @@ namespace DryIoc
         /// Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
         object TrackDisposable(object item, int disposalOrder = 0);
 
-        ///[Obsolete("Removing because it is used only by obsolete `UseInstance` feature")]
+        ///<summary>Sets or adds the service item directly to the scope services</summary>
         void SetOrAdd(int id, object item);
 
         ///[Obsolete("Removing because it is not used")]
@@ -11477,29 +11477,32 @@ namespace DryIoc
             return itemRef.Value;
         }
 
-        ///[Obsolete("Removing because it is used only by obsolete `UseInstance` feature")]
+        ///<inheritdoc />
         public void SetOrAdd(int id, object item)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
+            var itemRef = new ImMapEntry<object>(id, item);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
-                Ref.Swap(ref map, x => x.AddOrKeep(id, NoItem));
-
-            var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef.Value != NoItem)
-                return;
-
-            // lock on the ref itself to set its `Item` field
-            lock (itemRef)
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
             {
-                // double-check if the item was changed in between (double check locking)
-                if (itemRef.Value != NoItem)
-                    return;
-                // we can simple assign because we are under the lock 
-                itemRef.Value = item;
+                if (newMap == oldMap)
+                {
+                    itemRef = newMap.GetEntryOrDefault(id);
+                    if (ReferenceEquals(itemRef.Value, item))
+                        return;
+                    itemRef.Value = item;
+                }
+            }
+            else
+            {
+                // todo: @incomplete
+                var anotherItemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(itemRef)).GetEntryOrDefault(id);
+                if (!ReferenceEquals(anotherItemRef, itemRef))
+                    anotherItemRef.Value = item;
             }
 
             if (item is IDisposable disp && disp != this)
