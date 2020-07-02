@@ -4712,6 +4712,7 @@ namespace DryIoc
             return r.WithCurrentScope(null);
         }
 
+        [MethodImpl((MethodImplOptions)256)]
         internal static bool TryGetUsedInstance(this IResolverContext r, Type serviceType, out object instance)
         {
             instance = null;

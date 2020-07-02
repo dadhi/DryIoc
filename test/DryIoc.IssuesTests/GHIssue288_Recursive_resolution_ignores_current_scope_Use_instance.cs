@@ -38,7 +38,7 @@ namespace DryIoc.IssuesTests
 
                     // recursive type resolution skips the instance and calls the factory even though the instance is placed to the current scope
                     var innerParentInstance = c.Resolve<Parent>();
-                    Assert.AreSame(innerChildInstance, innerParentInstance.Child);
+                    Assert.AreSame(outerChildInstance, innerParentInstance.Child);
                 }
             }
         }
