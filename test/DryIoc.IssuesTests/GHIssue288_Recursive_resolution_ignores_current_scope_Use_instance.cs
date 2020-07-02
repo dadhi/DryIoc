@@ -5,12 +5,16 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue288_Recursive_resolution_ignores_current_scope_Use_instance
     {
-        [Test, Ignore("todo: fixme")]
+        [Test]
         public void Test()
         {
             var c = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
+
+            c.Register<Child>(Made.Of(() => ChildFactory()), Reuse.Scoped,
+                // NOTE: this is important to make the dependency 'dynamic' and be replaceable even if parent expression is cached
+                // see https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/RulesAndDefaultConventions.md#injecting-dependency-asresolutioncall
+                Setup.With(asResolutionCall: true));
             
-            c.Register<Child>(Made.Of(() => ChildFactory()), Reuse.Scoped);
             c.Register<Parent>(Reuse.Scoped);
 
             // instance is resolved in outer scope
@@ -34,7 +38,7 @@ namespace DryIoc.IssuesTests
 
                     // recursive type resolution skips the instance and calls the factory even though the instance is placed to the current scope
                     var innerParentInstance = c.Resolve<Parent>();
-                    Assert.AreSame(outerChildInstance, innerParentInstance.Child);
+                    Assert.AreSame(innerChildInstance, innerParentInstance.Child);
                 }
             }
         }

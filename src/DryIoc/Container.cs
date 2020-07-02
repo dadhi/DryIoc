@@ -439,11 +439,17 @@ namespace DryIoc
             if (service != null)
                 return service;
 
+            // #288 - ignoring the parent, `args`, `scopeName`seems OK because Use is supposed to overwrite anything with args,
+            // and TryGetUsedInstance will look into scope with the specified `scopeName` anyway
+            if (serviceKey == null && requiredServiceType == null)
+                if (ResolverContext.TryGetUsedInstance(this, serviceType, out var usedInstance))
+                    return usedInstance;
+
             object cacheKey = null;
             if (requiredServiceType == null && preResolveParent.IsEmpty && args.IsNullOrEmpty())
             {
-                cacheKey = scopeName == null ? serviceKey 
-                    : serviceKey == null ? scopeName 
+                cacheKey = scopeName == null ? serviceKey
+                    : serviceKey == null ? scopeName
                     : KV.Of(scopeName, serviceKey);
 
                 if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceTypeHash, serviceType, cacheKey, out var cacheEntry))
@@ -954,11 +960,9 @@ namespace DryIoc
         /// Adding the factory directly to scope for resolution 
         public void Use(Type serviceType, FactoryDelegate factory) 
         {
-            (CurrentScope ?? SingletonScope).SetUsedInstance(serviceType, factory);
-            
-            // todo: @perf calculate the hash once - currently it is also calculated in `SetUsedInstance` above
-            var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
-            var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
+            var typeHash = RuntimeHelpers.GetHashCode(serviceType);
+            (CurrentScope ?? SingletonScope).SetUsedInstance(typeHash, serviceType, factory);
+            var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(typeHash, serviceType);
             if (cacheEntry != null)
                 cacheEntry.Value.Value = null;
         }
@@ -11229,8 +11233,11 @@ namespace DryIoc
         ///[Obsolete("Removing because it is not used")]
         object GetOrTryAdd(int id, object item, int disposalOrder);
 
-        /// Sets (replaces) the factory for specified type.
+        ///[Obsolete("Removing because it is not used")]
         void SetUsedInstance(Type type, FactoryDelegate factory);
+
+        /// <summary>Sets (replaces) the factory for specified type.<summary>
+        void SetUsedInstance(int typeHash, Type type, FactoryDelegate factory);
 
         /// Looks up for stored item by type.
         bool TryGetUsedInstance(IResolverContext r, Type type, out object instance);
@@ -11581,15 +11588,18 @@ namespace DryIoc
         internal static readonly MethodInfo TrackDisposableMethod =
             typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.TrackDisposable));
 
-        /// Add instance to the small registry via factory
-        public void SetUsedInstance(Type type, FactoryDelegate factory)
+        ///[Obsolete("Removing because it is not used")]
+        public void SetUsedInstance(Type type, FactoryDelegate factory) =>
+            SetUsedInstance(RuntimeHelpers.GetHashCode(type), type, factory);
+        
+        /// <inheritdoc />
+        public void SetUsedInstance(int typeHash, Type type, FactoryDelegate factory)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
             var f = _factories;
-            var hash = RuntimeHelpers.GetHashCode(type);
-            if (Interlocked.CompareExchange(ref _factories, f.AddOrUpdate(hash, type, factory), f) != f)
-                Ref.Swap(ref _factories, hash, type, factory, (x, h, t, fac) => x.AddOrUpdate(h, t, fac));
+            if (Interlocked.CompareExchange(ref _factories, f.AddOrUpdate(typeHash, type, factory), f) != f)
+                Ref.Swap(ref _factories, typeHash, type, factory, (x, h, t, fac) => x.AddOrUpdate(h, t, fac));
         }
 
         /// <summary>Try retrieve instance from the small registry.</summary>
