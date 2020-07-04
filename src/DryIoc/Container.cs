@@ -11486,24 +11486,9 @@ namespace DryIoc
             var itemRef = new ImMapEntry<object>(id, item);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var oldMap = map;
-            var newMap = oldMap.AddOrKeepEntry(itemRef);
-            if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
-            {
-                if (newMap == oldMap)
-                {
-                    itemRef = newMap.GetEntryOrDefault(id);
-                    if (ReferenceEquals(itemRef.Value, item))
-                        return;
-                    itemRef.Value = item;
-                }
-            }
-            else
-            {
-                // todo: @incomplete
-                var anotherItemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(itemRef)).GetEntryOrDefault(id);
-                if (!ReferenceEquals(anotherItemRef, itemRef))
-                    anotherItemRef.Value = item;
-            }
+            var newMap = oldMap.AddOrUpdateEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
+                Ref.Swap(ref map, itemRef, (x, i) => x.AddOrUpdateEntry(i));
 
             if (item is IDisposable disp && disp != this)
                 AddUnorderedDisposable(disp);

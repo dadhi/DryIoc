@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.2.3 Bug-fix release / 2020-07-04
+
+- fixed: #289 Think how to make Use to directly replace scoped service without special asResolutionCall setup
+
 ## v4.2.2 Bug-fix release / 2020-07-02
 
 - fixed: #288 Recursive resolution ignores current scope .Use() instance 

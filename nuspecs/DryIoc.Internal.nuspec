@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.2.2</version>
+        <version>4.2.3</version>
 
         <authors>Maksim Volkau</authors>
 
@@ -15,6 +15,10 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v4.2.3 Bug-fix release
+
+- fixed: #289 Think how to make Use to directly replace scoped service without special asResolutionCall setup
+
 ## v4.2.2 Bug-fix release
 
 - fixed: #288 Recursive resolution ignores current scope .Use() instance 

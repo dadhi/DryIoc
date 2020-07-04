@@ -26,13 +26,16 @@ namespace DryIoc.IssuesTests
 
                 using (var __ = c.OpenScope())
                 {
+                    var innerChildNormal = c.Resolve<Child>();
+
                     // inject instance
                     var inner = c.Resolve<IResolverContext>();
                     inner.CurrentScope.SetOrAdd(childFactory.FactoryID, outerChildInstance);
 
                     // direct type resolution works
                     var innerChildInstance = c.Resolve<Child>();
-                    Assert.AreSame(outerChildInstance, innerChildInstance);
+                    Assert.AreNotSame(innerChildNormal, innerChildInstance);
+                    Assert.AreSame(outerChildInstance,  innerChildInstance);
 
                     // recursive type resolution skips the instance and calls the factory even though the instance is placed to the current scope
                     var innerParentInstance = c.Resolve<Parent>();
