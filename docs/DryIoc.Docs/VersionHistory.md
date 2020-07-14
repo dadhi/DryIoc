@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.2.4 Bug-fix release / 2020-07-14
+
+- fixed: #290 ScopedTo to Singleton does not work
+
 ## v4.2.3 Bug-fix release / 2020-07-04
 
 - fixed: #289 Think how to make Use to directly replace scoped service without special asResolutionCall setup
