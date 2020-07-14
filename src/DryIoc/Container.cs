@@ -4621,7 +4621,10 @@ namespace DryIoc
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
-            request.DirectParent.IsSingletonOrDependencyOfSingleton && !request.OpensResolutionScope && !request.IsDirectlyWrappedInFunc()
+             request.Reuse is CurrentScopeReuse == false &&
+             request.DirectParent.IsSingletonOrDependencyOfSingleton && 
+            !request.OpensResolutionScope && 
+            !request.IsDirectlyWrappedInFunc()
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
@@ -7715,9 +7718,12 @@ namespace DryIoc
                 ? _nullExpr
                 : container.GetConstantExpression(details.ServiceKey, typeof(object));
 
-            var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
-
-            if (opensResolutionScope)
+            Expression resolverExpr;
+            if (!opensResolutionScope)
+            {
+                resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
+            }
+            else
             {
                 // Generates the code below. That means the service opening the scope is scoped to this scope.
                 //
