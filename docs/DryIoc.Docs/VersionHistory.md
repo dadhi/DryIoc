@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.2.5 Bug-fix release / 2020-07-19
+
+- fixed: #294 in parameter modifier breaks service resolution
+
 ## v4.2.4 Bug-fix release / 2020-07-14
 
 - fixed: #290 ScopedTo to Singleton does not work

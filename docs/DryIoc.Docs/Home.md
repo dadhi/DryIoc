@@ -163,10 +163,10 @@ Get from NuGet:
   - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
   - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-## v4.2.4 Bug-fix release
+## v4.2.5 Bug-fix release
 
-- fixed: #290 ScopedTo to Singleton does not work
+- fixed: #294 in parameter modifier breaks service resolution
 
-[Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.2.4)
+[Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.2.5)
 
 ### [Previous Versions](VersionHistory.md)

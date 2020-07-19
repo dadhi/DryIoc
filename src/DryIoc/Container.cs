@@ -8163,7 +8163,15 @@ namespace DryIoc
         }
 
         /// <summary>Service type specified by <see cref="ParameterInfo.ParameterType"/>.</summary>
-        public virtual Type ServiceType => Parameter.ParameterType;
+        public virtual Type ServiceType
+        {
+            get
+            {
+                // todo: @perf memoise the type
+                var paramType = Parameter.ParameterType;
+                return paramType.IsByRef ? paramType.GetElementType() : paramType;
+            }
+        }
 
         /// <summary>Optional service details.</summary>
         public virtual ServiceDetails Details => ServiceDetails.Default;

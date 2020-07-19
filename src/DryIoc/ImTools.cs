@@ -4570,9 +4570,7 @@ namespace ImTools
         /// <summary> Returns the value if the Type key is found or default value otherwise. </summary>
         [MethodImpl((MethodImplOptions)256)]
         public static object GetValueOrDefault(this ImMap<KValue<Type>> map, Type typeKey) =>
-            map.GetEntryOrDefault(
-                typeKey.IsByRef ? RuntimeHelpers.GetHashCode(typeKey.GetElementType()) : RuntimeHelpers.GetHashCode(typeKey), 
-                typeKey)?.Value.Value;
+            map.GetEntryOrDefault(RuntimeHelpers.GetHashCode(typeKey), typeKey)?.Value.Value;
 
         internal static ImMapEntry<KValue<K>> GetConflictedEntryOrDefault<K>(ImMapEntry<KValue<K>> entry, K key)
         {
