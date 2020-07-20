@@ -8162,16 +8162,11 @@ namespace DryIoc
                 : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: parameter.DefaultValue));
         }
 
+        /// <summary>The parameter type or dereferenced parameter type for `ref`, `in`, `out` parameters</summary>
+        public readonly Type DereferencedParameterType;
+
         /// <summary>Service type specified by <see cref="ParameterInfo.ParameterType"/>.</summary>
-        public virtual Type ServiceType
-        {
-            get
-            {
-                // todo: @perf memoise the type
-                var paramType = Parameter.ParameterType;
-                return paramType.IsByRef ? paramType.GetElementType() : paramType;
-            }
-        }
+        public virtual Type ServiceType => DereferencedParameterType;
 
         /// <summary>Optional service details.</summary>
         public virtual ServiceDetails Details => ServiceDetails.Default;
@@ -8187,7 +8182,13 @@ namespace DryIoc
         public override string ToString() =>
             new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name).ToString();
 
-        private ParameterServiceInfo(ParameterInfo parameter) { Parameter = parameter; }
+        private ParameterServiceInfo(ParameterInfo p)
+        {
+            Parameter = p;
+            DereferencedParameterType = p.ParameterType.IsByRef
+                ? p.ParameterType.GetElementType()
+                : p.ParameterType;
+        }
 
         private class WithDetails : ParameterServiceInfo
         {
@@ -8921,22 +8922,20 @@ namespace DryIoc
             Func<FieldInfo, TResult> field = null)
         {
             var info = _serviceInfo;
-            if (info is ParameterServiceInfo)
+            if (info is ParameterServiceInfo par)
             {
                 if (parameter != null)
-                    return parameter(((ParameterServiceInfo)info).Parameter);
+                    return parameter(par.Parameter);
             }
-            else if (info is PropertyOrFieldServiceInfo)
+            else if (info is PropertyOrFieldServiceInfo propOrField)
             {
-                var propertyOrFieldServiceInfo = (PropertyOrFieldServiceInfo)info;
-                var propertyInfo = propertyOrFieldServiceInfo.Member as PropertyInfo;
-                if (propertyInfo != null)
+                if (propOrField.Member is PropertyInfo propertyInfo)
                 {
                     if (property != null)
                         return property(propertyInfo);
                 }
                 else if (field != null)
-                    return field((FieldInfo)propertyOrFieldServiceInfo.Member);
+                    return field((FieldInfo)propOrField.Member);
             }
             else if (root != null)
                 return root();
