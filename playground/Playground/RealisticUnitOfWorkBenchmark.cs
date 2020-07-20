@@ -1072,6 +1072,13 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |      DryIoc | 102.2 us | 1.89 us | 1.67 us | 102.1 us |  0.63 |    0.01 | 14.4043 | 0.1221 |     - |  66.77 KB |
 | DryIoc_MsDI | 126.2 us | 2.00 us | 1.87 us | 126.1 us |  0.78 |    0.02 | 19.0430 | 0.2441 |     - |  87.93 KB |
 
+## DryIoc 4.2.5
+
+|      Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|--------:|--------:|------:|--------:|--------:|-------:|------:|----------:|
+|        MsDI | 113.8 us | 2.26 us | 6.06 us |  1.00 |    0.00 | 18.0664 | 0.1221 |     - |  73.85 KB |
+|      DryIoc | 107.6 us | 1.83 us | 1.71 us |  1.00 |    0.13 | 16.4795 | 0.1221 |     - |  67.52 KB |
+| DryIoc_MsDI | 129.8 us | 1.03 us | 0.91 us |  1.22 |    0.18 | 21.4844 | 0.2441 |     - |   88.6 KB |
 */
             [Benchmark(Baseline = true)]
             public object MsDI() => Measure(PrepareMsDi());
