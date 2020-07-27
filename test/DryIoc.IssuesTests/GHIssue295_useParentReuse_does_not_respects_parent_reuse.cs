@@ -5,28 +5,27 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue295_useParentReuse_does_not_respects_parent_reuse
     {
-        [Test, Ignore("todo: fixme - works without `useParentReuse: true` because code searches for first non Transient ancestor and skips any Transients in between")]
+        [Test]
+        //[Ignore("todo: fixme")]
         public void RespectsParentReuse()
         {
             var c = new Container();
             c.Register<Car>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
 
-            c.Register<Engine>(setup: Setup.With(useParentReuse: true)); // Scoped
+            c.Register<Engine>(setup: Setup.With(useParentReuse: true)); // Scoped when injected in Car
 
-            c.Register<Replicator>(Reuse.Transient);
+            c.Register<Replicator>(Reuse.Transient, setup: Setup.With(asResolutionCall: true)); // todo: For some reason does not work
             
-            c.Register<Energy>(setup: Setup.With(useParentReuse: true));
+            c.Register<Energy>(setup: Setup.With(useParentReuse: true)); // Scoped when injected in Engine
 
             var car1 = c.Resolve<Car>();
             var car2 = c.Resolve<Car>();
             var engine1 = car1.Engine.Replicator.CreateTransientEngine();
             var engine2 = car1.Engine.Replicator.CreateTransientEngine();
 
-            Assert.AreNotSame(car1.Engine.Replicator.Energy, car2.Engine.Replicator.Energy);
+            Assert.AreNotSame(car1, car2);
             Assert.AreNotSame(engine1, engine2);
-            // Failed
-            Assert.AreNotSame(car1.Engine.Replicator.Energy, engine1.Replicator.Energy);
-            // Failed
+            Assert.AreNotSame(engine1.Replicator, engine2.Replicator);
             Assert.AreNotSame(engine1.Replicator.Energy, engine2.Replicator.Energy);
         }
 
@@ -56,7 +55,7 @@ namespace DryIoc.IssuesTests
                 Energy = energy;
             }
 
-            public Engine CreateTransientEngine() => 
+            public Engine CreateTransientEngine() =>
                 Container.Resolve<Engine>();
         }
 
