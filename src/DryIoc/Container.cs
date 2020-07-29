@@ -12672,7 +12672,7 @@ namespace DryIoc
             GenericWrapperTypeArgIndexOutOfBounds = Of(
                 "Registered generic wrapper {0} specified type argument index {1} is out of type argument list."),
             DependencyHasShorterReuseLifespan = Of(
-                "Dependency {0} with reuse {1} has shorter lifespan than its parent's {2}" + NewLine +
+                "Dependency {0} with reuse {1} has a shorter lifespan than its parent's {2}" + NewLine +
                 "If you know what you're doing you may disable this error with the rule `new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan())`."),
             WeakRefReuseWrapperGCed = Of(
                 "Reused service wrapped in WeakReference is Garbage Collected and no longer available."),
