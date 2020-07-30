@@ -69,7 +69,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 IContainer container = null,
                 Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
             {
-                _container = container;
+                _container = container; // we won't initialize the container here because it is logically expected to be done in `CreateBuilder`
                 _registerDescriptor = registerDescriptor;
             }
 
@@ -82,8 +82,8 @@ namespace DryIoc.Microsoft.DependencyInjection
                 container.BuildServiceProvider();
         }
 
-        /// Creates the container and the `IServiceProvider` because its implemented by `IContainer` -
-        /// you get simply the best of both worlds.
+        /// <summary>Creates the container and the `IServiceProvider` because its implemented by `IContainer` -
+        /// you get simply the best of both worlds.</summary>
         public static IContainer Create(
             IEnumerable<ServiceDescriptor> services,
             Func<IRegistrator, ServiceDescriptor, bool> registerService = null)
@@ -122,10 +122,12 @@ namespace DryIoc.Microsoft.DependencyInjection
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
             if (container.Rules != Rules.MicrosoftDependencyInjectionRules)
+                // todo: @check the better way to not duplicate the rules from MicrosoftDependencyInjectionRules
                 container = container.With(rules => rules
                     .With(FactoryMethod.ConstructorWithResolvableArguments)
                     .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                    .WithTrackingDisposableTransients());
+                    .WithTrackingDisposableTransients()
+                    .WithoutVariantGenericTypesInResolvedCollection());
 
             container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
 
