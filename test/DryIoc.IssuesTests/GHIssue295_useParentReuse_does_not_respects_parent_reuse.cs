@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
     public class GHIssue295_useParentReuse_does_not_respects_parent_reuse
     {
         [Test]
-        [Ignore("todo: fixme")]
+        //[Ignore("todo: fixme")]
         public void RespectsParentReuse()
         {
             var c = new Container();
@@ -14,8 +14,15 @@ namespace DryIoc.IssuesTests
 
             c.Register<Engine>(setup: Setup.With(useParentReuse: true)); // Scoped when injected in Car
 
-            c.Register<Replicator>(Reuse.Transient, setup: Setup.With(asResolutionCall: true)); // todo: For some reason does not work
-            
+            // WORKS!: this does work but requires you to know how to specify no-caching, and maybe it is a good thing.
+            //c.Register(typeof(Replicator), 
+            //    new ReflectionFactory(typeof(Replicator), Reuse.Transient) { Caching = FactoryCaching.DoNotCache });
+
+            // DOES NOT WORK!
+            // Hmm, the question though - does asResolutionCall prevents caching, ahahahaaa - NO~!
+            // So, let's see what happens when we disable the caching for IsResolutionCall - WORKS!
+            c.Register<Replicator>(Reuse.Transient, setup: Setup.With(asResolutionCall: true));
+
             c.Register<Energy>(setup: Setup.With(useParentReuse: true)); // Scoped when injected in Engine
 
             var car1 = c.Resolve<Car>();

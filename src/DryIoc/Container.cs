@@ -9680,22 +9680,23 @@ namespace DryIoc
             var rules = container.Rules;
 
             var splitAsRsolutionCall = 
-                (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 &&
-                !request.OpensResolutionScope && (
-                setup.OpenResolutionScope || 
-                !request.IsResolutionCall && (
-                setup.AsResolutionCall || 
-                setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration ||
-                setup.UseParentReuse) && request.GetActualServiceType() != typeof(void));
+                (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 
+                && !request.OpensResolutionScope
+                && (setup.OpenResolutionScope || 
+                    !request.IsResolutionCall 
+                        && (setup.AsResolutionCall || (setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration))
+                        && request.GetActualServiceType() != typeof(void));
 
             if (splitAsRsolutionCall)
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
 
-            var cacheExpression = Caching != FactoryCaching.DoNotCache && 
+            var cacheExpression = 
+                Caching != FactoryCaching.DoNotCache &&
                 FactoryType == FactoryType.Service &&
                 !request.IsResolutionRoot &&
                 !request.IsDirectlyWrappedInFunc() && 
                 !request.IsWrappedInFuncWithArgs() &&
+                !setup.AsResolutionCall && // see #295
                 !setup.UseParentReuse &&
                 !Made.IsConditional;
 
