@@ -18,10 +18,6 @@
         <ProjectReference Include="..\..\test_sut\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj" />
     </ItemGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp2.1'">
-        <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" />
-    </ItemGroup>
-
     <ItemGroup Condition="'$(TargetFramework)' == 'net45'">
         <Reference Include="System.ComponentModel.Composition" />
     </ItemGroup>

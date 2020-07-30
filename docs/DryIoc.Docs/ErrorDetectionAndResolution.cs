@@ -310,14 +310,4 @@ Where no service registrations found
 `Validate` allows to specify the registrations to resolve via predicate `Func<ServiceRegistrationInfo, bool>` 
 or via exact collection of service roots `ServiceInfo[]`. 
 
-
-### Validate is ignorant version of GenerateResolutionExpressions
-
-Internally `Validate` method delegates to another public method `GenerateResolutionExpressions` which collects errors and __successful resolution expressions__. 
-The latter are just ignored by `Validate`.
-
-Generated resolution expressions are expression-trees `Expression<DryIoc.FactoryDelegate>` and maybe examined, 
-or even compiled to actual delegates and used for __container-less service resolution__.
-
-__Note:__ [DryIocZero](Companions/DryIocZero) package uses the `GenerateResolutionExpressions` to generate factory delegates at compile-time.
 md*/
