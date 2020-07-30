@@ -12567,10 +12567,8 @@ namespace DryIoc
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
         public ContainerException(int errorCode, string message, Exception innerException)
-            : base($"code: {DryIoc.Error.NameOf(errorCode)}; message: {message}", innerException)
-        {
+            : base($"code: Error.{DryIoc.Error.NameOf(errorCode)};{NewLine}message: {message}", innerException) =>
             Error = errorCode;
-        }
 
         /// <summary>Creates exception with message describing cause and context of error.</summary>
         public ContainerException(int error, string message)
