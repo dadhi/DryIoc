@@ -6876,6 +6876,7 @@ namespace DryIoc
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>
             registrator.RegisterInstance(true, typeof(T), instance, ifAlreadyRegistered, setup, serviceKey);
 
+        // todo: @feature option to switch off NoServicesWereRegisteredByRegisterMany
         /// <summary>
         /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
         /// so you can check it via `IsRegestered` for each service type, 
@@ -7079,6 +7080,7 @@ namespace DryIoc
         public static Factory ToFactory(this Type implType, IReuse reuse, Made made = null, Setup setup = null) =>
             new ReflectionFactory(implType, reuse, made, setup);
 
+        // todo: @feature option to switch off NoServicesWereRegisteredByRegisterMany
         /// <summary>A primary (basic) method for batch registering of implementations with possibly many service types.
         /// The default factory is the <see cref="ReflectionFactory"/> with default reuse.</summary>
         public static void RegisterMany(this IRegistrator registrator,
