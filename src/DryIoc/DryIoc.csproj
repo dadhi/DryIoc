@@ -5,7 +5,7 @@
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.2.5</VersionPrefix>
+        <VersionPrefix>4.3.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -17,7 +17,12 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-## v4.2.5 Bug-fix release / 2020-07-19
+## v4.3.0 Small feature and bug-fix release
+
+- added: #298 Add RegisterManyIgnoreNoServicesWereRegistered 
+- fixed: #295 useParentReuse does not respects parent reuse
+
+## v4.2.5 Bug-fix release
 
 - fixed: #294 in parameter modifier breaks service resolution
 

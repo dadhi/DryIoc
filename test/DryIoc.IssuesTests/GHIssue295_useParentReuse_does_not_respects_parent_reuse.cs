@@ -6,7 +6,6 @@ namespace DryIoc.IssuesTests
     public class GHIssue295_useParentReuse_does_not_respects_parent_reuse
     {
         [Test]
-        //[Ignore("todo: fixme")]
         public void RespectsParentReuse()
         {
             var c = new Container();

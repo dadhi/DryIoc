@@ -1,6 +1,11 @@
 Version History
 ---------------
 
+## v4.3.0 Small feature and bug-fix release / 2020-07-31
+
+- added: #298 Add RegisterManyIgnoreNoServicesWereRegistered 
+- fixed: #295 useParentReuse does not respects parent reuse
+
 ## v4.2.5 Bug-fix release / 2020-07-19
 
 - fixed: #294 in parameter modifier breaks service resolution
