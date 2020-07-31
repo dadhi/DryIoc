@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2018 Maksim Volkau
+Copyright (c) 2013-2020 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +29,12 @@ namespace DryIoc.SignalR
     using System.Linq;
     using System.Diagnostics.CodeAnalysis;
     using System.Reflection;
+    using System.Threading.Tasks;
     using Microsoft.AspNet.SignalR;
     using Microsoft.AspNet.SignalR.Hubs;
 
-    /// <summary>DryIoc extension to support SignalR.
+    /// <summary>
+    /// DryIoc extension to support SignalR.
     /// Provides DryIoc implementations of <see cref="IHubActivator"/> and <see cref="IDependencyResolver"/>.
     /// </summary>
     public static class DryIocSignalR
@@ -40,6 +42,7 @@ namespace DryIoc.SignalR
         /// <summary>The method does: 
         ///  - registers <see cref="DryIocHubActivator"/> as <see cref="IHubActivator"/>,
         ///  - registers <see cref="DryIocDependencyResolver"/> as <see cref="IDependencyResolver"/>,
+        ///  - registers <see cref="DryIocHubDispatcher"/>,
         ///  - optionally registers Hubs from given assemblies,
         ///  - sets GlobalHost.DependencyResolver to <see cref="DryIocDependencyResolver"/>.
         /// </summary>
@@ -54,21 +57,32 @@ namespace DryIoc.SignalR
         ///      var hubAssemblies = new[] { Assembly.GetExecutingAssembly() };
         /// 
         ///      // - Approach 1: Full integration with HubActivator and setting-up the Resolver
-        ///      container = new Container().WithSignalR(hubAssemblies);
+        ///      var container = new Container().WithSignalR(hubAssemblies);
         ///      RouteTable.Routes.MapHubs(); // should go before setting the resolver, check SO link above for reasoning
         /// 
         ///      // - Approach 2: Selective integration with DryIocHubActivator and default DependencyResolver 
-        ///      container = new Container();
+        ///      var container = new Container();
         ///      container.RegisterHubs(hubAssemblies);
         ///      GlobalHost.DependencyResolver.Register(typeof(IHubActivator), () => new DryIocHubActivator(container));
         ///      RouteTable.Routes.MapHubs();
-        /// 
+        ///
+        ///      // - Approach 3: see #292
+        ///      var container = new Container().WithSignalR(hubAssemblies);
+        ///      var config = new HubConfiguration { Resolver = container.Resolve<IDependencyResolver>() };
+        ///      container.Use(config); // required for Dispatcher to be resolved
+        ///      appBuilder.Map("/signalr", app => app.RunSignalR<DryIocHubDispatcher>(config));
+        ///
         ///   ]]></code></example>
         public static IContainer WithSignalR(this IContainer container, params Assembly[] hubAssemblies)
         {
-            container.Register<IHubActivator, DryIocHubActivator>();
             container.Register<IDependencyResolver, DryIocDependencyResolver>(Reuse.Singleton);
-            RegisterHubs(container, hubAssemblies);
+            container.Register<IHubActivator, DryIocHubActivator>();
+
+            // todo: (see #292) should it be a Singleton?
+            // Client should `RegisterInstance(hubConfiguration)` in order to create the DryIocHubDispatcher 
+            container.RegisterMany<DryIocHubDispatcher>();
+
+            container.RegisterHubs(hubAssemblies);
             GlobalHost.DependencyResolver = container.Resolve<IDependencyResolver>();
             return container;
         }
@@ -120,10 +134,8 @@ namespace DryIoc.SignalR
     public sealed class DryIocDependencyResolver : DefaultDependencyResolver
     {
         /// <summary>Created resolver given DryIoc resolver.</summary>
-        public DryIocDependencyResolver(IResolver resolver)
-        {
+        public DryIocDependencyResolver(IResolver resolver) =>
             _resolver = resolver;
-        }
 
         /// <summary>Try to resolve service suing DryIoc container, 
         /// and if not resolved fallbacks to base <see cref="DefaultDependencyResolver"/>.</summary>
@@ -160,15 +172,55 @@ namespace DryIoc.SignalR
     public sealed class DryIocHubActivator : IHubActivator
     {
         /// <summary>Creates activator with provided resolver.</summary> 
-        public DryIocHubActivator(IResolver resolver)
-        {
+        public DryIocHubActivator(IResolver resolver) => 
             _resolver = resolver;
-        }
 
         /// <summary>Creates hub by using <paramref name="descriptor"/> info.</summary>
         public IHub Create(HubDescriptor descriptor) => 
             _resolver.Resolve<IHub>(descriptor.HubType);
 
         private readonly IResolver _resolver;
+    }
+
+    ///<summary>
+    /// Wraps the action dispatching into the DryIoc scopes.
+    /// Expecting the `HubConfiguration` to be registered in container.
+    /// See issue #292
+    ///</summary>
+    public class DryIocHubDispatcher : HubDispatcher
+    {
+        private readonly IResolverContext _resolver;
+
+        /// Constructor
+        public DryIocHubDispatcher(IResolverContext resolver, HubConfiguration configuration) : base(configuration) => 
+            _resolver = resolver;
+
+        /// <inheritdoc />
+        protected override async Task OnConnected(IRequest request, string connectionId)
+        {
+            using (_resolver.OpenScope()) 
+                await base.OnConnected(request, connectionId);
+        }
+
+        /// <inheritdoc />
+        protected override async Task OnReceived(IRequest request, string connectionId, string data)
+        {
+            using (_resolver.OpenScope()) 
+                await base.OnReceived(request, connectionId, data);
+        }
+
+        /// <inheritdoc />
+        protected override async Task OnDisconnected(IRequest request, string connectionId, bool stopCalled)
+        {
+            using (_resolver.OpenScope()) 
+                await base.OnDisconnected(request, connectionId, stopCalled);
+        }
+
+        /// <inheritdoc />
+        protected override async Task OnReconnected(IRequest request, string connectionId)
+        {
+            using (_resolver.OpenScope()) 
+                await base.OnReconnected(request, connectionId);
+        }
     }
 }

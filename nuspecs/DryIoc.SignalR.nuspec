@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.SignalR</id>
-        <version>4.0.0</version>
+        <version>4.1.0</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2016-2020 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,9 @@
         <tags>Web ASPNET SignalR Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
             <![CDATA[
+v4.1.0:
+- added: DryIocHubDispatcher
+- fixed: #292 Web Api SignalR. Cannot resolve hub instance on connection timeout.
 v4.0.0:
 - added: Support for DryIoc v4
 v3.0.0:
@@ -29,7 +32,7 @@ v2.0.0:
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc" version="4.0.0" />
+                <dependency id="DryIoc" version="4.3.0" />
                 <dependency id="Microsoft.AspNet.SignalR.Core" version="2.3.0" />
             </group>
         </dependencies>
