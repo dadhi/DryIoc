@@ -5956,7 +5956,8 @@ namespace DryIoc
             UseInterpretationForTheFirstResolution = 1 << 18,
             UseInterpretation = 1 << 19,
             UseDecorateeReuseForDecorators = 1 << 20,
-            UsedForValidation = 1 << 21 // informational flag, will appear in exceptions during validation
+            UsedForValidation = 1 << 21, // informational flag, will appear in exceptions during validation
+            //ScopedOrSingletonShouldApplySingletonForResolutionRootOnly = ??? // todo: @consider (see #285) that what it should be initially
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -7080,18 +7081,24 @@ namespace DryIoc
         public static Factory ToFactory(this Type implType, IReuse reuse, Made made = null, Setup setup = null) =>
             new ReflectionFactory(implType, reuse, made, setup);
 
-        // todo: @feature option to switch off NoServicesWereRegisteredByRegisterMany
-        /// <summary>A primary (basic) method for batch registering of implementations with possibly many service types.
-        /// The default factory is the <see cref="ReflectionFactory"/> with default reuse.</summary>
+        /// <summary>
+        /// Batch registering the implementations with possibly many service types,
+        /// throwing the <see cref="Error.NoServicesWereRegisteredByRegisterMany" /> error when there are no services types to register.
+        /// You may pass the predefined <see cref="GetRegisterManyImplementedServiceTypes"/> to <paramref name="getServiceTypes"/>.
+        /// By default <paramref name="getImplFactory"/> uses the <see cref="ReflectionFactory"/> with the default reuse,
+        /// or you may return the <see cref="ReflectionFactory"/> with the <see cref="Reuse"/> of your choice.
+        /// </summary>
         public static void RegisterMany(this IRegistrator registrator,
-            IEnumerable<Type> implTypes, Func<Type, Type[]> getServiceTypes,
-            Func<Type, Factory> getImplFactory = null, Func<Type, Type, object> getServiceKey = null,
+            IEnumerable<Type> implTypes, 
+            Func<Type, Type[]> getServiceTypes,
+            Func<Type, Factory> getImplFactory = null, 
+            Func<Type, Type, object> getServiceKey = null,
             IfAlreadyRegistered? ifAlreadyRegistered = null)
         {
             getImplFactory = getImplFactory ?? ToFactory;
 
-            bool isSomeoneRegistered = false;
-            bool anyImplTypes = false;
+            var isSomethingRegistered = false;
+            var anyImplTypes = false;
             foreach (var implType in implTypes)
             {
                 anyImplTypes = true;
@@ -7103,13 +7110,44 @@ namespace DryIoc
                     {
                         var t = serviceTypes[i];
                         registrator.Register(t, factory, ifAlreadyRegistered, getServiceKey?.Invoke(implType, t));
-                        isSomeoneRegistered = true;
+                        isSomethingRegistered = true;
                     }
                 }
             }
 
-            if (anyImplTypes && !isSomeoneRegistered)
+            if (anyImplTypes && !isSomethingRegistered)
                 Throw.It(Error.NoServicesWereRegisteredByRegisterMany, implTypes);
+        }
+
+        /// <summary>
+        /// Batch registering the implementations with possibly many service types,
+        /// ignoring the case when there are no services types to register.
+        /// You may pass the predefined <see cref="GetRegisterManyImplementedServiceTypes"/> to <paramref name="getServiceTypes"/>.
+        /// By default <paramref name="getImplFactory"/> uses the <see cref="ReflectionFactory"/> with the default reuse,
+        /// or you may return the <see cref="ReflectionFactory"/> with the <see cref="Reuse"/> of your choice.
+        /// </summary>
+        public static void RegisterManyIgnoreNoServicesWereRegistered(this IRegistrator registrator,
+            IEnumerable<Type> implTypes,
+            Func<Type, Type[]> getServiceTypes,
+            Func<Type, Factory> getImplFactory = null,
+            Func<Type, Type, object> getServiceKey = null,
+            IfAlreadyRegistered? ifAlreadyRegistered = null)
+        {
+            getImplFactory = getImplFactory ?? ToFactory;
+
+            foreach (var implType in implTypes)
+            {
+                var serviceTypes = getServiceTypes(implType);
+                if (!serviceTypes.IsNullOrEmpty())
+                {
+                    var factory = getImplFactory(implType);
+                    for (var i = 0; i < serviceTypes.Length; i++)
+                    {
+                        var t = serviceTypes[i];
+                        registrator.Register(t, factory, ifAlreadyRegistered, getServiceKey?.Invoke(implType, t));
+                    }
+                }
+            }
         }
 
         /// <summary>Batch registers implementation with possibly many service types.</summary>
@@ -12387,10 +12425,11 @@ namespace DryIoc
         Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType);
 
         /// Puts instance into the current scope or singletons.
+        //[Obsolete("me")]
         void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
             bool preventDisposal, bool weaklyReferenced, object serviceKey);
 
-        /// Puts instance created via the passed factory on demand into the current or singleton scope
+        /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
         void Use(Type serviceType, FactoryDelegate factory);
     }
 

@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -21,6 +22,28 @@ namespace DryIoc.IssuesTests
 
             Assert.IsTrue(c.IsRegistered<A>(condition: f => f.Reuse == Reuse.Scoped));
             Assert.IsTrue(c.IsRegistered<B>(condition: f => f.Reuse == Reuse.Transient)); // replaced
+        }
+
+        [Test]
+        public void RegisterMany_can_suppress_the_exception_if_no_service_is_registered()
+        {
+            var c = new Container();
+
+            c.Register<A>(Reuse.Scoped); // should be kept
+            c.Register<B>(Reuse.Scoped); // should be kept too
+
+            var implTypes = new[] { typeof(A), typeof(B) };
+
+            c.RegisterManyIgnoreNoServicesWereRegistered(implTypes,
+                implType => implType
+                    .GetRegisterManyImplementedServiceTypes(nonPublicServiceTypes: true)
+                    .Where(st => !c.IsRegistered(st, condition: factory => factory.Reuse == Reuse.Scoped))
+                    .ToArray(),
+                t => new ReflectionFactory(t, Reuse.Transient),
+                ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+
+            Assert.IsTrue(c.IsRegistered<A>(condition: f => f.Reuse == Reuse.Scoped));
+            Assert.IsTrue(c.IsRegistered<B>(condition: f => f.Reuse == Reuse.Scoped));
         }
 
         class A {}
