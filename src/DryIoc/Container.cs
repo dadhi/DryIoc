@@ -5253,18 +5253,25 @@ namespace DryIoc
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
     {
-        /// Default rules as staring point.
+        /// <summary>Default rules as a staring point.</summary>
         public static readonly Rules Default = new Rules();
 
-        /// Default rules as staring point.
-        public static readonly Rules MicrosoftDependencyInjectionRules = new Rules(
-            (DEFAULT_SETTINGS | Settings.TrackingDisposableTransients) 
-            & ~Settings.ThrowOnRegisteringDisposableTransient & ~Settings.VariantGenericTypesInResolvedCollection, 
-            Rules.SelectLastRegisteredFactory(), Reuse.Transient,
-            Made.Of(DryIoc.FactoryMethod.ConstructorWithResolvableArguments), 
-            IfAlreadyRegistered.AppendNotKeyed,
-            DefaultDependencyCountInLambdaToSplitBigObjectGraph, null, null, null, null, null);
-         
+        private static Rules SetMicrosoftDependencyInjectionRules(Rules rules)
+        {
+            rules._settings |= Settings.TrackingDisposableTransients;
+            rules._settings &= ~Settings.ThrowOnRegisteringDisposableTransient;
+            rules._settings &= ~Settings.VariantGenericTypesInResolvedCollection;
+            rules._factorySelector = SelectLastRegisteredFactory;
+            rules._made._factoryMethod = DryIoc.FactoryMethod.ConstructorWithResolvableArguments;
+            return rules;
+        }
+
+        /// <summary>The rules implementing the conventions of Microsoft.Extension.DependencyInjection library.</summary>
+        public static readonly Rules MicrosoftDependencyInjectionRules = SetMicrosoftDependencyInjectionRules(Default.Clone());
+
+        /// <summary>Returns the copy of the rules with the applied conventions of Microsoft.Extension.DependencyInjection library.</summary>
+        public Rules WithMicrosoftDependencyInjectionRules() => SetMicrosoftDependencyInjectionRules(Clone());
+
         /// <summary>Does nothing</summary>
         [Obsolete("Is not used anymore to split the graph - instead use the `DependencyCountInLambdaToSplitBigObjectGraph`")]
         public const int DefaultDependencyDepthToSplitObjectGraph = 20;
@@ -5385,7 +5392,7 @@ namespace DryIoc
         /// <summary>Rules to select single matched factory default and keyed registered factory/factories.
         /// Selectors applied in specified array order, until first returns not null <see cref="Factory"/>.
         /// Default behavior is to throw on multiple registered default factories, cause it is not obvious what to use.</summary>
-        public FactorySelectorRule FactorySelector { get; }
+        public FactorySelectorRule FactorySelector => _factorySelector;
 
         /// <summary>Sets <see cref="FactorySelector"/></summary>
         public Rules WithFactorySelector(FactorySelectorRule rule) =>
@@ -5590,7 +5597,7 @@ namespace DryIoc
 
                         // We nullify default keys (usually passed by ResolveMany to resolve the specific factory in order)
                         // so that `CombineRegisteredWithDynamicFactories` may assign the key again.
-                        // Given that the implementation types are unchanged then the new keys assignement will be the same the last one,
+                        // Given that the implementation types are unchanged then the new keys assignment will be the same the last one,
                         // so that the factory resolution will correctly match the required factory by key.
                         // e.g. bitbucket issue #396
                         var theKey = serviceKey is DefaultDynamicKey ? null : serviceKey;
@@ -5914,7 +5921,7 @@ namespace DryIoc
         {
             _settings = settings;
             _made = made;
-            FactorySelector = factorySelector;
+            _factorySelector = factorySelector;
             DefaultReuse = defaultReuse;
             DefaultIfAlreadyRegistered = defaultIfAlreadyRegistered;
             DependencyCountInLambdaToSplitBigObjectGraph = dependencyCountInLambdaToSplitBigObjectGraph;
@@ -5925,13 +5932,20 @@ namespace DryIoc
             DefaultRegistrationServiceKey = defaultRegistrationServiceKey;
         }
 
-        private Rules WithSettings(Settings newSettings) =>
-            new Rules(newSettings,
-                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
+        private Rules Clone() =>
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made.Copy(), DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
-        private readonly Made _made;
+        private Rules WithSettings(Settings newSettings)
+        {
+            var newRules = Clone();
+            newRules._settings = newSettings;
+            return newRules;
+        }
+
+        private Made _made;
 
         [Flags]
         private enum Settings
@@ -5970,8 +5984,9 @@ namespace DryIoc
             | Settings.UseInterpretationForTheFirstResolution;
 
         private Settings _settings;
+        private FactorySelectorRule _factorySelector;
 
-#endregion
+        #endregion
     }
 
     /// <summary>Wraps constructor or factory method optionally with factory instance to create service.</summary>
@@ -6268,7 +6283,8 @@ namespace DryIoc
     public class Made
     {
         /// <summary>Returns delegate to select constructor based on provided request.</summary>
-        public FactoryMethodSelector FactoryMethod { get; private set; }
+        public FactoryMethodSelector FactoryMethod { get => _factoryMethod; private set => _factoryMethod = value; }
+        internal FactoryMethodSelector _factoryMethod;
 
         /// <summary>Return type of strongly-typed factory method expression.</summary>
         public Type FactoryMethodKnownResultType { get; private set; }
@@ -6285,7 +6301,7 @@ namespace DryIoc
         private readonly MadeDetails _details;
 
         /// Has any conditional flags
-        public bool IsConditional => _details != MadeDetails.NoConditionals; 
+        public bool IsConditional => _details != MadeDetails.NoConditionals;
 
         /// True is made has properties or parameters with custom value.
         /// That's mean the whole made become context based which affects caching.
@@ -6337,17 +6353,15 @@ namespace DryIoc
         public static readonly Made Default = new Made();
 
         /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
-        public static implicit operator Made(FactoryMethodSelector factoryMethod) =>
-            Of(factoryMethod);
+        public static implicit operator Made(FactoryMethodSelector factoryMethod) => new Made(factoryMethod);
 
         /// <summary>Creates rules with only <see cref="Parameters"/> specified.</summary>
-        public static implicit operator Made(ParameterSelector parameters) =>
-            Of(parameters: parameters);
+        public static implicit operator Made(ParameterSelector parameters) => new Made(null, parameters);
 
         /// <summary>Creates rules with only <see cref="PropertiesAndFields"/> specified.</summary>
-        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields) =>
-            Of(propertiesAndFields: propertiesAndFields);
+        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields) => new Made(null, null, propertiesAndFields);
 
+        // todo: @bug fix the spelling for `isConditionalImlementation`
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         public static Made Of(FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
@@ -6395,7 +6409,7 @@ namespace DryIoc
         /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, Func<Request, ServiceInfo> factoryInfo,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)), 
+            new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)),
                 parameters, propertiesAndFields, isImplMemberDependsOnRequest: true);
 
         /// <summary>Defines how to select constructor from implementation type.
@@ -6526,11 +6540,11 @@ namespace DryIoc
             { }
         }
 
-#region Implementation
+        #region Implementation
 
         internal Made(
             FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false, 
+            Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false,
             bool isImplMemberDependsOnRequest = false)
         {
             FactoryMethod = factoryMethod;
@@ -6553,6 +6567,20 @@ namespace DryIoc
             FactoryMethod = factoryMethod.ToFunc<Request, FactoryMethod>;
             FactoryMethodKnownResultType = factoryReturnType;
         }
+
+        private Made(
+            FactoryMethodSelector factoryMethod, ParameterSelector parameters, PropertiesAndFieldsSelector propertiesAndFields,
+            Type factoryMethodKnownResultType, MadeDetails details)
+        {
+            FactoryMethod = factoryMethod;
+            Parameters = parameters;
+            PropertiesAndFields = propertiesAndFields;
+            FactoryMethodKnownResultType = factoryMethodKnownResultType;
+            _details = details;
+        }
+
+        internal Made Copy() =>
+            new Made(FactoryMethod, Parameters, PropertiesAndFields, FactoryMethodKnownResultType, _details);
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
             System.Linq.Expressions.Expression wholeServiceExpr, ParameterInfo[] paramInfos,
@@ -6617,7 +6645,7 @@ namespace DryIoc
                     if (methodCallExpr.Method.Name == Arg.ArgIndexMethodName) // handle custom value
                     {
                         var getArgValue = GetArgCustomValueProvider(wholeServiceExpr, methodCallExpr, argValues);
-                        propertiesAndFields = propertiesAndFields.OverrideWith(req => 
+                        propertiesAndFields = propertiesAndFields.OverrideWith(req =>
                             PropertyOrFieldServiceInfo.Of(member).WithDetails(ServiceDetails.Of(getArgValue(req))).One());
                         hasCustomValue = true;
                     }
@@ -6734,7 +6762,7 @@ namespace DryIoc
                 argExpr, wholeServiceExpr);
         }
 
-#endregion
+        #endregion
     }
 
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.

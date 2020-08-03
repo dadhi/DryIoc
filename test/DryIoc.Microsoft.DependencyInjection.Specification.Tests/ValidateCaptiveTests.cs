@@ -7,7 +7,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
     public class ValidateCaptiveTests
     {
         [Test]
-        public void ServiceCollection_AddScoped_dependency_in_a_Singleton_ISNOT_Validated_as_captive_dependency()
+        public void ServiceCollection_AddScoped_dependency_in_a_Singleton_ISNT_Validated_as_captive_dependency()
         {
             var services = new ServiceCollection();
             services.AddScoped<Foo>();      // Actually a `ScopedOrSingleton` due MS.DI convention
@@ -15,7 +15,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             services.AddScoped<Buz>();      // Actually a `ScopedOrSingleton` due MS.DI convention
 
             // These two line are "presumably" done by the framework
-            var providerFactory = new DryIocAdapter.DryIocServiceProviderFactory();
+            var providerFactory = new DryIocServiceProviderFactory();
             var provider = providerFactory.CreateServiceProvider(providerFactory.CreateBuilder(services));
 
             // Getting back the underlying DryIoc container to use its functions (it is always implicitly available).
@@ -36,7 +36,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             services.AddSingleton<Bar>();
 
             // These two line are "presumably" done by the framework
-            var providerFactory = new DryIocAdapter.DryIocServiceProviderFactory();
+            var providerFactory = new DryIocServiceProviderFactory();
             var provider = providerFactory.CreateServiceProvider(providerFactory.CreateBuilder(services));
 
             // Getting back the underlying DryIoc container to use its functions (it is always implicitly available).
