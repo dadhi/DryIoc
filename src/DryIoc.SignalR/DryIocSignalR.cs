@@ -80,7 +80,7 @@ namespace DryIoc.SignalR
 
             // todo: (see #292) should it be a Singleton?
             // Client should `RegisterInstance(hubConfiguration)` in order to create the DryIocHubDispatcher 
-            container.RegisterMany<DryIocHubDispatcher>();
+            container.Register<DryIocHubDispatcher>();
 
             container.RegisterHubs(hubAssemblies);
             GlobalHost.DependencyResolver = container.Resolve<IDependencyResolver>();
