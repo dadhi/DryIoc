@@ -72,12 +72,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
             if (container.Rules != Rules.MicrosoftDependencyInjectionRules)
-                // todo: @check the better way to not duplicate the rules from MicrosoftDependencyInjectionRules
-                container = container.With(rules => rules
-                    .With(FactoryMethod.ConstructorWithResolvableArguments)
-                    .WithFactorySelector(Rules.SelectLastRegisteredFactory())
-                    .WithTrackingDisposableTransients()
-                    .WithoutVariantGenericTypesInResolvedCollection());
+                container = container.With(rules => rules.WithMicrosoftDependencyInjectionRules());
 
             container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
 
