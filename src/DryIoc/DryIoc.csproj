@@ -20,6 +20,7 @@
 ## v4.3.0 Small feature and bug-fix release
 
 - added: #298 Add RegisterManyIgnoreNoServicesWereRegistered 
+- added: #300 Add Rules.WithMicrosoftDependencyInjectionRules
 - fixed: #295 useParentReuse does not respects parent reuse
 
 ## v4.2.5 Bug-fix release
