@@ -9762,8 +9762,10 @@ namespace DryIoc
                 !request.IsResolutionRoot &&
                 !request.IsDirectlyWrappedInFunc() && 
                 !request.IsWrappedInFuncWithArgs() &&
+                !(request.Reuse.Name is IScopeName) &&
                 !setup.AsResolutionCall && // see #295
                 !setup.UseParentReuse &&
+                setup.Condition == null &&
                 !Made.IsConditional;
 
             var reuse = request.Reuse;
