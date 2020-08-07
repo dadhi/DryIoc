@@ -17,7 +17,7 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-## v4.3.1 Small feature and bug-fix release
+## v4.3.1 Bug-fix release
 
 - fixed: #301 breakage in scoped enumeration in v4
 

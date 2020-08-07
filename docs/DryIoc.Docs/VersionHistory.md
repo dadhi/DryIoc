@@ -1,7 +1,7 @@
 Version History
 ---------------
 
-## v4.3.1 Small feature and bug-fix release / 2020-08-07
+## v4.3.1 Bug-fix release / 2020-08-07
 
 - fixed: #301 breakage in scoped enumeration in v4
 
