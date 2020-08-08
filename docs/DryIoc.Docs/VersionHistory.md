@@ -1,6 +1,37 @@
 Version History
 ---------------
 
+## v4.3.1 Bug-fix release / 2020-08-07
+
+- fixed: #301 breakage in scoped enumeration in v4
+
+## v4.3.0 Small feature and bug-fix release / 2020-07-31
+
+- added: #298 Add RegisterManyIgnoreNoServicesWereRegistered 
+- fixed: #295 useParentReuse does not respects parent reuse
+
+## v4.2.5 Bug-fix release / 2020-07-19
+
+- fixed: #294 in parameter modifier breaks service resolution
+
+## v4.2.4 Bug-fix release / 2020-07-14
+
+- fixed: #290 ScopedTo to Singleton does not work
+
+## v4.2.3 Bug-fix release / 2020-07-04
+
+- fixed: #289 Think how to make Use to directly replace scoped service without special asResolutionCall setup
+
+## v4.2.2 Bug-fix release / 2020-07-02
+
+- fixed: #288 Recursive resolution ignores current scope .Use() instance 
+- small perf improvements
+
+## v4.2.1 Bug-fix release / 2020-06-08
+
+- fixed: #156 Xamarin Forms iOS System.PlatformNotSupportedException: Operation is not supported on this platform.
+- fixed: #283 Open-generic decorators are no applied to the service registered via RegisterInstance
+
 ## v4.2.0 Feature release
 
 - feature: #270 Add FEC.LightExpression.LambdaExpression wrapper to work the same as System LambdaExpression  

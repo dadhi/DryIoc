@@ -185,7 +185,7 @@ class Recursive_dependency_detected
 
         // ex.Message example:
 
-        // code: RecursiveDependencyDetected;
+        // code: Error.RecursiveDependencyDetected;
         // message: Recursive dependency is detected when resolving
         // A as parameter "a" <--recursive
         //  in B as parameter "b" FactoryID=28
@@ -263,7 +263,7 @@ class Allow_recursive_dependency_in_DryIoc
 DryIoc provides a way to examine potential errors in Container registrations __prior to the actual service resolution__ via `Validate` method overloads. 
 The method finds all or selected registrations (except for the open-generics), tries to "resolve" them and catches the errors.
 
-__Note:__ `Validate` does not actually create any service object, neither affects container state.
+__Note:__ `Validate` does not actually create any service object, neither affects container state (internally it clones the container with modified rules to guide the validation)
 
 ```cs 
 class Registrations_diagnostics
@@ -291,14 +291,15 @@ class Registrations_diagnostics
 `errors` is the collection of key-value pairs of `ServiceRegistrationInfo` and `ContainerException`. 
 In the example above the error will contain:
 
-Key of `ServiceRegistrationInfo`:
+Key:
 ```
 MyService
 ```
 
-Value of `ContainerException` with `Message`:
+Value of `ContainerException` will have a message similar to this:
 ```
-Unable to resolve RequiredDependency as parameter "dependency"
+code: Error.UnableToResolveUnknownService
+message: Unable to resolve RequiredDependency as parameter "dependency"
   in MyService #27
   from container without scope
 Where no service registrations found
@@ -309,13 +310,51 @@ Where no service registrations found
 `Validate` allows to specify the registrations to resolve via predicate `Func<ServiceRegistrationInfo, bool>` 
 or via exact collection of service roots `ServiceInfo[]`. 
 
+## Using Validate to check for Captive Dependency
 
-### Validate is ignorant version of GenerateResolutionExpressions
+Captive Dependency in DI means the use of service with shorter lifespan inside a service with longet lifespan, e.g.
+when a Scoped dependency is injected into Singleton. The problem here is that dependency with shorter livespan may be 
+requested from the longer lived consumer when the dependency is already dead - and now you are in uncharted territory.
 
-Internally `Validate` method delegates to another public method `GenerateResolutionExpressions` which collects errors and __successful resolution expressions__. 
-The latter are just ignored by `Validate`.
+```cs 
+class Validate_CaptiveDependency_example
+{
+    [Test]
+    public void  Scoped_in_a_Singleton_should_be_reported_by_Validate()
+    {
+        var container = new Container();
+        container.Register<Foo>(Reuse.Scopded);
+        container.Register<Bar>(Reuse.Singleton);
+        container.Register<Buz>(Reuse.Scoped); // here is the problem!
 
-Generated resolution expressions are expression-trees `Expression<DryIoc.FactoryDelegate>` and maybe examined, 
-or even compiled to actual delegates and used for __container-less service resolution__.
+        var errors = container.Validate(ServiceInfo.Of<Foo>());
 
-__Note:__ [DryIocZero](Companions/DryIocZero) package uses the `GenerateResolutionExpressions` to generate factory delegates at compile-time.
+        Assert.AreEqual(1, errors.Length);
+        var error = errors[0].Value;
+        Assert.AreEqual(Error.NameOf(Error.DependencyHasShorterReuseLifespan), error.ErrorName);
+
+        /* Exception message:
+        code: Error.DependencyHasShorterReuseLifespan; 
+        message: Dependency Buz as parameter "buz" (IsSingletonOrDependencyOfSingleton) with reuse Scoped {Lifespan=100} has a shorter lifespan than its parent's Singleton Bar as parameter "bar" FactoryId=145 (IsSingletonOrDependencyOfSingleton)
+            in Resolution root Scoped Foo FactoryId=144
+            from container without scope
+            with Rules with {UsedForValidation} and without {ImplicitCheckForReuseMatchingScope, EagerCachingSingletonForFasterAccess} with TotalDependencyCountInLambdaToSplitBigObjectGraph=2147483647
+        If you know what you're doing you may disable this error with the rule `new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan())`.
+        */
+    }
+
+    public class Foo
+    {
+        public Foo(Bar bar) {}
+    }
+    
+    public class Bar
+    {
+        public Bar(Buz buz) {}
+    }
+
+    public class Buz { }
+}
+```
+
+

@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.Microsoft.DependencyInjection.src</id>
-    <version>4.0.0</version>
+    <version>4.1.0</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,11 @@
     <tags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</tags>
     <releaseNotes>
 <![CDATA[
+## v4.1.0
+
+- fixed: Applying Microsoft.DependencyInjection rules the passed DryIoc container with modified Rules.
+- added: Upping dependency versions to DryIoc v4.3.0 and Microsoft.Extensions.DependencyInjection.Abstractions 3.1.6
+
 ## v4.0.0
 
 - removed: .NET Standard 1.0 target
@@ -22,8 +27,8 @@
     </releaseNotes>
     <dependencies>
       <group>
-        <dependency id="DryIoc" version="4.1.3" />
-        <dependency id="Microsoft.Extensions.DependencyInjection.Abstractions" version="3.1.3" />
+        <dependency id="DryIoc" version="4.3.0" />
+        <dependency id="Microsoft.Extensions.DependencyInjection.Abstractions" version="3.1.6" />
       </group>
     </dependencies>
     <contentFiles>

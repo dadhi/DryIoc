@@ -1054,6 +1054,13 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |      DryIoc | 102.2 us | 1.89 us | 1.67 us | 102.1 us |  0.63 |    0.01 | 14.4043 | 0.1221 |     - |  66.77 KB |
 | DryIoc_MsDI | 126.2 us | 2.00 us | 1.87 us | 126.1 us |  0.78 |    0.02 | 19.0430 | 0.2441 |     - |  87.93 KB |
 
+## DryIoc 4.2.5
+
+|      Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|--------:|--------:|------:|--------:|--------:|-------:|------:|----------:|
+|        MsDI | 113.8 us | 2.26 us | 6.06 us |  1.00 |    0.00 | 18.0664 | 0.1221 |     - |  73.85 KB |
+|      DryIoc | 107.6 us | 1.83 us | 1.71 us |  1.00 |    0.13 | 16.4795 | 0.1221 |     - |  67.52 KB |
+| DryIoc_MsDI | 129.8 us | 1.03 us | 0.91 us |  1.22 |    0.18 | 21.4844 | 0.2441 |     - |   88.6 KB |
 
 ## V5
 
@@ -1331,6 +1338,17 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |               MsDI | 3.890 us | 0.0158 us | 0.0140 us |  1.00 |    0.00 | 0.9460 |     - |     - |   4.37 KB |
 |             DryIoc | 1.701 us | 0.0014 us | 0.0013 us |  0.44 |    0.00 | 0.6409 |     - |     - |   2.96 KB |
 | DryIoc_MsDIAdapter | 2.629 us | 0.0523 us | 0.0603 us |  0.68 |    0.02 | 0.6447 |     - |     - |   2.98 KB |
+
+
+### DryIoc v4.2.2 - replacing the AddOrKeep with AddOrKeepEntry and getting rid off GetEntryOrDefault afterwards and getting rid of created value check
+
+
+|             Method |     Mean |     Error |    StdDev |   Median | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|----------:|----------:|---------:|------:|--------:|-------:|-------:|------:|----------:|
+|               MsDI | 3.944 us | 0.0817 us | 0.2108 us | 3.867 us |  1.00 |    0.00 | 0.9460 | 0.0153 |     - |   4.35 KB |
+|             DryIoc | 1.663 us | 0.0354 us | 0.0408 us | 1.654 us |  0.42 |    0.03 | 0.6428 | 0.0076 |     - |   2.96 KB |
+| DryIoc_MsDIAdapter | 2.521 us | 0.0488 us | 0.0542 us | 2.498 us |  0.63 |    0.04 | 0.6485 | 0.0076 |     - |   2.98 KB |
+
 
 ### DryIoc v5
 

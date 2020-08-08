@@ -694,9 +694,11 @@ There is more to `Reuse.ScopeTo<T>(object serviceKey = null)`:
 
 ## Setup.UseParentReuse
 
-This option allows the dependency to use parent or ancestor service reuse (if it has parents defining a reuse).
-In case of all parents are transient or dependency is wrapped in `Func` somewhere in parents chain,
-the dependency will be transient at the end.
+This option allows the dependency to use its parent or ancestor service reuse. In case parent or ancestor is 
+Transient then it will be skipped until the first non-Transient ancestor found. If all ancestors are Transient or dependency is wrapped in `Func` somewhere in ancestor chain, the dependency will be Transient at the end.
+
+**Note:** If ancestors do not have assigned reuse (it is `null`) then the `Rules.DefaultReuse` will be used instead
+and the above rule is applied.
 
 ```cs md*/
 class Use_parent_reuse
