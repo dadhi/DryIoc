@@ -4706,8 +4706,8 @@ namespace DryIoc
             return r.WithCurrentScope(null);
         }
 
-        [MethodImpl((MethodImplOptions)256)]       
-		internal static bool TryGetUsedInstance(this IResolverContext r, int serviceTypeHash, Type serviceType, out object instance)
+        [MethodImpl((MethodImplOptions)256)]
+        internal static bool TryGetUsedInstance(this IResolverContext r, int serviceTypeHash, Type serviceType, out object instance)
         {
             instance = null;
             return r.CurrentScope? .TryGetUsedInstance(r, serviceTypeHash, serviceType, out instance) == true 
@@ -6942,7 +6942,6 @@ namespace DryIoc
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null) =>
             registrator.RegisterInstance(true, typeof(T), instance, ifAlreadyRegistered, setup, serviceKey);
 
-        // todo: @feature option to switch off NoServicesWereRegisteredByRegisterMany
         /// <summary>
         /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
         /// so you can check it via `IsRegestered` for each service type, 
