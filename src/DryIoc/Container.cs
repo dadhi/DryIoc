@@ -6104,7 +6104,7 @@ namespace DryIoc
 
             // Consider the constructor with the maximum number of parameters first, 
             // If there are more than one constructor with the same number of parameters,
-            // then we should consider the one with most of passed input aarguments and custom values provided
+            // then we should consider the one with most of passed input arguments and custom values provided
             var firstCtorParams  = firstCtor.GetParameters();
             var secondCtorParams = secondCtor.GetParameters();
             var maxParamsCtor       = firstCtorParams.Length > secondCtorParams.Length ? firstCtor : secondCtor;
@@ -6398,7 +6398,6 @@ namespace DryIoc
         /// <summary>Creates rules with only <see cref="PropertiesAndFields"/> specified.</summary>
         public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields) => new Made(null, null, propertiesAndFields);
 
-        // todo: @bug fix the spelling for `isConditionalImlementation`
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         public static Made Of(FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
