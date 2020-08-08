@@ -5244,6 +5244,7 @@ namespace DryIoc
         }
     }
 
+    // todo: @incomplete use Copy for setting the rules
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
     {
