@@ -23,7 +23,7 @@ namespace DryIoc.AspNetCore.Sample
             // Container in V4 is directly implementing `IServiceProvider`, so it is fine to return it.
             return new Container(rules =>
                     // optional: Enables property injection for Controllers
-                    // In current setup `WithMef` it will be overriden by properties marked with `ImportAttribute`
+                    // In current setup `WithMef` it will be overridden by properties marked with `ImportAttribute`
                     rules.With(propertiesAndFields: request => request.ServiceType.Name.EndsWith("Controller") 
                         ? PropertiesAndFields.Properties()(request)
                         : null)
