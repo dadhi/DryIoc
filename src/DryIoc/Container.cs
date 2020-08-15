@@ -9631,6 +9631,7 @@ namespace DryIoc
     /// creating closed-generic type reflection factory from registered open-generic prototype factory.</summary>
     public interface IConcreteFactoryGenerator
     {
+        // todo: @perf @v5 make it a ImHashMap<object, object> to use the implementationType as a key for no or default service key
         /// <summary>Generated factories so far, identified by the service type and key pair.</summary>
         ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories { get; }
 
@@ -10730,6 +10731,7 @@ namespace DryIoc
                 _openGenericFactory = openGenericFactory;
             }
 
+            // todo: @perf optimize request.Details access and reflection here
             public Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false)
             {
                 var openFactory = _openGenericFactory;
@@ -10776,7 +10778,7 @@ namespace DryIoc
 
                 var knownImplOrServiceType = implType ?? made.FactoryMethodKnownResultType ?? serviceType;
                 var serviceKey = request.ServiceKey;
-                serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey;
+                serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey ?? DefaultKey.Value;
                 var generatedFactoryKey = KV.Of(knownImplOrServiceType, serviceKey);
 
                 var generatedFactories = _generatedFactories.Value;
