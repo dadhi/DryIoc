@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.3.2 Bug-fix release / 2020-08-15
+
+- fixed: #303 Open Generic Singleton do not provide same instance for Resolve and ResolveMany
+
 ## v4.3.1 Bug-fix release / 2020-08-07
 
 - fixed: #301 breakage in scoped enumeration in v4
