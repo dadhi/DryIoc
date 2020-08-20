@@ -39,14 +39,13 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 ## Benchmarks
 
-* [Features](http://featuretests.apphb.com/DependencyInjection.html)
-* [Performance overview](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
+### [Performance overview](http://www.palmmedia.de/blog/2011/8/30/ioc-container-benchmark-performance-comparison)
 
-### Performance of the *realistic* unit-of-work object graph with 40 dependencies on 4 levels
+### Realistic scenario with the unit-of-work scope and object graph of 40 dependencies 4 levels deep
 
-Related issues are [#44](https://github.com/dadhi/DryIoc/issues/44#issuecomment-466440634) and [#26](https://github.com/dadhi/DryIoc/issues/26#issuecomment-466460255).
+More details in [#44](https://github.com/dadhi/DryIoc/issues/44#issuecomment-466440634) and [#26](https://github.com/dadhi/DryIoc/issues/26#issuecomment-466460255).
 
-#### Registering services then opening scope and resolving the root scoped service (e.g. controller) for the first time
+#### Cold start - Registering services then opening scope and resolving the root scoped service (e.g. controller) for the first time
 
 DryIoc 4.1.3 (.MsDI 3.0.3), MsDI 3.1.3, Grace 7.1.0 (.MsDI 7.0.1), Autofac 5.1.2 (.MsDI 6.0.0), Lamar 4.2.1
 
@@ -87,7 +86,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 </details>
 
 
-#### Opening scope and resolving the root scoped service (e.g. controller) after the warm-up
+#### Hot run - Opening scope and resolving the root scoped service for the Nth time
 
 DryIoc 4.1.3 (.MsDI 3.0.3), MsDI 3.1.3, Grace 7.1.0 (.MsDI 7.0.1), Autofac 5.1.2 (.MsDI 6.0.0), Lamar 4.2.1
 
@@ -111,7 +110,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 ```
 
 <details>
-<summary>DryIoc v4.0 and older libs - kept for comparison</summary>
+<summary>DryIoc v4.0 and the older libs - kept for comparison</summary>
 
 ```md
 |                  Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
@@ -139,34 +138,42 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 
 ## Features
 
-* Register interface/type mapping, additionally supported: registering service once, registration update, removing registration. 
-* Register user-defined delegate factory and register existing instance.
-* Register implementation types from provided assemblies with automatically determined service types.
-* Register with service key of arbitrary type, or register multiple non-keyed services.
-* Register with resolution condition.
-* Register with associated metadata object of arbitrary type.
-* Resolve and ResolveMany. 
-* Unknown service resolution:
-    * Optional automatic concrete types resolution
-* Instance lifetime control or *Reuse* in DryIoc terms:
-    * Nested disposable scopes with optional names 
-    * Ambient scope context
-    * Supported out-of-the-box: `Transient`, `Singleton`, `Scoped` in multiple flavors, including scoped to specific service in object graph
-    * `useParentReuse` and use `useDecorateeReuse` option for injected dependencies
-    * Control reused objects behavior with `preventDisposal` and `weaklyReferenced`.
-* Extensive Open-generics support: constraints, variance, complex nested, recurring generic definitions
-* Constructor, and optional property and field injection.
-* Static and Instance factory methods in addition to constructor. Factory method supports parameter injection the same way as constructor!
-* Injecting properties and fields into existing object.
-* Creating concrete object without registering it in Container but with injecting its parameters, properties, and fields.
-* Generic wrappers:
-    * Service collections: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and  `I(ReadOnly)Collection|List<T>`.
-    * Other: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>` or `Tuple<TMetadata, T>`, `KeyValuePair<TKey, T>`, and user-defined wrappers.
-    * [Currying](http://en.wikipedia.org/wiki/Currying) over constructor (or factory method) arguments: `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc.
-    * Nested wrappers: e.g. `Tuple<SomeMetadata, Func<ISomeService>>[]`.
-* [Composite pattern](https://bitbucket.org/dadhi/dryioc/wiki/Wrappers#markdown-header-composite-pattern-support): Composite itself is excluded from result collection.
-* [Decorator pattern](https://bitbucket.org/dadhi/dryioc/wiki/Decorators).
+### [Feature matrix](http://featuretests.apphb.com/DependencyInjection.html)
 
+### Incomplete feature list 
+
+* Registration of service to implementation type mapping (additionally supported: registering once, registration replace, registration removal). 
+* Registration of delegate factory and already created service instance.
+* Batch registration of types from the provided assemblies.
+* Registation identified with a service key of arbitrary type and registration of multiple non-keyed implementations for a single service.
+* Registration with the condition depending on context.
+* Registration with the associated metadata object of arbitrary type.
+* Resolve and ResolveMany. 
+* Service lifetime control via *Reuse* and lifetime scoping:
+    * Nested disposable scopes with optional names 
+    * Optional ambient scope context
+    * Reuse types: `Transient`, `Singleton`, `Scoped` in multiple flavors (including scoping to the specific service ancestor in the object graph)
+    * Option to `useParentReuse` and to `useDecorateeReuse` for decorators
+    * Option to `preventDisposal` and `weaklyReferenced`
+* Open-generics support including type constraints, variance, complex nesting and recurring definitions.
+* Constructor parameters injection and optional property and field injection.
+* Static and instance factory methods with the parameter injection similar to the constructor parameter injection.
+* Injection of properties and fields into the existing object.
+* [Decorators](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Decorators.md):
+    * Nested with the relative order control
+    * Generic and non-generic
+    * With the Reuse possibly different from the decorated service
+    * Decorators of wrapped service
+* [Wrappers](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Wrappers.md):
+    * Service collections: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and  `I(ReadOnly)Collection|List<T>`
+    * Single service wrappers: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>` or `Tuple<TMetadata, T>`, `KeyValuePair<TKey, T>`
+    * [Currying](http://en.wikipedia.org/wiki/Currying) of constructor or factory method parameters with `Func<TArg, T>`, `Func<TArg1, TArg2, T>`, etc
+    * Nested wrappers: e.g. `Tuple<SomeMetadata, Func<ISomeService>>[]`
+    * User-defined wrappers
+    * [Composite](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Wrappers.md#composite-pattern-support)
+* User-provided strategies for resolution of unknown service.
+    * Dynamic registration providers
+    * Optional automatic concrete types resolution
 
 ---
 <small>Icon made by <a href="http://www.freepik.com" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a> is licensed by <a href="http://creativecommons.org/licenses/by/3.0/" title="Creative Commons BY 3.0" target="_blank">CC 3.0 BY</a></small>
