@@ -18,7 +18,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 [DryIoc.MefAttributedModel]: https://www.nuget.org/packages/DryIoc.MefAttributedModel/
 
 [DryIoc.MefAttributedModel.dll]: https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll/
-[WikiHome]: https://bitbucket.org/dadhi/dryioc/wiki/Home
+[WikiHome]: https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Home.md#users-guide
 [MefAttributedModel]: https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel
 [PCL]: http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx
 
