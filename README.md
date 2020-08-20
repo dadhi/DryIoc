@@ -69,7 +69,8 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 | Autofac_MsDI |    561.82 us |  4.129 us |  3.862 us |   5.63 |    0.20 | 101.5625 | 27.3438 |     - | 467.85 KB |
 ```
 
-DryIoc v4.0 and the older libs - kept for comparison:
+<details>
+  <summary>DryIoc v4.0 and the older libs - kept for comparison</summary>
 
 ```md
 |              Method |        Mean  |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
@@ -82,6 +83,9 @@ DryIoc v4.0 and the older libs - kept for comparison:
 |             Autofac |    790.00 us |   5.206 us |   4.615 us |   4.74 |    0.06 |    101.5625 |      6.8359 |           - |           470.32 KB |
 | Autofac_MsDIAdapter |    747.80 us |   7.209 us |   6.391 us |   4.48 |    0.07 |    105.4688 |      7.8125 |           - |            487.8 KB |
 ```
+
+</details>
+
 
 #### Opening scope and resolving the root scoped service (e.g. controller) after the warm-up
 
@@ -106,7 +110,8 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 | Autofac_MsDIAdapter | 62.118 us | 0.1595 us | 0.1492 us | 17.50 |    0.07 | 12.9395 | 0.8545 |     - |  59.89 KB |
 ```
 
-DryIoc v4.0 and older libs - kept for comparison:
+<details>
+<summary>DryIoc v4.0 and older libs - kept for comparison</summary>
 
 ```md
 |                  Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
@@ -119,6 +124,8 @@ DryIoc v4.0 and older libs - kept for comparison:
 |                 Autofac | 40.098 us | 0.6651 us | 0.6221 us | 12.12 |    0.17 |      9.8267 |           - |           - |            45.37 KB |
 |     Autofac_MsDIAdapter | 51.747 us | 1.0334 us | 1.4821 us | 15.47 |    0.52 |     12.6953 |           - |           - |            58.53 KB |
 ```
+
+</details>
 
 
 ## Reliability
