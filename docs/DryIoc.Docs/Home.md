@@ -2,8 +2,6 @@
 
 # Wiki Home
 
-[TOC]
-
 ## Getting Started
 
 Let's define a simple interface and implementation setup:
