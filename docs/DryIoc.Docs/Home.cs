@@ -7,7 +7,6 @@
 
 Let's define a simple interface and implementation setup:
 ```cs md*/
-// these usings are for later
 using DryIoc;
 using NUnit.Framework;
 // ReSharper disable UnusedVariable
@@ -89,8 +88,8 @@ and to support the __extensibility__ and __testability__ of the code.
 - [Creating and Disposing Container](CreatingAndDisposingContainer.md)
 - [Register and Resolve](RegisterResolve.md)
 - [Open-generics](OpenGenerics.md)
-- [Specify Constructor or Factory Method](SelectConstructorOrFactoryMethod.md)
-- [Specify Dependency or Primitive Value](SpecifyDependencyAndPrimitiveValues.md)
+- [Specifying Constructor or Factory Method](SelectConstructorOrFactoryMethod.md)
+- [Parameter and Property injection](ParameterAndPropertyInjection.md)
 - [Reuse and Scopes](ReuseAndScopes.md)
 - [Wrappers](Wrappers.md)
 - [Decorators](Decorators.md)
