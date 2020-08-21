@@ -152,6 +152,6 @@ The above ways applied on the specific registration, but the same may be done on
 ```
 
 <details>
-<summary><code>the closing...<code></summary>
+<summary><code>closing...<code></summary>
 }
 </summary>
