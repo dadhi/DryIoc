@@ -75,14 +75,14 @@ class Created_by_DryIoc
 } /*md
 ```
 
-In the example with DryIoc, configuration of types is separate from the resolution, so that both can be changed independently.
+In the example with DryIoc, the configuration of types is separate from the resolution so that both can be changed independently.
 
-Now we have a configurator and creator Container, the provider of the service instances for our program. 
-Given that container controls the creation, we may logically extend it further to [control the lifetime](ReuseAndScopes) 
+Now we have the configured Container - the provider of the service instances for our program. 
+Given that container controls the creation of the services we may logically extend it responsibilities further to [control the lifetime](ReuseAndScopes) 
 as well.
 
-Summarizing, DI / IoC container is the tool to enforce [Open-Closed principle](http://msdn.microsoft.com/en-us/magazine/cc546578.aspx)
-and to support __extensibility__ and __testability__ of our code.
+Summarizing, DI/IoC container is the tool to enforce [Open-Closed principle](http://msdn.microsoft.com/en-us/magazine/cc546578.aspx)
+and to support the __extensibility__ and __testability__ of the code.
 
 
 ## User's Guide
@@ -144,8 +144,8 @@ for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs
 
 Located in this repo:
 
-- [DryIoc.WebApi.Owin.Sample](https://bitbucket.org/dadhi/dryioc/src/8e609b011beafd71236f9cfe3bb2d3e0589e76ae/Extensions/DryIoc.WebApi.Owin.Sample/?at=default)
-- [DryIoc.AspNetCore.Sample](https://bitbucket.org/dadhi/dryioc/src/8e609b011beafd71236f9cfe3bb2d3e0589e76ae/NetCore/src/DryIoc.AspNetCore.Sample/?at=default)
+- [DryIoc.AspNetCore31.WebApi.Sample](https://github.com/dadhi/DryIoc/tree/master/samples/DryIoc.AspNetCore31.WebApi.Sample)
+- [DryIoc.WebApi.Owin.Sample](https://github.com/dadhi/DryIoc/tree/master/samples/DryIoc.WebApi.Owin.Sample)
 
 External links:
 
@@ -164,10 +164,6 @@ Get from NuGet:
   - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
   - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-### v4.2.0 / 2020-05-18
-
-[Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.2.0)
-
-### [Previous Versions](VersionHistory.md)
+### [Version History](VersionHistory.md)
 
 md*/
