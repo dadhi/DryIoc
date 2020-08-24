@@ -1,8 +1,14 @@
-<!--Auto-generated from .cs file, the edits here will be lost! -->
+<!--Auto-generated from .cs file, the edits made to .md file will be lost! -->
 
 # Creating and Disposing Container
 
-[TOC]
+
+- [Creating and Disposing Container](#creating-and-disposing-container)
+  - [Creating Container](#creating-container)
+    - [Rules](#rules)
+    - [ScopeContext](#scopecontext)
+  - [Disposing Container](#disposing-container)
+
 
 ## Creating Container
 
