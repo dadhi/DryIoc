@@ -3,7 +3,26 @@
 
 # Register and Resolve
 
-[TOC]
+
+- [Register and Resolve](#register-and-resolve)
+  - [DryIoc Glossary](#dryioc-glossary)
+  - [Registration API](#registration-api)
+  - [Registering as Singleton](#registering-as-singleton)
+  - [Registering multiple implementations](#registering-multiple-implementations)
+    - [Default registrations](#default-registrations)
+    - [Keyed registrations](#keyed-registrations)
+    - [Resolving as KeyValuePair wrapper](#resolving-as-keyvaluepair-wrapper)
+  - [IsRegistered](#isregistered)
+    - [Implicit ways to know that service is registered](#implicit-ways-to-know-that-service-is-registered)
+  - [RegisterMany](#registermany)
+  - [RegisterMapping](#registermapping)
+  - [RegisterDelegate](#registerdelegate)
+    - [Will not detect recursive dependencies](#will-not-detect-recursive-dependencies)
+  - [RegisterInstance](#registerinstance)
+  - [RegisterInitializer](#registerinitializer)
+  - [RegisterPlaceholder](#registerplaceholder)
+  - [RegisterDisposer](#registerdisposer)
+
 
 ## DryIoc Glossary
 
