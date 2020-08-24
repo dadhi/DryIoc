@@ -2,7 +2,23 @@
 
 # Decorators
 
-[TOC]
+
+- [Decorators](#decorators)
+  - [Overview](#overview)
+  - [General use-case](#general-use-case)
+  - [Decorator of service registered with serviceKey](#decorator-of-service-registered-with-servicekey)
+    - [Using Setup.DecoratorOf](#using-setupdecoratorof)
+  - [Nested Decorators](#nested-decorators)
+    - [Decorators Order](#decorators-order)
+  - [Open-generic decorators](#open-generic-decorators)
+  - [Decorator of generic T](#decorator-of-generic-t)
+  - [Decorator Reuse](#decorator-reuse)
+    - [UseDecorateeReuse](#usedecorateereuse)
+  - [Decorator of Wrapped Service](#decorator-of-wrapped-service)
+  - [Decorator of Wrapper](#decorator-of-wrapper)
+  - [Decorator as Initializer](#decorator-as-initializer)
+  - [Decorator as Interceptor with Castle DynamicProxy](#decorator-as-interceptor-with-castle-dynamicproxy)
+
 
 [FactoryMethod]:SelectConstructorOrFactoryMethod#markdown-header-factory-method-instead-of-constructor
 
