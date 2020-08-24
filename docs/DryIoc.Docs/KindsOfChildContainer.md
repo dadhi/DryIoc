@@ -2,7 +2,17 @@
 
 # Kinds of Child Container
 
-[TOC]
+
+- [Kinds of Child Container](#kinds-of-child-container)
+  - [No child containers](#no-child-containers)
+  - [Facade](#facade)
+  - [With different Rules and ScopeContext](#with-different-rules-and-scopecontext)
+  - [With expression generation](#with-expression-generation)
+  - [Without Cache](#without-cache)
+  - [Without Singletons](#without-singletons)
+  - [With registrations copy](#with-registrations-copy)
+  - [With no more registration allowed](#with-no-more-registration-allowed)
+
 
 ## No child containers 
 
