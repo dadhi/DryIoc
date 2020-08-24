@@ -2,7 +2,11 @@
 
 # Auto-mocking with a mocking library
 
-[TOC]
+
+- [Auto-mocking with a mocking library](#auto-mocking-with-a-mocking-library)
+  - [Auto-mocking with NSubstitute](#auto-mocking-with-nsubstitute)
+  - [Auto-mocking with Moq](#auto-mocking-with-moq)
+
 
 For examples below we need to add:
 ```cs 
