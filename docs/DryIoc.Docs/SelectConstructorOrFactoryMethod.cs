@@ -3,7 +3,16 @@
 
 # Select Constructor or Factory Method
 
-[TOC]
+
+- [Select Constructor or Factory Method](#select-constructor-or-factory-method)
+  - [Multiple constructors](#multiple-constructors)
+  - [Selecting constructor with resolvable parameters](#selecting-constructor-with-resolvable-parameters)
+  - [Factory Method instead of Constructor](#factory-method-instead-of-constructor)
+  - [Property/Field as Factory Method](#propertyfield-as-factory-method)
+  - [Open-generic Factory Method](#open-generic-factory-method)
+  - [Using Factory Method as Initializer](#using-factory-method-as-initializer)
+  - [Easy Factory Method with DryIoc.MefAttributedModel](#easy-factory-method-with-dryiocmefattributedmodel)
+
 
 ## Multiple constructors
 
