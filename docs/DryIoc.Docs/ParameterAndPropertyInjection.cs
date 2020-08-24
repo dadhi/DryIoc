@@ -3,6 +3,13 @@
 
 # Parameter and Property injection
 
+
+- [Parameter and Property injection](#parameter-and-property-injection)
+  - [Matching the parameter name with the registration service key](#matching-the-parameter-name-with-the-registration-service-key)
+    - [The problem](#the-problem)
+    - [The solution](#the-solution)
+
+
 ## Matching the parameter name with the registration service key
 
 ### The problem
