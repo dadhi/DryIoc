@@ -2,7 +2,11 @@
 
 # Examples of context based resolution
 
-[TOC]
+
+- [Examples of context based resolution](#examples-of-context-based-resolution)
+  - [log4net logger](#log4net-logger)
+  - [Serilog logger](#serilog-logger)
+
 
 ## log4net logger
 
