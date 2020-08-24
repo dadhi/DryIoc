@@ -1,11 +1,33 @@
 /*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
-# Wrappers
-
 [recursive dependency]: ErrorDetectionAndResolution#markdown-header-recursivedependencydetected
 
-[TOC]
+# Wrappers
+
+
+- [Wrappers](#wrappers)
+  - [Overview](#overview)
+  - [Predefined wrappers](#predefined-wrappers)
+    - [Lazy of A](#lazy-of-a)
+    - [Func of A](#func-of-a)
+    - [Really "lazy" Lazy and Func](#really-lazy-lazy-and-func)
+    - [Func of A with parameters](#func-of-a-with-parameters)
+    - [KeyValuePair of Service Key and A](#keyvaluepair-of-service-key-and-a)
+    - [Meta or Tuple of A with Metadata](#meta-or-tuple-of-a-with-metadata)
+      - [Dictionary Metadata](#dictionary-metadata)
+    - [IEnumerable or array of A](#ienumerable-or-array-of-a)
+      - [Open-generics](#open-generics)
+      - [Co-variant generics](#co-variant-generics)
+      - [Composite Pattern support](#composite-pattern-support)
+    - [LazyEnumerable of A](#lazyenumerable-of-a)
+    - [LambdaExpression](#lambdaexpression)
+      - [DryIoc is not a magic](#dryioc-is-not-a-magic)
+  - [Nested wrappers](#nested-wrappers)
+  - [User-defined wrappers](#user-defined-wrappers)
+
+
+## Overview
 
 Wrapper in DryIoc is some useful data structure which operates on registered service or services. 
 

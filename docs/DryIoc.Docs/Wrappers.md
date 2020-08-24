@@ -1,10 +1,32 @@
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
-# Wrappers
-
 [recursive dependency]: ErrorDetectionAndResolution#markdown-header-recursivedependencydetected
 
-[TOC]
+# Wrappers
+
+
+- [Wrappers](#wrappers)
+  - [Overview](#overview)
+  - [Predefined wrappers](#predefined-wrappers)
+    - [Lazy of A](#lazy-of-a)
+    - [Func of A](#func-of-a)
+    - [Really "lazy" Lazy and Func](#really-lazy-lazy-and-func)
+    - [Func of A with parameters](#func-of-a-with-parameters)
+    - [KeyValuePair of Service Key and A](#keyvaluepair-of-service-key-and-a)
+    - [Meta or Tuple of A with Metadata](#meta-or-tuple-of-a-with-metadata)
+      - [Dictionary Metadata](#dictionary-metadata)
+    - [IEnumerable or array of A](#ienumerable-or-array-of-a)
+      - [Open-generics](#open-generics)
+      - [Co-variant generics](#co-variant-generics)
+      - [Composite Pattern support](#composite-pattern-support)
+    - [LazyEnumerable of A](#lazyenumerable-of-a)
+    - [LambdaExpression](#lambdaexpression)
+      - [DryIoc is not a magic](#dryioc-is-not-a-magic)
+  - [Nested wrappers](#nested-wrappers)
+  - [User-defined wrappers](#user-defined-wrappers)
+
+
+## Overview
 
 Wrapper in DryIoc is some useful data structure which operates on registered service or services. 
 
@@ -681,10 +703,11 @@ class Specify_to_use_LazyEnumerable_for_all_IEnumerable
 
 ### LambdaExpression
 
-DryIoc allows to get an actual [ExpressionTree](https://docs.microsoft.com/en-us/dotnet/csharp/expression-trees) composed by container to resolve a service. An expression may be used:
+Allows getting an actual [ExpressionTree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) composed by container to resolve a service. 
 
-- For diagnostics to check if container creates a service in an expected way.
-- In code generation scenarios by converting an expression to C# code via [ExpressionToCode](https://github.com/EamonNerbonne/ExpressionToCode) during compile or build time.
+- It may be used either for diagnostics, to check if container creates the service in an expected way.
+- In code generation scenarios, by converting the expression to C# code with something like [ExpressionToCode](https://github.com/EamonNerbonne/ExpressionToCode) library. 
+It may be done even at compile-time.
 - To understand how DryIoc works internally.
 
 ```cs 
@@ -703,8 +726,6 @@ class Resolve_expression
 
         // The result expression is of type `Expression<FactoryDelegate>`, like this:
         Expression<FactoryDelegate> f = (IResolverContext r) => new Service();
-        
-        Assert.True(expr is Expression<DryIoc.FactoryDelegate>);
     }
 
     interface IService { }
@@ -712,16 +733,23 @@ class Resolve_expression
 }
 ```
 
-__Note:__ Resolving as `LambdaExpression` does not instantiate any services.
+The actual type of returned `LambdaExpression` is `Expression<DryIoc.FactoryDelegate>` which has a signature as in the example.
+
+__Note:__ Resolving as `LambdaExpression` does not create an actual service.
 
 
-#### Internals
+#### DryIoc is not a magic
 
-DryIoc automates the creation of the object graph taking lifetime into consideration via same generated expression we resolved earlier. You may `Compile`(and cache) and invoke expression to instantiate an object.
+Examining the resolved `LambdaExpression` you won't see any magic -
 
-That allows for scenarios not simply possible with default container interface. 
+DryIoc just automates the generation of the object graph taking lifetime into consideration.
+
+Given that you now have the resolved expression you may even `Compile` (and cache) it yourself :-) doing the last "magical" part.
+
+This opens the additional possibilities:
+
 For instance, below is the example which is "normally" won't work without shared `scopeContext`. 
-Specifically we have a singleton holding on the `Func` of scoped service. Now we are getting an expression out 
+Specifically we have a singleton holding onto the `Func` of scoped service. Now we are getting the expression out 
 of container, compiling it and providing it with the scope (or any other container we want) 
 as a `IResolverContext` argument to the compiled factory.
 
@@ -787,8 +815,6 @@ container.Resolve<Meta<Func<Arg1, Arg2, IA>, object>>();
 // etc.
 ```
 
-<div id="markdown-header-user-defined-wrappers"></div>
-
 ## User-defined wrappers
 
 To register your own wrapper just specify setup parameter as `Setup.Wrapper` or `Setup.WrapperWith`:
@@ -805,6 +831,7 @@ class User_defined_wrappers
 
         // Register a wrapper
         container.Register(typeof(MenuItem<>), setup: Setup.Wrapper);
+        Assert.IsTrue(container.IsRegistered(typeof(MenuItem<>), factoryType: FactoryType.Wrapper));
 
         var items = container.Resolve<MenuItem<ICmd>[]>();
         Assert.AreEqual(2, items.Length);
@@ -815,7 +842,7 @@ class User_defined_wrappers
     public class Y : ICmd { }
 
     // Here is the wrapper
-    public class MenuItem<T> where T : ICmd { }
+    public class MenuItem<TCmd> where TCmd : ICmd { }
 }
 ```
 
@@ -843,8 +870,24 @@ class Non_generic_wrapper
         container.Register<IService, Foo>();
         container.Register<IService, Bar>();
         container.Register<MyWrapper>(setup: Setup.Wrapper);
+        Assert.IsTrue(container.IsRegistered(typeof(MyWrapper), factoryType: FactoryType.Wrapper));
 
         var items = container.Resolve<MyWrapper[]>(requiredServiceType: typeof(IService));
+        Assert.AreEqual(2, items.Length);
+    }
+
+    // The same should work with the closed-generic wrapper
+    [Test]
+    public void Example_with_closed_generic_wrapper()
+    {
+        var container = new Container();
+
+        container.Register<IService, Foo>();
+        container.Register<IService, Bar>();
+        container.Register<MyWrapper<IService>>(setup: Setup.Wrapper);
+        Assert.IsTrue(container.IsRegistered(typeof(MyWrapper<IService>), factoryType: FactoryType.Wrapper));
+
+        var items = container.Resolve<MyWrapper<IService>[]>(); // you dont need the `requiredServiceType` here
         Assert.AreEqual(2, items.Length);
     }
 
@@ -853,5 +896,7 @@ class Non_generic_wrapper
     class Bar : IService { }
 
     class MyWrapper { public MyWrapper(IService service) { } }
+
+    class MyWrapper<T> { public MyWrapper(T service) { } }
 }
 ```
