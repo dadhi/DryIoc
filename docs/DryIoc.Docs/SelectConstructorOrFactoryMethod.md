@@ -157,23 +157,39 @@ same way as for constructors.
 
 __Note:__ Please prefer to use factory method over `RegisterDelegate` to minimize state capturing problems leading to memory leaks and to keep code as container-agnostic as possible.
 
-Using static factory method:
-```
-#!c#
+Using the static factory method:
+
+```cs 
+class Register_with_static_factory_method
+{
     public static class FooFactory 
     {
-        public static IFoo CreateFoo(IRepo repo)
+        public static IFoo CreateFoo(Repo repo)
         {
-            var foo = new Foo();
+            var foo = new FooBar();
             repo.Add(foo);
             return foo;
         }
     }
-    
-    // elsewhere
-    c.Register<IRepo, Repo>();
-    c.Register<IFoo>(made: Made.Of(() => FooFactory.CreateFoo(Arg.Of<IRepo>())));
+
+    public interface IFoo {}
+    public class FooBar : IFoo {}
+    public class Repo 
+    {
+        public void Add(IFoo foo) {}
+    }
+
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+        c.Register<Repo>();
+        c.Register<IFoo>(made: Made.Of(() => FooFactory.CreateFoo(Arg.Of<Repo>())));
+        Assert.IsNotNull(c.Resolve<IFoo>());
+    }
+}
 ```
+
 
 Using instance factory method:
 ```
