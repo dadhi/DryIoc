@@ -24,16 +24,17 @@ If class has multiple constructors the default behavior is to throw correspondin
 To avoid the exception you may specify what constructor to use while registering.
 
 Given class with two constructors:
-``` 
+```cs 
+using DryIoc;
+using NUnit.Framework;
+// ReSharper disable UnusedVariable
 
 public interface IDependency { }
-
+public class Dep : IDependency {}
 public class Foo 
 {
     public IDependency Dep { get; }
-
-    public Foo() {}
-    public Foo(IDependency dep) { Dep = dep; }
+    public Foo(IDependency dep) => Dep = dep;
 }
 ```
 
@@ -41,26 +42,63 @@ There are multiple ways to select constructor:
 
 - The preferable way is strongly typed specification with [Expression Tree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) expression:
 
-```
-#!c#
-c.Register<Foo>(made: Made.Of(() => new Foo(Arg.Of<IDependency>())));
+```cs 
+class Register_strongly_typed_service_with_expression
+{
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+        c.Register<IDependency, Dep>();
+        c.Register<Foo>(made: Made.Of(() => new Foo(Arg.Of<IDependency>())));
+        Assert.IsNotNull(c.Resolve<Foo>());
+    }
+}
 ```
 
-__Note:__ Code `() => new Foo(Arg.Of<IDependency>()` is just specification expression and won't be executed.
+**Note:** The code `() => new Foo(Arg.Of<IDependency>()` is just a specification expression and won't be executed.
 
 `Arg` class provides static methods to specify injected dependency details as explained here: [Specify Dependency or Primitive Value Injection](https://bitbucket.org/dadhi/dryioc/wiki/SpecifyDependencyOrPrimitiveValueInjection).
 
 - Another way is using Reflection:
-```
-#!c#
-    c.Register<Foo>(made: Made.Of(typeof(Foo).GetConstructor(new[] { typeof(IDependency) })));
+
+```cs 
+class Register_with_reflection
+{
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+        c.Register<IDependency, Dep>();
+        c.Register<Foo>(made: Made.Of(typeof(Foo).GetConstructor(new[] { typeof(IDependency) })));
+        Assert.IsNotNull(c.Resolve<Foo>());
+    }
+}
 ```
 
 __Note:__ When registering open-generic the reflection is the only way:
-```
-#!c#
-    c.Register(typeof<Foo<>>, 
-        made: Made.Of(typeof(Foo<>).GetConstructor(new[] { typeof(IDependency<>) })));
+
+```cs 
+public interface IDependency<T> { }
+public class Foo<T> 
+{
+    public IDependency<T> Dep { get; }
+    public Foo(IDependency<T> dep) => Dep = dep;
+}
+
+public class Dep<T> : IDependency<T> {} 
+
+class Register_open_generics_with_reflection
+{
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+        c.Register<IDependency<int>, Dep<int>>();
+        c.Register(typeof(Foo<>), made: Made.Of(typeof(Foo<>).GetConstructors()[0]));
+        Assert.IsNotNull(c.Resolve<Foo<int>>());
+    }
+}
 ```
 
 
