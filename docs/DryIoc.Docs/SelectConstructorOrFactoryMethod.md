@@ -7,6 +7,8 @@
   - [Multiple constructors](#multiple-constructors)
   - [Selecting constructor with resolvable parameters](#selecting-constructor-with-resolvable-parameters)
   - [Factory Method instead of Constructor](#factory-method-instead-of-constructor)
+    - [Using static factory method](#using-static-factory-method)
+    - [Using instance factory method](#using-instance-factory-method)
   - [Property/Field as Factory Method](#propertyfield-as-factory-method)
   - [Open-generic Factory Method](#open-generic-factory-method)
   - [Using Factory Method as Initializer](#using-factory-method-as-initializer)
@@ -157,11 +159,20 @@ same way as for constructors.
 
 __Note:__ Please prefer to use factory method over `RegisterDelegate` to minimize state capturing problems leading to memory leaks and to keep code as container-agnostic as possible.
 
-Using the static factory method:
+### Using static factory method
 
 ```cs 
 class Register_with_static_factory_method
 {
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+        c.Register<Repo>();
+        c.Register<IFoo>(made: Made.Of(() => FooFactory.CreateFoo(Arg.Of<Repo>())));
+        Assert.IsNotNull(c.Resolve<IFoo>());
+    }
+
     public static class FooFactory 
     {
         public static IFoo CreateFoo(Repo repo)
@@ -178,40 +189,48 @@ class Register_with_static_factory_method
     {
         public void Add(IFoo foo) {}
     }
+}
+```
 
+### Using instance factory method
+
+```cs 
+class Register_with_instance_factory_method
+{
     [Test]
     public void Example()
     {
         var c = new Container();
+        c.Register<IFooFactory, FooFactory>(Reuse.Singleton);
+        c.Register<IDependency, Dep>();
         c.Register<Repo>();
-        c.Register<IFoo>(made: Made.Of(() => FooFactory.CreateFoo(Arg.Of<Repo>())));
+        c.Register<IFoo>(made: Made.Of(r => ServiceInfo.Of<IFooFactory>(), f => f.CreateFoo(Arg.Of<Repo>())));
         Assert.IsNotNull(c.Resolve<IFoo>());
     }
-}
-```
 
-
-Using instance factory method:
-```
-#!c#
+    public interface IFooFactory 
+    {
+        IFoo CreateFoo(Repo repo);
+    }
     public class FooFactory : IFooFactory
     {
-    	public FooFactory(FactoryDependency dep) { }
+    	public FooFactory(IDependency dep) { }
     
-        public IFoo CreateFoo(IRepo repo)
+        public IFoo CreateFoo(Repo repo)
         {
-            var foo = new Foo();
+            var foo = new FooBar();
             repo.Add(foo);
             return foo;
         }
     }
-    
-    // elsewhere
-    c.Register<FactoryDependency>();
-    c.Register<IFooFactory, FooFactory>(Reuse.Singleton);
-    
-    c.Register<IRepo, Repo>();
-    c.Register<IFoo>(made: Made.Of(r => ServiceInfo.Of<IFooFactory>(), f => f.CreateFoo(Arg.Of<IRepo>())));
+
+    public interface IFoo {}
+    public class FooBar : IFoo {}
+    public class Repo 
+    {
+        public void Add(IFoo foo) {}
+    }
+}
 ```
 
 With instance factory methods you can use chain of factories if necessary.
@@ -222,19 +241,32 @@ With instance factory methods you can use chain of factories if necessary.
 If DryIoc supports factory methods then why not support Properties and Fields?
 
 Here we are:
-```
-#!c#
-    public class FooFactory : IFooFactory
+
+```cs 
+class Register_with_instace_property
+{
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+        c.Register<Repo>();
+        c.Register<FooFactory>(Reuse.Singleton);
+        c.Register<IFoo>(made: Made.Of(r => ServiceInfo.Of<FooFactory>(), f => f.Foo));
+        Assert.IsNotNull(c.Resolve<IFoo>());
+    }
+
+    public class FooFactory
     {
         public IFoo Foo { get; private set; }
-        public FooFactory(IRepo repo) { Foo = new Foo(repo); }
+        public FooFactory(Repo repo) { Foo = new Foo(repo); }
     }
-    
-    // elsewhere
-    c.Register<IRepo, Repo>();
-    c.Register<IFooFactory, FooFactory>(Reuse.Singleton);
-    
-    c.Register<IFoo>(made: Made.Of(r => ServiceInfo.Of<IFooFactory>(), f => f.Foo));
+    public interface IFoo {}
+    public class Foo : IFoo
+    {
+        public Foo(Repo repo) {}
+    }
+    public class Repo {}
+}
 ```
 
 
@@ -258,7 +290,7 @@ Example:
     }
 
     // With DryIoc MefAttributedModel (Export attributes) the registration is simple
-    var container = new Contaner().WithMefAttributedModel();
+    var container = new Container().WithMefAttributedModel();
     container.RegisterExports(typeof(Factory<>));
 
     // Manual registration is more tedious
