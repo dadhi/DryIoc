@@ -11,8 +11,7 @@
     - [Using instance factory method](#using-instance-factory-method)
   - [Property/Field as Factory Method](#propertyfield-as-factory-method)
   - [Open-generic Factory Method](#open-generic-factory-method)
-  - [Using Factory Method as Initializer](#using-factory-method-as-initializer)
-  - [Easy Factory Method with DryIoc.MefAttributedModel](#easy-factory-method-with-dryiocmefattributedmodel)
+  - [Export Factory Method with DryIoc.MefAttributedModel](#export-factory-method-with-dryiocmefattributedmodel)
 
 
 ## Multiple constructors
@@ -28,6 +27,7 @@ To avoid the exception you may specify what constructor to use while registering
 Given the class with the two constructors:
 ```cs 
 using DryIoc;
+using DryIocAttributes;
 using DryIoc.MefAttributedModel;
 using System.ComponentModel.Composition;
 using NUnit.Framework;
@@ -322,8 +322,10 @@ class Register_open_generics
 }
 ```
 
+## Export Factory Method with DryIoc.MefAttributedModel
+
 DryIoc provides the [DryIoc.MefAttributedModel](Extensions/MefAttributedModel) extension which enables the use of MEF `Export` and `Import` attributes for registrations and injections 
-which may help to register the open-generics:
+which may help to register the open-generics. Look for the use of the `Export` attribute and for the `AsDecorator` (how simple is this).
 ```cs 
 class Register_open_generics_with_MefAttributedModel_extension
 {
@@ -332,7 +334,7 @@ class Register_open_generics_with_MefAttributedModel_extension
     {
         var container = new Container().WithMefAttributedModel();
 
-        container.RegisterExports(typeof(Factory<>), typeof(Foo));
+        container.RegisterExports(typeof(Factory<>), typeof(Foo), typeof(FooDecorator));
 
         Assert.IsNotNull(container.Resolve<IService<Foo, string>>());
     }
@@ -349,6 +351,12 @@ class Register_open_generics_with_MefAttributedModel_extension
     [Export]
     public class Foo {}
 
+    [Export, AsDecorator]
+    public class FooDecorator : Foo 
+    {
+        public FooDecorator(Foo f) {}
+    }
+
     [Export]
     public class Factory<A> 
     {
@@ -362,66 +370,3 @@ class Register_open_generics_with_MefAttributedModel_extension
     }
 }
 ```
-
-
-
-## Using Factory Method as Initializer
-
-It may be more advanced topic, but it is actually quite easy to do DryIoc.
-Initializer is method that expects service as input and returns initialized (or may be completely new) service as output. This looks quite similar to [Decorator](http://en.wikipedia.org/wiki/Decorator_pattern) and indeed may be implemented as Decorator:
-```
-#!c#
-    public class Service : IService { }
-    
-    public class Initializer 
-    {
-        public IService Init(IService service, IOtherDependency dep, IAnotherOneDep anotherDep) {
-            service.Configure(dep, anotherDep, "greetings");
-            return service;
-        }
-    }
-    
-    // elsewhere
-    c.Register<IService, Service>();
-    c.Register<Initializer>();
-    // register the rest of dependencies ...
-    
-    c.Register<IService>(made: Made.Of(r => ServiceInfo.Of<Initializer>(), 
-        i => i.Init(Arg.Of<IService>(), Arg.Of<IOtherDependency>(), Arg.Of<IAnotherOneDep>())),
-        setup: Setup.Decorator); // Important!
-    
-    // resolve as usual:
-    c.Resolve<IService>(); // after creating Service will call Initializer.Init injecting  dependencies.
-```
-
-
-## Easy Factory Method with DryIoc.MefAttributedModel
-
-I wanted to show how easy to specify Factory Method and Initializers without notion of container (fully container-agnostic) using _DryIoc.MefAttributedModel_ extension:
-```
-#!c#
-    [Export, AsFactory]
-    public class FooFactory
-    {
-        public FooFactory(FactoryDependency dep) { }
-    
-        [Export]
-        public IFoo CreateFoo(IRepo repo)
-        {
-            var foo = new Foo();
-            repo.Add(foo);
-            return foo;
-        }
-    
-        [Export]
-        public IBlah Blah { get; private set; }
-    
-        [Export, AsDecorator]
-        public IBlah ConfigureBlah(IBlah original) { } 
-    }
-    
-    // elsewhere
-    var container = new Container(rules => rules.WithMefAttributedModel());
-    container.RegisterExports(new[] { appAssembly });
-```
-
