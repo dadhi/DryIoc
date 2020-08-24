@@ -3,7 +3,35 @@
 
 # Rules and Default Conventions
 
-[TOC]
+
+- [Rules and Default Conventions](#rules-and-default-conventions)
+  - [General Approach](#general-approach)
+  - [Resolution order](#resolution-order)
+  - [Multiple services](#multiple-services)
+    - [Registering multiple default services](#registering-multiple-default-services)
+    - [Resolving from multiple default services](#resolving-from-multiple-default-services)
+  - [Injecting dependency asResolutionCall](#injecting-dependency-asresolutioncall)
+  - [Implicit registration selection based on scope](#implicit-registration-selection-based-on-scope)
+  - [Implicitly available services](#implicitly-available-services)
+    - [Container interfaces](#container-interfaces)
+  - [Default constructor selection](#default-constructor-selection)
+  - [Unresolved parameters and properties](#unresolved-parameters-and-properties)
+  - [Rules per Container](#rules-per-container)
+    - [FactorySelector](#factoryselector)
+    - [FactoryMethod, Parameters and Properties selector](#factorymethod-parameters-and-properties-selector)
+    - [UnknownServiceResolvers](#unknownserviceresolvers)
+      - [AutoFallbackDynamicRegistrations](#autofallbackdynamicregistrations)
+      - [WithConcreteTypeDynamicRegistrations](#withconcretetypedynamicregistrations)
+    - [Fallback Containers](#fallback-containers)
+    - [ThrowIfDependencyHasShorterReuseLifespan](#throwifdependencyhasshorterreuselifespan)
+    - [ThrowOnRegisteringDisposableTransient](#throwonregisteringdisposabletransient)
+    - [WithTrackingDisposableTransient](#withtrackingdisposabletransient)
+    - [WithDefaultReuseInsteadOfTransient](#withdefaultreuseinsteadoftransient)
+    - [WithDefaultIfAlreadyRegistered](#withdefaultifalreadyregistered)
+    - [WithoutImplicitCheckForReuseMatchingScope](#withoutimplicitcheckforreusematchingscope)
+    - [ResolveIEnumerableAsLazyEnumerable](#resolveienumerableaslazyenumerable)
+    - [VariantGenericTypesInResolvedCollection](#variantgenerictypesinresolvedcollection)
+
 
 ## General Approach
 
