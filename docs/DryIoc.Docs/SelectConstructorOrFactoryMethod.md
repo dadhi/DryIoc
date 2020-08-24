@@ -25,9 +25,11 @@ Default constructor means no dependencies.
 If class has multiple constructors the default behavior is to throw corresponding `ContainerException`.
 To avoid the exception you may specify what constructor to use while registering.
 
-Given class with two constructors:
+Given the class with the two constructors:
 ```cs 
 using DryIoc;
+using DryIoc.MefAttributedModel;
+using System.ComponentModel.Composition;
 using NUnit.Framework;
 // ReSharper disable UnusedVariable
 
@@ -278,34 +280,89 @@ That means the Container is capable to match repeated, recurring, position-swapp
 The generic parameter constraints are supported too.
 
 Example:
-```
-#!c#
-    [Export, AsFactory]
+
+```cs 
+class Register_open_generics
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<Foo>();
+        container.Register(typeof(Factory<>));
+        container.Register(typeof(IService<,>), 
+            made: Made.Of(typeof(Factory<>).GetSingleMethodOrNull("Create"), ServiceInfo.Of(typeof(Factory<>))));
+
+        Assert.IsNotNull(container.Resolve<IService<Foo, string>>());
+    }
+
+    public interface IService<A, B> 
+    {
+        void Initialize(A a);
+    }
+    public class ServiceImpl<A, B> : IService<A, B> 
+    {
+        public void Initialize(A a) {}
+    }
+
+    public class Foo {}
+
+    [Export]
     public class Factory<A> 
     {
         [Export]
-        IService<A, B> Create<B>(A a) 
+        public IService<A, B> Create<B>(A a)
         {
             var service = new ServiceImpl<A, B>();
             service.Initialize(a);
             return service;
         }
     }
-
-    // With DryIoc MefAttributedModel (Export attributes) the registration is simple
-    var container = new Container().WithMefAttributedModel();
-    container.RegisterExports(typeof(Factory<>));
-
-    // Manual registration is more tedious
-    container.Register(typeof(Factory<>));
-    container.Register(typeof(IService<,>), 
-        made: Made.Of(typeof(Factory<>).GetSingleMethodOrNull("Create"), ServiceInfo.Of(typeof(Factory<>))));
-
-    container.Register<Foo>(); // register required dependency A for Create
-
-    // Then resolve:
-    container.Resolve<IService<Foo, string>>();
+}
 ```
+
+DryIoc provides the [DryIoc.MefAttributedModel](Extensions/MefAttributedModel) extension which enables the use of MEF `Export` and `Import` attributes for registrations and injections 
+which may help to register the open-generics:
+```cs 
+class Register_open_generics_with_MefAttributedModel_extension
+{
+    [Test]
+    public void Example()
+    {
+        var container = new Container().WithMefAttributedModel();
+
+        container.RegisterExports(typeof(Factory<>), typeof(Foo));
+
+        Assert.IsNotNull(container.Resolve<IService<Foo, string>>());
+    }
+
+    public interface IService<A, B> 
+    {
+        void Initialize(A a);
+    }
+    public class ServiceImpl<A, B> : IService<A, B> 
+    {
+        public void Initialize(A a) {}
+    }
+
+    [Export]
+    public class Foo {}
+
+    [Export]
+    public class Factory<A> 
+    {
+        [Export]
+        public IService<A, B> Create<B>(A a)
+        {
+            var service = new ServiceImpl<A, B>();
+            service.Initialize(a);
+            return service;
+        }
+    }
+}
+```
+
 
 
 ## Using Factory Method as Initializer
