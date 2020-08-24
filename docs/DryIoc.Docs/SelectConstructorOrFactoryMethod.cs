@@ -117,16 +117,38 @@ Succeeded it will use the constructor for service resolution.
 The rule may be used:
 
 - Per service registration (preferable to pin-point problematic service but stay deterministic for rest of registrations):
-```
-#!c#
-    c.Register<Foo>(made: FactoryMethod.ConstructorWithResolvableArguments);
+
+```cs md*/
+class Register_with_automatic_constructor_selection
+{
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+        c.Register<IDependency, Dep>();
+        c.Register<Foo>(made: FactoryMethod.ConstructorWithResolvableArguments);
+        Assert.IsNotNull(c.Resolve<Foo>());
+    }
+}
+/*md
 ```
 
-- Per whole Container:
-```
-#!c#
-    var c = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments));
-    c.Register<Foo>(); // no need to specify how to select constructor
+
+- For the entire Container:
+
+```cs md*/
+class Register_with_automatic_constructor_selection_for_entire_container
+{
+    [Test]
+    public void Example()
+    {
+        var c = new Container(rules => rules.With(FactoryMethod.ConstructorWithResolvableArguments));
+        c.Register<IDependency, Dep>();
+        c.Register<Foo>(); // no need to specify how to select constructor
+        Assert.IsNotNull(c.Resolve<Foo>());
+    }
+}
+/*md
 ```
 
 Registration level rule will override container rule if both are present.
