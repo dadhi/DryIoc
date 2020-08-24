@@ -3,7 +3,16 @@
 
 # Required Service Type
 
-[TOC]
+
+- [Required Service Type](#required-service-type)
+  - [Overview](#overview)
+    - [Required service type is implemented by resolved type](#required-service-type-is-implemented-by-resolved-type)
+    - [Required service type identifies a wrapped service type when resolving a Wrapper](#required-service-type-identifies-a-wrapped-service-type-when-resolving-a-wrapper)
+    - [Specify to use open-generic type in case you have both closed and open-generic registrations](#specify-to-use-open-generic-type-in-case-you-have-both-closed-and-open-generic-registrations)
+  - [Adapts external code](#adapts-external-code)
+  - [Works with Wrappers](#works-with-wrappers)
+  - [Works with IEnumerable and collection wrappers](#works-with-ienumerable-and-collection-wrappers)
+
 
 ## Overview
 
