@@ -2,7 +2,18 @@
 
 # Error Detection and Resolution
 
-[TOC]
+
+- [Error Detection and Resolution](#error-detection-and-resolution)
+  - [Overview](#overview)
+  - [DryIoc exceptions](#dryioc-exceptions)
+  - [Unable to resolve](#unable-to-resolve)
+    - [UnableToResolveUnknownService](#unabletoresolveunknownservice)
+    - [UnableToResolveFromRegisteredServices](#unabletoresolvefromregisteredservices)
+  - [RecursiveDependencyDetected](#recursivedependencydetected)
+    - [How to allow recursive dependency](#how-to-allow-recursive-dependency)
+  - [Service Registrations Diagnostics](#service-registrations-diagnostics)
+  - [Using Validate to check for Captive Dependency](#using-validate-to-check-for-captive-dependency)
+
 
 ## Overview
 
@@ -323,7 +334,7 @@ class Validate_CaptiveDependency_example
     public void  Scoped_in_a_Singleton_should_be_reported_by_Validate()
     {
         var container = new Container();
-        container.Register<Foo>(Reuse.Scopded);
+        container.Register<Foo>(Reuse.Scoped);
         container.Register<Bar>(Reuse.Singleton);
         container.Register<Buz>(Reuse.Scoped); // here is the problem!
 

@@ -3,7 +3,18 @@
 
 # Error Detection and Resolution
 
-[TOC]
+
+- [Error Detection and Resolution](#error-detection-and-resolution)
+  - [Overview](#overview)
+  - [DryIoc exceptions](#dryioc-exceptions)
+  - [Unable to resolve](#unable-to-resolve)
+    - [UnableToResolveUnknownService](#unabletoresolveunknownservice)
+    - [UnableToResolveFromRegisteredServices](#unabletoresolvefromregisteredservices)
+  - [RecursiveDependencyDetected](#recursivedependencydetected)
+    - [How to allow recursive dependency](#how-to-allow-recursive-dependency)
+  - [Service Registrations Diagnostics](#service-registrations-diagnostics)
+  - [Using Validate to check for Captive Dependency](#using-validate-to-check-for-captive-dependency)
+
 
 ## Overview
 
