@@ -3,7 +3,26 @@
 
 # Reuse and Scopes
 
-[TOC]
+
+- [Reuse and Scopes](#reuse-and-scopes)
+  - [What is Reuse?](#what-is-reuse)
+  - [Reuse.Transient](#reusetransient)
+    - [Disposable Transient](#disposable-transient)
+    - [Different default Reuse instead of Transient](#different-default-reuse-instead-of-transient)
+  - [Reuse.Singleton](#reusesingleton)
+  - [Reuse.Scoped](#reusescoped)
+    - [What Scope is?](#what-scope-is)
+    - [What Current Scope is?](#what-current-scope-is)
+    - [ScopeContext](#scopecontext)
+    - [Nested scopes](#nested-scopes)
+  - [Reuse.ScopedTo(name)](#reusescopedtoname)
+    - [Reuse.InWebRequest and Reuse.InThread](#reuseinwebrequest-and-reuseinthread)
+  - [Reuse.ScopeTo{TService}(serviceKey)](#reusescopetotserviceservicekey)
+  - [Setup.UseParentReuse](#setupuseparentreuse)
+  - [Reuse lifespan diagnostics](#reuse-lifespan-diagnostics)
+  - [Weakly Referenced reused service](#weakly-referenced-reused-service)
+  - [Prevent Disposal of reused service](#prevent-disposal-of-reused-service)
+
 
 ## What is Reuse?
 
