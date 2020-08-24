@@ -20,6 +20,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
+        <ProjectReference Include="..\..\src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -74,6 +75,10 @@
       <Compile Update="SelectConstructorOrFactoryMethod.cs">
         <Generator>CsToMd</Generator>
         <LastGenOutput>SelectConstructorOrFactoryMethod.md</LastGenOutput>
+      </Compile>
+      <Compile Update="ParameterAndPropertyInjection.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>ParameterAndPropertyInjection.md</LastGenOutput>
       </Compile>
       <Compile Update="UsingInTestsWithMockingLibrary.cs">
         <Generator>CsToMd</Generator>
@@ -150,6 +155,11 @@
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
         <DependentUpon>SelectConstructorOrFactoryMethod.cs</DependentUpon>
+      </None>
+      <None Update="ParameterAndPropertyInjection.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>ParameterAndPropertyInjection.cs</DependentUpon>
       </None>
       <None Update="UsingInTestsWithMockingLibrary.md">
         <DesignTime>True</DesignTime>

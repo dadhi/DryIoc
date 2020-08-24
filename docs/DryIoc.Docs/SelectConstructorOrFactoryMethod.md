@@ -272,7 +272,10 @@ class Register_with_instace_property
 
 ## Open-generic Factory Method
 
-DryIoc supports open-generic methods (and properties/fields) defined in open-generic classes. The level of support is the same as for [OpenGenerics](OpenGenerics). That means the Container is capable to match repeated, recurring, position-swapped, etc. generic type parameters with service type arguments. Generic parameter constraints are supported too.
+DryIoc supports open-generic methods (and properties/fields) defined in the open-generic classes. 
+The level of support is the same as for [OpenGenerics](OpenGenerics). 
+That means the Container is capable to match repeated, recurring, position-swapped, etc. generic type parameters with service type arguments. 
+The generic parameter constraints are supported too.
 
 Example:
 ```
