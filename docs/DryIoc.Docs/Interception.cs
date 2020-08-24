@@ -3,7 +3,11 @@
 
 # Interception
 
-[TOC]
+
+- [Interception](#interception)
+  - [Decorator with Castle DynamicProxy](#decorator-with-castle-dynamicproxy)
+  - [Decorator with LinFu DynamicProxy](#decorator-with-linfu-dynamicproxy)
+
 
 ## Decorator with Castle DynamicProxy
 
