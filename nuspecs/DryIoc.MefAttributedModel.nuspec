@@ -18,6 +18,7 @@
 
 - Using the System.ComponentModel.Composition (netstandard2.0+ and netcoreapp2.0+) NuGet package instead of framework assembly reference
 - fixed: #306 Update DryIocAttributes for the .Net Core v3.1
+- fixed: #307 [DI.MEF] Lift up the requirement for the Export attribute for RegisterExports
 
 ]]>
     </releaseNotes>
