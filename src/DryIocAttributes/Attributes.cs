@@ -23,33 +23,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#if NETFRAMEWORK || PCL || NETSTANDARD1_0 || NETSTANDARD1_1 || NETSTANDARD1_2 || NETSTANDARD1_3 || NETSTANDARD1_4 || NETSTANDARD1_5 || NETSTANDARD1_6 || NETCOREAPP1_0 || NETCOREAPP1_1
+#define NO_SYSTEM_COMPONENTMODEL_COMPOSITION_PACKAGE
+#endif
+
+#if !NETSTANDARD && !NETCOREAPP && !PCL259
+#define NO_LAZY_WITH_METADATA
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
-
-
-#if NET40 || NET45
-using System.Runtime.CompilerServices;
-[assembly: TypeForwardedTo(typeof(ExportAttribute))]
-[assembly: TypeForwardedTo(typeof(InheritedExportAttribute))]
-[assembly: TypeForwardedTo(typeof(PartNotDiscoverableAttribute))]
-[assembly: TypeForwardedTo(typeof(CreationPolicy))]
-[assembly: TypeForwardedTo(typeof(PartCreationPolicyAttribute))]
-[assembly: TypeForwardedTo(typeof(ImportingConstructorAttribute))]
-[assembly: TypeForwardedTo(typeof(ImportAttribute))]
-[assembly: TypeForwardedTo(typeof(ImportManyAttribute))]
-[assembly: TypeForwardedTo(typeof(MetadataAttributeAttribute))]
-[assembly: TypeForwardedTo(typeof(ExportMetadataAttribute))]
-[assembly: TypeForwardedTo(typeof(IPartImportsSatisfiedNotification))]
-#endif
-
-#if NET45
-[assembly: TypeForwardedTo(typeof(ExportFactory<>))]
-[assembly: TypeForwardedTo(typeof(ExportFactory<,>))]
-[assembly: TypeForwardedTo(typeof(ExportLifetimeContext<>))]
-#endif
 
 namespace DryIocAttributes
 {
@@ -395,6 +381,7 @@ namespace DryIocAttributes
         ReturnDefaultIfNotRegistered,
     }
 
+    // todo: @incomplete we are repeating the DryIoc.Request here, but we need just a little functionality of it
     /// <summary>Dependency request path information.</summary>
     public sealed class Request
     {
@@ -719,7 +706,7 @@ namespace DryIocAttributes
     public class AsResolutionRootAttribute : Attribute { }
 }
 
-#if NET35 || PCL328
+#if NO_LAZY_WITH_METADATA
 namespace System
 {
     /// <summary>Provides a lazy indirect reference to an object and its associated metadata for use by the Managed Extensibility Framework.</summary>
@@ -777,7 +764,7 @@ namespace System
 }
 #endif
 
-#if NET35 || PCL || NETSTANDARD
+#if NO_SYSTEM_COMPONENTMODEL_COMPOSITION_PACKAGE
 namespace System.ComponentModel.Composition
 {
     /// <summary>Specifies to register annotated type in container.
@@ -998,12 +985,7 @@ namespace System.ComponentModel.Composition
         /// <summary>Called when a part's imports have been satisfied and it is safe to use.</summary>
         void OnImportsSatisfied();
     }
-}
-#endif
 
-#if NET35 || NET40 || PCL || NETSTANDARD
-namespace System.ComponentModel.Composition
-{
     /// <summary>Can be imported by parts that wish to dynamically create instances of other parts.</summary>
     /// <typeparam name="T">The contract type of the created parts.</typeparam>
     public class ExportFactory<T>

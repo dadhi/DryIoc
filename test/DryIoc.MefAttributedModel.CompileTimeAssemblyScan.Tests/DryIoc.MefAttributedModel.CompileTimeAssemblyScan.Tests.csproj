@@ -5,7 +5,7 @@
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <AssemblyTitle>DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests</AssemblyTitle>
     <Product>DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests</Product>
-    <Copyright>Copyright � 2013 Maksim Volkau</Copyright>
+    <Copyright>Copyright � 2013-2020 Maksim Volkau</Copyright>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -24,9 +24,6 @@
   <ItemGroup>
     <PackageReference Include="NUnit" Version="2.6.4" />
     <PackageReference Include="Wire" Version="0.8.0" />
-  </ItemGroup>
-  <ItemGroup>
-    <Reference Include="System.ComponentModel.Composition" />
   </ItemGroup>
   <ItemGroup>
     <Compile Update="CompileTimeGeneratedRegistrator.cs">
