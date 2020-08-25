@@ -5,8 +5,8 @@
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIocAttributes</Product>
-        <VersionPrefix>5.0.0</VersionPrefix>
-        <VersionSuffix></VersionSuffix>
+        <VersionPrefix>6.0.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -31,11 +31,15 @@ v4.0.0
         </PackageReleaseNotes>
     </PropertyGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+        <PackageReference Include="System.ComponentModel.Composition" Version="4.5.0" />
+    </ItemGroup>
+    
+    <!-- <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
         <Reference Include="System.ComponentModel.Composition" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'net45'">
         <Reference Include="System.ComponentModel.Composition" />
-    </ItemGroup>
+    </ItemGroup> -->
 </Project>

@@ -50,5 +50,5 @@ exit /b 0
 
 :error
 echo:
-echo:## Build Failed :-(
+echo:## Build is failed :-(
 exit /b 1
