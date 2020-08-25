@@ -698,7 +698,7 @@ namespace DryIocAttributes
     public class AsResolutionRootAttribute : Attribute { }
 }
 
-#if !NETSTANDARD1_0 && !NETSTANDARD1_3 && !NETSTANDARD2_0
+#if !NETSTANDARD1_0 && !NETSTANDARD1_3 && !NETSTANDARD2_0 && !PCL259
 namespace System
 {
     /// <summary>Provides a lazy indirect reference to an object and its associated metadata for use by the Managed Extensibility Framework.</summary>
