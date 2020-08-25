@@ -23,6 +23,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#if NETFRAMEWORK || PCL || NETSTANDARD1_0 || NETSTANDARD1_1 || NETSTANDARD1_2 || NETSTANDARD1_3 || NETSTANDARD1_4 || NETSTANDARD1_5 || NETSTANDARD1_6 || NETCOREAPP1_0 || NETCOREAPP1_1
+#define NO_SYSTEM_COMPONENTMODEL_COMPOSITION_PACKAGE
+#endif
+
+#if !NETSTANDARD && !NETCOREAPP && !PCL259
+#define NO_LAZY_WITH_METADATA
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
@@ -698,7 +706,7 @@ namespace DryIocAttributes
     public class AsResolutionRootAttribute : Attribute { }
 }
 
-#if !NETSTANDARD1_0 && !NETSTANDARD1_3 && !NETSTANDARD2_0 && !PCL259
+#if NO_LAZY_WITH_METADATA
 namespace System
 {
     /// <summary>Provides a lazy indirect reference to an object and its associated metadata for use by the Managed Extensibility Framework.</summary>
@@ -756,7 +764,7 @@ namespace System
 }
 #endif
 
-#if !NETSTANDARD2_0
+#if NO_SYSTEM_COMPONENTMODEL_COMPOSITION_PACKAGE
 namespace System.ComponentModel.Composition
 {
     /// <summary>Specifies to register annotated type in container.
