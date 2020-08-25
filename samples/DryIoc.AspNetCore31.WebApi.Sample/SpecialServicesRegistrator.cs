@@ -1,4 +1,5 @@
 using DryIoc.AspNetCore31.WebApi.Sample.Services;
+using DryIoc.MefAttributedModel;
 
 namespace DryIoc.AspNetCore31.WebApi.Sample
 {
@@ -6,11 +7,10 @@ namespace DryIoc.AspNetCore31.WebApi.Sample
     {
         public static void Register(IRegistrator r)
         {
-            r.Register<IExportedService, ExportedService>();
+            // r.Register<IExportedService, ExportedService>();
 
-            // optional: registering MEF Exported services
-            //var assemblies = new[] { typeof(ExportedService).GetAssembly() };
-            //r.RegisterExports(assemblies);
+            // Optionally using the MEF Exported services
+            r.RegisterExports(typeof(ExportedService));
         }
     }
 }

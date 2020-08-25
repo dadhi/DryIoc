@@ -6,7 +6,7 @@
 
         <Product>DryIocAttributes</Product>
         <VersionPrefix>6.0.0</VersionPrefix>
-        <VersionSuffix>preview-01</VersionSuffix>
+        <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -17,16 +17,12 @@
         <PackageTags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
             <![CDATA[
-v5.0.0
-- updated to DryIoc v4
-v4.1.0
-- updated: to sdk based csproj
-v4.0.2
-- fixed: NetStandard 1.0, 1.3 and 2.0 package targets
-v4.0.1
-- added: NetStandard 1.3 and 2.0 package targets
-v4.0.0
-- Support for DryIoc v3
+
+## v6.0.0
+
+- Using the System.ComponentModel.Composition (netstandard2.0+ and netcoreapp2.0+) NuGet package instead of framework assembly reference
+- fixed: #306 Update DryIocAttributes for the .Net Core v3.1
+
         ]]>
         </PackageReleaseNotes>
     </PropertyGroup>
@@ -34,12 +30,4 @@ v4.0.0
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <PackageReference Include="System.ComponentModel.Composition" Version="4.5.0" />
     </ItemGroup>
-    
-    <!-- <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
-        <Reference Include="System.ComponentModel.Composition" />
-    </ItemGroup>
-
-    <ItemGroup Condition="'$(TargetFramework)' == 'net45'">
-        <Reference Include="System.ComponentModel.Composition" />
-    </ItemGroup> -->
 </Project>
