@@ -22,7 +22,7 @@ Better illustrated with examples.
 
 ### Required service type is implemented by resolved type 
 
-```cd 
+```cs 
 using DryIoc;
 using NUnit.Framework;
 using System;
@@ -53,7 +53,7 @@ __Note:__ Required service type always refers to __service type__ and not to __i
 
 ### Required service type identifies a wrapped service type when resolving a [Wrapper](Wrappers)
 
-```cd 
+```cs 
 class Service_type_for_a_wrapper
 {
     class Foo { }

@@ -6,14 +6,13 @@
 
 - DryIoc.MefAttributedModel.dll [![NuGet Badge](https://buildstats.info/nuget/DryIoc.MefAttributedModel.dll)](https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll)
 - DryIoc.MefAttributedModel (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.MefAttributedModel)](https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll)
-- There is a related companion packages [DryIocAttributes](#dryiocattributes)
+- The related companion [DryIocAttributes](#dryiocattributes) packages
 
 
 ### ASP .NET Core
 
 - DryIoc.Microsoft.DependencyInjection [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Microsoft.DependencyInjection)](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection)
 - DryIoc.Microsoft.DependencyInjection.src (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Microsoft.DependencyInjection.src)](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection.src)
-- DryIoc.Microsoft.DependencyInjection.AspNetCore2_1 (targeting ASP .NET Core 2.1.1) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Microsoft.DependencyInjection.AspNetCore2_1)](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection.AspNetCore2_1)
 
 
 ### ASP .NET

@@ -387,8 +387,10 @@ Alternatively __DryIocAttributes__ library introduces the Reuse attributes to su
 - WebRequestReuseAttribute   -> Reuse.InWebRequest. Inherits from the CurrentScopeReuseAttribute.
 
 Example:
-```
-#!c#
+```cs
+md*/
+class Using_Reuse_attribute 
+{
     [Export, TransientReuse]
     class A {}
 
@@ -397,6 +399,8 @@ Example:
 
     [Export, CurrentScopeReuse("my-scope-name")]
     class C { public C(A a) {}}
+} 
+/*md
 ```
 
 
@@ -408,9 +412,9 @@ Example:
 
 All properties of `ImportAttribute` are supported by DryIoc: 
 
-- `ContractName`, is mapped to Service Key
-- `ContractType`, is mapped to [Required Service Type](..\RequiredServiceType)
-- `AllowDefault`, if set is mapped to `IfUnresolved.ReturnDefault`, otherwise is `IfUnresolved.Throw`
+- `ContractName`, is mapped to the Service Key
+- `ContractType`, is mapped to the [Required Service Type](..\RequiredServiceType)
+- `AllowDefault`, if set is mapped to the `IfUnresolved.ReturnDefault` otherwise is mapped to the `IfUnresolved.Throw`
 
 Example:
 ```cs md*/
@@ -423,6 +427,8 @@ class Import_specification
         var b = container.Resolve<B>();
         Assert.IsNotNull(b.A);
     }
+
+    public interface IA {}
 
     [Export("some-key", typeof(IA))]
     public class A : IA {}
@@ -446,7 +452,7 @@ and example will still work.
 ### ImportEx
 
 Inherits from `ImportAttribute` and adds ability to specify required service key of arbitrary type via `ContractKey` 
-instead of string `ImportAttribite.ContractName`.
+instead of string `ImportAttribute.ContractName`.
 ```
 #!c#
     public enum Speed { Fast, Slow }

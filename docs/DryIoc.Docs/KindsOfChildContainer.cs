@@ -142,7 +142,7 @@ to create an actual services.
 The reason for removing cache may be changing or removing a service registration after the fact, 
 when the resolutions were already made from Container and were cached internally. 
 
-```cd md*/
+```cs md*/
 class Without_cache
 {
     public interface I { }
@@ -182,7 +182,7 @@ class Without_cache
 ## Without Singletons
 
 To remove resolved singleton instances from the container:
-```cd md*/
+```cs md*/
 class Without_singletons
 {
     public class S { }
