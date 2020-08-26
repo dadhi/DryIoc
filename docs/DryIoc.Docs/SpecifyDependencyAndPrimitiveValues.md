@@ -1,3 +1,5 @@
+**Not updated yet for V4**
+
 # Specify Dependency or Primitive Value
 
 
@@ -42,7 +44,7 @@ In addition to Service Type you may provide:
 - Default value for Unresolved dependency
 - Custom primitive value for dependency
 
-## [Required Service Type](https://bitbucket.org/dadhi/dryioc/wiki/RequiredServiceType)
+## [Required Service Type](RequiredServiceType)
 
 ## Service Key
 
@@ -280,7 +282,7 @@ But Reflection based spec is rarely needed because `Made` allows strongly-typed 
         () => new Foo(Arg.Of<TestDependency>());
 ```
 
-__Note:__ Strongly-typed expression for factory method also defines spec for parameters and properties/fields in statically checked way, so the separate definitions are not needed. [More details on factory method here](https://bitbucket.org/dadhi/dryioc/wiki/SelectConstructorOrFactoryMethod).
+__Note:__ Strongly-typed expression for factory method also defines spec for parameters and properties/fields in statically checked way, so the separate definitions are not needed. [More details on factory method here](SelectConstructorOrFactoryMethod).
 
 If you omit either part in first example: `factoryMethod`, `parameters`, or `propertiesAndFields` then
 the default convention will be applied for omitted part.

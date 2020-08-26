@@ -2,7 +2,11 @@
 
 # Thread Safety
 
-[TOC]
+
+- [Thread Safety](#thread-safety)
+  - [DryIoc is Thread-Safe](#dryioc-is-thread-safe)
+  - [Locking is only used for reused service creation](#locking-is-only-used-for-reused-service-creation)
+
 
 ## DryIoc is Thread-Safe
 
