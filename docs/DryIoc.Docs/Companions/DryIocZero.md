@@ -1,6 +1,8 @@
 # DryIocZero
 
-[TOC]
+- [DryIocZero](#dryioczero)
+  - [At Glance](#at-glance)
+  - [How to use](#how-to-use)
 
 ## At Glance
 
