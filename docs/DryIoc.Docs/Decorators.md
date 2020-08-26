@@ -20,7 +20,7 @@
   - [Decorator as Interceptor with Castle DynamicProxy](#decorator-as-interceptor-with-castle-dynamicproxy)
 
 
-[FactoryMethod]:SelectConstructorOrFactoryMethod#markdown-header-factory-method-instead-of-constructor
+[FactoryMethod]:SelectConstructorOrFactoryMethod#factory-method-instead-of-constructor
 
 ## Overview
 
@@ -529,7 +529,7 @@ class Nesting_decorators_of_wrapped_service
 
 DryIoc supports decorating of wrappers directly to adjust corresponding wrapper behavior, to add new functionality, to apply filtering, etc.
 
-Consider the decorating of [collection wrapper](Wrappers#markdown-header-ienumerable-or-array-of-a).
+Consider the decorating of [collection wrapper](Wrappers#ienumerable-or-array-of-a).
 Let`s say we want to change the default collection behavior and exclude keyed services from the result:
 
 ```cs 
@@ -634,12 +634,12 @@ Here `DecorateFooWithGreet` is a static method just for the demonstration.
 It also may be a non-static and include additional dependencies to be injected by Container, 
 check the [FactoryMethod] for more details.
 
-DryIoc has a dedicated [`RegisterInitializer`](RegisterResolve#markdown-header-registerinitializer) method,
+DryIoc has a dedicated [`RegisterInitializer`](RegisterResolve#registerinitializer) method,
 which is a decorator in disguise.
 
-Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisposer`](RegisterResolve#markdown-header-registerdisposer).
+Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisposer`](RegisterResolve#registerdisposer).
 
 
 ## Decorator as Interceptor with Castle DynamicProxy
 
-[Explained here](Interception#markdown-header-decorator-with-castle-dynamicproxy)
+[Explained here](Interception#decorator-with-castle-dynamicproxy)

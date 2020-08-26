@@ -71,7 +71,7 @@ class Basic_example
         // registers exported types
         container.RegisterExports(typeof(Foo), typeof(Bar));
         // or via assemblies
-        container.RegisterExports(new[] { typeof(Foo).GetAssembly() });
+        // container.RegisterExports(new[] { typeof(Foo).GetAssembly() });
 
         // creates Foo with injected Bar
         var foo = container.Resolve<IFoo>();
@@ -453,41 +453,48 @@ and example will still work.
 
 Inherits from `ImportAttribute` and adds ability to specify required service key of arbitrary type via `ContractKey` 
 instead of string `ImportAttribute.ContractName`.
-```
-#!c#
+
+```cs md*/
+class Using_ImportEx_attribute
+{
     public enum Speed { Fast, Slow }
 
-    [ExportMany(ContractKey=Speed.Fast)]
+    [ExportMany(ContractKey = Speed.Fast)]
     public class A : I {}
 
-    [ExportMany(ContractKey=Speed.Slow)]
+    [ExportMany(ContractKey = Speed.Slow)]
     public class B : I {}
 
     [Export]
-    public class B 
+    public class C 
     {
-        public B([ImportWithKey(Speed.Fast)]I i) { /* will import i as A */ }
+        public C([ImportEx(Speed.Fast)]I i) { /* will import i as A */ }
     }
+}
+/*md
 ```
 
 #### ImportExternal
 
 Imports the specified service normally if the service is registered. 
-But in case the service is not registered, attribute will __exports the service in-place for registration__ with provided implementation info.
+But in the case the service is not registered, attribute will __exports the service in-place__ for registration with provided implementation info.
 
 This is useful for ad-hoc registration of types from not controlled libraries.
-```
-#!c#
-    // third-party MEF ignorant library 
+```cs md*/
+class Using_ImportExternal
+{
+    // A third-party MEF-ignorant library
     class AwesomeService : IService {}
 
-    // My code
+    // My library code
     [Export]
     public class NativeClient
     {
         [ImportExternal(typeof(IService), contractType: typeof(AwesomeService)), SingletonReuse]
         public IService Service { get; set; }
     }
+}
+/*md
 ```
 
 In this example `AwesomeService` is not exported and not aware of MEF composition in your code.
@@ -508,8 +515,9 @@ Have two goals:
 - Allows to specify metadata object associated with exported implementation.
 - Specifies the required metadata object for imported part, similar to MEF2 `RequiredMetadataAttribute`.
 
-```
-#!c#
+```cs md*/
+class Using_WithMetadata
+{
     [ExportMany][WithMetadata("a")]
     public class X : I {}
 
@@ -521,6 +529,8 @@ Have two goals:
     {
         public Client([WithMetadata("b")]I it) { /* will import it as Y */}
     }
+}
+/*md
 ```
 
 ## Exporting disposable transient
@@ -534,27 +544,37 @@ until the container-wide rule is set `Rules.WithoutThrowOnRegisteringDisposableT
 
 To prevent the exception for specific export you can mark it with `AllowDisposableTransientAttribute`:
 
-```
-#!c#
-    [Export][AllowDisposableTransient]
-    public class Foo : IDisposable {}
-
-    var c = new Container().WithMefAttributedModel();
-
-    // will throws until the export is marked with AllowDisposableTransient
-    c.RegisterExports(typeof(Foo));
-
-    using (var scope = c.OpenScope())
+```cs md*/
+class Exporting_disposable_transient
+{
+    [Test] public void Example() 
     {
-        var foo = c.Resolve<Foo>();
-        
-        // disposing is the client responsibility
-        foo.Dispose();
+        var c = new Container().WithMefAttributedModel();
+
+        // will throw if the export is not marked with the AllowDisposableTransient
+        c.RegisterExports(typeof(Foo));
+
+        using (var scope = c.OpenScope())
+        {
+            var foo = c.Resolve<Foo>();
+            Assert.IsNotNull(foo);
+            
+            // disposing is the client responsibility
+            foo.Dispose();
+        }
     }
+
+    [Export, AllowDisposableTransient]
+    public class Foo : IDisposable
+    {
+        public void Dispose() {}
+    }
+}
+/*md
 ```
 
-__Note:__ Container still won't be tracking the disposable transient, and disposing it is consumer responsiblity. 
-To enable tracking use `TrackDisposableTransientAttribute`.
+__Note:__ Container won't track the disposable transient and its disposal is the client responsibility. 
+To enable the tracking see the `TrackDisposableTransientAttribute` below.
 
 
 ### TrackDisposableTransient
@@ -562,44 +582,52 @@ To enable tracking use `TrackDisposableTransientAttribute`.
 Exported disposable transient marked with this attributed will be tracked by container and disposed on disposing the tracking scope.
 The attribute corresponds to DryIoc registration option [trackDisposableTransient](..\ReuseAndScopes#markdown-header-disposable-transient)
 
-```
-#!c#
+```cs md*/
+class Exporting_with_TrackDisposableTransient
+{
     [Export][TrackDisposableTransient]
-    public class Foo : IDisposable {}
-
-    var c = new Container().WithMefAttributedModel();
-
-    // will throws until the export is marked with AllowDisposableTransient
-    c.RegisterExports(typeof(Foo));
-
-    using (var scope = c.OpenScope())
+    public class Foo : IDisposable
     {
-        var foo = c.Resolve<Foo>();
+        public void Dispose() {}
+    }
 
-    }   // foo will be disposed automatically by Container on tracking scope disposal
+    [Test] public void Example() 
+    {
+        var c = new Container().WithMefAttributedModel();
+
+        c.RegisterExports(typeof(Foo));
+
+        using (var scope = c.OpenScope())
+        {
+            var foo = c.Resolve<Foo>();
+            Assert.IsNotNull(foo);
+        } // foo will be disposed automatically by Container
+    }
+}
+/*md
 ```
 
 ## Decorators and Wrappers
 
-### AsDecorator
+### AsDecorator attribute
 
+Check the [Decorators](../Decorators#overview)
 
+### AsWrapper attribute
 
-### AsWrapper
-
-
+Check the [Wrappers](../Wrappers#overview)
 
 ## Other export options
 
 ### PreventDisposalAttribute
 
-Sets the registration option [preventDisposal](..\ReuseAndScopes#markdown-header-prevent-disposal-of-reused-service).
+Sets the registration option [preventDisposal](..\ReuseAndScopes#prevent-disposal-of-reused-service).
 
 ### WeaklyReferencedAttribute
 
-Set the registration option [weaklyReferenced](..\ReuseAndScopes#markdown-header-weakly-referenced-reused-service).
+Set the registration option [weaklyReferenced](..\ReuseAndScopes#weakly-referenced-reused-service).
 
 ### AsResolutionCall
 
-Set the registration option [asResolutionCall](..\RulesAndDefaultConventions#markdown-header-injecting-dependency-asresolutioncall).
+Set the registration option [asResolutionCall](..\RulesAndDefaultConventions#injecting-dependency-asresolutioncall).
 md*/

@@ -57,8 +57,7 @@ using NUnit.Framework;
 
 class Wrapper_example
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -113,8 +112,7 @@ The important thing about `Lazy` and `Func` is that the wrapped dependency shoul
 ```cs md*/
 class Lazy_and_Func_require_services_to_be_registered
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -139,8 +137,7 @@ There is still a possibility to postpone a service registration:
 ```cs md*/
 class Func_works_without_registration
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules => rules.WithFuncAndLazyWithoutRegistration());
         var getA = container.Resolve<Func<A>>();
@@ -184,8 +181,7 @@ When the passed argument was not used it is maybe a mistake but maybe is not. It
 ```cs md*/
 class Passed_argument_was_not_used
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<A>();
@@ -206,8 +202,7 @@ By default, DryIoc will use the first call to `Func` to create a service and ign
 ```cs md*/
 class Func_with_args_and_reuse
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<A>(Reuse.Singleton);
@@ -233,8 +228,7 @@ If you don't like it this way, you may use a rule `Rules.WithIgnoringReuseForFun
 ```cs md*/
 class Func_with_args_with_rule_ignoring_reuse
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules => rules.WithIgnoringReuseForFuncWithArgs());
         container.Register<A>(Reuse.Singleton);
@@ -273,8 +267,7 @@ Metadata may be provided with attributes when using [MefAttributedModel](Extensi
 ```cs md*/
 class Providing_metadata
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -302,8 +295,7 @@ Metadata may be also used for collection filtering. When nesting in collection w
 ```cs md*/
 class Filtering_based_on_metadata
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         var items = container.Resolve<Meta<A, int>[]>();
@@ -327,8 +319,7 @@ In latter case you may `Resolve` by providing the type of any `object` value in 
 ```cs md*/
 class Resolve_value_out_of_metadata_dictionary
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<A>(setup: Setup.With(
@@ -392,8 +383,7 @@ Nested `Func` or `Lazy` will help in this case:
 ```cs md*/
 class Collection_of_Lazy_things
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<A>();
@@ -421,8 +411,7 @@ In all other cases, the item will be filtered out of the collection.
 ```cs md*/
 class Filtering_not_resolved_services
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<B>();
@@ -450,8 +439,7 @@ then both types will be present in the result collection
 ```cs md*/
 class Both_open_and_closed_generic_included_in_collection
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -475,16 +463,15 @@ DryIoc by default will include [co-variant](https://msdn.microsoft.com/en-us/lib
 generic services into resolved collection. 
 
 What does it mean? In C# you may declare a co-variant open-generic interface with `out` modifier: `IHandler<out T>`.
-Then if you have a class `B` assignable to `A` (`class B : A {}), then their handlers are assignable as well 
+Then if you have a class `B` assignable to `A` (`class B : A {}`), then their handlers are assignable as well 
 `IHandler<B> b = null; IHandler<A> a = b;`.
 
-Proceeding to collections, you may have an `IEnumerable<IHandler<A>>` with elements of type `IHandler<A>` and `IHandler<B>`.
+Proceeding to the collections you may have `IEnumerable<IHandler<A>>` with the elements of type `IHandler<A>` and `IHandler<B>`.
 
 ```cs md*/
 class Covariant_generics_collection
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -516,8 +503,7 @@ via `Rules.WithoutVariantGenericTypesInResolvedCollection()`:
 ```cs md*/
 class Covariant_generics_collection_suppressed
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules => rules.WithoutVariantGenericTypesInResolvedCollection());
 
@@ -564,8 +550,7 @@ DryIoc does exactly that:
 ```cs md*/
 class DryIoc_composite_pattern
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -601,8 +586,7 @@ because multiple implementation are registered. But sometimes you may prefer to 
 ```cs md*/
 class Prefer_composite_when_resolving_a_single_service
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -638,8 +622,7 @@ By comparison, an array wrapper always returns a fixed set of services ignoring 
 ```cs md*/
 class LazeEnumerable_example
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -674,8 +657,7 @@ as the `requiredServiceType`. It allows you to override default array injection 
 
 class Specify_LazyEnumerable_per_dependency
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         
@@ -695,8 +677,7 @@ Another option is to specify `LazyEnumerable<>` implementation for `IEnumerable<
 ```cs md*/
 class Specify_to_use_LazyEnumerable_for_all_IEnumerable
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
     }
@@ -716,8 +697,7 @@ It may be done even at compile-time.
 ```cs md*/
 class Resolve_expression
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -759,8 +739,7 @@ as a `IResolverContext` argument to the compiled factory.
 ```cs md*/
 class Swap_container_in_factory_delegate
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules => rules.ForExpressionGeneration());
 
@@ -824,8 +803,7 @@ To register your own wrapper just specify setup parameter as `Setup.Wrapper` or 
 ```cs md*/
 class User_defined_wrappers
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -865,8 +843,7 @@ Example of the non-generic wrapper:
 ```cs md*/
 class Non_generic_wrapper
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -880,8 +857,7 @@ class Non_generic_wrapper
     }
 
     // The same should work with the closed-generic wrapper
-    [Test]
-    public void Example_with_closed_generic_wrapper()
+    [Test] public void Example_with_closed_generic_wrapper()
     {
         var container = new Container();
 
