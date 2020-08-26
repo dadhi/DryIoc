@@ -71,10 +71,11 @@ class Basic_example
         // registers exported types
         container.RegisterExports(typeof(Foo), typeof(Bar));
         // or via assemblies
-        // container.RegisterExports(new[] { typeof(Foo).GetTypeInfo().Assembly });
+        container.RegisterExports(new[] { typeof(Foo).GetAssembly() });
 
         // creates Foo with injected Bar
         var foo = container.Resolve<IFoo>();
+        Assert.IsNotNull(foo);
     }
 
     public interface IFoo {}
@@ -105,8 +106,8 @@ To get rid off not used functionality. For instance, you can mark types for Expo
 __DryIoc.MefAttributedModel__ functionality at runtime. All registrations will be scanned and factory delegates 
 generated at compile-time by __DryIocZero__.
 
-Another reason, though unlikely matirialized one. I believe that set of features covered by __DryIoc.Attributes__ 
-may be used by other IoC libraries without introducing their own attributes.
+Another reason is that the set of features covered by __DryIoc.Attributes__ 
+may be used by other IoC libraries without introducing their own attributes (ha-ha, it likely won't materialize).
 
 ### Export and Import attributes may be used separately 
 
@@ -118,17 +119,6 @@ Or other way around: you don't need to put `Export` attributes everyware to make
 ``` md*/
 class Export_and_Import_used_separately
 {
-    // Types without exports:
-
-    public interface IFoo {}
-
-    public class Foo : IFoo 
-    {
-        public Foo([Import("some-key")]Bar bar) {}
-    }
-
-    public class Bar {}
-
     [Test] public void Example()
     {
         var container = new Container().WithMefAttributedModel(); 
@@ -137,7 +127,18 @@ class Export_and_Import_used_separately
         container.Register<Bar>(Reuse.Singleton, serviceKey: "some-key");
 
         var foo = container.Resolve<IFoo>();
+        Assert.IsNotNull(foo);
     }
+
+    // The types are without Exports
+    public interface IFoo {}
+
+    public class Foo : IFoo 
+    {
+        public Foo([Import("some-key")]Bar bar) {}
+    }
+
+    public class Bar {}
 }
 /*md
 ```
@@ -293,7 +294,7 @@ class DryIocAttributes_ExportEx
 
 `ExportMany` maps directly to DryIoc [RegisterMany](..\RegisterResolve#markdown-header-registermany) method.
 
-It allows to omit specifying `typeof(IService)` contract, because it will be firgure out automatically by `ExportMany`:
+It allows to omit the `typeof(IService)` contract because it will be figured-out automatically by the `ExportMany`:
 
 ```cs
 md*/
@@ -339,7 +340,7 @@ class ExportMany_with_Except_and_NonPublic_options
     } 
 
     // Exports X, IA and IC, but not IB
-    [ExportMany(NonPublic=true, Except=new[] { typeof(IB) })]
+    [ExportMany(NonPublic = true, Except = new[] { typeof(IB) })]
     class X : IA, IB {}
 
     interface IA {} 
@@ -353,9 +354,11 @@ class ExportMany_with_Except_and_NonPublic_options
 __By default MEF treat all exports as Singletons__: It means that if you do not specify `PartCreationPolicy` attribute for the exported type, it will be registered as Singleton.
 
 To register Transient  service you need to specify `PartCreationPolicy(CreationPolicy.NonShared)` attribute:
-```
-#!C#
-   
+
+```cs
+md*/
+class Using_CreationPolicy 
+{
     [Export] // exports Singleton
     public class A {}
 
@@ -366,20 +369,22 @@ To register Transient  service you need to specify `PartCreationPolicy(CreationP
     [Export] // again Singleton but specified explicitly
     [PartCreationPolicy(CreationPolicy.Shared)]
     public class C {}
+} 
+/*md
 ```
 
-DryIoc converts MEF `CreationPolicy` to its own `IReuse` as following:
+DryIoc converts MEF `CreationPolicy` into the `DryIoc.IReuse` as following:
 
-- CreationPolicy.Shared -> Reuse.Singleton
+- CreationPolicy.Shared    -> Reuse.Singleton
 - CreationPolicy.NonShared -> Reuse.Transient
-- CreationPolicy.Any -> Reuse.Singleton
+- CreationPolicy.Any       -> Reuse.Singleton
 
-Alternatively __DryIocAttributes__ library introduces its own Reuse attributes to support whole set of DryIoc reuses:
+Alternatively __DryIocAttributes__ library introduces the Reuse attributes to support the whole set of DryIoc reuses:
 
-- TransientReuseAttribute -> Reuse.Transient
-- SingletonReuseAttribute -> Reuse.Singleton
+- TransientReuseAttribute    -> Reuse.Transient
+- SingletonReuseAttribute    -> Reuse.Singleton
 - CurrentScopeReuseAttribute -> Reuse.InCurrentScope. Supports the Scope name as attribute parameter.
-- WebRequestReuseAttribute -> Reuse.InWebRequest. Inherits from the CurrentScopeReuseAttribute.
+- WebRequestReuseAttribute   -> Reuse.InWebRequest. Inherits from the CurrentScopeReuseAttribute.
 
 Example:
 ```

@@ -289,11 +289,17 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterExportsAndTypes(this IRegistrator registrator, params Type[] types) => 
             registrator.RegisterExportsAndTypes((IEnumerable<Type>)types);
 
-        /// <summary>First scans (<see cref="Scan"/>) provided assemblies to find types annotated with
+        /// <summary>First scans (<see cref="Scan"/>) the provided assemblies to find the types annotated with
         /// <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/>, or <see cref="ExportManyAttribute"/>.
-        /// Then registers found types into registrator/container.</summary>
+        /// Then registers the found types into registrator/container.</summary>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Assembly> assemblies) => 
             registrator.RegisterExports(Scan(assemblies));
+
+        /// <summary>First scans (<see cref="Scan"/>) the provided assemblies to find the types annotated with
+        /// <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/>, or <see cref="ExportManyAttribute"/>.
+        /// Then registers the found types into registrator/container.</summary>
+        public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies) => 
+            registrator.RegisterExports((IEnumerable<Assembly>)assemblies);
 
         /// <summary>Registers new factories into registrator/container based on provided registration info's, which
         /// is serializable DTO for registration.</summary>
