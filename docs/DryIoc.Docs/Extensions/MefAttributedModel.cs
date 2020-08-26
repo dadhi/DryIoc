@@ -260,7 +260,7 @@ that means the same `I` and `J` singleton for exported singleton.
 Allows to mark interface or base type as a service type once, and consider all the implementations as exported.
 ```cs
 md*/
-class Inherited_export 
+class Using_InheritedExport
 {
     [Test] public void Example()
     {
@@ -278,11 +278,11 @@ class Inherited_export
     [InheritedExport("xyz")]
     public interface J {}
 
-    // exported as service I
+    // exported as a service I
     class A : I {}
 
-    // exported as service I and service J with key "xyz"
-    class B : I, J {}
+    // exported as a service J with the service key "xyz"
+    class B : J {}
 }
 
 /*md
