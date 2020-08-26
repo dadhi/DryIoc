@@ -332,7 +332,7 @@ It allows to omit the `typeof(IService)` contract because it will be figured-out
 
 ```cs
 md*/
-class DryIocAttributes_ExportMany 
+public class DryIocAttributes_ExportMany 
 {
     [Test] public void Example()
     {
@@ -346,8 +346,7 @@ class DryIocAttributes_ExportMany
 
     public interface IService {}
 
-    // Automatically discovers the `IService` interface for registration 
-    [ExportMany]
+    [ExportMany] // automatically discovers the `IService` interface for registration
     class ServiceImpl : IService {}
 } 
 /*md

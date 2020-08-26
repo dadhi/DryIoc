@@ -904,7 +904,8 @@ namespace DryIoc.MefAttributedModel
                 .Map(contractType => new ExportInfo(contractType,
                     attribute.ContractName ?? attribute.ContractKey, GetIfAlreadyRegistered(attribute.IfAlreadyExported)));
 
-            Throw.If(manyExports.Length == 0, Error.ExportManyDoesNotExportAnyType, implementationType, contractTypes);
+            if (manyExports.Length == 0)
+                Throw.It(Error.ExportManyDoesNotExportAnyType, implementationType, contractTypes);
 
             // Filters exports that were already made, because ExportMany has less priority than Export(Ex)
             var currentExports = info.Exports;
@@ -1081,6 +1082,13 @@ namespace DryIoc.MefAttributedModel
         internal static string GetMessage(int errorIndex) =>
             Messages[errorIndex - _containerErrorCount];
 
+        /// <summary>Returns the name of error with the provided error code.</summary>
+        public static string NameOf(int error) => 
+            typeof(Error).GetTypeInfo().DeclaredFields
+                .Where(f => f.FieldType == typeof(int))
+                .Where((_, i) => i == error - _containerErrorCount + 1)
+                .FirstOrDefault()?.Name;
+
         static Error()
         {
             Throw.GetMatchedException = GetAttributedModelOrContainerException;
@@ -1107,9 +1115,11 @@ namespace DryIoc.MefAttributedModel
                 : new AttributedModelException(errorCode, message, inner);
         }
 
-        private AttributedModelException(int error, string message) : base(error, message) { }
+        private AttributedModelException(int error, string message) : this(error, message, null) { }
 
-        private AttributedModelException(int error, string message, Exception innerException) : base(error, message, innerException) { }
+        private AttributedModelException(int error, string message, Exception innerException) : 
+            base(error, message, innerException, (e, m, _) => 
+            FormatMessage(MefAttributedModel.Error.NameOf(e), m)) { }
     }
 
     /// <summary>Converts provided literal into valid C# code. Used for generating registration code

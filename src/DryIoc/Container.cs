@@ -12638,15 +12638,23 @@ namespace DryIoc
         protected static string Print(object arg) =>
             arg == null ? string.Empty : new StringBuilder().Print(arg).ToString();
 
-        /// <summary>Creates exception with message describing cause and context of error,
-        /// and leading/system exception causing it.</summary>
-        public ContainerException(int errorCode, string message, Exception innerException)
-            : base($"code: Error.{DryIoc.Error.NameOf(errorCode)};{NewLine}message: {message}", innerException) =>
-            Error = errorCode;
-
         /// <summary>Creates exception with message describing cause and context of error.</summary>
         public ContainerException(int error, string message)
             : this(error, message, null) { }
+
+        /// <summary>Creates exception with message describing cause and context of error,
+        /// and leading/system exception causing it.</summary>
+        public ContainerException(int errorCode, string message, Exception innerException)
+            : this(errorCode, message, innerException, (e, m, _) => FormatMessage(DryIoc.Error.NameOf(e), m)) {}
+
+        protected static string FormatMessage(string errorName, string message) =>
+            $"code: Error.{errorName};{NewLine}message: {message}";
+
+        protected ContainerException(int errorCode, string message, Exception innerException,
+            Func<int, string, Exception, string> formatMessage)
+            : base(formatMessage(errorCode, message, innerException), innerException) =>
+            Error = errorCode;
+
 
 #if SUPPORTS_SERIALIZABLE
         /// <inheritdoc />
@@ -12872,7 +12880,7 @@ namespace DryIoc
         }
 
         /// <summary>Returns the name of error with the provided error code.</summary>
-        public static string NameOf(int error) =>
+        public static string NameOf(int error) => 
             typeof(Error).GetTypeInfo().DeclaredFields
                 .Where(f => f.FieldType == typeof(int)).Where((_, i) => i == error + 1)
                 .FirstOrDefault()?.Name;
