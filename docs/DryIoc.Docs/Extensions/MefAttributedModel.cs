@@ -1,3 +1,4 @@
+/*md
 <!--Auto-generated from .cs file, the edits made to .md file will be lost! -->
 
 # MefAttributedModel extension
@@ -44,7 +45,7 @@ __DryIoc.MefAttributedModel__ is the set of extension methods to support:
 
 <details><summary>using ...</summary>
 
-```cs 
+```cs md*/
 using System;
 
 // for the Export and Import attributes
@@ -54,11 +55,12 @@ using DryIocAttributes;
 using DryIoc.MefAttributedModel;
 using DryIoc;
 using NUnit.Framework;
+/*md 
 ```
 
 </details>
 
-```cs 
+```cs md*/
 class Basic_example 
 {
     [Test] public void Example()
@@ -86,6 +88,7 @@ class Basic_example
     [Export("some-key")]
     public class Bar {}
 }
+/*md
 ```
 
 ### Relation with DryIoc.Attributes extension
@@ -112,7 +115,7 @@ but utilize the `Import` and `ImportingConstructor` attributes for dependency in
 
 Or other way around: you don't need to put `Export` attributes everyware to make advantage of Imports. 
 
-``` 
+``` md*/
 class Export_and_Import_used_separately
 {
     // Types without exports:
@@ -136,6 +139,7 @@ class Export_and_Import_used_separately
         var foo = container.Resolve<IFoo>();
     }
 }
+/*md
 ```
 
 
@@ -174,6 +178,7 @@ Which should be generally faster than heavy-weight reflection scanning at run-ti
 Allows to specify service type and service key, aka `ContractType` and `ContractName` in MEF terms.
 
 ```cs
+md*/
 class Export_example 
 {
     [Test] public void Example()
@@ -209,6 +214,7 @@ class Export_example
     [Export("xyz")]
     public class B : I, J {}
 }
+/*md
 ```
 
 __Note:__ Using multiple exports on one implementation type will register the same factory for each export,
@@ -218,6 +224,7 @@ that means the same `I` and `J` singleton for exported singleton.
 
 Allows to mark interface or base type as a service type once, and consider all the implementations as exported.
 ```cs
+md*/
 class Inherited_export 
 {
     [Test] public void Example()
@@ -243,6 +250,7 @@ class Inherited_export
     class B : I, J {}
 }
 
+/*md
 ```
 
 ### DryIoc.Attributes
@@ -258,6 +266,7 @@ The difference from the normal MEF `ExportAttribute`, the extended DryIoc `Expor
 
 For example to ensure the _register-once_ semantics you can export type with the `IfAlreadyExported.Keep` option:
 ```cs
+md*/
 class DryIocAttributes_ExportEx 
 {
     [ExportEx(typeof(IService), IfAlreadyExported=IfAlreadyExported.Keep)]
@@ -277,6 +286,7 @@ class DryIocAttributes_ExportEx
     [ExportEx(CommandKey.Delete, typeof(ICommandHandler))]
     public class DeleteCommandHandler : ICommandHandler {} 
 } 
+/*md
 ```
 
 #### ExportMany
@@ -286,6 +296,7 @@ class DryIocAttributes_ExportEx
 It allows to omit specifying `typeof(IService)` contract, because it will be firgure out automatically by `ExportMany`:
 
 ```cs
+md*/
 class DryIocAttributes_ExportMany 
 {
     [Test] public void Example()
@@ -304,6 +315,7 @@ class DryIocAttributes_ExportMany
     [ExportMany]
     class ServiceImpl : IService {}
 } 
+/*md
 ```
 
 Additionally `ExportMany` provides the facilities to:
@@ -312,6 +324,7 @@ Additionally `ExportMany` provides the facilities to:
 - Allow `NonPublic` types for registration
 
 ```cs
+md*/
 class ExportMany_with_Except_and_NonPublic_options 
 {
     [Test] public void Example()
@@ -332,6 +345,7 @@ class ExportMany_with_Except_and_NonPublic_options
     interface IA {} 
     public interface IB {} 
 } 
+/*md
 ```
 
 ## CreationPolicy and Reuse
@@ -394,7 +408,7 @@ All properties of `ImportAttribute` are supported by DryIoc:
 - `AllowDefault`, if set is mapped to `IfUnresolved.ReturnDefault`, otherwise is `IfUnresolved.Throw`
 
 Example:
-```cs 
+```cs md*/
 class Import_specification
 {
     [Test] public void Example() 
@@ -416,6 +430,7 @@ class Import_specification
         public B([Import("some-key", AllowDefault=true)]IA a) { A = a; }
     }
 }
+/*md
 ```
 
 __Note:__ Again, you can just replace `RegisterExports` with the normal `Register`, and remove all exports, 
@@ -576,3 +591,4 @@ Set the registration option [weaklyReferenced](..\ReuseAndScopes#markdown-header
 ### AsResolutionCall
 
 Set the registration option [asResolutionCall](..\RulesAndDefaultConventions#markdown-header-injecting-dependency-asresolutioncall).
+md*/
