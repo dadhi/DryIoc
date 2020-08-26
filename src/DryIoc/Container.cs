@@ -12676,7 +12676,7 @@ namespace DryIoc
                 "  with normal and dynamic registrations:" + NewLine + "{1}"),
 
             ExpectedSingleDefaultFactory = Of(
-                "Expecting single default registration but found many:" + NewLine + "{0}" + NewLine +
+                "Expecting a single default registration but found many:" + NewLine + "{0}" + NewLine +
                 "when resolving {1}." + NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
 

@@ -55,7 +55,7 @@ namespace DryIoc.MefAttributedModel
             GetImportedParameter,
             _getImportedPropertiesAndFields);
 
-        /// <summary>Updates the source rules to provide full MEF compatibility.</summary>
+        /// <summary>Adjusts the rules to provide the full MEF compatibility.</summary>
         public static Rules WithMefRules(this Rules rules)
         {
             var importMadeOf = rules.FactoryMethod == null ? _defaultImportMadeOf :
@@ -67,7 +67,7 @@ namespace DryIoc.MefAttributedModel
                 .WithTrackingDisposableTransients();
         }
 
-        /// <summary>Add to container rules with <see cref="WithMefRules"/> to provide the full MEF compatibility.
+        /// <summary>Adjusts the rules with <see cref="WithMefRules"/> to provide the full MEF compatibility.
         /// In addition registers the MEF specific wrappers, and adds support for <see cref="IPartImportsSatisfiedNotification"/>.</summary>
         public static IContainer WithMef(this IContainer container) => 
             container

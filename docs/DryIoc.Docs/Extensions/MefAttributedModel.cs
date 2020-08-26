@@ -86,15 +86,12 @@ __DryIoc.MefAttributedModel__ is the set of extension methods to support:
 
 ```cs md*/
 using System;
-
-// for the Export and Import attributes
-using System.ComponentModel.Composition; 
-// for the ExportEx and ExportMany attributes
-using DryIocAttributes;
+using System.ComponentModel.Composition; // for the Export and Import attributes
+using DryIocAttributes;                  // for the ExportEx and ExportMany attributes
 using DryIoc.MefAttributedModel;
 using DryIoc;
 using NUnit.Framework;
-/*md 
+/*md
 ```
 
 </details>
@@ -223,13 +220,15 @@ class Export_example
 {
     [Test] public void Example()
     {
-        var container = new Container(); // no need for `.WithMefAttributedModel()` to use just Exports
+        // Using `WithMefAttributedModel` applies the MEF rules where the default reuse is singleton
+        var container = new Container().WithMefAttributedModel();
+        // alternatively you may apply just the rules
+        container = new Container(rules => rules.WithMefAttributedModel());
 
         container.RegisterExports(
             typeof(A),
-            typeof(A1),
-            typeof(A2),
-            typeof(B)
+            typeof(B),
+            typeof(C)
         );
 
         Assert.AreSame(container.Resolve<I>(), container.Resolve<J>()); 
@@ -241,18 +240,14 @@ class Export_example
     [Export] // exports implementation A as service A
     public class A {}
 
-    [Export(typeof(I))] // exports implementation A as service I
-    public class A1 : I {}
-
-    [Export("some-key", typeof(I))] // exports implementation A as service I with key "some-key"
-    public class A2 : I {}
-
-    // The exporting B as I and J will share the same implementation factory, 
-    // that means the same instance of a singleton
-    [Export(typeof(I))]
-    [Export(typeof(J))]
-    [Export("xyz")]
+    [Export(typeof(I))] // exports I and J to share the same implementation B, so that
+    [Export(typeof(J))] // resolving I and J will return the same singleton object B
+    [Export("xyz")]     // exports B with the service key "xyz", which also returns the same B
     public class B : I, J {}
+
+    [Export("abc", typeof(I))] // exports С as a service I with the service key "abc"
+    public class C : I {}
+
 }
 /*md
 ```

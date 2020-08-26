@@ -62,7 +62,7 @@ First let's see what happens when Service Key specification is omitted (using `F
     container.Resolve<Foo>();
 ```
 
-Resolution of `Foo` will fail with exception `"Expecting single default registration of IDependency but found many ..."`
+Resolution of `Foo` will fail with exception `"Expecting a single default registration of IDependency but found many ..."`
 
 Make it work with `enum` Service Key:
 ```
