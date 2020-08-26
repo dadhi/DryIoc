@@ -3,9 +3,49 @@
 
 # MefAttributedModel extension
 
-Enables [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) in DryIoc.
 
-[TOC]
+- [MefAttributedModel extension](#mefattributedmodel-extension)
+  - [Overview](#overview)
+  - [Comparing to MEF](#comparing-to-mef)
+    - [Works without System.ComponentModel.Composition](#works-without-systemcomponentmodelcomposition)
+    - [Adds on top](#adds-on-top)
+    - [Not supported](#not-supported)
+  - [Concept](#concept)
+    - [What is MefAttributedModel extension](#what-is-mefattributedmodel-extension)
+    - [Relation with DryIoc.Attributes extension](#relation-with-dryiocattributes-extension)
+    - [Export and Import attributes may be used separately](#export-and-import-attributes-may-be-used-separately)
+    - [Assembly scan](#assembly-scan)
+  - [Exporting](#exporting)
+    - [MEF attributes](#mef-attributes)
+      - [ExportAttribute](#exportattribute)
+      - [InheritedExport](#inheritedexport)
+    - [DryIoc.Attributes](#dryiocattributes)
+      - [ExportEx](#exportex)
+      - [ExportMany](#exportmany)
+  - [CreationPolicy and Reuse](#creationpolicy-and-reuse)
+  - [Importing](#importing)
+    - [MEF attributes](#mef-attributes-1)
+      - [Import](#import)
+    - [DryIoc.Attributes](#dryiocattributes-1)
+    - [ImportEx](#importex)
+      - [ImportExternal](#importexternal)
+  - [Metadata support](#metadata-support)
+    - [WithMetadata](#withmetadata)
+  - [Exporting disposable transient](#exporting-disposable-transient)
+    - [AllowDisposableTransient](#allowdisposabletransient)
+    - [TrackDisposableTransient](#trackdisposabletransient)
+  - [Decorators and Wrappers](#decorators-and-wrappers)
+    - [AsDecorator attribute](#asdecorator-attribute)
+    - [AsWrapper attribute](#aswrapper-attribute)
+  - [Other export options](#other-export-options)
+    - [PreventDisposalAttribute](#preventdisposalattribute)
+    - [WeaklyReferencedAttribute](#weaklyreferencedattribute)
+    - [AsResolutionCall](#asresolutioncall)
+
+
+## Overview
+
+Enables the [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) in DryIoc.
 
 ## Comparing to MEF
 
@@ -13,7 +53,6 @@ Enables [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/libra
 
 * The standard MEF attributes are re-defined in _Ported-net40.cs_.
 * Additional DryIoc attributes are define in _Attributes.cs_.
-
 
 ### Adds on top
 
@@ -292,7 +331,7 @@ class DryIocAttributes_ExportEx
 
 #### ExportMany
 
-`ExportMany` maps directly to DryIoc [RegisterMany](..\RegisterResolve#markdown-header-registermany) method.
+`ExportMany` maps directly to DryIoc [RegisterMany](..\RegisterResolve#registermany) method.
 
 It allows to omit the `typeof(IService)` contract because it will be figured-out automatically by the `ExportMany`:
 
@@ -535,7 +574,7 @@ class Using_WithMetadata
 
 ## Exporting disposable transient
 
-The attributes described below correspond to the specific [DryIoc registration options](..\ReuseAndScopes#markdown-header-disposable-transient).
+The attributes described below correspond to the specific [DryIoc registration options](..\ReuseAndScopes#disposable-transient).
 
 By default exporting transient service implementing `IDisposable` will throw the exception,
 until the container-wide rule is set `Rules.WithoutThrowOnRegisteringDisposableTransient`.
@@ -580,7 +619,7 @@ To enable the tracking see the `TrackDisposableTransientAttribute` below.
 ### TrackDisposableTransient
 
 Exported disposable transient marked with this attributed will be tracked by container and disposed on disposing the tracking scope.
-The attribute corresponds to DryIoc registration option [trackDisposableTransient](..\ReuseAndScopes#markdown-header-disposable-transient)
+The attribute corresponds to DryIoc registration option [trackDisposableTransient](..\ReuseAndScopes#disposable-transient)
 
 ```cs md*/
 class Exporting_with_TrackDisposableTransient
