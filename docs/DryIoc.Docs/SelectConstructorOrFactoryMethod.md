@@ -62,7 +62,7 @@ class Register_strongly_typed_service_with_expression
 
 **Note:** The code `() => new Foo(Arg.Of<IDependency>()` is just a specification expression and won't be executed.
 
-`Arg` class provides static methods to specify injected dependency details as explained here: [Specify Dependency or Primitive Value Injection](https://bitbucket.org/dadhi/dryioc/wiki/SpecifyDependencyOrPrimitiveValueInjection).
+`Arg` class provides static methods to specify injected dependency details as explained here: [Specify Dependency or Primitive Value Injection](SpecifyDependencyOrPrimitiveValueInjection).
 
 - Another way is using Reflection:
 

@@ -2,7 +2,17 @@
 
 # Unregister and Resolution Cache
 
-[TOC]
+
+- [Unregister and Resolution Cache](#unregister-and-resolution-cache)
+  - [Unregister](#unregister)
+    - [Works for not resolved and not injected service](#works-for-not-resolved-and-not-injected-service)
+    - [Works for resolved root](#works-for-resolved-root)
+    - [Does not work for injected dependency](#does-not-work-for-injected-dependency)
+    - [Make injected dependency re-wireable by registering it asResolutionCall](#make-injected-dependency-re-wireable-by-registering-it-asresolutioncall)
+  - [Unregister and Reused services](#unregister-and-reused-services)
+    - [Unregistering resolved singleton](#unregistering-resolved-singleton)
+    - [Unregistering injected singleton](#unregistering-injected-singleton)
+
 
 ## Unregister
 

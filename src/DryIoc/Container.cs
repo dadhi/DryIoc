@@ -7566,14 +7566,14 @@ namespace DryIoc
 
         /// <summary>Removes specified registration from container.
         /// It also tries to remove the cached resolutions for the removed registration, But it may not work depending on context.
-        /// Check the docs for more info: https://bitbucket.org/dadhi/dryioc/wiki/UnregisterAndResolutionCache </summary>
+        /// Check the docs for more info: https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/UnregisterAndResolutionCache.md </summary>
         public static void Unregister(this IRegistrator registrator, Type serviceType,
             object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null) =>
             registrator.Unregister(serviceType, serviceKey, factoryType, condition);
 
         /// <summary>Removes specified registration from container.
         /// It also tries to remove the cached resolutions for the removed registration, But it may not work depending on context.
-        /// Check the docs for more info: https://bitbucket.org/dadhi/dryioc/wiki/UnregisterAndResolutionCache </summary>
+        /// Check the docs for more info: https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/UnregisterAndResolutionCache.md </summary>
         public static void Unregister<TService>(this IRegistrator registrator,
             object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null) =>
             registrator.Unregister(typeof(TService), serviceKey, factoryType, condition);

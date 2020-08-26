@@ -35,7 +35,7 @@ namespace DryIoc.MefAttributedModel
     using ImTools;
 
     /// <summary>Implements MEF Attributed Programming Model.
-    /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
+    /// Documentation is available at https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Extensions/MefAttributedModel.md </summary>
     public static class AttributedModel
     {
         /// <summary>Maps the supported reuse types to respective DryIoc reuse.</summary>
