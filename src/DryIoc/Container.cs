@@ -12647,9 +12647,11 @@ namespace DryIoc
         public ContainerException(int errorCode, string message, Exception innerException)
             : this(errorCode, message, innerException, (e, m, _) => FormatMessage(DryIoc.Error.NameOf(e), m)) {}
 
+        /// <summary>The default exception message format.</summary>
         protected static string FormatMessage(string errorName, string message) =>
             $"code: Error.{errorName};{NewLine}message: {message}";
 
+        /// <summary>Allows the formatting of the final exception message.</summary>
         protected ContainerException(int errorCode, string message, Exception innerException,
             Func<int, string, Exception, string> formatMessage)
             : base(formatMessage(errorCode, message, innerException), innerException) =>

@@ -359,7 +359,7 @@ Additionally `ExportMany` provides the facilities to:
 
 ```cs
 md*/
-class ExportMany_with_Except_and_NonPublic_options 
+public class ExportMany_with_Except_and_NonPublic_options 
 {
     [Test] public void Example()
     {
