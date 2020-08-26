@@ -53,10 +53,10 @@ Service setup options:
 
 You can create your own reuse by implementing `IReuse` interface.
 
-Container uses Scopes ([see below](ReuseAndScopes#markdown-header-what-scope-is)) to 
+Container uses Scopes ([see below](ReuseAndScopes#what-scope-is)) to 
 store resolved services of non-Transient reuse.
 Scope implements `IDisposable` and when disposed will dispose reused disposable services. You may prevent service disposal 
-via [setup option](ReuseAndScopes#markdown-header-prevent-disposal-of-reused-service).
+via [setup option](ReuseAndScopes#prevent-disposal-of-reused-service).
 
 __Note:__ Service disposal is always taken in the reverse registration order.
 

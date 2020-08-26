@@ -30,8 +30,8 @@ The signature of `IContainer.With` describes what can be changed:
 IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope);
 ```
 
-- `rules` are described in details [here](RulesAndDefaultConventions#markdown-header-Rules-per-Container)
-- `scopeContext` and `singletonScope` are described [here](ReuseAndScopes#markdown-header-scopecontext) 
+- `rules` are described in details [here](RulesAndDefaultConventions#Rules-per-Container)
+- `scopeContext` and `singletonScope` are described [here](ReuseAndScopes#scopecontext) 
 
 `RegistrySharing` is the `enum` to specify how to re-use the parent registry:
 ```cs
@@ -41,7 +41,7 @@ public enum RegistrySharing { Share, CloneButKeepCache, CloneAndDropCache }
 The enum member names are self-explanatory.
 
 __Note__: `OpenScope` is another way to create a new container from existing one, but a bit different from `With`.
-It is explained in details [here](ReuseAndScopes#markdown-header-incurrentscope).
+It is explained in details [here](ReuseAndScopes#incurrentscope).
 
 
 ## Facade
@@ -129,7 +129,7 @@ public static IContainer WithExpressionGeneration(this IContainer container)
 
 Will store the expressions built for service resolution. 
 This is used in `Validate` and `GenerateResolutionExpressions` methods described 
-[here](ErrorDetectionAndResolution-#markdown-header-Service-Registrations-Diagnostics).
+[here](ErrorDetectionAndResolution-#Service-Registrations-Diagnostics).
 
 
 ## Without Cache
@@ -246,6 +246,6 @@ so the cache from the parent will work just fine.
 
 ## With no more registration allowed
 
-[Explained in detail here](FaqAutofacMigration#markdown-header-separate-build-stage)
+[Explained in detail here](FaqAutofacMigration#separate-build-stage)
 
 md*/

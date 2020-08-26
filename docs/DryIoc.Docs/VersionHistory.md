@@ -570,7 +570,7 @@ Version History
 This release pushes DryIoc towards the mature [full-featured](http://featuretests.apphb.com/DependencyInjection.html) library with:
 
 - Support for [PCL](http://msdn.microsoft.com/en-us/library/gg597391(v=vs.110).aspx) and [.NET Core](https://oren.codes/2015/07/29/targeting-net-core).
-- [Documentation](Home#markdown-header-usage-guide).
+- [Documentation](Home#usage-guide).
 - More complete and consistent API surface.
 - Bug fixes.
 - Diagnostics for potential resolution problems with `container.VerifyResolutions()`.

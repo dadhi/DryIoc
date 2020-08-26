@@ -1,7 +1,7 @@
 /*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
-[recursive dependency]: ErrorDetectionAndResolution#markdown-header-recursivedependencydetected
+[recursive dependency]: ErrorDetectionAndResolution#recursivedependencydetected
 
 # Wrappers
 
@@ -41,9 +41,9 @@ More info:
 
 - Wrappers are composable through nesting: e.g. `IEnumerable<Lazy<TService>>`.
 - A similar concept in Autofac is [relationship types](http://docs.autofac.org/en/latest/resolve/relationships.html).
-- DryIoc supports both predefined and [user-defined wrappers](Wrappers#markdown-header-user-defined-wrappers).
+- DryIoc supports both predefined and [user-defined wrappers](Wrappers#user-defined-wrappers).
 - Explicitly registering a wrapper type (e.g. `Func<>` or `Lazy<>`) as a normal service overrides corresponding wrapper registration.
-- The actual difference between normal open-generic service and wrapper is [explained here](Wrappers#markdown-header-user-defined-wrappers).
+- The actual difference between normal open-generic service and wrapper is [explained here](Wrappers#user-defined-wrappers).
 
 Wrapper example:
 ```cs md*/
@@ -131,7 +131,7 @@ postponing a registration.
 
 There is still a possibility to postpone a service registration:
 
-- One is via [`RegisterPlaceholder`](RegisterResolve#markdown-header-registerplaceholder).
+- One is via [`RegisterPlaceholder`](RegisterResolve#registerplaceholder).
 - Another one is globally, via `Rules.WithFuncAndLazyWithoutRegistration()`, see below:
 
 ```cs md*/
@@ -256,7 +256,7 @@ class Func_with_args_with_rule_ignoring_reuse
 Wraps a registered service key together with the resolved service. 
 May be used to filter service based on its key. Usually used together with Func or Lazy wrapper and nested inside collection: `IEnumerable<KeyValuePair<string, Func<A>>>`.
 
-More on the `KeyValuePair` usage is [here](RegisterResolve#markdown-header-resolving-as-keyvaluepair-wrapper).
+More on the `KeyValuePair` usage is [here](RegisterResolve#resolving-as-keyvaluepair-wrapper).
 
 
 ### Meta or Tuple of A with Metadata
