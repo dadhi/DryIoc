@@ -22,7 +22,8 @@
 The minimal part of service and dependency resolution specification is Service Type. It allows container to find corresponding service registration:
 
 ```cs 
-//md{ usings ... TODO: make into the collapsible section
+//md{ usings ...
+using System;
 using NUnit.Framework;
 using DryIoc;
 // ReSharper disable UnusedVariable
@@ -375,27 +376,39 @@ class Injecting_the_value_of_a_primitive_type
 
 ## Custom value for dependency
 
-DryIoc supports the injecting of custom (non-registered) values as a parameter, property, or field. But using the constant value is not very interesting, so let's look at the case when the value depends on the  object graph context. It is the common pattern to pass the holder Type as a parameter when utilizing the "Logger" object. Check example below:
-```
-#!c#
+DryIoc supports the injecting of custom (non-registered) values as a parameter, property, or field. But using the _constant_ value is not very interesting, so let's look at the case when the value depends on the  object graph context. It is the common pattern to pass the holder Type as a parameter when utilizing the "Logger" object. Check example below:
+```cs 
+class Injecting_the_custom_value_depending_on_context
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<User>();
+        container.Register<ILogger, Logger>(made: 
+            Parameters.Of.Type<Type>(req => req.Parent.ImplementationType));
+
+        var user = container.Resolve<User>();
+        Assert.AreEqual(typeof(User), user.Logger.ContextType);
+    }
+
+    public interface ILogger
+    {
+        public Type ContextType { get; }
+    }
+
     public class Logger : ILogger 
     {
-        public Logger(Type type) { Type = type; }
+        public Type ContextType { get; }
+        public Logger(Type type) => ContextType = type;
     }
     
     public class User 
     {
-        public User(ILogger logger) { Logger = logger; }
+        public ILogger Logger { get; }
+        public User(ILogger logger) => Logger = logger;
     }
-    
-    // register types in container:
-    container.Register<User>();
-    container.Register<ILogger, Logger>(made: 
-        Parameters.Of.Type<Type>(request => request.Parent.ImplementationType));
-    
-    // resolving User
-    var user = container.Resolve<User>();
-    Assert.AreEqual(typeof(User), user.Logger.Type)
+}
 ```
 
 In addition to `Parameters.Of.Type` there are corresponding methods `Name` and `Details` in `Parameters` and `PropertiesAndFields` classes.
