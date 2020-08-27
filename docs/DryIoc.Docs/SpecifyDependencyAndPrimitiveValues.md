@@ -375,9 +375,7 @@ class Injecting_the_value_of_a_primitive_type
 
 ## Custom value for dependency
 
-DryIoc supports injecting Custom (non-registered) primitive value as parameter and property/field dependency. Using constant value is not
-very interesting, let's look at case when value depends on object graph itself. It is common pattern to pass
-holder Type as parameter when utilizing "Logger" objects. Check example below:
+DryIoc supports the injecting of custom (non-registered) values as a parameter, property, or field. But using the constant value is not very interesting, so let's look at the case when the value depends on the  object graph context. It is the common pattern to pass the holder Type as a parameter when utilizing the "Logger" object. Check example below:
 ```
 #!c#
     public class Logger : ILogger 
