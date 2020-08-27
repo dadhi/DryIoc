@@ -27,12 +27,14 @@ To avoid the exception you may specify what constructor to use while registering
 
 Given the class with the two constructors:
 ```cs md*/
+//md{ usings ...
 using DryIoc;
 using DryIocAttributes;
 using DryIoc.MefAttributedModel;
 using System.ComponentModel.Composition;
 using NUnit.Framework;
 // ReSharper disable UnusedVariable
+//md}
 
 public interface IDependency { }
 public class Dep : IDependency {}

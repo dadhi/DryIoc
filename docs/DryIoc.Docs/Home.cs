@@ -24,7 +24,8 @@ public class SomeClient : IClient
 {
     public IService Service { get; }
     public SomeClient(IService service) { Service = service; }
-} /*md
+} 
+/*md
 ```
 
 To illustrate the idea of Dependency Injection container, we will start from the problem.
@@ -38,7 +39,8 @@ class Created_manually
     {
         IClient client = new SomeClient(new SomeService());
     }
-} /*md
+} 
+/*md
 ```
 
 The manual implementation is a hard-wired - we are using implementation types `SomeClient` and `SomeService` in-place of
