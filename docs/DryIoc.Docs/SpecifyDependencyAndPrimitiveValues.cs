@@ -407,7 +407,7 @@ class Injecting_the_custom_value_depending_on_context
 
     public interface ILogger
     {
-        public Type ContextType { get; }
+        Type ContextType { get; }
     }
 
     public class Logger : ILogger 
