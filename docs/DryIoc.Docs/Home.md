@@ -89,6 +89,7 @@ and to support the __extensibility__ and __testability__ of the code.
 - [Open-generics](OpenGenerics.md)
 - [Specifying Constructor or Factory Method](SelectConstructorOrFactoryMethod.md)
 - [Parameter and Property injection](ParameterAndPropertyInjection.md)
+- [Specify Dependency and Primitive values](SpecifyDependencyAndPrimitiveValues.md)
 - [Reuse and Scopes](ReuseAndScopes.md)
 - [Wrappers](Wrappers.md)
 - [Decorators](Decorators.md)
