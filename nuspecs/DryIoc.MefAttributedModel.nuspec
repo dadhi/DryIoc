@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.MefAttributedModel</id>
-    <version>6.0.0</version>
+    <version>6.0.1</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,6 +14,10 @@
     <releaseNotes>
         <![CDATA[
 
+## v6.0.1
+
+- uses ContainerException changes from the DryIoc v4.3.3
+
 ## v6.0.0
 
 - Using the System.ComponentModel.Composition (netstandard2.0+ and netcoreapp2.0+) NuGet package instead of framework assembly reference
@@ -24,7 +28,7 @@
     </releaseNotes>
     <dependencies>
       <group>
-        <dependency id="DryIoc" version="4.3.2" />
+        <dependency id="DryIoc" version="4.3.3" />
         <dependency id="DryIocAttributes" version="6.0.0" />
       </group>
     </dependencies>

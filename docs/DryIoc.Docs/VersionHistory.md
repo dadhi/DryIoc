@@ -1,5 +1,8 @@
 Version History
 ---------------
+## v4.3.3 Bug-fix release / 2020-08-27
+
+- fixed: #310 Ensure that FEC.LightExpression.ILGeneratorHacks does not crash if some method is not reflected
 
 ## v4.3.2 Bug-fix release / 2020-08-15
 
