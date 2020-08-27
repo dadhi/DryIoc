@@ -4655,7 +4655,7 @@ namespace FastExpressionCompiler.LightExpression
         static ILGeneratorHacks() 
         {
              // the default allocatee method
-            _getNextLocalVarIndex = (il, type) => il.DeclareLocal(type).LocalIndex;
+            _getNextLocalVarIndex = (i, t) => i.DeclareLocal(t).LocalIndex;
 
             // now let's try to acquire the more efficient less allocating method
             var ilGenTypeInfo = typeof(ILGenerator).GetTypeInfo();
