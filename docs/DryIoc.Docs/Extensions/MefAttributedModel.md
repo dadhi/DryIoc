@@ -1,9 +1,9 @@
 <!--Auto-generated from .cs file, the edits made to .md file will be lost! -->
 
-# MefAttributedModel extension
+# MefAttributedModel
 
 
-- [MefAttributedModel extension](#mefattributedmodel-extension)
+- [MefAttributedModel](#mefattributedmodel)
   - [Overview](#overview)
   - [Comparing to MEF](#comparing-to-mef)
     - [Works without System.ComponentModel.Composition](#works-without-systemcomponentmodelcomposition)

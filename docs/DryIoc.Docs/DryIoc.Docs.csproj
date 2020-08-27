@@ -24,6 +24,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Update="Extensions\MefAttributedModel.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>MefAttributedModel.md</LastGenOutput>
+      </Compile>
       <Compile Update="CreatingAndDisposingContainer.cs">
         <Generator>CsToMd</Generator>
         <LastGenOutput>CreatingAndDisposingContainer.md</LastGenOutput>
@@ -80,6 +84,10 @@
         <Generator>CsToMd</Generator>
         <LastGenOutput>SpecifyDependencyAndPrimitiveValues.md</LastGenOutput>
       </Compile>
+      <Compile Update="ThreadSafety.cs">
+        <Generator>CsToMd</Generator>
+        <LastGenOutput>ThreadSafety.md</LastGenOutput>
+      </Compile>
       <Compile Update="UsingInTestsWithMockingLibrary.cs">
         <Generator>CsToMd</Generator>
         <LastGenOutput>UsingInTestsWithMockingLibrary.md</LastGenOutput>
@@ -91,6 +99,11 @@
     </ItemGroup>
 
     <ItemGroup>
+      <None Update="Extensions\MefAttributedModel.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>MefAttributedModel.cs</DependentUpon>
+      </None>
       <None Update="CreatingAndDisposingContainer.md">
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
@@ -160,6 +173,11 @@
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
         <DependentUpon>SpecifyDependencyAndPrimitiveValues.cs</DependentUpon>
+      </None>
+      <None Update="ThreadSafety.md">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>ThreadSafety.cs</DependentUpon>
       </None>
       <None Update="UsingInTestsWithMockingLibrary.md">
         <DesignTime>True</DesignTime>

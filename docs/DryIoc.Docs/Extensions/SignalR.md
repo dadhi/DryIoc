@@ -1,6 +1,12 @@
 # SignalR Integration
 
-[TOC]
+
+- [SignalR Integration](#signalr-integration)
+- [Overview](#overview)
+- [Usage](#usage)
+  - [Replacing Dependency Resolver WithSignalR method](#replacing-dependency-resolver-withsignalr-method)
+  - [Using DryIocHubActivator with DefaultDependencyResolver](#using-dryiochubactivator-with-defaultdependencyresolver)
+
 
 # Overview
 
@@ -28,8 +34,7 @@ DryIoc has two ways to setup things with SignalR:
 ## Replacing Dependency Resolver WithSignalR method
 
 Using max integration with `WithSignalR`:
-```
-#!c#
+```cs
     var hubAssemblies = new[] { Assembly.GetExecutingAssembly() };
     container = new Container().WithSignalR(hubAssemblies);
     RouteTable.Routes.MapHubs();
@@ -39,8 +44,8 @@ Using max integration with `WithSignalR`:
 ## Using DryIocHubActivator with DefaultDependencyResolver
 
 Just using `DryIocHubActivator` with default dependency resolver:
-```
-#!c#
+
+```cs
     container = new Container();
     var hubAssemblies = new[] { Assembly.GetExecutingAssembly() };
     container.RegisterHubs(hubAssemblies);
