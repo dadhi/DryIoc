@@ -272,18 +272,35 @@ __Note:__ DryIoc supports only primitive custom values: numbers, strings, enums 
 
 ### Optional arguments
 
-DryIoc respects [Optional Arguments](https://msdn.microsoft.com/en-us/library/dd264739.aspx) in
-Constructors and Factory Methods. Basically it is application of `IfUnresolved.ReturnDefault` option for parameter dependency with use of provided default parameter value. No need to specify anything in addition:
-```
-#!c#
-    public class Foo { public Foo(IDependency dependency = null, int answer = 42) { /*...*/ } }
-    
-    container.Register<Foo>();
-    
-    var foo = container.Resolve<Foo>(); // No need to say IfUnresolved.ReturnDefault
-    
-    Assert.IsNull(foo.Dependency);
-    Assert.AreEqual(42, foo.Answer);
+DryIoc respects the [Optional Arguments](https://msdn.microsoft.com/en-us/library/dd264739.aspx) in
+the constructors and the factory methods. Basically it is the application of the `IfUnresolved.ReturnDefault` option for the parameter dependency with the use of the provided default parameter value. No need to specify anything in addition:
+
+```cs 
+class Respecting_the_csharp_optional_arguments
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<Foo>();
+
+        var foo = container.Resolve<Foo>();
+
+        Assert.IsNull(foo.Dependency);
+        Assert.AreEqual(42, foo.Answer);
+    }
+
+    public class Foo 
+    { 
+        public IDependency Dependency;
+        public int Answer;
+        public Foo(IDependency dependency = null, int answer = 42)
+        {
+            Dependency = dependency;
+            Answer     = answer;
+        }
+    }
+}
 ```
 
 ## Injecting value of primitive type
