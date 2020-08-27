@@ -477,62 +477,128 @@ It contains three __optional__ parts:
 - `PropertiesAndFields` is responsible for properties and fields specification only.
 
 Example of full `Made` specification:
-```
-#!c#
-    container.Register<IFoo, Foo>(made: Made.Of(
-        factoryMethod: r => typeof(Foo).GetConstructorOrNull(args: new[] { typeof(IDependency) }),
-        parameters: Parameters.Of.Type<IDependency>(requiredServiceType: typeof(TestDependency)),
-        propertiesAndFields: PropertiesAndFields.Auto));
+```cs md*/
+class Full_spec_with_reflection
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<IFoo, Foo>(made: Made.Of(
+            factoryMethod: r => FactoryMethod.Of(typeof(Foo).GetConstructorOrNull(args: new[] { typeof(IDependency) })),
+            parameters: Parameters.Of.Type<IDependency>(requiredServiceType: typeof(TestDependency)),
+            propertiesAndFields: PropertiesAndFields.Auto));
+    }
+
+    public interface IFoo {}
+    public class Foo : IFoo {}
+    public interface IDependency {}
+    public class TestDependency : IDependency {}
+}
+/*md
 ```
 
-As you see `factoryMethod` uses reflection to select constructor.
+As you can see, the `factoryMethod` selector uses reflection to select the constructor.
 
-But Reflection based spec is rarely needed because `Made` allows strongly-typed expression spec:
-```
-#!c#
-    container.Register<IFoo, Foo>(made: Made.Of(
-        () => new Foo(Arg.Of<TestDependency>());
+But the Reflection-based spec is rarely needed because the `Made` has an option for the strongly-typed expression spec:
+
+```cs md*/
+class The_spec_with_strongly_typed_Made
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<IFoo, Foo>(made: Made.Of(() => 
+            new Foo(Arg.Of<TestDependency>())
+        ));
+    }
+
+    public interface IFoo {}
+    public class Foo : IFoo 
+    {
+        public Foo(IDependency dependency) {}
+    }
+    public interface IDependency {}
+    public class TestDependency : IDependency {}
+}
+/*md
 ```
 
-__Note:__ Strongly-typed expression for factory method also defines spec for parameters and properties/fields in statically checked way, so the separate definitions are not needed. [More details on factory method here](SelectConstructorOrFactoryMethod).
+__Note:__ A strongly-typed expression for factory method also defines spec for parameters and properties/fields in statically checked way so that the separate definitions are not needed - [more details here](SelectConstructorOrFactoryMethod).
 
 If you omit either part in first example: `factoryMethod`, `parameters`, or `propertiesAndFields` then
-the default convention will be applied for omitted part.
+the default convention will be applied for the omitted part.
 
-To define `parameters` and `propertiesAndFields` part DryIoc provides corresponding `Parameters` and `PropertiesAndFields` static classes. They may be defined in more simple way as following:
-```
-#!c#
-    container.Register<IFoo, Foo>(
-        made: Parameters.Of.Type<IDependency>(requiredServiceType: typeof(TestDependency));
+To define the `parameters` and `propertiesAndFields` parts DryIoc provides the corresponding `Parameters` and `PropertiesAndFields` static classes. They may be defined in a more simple way as following:
+
+```cs md*/
+class The_spec_Parameters
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        // note that the dependency registered with the implementation type, but Foo requires the interface...
+        container.Register<TestDependency>();
+
+        // so let's specify this with the `requiredServiceType`
+        container.Register<IFoo, Foo>(
+            made: Parameters.Of.Type<IDependency>(requiredServiceType: typeof(TestDependency)));
+    }
+
+    public interface IFoo {}
+    public class Foo : IFoo 
+    {
+        public Foo(IDependency dependency) {}
+    }
+    public interface IDependency {}
+    public class TestDependency : IDependency {}
+}
+/*md
 ```
 
-and:
-```
-#!c#
-    container.Register<IFoo, Foo>(made: PropertiesAndFields.Auto));
-```
+__Note:__ The `Parameters` and `PropertiesAndFields` are implicitly convertible to the `Made` class, so use whatever is more convenient for you.
 
-__Note:__ That's possible because `Parameters` and `PropertiesAndFields` are implicitly convertible to `Made` specification. Use whatever is more convenient for you.
+To specify multiple parameters or properties/fields just chain the `Type`, `Name`, and the more low-level `Details` extension methods:
+```cs md*/
+class The_spec_chain
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
 
-To specify multiple parameters or properties/fields just chain `Type`, `Name`, and more generic `Details` extension methods:
-```
-#!c#
-    container.Register<Foo>(
-        made: Parameters.Of
-            .Details((par, req) => par.ParameterType.IsAssignableTo(typeof(IDisposable)) 
-                ? ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault)
-                : null) // null means use default parameter resolution
-            .Name("parameter2", serviceKey: "p2")
-            .Type<IDependency>(serviceKey: DepKind.In));
-```
+        container.Register<Foo>(
+            made: Parameters.Of
 
+                .Details((req, paramInfo) => paramInfo.ParameterType.IsAssignableTo<IDisposable>()
+                    ? ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault)
+                    : null) // the `null` means to use default parameter resolution
+
+                .Name("parameter2", serviceKey: "p2")
+
+                .Type<IDependency>(serviceKey: SomeKind.In));
+    }
+
+    public enum SomeKind { In, Out }
+
+    public class Foo 
+    {
+        public Foo(IDisposableResource parameter1, int parameter2, IDependency parameter3) {}
+    }
+
+    public interface IDisposableResource : IDisposable {}
+    public interface IDependency {}
+}
+/*md
+```
 
 ## Default conventions
 
 DryIoc uses following default conventions if you are not specifying resolution details:
 
-- Constructor and factory method parameters are injected based on Service Type equal to `ParameterType` with `IfUnresolved.Throw` policy.
-- __If not explicitly specified Properties and Fields are not injected at all__. If `PropertiesAndFields.Auto` specified - then all assignable and non primitive properties and fields are injected with `IfUnresolved.ReturnDefault` policy.
-- Primitive parameter and property/field types are treated the same normal service types: e.g. DryIoc does not forbid registering of `string` services.
+- Constructor and factory method parameters are injected based on Service Type equal to the `ParameterType` with `IfUnresolved.Throw` policy.
+- __If not explicitly specified Properties and Fields are not injected at all__. If the `PropertiesAndFields.Auto` specified - then all assignable and non primitive properties and fields are injected with `IfUnresolved.ReturnDefault` policy.
+- Primitive parameter and property/field types are treated the same as a normal service types: e.g. DryIoc does not forbid registering of `bool` or `int` services.
 
 md*/
