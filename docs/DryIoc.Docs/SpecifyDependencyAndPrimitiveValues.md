@@ -420,14 +420,37 @@ __Note:__ DryIoc supports only primitive custom values: numbers, strings, enums 
 
 ## Registering with Condition
 
-Sometimes dependency may depend on concrete injection position in object graph. You may need one type of `ILogger` for one service and another one for another service. You may handle it by registering two loggers with different Service Key. Another way is to address problem directly by setting up resolution condition:
-```
-#!c#
-    contaner.Register<ILogger, FileLogger>(
-        setup: Setup.With(condition: request => request.Parent.ServiceType.IsAssignableTo(typeof(ISmallFish))));
-    
-    contaner.Register<ILogger, DbLogger>(
-        setup: Setup.With(condition: request => request.Parent.ServiceType.IsAssignableTo(typeof(IBigFish))));
+Sometimes dependency may depend on concrete injection position in the object graph. You may need the one type of `ILogger` for one service and the another one for another service. You may handle it by registering two loggers with the different Service Key. Another way is to address problem directly by setting up the resolution condition:
+```cs 
+class Injecting_the_custom_value_with_condition_setup
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<ILogger, FileLogger>(
+            setup: Setup.With(condition: request => request.Parent.ServiceType.IsAssignableTo(typeof(ISmallFish))));
+        
+        container.Register<ILogger, DbLogger>(
+            setup: Setup.With(condition: request => request.Parent.ServiceType.IsAssignableTo(typeof(IBigFish))));
+
+        var fish = container.Resolve<IBigFish>();
+        Assert.IsInstanceOf<DbLogger>((fish as Tuna).Logger);
+    }
+
+    public interface ISmallFish {}
+    public interface IBigFish {}
+
+    public class Tuna : IBigFish
+    {
+        public ILogger Logger;
+        public Tuna(ILogger logger) => Logger = logger;
+    }
+
+    public interface ILogger {}
+    public class FileLogger : ILogger {}
+    public class DbLogger : ILogger {}
+}
 ```
 
 ## Specification API
