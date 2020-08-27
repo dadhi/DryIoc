@@ -1,3 +1,4 @@
+/*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Thread Safety
@@ -19,7 +20,7 @@ DryIoc ensures that:
 
 The above guaranties are possible because of the Container data-structure. 
 In a pseudo code and simplifying things a lot the DryIoc Container may be represented as following:
-```cs 
+```cs md*/
 using System;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -48,6 +49,7 @@ class Oversimplified_container
         ImHashMap<object, Func<Container, object>> cache;
     }
 }
+/*md
 ```
 
 Given this structure, Registration of new service will produce new `registry`, then will swap old `registry` with new one inside the container. If some concurrent registration will intervene then the Registration will be retried with new `registry`.
@@ -60,7 +62,7 @@ __Note:__ In addition to providing thread-safety the described Container structu
 ## Locking is only used for reused service creation
 
 Lock is required to ensure that creation of reused service happens only once. For instance for singleton service A:
-```cs 
+```cs md*/
 class Resolving_singleton_in_parallel 
 {
     [Test] public void Example() 
@@ -83,6 +85,8 @@ class Resolving_singleton_in_parallel
         public A() { ++InstanceCount; }
     }
 }
+/*md
 ```
 
 The lock boundaries are minimized to cover service creation only - the rest of resolution bits are handled outside of lock. 
+md*/
