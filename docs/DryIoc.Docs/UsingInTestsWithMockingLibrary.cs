@@ -10,22 +10,23 @@
 
 
 For examples below we need to add:
-```cs md*/
+md*/
 
-using System;
+//md{ usings ...
+//md ```cs
+using System.Collections.Concurrent;
 using NUnit.Framework;
-
 using DryIoc;
 using NSubstitute;
 using Moq;
+//md ```
+//md}
 
-using System.Collections.Concurrent;
 /*md
-```
 
 ## Auto-mocking with NSubstitute
 
-Auto-mocking here means that we can setup container to return mocks for unregistred services. 
+Auto-mocking here means that we can setup container to return mocks for unregistered services. 
 In example below we will use [NSubstitute](http://nsubstitute.github.io/) library for creating mocks, 
 but you can use something else, e.g. Fake-it-easy or Moq.
 

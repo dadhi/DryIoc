@@ -1,3 +1,4 @@
+/*md
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Specify Dependency or Primitive Value
@@ -21,7 +22,7 @@
 
 The minimal part of service and dependency resolution specification is Service Type. It allows container to find corresponding service registration:
 
-```cs 
+```cs md*/
 //md{ usings ... TODO: make into the collapsible section
 using NUnit.Framework;
 using DryIoc;
@@ -45,6 +46,7 @@ class Resolving_with_a_service_type
     public class Dependency : IDependency {}
     public class Foo { public Foo(IDependency dependency) { /*...*/} }
 } 
+/*md
 ```
 
 In example above container will use parameter type of `dependency` as Service Type
@@ -337,3 +339,4 @@ DryIoc uses following default conventions if you are not specifying resolution d
 - __If not explicitly specified Properties and Fields are not injected at all__. If `PropertiesAndFields.Auto` specified - then all assignable and non primitive properties and fields are injected with `IfUnresolved.ReturnDefault` policy.
 - Primitive parameter and property/field types are treated the same normal service types: e.g. DryIoc does not forbid registering of `string` services.
 
+md*/
