@@ -188,7 +188,7 @@ These options may be specified when calling `Resolve` method:
 
 Or per dependency when registering service:
 ```cs 
-class Specifying_if_parameter_is_unresolved_policy
+class Specifying_IfUnresolved_for_the_parameter
 {
     [Test] public void Example()
     {
@@ -215,7 +215,7 @@ class Specifying_if_parameter_is_unresolved_policy
 
 Specify `IfUnresolved.Throw` for the property or the field dependency to override returning null by default:
 ```cs 
-class Specifying_the_default_value_for_the_unresolved_parameter
+class Specifying_IfUnresolved_for_the_property
 {
     [Test] public void Example()
     {
@@ -246,13 +246,26 @@ class Specifying_the_default_value_for_the_unresolved_parameter
 ### Default value for Unresolved dependency
 
 Primitive default value may be specified in case of `IfUnresolved.ReturnDefault`:
-```
-#!c#
-    public class Foo { public Foo(int answer) { } }
-    
-    container.Register<Foo>(
-        made: Parameters.Of.Name("answer", ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: 42));
-    
+```cs 
+class Specifying_the_default_value_for_the_unresolved_parameter
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<Foo>(
+            made: Parameters.Of.Name("answer", ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: 42));
+
+        var foo = container.Resolve<Foo>();
+        Assert.AreEqual(42, foo.Answer);
+    }
+
+    public class Foo 
+    { 
+        public int Answer; 
+        public Foo(int answer) => Answer = answer;
+    }
+}
 ```
 
 __Note:__ DryIoc supports only primitive custom values: numbers, strings, enums are OK - but it is not possible to specify arbitrary object. So the only supported default value for `IDependency` is `null`.
