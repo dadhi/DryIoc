@@ -306,37 +306,70 @@ class Respecting_the_csharp_optional_arguments
 ## Injecting value of primitive type
 
 An overview of all possible ways of injecting primitive value using `String` parameter as example:
-```
-#!c#
+```cs 
+class Injecting_the_value_of_a_primitive_type
+{
     public class Foo
     {
-        public Foo(string name) { }
+        public string Name;
+        public Foo(string name) => Name = name;
     }
-```
 
-and the ways of injecting `name`:
-```
-#!c#
+    // There many ways of injecting the `name`:
 
-    var c = new Container();
+    // 1) Register the string object
+    [Test] public void Example_via_RegisterInstance()
+    {
+        var c = new Container();
 
-    // 1) Just register string object
-    c.Register<Foo>();
-    c.RegisterInstance("my string");
+        c.Register<Foo>();
+        c.RegisterInstance("my string");
 
-    // 2) Register string and identify it with serviceKey
-    c.Register<Foo>(made: Parameters.Of.Type<string>(serviceKey: "someSetting"));
-    c.RegisterInstance("my string", serviceKey: "someSetting");
+        Assert.AreEqual("my string", c.Resolve<Foo>().Name);
+    }
 
-    // 3) Register string with key and Foo with strongly typed constructor specification
-    c.Register<Foo>(Made.Of(() => new Foo(Arg.Of<string>("someSetting"))));
-    c.RegisterInstance("my string", serviceKey: "someSetting");
+    // 2) Register the string and identify it with the service key
+    [Test] public void Example_via_RegisterInstance_and_ServiceKey()
+    {
+        var c = new Container();
 
-    // 4) Specify custom value as argument for Foo constructor
-    c.Register<Foo>(Made.Of(() => new Foo(Arg.Index<string>(0)), requestIgnored => "someString"));
+        c.Register<Foo>(made: Parameters.Of.Type<string>(serviceKey: "someSetting"));
+        c.RegisterInstance("my string", serviceKey: "someSetting");
 
-    // 5) Use oldschool RegisterDelegate for Foo (but DryIoc will be unable to look inside delegate and help with resolution errors)
-    c.RegisterDelegate<Foo>(() => new Foo("someString"));
+        Assert.AreEqual("my string", c.Resolve<Foo>().Name);
+    }
+
+    // 3) Register string with the key and a Foo with the strongly typed constructor specification
+    [Test] public void Example_via_strongly_typed_spec()
+    {
+        var c = new Container();
+
+        c.Register<Foo>(Made.Of(() => new Foo(Arg.Of<string>("someSetting"))));
+        c.RegisterInstance("my string", serviceKey: "someSetting");
+
+        Assert.AreEqual("my string", c.Resolve<Foo>().Name);
+    }
+
+    // 4) Specify the custom value as argument for Foo constructor
+    [Test] public void Example_via_strongly_typed_spec_and_direct_argument_spec()
+    {
+        var c = new Container();
+
+        c.Register<Foo>(Made.Of(() => new Foo(Arg.Index<string>(0)), _ => "someString"));
+
+        Assert.AreEqual("my string", c.Resolve<Foo>().Name);
+    }
+     
+    // 5) Use the old-school black-boxy delegate with the RegisterDelegate for the Foo
+    [Test] public void Example_via_RegisterDelegate()
+    {
+        var c = new Container();
+
+        c.RegisterDelegate<Foo>(() => new Foo("someString"));
+
+        Assert.AreEqual("my string", c.Resolve<Foo>().Name);
+    }
+}
 ```
 
 
