@@ -21,32 +21,35 @@ DryIoc ensures that:
 The above guaranties are possible because of the Container data-structure. 
 In a pseudo code and simplifying things a lot the DryIoc Container may be represented as following:
 ```cs md*/
+//md{ usings ...
 using System;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using NUnit.Framework;
 using ImTools;
 using DryIoc;
+#pragma warning disable CS0649
 // ReSharper disable UnusedVariable
+//md}
 
 class Oversimplified_container 
 {
-    class Ref<T> { T Value; } // represents CAS (compare-and-swap) box for the referenced value
+    class Ref<T> { public T Value; } // represents the CAS (compare-and-swap) box for the referenced value
 
     class Container 
     { 
-        Ref<Registry> registry; 
+        public Ref<Registry> Registry;
     }
 
     class Registry 
     {
-        ImHashMap<object, Expression<Func<Container, object>>> registrations;
-        Ref<ResolutionCache> resolutionCache;
+        public ImHashMap<object, Expression<Func<Container, object>>> Registrations;
+        public Ref<ResolutionCache> ResolutionCache;
     }
 
     class ResolutionCache 
     {
-        ImHashMap<object, Func<Container, object>> cache;
+        public ImHashMap<object, Func<Container, object>> Cache;
     }
 }
 /*md
@@ -71,9 +74,11 @@ class Resolving_singleton_in_parallel
 
         container.Register<A>(Reuse.Singleton);
 
-        Task.Run(() => container.Resolve<A>());
-        Task.Run(() => container.Resolve<A>());
-        Task.Run(() => container.Resolve<A>());
+        Task.WaitAll(
+            Task.Run(() => container.Resolve<A>()),
+            Task.Run(() => container.Resolve<A>()),
+            Task.Run(() => container.Resolve<A>())
+        );
 
         Assert.AreEqual(1, A.InstanceCount);
     }

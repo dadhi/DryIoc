@@ -365,7 +365,7 @@ class Injecting_the_value_of_a_primitive_type
     {
         var c = new Container();
 
-        c.Register<Foo>(Made.Of(() => new Foo(Arg.Index<string>(0)), _ => "someString"));
+        c.Register<Foo>(Made.Of(() => new Foo(Arg.Index<string>(0)), _ => "my string"));
 
         Assert.AreEqual("my string", c.Resolve<Foo>().Name);
     }
@@ -375,7 +375,7 @@ class Injecting_the_value_of_a_primitive_type
     {
         var c = new Container();
 
-        c.RegisterDelegate<Foo>(() => new Foo("someString"));
+        c.RegisterDelegate<Foo>(() => new Foo("my string"));
 
         Assert.AreEqual("my string", c.Resolve<Foo>().Name);
     }
@@ -438,12 +438,13 @@ class Injecting_the_custom_value_with_condition_setup
     [Test] public void Example()
     {
         var container = new Container();
+        container.Register<IBigFish, Tuna>();
 
         container.Register<ILogger, FileLogger>(
-            setup: Setup.With(condition: request => request.Parent.ServiceType.IsAssignableTo(typeof(ISmallFish))));
+            setup: Setup.With(condition: request => request.Parent.ServiceType.IsAssignableTo<ISmallFish>()));
         
         container.Register<ILogger, DbLogger>(
-            setup: Setup.With(condition: request => request.Parent.ServiceType.IsAssignableTo(typeof(IBigFish))));
+            setup: Setup.With(condition: request => request.Parent.ServiceType.IsAssignableTo<IBigFish>()));
 
         var fish = container.Resolve<IBigFish>();
         Assert.IsInstanceOf<DbLogger>((fish as Tuna).Logger);
