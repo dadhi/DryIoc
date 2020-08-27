@@ -66,46 +66,102 @@ Helps to identify service to be used for specific resolution.
 Given you registered multiple services of the same Service Type, Service Key provides the easiest way to find specific service. 
 
 First let's see what happens when Service Key specification is omitted (using `Foo` from  above):
-```
-#!c#
-    container.Register<IDependency, XDependency>();
-    container.Register<IDependency, YDependency>();
-    container.Register<Foo>();
-    
-    // elsewhere
-    container.Resolve<Foo>();
+```cs 
+class Fail_to_resolve_from_the_multiple_registered_services 
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<IDependency, XDependency>();
+        container.Register<IDependency, YDependency>();
+        container.Register<Foo>();
+
+        var ex = Assert.Throws<ContainerException>(() =>
+        container.Resolve<Foo>());
+
+        Assert.AreEqual(Error.NameOf(Error.ExpectedSingleDefaultFactory), ex.ErrorName);
+    }
+
+    public interface IDependency {}
+    public class XDependency : IDependency {}
+    public class YDependency : IDependency {}
+    public class Foo { public Foo(IDependency dependency) { /*...*/} }
+} 
 ```
 
-Resolution of `Foo` will fail with exception `"Expecting a single default registration of IDependency but found many ..."`
+Resolution of `Foo` will fail with the exception `"Expecting a single default registration of IDependency but found many ..."`
 
-Make it work with `enum` Service Key:
-```
-#!c#
-    public enum DepKind { In, Out }
+Now let's make it work with the `enum` Service Key:
+
+```cs 
+class Using_the_enum_service_key
+{    
+    [Test] public void Example()
+    {
+        var container = new Container();
     
-    container.Register<IDependency, XDependency>(serviceKey: DepKind.In);
-    container.Register<IDependency, YDependency>(serviceKey: DepKind.Out);
-    
-    // changing Foo registration to inject specific dependency
-    container.Register<Foo>(made: Made.Of(
-        () => new Foo(Arg.Of<IDependency>(DepKind.In))));
-    
-    // elsewhere
-    container.Resolve<Foo>();
+        container.Register<IDependency, XDependency>(serviceKey: SomeKind.In);
+        container.Register<IDependency, YDependency>(serviceKey: SomeKind.Out);
+        
+        // changing Foo registration to inject the dependency with the specific service key
+        container.Register<Foo>(made: 
+            Made.Of(() => new Foo(Arg.Of<IDependency>(SomeKind.In))));
+
+        var foo = container.Resolve<Foo>();
+        Assert.IsInstanceOf<XDependency>(foo.Dependency);
+    }
+
+    public enum SomeKind { In, Out }
+
+    public interface IDependency {}
+    public class XDependency : IDependency {}
+    public class YDependency : IDependency {}
+    public class Foo 
+    {
+        public IDependency Dependency;
+        public Foo(IDependency dependency) => Dependency = dependency;
+    }
+} 
 ```
 
 Only the registration part was changed - resolution remained the same. Which is great for  extensibility and testability.
 
 __Note:__ Service Key may be of any type as long as type implements `object.Equals` and `object.GetHashCode` methods. You may use strings as well, but __strings are more fragile for refactoring and do not statically checked by compiler__. So using `enum` is more preferable.
 
-We have used `Arg` class for specifying Service Key (explained later in details). Alternatively you may use `Parameters` or `PropertiesAndFields` classes:
-```
-#!c#
-    container.Register<Foo>(
-        made: Parameters.Of.Type<IDependency>(serviceKey: DepKind.In));
+We have used `Arg` class for specifying Service Key (explained later in details). Alternatively you may use the `Parameters` or `PropertiesAndFields` classes:
+
+```cs 
+class Using_the_enum_service_key_and_parameter_specification
+{    
+    [Test] public void Example()
+    {
+        var container = new Container();
+        container.Register<IDependency, XDependency>(serviceKey: SomeKind.In);
+        container.Register<IDependency, YDependency>(serviceKey: SomeKind.Out);
+        
+        // using the paremeter specification
+        container.Register<Foo>(made: 
+            Parameters.Of.Type<IDependency>(serviceKey: SomeKind.In));
+
+        var foo = container.Resolve<Foo>();
+        Assert.IsInstanceOf<XDependency>(foo.Dependency);
+    }
+
+    public enum SomeKind { In, Out }
+
+    public interface IDependency {}
+    public class XDependency : IDependency {}
+    public class YDependency : IDependency {}
+    public class Foo 
+    {
+        public IDependency Dependency;
+        public Foo(IDependency dependency) => Dependency = dependency;
+    }
+} 
 ```
 
-__Note:__ Using `Parameters` is less refactoring friendly and therefore more error-prone comparing to constructor with `Arg` expression. Latter is statically checked and won't even compile if `Foo` constructor does not contain the dependency.
+__Note:__ Using the `Parameters` is less refactoring friendly and therefore more error-prone comparing to constructor with `Arg` expression. Latter is statically checked and won't even compile if `Foo` constructor does not contain the dependency.
 
 
 ## Unresolved service handling
@@ -131,27 +187,60 @@ These options may be specified when calling `Resolve` method:
 - `Resolve<IService>(ifUnresolved: IfUnresolved.ReturnDefault)`
 
 Or per dependency when registering service:
-```
-#!c#
-    public class Foo 
-    { 
-        public IDependency Dependency { get; set; }
-        public Foo(IDependency dependency) { Dependency = dependency; } 
+```cs 
+class Specifying_if_parameter_is_unresolved_policy
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<Foo>(made: Made.Of(() => 
+            new Foo(Arg.Of<IDependency>(IfUnresolved.ReturnDefault))));
+
+        var foo = container.Resolve<Foo>(ifUnresolved: IfUnresolved.Throw);
+        // IfUnresolved.Throw is the default so the alternative is just a
+        foo = container.Resolve<Foo>();
+
+        Assert.IsNotNull(foo);
+        Assert.IsNull(foo.Dependency);
     }
 
-    // Use null if IDependency is unresolved
-    container.Register<Foo>(made: Made.Of(() => new Foo(Arg.Of<IDependency>(IfUnresolved.ReturnDefault))));
-    
-    // Should not throw because of above
-    var foo = container.Resolve<Foo>(ifUnresolved: IfUnresolved.Throw);
-    Assert.IsNull(foo.Dependency);
+    public class Foo 
+    { 
+        public IDependency Dependency { get; }
+        public Foo(IDependency dependency) => Dependency = dependency;
+    }
+} 
 ```
 
-Specify `IfUnresolved.Throw` for property or field dependency to override returning null by default:
-```
-#!c#
-    container.Register<Bar>(made: Made.Of(() => 
-        new Bar() { Depenedency = Arg.Of<IDependency>(IfUnresolved.Throw) }));
+Specify `IfUnresolved.Throw` for the property or the field dependency to override returning null by default:
+```cs 
+class Specifying_the_default_value_for_the_unresolved_parameter
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<Bar>(made: Made.Of(() =>
+            new Bar() { Dependency = Arg.Of<IDependency>(IfUnresolved.Throw) }));
+
+        var ex = Assert.Throws<ContainerException>(() =>
+            container.Resolve<Bar>());
+        Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), ex.ErrorName);
+
+        // compare it to the default behavior:
+
+        container.Register<Bar>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+        var bar = container.Resolve<Bar>();
+        Assert.IsNotNull(bar);
+        Assert.IsNull(bar.Dependency);
+    }
+
+    public class Bar 
+    { 
+        public IDependency Dependency { get; set; }
+    }
+}
 ```
 
 ### Default value for Unresolved dependency
@@ -159,7 +248,7 @@ Specify `IfUnresolved.Throw` for property or field dependency to override return
 Primitive default value may be specified in case of `IfUnresolved.ReturnDefault`:
 ```
 #!c#
-    public class Foo { public Foo(int answer) { /*...*/ } }
+    public class Foo { public Foo(int answer) { } }
     
     container.Register<Foo>(
         made: Parameters.Of.Name("answer", ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: 42));
