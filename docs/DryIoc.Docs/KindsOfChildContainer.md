@@ -7,7 +7,6 @@
   - [No child containers](#no-child-containers)
   - [Facade](#facade)
   - [With different Rules and ScopeContext](#with-different-rules-and-scopecontext)
-  - [With expression generation](#with-expression-generation)
   - [Without Cache](#without-cache)
   - [Without Singletons](#without-singletons)
   - [With registrations copy](#with-registrations-copy)
@@ -88,11 +87,16 @@ class FacadeExample
 Actually, `CreateFacade` does not do anything magic. It uses a `With` method to create a new container with
 a new default `serviceKey` and set a rule to prefer this `serviceKey` over default:
 
-```cs
-public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
-    container.With(rules => rules
-        .WithDefaultRegistrationServiceKey(facadeKey)
-        .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey)));
+```cs 
+static class CreateFacade_implementation 
+{
+    public const string FacadeKey = "@facade";
+
+    public static IContainer CreateFacade_example(this IContainer container, string facadeKey = FacadeKey) =>
+        container.With(rules => rules
+            .WithDefaultRegistrationServiceKey(facadeKey)
+            .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey)));
+}
 ```
 
 __Note:__ In case the `CreateFacade` does no meet your use-case, you may always go one level deeper in API and
@@ -101,7 +105,7 @@ select your set of rules and arguments for the `With` method.
 
 ## With different Rules and ScopeContext
 
-As it said above, you may provide a new `rules` and `scopeContext` using the `With` method.
+As it said above you may provide the new `rules` and `scopeContext` using the `With` method.
 
 Setting rules is a very common thing, so there is a dedicated `With` overload for this:
 ```cs
@@ -110,36 +114,22 @@ IContainer With(this IContainer container,
     IScopeContext scopeContext = null)
 ```
 
-The important and may be not clear point, what happens with a parent registry in a new container.
-The answer is the __registry is cloned__ and the __cache is dropped__. The cache is dropped, because
-the new rules may lead to resolving a new services in a child container, different from the already
+The important and maybe not as much clear point is what happens with the parent registry in the new container.
+The answer is that __the registry is copied__ and the __cache is dropped__. The cache is dropped because
+the new rules may lead to the resolving the new services in the child container different from the already
 resolved services in the parent. Therefore, we need to drop (invalidate) the cache to stop serving the
 wrong results.
 
-The cloned registry means that new registration made into child container won't appear in the parent,
-and vice versa. The reason is not only an isolation of parent from the changes in child, but also there are
+The copied (cloned) registry means that the new registration made into the child container won't appear in the parent,
+and vice versa. The reason is not only the isolation of the parent from the changes in the child but also there are
 rules that affect how registrations are done, e.g. `DefaultRegistrationServiceKey`. 
-
-## With expression generation
-
-```cs
-public static IContainer WithExpressionGeneration(this IContainer container)
-```
-
-Will store the expressions built for service resolution. 
-This is used in `Validate` and `GenerateResolutionExpressions` methods described 
-[here](ErrorDetectionAndResolution-#Service-Registrations-Diagnostics).
-
 
 ## Without Cache
 
-Cache in DryIoc usually means a some artifacts stored while resolving services.
+Cache in DryIoc usually means the expressions and delegates created and stored in the container while resolving the services.
 
-More precisely, the resolution cache contains a set of `FactoryDelegate` compiled from expression trees
-to create an actual services.
-
-The reason for removing cache may be changing or removing a service registration after the fact, 
-when the resolutions were already made from Container and were cached internally. 
+The reason for removing the cache may be the changing or removing the service registration after the fact - 
+when the resolutions were already made and the things were cached. 
 
 ```cs 
 class Without_cache
@@ -200,13 +190,13 @@ class Without_singletons
 }
 ```
 
-The method will clone the container registrations but will drop cache.
+The method will clone the container registrations but will drop the cache.
 
 
 ## With registrations copy
 
-`WithRegistrationsCopy` will create a container clone (child) where new registration will be isolated from the parent
-and vice versa.
+`WithRegistrationsCopy` will create a container clone (child) where the new registration will be isolated from the parent
+and the vice versa.
 
 
 class With_registrations_copy
@@ -235,11 +225,11 @@ class With_registrations_copy
 }
 ```
 
-Again, a cloning here is the fast `O(1)` operation.
+Again, the cloning here is the fast `O(1)` operation.
 
-By default, the cache is dropped, but you may pass optional argument `preserveCache: true` to keep the cache.
-For instance in the example above, we atr just adding a new registration without replacing anything, 
-so the cache from the parent will work just fine.
+By default, the cache is dropped but you may pass the optional argument `preserveCache: true` to keep the cache.
+For instance in the example above we are just adding a new registration without replacing anything, 
+so the cache from the parent will proceed to be valid and useful.
 
 
 ## With no more registration allowed
