@@ -145,7 +145,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 * Registration of service to implementation type mapping (additionally supported: registering once, registration replace, registration removal). 
 * Registration of delegate factory and already created service instance.
 * Batch registration of types from the provided assemblies.
-* Registation identified with a service key of arbitrary type and registration of multiple non-keyed implementations for a single service.
+* Registration identified with a service key of arbitrary type and registration of multiple non-keyed implementations for a single service.
 * Registration with the condition depending on context.
 * Registration with the associated metadata object of arbitrary type.
 * Resolve and ResolveMany. 
@@ -174,6 +174,12 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 * User-provided strategies for resolution of unknown service.
     * Dynamic registration providers
     * Optional automatic concrete types resolution
+
+### Resolution options
+
+DryIoc implements a service resolution and injection via expression compilation and interpretation.
+The interpretation is the only option for the target platforms without the `System.Reflection.Emit` like the Xamarin iOS.
+Check the [Resolution Pipeline](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/ResolutionPipeline.md) document for more details. 
 
 ---
 <small>Icon made by <a href="http://www.freepik.com" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a> is licensed by <a href="http://creativecommons.org/licenses/by/3.0/" title="Creative Commons BY 3.0" target="_blank">CC 3.0 BY</a></small>
