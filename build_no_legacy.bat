@@ -18,10 +18,20 @@ if %ERRORLEVEL% neq 0 goto :error
 echo: 
 echo:## Finished: TESTS
 
+echo: 
+echo:## Starting: MARKDOWN DOCS GENERATION
+
+dotnet msbuild -target:MdGenerate docs\DryIoc.Docs\DryIoc.Docs.csproj
+
+echo:
+echo:## Finished: MARKDOWN DOCS GENERATION
+echo: 
+echo:## Starting: PACKAGING
+
 call build\NugetPack.bat
 if %ERRORLEVEL% neq 0 goto :error
 echo:
-echo:## Finished: PACKAGING ##
+echo:## Finished: PACKAGING
 
 echo:
 echo:## Finished: ALL Successful ##
