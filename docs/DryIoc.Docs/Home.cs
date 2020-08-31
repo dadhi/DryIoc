@@ -100,6 +100,7 @@ and to support the __extensibility__ and __testability__ of the code.
 
 - Advanced topics:
 
+    - [Resolution Pipeline](ResolutionPipeline.md)
     - ["Child" Containers](KindsOfChildContainer.md)
     - [Required Service Type](RequiredServiceType.md)
     - [Examples of context based resolution](ExamplesContextBasedResolution.md)
