@@ -24,6 +24,16 @@
     </ItemGroup>
 
     <ItemGroup>
+        <DocFile Include="**\*.cs" />
+    </ItemGroup>
+
+    <Target Name="MdGenerate" BeforeTargets="BeforeBuild"
+        Condition=" '$(Configuration)' == 'Debug' ">
+        <Message Text="Generating the Markdown documentation..." Importance="high"/>
+        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet cstomd %(DocFile.Identity)" />
+    </Target>
+
+    <ItemGroup>
       <Compile Update="Extensions\MefAttributedModel.cs">
         <Generator>CsToMd</Generator>
         <LastGenOutput>MefAttributedModel.md</LastGenOutput>

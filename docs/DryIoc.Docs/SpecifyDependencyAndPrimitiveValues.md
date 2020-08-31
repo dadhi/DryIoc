@@ -23,15 +23,17 @@
 ## Service Type
 
 The minimal part of service and dependency resolution specification is Service Type. It allows container to find corresponding service registration:
+<details><summary><strong>usings ...</strong></summary>
 
-```cs 
-//md{ usings ...
+```cs
 using System;
 using NUnit.Framework;
 using DryIoc;
 // ReSharper disable UnusedVariable
-//md}
+```
+</details>
 
+```cs 
 class Resolving_with_a_service_type 
 {
     [Test] public void Example()
@@ -397,7 +399,7 @@ class Injecting_the_custom_value_depending_on_context
 
     public interface ILogger
     {
-        public Type ContextType { get; }
+        Type ContextType { get; }
     }
 
     public class Logger : ILogger 

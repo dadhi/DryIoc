@@ -19,8 +19,9 @@ DryIoc ensures that:
 
 The above guaranties are possible because of the Container data-structure. 
 In a pseudo code and simplifying things a lot the DryIoc Container may be represented as following:
+<details><summary><strong>usings ...</strong></summary>
+
 ```cs 
-//md{ usings ...
 using System;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
@@ -29,8 +30,10 @@ using ImTools;
 using DryIoc;
 #pragma warning disable CS0649
 // ReSharper disable UnusedVariable
-//md}
+```
+</details>
 
+```cs 
 class Oversimplified_container 
 {
     class Ref<T> { public T Value; } // represents the CAS (compare-and-swap) box for the referenced value

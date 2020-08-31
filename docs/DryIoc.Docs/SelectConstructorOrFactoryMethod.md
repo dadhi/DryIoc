@@ -25,14 +25,19 @@ If class has multiple constructors the default behavior is to throw correspondin
 To avoid the exception you may specify what constructor to use while registering.
 
 Given the class with the two constructors:
-```cs 
+<details><summary><strong>usings ...</strong></summary>
+
+```cs
 using DryIoc;
 using DryIocAttributes;
 using DryIoc.MefAttributedModel;
 using System.ComponentModel.Composition;
 using NUnit.Framework;
 // ReSharper disable UnusedVariable
+```
+</details>
 
+```cs
 public interface IDependency { }
 public class Dep : IDependency {}
 public class Foo 

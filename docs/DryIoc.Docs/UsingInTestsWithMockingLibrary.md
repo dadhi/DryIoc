@@ -10,15 +10,16 @@
 
 For examples below we need to add:
 
-//md{ usings ...
-//md ```cs
+<details><summary><strong>usings ...</strong></summary>
+
+ ```cs
 using System.Collections.Concurrent;
 using NUnit.Framework;
 using DryIoc;
 using NSubstitute;
 using Moq;
-//md ```
-//md}
+ ```
+</details>
 
 
 ## Auto-mocking with NSubstitute
