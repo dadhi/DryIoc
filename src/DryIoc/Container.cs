@@ -1693,12 +1693,12 @@ namespace DryIoc
             var resultFactories = registeredFactories;
             var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
 
-            // Assign unique continious keys across all of dynamic providers,
+            // Assign unique continuous keys across all of dynamic providers,
             // to prevent duplicate keys and peeking the wrong factory by collection wrappers
             // NOTE: Given that dynamic registration always return the same implementation types in the same order
             // then the dynamic key will be assigned deterministically, so that even if `CombineRegisteredWithDynamicFactories`
             // is called multiple times during the resolution (like for `ResolveMany`) it is possible to match the required factory by its order.
-            var dynamicKey = DefaultDynamicKey.Value;
+            DefaultDynamicKey dynamicKey = null;
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             { 
                 var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
@@ -1720,7 +1720,9 @@ namespace DryIoc
                     resultFactories = dynamicRegistrations.Match(x =>
                         x.Factory.FactoryType == factoryType &&
                         x.Factory.ValidateAndNormalizeRegistration(serviceType, serviceKey, false, Rules),
-                        x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
+                        x => KV.Of(
+                            x.ServiceKey ?? (dynamicKey = dynamicKey?.Next() ?? DefaultDynamicKey.Value),
+                            x.Factory));
                     continue;
                 }
 

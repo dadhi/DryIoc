@@ -652,10 +652,69 @@ In addition you can use the rule to [select constructor with all resolvable para
 
 ### UnknownServiceResolvers
 
-The rules is used as a last resort / fallback resolution strategy when no registration is found.
+**Obsolete** - please use the the `WithDynamicRegistrations` and `WithDynamicRegistrationsAsFallback` instead.
 
-You may use this rule to implement on-demand registrations, or automatic concrete types registrations, etc.
+The `UnknownServiceResolvers` is **obsolete** Today because they did not support the other DryIoc features,
+(e.g. wrappers, decorators, `ResolveMany`) comparing to the normal registrations.
+The reason is because the `UnknownServiceResolvers` were implemented as a mechanism different from the registration resolution pipeline.
+The newer alternative is the `WithDynamicRegistrations` and the features based on it. See below.
 
+Example of `ResolveMany` not working with the `UnknownServiceResolvers` and working with the `WithDynamicRegistrationsAsFallback`:
+
+```cs md*/
+class ResolveMany_does_not_work_WithUnknownResolvers 
+{
+    [Test]public void Example_not_working()
+    {
+        var parent = new Container();
+        parent.Register<IService, Service1>();
+        parent.Register<IService, Service2>();
+
+        var child = new Container(Rules.Default.WithUnknownServiceResolvers(req =>
+            new DelegateFactory(_ => parent.Resolve(req.ServiceType))));
+
+        // does not work
+        var actual = child.ResolveMany<IService>();
+
+        // the result count is 0!
+        Assert.AreEqual(0, actual.Count());
+    }
+
+    [Test]public void Example_working()
+    {
+        var parent = new Container();
+        parent.Register<IService, Service1>();
+        parent.Register<IService, Service2>();
+
+        Rules.DynamicRegistrationProvider dynamicRegistration = (serviceType, serviceKey) => 
+            new[] 
+            {
+                new DynamicRegistration(new DelegateFactory(_ => parent.Resolve(serviceType, 
+                    serviceKey is DefaultDynamicKey dk ? DefaultKey.Of(dk.RegistrationOrder) : null))) 
+            };
+        
+        // we need a double dynamic registrations here because we have a two default services and 
+        // the service key translation is the "key" to distinguish between the services
+        var child = new Container(Rules.Default.WithDynamicRegistrationsAsFallback(
+            dynamicRegistration, 
+            dynamicRegistration));
+
+        // works
+        var actual = child.ResolveMany<IService>().ToArray();
+
+        // 2 services are resolved
+        Assert.AreEqual(2, actual.Length);
+        CollectionAssert.AreEquivalent(new[] { typeof(Service1), typeof(Service2) },
+            actual.Select(x => x.GetType()));
+    }
+
+    interface IService { }
+    class Service1: IService { }
+    class Service2: IService { }
+}
+
+/*md
+```
 
 #### AutoFallbackDynamicRegistrations
 
