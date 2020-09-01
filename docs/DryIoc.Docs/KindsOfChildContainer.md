@@ -11,6 +11,8 @@
   - [Without Singletons](#without-singletons)
   - [With registrations copy](#with-registrations-copy)
   - [With no more registration allowed](#with-no-more-registration-allowed)
+  - [Scenarios from the actual Users](#scenarios-from-the-actual-users)
+    - [The child container for each test disposed at end of the test without disposing the parent](#the-child-container-for-each-test-disposed-at-end-of-the-test-without-disposing-the-parent)
 
 
 ## No child containers 
@@ -67,8 +69,7 @@ class FacadeExample
         }
     }
 
-    [Test]
-    public void Facade_for_tests()
+    [Test]public void Facade_for_tests()
     {
         var container = new Container();
 
@@ -175,8 +176,7 @@ To remove resolved singleton instances from the container:
 class Without_singletons
 {
     public class S { }
-    [Test]
-    public void Example()
+    [Test]public void Example()
     {
         IContainer container = new Container();
         container.Register<S>(Reuse.Singleton);
@@ -198,14 +198,13 @@ The method will clone the container registrations but will drop the cache.
 `WithRegistrationsCopy` will create a container clone (child) where the new registration will be isolated from the parent
 and the vice versa.
 
-
+```cs 
 class With_registrations_copy
 {
     class A { }
     class B { public B(A a) {} }
 
-    [Test]
-    public void Example()
+    [Test]public void Example()
     {
         var parent = new Container();
         parent.Register<A>();
@@ -236,3 +235,54 @@ so the cache from the parent will proceed to be valid and useful.
 
 [Explained in detail here](FaqAutofacMigration#separate-build-stage)
 
+
+## Scenarios from the actual Users
+
+### The child container for each test disposed at end of the test without disposing the parent
+
+[The related case](https://github.com/dadhi/DryIoc/issues/269)
+
+```cs 
+
+class Child_container_per_test_disposed_at_the_end_without_disposing_the_parent
+{
+    [Test]public void Child_lifecycle_should_be_independent_of_parent_lifecycle()
+    {
+        var parent = new Container(rules => rules.WithConcreteTypeDynamicRegistrations());
+        
+        parent.Register<IService, Service>(Reuse.Singleton);
+
+        var child = CreateChildContainer(parent);
+
+        // child can override parent registrations and parent is unchanged
+        child.Use<IService>(new TestService());
+
+        Assert.IsInstanceOf<TestService>(child.Resolve<Concrete>().Service);
+        Assert.IsInstanceOf<Service>(parent.Resolve<Concrete>().Service);
+        
+        child.Dispose();
+        Assert.IsTrue(child.IsDisposed);
+
+        // when child is disposed parent is unaffected
+        Assert.IsFalse(parent.IsDisposed);
+        Assert.IsInstanceOf<Service>(parent.Resolve<Concrete>().Service);
+    }
+
+    private static IContainer CreateChildContainer(Container parent) => 
+        parent.With(
+            parent.Rules,
+            parent.ScopeContext,
+            RegistrySharing.CloneAndDropCache,
+            parent.SingletonScope.Clone());
+
+    public interface IService { }
+    public class Service : IService { }
+    public class TestService : IService { }
+    public class Concrete
+    {
+        public IService Service { get; }
+        public Concrete(IService service) => Service = service;
+    }
+}
+
+```
