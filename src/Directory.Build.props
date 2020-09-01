@@ -16,6 +16,7 @@
         <RepositoryUrl>https://github.com/dadhi/DryIoc.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <PackageIcon>logo.png</PackageIcon>
+        <icon>logo.png</icon>
     </PropertyGroup>
 
     <!--Signing all packages, oh boy-->
