@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.3.3</version>
+        <version>4.3.4</version>
 
         <authors>Maksim Volkau</authors>
 
@@ -15,6 +15,10 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v4.3.4 Bug-fix release
+
+- fixed: #239 [DOCS] WithUknownServiceResolver ignores ResolveMany
+
 ## v4.3.3 Bug-fix release
 
 - fixed: #310 Ensure that FEC.LightExpression.ILGeneratorHacks does not crash if some method is not reflected

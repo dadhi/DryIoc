@@ -1,5 +1,10 @@
 Version History
 ---------------
+
+## v4.3.4 Bug-fix release / 2020-09-01
+
+- fixed: #239 [DOCS] WithUknownServiceResolver ignores ResolveMany
+
 ## v4.3.3 Bug-fix release / 2020-08-27
 
 - fixed: #310 Ensure that FEC.LightExpression.ILGeneratorHacks does not crash if some method is not reflected
