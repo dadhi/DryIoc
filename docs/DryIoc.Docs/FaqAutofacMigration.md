@@ -11,6 +11,7 @@
   - [Owned instances](#owned-instances)
   - [Using constructor with most resolvable parameters](#using-constructor-with-most-resolvable-parameters)
   - [Modules](#modules)
+  - [IRegistrationSource and the dynamic registrations](#iregistrationsource-and-the-dynamic-registrations)
 
 
 ## Autofac version
@@ -342,4 +343,21 @@ And here the equivalent in DryIoc without use of any additional abstractions exc
 
     var a = container.Resolve<A>();
     Assert.IsInstanceOf<B>(a.B);
+```
+
+## IRegistrationSource and the dynamic registrations
+
+[The related case](https://github.com/dadhi/DryIoc/issues/143)
+
+Example of the dynamic registration of the types started with the `Asp` prefix:
+
+```cs
+    IEnumerable<DynamicRegistration> GetAspTypes(Type serviceType, object serviceKey)
+    {
+        if (serviceType.Namespace.StartsWith("ASP", true, CultureInfo.InvariantCultureIgnoreCase))
+            return new[] { new DynamicRegistration(new ReflectionFactory(serviceType), IfAlreadyRegistered.Keep) };
+        return null;
+    }
+
+    container = container.With(rules => rules.WithDynamicRegistrations(GetAspTypes));
 ```
