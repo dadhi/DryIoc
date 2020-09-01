@@ -1777,7 +1777,7 @@ namespace DryIoc
 
                         return true;
                     }, 
-                    x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
+                    x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey?.Next() ?? DefaultDynamicKey.Value), x.Factory));
 
                 resultFactories = resultFactories.Append(remainingDynamicFactories);
             }
