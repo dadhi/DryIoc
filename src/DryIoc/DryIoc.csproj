@@ -19,7 +19,7 @@
 <![CDATA[
 ## v4.3.4 Bug-fix release
 
-- fixed: #239 [DOCS] WithUknownServiceResolver ignores ResolveMany
+- fixed: #239 WithUknownServiceResolver ignores ResolveMany
 
 ## v4.3.3 Bug-fix release
 
