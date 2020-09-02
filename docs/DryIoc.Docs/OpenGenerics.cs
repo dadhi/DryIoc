@@ -3,7 +3,14 @@
 
 # Open-generics
 
-[TOC]
+
+- [Open-generics](#open-generics)
+  - [Registering open-generic service](#registering-open-generic-service)
+  - [Matching type arguments constraints](#matching-type-arguments-constraints)
+    - [Filter services in collection based on constraints](#filter-services-in-collection-based-on-constraints)
+    - [Fill-in type arguments from constraints](#fill-in-type-arguments-from-constraints)
+  - [Generic variance when resolving many services](#generic-variance-when-resolving-many-services)
+
 
 ## Registering open-generic service
 

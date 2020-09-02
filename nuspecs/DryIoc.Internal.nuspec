@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.3.1</version>
+        <version>4.3.4</version>
 
         <authors>Maksim Volkau</authors>
 
@@ -10,11 +10,24 @@
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
         <icon>logo.png</icon>
+        <iconUrl>https://github.com/dadhi/DryIoc/blob/master/logo.png</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v4.3.4 Bug-fix release
+
+- fixed: #239 [DOCS] WithUknownServiceResolver ignores ResolveMany
+
+## v4.3.3 Bug-fix release
+
+- fixed: #310 Ensure that FEC.LightExpression.ILGeneratorHacks does not crash if some method is not reflected
+
+## v4.3.2 Bug-fix release
+
+- fixed: #303 Open Generic Singleton do not provide same instance for Resolve and ResolveMany
+
 ## v4.3.1 Bug-fix release
 
 - fixed: #301 breakage in scoped enumeration in v4

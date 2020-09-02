@@ -3,7 +3,26 @@
 
 # Register and Resolve
 
-[TOC]
+
+- [Register and Resolve](#register-and-resolve)
+  - [DryIoc Glossary](#dryioc-glossary)
+  - [Registration API](#registration-api)
+  - [Registering as Singleton](#registering-as-singleton)
+  - [Registering multiple implementations](#registering-multiple-implementations)
+    - [Default registrations](#default-registrations)
+    - [Keyed registrations](#keyed-registrations)
+    - [Resolving as KeyValuePair wrapper](#resolving-as-keyvaluepair-wrapper)
+  - [IsRegistered](#isregistered)
+    - [Implicit ways to know that service is registered](#implicit-ways-to-know-that-service-is-registered)
+  - [RegisterMany](#registermany)
+  - [RegisterMapping](#registermapping)
+  - [RegisterDelegate](#registerdelegate)
+    - [Will not detect recursive dependencies](#will-not-detect-recursive-dependencies)
+  - [RegisterInstance](#registerinstance)
+  - [RegisterInitializer](#registerinitializer)
+  - [RegisterPlaceholder](#registerplaceholder)
+  - [RegisterDisposer](#registerdisposer)
+
 
 ## DryIoc Glossary
 
@@ -211,14 +230,14 @@ __Note:__ When resolving collection of multiple defaults, it always ordered in r
 
 There are also a couple of ways to select a specific registration and avoid an exception in `Resolve<ICommand>`:
 
-- Using [condition](SpecifyDependencyAndPrimitiveValues#markdown-header-registering-with-condition): 
+- Using [condition](SpecifyDependencyAndPrimitiveValues#registering-with-condition): 
 `container.Register<ICommand, GetCommand>(setup: Setup.With(condition: req => req.IsResolutionRoot))` 
 and for the rest of registrations to specify opposite condition, e.g. `condition: r => !r.IsResolutionRoot`.
 - Using specific metadata type (`CommandId` enum) and resolving as `Meta<,>` wrapper: 
 `container.Register<ICommand, GetCommand>(setup: Setup.With(metadata: CommandId.Get));` 
 and then resolving as `container.Resolve<IEnumerable<Meta<ICommand, CommandId>>>().Where(m => m.Metadata == CommandId.Get))`
-- Using [reuse bound to specific parent scope](ReuseAndScopes#markdown-header-reuseinresolutionscopeof) 
-or to [named scope](ReuseAndScopes#markdown-header-reuseincurrentnamedscope-and-reuseinthread).
+- Using [reuse bound to specific parent scope](ReuseAndScopes#reuseinresolutionscopeof) 
+or to [named scope](ReuseAndScopes#reuseincurrentnamedscope-and-reuseinthread).
 - Registering with `serviceKey`.
 
 
@@ -736,7 +755,7 @@ class Register_delegate_returning_object
 
 ### Will not detect recursive dependencies
 
-When using normal typed registration DryIoc will detect [recursive dependencies](ErrorDetectionAndResolution#markdown-header-RecursiveDependencyDetected). 
+When using normal typed registration DryIoc will detect [recursive dependencies](ErrorDetectionAndResolution#RecursiveDependencyDetected). 
 
 But when using the delegate registration DryIoc is unable to analyze what dependencies are used inside delegate. 
 That is another reason to avoid `RegisterDelegate` whatsoever:

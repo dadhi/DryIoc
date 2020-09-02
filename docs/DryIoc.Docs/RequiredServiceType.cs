@@ -3,7 +3,16 @@
 
 # Required Service Type
 
-[TOC]
+
+- [Required Service Type](#required-service-type)
+  - [Overview](#overview)
+    - [Required service type is implemented by resolved type](#required-service-type-is-implemented-by-resolved-type)
+    - [Required service type identifies a wrapped service type when resolving a Wrapper](#required-service-type-identifies-a-wrapped-service-type-when-resolving-a-wrapper)
+    - [Specify to use open-generic type in case you have both closed and open-generic registrations](#specify-to-use-open-generic-type-in-case-you-have-both-closed-and-open-generic-registrations)
+  - [Adapts external code](#adapts-external-code)
+  - [Works with Wrappers](#works-with-wrappers)
+  - [Works with IEnumerable and collection wrappers](#works-with-ienumerable-and-collection-wrappers)
+
 
 ## Overview
 
@@ -14,7 +23,7 @@ Better illustrated with examples.
 
 ### Required service type is implemented by resolved type 
 
-```cd md*/
+```cs md*/
 using DryIoc;
 using NUnit.Framework;
 using System;
@@ -45,7 +54,7 @@ __Note:__ Required service type always refers to __service type__ and not to __i
 
 ### Required service type identifies a wrapped service type when resolving a [Wrapper](Wrappers)
 
-```cd md*/
+```cs md*/
 class Service_type_for_a_wrapper
 {
     class Foo { }
@@ -227,7 +236,7 @@ Here in `Arg.Of<Lazy<object>, IFoo>()` DryIoc will look for required service typ
 
 ## Works with IEnumerable and collection wrappers
 
-[IEnumerable and the rest of supported collection types]((Wrappers#markdown-header-ienumerable-or-array-of-a)) are also Wrappers, 
+[IEnumerable and the rest of supported collection types]((Wrappers#ienumerable-or-array-of-a)) are also Wrappers, 
 so you may expect required service type to work with them too:
 ```cs md*/
 class Required_service_type_in_collection

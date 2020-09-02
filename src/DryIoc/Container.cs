@@ -1718,7 +1718,7 @@ namespace DryIoc
             // NOTE: Given that dynamic registration always return the same implementation types in the same order
             // then the dynamic key will be assigned deterministically, so that even if `CombineRegisteredWithDynamicFactories`
             // is called multiple times during the resolution (like for `ResolveMany`) it is possible to match the required factory by its order.
-            var dynamicKey = DefaultDynamicKey.Value;
+            DefaultDynamicKey dynamicKey = null;
             for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
             { 
                 var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
@@ -1740,7 +1740,9 @@ namespace DryIoc
                     resultFactories = dynamicRegistrations.Match(x =>
                         x.Factory.FactoryType == factoryType &&
                         x.Factory.ValidateAndNormalizeRegistration(serviceType, serviceKey, isStaticallyChecked: false, rules: Rules),
-                        x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
+                        x => KV.Of(
+                            x.ServiceKey ?? (dynamicKey = dynamicKey?.Next() ?? DefaultDynamicKey.Value),
+                            x.Factory));
                     continue;
                 }
 
@@ -1795,7 +1797,7 @@ namespace DryIoc
 
                         return true;
                     }, 
-                    x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey.Next()), x.Factory));
+                    x => KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey?.Next() ?? DefaultDynamicKey.Value), x.Factory));
 
                 resultFactories = resultFactories.Append(remainingDynamicFactories);
             }
@@ -7617,14 +7619,14 @@ namespace DryIoc
 
         /// <summary>Removes specified registration from container.
         /// It also tries to remove the cached resolutions for the removed registration, But it may not work depending on context.
-        /// Check the docs for more info: https://bitbucket.org/dadhi/dryioc/wiki/UnregisterAndResolutionCache </summary>
+        /// Check the docs for more info: https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/UnregisterAndResolutionCache.md </summary>
         public static void Unregister(this IRegistrator registrator, Type serviceType,
             object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null) =>
             registrator.Unregister(serviceType, serviceKey, factoryType, condition);
 
         /// <summary>Removes specified registration from container.
         /// It also tries to remove the cached resolutions for the removed registration, But it may not work depending on context.
-        /// Check the docs for more info: https://bitbucket.org/dadhi/dryioc/wiki/UnregisterAndResolutionCache </summary>
+        /// Check the docs for more info: https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/UnregisterAndResolutionCache.md </summary>
         public static void Unregister<TService>(this IRegistrator registrator,
             object serviceKey = null, FactoryType factoryType = FactoryType.Service, Func<Factory, bool> condition = null) =>
             registrator.Unregister(typeof(TService), serviceKey, factoryType, condition);
@@ -9698,6 +9700,7 @@ private ParameterServiceInfo(ParameterInfo p)
     /// creating closed-generic type reflection factory from registered open-generic prototype factory.</summary>
     public interface IConcreteFactoryGenerator
     {
+        // todo: @perf @v5 make it a ImHashMap<object, object> to use the implementationType as a key for no or default service key
         /// <summary>Generated factories so far, identified by the service type and key pair.</summary>
         ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories { get; }
 
@@ -10798,6 +10801,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 _openGenericFactory = openGenericFactory;
             }
 
+            // todo: @perf optimize request.Details access and reflection here
             public Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false)
             {
                 var openFactory = _openGenericFactory;
@@ -10844,7 +10848,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
                 var knownImplOrServiceType = implType ?? made.FactoryMethodKnownResultType ?? serviceType;
                 var serviceKey = request.ServiceKey;
-                serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey;
+                serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey ?? DefaultKey.Value;
                 var generatedFactoryKey = KV.Of(knownImplOrServiceType, serviceKey);
 
                 var generatedFactories = _generatedFactories.Value;
@@ -12674,15 +12678,24 @@ private ParameterServiceInfo(ParameterInfo p)
         protected static string Print(object arg) =>
             arg == null ? string.Empty : new StringBuilder().Print(arg).ToString();
 
-        /// <summary>Creates exception with message describing cause and context of error,
-        /// and leading/system exception causing it.</summary>
-        public ContainerException(int errorCode, string message, Exception innerException)
-            : base($"code: Error.{DryIoc.Error.NameOf(errorCode)};{NewLine}message: {message}", innerException) =>
-            Error = errorCode;
-
         /// <summary>Creates exception with message describing cause and context of error.</summary>
         public ContainerException(int error, string message)
             : this(error, message, null) { }
+
+        /// <summary>Creates exception with message describing cause and context of error,
+        /// and leading/system exception causing it.</summary>
+        public ContainerException(int errorCode, string message, Exception innerException)
+            : this(errorCode, message, innerException, (e, m, _) => FormatMessage(DryIoc.Error.NameOf(e), m)) {}
+
+        /// <summary>The default exception message format.</summary>
+        protected static string FormatMessage(string errorName, string message) =>
+            $"code: Error.{errorName};{NewLine}message: {message}";
+
+        /// <summary>Allows the formatting of the final exception message.</summary>
+        protected ContainerException(int errorCode, string message, Exception innerException,
+            Func<int, string, Exception, string> formatMessage)
+            : base(formatMessage(errorCode, message, innerException), innerException) =>
+            Error = errorCode;
 
 #if SUPPORTS_SERIALIZABLE
         /// <inheritdoc />
@@ -12712,7 +12725,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 "  with normal and dynamic registrations:" + NewLine + "{1}"),
 
             ExpectedSingleDefaultFactory = Of(
-                "Expecting single default registration but found many:" + NewLine + "{0}" + NewLine +
+                "Expecting a single default registration but found many:" + NewLine + "{0}" + NewLine +
                 "when resolving {1}." + NewLine +
                 "Please identify service with key, or metadata, or use Rules.WithFactorySelector to specify single registered factory."),
 

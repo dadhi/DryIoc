@@ -1,8 +1,14 @@
-<!--Auto-generated from .cs file, the edits here will be lost! -->
+<!--Auto-generated from .cs file, the edits made to .md file will be lost! -->
 
 # Creating and Disposing Container
 
-[TOC]
+
+- [Creating and Disposing Container](#creating-and-disposing-container)
+  - [Creating Container](#creating-container)
+    - [Rules](#rules)
+    - [ScopeContext](#scopecontext)
+  - [Disposing Container](#disposing-container)
+
 
 ## Creating Container
 
@@ -36,7 +42,7 @@ class Creating_container_with_explicit_defaults
 ```
 
 As you see, it is possible to additionally specify the `rules` and 
-the [`scopeContext`](https://bitbucket.org/dadhi/dryioc/wiki/ReuseAndScopes#markdown-header-what-scopecontext-is).
+the [`scopeContext`](ReuseAndScopes#what-scopecontext-is).
 
 
 ### Rules
@@ -76,7 +82,7 @@ class Adding_some_rules_with_action
 ### ScopeContext
 
 ScopeContext is an __optional__ ambient context for the new open scopes to be bound to. 
-It is described in details [here](https://bitbucket.org/dadhi/dryioc/wiki/ReuseAndScopes#markdown-header-scopecontext).
+It is described in details [here](ReuseAndScopes#scopecontext).
 
 
 ## Disposing Container

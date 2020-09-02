@@ -6,12 +6,13 @@
 
 - DryIoc.MefAttributedModel.dll [![NuGet Badge](https://buildstats.info/nuget/DryIoc.MefAttributedModel.dll)](https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll)
 - DryIoc.MefAttributedModel (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.MefAttributedModel)](https://www.nuget.org/packages/DryIoc.MefAttributedModel.dll)
+- The related companion [DryIocAttributes](#dryiocattributes) packages
+
 
 ### ASP .NET Core
 
 - DryIoc.Microsoft.DependencyInjection [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Microsoft.DependencyInjection)](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection)
 - DryIoc.Microsoft.DependencyInjection.src (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Microsoft.DependencyInjection.src)](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection.src)
-- DryIoc.Microsoft.DependencyInjection.AspNetCore2_1 (targeting ASP .NET Core 2.1.1) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Microsoft.DependencyInjection.AspNetCore2_1)](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection.AspNetCore2_1)
 
 
 ### ASP .NET
@@ -48,17 +49,3 @@ Companion packages do not depend on DryIoc package.
 - DryIocAttributes (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIocAttributes)](https://www.nuget.org/packages/DryIocAttributes)
 
 Extends [MEF](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) attributes to cover DryIoc features: metadata, advanced reuses, context based registration, decorators, etc. 
-
-
-### DryIocZero
-
-DryIocZero [![NuGet Badge](https://buildstats.info/nuget/DryIocZero)](https://www.nuget.org/packages/DryIocZero)
-
-Slim IoC Container based on service factory delegates __generated at compile-time__ by DryIoc.
-
-- __Does not depend on DryIoc at run-time.__
-- Ensures _zero_ application bootstrapping time associated with IoC registrations.
-- Provides verification of DryIoc registration setup at compile-time by generating service factory delegates. Basically you can see how DryIoc is creating things.
-- Supports everything registered in DryIoc: reuses, decorators, wrappers, etc.
-- Much smaller and simpler than DryIoc itself. Works standalone without any run-time dependencies.
-- Allows run-time registrations too. You may register instances and delegates at run-time.

@@ -4,7 +4,7 @@
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIocAttributes</Product>
-        <VersionPrefix>6.0.0</VersionPrefix>
+        <VersionPrefix>7.0.0</VersionPrefix>
         <VersionSuffix>preview-01</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -16,15 +16,16 @@
         <PackageTags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
             <![CDATA[
-v5.0.0:
 
-- Removing support for .NET 4.0
+## v7.0.0
+
+- Removing the support for .NET 4.0
 
         ]]>
         </PackageReleaseNotes>
     </PropertyGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' == 'net45'">
-        <Reference Include="System.ComponentModel.Composition" />
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+        <PackageReference Include="System.ComponentModel.Composition" Version="4.5.0" />
     </ItemGroup>
 </Project>

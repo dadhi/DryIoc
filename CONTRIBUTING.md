@@ -19,7 +19,7 @@ You may help via
 
 If you found the problem with DryIoc:
 
- - Please check that you are using the [latest DryIoc version](https://bitbucket.org/dadhi/dryioc/wiki/Home#markdown-header-latest-version).
+ - Please check that you are using the [latest DryIoc version](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Home.md#latest-version).
  - [Create new issue](https://github.com/dadhi/DryIoc/issues/new) with problem description.
  - To get faster feedback, faster fixes, and generally to make me happy :-) 
      - [Fork DryIoc](https://github.com/dadhi/DryIoc/fork)

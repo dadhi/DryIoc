@@ -10,9 +10,4 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\DryIocAttributes\DryIocAttributes.csproj" />
     </ItemGroup>
-
-    <ItemGroup Condition="'$(TargetFramework)' == 'net45'">
-        <Reference Include="System.ComponentModel.Composition" />
-    </ItemGroup>
-
 </Project>

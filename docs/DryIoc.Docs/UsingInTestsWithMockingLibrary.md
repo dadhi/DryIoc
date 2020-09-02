@@ -2,24 +2,29 @@
 
 # Auto-mocking with a mocking library
 
-[TOC]
+
+- [Auto-mocking with a mocking library](#auto-mocking-with-a-mocking-library)
+  - [Auto-mocking with NSubstitute](#auto-mocking-with-nsubstitute)
+  - [Auto-mocking with Moq](#auto-mocking-with-moq)
+
 
 For examples below we need to add:
-```cs 
 
-using System;
+<details><summary><strong>usings ...</strong></summary>
+
+ ```cs
+using System.Collections.Concurrent;
 using NUnit.Framework;
-
 using DryIoc;
 using NSubstitute;
 using Moq;
+ ```
+</details>
 
-using System.Collections.Concurrent;
-```
 
 ## Auto-mocking with NSubstitute
 
-Auto-mocking here means that we can setup container to return mocks for unregistred services. 
+Auto-mocking here means that we can setup container to return mocks for unregistered services. 
 In example below we will use [NSubstitute](http://nsubstitute.github.io/) library for creating mocks, 
 but you can use something else, e.g. Fake-it-easy or Moq.
 
@@ -35,7 +40,7 @@ public class SomeConsumer
 ```
 
 Let's test a `SomeConsumer` by mocking its `Service` dependency:
-```
+```cs 
 class NSubstitute_example
 {
     // Let's define a method to configure our container with auto-mocking of interfaces or abstract classes
@@ -64,7 +69,7 @@ class NSubstitute_example
 
 With above example there is still the problem though - the factory will be created each time when non-registered service is requested.
 It may be also problematic if we want the mock to be a _singleton_. Let's fix it by caching the factory in the dictionary:
-```
+```cs 
 public class OtherConsumer
 {
     public INotImplementedService Service { get; }

@@ -98,13 +98,22 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterMany(typeof(IBlah<,>).GetAssembly().One(), t => t == typeof(IBlah<,>));
+            container.RegisterMany(typeof(IBlah<,>).GetAssembly().One(), 
+                t => //t == typeof(IBlah<,>)
+                t.GetGenericDefinitionOrNull() == typeof(IBlah<,>)
+                );
 
             var services = container.Resolve<IBlah<string, bool>[]>();
 
             CollectionAssert.AreEquivalent(
                 new[] { typeof(Blah<string, bool>), typeof(AnotherBlah<bool>) },
                 services.Select(s => s.GetType()));
+
+            var services2 = container.Resolve<IBlah<string, int>[]>();
+
+            CollectionAssert.AreEquivalent(
+                new[] { typeof(Blah<string, int>), typeof(AnotherBlah<int>), typeof(YetAnotherBlah) },
+                services2.Select(s => s.GetType()));
         }
 
         public interface IBlah { }
@@ -114,6 +123,7 @@ namespace DryIoc.UnitTests
         public interface IBlah<T0, T1> { }
         public class Blah<T0, T1> : IBlah<T0, T1> { }
         public class AnotherBlah<T> : IBlah<string, T> { }
+        public class YetAnotherBlah : IBlah<string, int> { }
 
         [Test]
         public void Can_register_something_from_assembly_as_singleton()

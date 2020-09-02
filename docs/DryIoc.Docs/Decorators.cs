@@ -3,9 +3,25 @@
 
 # Decorators
 
-[TOC]
 
-[FactoryMethod]:SelectConstructorOrFactoryMethod#markdown-header-factory-method-instead-of-constructor
+- [Decorators](#decorators)
+  - [Overview](#overview)
+  - [General use-case](#general-use-case)
+  - [Decorator of service registered with serviceKey](#decorator-of-service-registered-with-servicekey)
+    - [Using Setup.DecoratorOf](#using-setupdecoratorof)
+  - [Nested Decorators](#nested-decorators)
+    - [Decorators Order](#decorators-order)
+  - [Open-generic decorators](#open-generic-decorators)
+  - [Decorator of generic T](#decorator-of-generic-t)
+  - [Decorator Reuse](#decorator-reuse)
+    - [UseDecorateeReuse](#usedecorateereuse)
+  - [Decorator of Wrapped Service](#decorator-of-wrapped-service)
+  - [Decorator of Wrapper](#decorator-of-wrapper)
+  - [Decorator as Initializer](#decorator-as-initializer)
+  - [Decorator as Interceptor with Castle DynamicProxy](#decorator-as-interceptor-with-castle-dynamicproxy)
+
+
+[FactoryMethod]:SelectConstructorOrFactoryMethod#factory-method-instead-of-constructor
 
 ## Overview
 
@@ -515,7 +531,7 @@ class Nesting_decorators_of_wrapped_service
 
 DryIoc supports decorating of wrappers directly to adjust corresponding wrapper behavior, to add new functionality, to apply filtering, etc.
 
-Consider the decorating of [collection wrapper](Wrappers#markdown-header-ienumerable-or-array-of-a).
+Consider the decorating of [collection wrapper](Wrappers#ienumerable-or-array-of-a).
 Let`s say we want to change the default collection behavior and exclude keyed services from the result:
 
 ```cs md*/
@@ -620,13 +636,13 @@ Here `DecorateFooWithGreet` is a static method just for the demonstration.
 It also may be a non-static and include additional dependencies to be injected by Container, 
 check the [FactoryMethod] for more details.
 
-DryIoc has a dedicated [`RegisterInitializer`](RegisterResolve#markdown-header-registerinitializer) method,
+DryIoc has a dedicated [`RegisterInitializer`](RegisterResolve#registerinitializer) method,
 which is a decorator in disguise.
 
-Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisposer`](RegisterResolve#markdown-header-registerdisposer).
+Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisposer`](RegisterResolve#registerdisposer).
 
 
 ## Decorator as Interceptor with Castle DynamicProxy
 
-[Explained here](Interception#markdown-header-decorator-with-castle-dynamicproxy)
+[Explained here](Interception#decorator-with-castle-dynamicproxy)
 md*/

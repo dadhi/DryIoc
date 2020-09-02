@@ -35,7 +35,7 @@ namespace DryIoc.MefAttributedModel
     using DryIoc.ImTools;
 
     /// <summary>Implements MEF Attributed Programming Model.
-    /// Documentation is available at https://bitbucket.org/dadhi/dryioc/wiki/MefAttributedModel. </summary>
+    /// Documentation is available at https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Extensions/MefAttributedModel.md </summary>
     public static class AttributedModel
     {
         /// <summary>Maps the supported reuse types to respective DryIoc reuse.</summary>
@@ -55,7 +55,7 @@ namespace DryIoc.MefAttributedModel
             GetImportedParameter,
             _getImportedPropertiesAndFields);
 
-        /// <summary>Updates the source rules to provide full MEF compatibility.</summary>
+        /// <summary>Adjusts the rules to provide the full MEF compatibility.</summary>
         public static Rules WithMefRules(this Rules rules)
         {
             var importMadeOf = rules.FactoryMethod == null ? _defaultImportMadeOf :
@@ -67,7 +67,7 @@ namespace DryIoc.MefAttributedModel
                 .WithTrackingDisposableTransients();
         }
 
-        /// <summary>Add to container rules with <see cref="WithMefRules"/> to provide the full MEF compatibility.
+        /// <summary>Adjusts the rules with <see cref="WithMefRules"/> to provide the full MEF compatibility.
         /// In addition registers the MEF specific wrappers, and adds support for <see cref="IPartImportsSatisfiedNotification"/>.</summary>
         public static IContainer WithMef(this IContainer container) => 
             container
@@ -269,21 +269,37 @@ namespace DryIoc.MefAttributedModel
 
         #endregion
 
-        /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
-        /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.</summary>
+        /// <summary>Registers implementation type(s) with provided registrator/container.
+        /// Expects the implementation type with the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> types) => 
-            registrator.RegisterExports(types.ThrowIfNull().SelectMany(GetExportedRegistrations));
+            registrator.RegisterExports(types.ThrowIfNull().SelectMany(t => GetExportedRegistrations(t)));
 
-        /// <summary>Registers implementation type(s) with provided registrator/container. Expects that
-        /// implementation type are annotated with <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.</summary>
+        /// <summary>Registers implementation type(s) with provided registrator/container.
+        /// Expects the implementation type with or without the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
+        public static void RegisterExportsAndTypes(this IRegistrator registrator, IEnumerable<Type> types) =>
+            registrator.RegisterExports(types.ThrowIfNull().SelectMany(t => GetExportedRegistrations(t, true)));
+
+        /// <summary>Registers implementation type(s) with provided registrator/container.
+        /// Expects the implementation type with the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
         public static void RegisterExports(this IRegistrator registrator, params Type[] types) => 
             registrator.RegisterExports((IEnumerable<Type>)types);
 
-        /// <summary>First scans (<see cref="Scan"/>) provided assemblies to find types annotated with
-        /// <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>.
-        /// Then registers found types into registrator/container.</summary>
+        /// <summary>Registers implementation type(s) with provided registrator/container.
+        /// Expects the implementation type with or without the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
+        public static void RegisterExportsAndTypes(this IRegistrator registrator, params Type[] types) => 
+            registrator.RegisterExportsAndTypes((IEnumerable<Type>)types);
+
+        /// <summary>First scans (<see cref="Scan"/>) the provided assemblies to find the types annotated with
+        /// <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/>, or <see cref="ExportManyAttribute"/>.
+        /// Then registers the found types into registrator/container.</summary>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Assembly> assemblies) => 
             registrator.RegisterExports(Scan(assemblies));
+
+        /// <summary>First scans (<see cref="Scan"/>) the provided assemblies to find the types annotated with
+        /// <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/>, or <see cref="ExportManyAttribute"/>.
+        /// Then registers the found types into registrator/container.</summary>
+        public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies) => 
+            registrator.RegisterExports((IEnumerable<Assembly>)assemblies);
 
         /// <summary>Registers new factories into registrator/container based on provided registration info's, which
         /// is serializable DTO for registration.</summary>
@@ -341,7 +357,12 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Creates registration info DTOs for provided type and/or for exported members.
         /// If no exports found, the method returns empty enumerable.</summary>
-        public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(Type type)
+        public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(Type type) => GetExportedRegistrations(type, false);
+
+
+        /// <summary>Creates registration info DTOs for provided type and/or for exported members.
+        /// If no exports found, the method returns empty enumerable.</summary>
+        public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(Type type, bool shouldRegisterWithoutExport)
         {
             if (!CanBeExported(type))
                 yield break;
@@ -353,9 +374,9 @@ namespace DryIoc.MefAttributedModel
             if (!type.IsStatic() && !type.IsAbstract())
             {
                 var typeAttributes = GetAllExportAttributes(type);
-                if (IsExportDefined(typeAttributes))
+                if (IsExportDefined(typeAttributes, shouldRegisterWithoutExport))
                 {
-                    typeRegistrationInfo = GetRegistrationInfoOrDefault(type, typeAttributes);
+                    typeRegistrationInfo = GetRegistrationInfoOrDefault(type, typeAttributes, shouldRegisterWithoutExport);
                     if (typeRegistrationInfo != null)
                         yield return typeRegistrationInfo;
                 }
@@ -365,7 +386,7 @@ namespace DryIoc.MefAttributedModel
             foreach (var member in members)
             {
                 var memberAttributes = member.GetAttributes().ToArrayOrSelf();
-                if (!IsExportDefined(memberAttributes))
+                if (!IsExportDefined(memberAttributes, false))
                     continue;
 
                 var memberReturnType = member.GetReturnTypeOrDefault();
@@ -725,7 +746,8 @@ namespace DryIoc.MefAttributedModel
 
         #region Implementation
 
-        private static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type type, Attribute[] attributes)
+        private static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type type, Attribute[] attributes, 
+            bool shouldRegisterWithoutExport = false)
         {
             if (type.IsOpenGeneric())
                 type = type.GetGenericTypeDefinition();
@@ -812,15 +834,21 @@ namespace DryIoc.MefAttributedModel
 
             if (info.HasMetadataAttribute)
                 info.InitExportedMetadata(attributes);
+            
+            if (info.Exports == null)
+            {
+                if (shouldRegisterWithoutExport)
+                    info.Exports = GetExportFromImplementationType(info, type);
+                else
+                    Throw.It(Error.NoExport, type);
+            }
 
-            info.Exports.ThrowIfNull(Error.NoExport, type);
             return info;
         }
 
-        private static bool IsExportDefined(Attribute[] attributes) => 
-            attributes.Length != 0 && 
-            attributes.IndexOf(a => a is ExportAttribute || a is ExportManyAttribute) != -1 && 
-            attributes.IndexOf(a => a is PartNotDiscoverableAttribute) == -1;
+        private static bool IsExportDefined(Attribute[] attributes, bool shouldRegisterWithoutExport) => 
+            (shouldRegisterWithoutExport || attributes.Length != 0 && attributes.IndexOf(a => a is ExportAttribute || a is ExportManyAttribute) != -1) &&
+            (attributes.Length == 0 || attributes.IndexOf(a => a is PartNotDiscoverableAttribute) == -1);
 
         private static ExportInfo[] GetExportsFromExportAttribute(ExportAttribute attribute,
             ExportedRegistrationInfo info, Type implementationType)
@@ -847,6 +875,12 @@ namespace DryIoc.MefAttributedModel
             return info.Exports.AppendOrUpdate(export, info.Exports.IndexOf(export));
         }
 
+        private static ExportInfo[] GetExportFromImplementationType(ExportedRegistrationInfo info, Type implementationType)
+        {
+            var export = new ExportInfo(implementationType);
+            return info.Exports.AppendOrUpdate(export, info.Exports.IndexOf(export));
+        }
+
         private static IfAlreadyRegistered GetIfAlreadyRegistered(IfAlreadyExported ifAlreadyExported)
         {
             switch (ifAlreadyExported)
@@ -870,7 +904,8 @@ namespace DryIoc.MefAttributedModel
                 .Map(contractType => new ExportInfo(contractType,
                     attribute.ContractName ?? attribute.ContractKey, GetIfAlreadyRegistered(attribute.IfAlreadyExported)));
 
-            Throw.If(manyExports.Length == 0, Error.ExportManyDoesNotExportAnyType, implementationType, contractTypes);
+            if (manyExports.Length == 0)
+                Throw.It(Error.ExportManyDoesNotExportAnyType, implementationType, contractTypes);
 
             // Filters exports that were already made, because ExportMany has less priority than Export(Ex)
             var currentExports = info.Exports;
@@ -1047,6 +1082,13 @@ namespace DryIoc.MefAttributedModel
         internal static string GetMessage(int errorIndex) =>
             Messages[errorIndex - _containerErrorCount];
 
+        /// <summary>Returns the name of error with the provided error code.</summary>
+        public static string NameOf(int error) => 
+            typeof(Error).GetTypeInfo().DeclaredFields
+                .Where(f => f.FieldType == typeof(int))
+                .Where((_, i) => i == error - _containerErrorCount + 1)
+                .FirstOrDefault()?.Name;
+
         static Error()
         {
             Throw.GetMatchedException = GetAttributedModelOrContainerException;
@@ -1073,9 +1115,11 @@ namespace DryIoc.MefAttributedModel
                 : new AttributedModelException(errorCode, message, inner);
         }
 
-        private AttributedModelException(int error, string message) : base(error, message) { }
+        private AttributedModelException(int error, string message) : this(error, message, null) { }
 
-        private AttributedModelException(int error, string message, Exception innerException) : base(error, message, innerException) { }
+        private AttributedModelException(int error, string message, Exception innerException) : 
+            base(error, message, innerException, (e, m, _) => 
+            FormatMessage(MefAttributedModel.Error.NameOf(e), m)) { }
     }
 
     /// <summary>Converts provided literal into valid C# code. Used for generating registration code
@@ -1864,3 +1908,4 @@ namespace DryIoc.MefAttributedModel
     }
 }
 #endif
+ 

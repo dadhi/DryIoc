@@ -1,10 +1,32 @@
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
+[recursive dependency]: ErrorDetectionAndResolution#recursivedependencydetected
+
 # Wrappers
 
-[recursive dependency]: ErrorDetectionAndResolution#markdown-header-recursivedependencydetected
 
-[TOC]
+- [Wrappers](#wrappers)
+  - [Overview](#overview)
+  - [Predefined wrappers](#predefined-wrappers)
+    - [Lazy of A](#lazy-of-a)
+    - [Func of A](#func-of-a)
+    - [Really "lazy" Lazy and Func](#really-lazy-lazy-and-func)
+    - [Func of A with parameters](#func-of-a-with-parameters)
+    - [KeyValuePair of Service Key and A](#keyvaluepair-of-service-key-and-a)
+    - [Meta or Tuple of A with Metadata](#meta-or-tuple-of-a-with-metadata)
+      - [Dictionary Metadata](#dictionary-metadata)
+    - [IEnumerable or array of A](#ienumerable-or-array-of-a)
+      - [Open-generics](#open-generics)
+      - [Co-variant generics](#co-variant-generics)
+      - [Composite Pattern support](#composite-pattern-support)
+    - [LazyEnumerable of A](#lazyenumerable-of-a)
+    - [LambdaExpression](#lambdaexpression)
+      - [DryIoc is not a magic](#dryioc-is-not-a-magic)
+  - [Nested wrappers](#nested-wrappers)
+  - [User-defined wrappers](#user-defined-wrappers)
+
+
+## Overview
 
 Wrapper in DryIoc is some useful data structure which operates on registered service or services. 
 
@@ -18,9 +40,9 @@ More info:
 
 - Wrappers are composable through nesting: e.g. `IEnumerable<Lazy<TService>>`.
 - A similar concept in Autofac is [relationship types](http://docs.autofac.org/en/latest/resolve/relationships.html).
-- DryIoc supports both predefined and [user-defined wrappers](Wrappers#markdown-header-user-defined-wrappers).
+- DryIoc supports both predefined and [user-defined wrappers](Wrappers#user-defined-wrappers).
 - Explicitly registering a wrapper type (e.g. `Func<>` or `Lazy<>`) as a normal service overrides corresponding wrapper registration.
-- The actual difference between normal open-generic service and wrapper is [explained here](Wrappers#markdown-header-user-defined-wrappers).
+- The actual difference between normal open-generic service and wrapper is [explained here](Wrappers#user-defined-wrappers).
 
 Wrapper example:
 ```cs 
@@ -34,8 +56,7 @@ using NUnit.Framework;
 
 class Wrapper_example
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -90,8 +111,7 @@ The important thing about `Lazy` and `Func` is that the wrapped dependency shoul
 ```cs 
 class Lazy_and_Func_require_services_to_be_registered
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -110,14 +130,13 @@ postponing a registration.
 
 There is still a possibility to postpone a service registration:
 
-- One is via [`RegisterPlaceholder`](RegisterResolve#markdown-header-registerplaceholder).
+- One is via [`RegisterPlaceholder`](RegisterResolve#registerplaceholder).
 - Another one is globally, via `Rules.WithFuncAndLazyWithoutRegistration()`, see below:
 
 ```cs 
 class Func_works_without_registration
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules => rules.WithFuncAndLazyWithoutRegistration());
         var getA = container.Resolve<Func<A>>();
@@ -161,8 +180,7 @@ When the passed argument was not used it is maybe a mistake but maybe is not. It
 ```cs 
 class Passed_argument_was_not_used
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<A>();
@@ -183,8 +201,7 @@ By default, DryIoc will use the first call to `Func` to create a service and ign
 ```cs 
 class Func_with_args_and_reuse
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<A>(Reuse.Singleton);
@@ -210,8 +227,7 @@ If you don't like it this way, you may use a rule `Rules.WithIgnoringReuseForFun
 ```cs 
 class Func_with_args_with_rule_ignoring_reuse
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules => rules.WithIgnoringReuseForFuncWithArgs());
         container.Register<A>(Reuse.Singleton);
@@ -239,7 +255,7 @@ class Func_with_args_with_rule_ignoring_reuse
 Wraps a registered service key together with the resolved service. 
 May be used to filter service based on its key. Usually used together with Func or Lazy wrapper and nested inside collection: `IEnumerable<KeyValuePair<string, Func<A>>>`.
 
-More on the `KeyValuePair` usage is [here](RegisterResolve#markdown-header-resolving-as-keyvaluepair-wrapper).
+More on the `KeyValuePair` usage is [here](RegisterResolve#resolving-as-keyvaluepair-wrapper).
 
 
 ### Meta or Tuple of A with Metadata
@@ -250,8 +266,7 @@ Metadata may be provided with attributes when using [MefAttributedModel](Extensi
 ```cs 
 class Providing_metadata
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -279,8 +294,7 @@ Metadata may be also used for collection filtering. When nesting in collection w
 ```cs 
 class Filtering_based_on_metadata
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         var items = container.Resolve<Meta<A, int>[]>();
@@ -304,8 +318,7 @@ In latter case you may `Resolve` by providing the type of any `object` value in 
 ```cs 
 class Resolve_value_out_of_metadata_dictionary
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<A>(setup: Setup.With(
@@ -369,8 +382,7 @@ Nested `Func` or `Lazy` will help in this case:
 ```cs 
 class Collection_of_Lazy_things
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<A>();
@@ -398,8 +410,7 @@ In all other cases, the item will be filtered out of the collection.
 ```cs 
 class Filtering_not_resolved_services
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<B>();
@@ -427,8 +438,7 @@ then both types will be present in the result collection
 ```cs 
 class Both_open_and_closed_generic_included_in_collection
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -452,16 +462,15 @@ DryIoc by default will include [co-variant](https://msdn.microsoft.com/en-us/lib
 generic services into resolved collection. 
 
 What does it mean? In C# you may declare a co-variant open-generic interface with `out` modifier: `IHandler<out T>`.
-Then if you have a class `B` assignable to `A` (`class B : A {}), then their handlers are assignable as well 
+Then if you have a class `B` assignable to `A` (`class B : A {}`), then their handlers are assignable as well 
 `IHandler<B> b = null; IHandler<A> a = b;`.
 
-Proceeding to collections, you may have an `IEnumerable<IHandler<A>>` with elements of type `IHandler<A>` and `IHandler<B>`.
+Proceeding to the collections you may have `IEnumerable<IHandler<A>>` with the elements of type `IHandler<A>` and `IHandler<B>`.
 
 ```cs 
 class Covariant_generics_collection
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -493,8 +502,7 @@ via `Rules.WithoutVariantGenericTypesInResolvedCollection()`:
 ```cs 
 class Covariant_generics_collection_suppressed
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules => rules.WithoutVariantGenericTypesInResolvedCollection());
 
@@ -541,8 +549,7 @@ DryIoc does exactly that:
 ```cs 
 class DryIoc_composite_pattern
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -577,8 +584,7 @@ because multiple implementation are registered. But sometimes you may prefer to 
 ```cs 
 class Prefer_composite_when_resolving_a_single_service
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -613,8 +619,7 @@ By comparison, an array wrapper always returns a fixed set of services ignoring 
 ```cs 
 class LazeEnumerable_example
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -649,8 +654,7 @@ as the `requiredServiceType`. It allows you to override default array injection 
 
 class Specify_LazyEnumerable_per_dependency
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         
@@ -670,8 +674,7 @@ Another option is to specify `LazyEnumerable<>` implementation for `IEnumerable<
 ```cs 
 class Specify_to_use_LazyEnumerable_for_all_IEnumerable
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
     }
@@ -681,17 +684,17 @@ class Specify_to_use_LazyEnumerable_for_all_IEnumerable
 
 ### LambdaExpression
 
-DryIoc allows to get an actual [ExpressionTree](https://docs.microsoft.com/en-us/dotnet/csharp/expression-trees) composed by container to resolve a service. An expression may be used:
+Allows getting an actual [ExpressionTree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) composed by container to resolve a service. 
 
-- For diagnostics to check if container creates a service in an expected way.
-- In code generation scenarios by converting an expression to C# code via [ExpressionToCode](https://github.com/EamonNerbonne/ExpressionToCode) during compile or build time.
+- It may be used either for diagnostics, to check if container creates the service in an expected way.
+- In code generation scenarios, by converting the expression to C# code with something like [ExpressionToCode](https://github.com/EamonNerbonne/ExpressionToCode) library. 
+It may be done even at compile-time.
 - To understand how DryIoc works internally.
 
 ```cs 
 class Resolve_expression
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -703,8 +706,6 @@ class Resolve_expression
 
         // The result expression is of type `Expression<FactoryDelegate>`, like this:
         Expression<FactoryDelegate> f = (IResolverContext r) => new Service();
-        
-        Assert.True(expr is Expression<DryIoc.FactoryDelegate>);
     }
 
     interface IService { }
@@ -712,24 +713,30 @@ class Resolve_expression
 }
 ```
 
-__Note:__ Resolving as `LambdaExpression` does not instantiate any services.
+The actual type of returned `LambdaExpression` is `Expression<DryIoc.FactoryDelegate>` which has a signature as in the example.
+
+__Note:__ Resolving as `LambdaExpression` does not create an actual service.
 
 
-#### Internals
+#### DryIoc is not a magic
 
-DryIoc automates the creation of the object graph taking lifetime into consideration via same generated expression we resolved earlier. You may `Compile`(and cache) and invoke expression to instantiate an object.
+Examining the resolved `LambdaExpression` you won't see any magic -
 
-That allows for scenarios not simply possible with default container interface. 
+DryIoc just automates the generation of the object graph taking lifetime into consideration.
+
+Given that you now have the resolved expression you may even `Compile` (and cache) it yourself :-) doing the last "magical" part.
+
+This opens the additional possibilities:
+
 For instance, below is the example which is "normally" won't work without shared `scopeContext`. 
-Specifically we have a singleton holding on the `Func` of scoped service. Now we are getting an expression out 
+Specifically we have a singleton holding onto the `Func` of scoped service. Now we are getting the expression out 
 of container, compiling it and providing it with the scope (or any other container we want) 
 as a `IResolverContext` argument to the compiled factory.
 
 ```cs 
 class Swap_container_in_factory_delegate
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container(rules => rules.ForExpressionGeneration());
 
@@ -787,16 +794,13 @@ container.Resolve<Meta<Func<Arg1, Arg2, IA>, object>>();
 // etc.
 ```
 
-<div id="markdown-header-user-defined-wrappers"></div>
-
 ## User-defined wrappers
 
 To register your own wrapper just specify setup parameter as `Setup.Wrapper` or `Setup.WrapperWith`:
 ```cs 
 class User_defined_wrappers
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
@@ -805,6 +809,7 @@ class User_defined_wrappers
 
         // Register a wrapper
         container.Register(typeof(MenuItem<>), setup: Setup.Wrapper);
+        Assert.IsTrue(container.IsRegistered(typeof(MenuItem<>), factoryType: FactoryType.Wrapper));
 
         var items = container.Resolve<MenuItem<ICmd>[]>();
         Assert.AreEqual(2, items.Length);
@@ -815,7 +820,7 @@ class User_defined_wrappers
     public class Y : ICmd { }
 
     // Here is the wrapper
-    public class MenuItem<T> where T : ICmd { }
+    public class MenuItem<TCmd> where TCmd : ICmd { }
 }
 ```
 
@@ -835,16 +840,30 @@ Example of the non-generic wrapper:
 ```cs 
 class Non_generic_wrapper
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
         container.Register<IService, Foo>();
         container.Register<IService, Bar>();
         container.Register<MyWrapper>(setup: Setup.Wrapper);
+        Assert.IsTrue(container.IsRegistered(typeof(MyWrapper), factoryType: FactoryType.Wrapper));
 
         var items = container.Resolve<MyWrapper[]>(requiredServiceType: typeof(IService));
+        Assert.AreEqual(2, items.Length);
+    }
+
+    // The same should work with the closed-generic wrapper
+    [Test] public void Example_with_closed_generic_wrapper()
+    {
+        var container = new Container();
+
+        container.Register<IService, Foo>();
+        container.Register<IService, Bar>();
+        container.Register<MyWrapper<IService>>(setup: Setup.Wrapper);
+        Assert.IsTrue(container.IsRegistered(typeof(MyWrapper<IService>), factoryType: FactoryType.Wrapper));
+
+        var items = container.Resolve<MyWrapper<IService>[]>(); // you dont need the `requiredServiceType` here
         Assert.AreEqual(2, items.Length);
     }
 
@@ -853,5 +872,7 @@ class Non_generic_wrapper
     class Bar : IService { }
 
     class MyWrapper { public MyWrapper(IService service) { } }
+
+    class MyWrapper<T> { public MyWrapper(T service) { } }
 }
 ```

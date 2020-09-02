@@ -26,9 +26,6 @@
     <PackageReference Include="Wire" Version="0.8.0" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="System.ComponentModel.Composition" />
-  </ItemGroup>
-  <ItemGroup>
     <Compile Update="CompileTimeGeneratedRegistrator.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

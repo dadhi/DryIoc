@@ -1,9 +1,27 @@
-
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
 # Reuse and Scopes
 
-[TOC]
+
+- [Reuse and Scopes](#reuse-and-scopes)
+  - [What is Reuse?](#what-is-reuse)
+  - [Reuse.Transient](#reusetransient)
+    - [Disposable Transient](#disposable-transient)
+    - [Different default Reuse instead of Transient](#different-default-reuse-instead-of-transient)
+  - [Reuse.Singleton](#reusesingleton)
+  - [Reuse.Scoped](#reusescoped)
+    - [What Scope is?](#what-scope-is)
+    - [What Current Scope is?](#what-current-scope-is)
+    - [ScopeContext](#scopecontext)
+    - [Nested scopes](#nested-scopes)
+  - [Reuse.ScopedTo(name)](#reusescopedtoname)
+    - [Reuse.InWebRequest and Reuse.InThread](#reuseinwebrequest-and-reuseinthread)
+  - [Reuse.ScopeTo{TService}(serviceKey)](#reusescopetotserviceservicekey)
+  - [Setup.UseParentReuse](#setupuseparentreuse)
+  - [Reuse lifespan diagnostics](#reuse-lifespan-diagnostics)
+  - [Weakly Referenced reused service](#weakly-referenced-reused-service)
+  - [Prevent Disposal of reused service](#prevent-disposal-of-reused-service)
+
 
 ## What is Reuse?
 
@@ -34,10 +52,10 @@ Service setup options:
 
 You can create your own reuse by implementing `IReuse` interface.
 
-Container uses Scopes ([see below](ReuseAndScopes#markdown-header-what-scope-is)) to 
+Container uses Scopes ([see below](ReuseAndScopes#what-scope-is)) to 
 store resolved services of non-Transient reuse.
 Scope implements `IDisposable` and when disposed will dispose reused disposable services. You may prevent service disposal 
-via [setup option](ReuseAndScopes#markdown-header-prevent-disposal-of-reused-service).
+via [setup option](ReuseAndScopes#prevent-disposal-of-reused-service).
 
 __Note:__ Service disposal is always taken in the reverse registration order.
 
@@ -88,7 +106,6 @@ class Disposable_transient_as_resolved_service
 
     class X : IDisposable { public void Dispose() { } }
 }
-
 ```
 
 In this case, using the container is very similar to using a `new` operator. 
@@ -120,7 +137,6 @@ class Disposable_transient_as_injected_dependency
     class X : IDisposable { public void Dispose() { } }
     class XUser { public XUser(X x) { } }
 }
-
 ```
 
 Here `XUser` just accepts `X` parameter without knowing its reuse, is it shared or not. 
@@ -217,7 +233,6 @@ class Prevent_disposable_tracking_with_Func
         public void Dispose() => IsDisposed = true;
     }
 }
-
 ```
 
 
@@ -871,4 +886,3 @@ By default, DryIoc will dispose `IDisposable` reused service together with its s
 ```cs
 container.Register<Service>(Reuse.Singleton, setup: Setup.With(preventDisposal: true));
 ```
-

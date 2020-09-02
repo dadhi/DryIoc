@@ -336,7 +336,6 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        //[Description("https://bitbucket.org/dadhi/dryioc/issue/73/remove-reused-instance-when-unregister")]
         public void Unregister_singleton_without_swappable()
         {
             var container = new Container();
