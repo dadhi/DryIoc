@@ -113,7 +113,6 @@ and to support the __extensibility__ and __testability__ of the code.
 
 ## Companions
 
-- [DryIocZero](Companions/DryIocZero)
 - [DryIocAttributes](Companions/DryIocAttributes)
 
 ## Extensions
