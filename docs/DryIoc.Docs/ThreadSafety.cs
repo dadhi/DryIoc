@@ -27,8 +27,8 @@ using System;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using ImTools;
 using DryIoc;
+using DryIoc.ImTools;
 #pragma warning disable CS0649
 // ReSharper disable UnusedVariable
 //md```
