@@ -1866,8 +1866,7 @@ namespace DryIoc.MefAttributedModel
     using System.Linq;
     using System.Reflection;
 
-    /// <summary>Fake polyfill for the reflection API missing in the PCL profiles.</summary>
-    /// <remarks>Actually, PCL-Net45 has CustomAttributeData class, but it's almost empty.</remarks>
+    /// <summary>The polyfill for the reflection API missing in the lower NET Standard targets.</summary>
     public class CustomAttributeData
     {
         /// <summary>Gets or sets the constructor information.</summary>
@@ -1879,7 +1878,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Gets or sets the named arguments.</summary>
         public IList<CustomAttributeNamedArgument> NamedArguments { get; set; }
 
-        /// <summary>Fake poly-fill for the reflection API missing in the PCL profiles.</summary>
+        /// <summary>The polyfill for the reflection API missing in the lower NET Standard targets.</summary>
         public struct CustomAttributeTypedArgument
         {
             /// <summary>Gets or sets the type of the value.</summary>
@@ -1889,7 +1888,7 @@ namespace DryIoc.MefAttributedModel
             public object Value { get; set; }
         }
 
-        /// <summary>Fake poly-fill for the reflection API missing in the PCL profiles.</summary>
+        /// <summary>The polyfill for the reflection API missing in the lower NET Standard targets.</summary>
         public struct CustomAttributeNamedArgument
         {
             /// <summary>Gets or sets the argument member information.</summary>
@@ -1900,7 +1899,6 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Returns an empty data list as the functionality is not available.</summary>
-        /// <param name="type"></param> <returns></returns>
         public static IEnumerable<CustomAttributeData> GetCustomAttributes(Type type)
         {
             return Enumerable.Empty<CustomAttributeData>();
