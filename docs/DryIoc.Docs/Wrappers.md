@@ -90,7 +90,7 @@ __Note:__ `DryIoc.Meta<,>` type may just help to migrate from Autofac but you ma
 
 - Provides an instance of `A` created on first access.
 - Internally implemented as a call to a container Resolve: `r => new Lazy(() => r.Resolve<A>())`, therefore `A` may not be yet available when `Lazy` is injected.
-- Permits a [recursive dependency] in resolution graph, because uses a `Resolve` to postpone to getting an actual service value.
+- Permits [recursive dependency] in resolution graph, because uses the `Resolve` call for service creation postponing its dependency check.
 
 
 ### Func of A
@@ -102,7 +102,7 @@ __Note:__ `DryIoc.Meta<,>` type may just help to migrate from Autofac but you ma
 
     `container.Register<A>(setup: Setup.With(asResolutionCall: true));`
 
-    - This way `Func<A>` will be injected as: `new B(() => r.Resolver.Resolve<A>())`    
+    - This way `Func<A>` will be injected as: `new B(() => r.Resolver.Resolve<A>())`
     - Permits [recursive dependency] in resolution graph.
 
 ### Really "lazy" Lazy and Func
@@ -125,7 +125,7 @@ class Lazy_and_Func_require_services_to_be_registered
 ```
 
 This was done intentionally to be able to construct as much of the object graph as possible to verify its correctness.
-The default DryIoc laziness of `Func` and `Lazy` is about postponing a creation of service value, and not about 
+The default DryIoc laziness of `Func` and `Lazy` is about postponing a creation of service value and not about 
 postponing a registration.
 
 There is still a possibility to postpone a service registration:
@@ -150,6 +150,9 @@ class Func_works_without_registration
     class A { }
 } 
 ```
+
+**Note:** Using `WithFuncAndLazyWithoutRegistration` will also permit the [recursive dependency].
+
 
 ### Func of A with parameters
 
