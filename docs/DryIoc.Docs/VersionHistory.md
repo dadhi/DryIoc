@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.4.0 Small features release / 2020-09-04
+
+- fixed: #314 Expose the usual IfAlreadyRegistered option parameter for RegisterMapping
+
 ## v4.3.4 Bug-fix release / 2020-09-01
 
 - fixed: #239 [DOCS] WithUknownServiceResolver ignores ResolveMany

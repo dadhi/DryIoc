@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>4.3.4</version>
+        <version>4.4.0</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,60 +14,10 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
-## v4.3.4 Bug-fix release
 
-- fixed: #239 [DOCS] WithUknownServiceResolver ignores ResolveMany
+## v4.4.0 Small features release
 
-## v4.3.3 Bug-fix release
-
-- fixed: #310 Ensure that FEC.LightExpression.ILGeneratorHacks does not crash if some method is not reflected
-
-## v4.3.2 Bug-fix release
-
-- fixed: #303 Open Generic Singleton do not provide same instance for Resolve and ResolveMany
-
-## v4.3.1 Bug-fix release
-
-- fixed: #301 breakage in scoped enumeration in v4
-
-## v4.3.0 Small feature and bug-fix release
-
-- added: #298 Add RegisterManyIgnoreNoServicesWereRegistered
-- added: #300 Add Rules.WithMicrosoftDependencyInjectionRules
-- fixed: #295 useParentReuse does not respects parent reuse
-
-## v4.2.5 Bug-fix release
-
-- fixed: #294 in parameter modifier breaks service resolution
-
-## v4.2.4 Bug-fix release
-
-- fixed: #290 ScopedTo to Singleton does not work
-
-## v4.2.3 Bug-fix release
-
-- fixed: #289 Think how to make Use to directly replace scoped service without special asResolutionCall setup
-
-## v4.2.2 Bug-fix release
-
-- fixed: #288 Recursive resolution ignores current scope .Use() instance 
-- small perf improvements
-
-## v4.2.1 Bug-fix release
-
-- fixed: #156 Xamarin Forms iOS System.PlatformNotSupportedException: Operation is not supported on this platform.
-- fixed: #283 Open-generic decorators are no applied to the service registered via RegisterInstance
-
-## v4.2.0 Feature release
-
-- feature: #270 Add FEC.LightExpression.LambdaExpression wrapper to work the same as System LambdaExpression  
-
-- fixed: #258 System Invalid program exception when removing dependency
-- fixed: #265 Improve the case with splitting the big object graph
-- fixed: #267 [MS.DI] Incorrect resolving for generic types.
-- fixed: #256 Memory usage increase up to 7 percent in real-case benchmark
-- fixed: #254 ResolveMany if singleton decorators decorates the first item only
-- fixed: #280 Possibility to make source files which are embedded to the project internal? 
+- fixed: #314 Expose the usual IfAlreadyRegistered option parameter for RegisterMapping
 
 ]]>
         </releaseNotes>
