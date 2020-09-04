@@ -579,8 +579,7 @@ The value may depend on your .NET framework.
 ```cs 
 class RegisterMany_excludes_these_types
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var excludedTypes = Registrator.ExcludedGeneralPurposeServiceTypes;
         Assert.IsNotEmpty(excludedTypes);
@@ -608,7 +607,7 @@ __Note:__ If you really need to register something from the list, you may regist
 
 `RegisterMapping` allows to map a new service to the already registered service and its implementation.
 
-For example you have a singleton implementation which may be accessed via two different facades / services:
+For example you may want to have a singleton implementation accessed via two different services (facades):
 ```cs 
 class Register_mapping
 {
@@ -655,9 +654,8 @@ class Register_mapping_with_RegisterMany
 }
 ```
 
-The possible advantage of `RegisterMapping` would be that you can decide on mapping for already existing registration.
-
-Performance considered it should be the same.
+Regarding the multi-service capabilities, the possible advantage of `RegisterMapping` is the ability to map the registration made externally and not controlled by you, 
+see this [StackOverflow question for example](https://stackoverflow.com/questions/63736612/resolve-services-derived-from-base-class-using-dryioc).
 
 
 ## RegisterDelegate
