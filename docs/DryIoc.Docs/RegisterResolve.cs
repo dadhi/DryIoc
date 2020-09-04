@@ -17,7 +17,8 @@
   - [RegisterMany](#registermany)
   - [RegisterMapping](#registermapping)
   - [RegisterDelegate](#registerdelegate)
-    - [Will not detect recursive dependencies](#will-not-detect-recursive-dependencies)
+    - [The cure - RegisterDelegate with the dependency parameters](#the-cure---registerdelegate-with-the-dependency-parameters)
+    - [RegisterDelegate is harder to use when types are not known](#registerdelegate-is-harder-to-use-when-types-are-not-known)
   - [RegisterInstance](#registerinstance)
   - [RegisterInitializer](#registerinitializer)
   - [RegisterPlaceholder](#registerplaceholder)
@@ -579,8 +580,7 @@ The value may depend on your .NET framework.
 ```cs md*/
 class RegisterMany_excludes_these_types
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var excludedTypes = Registrator.ExcludedGeneralPurposeServiceTypes;
         Assert.IsNotEmpty(excludedTypes);
@@ -606,9 +606,9 @@ __Note:__ If you really need to register something from the list, you may regist
 
 ## RegisterMapping
 
-`RegisterMapping` allows to map new service to already registered service and its implementation. 
+`RegisterMapping` allows to map a new service to the already registered service and its implementation.
 
-For example you have a singleton implementation which can be accessed via two different facades / services:
+For example you may want to have a singleton implementation accessed via two different services (facades):
 ```cs md*/
 class Register_mapping
 {
@@ -632,7 +632,7 @@ class Register_mapping
 }/*md
 ```
 
-This same result maybe achieved via `RegisterMany`:
+The same result may be achieved via the `RegisterMany`:
 
 ```cs md*/
 class Register_mapping_with_RegisterMany
@@ -655,9 +655,8 @@ class Register_mapping_with_RegisterMany
 }/*md
 ```
 
-The possible advantage of `RegisterMapping` would be that you can decide on mapping for already existing registration.
-
-Performance considered it should be the same.
+Regarding the multi-service capabilities, the possible advantage of `RegisterMapping` is the ability to map the registration made externally and not controlled by you, 
+see this [StackOverflow question for example](https://stackoverflow.com/questions/63736612/resolve-services-derived-from-base-class-using-dryioc).
 
 
 ## RegisterDelegate
@@ -684,8 +683,8 @@ class Register_delegate
 }/*md
 ```
 
-The `IResolverContext resolverContext` delegate parameter was not used in example above. 
-Actually, it could be used to resolve any additional dependencies required for service creation and initialization:
+The `IResolverContext resolverContext` delegate parameter was not used in the example above. 
+Actually, it could be used to resolve any additional dependencies required for the service creation and initialization:
 
 ```cs md*/
 class Register_delegate_with_resolved_dependencies
@@ -725,10 +724,54 @@ class Register_delegate_with_resolved_dependencies
 Though powerful, registering delegate may lead to the problems:
 
 1. Memory leaks by capturing variables into delegate closure and keeping them for a container lifetime.
-2. Delegate is the black box for Container - which makes hard to find type mismatches or diagnose other potential problems.
+2. Delegate is the black box for Container, mostly because it should use the `Resolve` call inside to resolve the dependency cutting of the object graph analysis, which makes it hard to find type mismatches or diagnose other potential problems. Among the un-catched problems are:
+
+    - [Recursive Dependency](ErrorDetectionAndResolution#RecursiveDependencyDetected)
+    - [Captive Dependency](ErrorDetectionAndResolution#using-validate-to-check-for-captive-dependency)
 
 Therefore, try to use it only as a last resort. DryIoc has plenty of tools to cover for custom delegate in more effective way. 
-The ultimate alternative would be a [FactoryMethod](ConstructorSelection).
+The alternative would be a [FactoryMethod](ConstructorSelection).
+
+Another alternative would be the **RegisterDelegate with the dependency parameters introduced in DryIoc v4.3**. See below...
+
+### The cure - RegisterDelegate with the dependency parameters
+
+It solves the two problems mentioned in the [RegisterDelegate](#registerdelegate) above because 
+it **injects** the requested dependencies as a delegate arguments so there is no need in calling `Resolve` inside.
+
+- The dependencies injection and their lifetime is controlled by container
+- There is no black-box service location involved and both [Recursive Dependency](ErrorDetectionAndResolution#RecursiveDependencyDetected) and [Captive Dependency](ErrorDetectionAndResolution#using-validate-to-check-for-captive-dependency) problems are catched by container.
+
+The example:
+```cs md*/
+
+class Register_delegate_with_parameters
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<A>(Reuse.Singleton);
+        container.Register<B>(Reuse.Singleton);
+
+        // injecting A and B for X created via delegate
+        container.RegisterDelegate<A, B, X>((a, b) => new X(a, b));
+
+        Assert.IsNotNull(container.Resolve<X>());
+    }
+
+    class A {}
+    class B {}
+    class X 
+    {
+        public X(A a, B b) {}
+    }
+}
+
+/*md
+```
+
+### RegisterDelegate is harder to use when types are not known
 
 Another thing, that delegate is usually hard to use when types are not known in the compile time. 
 Given `type = typeof(Foo)` it is impossible to write `new type();`.
@@ -751,26 +794,6 @@ class Register_delegate_returning_object
 }
 /*md
  ```
-
-
-### Will not detect recursive dependencies
-
-When using normal typed registration DryIoc will detect [recursive dependencies](ErrorDetectionAndResolution#RecursiveDependencyDetected). 
-
-But when using the delegate registration DryIoc is unable to analyze what dependencies are used inside delegate. 
-That is another reason to avoid `RegisterDelegate` whatsoever:
-```cs
-public class A { public A(B b) {} } // A requires B
-public class B { public B(A a) {} } // B requires A
-
-container.Register<A>();
-container.RegisterDelegate<B>(r => new B(r.Resolve<A>()));
-
-container.Resolve<A>(); // Fails with StackOverflowException
-```
-
-To catch the problem with recursive dependency, replace `RegisterDelegate` with `container.Register<B>()`.
-
 
 ## RegisterInstance
 

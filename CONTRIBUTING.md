@@ -1,16 +1,29 @@
 # Contributing
 
-## In general
 
-_is much appreciated_
+- [Contributing](#contributing)
+  - [Overview](#overview)
+  - [How to report an issue step-by-step](#how-to-report-an-issue-step-by-step)
+  - [How to build and develop the DryIoc](#how-to-build-and-develop-the-dryioc)
+    - [Build from the command line](#build-from-the-command-line)
+    - [Develop in Visual Studio 2017+](#develop-in-visual-studio-2017)
+    - [Develop in Visual Studio Code](#develop-in-visual-studio-code)
+  - [Contributing to the documentation](#contributing-to-the-documentation)
+    - [TL;DR;](#tldr)
+    - [Documentation in DryIoc explained](#documentation-in-dryioc-explained)
 
-You may help via
+
+## Overview
+
+Your help is highly appreciated. Thank you!
+
+You may help via:
 
 - Commenting on the existing issues in the [DryIoc GitHub repository](https://github.com/dadhi/DryIoc).
 - Opening new issues for bugs, enhancements, and feature proposals.
-- Creating Pull Requests with the improvements, failed tests for the found bugs, and the bug fixes.
-- Correcting the documentation errors and submitting the new documentation topics.
-- Asking and answering questions on [StackOverflow](http://stackoverflow.com/questions/tagged/dryioc), tagging your questions with `dryioc` tag for easy finding.
+- Creating Pull Requests with the improvements, failed tests for the found bugs, and the bug-fixes.
+- [Correcting the documentation errors](#contributing-to-the-documentation) and submitting the new documentation topics.
+- Asking and answering the questions on [StackOverflow](http://stackoverflow.com/questions/tagged/dryioc), tagging your questions with `dryioc` tag for easy finding.
 - Discussing the problems and ideas in the [Gitter](https://gitter.im/dadhi/DryIoc) or [Slack](https://dryioc.slack.com) rooms.
 - Poking me on [Twitter](http://twitter.com/intent/user?screen_name=DryIoc).
 
@@ -26,71 +39,66 @@ If you found the problem with DryIoc:
      - Add failing tests reproducing your case to `test\DryIoc.IssuesTests` project. Check other files in the project for general guideline, but nothing is strict here.
      - **Ignore** the failing tests with `[Ignore("fixme")]` attribute, so that CI build should pass.
      - Commit your tests and create a Pull Request for me to review.
-    
-Thank you.
 
 
 ## How to build and develop the DryIoc
 
 ### Build from the command line 
 
-Before sending a Pull Request, please build solution with `build.bat` located in the root folder.
+Before sending the Pull Request please build the solution with the `build.bat` located in the root folder.
 
-It will build all projects for __all platforms__ in Release configuration, run unit tests, and create NuGet packages.
+It will build all projects for in the Release configuration, will run unit tests and create the NuGet packages.
 Make sure that there are no project build errors or failing tests.
 
 ### Develop in Visual Studio 2017+
 
-Open `DryIoc.sln` solution and re-build it. If something is failing, you may try to close VS, open command line and run `dotnet clean`, then `build.bat` in solution folder, open VS and try to build again.
+Open `DryIoc.sln` solution and re-build it. If something is failing you may try to close VS, run `build.bat` in the root folder, open VS and try to build again.
 
-__Note:__ Projects in the solution multi-target multiple platforms, e.g. `DryIoc` targets 6+ platforms which makes it slower to build. To speedup the development DryIoc has `<DevMode>true</DevMode>` MSBuild property set to `true` in `Directory.Build.props` file in the solution root folder. This setting minimizes the number of platforms to target. That's why you need to run `build.bat` to test your work on all platforms.
+__Note:__ DryIoc targets multiple platforms (via msbuild project multi-targeting) which makes it slower to build. 
+To speedup the development DryIoc has `<DevMode>true</DevMode>` (TODO: Point to change) MSBuild property set to `true` in `Directory.Build.props` file in the root folder. 
+This setting minimizes the number of platforms to build - that's why you need to run `build.bat` to test your work for all platforms.
 
-__Productivity hint:__ I am using [NCrunch](http://www.ncrunch.net/) to build and run tests continuously, to get an immediate feedback, quickly find regressions, and generally experiment with the code.
+__Productivity hint:__ I am using [NCrunch](http://www.ncrunch.net/) extension to build and run the tests continuously to get an immediate feedback, quickly find regressions, and generally experiment with the code.
 
 ### Develop in Visual Studio Code
 
-It is possible to develop and run tests via extensions and `dotnet` CLI in VS Code. 
+DryIoc provides the friendly VSCode developing experience. 
 
+Basically you need just the **C# extension** installed. 
+
+Then you may run the `build.bat` from the shell to ensure packages are restored, code is built, tests are passing and packages are created.
+
+You may go to the test projects in the _test_ sub-folder and Run or Debug the tests via the editor lens provided by the extension.
 
 ## Contributing to the documentation
 
+### TL;DR;
+
+- Edit the selected document **.cs** (not the .md) file in the _docs\DryIoc.Docs_ sub-folder.
+- Run the `build_the_docs.bat` file from the root folder in the shell.
+- Check the updated .md file. You may preview the markdown files with the respective markdown extension in VSCode or in Visual Studio.
+- Commit the changes both for .cs and .md and follow the usual PR GitHub workflow.
+
 ### Documentation in DryIoc explained
 
-DryIoc uses **compilable runnable documentation** written in `.cs` C# files in the markdown format - [example](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/CreatingAndDisposingContainer.cs).
-That's a lot to say :-) so let's explain it step by step.
+DryIoc uses the **compile-able runnable documentation** written in `.cs` C# files in the markdown format - [example](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/CreatingAndDisposingContainer.cs).
+That's a lot to say :-) so let me explain...
 
-Markdown text is placed inside `/*md ... md*/` block comment sections and 
+Markdown text is placed inside the `/*md ... md*/` comments and 
 the examples are just the unit test classes outside of the markdown comment blocks.
 
-The documentation files are included into the normal NUnit test project `docs\DryIoc.Docs` in the DryIoc solution. That way docs are compiled and __examples (tests) are always up-to-date__ and can be run locally and on CI side.
+The documentation files are included into the normal NUnit test project _docs\DryIoc.Docs_ in the DryIoc solution. 
+This way the docs are compiled as a normal code and __the example tests are up-to-date__ and can be run locally or on the CI side.
 
-The doc `.cs` file can be converted to the markdown `.md` file by removing the `/*md` and `md*/` strings. That's exactly what [CsToMd Visual Studio Extension](https://marketplace.visualstudio.com/items?itemName=dadhi.cstomd123) is doing.
-There is a [repository](https://github.com/dadhi/CsToMd) for extension with more information and nice screenshots.
+The documentation `.cs` files are converted to the markdown `.md` file via [CsToMd Visual Studio extension](https://marketplace.visualstudio.com/items?itemName=dadhi.cstomd123) 
+and via the [dotnet-cstomd](https://www.nuget.org/packages/dotnet-cstomd) dotnet CLI local tool which is **already installed when you build the project**.
+There is a [CsToMd repository](https://github.com/dadhi/CsToMd) with more information.
 
-After installing the extension and re-launching the Visual Studio, you will see that `DryIoc.Docs` project
-has a corresponding `.md` file located under the `.cs` file. 
+When installing the extension for the Visual Studio you will see that `DryIoc.Docs` project has a `.md` files located under corresponding the `.cs` files.
 
-Now edit the `.cs` file, save it, and the `.md` file will be automatically re-generated by the extension.
-__That also means you should not edit the `.md` file directly, because the changes will be lost on the next save__.
+Try edit the `.cs` file then save it and see that the `.md` file is automatically changed by the extension.
 
-The result markdown file can be automatically previewed inside the Visual Studio with the help of 
-another extension [Markdown Editor](https://marketplace.visualstudio.com/items?itemName=MadsKristensen.MarkdownEditor).
+The result markdown file may be automatically previewed inside the Visual Studio with the help of 
+[Markdown Editor extension](https://marketplace.visualstudio.com/items?itemName=MadsKristensen.MarkdownEditor).
 
-I would also recommend installing the spell-checker: I usually use the one available with [ReSharper](https://www.jetbrains.com/resharper/?gclid=Cj0KCQjws5HlBRDIARIsAOomqA1wr-wPRR8sQcIp3_FrcaP6_I9lceuZaUDPzjboxcU1SBHExV6tFfMaAhh5EALw_wcB&gclsrc=aw.ds) or 
-you may install [Visual Studio Spell Checker extension](https://ewsoftware.github.io/VSSpellChecker/html/e339cac1-9783-4c2a-919f-88436c78fef8.htm).
-
-### Step-by-step guide
-
-- [Fork DryIoc](https://github.com/dadhi/DryIoc/fork) from the GitHub repository.
-- Open `DryIoc.sln` in Visual Studio 2017+ with [CsToMd extension](https://marketplace.visualstudio.com/items?itemName=dadhi.cstomd123)
- installed and find `docs/DryIoc.Docs` project in the Solution Explorer.
-- Make your edits into `.cs` files. If you need to create a new one, I suggest copying the existing `.cs` file to get started.
-- If you change the C# examples, compile the project and run the tests.
-- Save edited files - the markdown file will be re-generated and saved automatically.
-- Check your edits in the result markdown file with the [Markdown Editor extension](https://marketplace.visualstudio.com/items?itemName=MadsKristensen.MarkdownEditor).
-- Run `build.bat` file to ensure the whole solution is OK after submitting your changes and is successfully built on CI.
-- Git Commit your changes with the descriptive message and Git Push them to your fork.
-- Open the GitHub with your DryIoc fork and create a Pull Request with the committed changes.
-
-Thank you.
-
+In VSCode you need to run the `build_the_docs.bat` to see the changes or just build the `DryIoc.Docs` project in the Debug mode (the default).

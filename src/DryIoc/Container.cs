@@ -7635,11 +7635,11 @@ namespace DryIoc
         /// Throw if no such registered service type in container.</summary>
         /// <param name="registrator">Registrator</param> <param name="serviceType">New service type.</param>
         /// <param name="registeredServiceType">Existing registered service type.</param>
+        /// <param name="ifAlreadyRegistered">The registration to overwrite or preserve the already registered service</param>
         /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
         /// <param name="factoryType">(optional) By default is <see cref="FactoryType.Service"/></param>
-        /// <remarks>Does nothing if registration is already exists.</remarks>
         public static void RegisterMapping(this IRegistrator registrator, Type serviceType, Type registeredServiceType,
-            object serviceKey = null, object registeredServiceKey = null, FactoryType factoryType = FactoryType.Service)
+            IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey = null, object registeredServiceKey = null, FactoryType factoryType = FactoryType.Service)
         {
             var factories = registrator.GetRegisteredFactories(registeredServiceType, registeredServiceKey, factoryType);
 
@@ -7649,8 +7649,14 @@ namespace DryIoc
             if (factories.Length > 1)
                 Throw.It(Error.RegisterMappingUnableToSelectFromMultipleFactories, serviceType, serviceKey, factories);
 
-            registrator.Register(factories[0], serviceType, serviceKey, IfAlreadyRegistered.Keep, false);
+            registrator.Register(factories[0], serviceType, serviceKey, ifAlreadyRegistered, false);
         }
+
+        /// <summary>Registers new service type with factory for registered service type.
+        /// Throw if no such registered service type in container.</summary>
+        public static void RegisterMapping(this IRegistrator registrator, Type serviceType, Type registeredServiceType,
+            object serviceKey = null, object registeredServiceKey = null, FactoryType factoryType = FactoryType.Service) =>
+            registrator.RegisterMapping(serviceType, registeredServiceType, null, serviceKey, registeredServiceKey, factoryType);
 
         /// <summary>Registers new service type with factory for registered service type.
         /// Throw if no such registered service type in container.</summary>
@@ -7659,10 +7665,9 @@ namespace DryIoc
         /// <typeparam name="TRegisteredService">Existing registered service type.</typeparam>
         /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
         /// <param name="factoryType">(optional) By default is <see cref="FactoryType.Service"/></param>
-        /// <remarks>Does nothing if registration is already exists.</remarks>
         public static void RegisterMapping<TService, TRegisteredService>(this IRegistrator registrator,
             object serviceKey = null, object registeredServiceKey = null, FactoryType factoryType = FactoryType.Service) =>
-            registrator.RegisterMapping(typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
+            registrator.RegisterMapping(typeof(TService), typeof(TRegisteredService), null, serviceKey, registeredServiceKey);
 
         /// <summary>Register a service without implementation which can be provided later in terms
         /// of normal registration with IfAlreadyRegistered.Replace parameter.
@@ -7675,6 +7680,18 @@ namespace DryIoc
         public static void RegisterPlaceholder(this IRegistrator registrator, Type serviceType,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             registrator.Register(FactoryPlaceholder.Default, serviceType, serviceKey, ifAlreadyRegistered, true);
+
+        /// <summary>Registers new service type with factory for registered service type.
+        /// Throw if no such registered service type in container.</summary>
+        /// <param name="container">Container</param>
+        /// <typeparam name="TService">New service type.</typeparam>
+        /// <typeparam name="TRegisteredService">Existing registered service type.</typeparam>
+        /// <param name="ifAlreadyRegistered">The registration to overwrite or preserve the already registered service</param>
+        /// <param name="serviceKey">(optional)</param> <param name="registeredServiceKey">(optional)</param>
+        public static void RegisterMapping<TService, TRegisteredService>(this IContainer container,
+            IfAlreadyRegistered ifAlreadyRegistered, object serviceKey = null, object registeredServiceKey = null) =>
+            Registrator.RegisterMapping(container,
+                typeof(TService), typeof(TRegisteredService), ifAlreadyRegistered, serviceKey, registeredServiceKey);
 
         /// <summary>Register a service without implementation which can be provided later in terms
         /// of normal registration with IfAlreadyRegistered.Replace parameter.

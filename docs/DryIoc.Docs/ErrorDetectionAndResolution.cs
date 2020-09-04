@@ -324,7 +324,7 @@ or via exact collection of service roots `ServiceInfo[]`.
 
 ## Using Validate to check for Captive Dependency
 
-Captive Dependency in DI means the use of service with shorter lifespan inside a service with longet lifespan, e.g.
+Captive Dependency in DI means the use of service with shorter lifespan inside a service with longer lifespan, e.g.
 when a Scoped dependency is injected into Singleton. The problem here is that dependency with shorter livespan may be 
 requested from the longer lived consumer when the dependency is already dead - and now you are in uncharted territory.
 
