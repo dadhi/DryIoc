@@ -2917,18 +2917,17 @@ namespace DryIoc
                             if (!TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, useFec, ref instance))
                                 return false;
                         }
-                        else if (operandExpr is InvocationExpression i &&
-                             i.Expression is ConstantExpression cd &&
-                             cd.Value is FactoryDelegate d)
+                        else if (operandExpr is InvocationExpression invokeExpr &&
+                             invokeExpr.Expression is ConstantExpression cd && cd.Value is FactoryDelegate facDel)
                         {
                             // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
-                            if (i.Arguments[0] == FactoryDelegateCompiler.ResolverContextParamExpr)
-                                result = d(r);
-                            else if (i.Arguments[0] == ResolverContext.RootOrSelfExpr)
-                                result = d(r.Root ?? r);
-                            else if (TryInterpret(r, i.Arguments[0], paramExprs, paramValues, parentArgs, useFec,
-                                out var resolver))
-                                result = d((IResolverContext) resolver);
+                            var rArg = invokeExpr.Arguments[0]; // todo: @perf optimize for a OneArgumentInvocationExpression
+                            if (rArg == FactoryDelegateCompiler.ResolverContextParamExpr)
+                                result = facDel(r);
+                            else if (rArg == ResolverContext.RootOrSelfExpr)
+                                result = facDel(r.Root ?? r);
+                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, useFec, out var resolver))
+                                result = facDel((IResolverContext)resolver);
                             else return false;
                             return true;
                         }
@@ -3006,6 +3005,18 @@ namespace DryIoc
                     {
                         var invokeExpr = (InvocationExpression)expr;
                         var delegateExpr = invokeExpr.Expression;
+                        if (delegateExpr is ConstantExpression dc && dc.Value is FactoryDelegate facDel) 
+                        {
+                            var rArg = invokeExpr.Arguments[0]; // todo: @perf optimize for a OneArgumentInvocationExpression
+                            if (rArg == FactoryDelegateCompiler.ResolverContextParamExpr)
+                                result = facDel(r);
+                            else if (rArg == ResolverContext.RootOrSelfExpr)
+                                result = facDel(r.Root ?? r);
+                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, useFec, out var resolver))
+                                result = facDel((IResolverContext)resolver);
+                            else return false;
+                            return true;
+                        }
 
                         // The Invocation of Func is used for splitting the big object graphs
                         // so we can ignore this split and go directly to the body
@@ -3015,23 +3026,20 @@ namespace DryIoc
 #if !SUPPORTS_DELEGATE_METHOD
                         return false;
 #else
-                        if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj)) // todo: @perf avoid calling the TryInterpret for the known constant of FactoryDelegate
+                        if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
                             return false;
 
                         var lambda = (Delegate)delegateObj;
                         var argExprs = invokeExpr.Arguments.ToListOrSelf(); // todo: @perf recognize the OneArgumentInvocationExpression
                         if (argExprs.Count == 0)
                             result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
-                        else
+                        else // it does not make sense to avoid array allocating for the single argument because we still need to pass array to the Invoke call
                         {
-                            var args = new object[argExprs.Count]; // todo: @perf avoid allocating for the single argument
+                            var args = new object[argExprs.Count];
                             for (var i = 0; i < args.Length; i++)
-                                if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i])) // todo: @perf simplify for the single argument `r` of ResolverContext for FactoryDelegate
+                                if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
                                     return false;
-                            if (lambda is FactoryDelegate fd) 
-                                result = fd.Invoke((IResolverContext)args[0]);
-                            else
-                                result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
+                            result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
                         }
                         return true;
 #endif
@@ -3364,7 +3372,7 @@ namespace DryIoc
                     r = r.Root ?? r;
                     if (!TryInterpret(r, callArgs[0], paramExprs, paramValues, parentArgs, useFec, out var service))
                         return false;
-                    result = r.SingletonScope.TrackDisposable(service, (int) ConstValue(callArgs[1]));
+                    result = r.SingletonScope.TrackDisposable(service, (int)ConstValue(callArgs[1]));
                     return true;
                 }
             }
@@ -4726,9 +4734,10 @@ namespace DryIoc
                 || r.SingletonScope.TryGetUsedInstance(r, serviceType, out instance);
         }
 
-        /// A bit if sugar to track disposable in singleton or current scope
+        // todo: @perf no need to check for IDisposable in TrackDisposable
+        /// <summary>A bit if sugar to track disposable in the current scope or in the singleton scope as a fallback</summary>
         public static T TrackDisposable<T>(this IResolverContext r, T instance) where T : IDisposable =>
-            (T)(r.SingletonScope ?? r.CurrentScope).TrackDisposable(instance);
+            (T)(r.SingletonScope ?? r.CurrentScope).TrackDisposable(instance); // todo: @fix check the scope first
     }
 
     /// <summary>The result delegate generated by DryIoc for service creation.</summary>
@@ -11669,7 +11678,8 @@ namespace DryIoc
             return false;
         }
 
-        // todo: consider adding the overload without `disposalOrder`
+        // todo: @perf consider adding the overload without `disposalOrder`
+        // todo: @perf we always know that item is IDisposable because it is being checked upper in stack, so we may remove the check here 
         /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalOrder = 0)
         {
@@ -12089,7 +12099,8 @@ namespace DryIoc
         internal static readonly MethodInfo GetScopedOrSingletonViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedOrSingletonViaFactoryDelegate));
 
-        /// Subject
+        /// <summary>Tracks the Unordered disposal in the current scope or in the singleton as fallback</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static object TrackScopedOrSingleton(IResolverContext r, object item) =>
             (r.CurrentScope ?? r.SingletonScope).TrackDisposable(item);
 

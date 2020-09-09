@@ -7,7 +7,7 @@ namespace DryIoc.IssuesTests
     public class GHIssue315_Combining_RegisterDelegate_with_TrackingDisposableTransients_rule_throws_TargetParameterCountException
     {
         [Test]
-        public void Test()
+        public void Test_RegisterDelegate()
         {
             var container = new Container(rules => rules.WithTrackingDisposableTransients());
             container.RegisterDelegate<Foo>(c => new Bar());
