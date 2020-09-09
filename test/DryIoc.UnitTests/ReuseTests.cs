@@ -559,6 +559,19 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Disposing_the_scope_should_dispose_the_registered_instance_even_not_resolved()
+        {
+            var container = new Container();
+            var service = new SomethingDisposable();
+            using (var scope = container.OpenScope())
+            {
+                scope.Use(scope.TrackDisposable(service));
+            }
+
+            Assert.IsTrue(service.IsDisposed);
+        }
+
+        [Test]
         public void Dispose_should_happen_in_reverse_resolution_order()
         {
             var container = new Container();
