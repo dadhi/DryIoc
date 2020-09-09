@@ -3013,22 +3013,25 @@ namespace DryIoc
                             return TryInterpret(r, f.Body, paramExprs, paramValues, parentArgs, useFec, out result);
 
 #if !SUPPORTS_DELEGATE_METHOD
-                return false;
+                        return false;
 #else
-                        if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
+                        if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj)) // todo: @perf avoid calling the TryInterpret for the known constant of FactoryDelegate
                             return false;
 
                         var lambda = (Delegate)delegateObj;
-                        var argExprs = invokeExpr.Arguments.ToListOrSelf();
+                        var argExprs = invokeExpr.Arguments.ToListOrSelf(); // todo: @perf recognize the OneArgumentInvocationExpression
                         if (argExprs.Count == 0)
                             result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
                         else
                         {
-                            var args = new object[argExprs.Count];
+                            var args = new object[argExprs.Count]; // todo: @perf avoid allocating for the single argument
                             for (var i = 0; i < args.Length; i++)
-                                if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i]))
+                                if (!TryInterpret(r, argExprs[i], paramExprs, paramValues, parentArgs, useFec, out args[i])) // todo: @perf simplify for the single argument `r` of ResolverContext for FactoryDelegate
                                     return false;
-                            result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
+                            if (lambda is FactoryDelegate fd) 
+                                result = fd.Invoke((IResolverContext)args[0]);
+                            else
+                                result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
                         }
                         return true;
 #endif
@@ -3284,7 +3287,7 @@ namespace DryIoc
                     return true;
                 }
 
-                var callArgs = callExpr.Arguments.ToListOrSelf();
+                var callArgs = callExpr.Arguments.ToListOrSelf(); // todo: Check for the few arguments method call expression
                 var resolver = r;
                 if (!ReferenceEquals(callArgs[0], FactoryDelegateCompiler.ResolverContextParamExpr))
                 {
@@ -3310,7 +3313,7 @@ namespace DryIoc
                     {
                         if (!TryInterpret(resolver, callArgs[2], paramExprs, paramValues, parentArgs, useFec, out var service))
                             return false;
-                        result = scope.TrackDisposable(service /* todo: what is with `disposalOrder`*/);
+                        result = scope.TrackDisposable(service); // todo: what is with `disposalOrder`
                     }
 
                     return true;
@@ -11327,6 +11330,7 @@ namespace DryIoc
             IResolverContext resolveContext, Expression expr, bool useFec,
             Func<IResolverContext, Expression, bool, object> createValue, int disposalOrder = 0);
 
+        // todo: @perf introduce the overload WithoutDisposalOrder
         /// <summary>Tracked item will be disposed with the scope. 
         /// Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
         object TrackDisposable(object item, int disposalOrder = 0);

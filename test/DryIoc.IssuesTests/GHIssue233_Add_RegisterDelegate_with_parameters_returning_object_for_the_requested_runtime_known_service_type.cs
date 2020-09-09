@@ -2,7 +2,7 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    public class GIssue233_Add_RegisterDelegate_with_parameters_returning_object_for_the_requested_runtime_known_service_type
+    public class GHIssue233_Add_RegisterDelegate_with_parameters_returning_object_for_the_requested_runtime_known_service_type
     {
         [Test]
         public void Should_be_able_to_use_delegate_with_one_argument_returning_object()
