@@ -2960,18 +2960,17 @@ namespace DryIoc
                             if (!TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, useFec, ref instance))
                                 return false;
                         }
-                        else if (operandExpr is InvocationExpression i &&
-                             i.Expression is ConstantExpression cd &&
-                             cd.Value is FactoryDelegate d)
+                        else if (operandExpr is InvocationExpression invokeExpr &&
+                             invokeExpr.Expression is ConstantExpression cd && cd.Value is FactoryDelegate facDel)
                         {
                             // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
-                            if (i.Arguments[0] == FactoryDelegateCompiler.ResolverContextParamExpr)
-                                result = d(r);
-                            else if (i.Arguments[0] == ResolverContext.RootOrSelfExpr)
-                                result = d(r.Root ?? r);
-                            else if (TryInterpret(r, i.Arguments[0], paramExprs, paramValues, parentArgs, useFec,
-                                out var resolver))
-                                result = d((IResolverContext)resolver);
+                            var rArg = invokeExpr.Arguments[0]; // todo: @perf optimize for a OneArgumentInvocationExpression
+                            if (rArg == FactoryDelegateCompiler.ResolverContextParamExpr)
+                                result = facDel(r);
+                            else if (rArg == ResolverContext.RootOrSelfExpr)
+                                result = facDel(r.Root ?? r);
+                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, useFec, out var resolver))
+                                result = facDel((IResolverContext)resolver);
                             else return false;
                             return true;
                         }
@@ -3049,6 +3048,18 @@ namespace DryIoc
                     {
                         var invokeExpr = (InvocationExpression)expr;
                         var delegateExpr = invokeExpr.Expression;
+                        if (delegateExpr is ConstantExpression dc && dc.Value is FactoryDelegate facDel) 
+                        {
+                            var rArg = invokeExpr.Arguments[0]; // todo: @perf optimize for a OneArgumentInvocationExpression
+                            if (rArg == FactoryDelegateCompiler.ResolverContextParamExpr)
+                                result = facDel(r);
+                            else if (rArg == ResolverContext.RootOrSelfExpr)
+                                result = facDel(r.Root ?? r);
+                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, useFec, out var resolver))
+                                result = facDel((IResolverContext)resolver);
+                            else return false;
+                            return true;
+                        }
 
                         // The Invocation of Func is used for splitting the big object graphs
                         // so we can ignore this split and go directly to the body
@@ -3059,10 +3070,10 @@ namespace DryIoc
                             return false;
 
                         var lambda = (Delegate)delegateObj;
-                        var argExprs = invokeExpr.Arguments.ToListOrSelf();
+                        var argExprs = invokeExpr.Arguments.ToListOrSelf(); // todo: @perf recognize the OneArgumentInvocationExpression
                         if (argExprs.Count == 0)
                             result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
-                        else
+                        else // it does not make sense to avoid array allocating for the single argument because we still need to pass array to the Invoke call
                         {
                             var args = new object[argExprs.Count];
                             for (var i = 0; i < args.Length; i++)
@@ -3317,7 +3328,7 @@ namespace DryIoc
                     return true;
                 }
 
-                var callArgs = callExpr.Arguments.ToListOrSelf();
+                var callArgs = callExpr.Arguments.ToListOrSelf(); // todo: Check for the few arguments method call expression
                 var resolver = r;
                 if (!ReferenceEquals(callArgs[0], FactoryDelegateCompiler.ResolverContextParamExpr))
                 {
@@ -3343,7 +3354,7 @@ namespace DryIoc
                     {
                         if (!TryInterpret(resolver, callArgs[2], paramExprs, paramValues, parentArgs, useFec, out var service))
                             return false;
-                        result = scope.TrackDisposable(service /* todo: what is with `disposalOrder`*/);
+                        result = service is IDisposable d ? scope.TrackDisposableWithoutDisposalOrder(d) : service;
                     }
 
                     return true;
@@ -3358,7 +3369,7 @@ namespace DryIoc
                     {
                         if (!TryInterpret(resolver, callArgs[3], paramExprs, paramValues, parentArgs, useFec, out var service))
                             return false;
-                        result = scope.TrackDisposable(service);
+                        result = service is IDisposable d ? scope.TrackDisposableWithoutDisposalOrder(d) : service;
                     }
 
                     return true;
@@ -3381,9 +3392,9 @@ namespace DryIoc
                             {
                                 if (TryInterpret(rc, e, paramExprs, paramValues, parentArgs, uf, out var value))
                                     return value;
-                                return e.CompileToFactoryDelegate(uf, ((IContainer) rc).Rules.UseInterpretation)(rc);
+                                return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
                             },
-                            (int) ConstValue(callArgs[3]));
+                            (int)ConstValue(callArgs[3]));
                     }
 
                     return true;
@@ -3394,7 +3405,14 @@ namespace DryIoc
                     r = r.Root ?? r;
                     if (!TryInterpret(r, callArgs[0], paramExprs, paramValues, parentArgs, useFec, out var service))
                         return false;
-                    result = r.SingletonScope.TrackDisposable(service, (int) ConstValue(callArgs[1]));
+                    if (service is IDisposable d) 
+                    {
+                        var disposalOrder = (int)ConstValue(callArgs[1]);
+                        result = disposalOrder == 0
+                            ? r.SingletonScope.TrackDisposableWithoutDisposalOrder(d)
+                            : r.SingletonScope.TrackDisposable(service, disposalOrder);
+                    }
+                    
                     return true;
                 }
             }
@@ -4695,7 +4713,7 @@ namespace DryIoc
                 var parentScope = r.CurrentScope;
                 var newOwnScope = new Scope(parentScope, name);
                 if (trackInParent)
-                    (parentScope ?? r.SingletonScope).TrackDisposable(newOwnScope);
+                    (parentScope ?? r.SingletonScope).TrackDisposableWithoutDisposalOrder(newOwnScope);
                 return r.WithCurrentScope(newOwnScope);
             }
 
@@ -4704,7 +4722,7 @@ namespace DryIoc
                 : r.ScopeContext.SetCurrent(parent => new Scope(parent, name));
 
             if (trackInParent)
-                (newContextScope.Parent ?? r.SingletonScope).TrackDisposable(newContextScope);
+                (newContextScope.Parent ?? r.SingletonScope).TrackDisposableWithoutDisposalOrder(newContextScope);
             return r.WithCurrentScope(null);
         }
 
@@ -4716,9 +4734,10 @@ namespace DryIoc
                 || r.SingletonScope.TryGetUsedInstance(r, serviceTypeHash, serviceType, out instance);
         }
 
-        /// A bit if sugar to track disposable in singleton or current scope
+        // todo: @perf no need to check for IDisposable in TrackDisposable
+        /// <summary>A bit if sugar to track disposable in the current scope or in the singleton scope as a fallback</summary>
         public static T TrackDisposable<T>(this IResolverContext r, T instance) where T : IDisposable =>
-            (T)(r.SingletonScope ?? r.CurrentScope).TrackDisposable(instance);
+            (T)(r.CurrentScope ?? r.SingletonScope).TrackDisposableWithoutDisposalOrder(instance);
     }
 
     /// <summary>The result delegate generated by DryIoc for service creation.</summary>
@@ -6918,8 +6937,8 @@ namespace DryIoc
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
 
             // done after registration to pass all the registration validation checks
-            if (instance is IDisposable && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
-                (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
+            if (instance is IDisposable d && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
+                (registrator as IResolverContext)?.SingletonScope.TrackDisposableWithoutDisposalOrder(d);
         }
 
          /// <summary>
@@ -6971,8 +6990,9 @@ namespace DryIoc
             foreach (var serviceType in serviceTypes)
                 registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
-            if (instance is IDisposable && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
-                (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
+            if (instance is IDisposable d && 
+                (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
+                (registrator as IResolverContext)?.SingletonScope.TrackDisposableWithoutDisposalOrder(d);
         }
 
         /// <summary>
@@ -7012,8 +7032,9 @@ namespace DryIoc
                 registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
             }
 
-            if (instance is IDisposable && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
-                (registrator as IResolverContext)?.SingletonScope.TrackDisposable(instance);
+            if (instance is IDisposable d && 
+                (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
+                (registrator as IResolverContext)?.SingletonScope.TrackDisposableWithoutDisposalOrder(d);
         }
 
         /// <summary>List of types excluded by default from RegisterMany convention.</summary>
@@ -11401,6 +11422,9 @@ private ParameterServiceInfo(ParameterInfo p)
         /// Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
         object TrackDisposable(object item, int disposalOrder = 0);
 
+        /// <summary>Tracked item will be disposed with the scope.</summary> 
+        T TrackDisposableWithoutDisposalOrder<T>(T disposable) where T : IDisposable;
+
         ///<summary>Sets or adds the service item directly to the scope services</summary>
         void SetOrAdd(int id, object item);
 
@@ -11738,11 +11762,12 @@ private ParameterServiceInfo(ParameterInfo p)
             return false;
         }
 
-        // todo: consider adding the overload without `disposalOrder`
+        // todo: @perf consider adding the overload without `disposalOrder`
+        // todo: @perf we always know that item is IDisposable because it is being checked upper in stack, so we may remove the check here 
         /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalOrder = 0)
         {
-            if (item is IDisposable disposable && disposable != this)
+            if (item is IDisposable disposable && !ReferenceEquals(disposable, this))
                 if (disposalOrder == 0)
                     AddUnorderedDisposable(disposable);
                 else
@@ -11752,6 +11777,18 @@ private ParameterServiceInfo(ParameterInfo p)
 
         internal static readonly MethodInfo TrackDisposableMethod =
             typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.TrackDisposable));
+
+        /// <summary>Tracked item will be disposed with the scope.</summary> 
+        public T TrackDisposableWithoutDisposalOrder<T>(T disposable) where T : IDisposable 
+        {
+            if (!ReferenceEquals(disposable, this)) 
+            {
+                var copy = _unorderedDisposables;
+                if (Interlocked.CompareExchange(ref _unorderedDisposables, copy.Push(disposable), copy) != copy)
+                    Ref.Swap(ref _unorderedDisposables, disposable, (x, d) => x.Push(d));
+            }
+            return disposable;
+        }
 
         /// Add instance to the small registry via factory
         public void SetUsedInstance(Type type, FactoryDelegate factory) =>
@@ -12124,9 +12161,10 @@ private ParameterServiceInfo(ParameterInfo p)
         internal static readonly MethodInfo GetScopedOrSingletonViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedOrSingletonViaFactoryDelegate));
 
-        /// Subject
+        /// <summary>Tracks the Unordered disposal in the current scope or in the singleton as fallback</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static object TrackScopedOrSingleton(IResolverContext r, object item) =>
-            (r.CurrentScope ?? r.SingletonScope).TrackDisposable(item);
+            item is IDisposable d ? (r.CurrentScope ?? r.SingletonScope).TrackDisposableWithoutDisposalOrder(d) : item;
 
         internal static readonly MethodInfo TrackScopedOrSingletonMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackScopedOrSingleton));
@@ -12167,14 +12205,14 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// Subject
         public static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
-            r.GetCurrentScope(throwIfNoScope)?.TrackDisposable(item);
+            item is IDisposable d ? r.GetCurrentScope(throwIfNoScope)?.TrackDisposableWithoutDisposalOrder(d) : item;
 
         internal static readonly MethodInfo TrackScopedMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackScoped));
 
         /// Subject
         public static object TrackNameScoped(IResolverContext r, object scopeName, bool throwIfNoScope, object item) =>
-            r.GetNamedScope(scopeName, throwIfNoScope)?.TrackDisposable(item);
+            item is IDisposable d ? r.GetNamedScope(scopeName, throwIfNoScope)?.TrackDisposableWithoutDisposalOrder(d) : item;
 
         internal static readonly MethodInfo TrackNameScopedMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackNameScoped));
