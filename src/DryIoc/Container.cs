@@ -3741,7 +3741,7 @@ namespace DryIoc
             return itemRef.Value;
         }
 
-        // todo: @perf create the overload without disposal index so we could use FiveArgumentsMethodCall expression from the FEC
+        // todo: @perf create the overload without disposal index so we could use FiveArgumentsMethodCall expression from the FEC, because it is now have a 6 arguments and I see impractical to create a SixArgumentsMethodCall
         private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, 
             MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
         {
@@ -3800,7 +3800,7 @@ namespace DryIoc
 
             if (result is IDisposable disp && disp != scope)
             {
-                var disposalOrder = (int)((ConstantExpression)args[5]).Value;
+                var disposalOrder = (int)((ConstantExpression)args[5]).Value; //@perf no need for this if we have a overload without disposal index
                 if (disposalOrder == 0)
                     scope.AddUnorderedDisposable(disp);
                 else
