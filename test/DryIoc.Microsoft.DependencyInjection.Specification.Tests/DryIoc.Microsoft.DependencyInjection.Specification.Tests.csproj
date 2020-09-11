@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">netcoreapp2.1</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp2.1;netcoreapp2.1</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp2.1;netcoreapp3.1</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
@@ -10,13 +10,14 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.0">
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="xunit" Version="2.4.0" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="2.2.0" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Specification.Tests" Version="2.2.0" />
+        <PackageReference Include="xunit" Version="2.4.1" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="3.1.8" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="3.1.8" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Specification.Tests" Version="3.1.8" />
     </ItemGroup>
 
 </Project>

@@ -1,13 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
-using NUnit.Framework;
+using NUnit.Framework; 
 
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     [TestFixture]
-    public class ValidateCaptiveTests
+    public class ValidateCaptiveDependencyTests
     {
         [Test]
-        public void ServiceCollection_AddScoped_dependency_in_a_Singleton_ISNT_Validated_as_captive_dependency()
+        public void ServiceCollection_AddScoped_dependency_in_a_Singleton_is_Not_validated_as_captive_dependency()
         {
             var services = new ServiceCollection();
             services.AddScoped<Foo>();      // Actually a `ScopedOrSingleton` due MS.DI convention
