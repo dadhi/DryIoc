@@ -214,7 +214,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() => 
             container.RegisterDelegate(typeof(OpenGenericFriend<>), resolver => "nah"));
 
-            Assert.AreEqual(Error.RegisteringOpenGenericRequiresFactoryProvider, ex.Error);
+            Assert.AreEqual(Error.ImpossibleToRegisterOpenGenericWithRegisterDelegate, ex.Error);
         }
 
         public class OpenGenericFriend<T> {}
