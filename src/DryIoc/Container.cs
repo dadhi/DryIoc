@@ -12752,7 +12752,7 @@ namespace DryIoc
                 "Unable to register delegate factory for open-generic service {0}." + NewLine +
                 "You need to specify concrete (closed) service type returned by delegate."),
             RegisteringOpenGenericImplWithNonGenericService = Of(
-                "Unable to register open-generic implementation {0} with non-generic service {1}."),n
+                "Unable to register open-generic implementation {0} with non-generic service {1}."),
             RegisteringOpenGenericServiceWithMissingTypeArgs = Of(
                 "Unable to register open-generic implementation {0} because service {1} should specify all type arguments, but specifies only {2}."),
             RegisteringNotAGenericTypedefImplType = Of(
