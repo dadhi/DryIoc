@@ -12748,11 +12748,11 @@ namespace DryIoc
                 "Registering implementation type {0} is not assignable to service type {1}."),
             RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType = Of(
                 "Registered factory method return type {1} should be assignable Or castable to implementation type {0} but it is not."),
-            RegisteringOpenGenericRequiresFactoryProvider = Of(
+            RegisteringOpenGenericRequiresFactoryProvider = Of( // todo: @fix Improve the naming to say something about open-generic
                 "Unable to register delegate factory for open-generic service {0}." + NewLine +
                 "You need to specify concrete (closed) service type returned by delegate."),
             RegisteringOpenGenericImplWithNonGenericService = Of(
-                "Unable to register open-generic implementation {0} with non-generic service {1}."),
+                "Unable to register open-generic implementation {0} with non-generic service {1}."),n
             RegisteringOpenGenericServiceWithMissingTypeArgs = Of(
                 "Unable to register open-generic implementation {0} because service {1} should specify all type arguments, but specifies only {2}."),
             RegisteringNotAGenericTypedefImplType = Of(
