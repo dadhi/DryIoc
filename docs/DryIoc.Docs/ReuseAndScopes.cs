@@ -17,7 +17,8 @@
     - [Nested scopes](#nested-scopes)
   - [Reuse.ScopedTo(name)](#reusescopedtoname)
     - [Reuse.InWebRequest and Reuse.InThread](#reuseinwebrequest-and-reuseinthread)
-  - [Reuse.ScopeTo{TService}(serviceKey)](#reusescopetotserviceservicekey)
+  - [Reuse.ScopedTo service type](#reusescopedto-service-type)
+    - [Own the resolution scope disposal](#own-the-resolution-scope-disposal)
   - [Setup.UseParentReuse](#setupuseparentreuse)
   - [Reuse lifespan diagnostics](#reuse-lifespan-diagnostics)
   - [Weakly Referenced reused service](#weakly-referenced-reused-service)
@@ -576,10 +577,11 @@ Basically `Reuse.InWebRequest` and `Reuse.InThread` are just a scope reuses:
 - `Reuse.InThread == Reuse.Scoped` just a scoped reuse in presence of `ThreadScopeContext`
 
 
-## Reuse.ScopeTo{TService}(serviceKey)
+## Reuse.ScopedTo service type
 
-`ScopeTo<TService>()` reuse defines to use the same dependency instance in specific service object sub-tree. 
-The concept is similar to assigning dependency object to the variable and then re-using this variable when creating a service object.
+`ScopedTo<TService>()` is the reuse of the same dependency instance in the service sub-tree.
+The concept is similar to the assigning of dependency object to variable and then passing (re-using) this variable 
+in the service tree.
 
 ```cs md*/
 class Example_of_reusing_dependency_as_variable
@@ -604,17 +606,16 @@ class Example_of_reusing_dependency_as_variable
 } /*md
 ```
 
-In terms of DryIoc `SubDependency` has a reuse `Reuse.ScopedTo<Foo>()`.
-Here is the full setup:
+In the example above `SubDependency` has a reuse `Reuse.ScopedTo<Foo>()`:
+
 ```cs md*/
 class Scoped_to_service_reuse
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
-        // This is required to mark that `Foo` opens the scope
+        // `openResolutionScope` option is required to open the scope for the `Foo`
         container.Register<Foo>(setup: Setup.With(openResolutionScope: true));
 
         container.Register<Dependency>();
@@ -648,34 +649,30 @@ class Scoped_to_service_reuse
 } /*md
 ```
 
-Important note, that you need to register `Foo` with `openResolutionScope: true` setup option.
+The requirement to use `openResolutionScope: true` explains how things are working for the `ScopedTo<Type>()`. 
+It is no different to `ScopedTo(object someName)` where the `someName` is the special type of `ResolutionScopeName` composed from the `typeof(Foo)` and optional service key.
 
-Actually, this requirement explains how things are working for `ScopeTo<Type>()`. It is no different to 
-`ScopedTo(object name)` where is `name` is of special type `ResolutionScopeName` composed from 
-`typeof(Foo)` and optional service key.
-
-To satisfy the `ScopedTo` reuse we need an open scope somewhere. Here DryIoc will automatically open scope when resolving the `Foo` service.
+To satisfy the `ScopedTo` reuse we need an open scope somewhere. Here DryIoc will automatically open the scope when resolving the `Foo` service.
 We may desugar it to something like: 
 ```cs
 var foo container.OpenScope(new ResolutionScopeName(typeof(Foo))).Resolve<Foo>();
 ```
 
-The code also implies that `Foo` itself will be automatically scoped to its scope. It may be important if you want to access `Foo` recursively from its dependency.
+**Note:** The code also tells that `Foo` itself will be scoped to its scope. It may be important if you want to access `Foo` recursively from its dependency.
 
-But with such an automatic scoping we still have a problem: how to dispose the scope.
+But with a such an automatic scoping we still have a problem: how to dispose the scope.
 
-In order to dispose the scope, DryIoc should somehow track the reference to it. This is exactly how it works, an automatically created scope will be held by either
-current open scope or by singleton scope. When the current scope or container with singletons is disposed - the automatic scope is disposed to.
+In order to dispose the scope, DryIoc should somehow track the reference to it - **otherwise we are in the memory leak territory**. 
+
+This is exactly how it works, the new resolution scope will itself be held by either the upper scope or by the singleton scope. When the upper scope or container with singletons is disposed - the resolutions scope is disposed to.
 
 ```cs md*/
 class Scoped_to_service_reuse_with_dispose
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
 
-        // This is required to mark that `Foo` opens the scope
         container.Register<Foo>(setup: Setup.With(openResolutionScope: true));
 
         container.Register<Dependency>(Reuse.ScopedTo<Foo>());
@@ -700,15 +697,63 @@ class Scoped_to_service_reuse_with_dispose
 } /*md
 ```
 
+### Own the resolution scope disposal
+
+You else may get in control of disposing the resolution scope by injecting the `IResolverContext` ([automatically provided for you by Container](RulesAndDefaultConventions#implicitly-available-services)) 
+which holds the current scope and then dispose it manually.
+
+```cs md*/
+class Own_the_resolution_scope_disposal
+{
+    [Test] public void Example()
+    {
+        var container = new Container(rules => rules
+            .WithTrackingDisposableTransients() // we need this to allow disposable transient Foo
+        );
+
+        container.Register<Foo>(setup: Setup.With(openResolutionScope: true));
+
+        container.Register<Dependency>(Reuse.ScopedTo<Foo>());
+
+        var foo = container.Resolve<Foo>();
+        
+        // Disposing the foo will dispose its scope and the scoped dependencies down the tree
+        foo.Dispose(); 
+
+        Assert.IsTrue(foo.Dep.IsDisposed);
+    }
+
+    class Foo : IDisposable
+    {
+        public Dependency Dep { get; }
+        private readonly IResolverContext _scope;
+        public Foo(Dependency dep, IResolverContext scope) 
+        { 
+            Dep = dep;
+            _scope = scope;
+        }
+
+        public void Dispose() => _scope.Dispose();
+    }
+
+    class Dependency : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+        public void Dispose() => IsDisposed = true;
+    }
+} /*md
+```
+
+
 __Note:__ There is a similar reuse (lifestyle) available in other IoC libraries, e.g. 
 [Autofac InstancePerOwned Lifestyle](http://docs.autofac.org/en/latest/lifetime/instance-scope.html#instance-per-owned) and 
 [Castle Winsdor Bound LifeStyle](http://docs.castleproject.org/Default.aspx?Page=LifeStyles&NS=Windsor&AspxAutoDetectCookieSupport=1#Bound_8).
 
 
-There is more to `Reuse.ScopeTo<T>(object serviceKey = null)`:
+There is more to `Reuse.ScopedTo<T>(object serviceKey = null)`:
 
 - You may provide an optional `serviceKey` to match a service registered with this key.
-- You may register to match not only the exact `TService` but its base class or the implemented interface.
+- You may match not only the exact `TService` but its base class or the implemented interface.
 
 
 ## Setup.UseParentReuse
