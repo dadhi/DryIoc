@@ -1352,6 +1352,29 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |             DryIoc | 1.663 us | 0.0354 us | 0.0408 us | 1.654 us |  0.42 |    0.03 | 0.6428 | 0.0076 |     - |   2.96 KB |
 | DryIoc_MsDIAdapter | 2.521 us | 0.0488 us | 0.0542 us | 2.498 us |  0.63 |    0.04 | 0.6485 | 0.0076 |     - |   2.98 KB |
 
+### DryIoc v4.4.1
+
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.19041
+Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical cores
+.NET Core SDK=3.1.402
+  [Host]     : .NET Core 3.1.8 (CoreCLR 4.700.20.41105, CoreFX 4.700.20.41903), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.8 (CoreCLR 4.700.20.41105, CoreFX 4.700.20.41903), X64 RyuJIT
+
+
+|             Method |     Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+|               MsDI | 4.232 us | 0.1002 us | 0.0938 us |  1.00 |    0.00 | 1.0605 |     - |     - |   4.35 KB |
+|             DryIoc | 1.868 us | 0.0226 us | 0.0200 us |  0.44 |    0.01 | 0.7248 |     - |     - |   2.96 KB |
+| DryIoc_MsDIAdapter | 2.651 us | 0.0404 us | 0.0338 us |  0.63 |    0.02 | 0.7286 |     - |     - |   2.98 KB |
+
+#### No locking in Scope - commenting the `lock` in `Scope.TryGetOrAddViaFactoryDelegate`
+
+|             Method |     Mean |     Error |    StdDev | Ratio |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|----------:|----------:|------:|-------:|------:|------:|----------:|
+|               MsDI | 4.310 us | 0.0854 us | 0.0877 us |  1.00 | 1.0605 |     - |     - |   4.35 KB |
+|             DryIoc | 1.613 us | 0.0144 us | 0.0135 us |  0.37 | 0.7229 |     - |     - |   2.96 KB |
+| DryIoc_MsDIAdapter | 2.373 us | 0.0322 us | 0.0269 us |  0.55 | 0.7286 |     - |     - |   2.98 KB |
+
 */
 
             private IServiceProvider _msDi;

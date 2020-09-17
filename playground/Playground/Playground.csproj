@@ -2,10 +2,10 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
 
-        <TargetFrameworks>netcoreapp2.2</TargetFrameworks>
-        <!--<TargetFrameworks Condition="'$(DevMode)'               == 'true'">netcoreapp3.1</TargetFrameworks>-->
-        <TargetFrameworks Condition="'$(NoSupportForNetCore22)' == 'true'">netcoreapp2.1</TargetFrameworks>
-        
+        <TargetFramework>netcoreapp2.2</TargetFramework>
+        <TargetFramework Condition="'$(NoSupportForNetCore22)' == 'true'">netcoreapp2.1</TargetFramework>
+        <TargetFramework Condition="'$(DevMode)' == 'true'">netcoreapp3.1</TargetFramework>
+
         <Description>Benchmarks, sandbox for experiments.</Description>
         
         <NoWarn>1701;1702;AD0001;NU1608</NoWarn>
