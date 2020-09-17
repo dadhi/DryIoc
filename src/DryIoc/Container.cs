@@ -46,6 +46,9 @@ THE SOFTWARE.
 #if !PCL && !NET35 && !NET40 && !NET403
 #define SUPPORTS_DELEGATE_METHOD
 #endif
+#if !NET35 && !PCL
+#define SUPPORTS_SPIN_WAIT
+#endif
 
 namespace DryIoc
 {
@@ -11513,21 +11516,48 @@ namespace DryIoc
                 // Otherwise our own item was added and we can skip this step.
                 if (newMap == oldMap)
                 {
-                    itemRef = map.GetEntryOrDefault(id);
-                    // if someone added the item already there is a chance that it has a created value, so let's check it
-                    if (itemRef.Value != NoItem)
-                        return itemRef.Value;
+                    itemRef = map.GetSurePresentEntry(id);
+                    
+                    // If someone added the item already there is a chance it has a created value, so let's check it.
+                    // Otherwise wait until the other thread creates populates the entry.
+                    if (itemRef.Value == NoItem) 
+                    {
+#if SUPPORTS_SPIN_WAIT
+                        var spinWait = new SpinWait();
+                        while (itemRef.Value == NoItem)
+                            spinWait.SpinOnce();
+#else
+                        while (itemRef.Value == NoItem)
+                            Thread.Sleep(1);
+#endif
+                    }
+
+                    return itemRef.Value;
                 }
             }
             else 
-                itemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i)).GetEntryOrDefault(id);
-
-            lock (itemRef)
             {
-                if (itemRef.Value != NoItem)
-                    return itemRef.Value;
-                itemRef.Value = createValue(r);
+                var otherItemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i)).GetSurePresentEntry(id);
+                if (otherItemRef != itemRef) 
+                {
+#if SUPPORTS_SPIN_WAIT
+                    var spinWait = new SpinWait();
+                    while (otherItemRef.Value == NoItem)
+                        spinWait.SpinOnce();
+#else
+                    while (otherItemRef.Value == NoItem)
+                        Thread.Sleep(1);
+#endif
+                    return otherItemRef.Value;
+                }
             }
+
+            // lock (itemRef)
+            // {
+                // if (itemRef.Value != NoItem)
+                //     return itemRef.Value;
+            Interlocked.Exchange(ref itemRef.Value, createValue(r));
+            // }
 
             if (itemRef.Value is IDisposable disp && disp != this)
             {

@@ -2116,8 +2116,8 @@ namespace ImTools
         public T Swap(Func<T, T> getNewValue) =>
             Ref.Swap(ref _value, getNewValue);
 
-        // todo: A good candidate to implement
-        // <summary>The same as `Swap` but instead of old known value it returns the new one</summary>
+        // todo: @feature A good candidate to implement
+        // <summary>The same as `Swap` but instead of the old known value it returns the new one</summary>
         //public T SwapAndGetNewValue(Func<T, T> getNewValue) =>
         //    Ref.Swap(ref _value, getNewValue);
 
@@ -2938,7 +2938,7 @@ namespace ImTools
         /// Contains the once created data node
         public readonly ImMapEntry<V> Entry;
 
-        /// Left sub-tree/branch, or empty.
+        /// Right branch or empty.
         public ImMapEntry<V> RightEntry;
 
         /// Constructor
@@ -3804,6 +3804,28 @@ namespace ImTools
 
             entry = map as ImMapEntry<V>;
             return entry != null && entry.Key == key ? entry : null;
+        }
+
+        /// <summary>Looks for the sure present entry - in cases when we know for certain that the map contains the entry</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMapEntry<V> GetSurePresentEntry<V>(this ImMap<V> map, int key)
+        {
+            ImMapEntry<V> entry;
+            while (map is ImMapTree<V> tree)
+            {
+                entry = tree.Entry;
+                if (key > entry.Key)
+                    map = tree.Right;
+                else if (key < entry.Key)
+                    map = tree.Left;
+                else
+                    return entry;
+            }
+
+            if (map is ImMapBranch<V> branch)
+                return branch.Entry.Key == key ? branch.Entry : branch.RightEntry;
+
+            return (ImMapEntry<V>)map;
         }
 
         /// <summary> Returns the value if key is found or default value otherwise. </summary>
