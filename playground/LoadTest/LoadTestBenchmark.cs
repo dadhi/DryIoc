@@ -14,25 +14,14 @@ namespace LoadTest
     {
 /*
 # v4.1.5 - Singleton decorators 
+-------------------------------
 
 Validation finished
 00:01:24.33
 
-ResolveAllControllersOnce of 156 controllers is done in 0.1533677 seconds
-
-----------------------------------
- Starting compiled + cached tests
-----------------------------------
-
-New container created
-
-container with ambient ScopeContext DryIoc.AsyncExecutionFlowScopeContext without scope
- with Rules  with Made={FactoryMethod=ConstructorWithResolvableArguments}
-
-ResolveAllControllersOnce of 156 controllers is done in 0.0073486 seconds
-ResolveAllControllersOnce of 156 controllers is done in 0.1591292 seconds
 
 # v4.2.0 - Singleton decorators 
+-------------------------------
 
 New container created:
 
@@ -57,6 +46,66 @@ ResolveAllControllersOnce of 156 controllers is done in 0.1624977 seconds
 ResolveAllControllersOnce of 156 controllers is done in 13.0481077 seconds
 ## Invoking the cached delegate...
 ResolveAllControllersOnce of 156 controllers is done in 0.0262042 seconds
+
+# v4.4.1 - Singleton decorators 
+-------------------------------
+
+# LoadTestBenchmark
+New container created:
+
+container with ambient DryIoc.AsyncExecutionFlowScopeContext without scope
+ with Rules  with Made={FactoryMethod=ConstructorWithResolvableArguments} 
+
+Validating controllers only...
+
+Validation finished
+00:00:00.08        
+
+ResolveAllControllersOnce of 156 controllers is done in 0.4730469 seconds
+
+----------------------------------
+ Starting compiled + cached tests
+----------------------------------
+
+New container created:
+
+container with ambient DryIoc.AsyncExecutionFlowScopeContext without scope
+ with Rules  with Made={FactoryMethod=ConstructorWithResolvableArguments}
+
+## Interpreting...
+ResolveAllControllersOnce of 156 controllers is done in 0.1592902 seconds
+## Compiling and caching the delegate...
+ResolveAllControllersOnce of 156 controllers is done in 13.0788307 seconds
+## Invoking the cached delegate...
+ResolveAllControllersOnce of 156 controllers is done in 0.0379507 seconds
+-- Starting Load test --
+32 Threads.
+
+-- Load Test Finished --
+00:00:17.97
+
+-- 1st Randomized Load Finished --
+00:02:06.97
+
+-- 2nd Randomized Load Finished --
+00:02:39.36
+
+---------------------------------------
+      Starting cold run tests
+      This can take a long time...
+---------------------------------------
+
+New container created:
+
+container with ambient DryIoc.AsyncExecutionFlowScopeContext without scope
+ with Rules  with Made={FactoryMethod=ConstructorWithResolvableArguments}
+
+-- Starting Load test --
+32 Threads.
+
+-- Load Test Finished --
+00:00:43.66
+
 */
 
         public static IContainer RootContainer = null;
