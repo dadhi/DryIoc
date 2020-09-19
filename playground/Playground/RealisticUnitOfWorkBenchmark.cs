@@ -1367,13 +1367,13 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
 |             DryIoc | 1.868 us | 0.0226 us | 0.0200 us |  0.44 |    0.01 | 0.7248 |     - |     - |   2.96 KB |
 | DryIoc_MsDIAdapter | 2.651 us | 0.0404 us | 0.0338 us |  0.63 |    0.02 | 0.7286 |     - |     - |   2.98 KB |
 
-#### No locking in Scope - commenting the `lock` in `Scope.TryGetOrAddViaFactoryDelegate`
+### DryIoc v4.5.0 - no scope locking
 
-|             Method |     Mean |     Error |    StdDev | Ratio |  Gen 0 | Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|----------:|----------:|------:|-------:|------:|------:|----------:|
-|               MsDI | 4.310 us | 0.0854 us | 0.0877 us |  1.00 | 1.0605 |     - |     - |   4.35 KB |
-|             DryIoc | 1.613 us | 0.0144 us | 0.0135 us |  0.37 | 0.7229 |     - |     - |   2.96 KB |
-| DryIoc_MsDIAdapter | 2.373 us | 0.0322 us | 0.0269 us |  0.55 | 0.7286 |     - |     - |   2.98 KB |
+|             Method |     Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 | Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|----------:|----------:|------:|--------:|-------:|------:|------:|----------:|
+|               MsDI | 4.215 us | 0.0811 us | 0.0901 us |  1.00 |    0.00 | 1.0605 |     - |     - |   4.35 KB |
+|             DryIoc | 1.628 us | 0.0307 us | 0.0272 us |  0.39 |    0.01 | 0.7248 |     - |     - |   2.96 KB |
+| DryIoc_MsDIAdapter | 2.377 us | 0.0412 us | 0.0344 us |  0.56 |    0.02 | 0.7286 |     - |     - |   2.98 KB |
 
 */
 
