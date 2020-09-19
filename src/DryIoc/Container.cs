@@ -11493,9 +11493,25 @@ namespace DryIoc
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
             var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
-            return itemRef != null && itemRef.Value != NoItem
-                ? itemRef.Value
-                : TryGetOrAddViaFactoryDelegate(id, createValue, r, disposalOrder);
+            if (itemRef != null)
+            {
+                if (itemRef.Value == NoItem) 
+                {
+#if SUPPORTS_SPIN_WAIT
+                    var spinWait = new SpinWait();
+                    while (itemRef.Value == NoItem)
+                        spinWait.SpinOnce();
+#else
+                    lock (itemRef) 
+                        while (itemRef.Value == NoItem)
+                            Monitor.Wait(itemRef);
+#endif
+                }
+
+                return itemRef.Value;
+            } 
+                
+            return TryGetOrAddViaFactoryDelegate(id, createValue, r, disposalOrder);
         }
 
         internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
@@ -11527,8 +11543,9 @@ namespace DryIoc
                         while (itemRef.Value == NoItem)
                             spinWait.SpinOnce();
 #else
+                    lock (itemRef) 
                         while (itemRef.Value == NoItem)
-                            Thread.Sleep(1);
+                            Monitor.Wait(itemRef);
 #endif
                     }
 
@@ -11545,19 +11562,23 @@ namespace DryIoc
                     while (otherItemRef.Value == NoItem)
                         spinWait.SpinOnce();
 #else
-                    while (otherItemRef.Value == NoItem)
-                        Thread.Sleep(1);
+                    lock (itemRef) 
+                        while (itemRef.Value == NoItem)
+                            Monitor.Wait(itemRef);
 #endif
                     return otherItemRef.Value;
                 }
             }
 
-            // lock (itemRef)
-            // {
-                // if (itemRef.Value != NoItem)
-                //     return itemRef.Value;
-            Interlocked.Exchange(ref itemRef.Value, createValue(r));
-            // }
+#if SUPPORTS_SPIN_WAIT
+            itemRef.Value = createValue(r);
+#else
+            lock (itemRef) 
+            {
+                itemRef.Value = createValue(r);
+                Monitor.PulseAll(itemRef);
+            }
+#endif
 
             if (itemRef.Value is IDisposable disp && disp != this)
             {
