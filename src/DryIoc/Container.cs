@@ -11562,9 +11562,9 @@ namespace DryIoc
                     while (otherItemRef.Value == NoItem)
                         spinWait.SpinOnce();
 #else
-                    lock (itemRef) 
-                        while (itemRef.Value == NoItem)
-                            Monitor.Wait(itemRef);
+                    lock (otherItemRef) 
+                        while (otherItemRef.Value == NoItem)
+                            Monitor.Wait(otherItemRef);
 #endif
                     return otherItemRef.Value;
                 }
@@ -11575,6 +11575,7 @@ namespace DryIoc
 #else
             lock (itemRef) 
             {
+                // no need for the double check because this thread is the only one who can create the value
                 itemRef.Value = createValue(r);
                 Monitor.PulseAll(itemRef);
             }
