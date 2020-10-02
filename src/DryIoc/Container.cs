@@ -11493,25 +11493,9 @@ namespace DryIoc
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
             var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
-            if (itemRef != null)
-            {
-                if (itemRef.Value == NoItem) 
-                {
-#if SUPPORTS_SPIN_WAIT
-                    var spinWait = new SpinWait();
-                    while (itemRef.Value == NoItem)
-                        spinWait.SpinOnce();
-#else
-                    lock (itemRef) 
-                        while (itemRef.Value == NoItem)
-                            Monitor.Wait(itemRef);
-#endif
-                }
-
-                return itemRef.Value;
-            } 
-                
-            return TryGetOrAddViaFactoryDelegate(id, createValue, r, disposalOrder);
+            return itemRef != null
+                ? itemRef.Value != NoItem ? itemRef.Value : WaitForItemIsSet(itemRef)
+                : TryGetOrAddViaFactoryDelegate(id, createValue, r, disposalOrder);
         }
 
         internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
@@ -11528,60 +11512,26 @@ namespace DryIoc
             var newMap = oldMap.AddOrKeepEntry(itemRef);
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap) 
             {
-                // If the map did not change that means we are keeping someone else item added in parallel, so let's get it.
-                // Otherwise our own item was added and we can skip this step.
+                // If the map did not change that means we are keeping someone else item added in parallel, 
+                // so let's get it. Otherwise our own item was added and we can skip this step.
                 if (newMap == oldMap)
                 {
-                    itemRef = map.GetSurePresentEntry(id);
-                    
                     // If someone added the item already there is a chance it has a created value, so let's check it.
                     // Otherwise wait until the other thread creates populates the entry.
-                    if (itemRef.Value == NoItem) 
-                    {
-#if SUPPORTS_SPIN_WAIT
-                        var spinWait = new SpinWait();
-                        while (itemRef.Value == NoItem)
-                            spinWait.SpinOnce();
-#else
-                    lock (itemRef) 
-                        while (itemRef.Value == NoItem)
-                            Monitor.Wait(itemRef);
-#endif
-                    }
-
-                    return itemRef.Value;
+                    itemRef = map.GetSurePresentEntry(id);
+                    return itemRef.Value != NoItem ? itemRef.Value : WaitForItemIsSet(itemRef);
                 }
             }
             else 
             {
                 var otherItemRef = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i)).GetSurePresentEntry(id);
                 if (otherItemRef != itemRef) 
-                {
-#if SUPPORTS_SPIN_WAIT
-                    var spinWait = new SpinWait();
-                    while (otherItemRef.Value == NoItem)
-                        spinWait.SpinOnce();
-#else
-                    lock (otherItemRef) 
-                        while (otherItemRef.Value == NoItem)
-                            Monitor.Wait(otherItemRef);
-#endif
-                    return otherItemRef.Value;
-                }
+                    return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
             }
 
-#if SUPPORTS_SPIN_WAIT
-            itemRef.Value = createValue(r);
-#else
-            lock (itemRef) 
-            {
-                // no need for the double check because this thread is the only one who can create the value
-                itemRef.Value = createValue(r);
-                Monitor.PulseAll(itemRef);
-            }
-#endif
+            CreateAndSetItem(itemRef, createValue, r);
 
-            if (itemRef.Value is IDisposable disp && disp != this)
+            if (itemRef.Value is IDisposable disp && !ReferenceEquals(disp, this))
             {
                 if (disposalOrder == 0)
                     AddUnorderedDisposable(disp);
@@ -11592,7 +11542,39 @@ namespace DryIoc
             return itemRef.Value;
         }
 
-                //[Obsolete("Not used - remove")]
+        [MethodImpl((MethodImplOptions)256)]
+        internal static object WaitForItemIsSet(ImMapEntry<object> itemRef)
+        {
+            System.Console.WriteLine("SpinWaiting!!!!");
+#if SUPPORTS_SPIN_WAIT
+            var spinWait = new SpinWait();
+            while (itemRef.Value == NoItem)
+                spinWait.SpinOnce();
+#else
+            lock (itemRef) 
+                while (itemRef.Value == NoItem)
+                    Monitor.Wait(itemRef);
+#endif
+            System.Console.WriteLine("SpinWaiting DONE!!!!");
+            return itemRef.Value;
+        }
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal static void CreateAndSetItem(ImMapEntry<object> itemRef, FactoryDelegate createValue, IResolverContext r)
+        {
+#if SUPPORTS_SPIN_WAIT
+            itemRef.Value = createValue(r); // todo: @perf should we have an Interlocked.Exchange here?
+#else
+            lock (itemRef) 
+            {
+                // no need for the double check because this thread is the only one who can create the value
+                itemRef.Value = createValue(r);
+                Monitor.PulseAll(itemRef);
+            }
+#endif
+        }
+
+        //[Obsolete("Not used - remove")]
         internal ImMapEntry<object> TryAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
         {
             if (_disposed == 1)

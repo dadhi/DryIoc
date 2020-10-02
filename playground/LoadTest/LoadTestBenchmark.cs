@@ -106,6 +106,49 @@ container with ambient DryIoc.AsyncExecutionFlowScopeContext without scope
 -- Load Test Finished --
 00:00:43.66
 
+
+# v4.5
+
+Validation finished
+00:00:00.10
+
+ResolveAllControllersOnce of 156 controllers is done in 0.4809402 seconds
+
+New container created: container with ambient DryIoc.AsyncExecutionFlowScopeContext without scope
+ with Rules  with Made={FactoryMethod=ConstructorWithResolvableArguments}
+
+## Interpreting...
+ResolveAllControllersOnce of 156 controllers is done in 0.2221077 seconds
+## Compiling and caching the delegate...
+ResolveAllControllersOnce of 156 controllers is done in 19.1688573 seconds
+## Invoking the cached delegate...
+ResolveAllControllersOnce of 156 controllers is done in 0.0337507 seconds
+-- Starting Load test --
+32 Threads.
+
+-- Load Test Finished --
+00:00:22.54
+
+New container created:
+
+container with ambient DryIoc.AsyncExecutionFlowScopeContext without scope
+ with Rules  with Made={FactoryMethod=ConstructorWithResolvableArguments} 
+
+## Interpreting...
+ResolveAllControllersOnce of 156 controllers is done in 0.2457103 seconds
+## Compiling and caching the delegate...
+ResolveAllControllersOnce of 156 controllers is done in 20.6428925 seconds
+## Invoking the cached delegate...
+ResolveAllControllersOnce of 156 controllers is done in 0.0441964 seconds
+-- Starting Randomized Load test -- 
+155 Threads.
+
+-- Randomized Load Finished --
+00:02:51.94
+
+-- Load Test Finished --
+00:00:52.47
+
 */
 
         public static IContainer RootContainer = null;

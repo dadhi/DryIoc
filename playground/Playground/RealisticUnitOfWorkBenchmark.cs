@@ -1390,6 +1390,16 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
 |             DryIoc | 1.628 us | 0.0307 us | 0.0272 us |  0.39 |    0.01 | 0.7248 |     - |     - |   2.96 KB |
 | DryIoc_MsDIAdapter | 2.377 us | 0.0412 us | 0.0344 us |  0.56 |    0.02 | 0.7286 |     - |     - |   2.98 KB |
 
+#### DryIoc v4.5.0 with Autofac 5.1.2 and Autofac.MS.DI 6.0.0
+
+|              Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 | Gen 1 | Gen 2 | Allocated |
+|-------------------- |----------:|----------:|----------:|------:|--------:|--------:|------:|------:|----------:|
+|                MsDI |  4.783 us | 0.1155 us | 0.1134 us |  1.00 |    0.00 |  1.0605 |     - |     - |   4.35 KB |
+|              DryIoc |  1.972 us | 0.0189 us | 0.0168 us |  0.41 |    0.01 |  0.7248 |     - |     - |   2.96 KB |
+|  DryIoc_MsDIAdapter |  2.900 us | 0.0491 us | 0.0410 us |  0.61 |    0.02 |  0.7286 |     - |     - |   2.98 KB |
+|             Autofac | 69.356 us | 1.1243 us | 1.0516 us | 14.50 |    0.38 | 11.8408 |     - |     - |  48.56 KB |
+| Autofac_MsDIAdapter | 87.217 us | 1.7344 us | 1.8558 us | 18.27 |    0.62 | 15.0146 |     - |     - |   61.7 KB |
+
 */
 
             private IServiceProvider _msDi;
@@ -1452,10 +1462,10 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
             //[Benchmark]
             public object Lamar_MsDI() => Measure(_lamarMsDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            //[Benchmark]
+            [Benchmark]
             public object Autofac_MsDIAdapter() => Measure(_autofacMsDi);
         }
     }
