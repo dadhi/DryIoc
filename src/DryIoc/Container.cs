@@ -5789,15 +5789,19 @@ namespace DryIoc
         public Rules WithResolveIEnumerableAsLazyEnumerable() =>
             WithSettings(_settings | Settings.ResolveIEnumerableAsLazyEnumerable);
 
-        /// <summary><see cref="WithoutVariantGenericTypesInResolvedCollection"/>.</summary>
+        /// <summary><see cref="WithVariantGenericTypesInResolvedCollection"/>.</summary>
         public bool VariantGenericTypesInResolvedCollection =>
             (_settings & Settings.VariantGenericTypesInResolvedCollection) != 0;
 
-        /// <summary>Flag instructs to include covariant compatible types in resolved collection.</summary>
+        /// <summary>Flag instructs to include covariant compatible types into the resolved collection.</summary>
+        public Rules WithVariantGenericTypesInResolvedCollection() =>
+            WithSettings(_settings | Settings.VariantGenericTypesInResolvedCollection);
+
+        /// <summary>Flag instructs to exclude covariant compatible types into the resolved collection.</summary>
         public Rules WithoutVariantGenericTypesInResolvedCollection() =>
             WithSettings(_settings & ~Settings.VariantGenericTypesInResolvedCollection);
 
-        /// <summary><seew cref="WithDefaultIfAlreadyRegistered"/>.</summary>
+        /// <summary><see cref="WithDefaultIfAlreadyRegistered"/>.</summary>
         public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; }
 
         /// <summary>Specifies default setting for container. By default is <see cref="IfAlreadyRegistered.AppendNotKeyed"/>.
