@@ -6840,7 +6840,7 @@ namespace DryIoc
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
     public static class Registrator
     {
-        /// <summary>The base method for registering servce with its implementation factory. Allows to specify all possible options.</summary>
+        /// <summary>The base method for registering service with its implementation factory. Allows to specify all possible options.</summary>
         public static void Register(this IRegistrator registrator, Type serviceType, Factory factory,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
@@ -7746,7 +7746,7 @@ namespace DryIoc
             object[] args = null) =>
             resolver.Resolve(serviceType, serviceKey, ifUnresolved, requiredServiceType, Request.Empty, args);
 
-        /// <summary>Returns instance of <typepsaramref name="TService"/> type.</summary>
+        /// <summary>Returns instance of <typeparamref name="TService"/> type.</summary>
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <returns>The requested service instance.</returns>
         /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
@@ -7796,6 +7796,21 @@ namespace DryIoc
             object[] args = null, object serviceKey = null) =>
             resolver.ResolveMany<object>(serviceType, behavior, args, serviceKey);
 
+        /// <summary>Creates a service by injecting its parameters registered in the container but without registering the service itself in the container.</summary>
+        public static object New(this IResolver resolver, Type concreteType, Made made = null,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
+            resolver.Resolve<IContainer>().New(concreteType, setup: null, made, registrySharing);
+
+        /// <summary>Creates a service by injecting its parameters registered in the container but without registering the service itself in the container.</summary>
+        public static T New<T>(this IResolver resolver, Made made = null,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
+            (T)resolver.New(typeof(T), made, registrySharing);
+
+        /// <summary>Creates a service by injecting its parameters registered in the container but without registering the service itself in the container.</summary>
+        public static T New<T>(this IResolver resolver, Made.TypedMade<T> made,
+            RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
+            (T)resolver.New(typeof(T), made, registrySharing);
+
         internal static readonly ConstructorInfo ResolutionScopeNameCtor =
             typeof(ResolutionScopeName).GetTypeInfo().DeclaredConstructors.First();
 
@@ -7841,7 +7856,7 @@ namespace DryIoc
                 //       .Resolve(serviceType, serviceKey)
                 //
                 var actualServiceTypeExpr = Constant(request.GetActualServiceType(), typeof(Type));
-                var scopeNameExpr = New(ResolutionScopeNameCtor, actualServiceTypeExpr, serviceKeyExpr);
+                var scopeNameExpr = Expression.New(ResolutionScopeNameCtor, actualServiceTypeExpr, serviceKeyExpr);
                 var trackInParent = Constant(true);
 
                 resolverExpr = Call(ResolverContext.OpenScopeMethod,

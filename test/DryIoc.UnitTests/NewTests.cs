@@ -96,39 +96,54 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<ISingleton, SingletonImpl>(Reuse.Singleton);
+            container.Register<IFoo, SingletonImpl>(Reuse.Singleton);
 
             var testconcreate1 = container.New<ConcreteService>();
             var testconcreate2 = container.New<ConcreteService>();
 
-            Assert.AreSame(testconcreate1.Singleton, testconcreate2.Singleton);
+            Assert.AreSame(testconcreate1.Foo, testconcreate2.Foo);
         }
 
-        public interface ISingleton
+        [Test]
+        public void New_is_working_for_the_resolver()
+        {
+            var container = new Container();
+
+            container.Register<IFoo, ScopedImpl>(Reuse.Scoped);
+
+            using (var scope = container.OpenScope()) 
+            {
+                var testconcreate1 = scope.New<ConcreteService>();
+                var testconcreate2 = scope.New<ConcreteService>();
+                Assert.AreSame(testconcreate1.Foo, testconcreate2.Foo);
+            }
+        }
+
+        public interface IFoo
         {
             void Foo();
         }
 
-        public class SingletonImpl : ISingleton
+        public class SingletonImpl : IFoo
         {
-            public SingletonImpl() { }
-
             public void Foo() { }
+        }
+
+        public class ScopedImpl : IFoo
+        {
+            public void Foo() {}
         }
 
         public class ConcreteService
         {
-            public ISingleton Singleton { get; private set; }
+            public IFoo Foo { get; private set; }
 
-            public ConcreteService(ISingleton singleton)
-            {
-                Singleton = singleton;
-            }
+            public ConcreteService(IFoo foo) => Foo = foo;
         }
 
         internal class Wheels
         {
-            public string Paint;            
+            public string Paint;
         }
 
         internal class Car
