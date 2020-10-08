@@ -128,7 +128,7 @@ namespace DryIoc.UnitTests
 
         internal class Wheels
         {
-            public string Paint;            
+            public string Paint;
         }
 
         internal class Car

@@ -60,7 +60,7 @@ namespace DryIoc.Mvc.UnitTests
         }
 
         [Test]
-        public void Without_specyfuing_scope_context_error_handler_the_error_should_be_rethrown()
+        public void Without_specifying_scope_context_error_handler_the_error_should_be_re_thrown()
         {
             var contextItems = new Dictionary<object, object>();
             var container = new Container(
