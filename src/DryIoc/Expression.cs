@@ -1931,6 +1931,9 @@ namespace FastExpressionCompiler.LightExpression
 
             return sb.Append(')');
         }
+
+        /// <summary>I want to see the actual Value not the default one</summary>
+        public override string ToString() => $"Constant({Value}, typeof({Type.ToCode()}))";
     }
 
 

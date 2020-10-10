@@ -3586,8 +3586,7 @@ namespace DryIoc
             else if (newMap == oldMap)
             {
                 var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -3602,8 +3601,7 @@ namespace DryIoc
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
-            // itemRef.Value = result;
-            Interlocked.Exchange(ref itemRef.Value, result);
+            itemRef.Value = result;
 #else
             lock (itemRef) 
             {
@@ -3676,8 +3674,7 @@ namespace DryIoc
             else if (newMap == oldMap)
             {
                 var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -3692,8 +3689,7 @@ namespace DryIoc
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
-            // itemRef.Value = result;
-            Interlocked.Exchange(ref itemRef.Value, result);
+            itemRef.Value = result;
 #else
             lock (itemRef) 
             {
@@ -3762,8 +3758,7 @@ namespace DryIoc
             else if (newMap == oldMap)
             {
                 var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
             var lambda = args[4];
@@ -3773,8 +3768,7 @@ namespace DryIoc
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
-            // itemRef.Value = result;
-            Interlocked.Exchange(ref itemRef.Value, result);
+            itemRef.Value = result;
 #else
             lock (itemRef)
             {
@@ -3846,8 +3840,7 @@ namespace DryIoc
             else if (newMap == oldMap)
             {
                 var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -3861,8 +3854,7 @@ namespace DryIoc
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
-            // itemRef.Value = result;
-            Interlocked.Exchange(ref itemRef.Value, result);
+            itemRef.Value = result;
 #else
             lock (itemRef) 
             {
@@ -7513,21 +7505,37 @@ namespace DryIoc
 
         /// <summary>
         /// Registers initializing action that will be called after service is resolved 
-        /// just before returning it to the caller.  You can register multiple initializers for single service.
-        /// Or you can register initializer for <see cref="Object"/> type to be applied 
+        /// just before returning it to the caller. You can register multiple initializers for a single service.
+        /// Or you can register initializer for the <see cref="Object"/> type to be applied 
         /// for all services and use <paramref name="condition"/> to specify the target services.
+        /// Note: The initializer action has the same reuse as a initialized (decorated) service.
         /// </summary>
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
-            Action<TTarget, IResolverContext> initialize, Func<Request, bool> condition = null)
+            Action<TTarget, IResolverContext> initialize, Func<Request, bool> condition = null) =>
+            registrator.RegisterInitializer<TTarget>(initialize, null, condition);
+
+        /// <summary>
+        /// Registers initializing action that will be called after service is resolved 
+        /// just before returning it to the caller. You can register multiple initializers for a single service.
+        /// Or you can register initializer for the <see cref="Object"/> type to be applied 
+        /// for all services and use <paramref name="condition"/> to specify the target services.
+        /// Note: You may specify a <paramref name="reuse"/> different from the initiliazed object enabling the
+        /// <paramref name="initialize"/> action to run once (Singleton), run once-per-scope (Scoped), run always (Transient).
+        /// </summary>
+        public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
+            Action<TTarget, IResolverContext> initialize, 
+            IReuse reuse,
+            Func<Request, bool> condition = null)
         {
             initialize.ThrowIfNull();
 
             registrator.Register<object>(
-                made: Made.Of(r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
-                    // specify ResolverContext as parameter to prevent applying initializer for injected resolver too
+                reuse: reuse,
+                made: Made.Of(
+                    r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
+                    // specify ResolverContext as a parameter to prevent applying initializer for injected resolver too
                     parameters: Parameters.Of
-                        .Type(r => r.IsSingletonOrDependencyOfSingleton && !r.OpensResolutionScope
-                            ? r.Container.RootOrSelf() : r.Container)
+                        .Type<IResolverContext>(r => r.IsSingletonOrDependencyOfSingleton && !r.OpensResolutionScope ? r.Container.RootOrSelf() : r.Container)
                         .Type(initialize.ToFunc<Request, Action<TTarget, IResolverContext>>)),
                 setup: Setup.DecoratorWith(
                     r => r.ServiceType.IsAssignableTo<TTarget>() && (condition == null || condition(r)),
@@ -9837,7 +9845,7 @@ namespace DryIoc
                 setup.Condition == null &&
                 !Made.IsConditional;
 
-            // first lookup in the expression cache
+            // First, lookup in the expression cache
             var reuse = request.Reuse;
             ImMapEntry<Container.Registry.ExpressionCacheSlot> cacheEntry = null;
             if (cacheExpression)
@@ -9856,10 +9864,10 @@ namespace DryIoc
                     return cachedExpr;
                 }
             }
-            
-            // next lookup in the singleton scope
-            if (reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess &&
-                !setup.PreventDisposal && !setup.WeaklyReferenced)
+
+            // Next, lookup for the already created service in the singleton scope
+            Expression serviceExpr;
+            if (reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess)
             {
                 // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
                 var id = request.FactoryType == FactoryType.Decorator
@@ -9870,14 +9878,22 @@ namespace DryIoc
                     .GetEntryOrDefault(id);
                 if (itemRef != null) 
                 {
-                    // If itemRef is found its value maybe either NoItem (not created yet) or some other value including null (already created and set)
-                    var service = itemRef.Value != Scope.NoItem ? itemRef.Value : Scope.WaitForItemIsSet(itemRef);
-                    return service == null ? Constant(null, request.GetActualServiceType()) : Constant(service); // fixes #258
+                    // If the itemRef is found, its value will be either NoItem (not created yet) or some other value including null
+                    var singleton = itemRef.Value != Scope.NoItem ? itemRef.Value : Scope.WaitForItemIsSet(itemRef);
+                    serviceExpr = singleton == null ? Constant(null, request.GetActualServiceType())/*fixes #258*/ : Constant(singleton);
+                    
+                    if (Setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
+                        serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
+                            Property(Convert(serviceExpr, typeof(WeakReference)), ThrowInGeneratedCode.WeakReferenceValueProperty));
+                    else if (Setup.PreventDisposal)
+                        serviceExpr = Field(Convert(serviceExpr, typeof(HiddenDisposable)), HiddenDisposable.ValueField);
+
+                    return serviceExpr;
                 }
             }
 
-            // Creates an object graph expression with all of the dependencies created
-            var serviceExpr = CreateExpressionOrDefault(request);
+            // At last, create the object graph with all of the dependencies created and injected
+            serviceExpr = CreateExpressionOrDefault(request);
             if (serviceExpr == null)
             {
                 Container.TryThrowUnableToResolve(request);
@@ -9891,7 +9907,7 @@ namespace DryIoc
                 {
                     var originalServiceExprType = serviceExpr.Type;
 
-                    serviceExpr = ApplyReuse(serviceExpr, request);
+                    serviceExpr = ApplyReuse(serviceExpr, request); // todo: @perf pass the possibly claculated id to here
 
                     if (serviceExpr.NodeType != ExprType.Constant &&
                         serviceExpr.Type != originalServiceExprType &&
@@ -9964,24 +9980,22 @@ namespace DryIoc
                 // Creating a new local item with the id and the marker for not yet created item
                 var itemRef = new ImMapEntry<object>(id, Scope.NoItem); 
                 ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK]; // got a live reference to the map where value can be queried and stored
-                
-                var oldMap = map; // fix the map available now as an oldMap
 
-                // Add the new into into the current map. 
-                
-                // If the `newMap` is the same as `oldMap` it means there is item already in the map.
+                var oldMap = map; // get a reference to the map available now as an oldMap
+                // If the `newMap` is the same as an `oldMap` it means there is item already in the map.
                 var newMap = oldMap.AddOrKeepEntry(itemRef);
+
+                // The check before the CAS operation is only here for Singleton and not in a Scope 
+                // because the race for the Singletons is far more likely and the race for the Scoped services is almost non-existent
                 if (newMap == oldMap)
                 {
-                    // It does not matter if the live `map` changed because the item can only be added and not removed,
-                    // so once added - it will always be there
+                    // It does not matter if the live `map` changed because the item can only be added and not removed ever
                     var otherItemRef = newMap.GetSurePresentEntry(id);
                     singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-
                 }
-
-                if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
+                else if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
                 {
+                    // if the map wa changed by the other party, let's retry using the Swap thing
                     newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
                     var otherItemRef = newMap.GetSurePresentEntry(id);
                     if (otherItemRef != itemRef)
@@ -9990,8 +10004,7 @@ namespace DryIoc
                 else if (newMap == oldMap)
                 {
                     var otherItemRef = newMap.GetSurePresentEntry(id);
-                    if (otherItemRef != itemRef)
-                        singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                    singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
                 }
 
                 if (singleton == Scope.NoItem)
@@ -10004,8 +10017,7 @@ namespace DryIoc
                         singleton = new WeakReference(singleton);
                     else if (Setup.PreventDisposal)
                         singleton = new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
-                    // itemRef.Value = singleton;
-                    Interlocked.Exchange(ref itemRef.Value, singleton);
+                    itemRef.Value = singleton;
 #else
                     lock (itemRef)
                     {
@@ -10014,13 +10026,17 @@ namespace DryIoc
 
                         if (Setup.WeaklyReferenced)
                             singleton = new WeakReference(singleton);
-                        else if (Setup.PreventDisposal)
-                            singleton = new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
+                        // todo: @perf Do we need HiddenDisposable here or instead we may skip adding the object to Disposable items collection 
+                        // - just don't call the AddUnorderedDisposable or AddDisposable below.
+                        // Huh, but we need to handle the case when we have the expression createdfor not eager singleton.
+                        // So maybe we can optimize and simplify for the eager singleton only?
+                        else if (Setup.PreventDisposal) 
+                            singleton = new HiddenDisposable(singleton); 
                         itemRef.Value = singleton;
                         Monitor.PulseAll(itemRef);
                     }
 #endif
-                    if (singleton is IDisposable disp && !ReferenceEquals(disp, this))
+                    if (singleton is IDisposable disp && !ReferenceEquals(disp, scope))
                     {
                         if (Setup.DisposalOrder == 0)
                             scope.AddUnorderedDisposable(disp);
@@ -10029,7 +10045,7 @@ namespace DryIoc
                     }
                 }
 
-                Debug.Assert(singleton != Scope.NoItem, "Should not be the case otherwise I am failed here as a programmer");
+                Debug.Assert(singleton != Scope.NoItem, "Should not be the case otherwise I am effing failed");
                 serviceExpr = singleton == null ? Constant(null, serviceExpr.Type) /* fixes #258 */ : Constant(singleton);
                 if (request.DependencyCount > 0)
                     request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
@@ -10038,25 +10054,18 @@ namespace DryIoc
             {
                 // Wrap service expression in WeakReference or HiddenDisposable
                 if (Setup.WeaklyReferenced)
-                    serviceExpr = New(typeof(WeakReference).Constructor(typeof(object)), serviceExpr);
+                    serviceExpr = New(ThrowInGeneratedCode.WeakReferenceCtor, serviceExpr);
                 else if (Setup.PreventDisposal) 
                     serviceExpr = New(HiddenDisposable.Ctor, serviceExpr);
 
                 serviceExpr = request.Reuse.Apply(request, serviceExpr);
             }
 
-            // Unwrap WeakReference or HiddenDisposable
-            if (Setup.WeaklyReferenced)
-            {
-                serviceExpr = Call(
-                    typeof(ThrowInGeneratedCode).GetTypeInfo().GetDeclaredMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
-                    Property(Convert(serviceExpr, typeof(WeakReference)),
-                        typeof(WeakReference).Property(nameof(WeakReference.Target))));
-            }
+            if (Setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
+                serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
+                    Property(Convert(serviceExpr, typeof(WeakReference)), ThrowInGeneratedCode.WeakReferenceValueProperty));
             else if (Setup.PreventDisposal)
-            {
                 serviceExpr = Field(Convert(serviceExpr, typeof(HiddenDisposable)), HiddenDisposable.ValueField);
-            }
 
             return serviceExpr;
         }
@@ -11505,10 +11514,8 @@ namespace DryIoc
             return new Scope(Parent, Name, slotsCopy, _factories, _unorderedDisposables, _disposables);
         }
 
-        // [Obsolete("Replaced by `GetOrAddViaFactoryDelegate`")]
-        /*
         /// <inheritdoc />
-        [MethodImpl((MethodImplOptions)256)]
+        [Obsolete("Replaced by `GetOrAddViaFactoryDelegate`")]
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
@@ -11517,41 +11524,51 @@ namespace DryIoc
                 return itemRef.Value;
             return TryGetOrAdd(ref map, id, createValue, disposalOrder);
         }
-        */
 
-        //[Obsolete("Not used - remove")]
-        /*
+        [Obsolete("Not used - to be removed")]
         private object TryGetOrAdd(ref ImMap<object> map, int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
-                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));
-
-            var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef.Value != NoItem)
-                return itemRef.Value;
-
-            // lock on the ref itself to set its `Item` field
-            lock (itemRef)
+            var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
             {
-                // double-check if the item was changed in between (double check locking)
-                if (itemRef.Value != NoItem)
-                    return itemRef.Value;
-                itemRef.Value = createValue();
+                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+                var otherItemRef = newMap.GetSurePresentEntry(id);
+                if (otherItemRef != itemRef)
+                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+            }
+            else if (newMap == oldMap)
+            {
+                var otherItemRef = newMap.GetSurePresentEntry(id);
+                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            if (itemRef.Value is IDisposable disp && disp != this)
+            object result = null;
+#if SUPPORTS_SPIN_WAIT
+            itemRef.Value = result = createValue();
+#else
+            lock (itemRef) 
+            {
+                // no need for the double check because this thread is the only one who can create the value
+                itemRef.Value = result = createValue();
+                Monitor.PulseAll(itemRef);
+            }
+#endif
+
+            if (result is IDisposable disp && !ReferenceEquals(disp, this))
+            {
                 if (disposalOrder == 0)
                     AddUnorderedDisposable(disp);
                 else
                     AddDisposable(disp, disposalOrder);
+            }
 
-            return itemRef.Value;
+            return result;
         }
-        */
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
@@ -11585,14 +11602,12 @@ namespace DryIoc
             else if (newMap == oldMap)
             {
                 var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                    return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
+                return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
             }
 
             object result = null;
 #if SUPPORTS_SPIN_WAIT
-            result = createValue(r); // todo: @perf should we have an Interlocked.Exchange here?
-            Interlocked.Exchange(ref itemRef.Value, result);
+            itemRef.Value = result = createValue(r);
 #else
             lock (itemRef) 
             {
@@ -11613,56 +11628,79 @@ namespace DryIoc
             return result;
         }
 
-        [MethodImpl((MethodImplOptions)256)]
         internal static object WaitForItemIsSet(ImMapEntry<object> itemRef)
         {
-            // todo: @debug
-            var sw = Stopwatch.StartNew();
 #if SUPPORTS_SPIN_WAIT
             Debug.WriteLine("SpinWaiting!!!! ");
+
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
                 spinWait.SpinOnce();
-            Debug.WriteLine("SpinWaiting!!!! Done in total ms " + sw.ElapsedMilliseconds);
+
+            Debug.WriteLine("SpinWaiting!!!! Done");
 #else
             Debug.WriteLine("LockWaiting!!!! ");
+
             lock (itemRef) 
                 while (itemRef.Value == NoItem)
                     Monitor.Wait(itemRef);
-            Debug.WriteLine("Lock waiting!!!! Done in total ms " + sw.ElapsedMilliseconds);
-#endif
 
+            Debug.WriteLine("Lock waiting!!!! Done");
+#endif
             return itemRef.Value;
         }
 
-        //[Obsolete("Not used - remove")] 
-        /*
+        [Obsolete("Not used - to be removed")] 
         internal ImMapEntry<object> TryAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
 
+            var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
-                Ref.Swap(ref map, id, (x, i) => x.AddOrKeep(i, NoItem));
-
-            var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef.Value != NoItem)
-                return itemRef;
-
-            lock (itemRef)
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
             {
-                if (itemRef.Value != NoItem)
-                    return itemRef;
-                itemRef.Value = createValue(r);
+                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+                var otherItemRef = newMap.GetSurePresentEntry(id);
+                if (otherItemRef != itemRef)
+                {
+                    if (otherItemRef.Value == Scope.NoItem)
+                        Scope.WaitForItemIsSet(otherItemRef);
+                    return otherItemRef;
+                }
+            }
+            else if (newMap == oldMap)
+            {
+                var otherItemRef = newMap.GetSurePresentEntry(id);
+                if (otherItemRef.Value == Scope.NoItem)
+                    Scope.WaitForItemIsSet(otherItemRef);
+                return otherItemRef;
             }
 
-            if (itemRef.Value is IDisposable disp && disp != this)
-                AddDisposable(disp, disposalOrder);
+            object result = null;
+#if SUPPORTS_SPIN_WAIT
+            itemRef.Value = result = createValue(r);
+#else
+            lock (itemRef) 
+            {
+                // no need for the double check because this thread is the only one who can create the value
+                itemRef.Value = result = createValue(r);
+                Monitor.PulseAll(itemRef);
+            }
+#endif
+
+            if (result is IDisposable disp && !ReferenceEquals(disp, this))
+            {
+                if (disposalOrder == 0)
+                    AddUnorderedDisposable(disp);
+                else
+                    AddDisposable(disp, disposalOrder);
+            }
 
             return itemRef;
-        } */
+        }
 
         /// <inheritdoc />
         public object TryGetOrAddWithoutClosure(int id,
@@ -11686,14 +11724,12 @@ namespace DryIoc
             else if (newMap == oldMap)
             {
                 var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                    return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
+                return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
             }
 
             object result = null;
 #if SUPPORTS_SPIN_WAIT
-            result = createValue(resolveContext, expr, useFec); // todo: @perf should we have an Interlocked.Exchange here?
-            Interlocked.Exchange(ref itemRef.Value, result); 
+            itemRef.Value = result = createValue(resolveContext, expr, useFec);
 #else
             lock (itemRef) 
             {
@@ -11729,8 +11765,8 @@ namespace DryIoc
                 AddUnorderedDisposable(disp);
         }
 
-        ///[Obsolete("Removing because it is not used")]
-        /*
+        /// [Obsolete("Removing because it is not used")]
+        [Obsolete("Removing because it is not used")]
         public object GetOrTryAdd(int id, object newItem, int disposalOrder)
         {
             if (_disposed == 1)
@@ -11738,37 +11774,43 @@ namespace DryIoc
 
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
 
-            var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef != null && itemRef.Value != NoItem)
-                return itemRef.Value;
-
-            var m = map;
-            if (Interlocked.CompareExchange(ref map, m.AddOrKeep(id, NoItem), m) != m)
-                Ref.Swap(ref map, x => x.AddOrUpdate(id, NoItem));
-
-            itemRef = map.GetEntryOrDefault(id);
-
-            // lock on the ref itself to set its `Item` field
-            lock (itemRef)
+            var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
             {
-                // double-check if the item was changed in between (double check locking)
-                if (itemRef.Value != NoItem)
-                    return itemRef.Value;
-
-                // we can simple assign because we are under the lock 
-                itemRef.Value = newItem;
+                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+                var otherItemRef = newMap.GetSurePresentEntry(id);
+                if (otherItemRef != itemRef)
+                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+            }
+            else if (newMap == oldMap)
+            {
+                var otherItemRef = newMap.GetSurePresentEntry(id);
+                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            if (itemRef.Value is IDisposable disp && !ReferenceEquals(disp, this))
+#if SUPPORTS_SPIN_WAIT
+            itemRef.Value = newItem;
+#else
+            lock (itemRef) 
+            {
+                // no need for the double check because this thread is the only one who can create the value
+                itemRef.Value = newItem;
+                Monitor.PulseAll(itemRef);
+            }
+#endif
+
+            if (newItem is IDisposable disp && !ReferenceEquals(disp, this))
+            {
                 if (disposalOrder == 0)
                     AddUnorderedDisposable(disp);
                 else
                     AddDisposable(disp, disposalOrder);
+            }
 
-            return itemRef.Value;
+            return newItem;
         }
-        */
-
         internal void AddDisposable(IDisposable disposable, int disposalOrder)
         {
             var d = _disposables;
@@ -11804,11 +11846,11 @@ namespace DryIoc
         /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalOrder = 0)
         {
-            if (item is IDisposable disposable && !ReferenceEquals(disposable, this))
+            if (item is IDisposable disp && !ReferenceEquals(disp, this))
                 if (disposalOrder == 0)
-                    AddUnorderedDisposable(disposable);
+                    AddUnorderedDisposable(disp);
                 else
-                    AddDisposable(disposable, disposalOrder);
+                    AddDisposable(disp, disposalOrder);
             return item;
         }
 
@@ -13177,15 +13219,22 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Called from generated code.</summary>
+    /// <summary>Called from the generated code to check if WeakReference.Value is GCed.</summary>
     public static class ThrowInGeneratedCode
     {
-        /// <summary>Throws if object is null.</summary>
+        /// <summary>Throws if the object is null.</summary>
         public static object WeakRefReuseWrapperGCed(this object obj)
         {
             if (obj == null) Throw.It(Error.WeakRefReuseWrapperGCed);
             return obj;
         }
+
+        internal static readonly MethodInfo WeakRefReuseWrapperGCedMethod =
+            typeof(ThrowInGeneratedCode).GetTypeInfo().GetDeclaredMethod(nameof(WeakRefReuseWrapperGCed));
+        internal static readonly PropertyInfo WeakReferenceValueProperty =
+            typeof(WeakReference).Property(nameof(WeakReference.Target));
+        internal static readonly ConstructorInfo WeakReferenceCtor =
+            typeof(WeakReference).Constructor(typeof(object));
     }
 
     /// <summary>Contains helper methods to work with Type: for instance to find Type implemented base types and interfaces, etc.</summary>
