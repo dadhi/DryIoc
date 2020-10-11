@@ -7389,7 +7389,7 @@ namespace DryIoc
         }
 
         /// A special performant version mostly for integration with other libraries,
-        /// that already check compatiblity between delegate result and the service type
+        /// that already check compatibility between delegate result and the service type
         public static void RegisterDelegate(this IRegistrator registrator,
             bool isChecked, Type serviceType, Func<IResolverContext, object> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
