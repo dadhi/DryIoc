@@ -21,6 +21,7 @@
     - [RegisterDelegate is harder to use when types are not known](#registerdelegate-is-harder-to-use-when-types-are-not-known)
   - [RegisterInstance](#registerinstance)
   - [RegisterInitializer](#registerinitializer)
+    - [RegisterInitializer with the reuse different from the initialized object](#registerinitializer-with-the-reuse-different-from-the-initialized-object)
   - [RegisterPlaceholder](#registerplaceholder)
   - [RegisterDisposer](#registerdisposer)
 
@@ -896,17 +897,16 @@ class Typed_instance
 
 ## RegisterInitializer
 
-Initializer is an action to be invoked on created service before returning it from resolve method, 
+`RegisterInitializer` allows to pass the action to be invoked on created a service before returning it from resolve method, 
 or before injecting it as dependency. 
 
-__Note:__ Underneath Initializer is registered as [Decorator](Decorators).
+__Note:__ From the implementation perspective `RegisterInitializer` is just a sugar for registering a [Decorator](Decorators).
 
 Let's say we want to log the creation of our service:
 ```cs md*/
 class Register_initializer
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<Logger>(Reuse.Singleton);
@@ -930,13 +930,12 @@ class Register_initializer
 }/*md
 ```
 
-OK, this works for specific service `IService`. What if I want to log creation of _any_ resolved or injected service.
+OK, this works for the specific service `IService` but what if I want to log the creation of _any_ resolved or injected service.
 
 ```cs md*/
 class Register_initializer_for_any_object
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         var loggerKey = "logger";
@@ -962,19 +961,58 @@ class Register_initializer_for_any_object
 }/*md
 ```
 
-Initializer maybe registered for an `object` service, which means _any_ service type.
+When registered for the `Object` type the initializer will be applied to _any_ target service type.
 
-__Note:__ Invoking initializer for any object means, that it will be invoked for the `Logger` itself causing a `StackOverflowException`. 
+__Note:__ In the example above invoking initializer for any object means 
+that it will be invoked for the `Logger` itself causing the `StackOverflowException`. 
 To avoid this, logger is registered with a `serviceKey` and excluded from initializer action via `condition` parameter.
 
 
-The `TTarget` of `RegisterInitializer<TTarget>()` maybe an any type implemented by registered service type, but not by implementation type.
+The `TTarget` of `RegisterInitializer<TTarget>()` maybe the type implemented by theregistered service type 
+but not by the implementation type.
 
 For instance, to register logger for disposable services:
 ```cs
 container.RegisterInitializer<IDisposable>(
     (disposable, resolver) => resolver.Resolve<Logger>().Log("resolved disposable " + disposable));
 ```
+
+### RegisterInitializer with the reuse different from the initialized object
+
+By default initializer decorator is registered with the `useDecorateeReuse` option which binds it to the initialized object lifetime.
+But there is an overload of `RegisterInitializer` (since the DryIoc v4.5.0) with the `reuse` parameter.
+Having a separate reuse option makes possible to apply initializer once per scope (Scoped), once per container (Singleton), or every time (Transient).
+
+```cs md*/
+class RegisterInitializer_with_reuse_different_from_initialized_object
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<IFoo, Boo>(Reuse.Singleton);
+        
+        var scopedUsages = 0;
+        container.RegisterInitializer<IFoo>((x, r) => ++scopedUsages, Reuse.Scoped);
+
+        using (var scope = container.OpenScope())
+            container.Resolve<IFoo>();
+
+        using (var scope = container.OpenScope())
+            container.Resolve<IFoo>();
+
+        using (var scope = container.OpenScope())
+            container.Resolve<IFoo>();
+
+        Assert.AreEqual(3, scopedUsages);
+    }
+
+    interface IFoo { }
+    class Boo : IFoo { }
+}
+/*md
+```
+
 
 ## RegisterPlaceholder
 
