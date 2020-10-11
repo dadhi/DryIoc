@@ -4,7 +4,7 @@
 
         <TargetFramework>netcoreapp2.2</TargetFramework>
         <TargetFramework Condition="'$(NoSupportForNetCore22)' == 'true'">netcoreapp2.1</TargetFramework>
-        <!-- <TargetFramework Condition="'$(DevMode)' == 'true'">netcoreapp3.1</TargetFramework> -->
+        <!--TargetFramework>netcoreapp3.1</TargetFramework-->
 
         <Description>Benchmarks, sandbox for experiments.</Description>
         

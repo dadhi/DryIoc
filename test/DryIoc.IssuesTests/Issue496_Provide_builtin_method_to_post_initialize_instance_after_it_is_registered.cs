@@ -48,13 +48,14 @@ namespace DryIoc.IssuesTests
                 Name += " is initialized";
                 return this;
             }
-        }
+        } 
 
         [Test]
         public void Try_initializer()
         {
             var c = new Container();
 
+            c.Register<N>(Reuse.Singleton);
             c.Register<M>(Reuse.Singleton);
 
             var mInitialized = false;
@@ -67,9 +68,8 @@ namespace DryIoc.IssuesTests
                 m.S += "i";
                 var n = r.Resolve<N>();
                 Assert.AreEqual(">i", n.S);
-            });
-
-            c.Register<N>(Reuse.Singleton);
+            }, 
+            Reuse.Transient);
 
             var nInitialized = false;
             c.RegisterInitializer<N>((n, r) =>
@@ -81,7 +81,8 @@ namespace DryIoc.IssuesTests
                 n.S += "i";
                 var m = r.Resolve<M>();
                 Assert.AreEqual(">i", m.S);
-            });
+            },
+            Reuse.Transient);
 
             var mm = c.Resolve<M>();
             Assert.AreEqual(">i", mm.S);
