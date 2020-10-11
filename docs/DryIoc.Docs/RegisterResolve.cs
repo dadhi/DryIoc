@@ -996,13 +996,13 @@ class RegisterInitializer_with_reuse_different_from_initialized_object
         container.RegisterInitializer<IFoo>((x, r) => ++scopedUsages, Reuse.Scoped);
 
         using (var scope = container.OpenScope())
-            container.Resolve<IFoo>();
+            scope.Resolve<IFoo>();
 
         using (var scope = container.OpenScope())
-            container.Resolve<IFoo>();
+            scope.Resolve<IFoo>();
 
         using (var scope = container.OpenScope())
-            container.Resolve<IFoo>();
+            scope.Resolve<IFoo>();
 
         Assert.AreEqual(3, scopedUsages);
     }
