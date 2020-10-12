@@ -306,13 +306,6 @@ namespace DryIoc
         object IServiceProvider.GetService(Type serviceType) =>
             ((IResolver)this).Resolve(serviceType, 
                 Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered);
-
-        /// <summary>
-        /// Resolves service with <see cref="IfUnresolved.Throw"/> policy 
-        /// throwing the specific <see cref="ContainerException"/> if not resolved.
-        /// </summary>
-        public object GetRequiredService(Type serviceType) =>
-            ((IResolver)this).Resolve(serviceType, IfUnresolved.Throw);
 #endif
 
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
@@ -347,8 +340,7 @@ namespace DryIoc
                     if (Interlocked.CompareExchange(ref entry.Value, new Registry.Compiling(expr), expr) == expr)
                     {
                         var compiledFactory = expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
-                        // todo: should we instead cache only after invoking the factory delegate
-                        entry.Value = compiledFactory;
+                        entry.Value = compiledFactory; // todo: @unclear should we instead cache only after invoking the factory delegate
                         return compiledFactory(this);
                     }
                 }
@@ -13946,6 +13938,7 @@ namespace DryIoc
             t.FullName != null && t.Namespace != null && !t.Namespace.StartsWith("System") ? t.FullName : t.Name;
 #endif
 
+        // todo: @bug Use the version from the FEC v3
         /// <summary>Pretty prints the <paramref name="type"/> in proper C# representation.
         /// <paramref name="getTypeName"/>Allows to specify if you want Name instead of FullName.</summary>
         public static StringBuilder Print(this StringBuilder s, Type type, Func<Type, string> getTypeName = null)
