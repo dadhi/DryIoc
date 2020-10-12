@@ -300,8 +300,8 @@ namespace DryIoc
         /// <summary>
         /// Resolves service with the <see cref="IfUnresolved.ReturnDefaultIfNotRegistered"/> policy,
         /// enabling the fallback resolution for not registered services (default MS convention).
-        /// But you may set the global rule <see cref="DryIoc.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved"/> to alter the behavior. 
-        /// It may help to highlight the issues by throwing the original rich DryIoc exception instead of just returning the `null`.
+        /// For diagnostics reasons, you may globally set the rule <see cref="DryIoc.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved"/> to alter the behavior. 
+        /// It may help to highlight the issues by throwing the original rich <see cref="ContainerException"/> instead of just returning the `null`.
         /// </summary>
         object IServiceProvider.GetService(Type serviceType) =>
             ((IResolver)this).Resolve(serviceType, 
@@ -309,7 +309,7 @@ namespace DryIoc
 
         /// <summary>
         /// Resolves service with <see cref="IfUnresolved.Throw"/> policy 
-        /// throwing the specific <see cref="ContainerException"/> if not resolved
+        /// throwing the specific <see cref="ContainerException"/> if not resolved.
         /// </summary>
         public object GetRequiredService(Type serviceType) =>
             ((IResolver)this).Resolve(serviceType, IfUnresolved.Throw);
