@@ -77,24 +77,20 @@ namespace DryIoc
     using static System.Linq.Expressions.Expression;
 #endif
 
-    /// Inversion of control container
-    public sealed partial class Container : IContainer
+    /// <summary>Inversion of control container</summary>
+    public partial class Container : IContainer
     {
         /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
-        public Container() : this(Rules.Default, Ref.Of(Registry.Default), NewSingletonScope())
-        {
+        public Container() : this(Rules.Default, Ref.Of(Registry.Default), NewSingletonScope()) => 
             SetInitialFactoryID();
-        }
 
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
         /// <param name="rules">(optional) Rules to modify container default resolution behavior.
         /// If not specified, then <see cref="DryIoc.Rules.Default"/> will be used.</param>
         /// <param name="scopeContext">(optional) Scope context to use for scoped reuse.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
-            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), NewSingletonScope(), scopeContext)
-        {
+            : this(rules ?? Rules.Default, Ref.Of(Registry.Default), NewSingletonScope(), scopeContext) =>
             SetInitialFactoryID();
-        }
 
         /// <summary>Creates new container with configured rules.</summary>
         /// <param name="configure">Allows to modify <see cref="DryIoc.Rules.Default"/> rules.</param>
@@ -104,7 +100,7 @@ namespace DryIoc
         { }
 
         /// <summary>Helper to create singleton scope</summary>
-        public static IScope NewSingletonScope() => new Scope(name: "<sigletons>");
+        public static IScope NewSingletonScope() => new Scope(name: "<singletons>");
 
         /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
@@ -301,10 +297,22 @@ namespace DryIoc
 #region IResolver
 
 #if SUPPORTS_ISERVICE_PROVIDER
-        /// Resolves service with <see cref="IfUnresolved.ReturnDefaultIfNotRegistered"/> policy,
-        /// enabling the fallback resolution for not registered services (default MS convention)
-        object IServiceProvider.GetService(Type serviceType) => 
-            ((IResolver)this).Resolve(serviceType, IfUnresolved.ReturnDefaultIfNotRegistered);
+        /// <summary>
+        /// Resolves service with the <see cref="IfUnresolved.ReturnDefaultIfNotRegistered"/> policy,
+        /// enabling the fallback resolution for not registered services (default MS convention).
+        /// But you may set the global rule <see cref="DryIoc.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved"/> to alter the behavior. 
+        /// It may help to highlight the issues by throwing the original rich DryIoc exception instead of just returning the `null`.
+        /// </summary>
+        object IServiceProvider.GetService(Type serviceType) =>
+            ((IResolver)this).Resolve(serviceType, 
+                Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered);
+
+        /// <summary>
+        /// Resolves service with <see cref="IfUnresolved.Throw"/> policy 
+        /// throwing the specific <see cref="ContainerException"/> if not resolved
+        /// </summary>
+        public object GetRequiredService(Type serviceType) =>
+            ((IResolver)this).Resolve(serviceType, IfUnresolved.Throw);
 #endif
 
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
@@ -5313,6 +5321,14 @@ namespace DryIoc
         /// <summary>Returns the copy of the rules with the applied conventions of Microsoft.Extension.DependencyInjection library.</summary>
         public Rules WithMicrosoftDependencyInjectionRules() => SetMicrosoftDependencyInjectionRules(Clone());
 
+        /// <summary></summary>
+        public Rules WithServiceProviderGetServiceShouldThrowIfUnresolved() =>
+            WithSettings(_settings | Settings.ServiceProviderGetServiceShouldThrowIfUnresolved);
+
+        /// <summary><see cref="WithServiceProviderGetServiceShouldThrowIfUnresolved"/></summary>
+        public bool ServiceProviderGetServiceShouldThrowIfUnresolved =>
+            (_settings & Settings.ServiceProviderGetServiceShouldThrowIfUnresolved) != 0;
+
         /// <summary>Does nothing</summary>
         [Obsolete("Is not used anymore to split the graph - instead use the `DependencyCountInLambdaToSplitBigObjectGraph`")]
         public const int DefaultDependencyDepthToSplitObjectGraph = 20;
@@ -5337,7 +5353,6 @@ namespace DryIoc
         /// The split itseft just wraps the node in `Func{T}` delegate making it a separate compilation unit.
         /// In our example it will be `Func{Y} f = () => new Y(A, new B(K), new C(new L(), new M()))` considering
         /// that everything is transient.
-        ///
         /// </summary>
         public int DependencyCountInLambdaToSplitBigObjectGraph { get; private set; }
 
@@ -5740,8 +5755,7 @@ namespace DryIoc
         /// </summary>
         /// <remarks>Turning this setting On automatically turns off <see cref="ThrowOnRegisteringDisposableTransient"/>.</remarks>
         public Rules WithTrackingDisposableTransients() =>
-            WithSettings((_settings | Settings.TrackingDisposableTransients)
-                & ~Settings.ThrowOnRegisteringDisposableTransient);
+            WithSettings((_settings | Settings.TrackingDisposableTransients) & ~Settings.ThrowOnRegisteringDisposableTransient);
 
         /// <summary><see cref="WithoutEagerCachingSingletonForFasterAccess"/>.</summary>
         public bool EagerCachingSingletonForFasterAccess =>
@@ -6016,6 +6030,7 @@ namespace DryIoc
             UseInterpretation = 1 << 19,
             UseDecorateeReuseForDecorators = 1 << 20,
             UsedForValidation = 1 << 21, // informational flag, will appear in exceptions during validation
+            ServiceProviderGetServiceShouldThrowIfUnresolved = 1 << 22,
             //ScopedOrSingletonShouldApplySingletonForResolutionRootOnly = ??? // todo: @consider (see #285) that what it should be initially
         }
 
