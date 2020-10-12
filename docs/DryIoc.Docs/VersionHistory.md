@@ -1,6 +1,14 @@
 Version History
 ---------------
 
+## v4.5.0 Performance and feature release / 2020-10-12
+
+- added: #203 [Perf] Avoid locking of service creation in scope if possible
+- added: #13 Make New() method available on IResolver/IResolverContext interface
+- added: #328 Why is there no WithVariantGenericTypesInResolvedCollection?
+- added: #329 Add RegisterInitializer with the IReuse parameter overload to allow separate initializer lifetime
+- added: #331 [MS.DI] Add the Rules.WithServiceProviderGetServiceShouldThrowIfUnresolved
+
 ## v4.4.1 Bug-fix release / 2020-09-09
 
 - fixed: #315 Combining `RegisterDelegate` with `TrackingDisposableTransients` rule throws `TargetParameterCountException`

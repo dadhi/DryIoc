@@ -1094,6 +1094,26 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
 |      DryIoc | 112.1 us | 1.33 us | 1.24 us |  0.85 |    0.01 | 16.4795 | 0.1221 |     - |  67.52 KB |
 | DryIoc_MsDI | 141.0 us | 1.54 us | 1.36 us |  1.07 |    0.02 | 21.4844 | 0.2441 |     - |   88.6 KB |
 
+## DryIoc 4.5.0 (.MsDI 5.0.0), MsDI 3.1.8, Grace 7.1.1 (.MsDI 7.0.1), Autofac 6.0.0 (.MsDI 7.0.2), Lamar 4.3.1
+
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.19041
+Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical cores
+.NET Core SDK=3.1.402
+  [Host]     : .NET Core 3.1.8 (CoreCLR 4.700.20.41105, CoreFX 4.700.20.41903), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.8 (CoreCLR 4.700.20.41105, CoreFX 4.700.20.41903), X64 RyuJIT
+
+
+|       Method |        Mean |     Error |    StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+|------------- |------------:|----------:|----------:|-------:|--------:|---------:|--------:|-------:|----------:|
+|         MsDI |    150.8 us |   2.83 us |   3.03 us |   1.00 |    0.00 |  18.0664 |  0.2441 |      - |  73.86 KB |
+|       DryIoc |    129.6 us |   1.90 us |   1.68 us |   0.86 |    0.02 |  16.3574 |  0.2441 |      - |  67.52 KB |
+|  DryIoc_MsDI |    161.9 us |   1.74 us |   1.63 us |   1.07 |    0.03 |  21.4844 |  0.2441 |      - |   88.6 KB |
+|        Grace | 21,380.9 us | 375.46 us | 351.21 us | 141.65 |    2.83 | 156.2500 | 62.5000 |      - | 729.12 KB |
+|   Grace_MsDI | 24,102.4 us | 243.21 us | 203.09 us | 159.26 |    3.52 | 187.5000 | 93.7500 |      - | 894.57 KB |
+|   Lamar_MsDI | 10,938.2 us | 308.25 us | 874.46 us |  70.86 |    4.29 |        - |       - |      - | 696.16 KB |
+|      Autofac |    789.4 us |  19.84 us |  20.38 us |   5.24 |    0.18 |  50.7813 | 25.3906 | 1.9531 | 311.12 KB |
+| Autofac_MsDI |    784.9 us |  15.04 us |  18.47 us |   5.20 |    0.15 |  54.6875 | 27.3438 | 1.9531 | 335.07 KB |
+
 */
             [Benchmark(Baseline = true)]
             public object MsDI() => Measure(PrepareMsDi());
@@ -1101,7 +1121,7 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
             [Benchmark]
             public object DryIoc() => Measure(PrepareDryIoc());
 
-            // [Benchmark]
+            [Benchmark]
             public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark
@@ -1111,16 +1131,16 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
             [Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            //[Benchmark]
+            [Benchmark]
             public object Grace_MsDI() => Measure(PrepareGraceMsDi());
 
-            //[Benchmark]
+            [Benchmark]
             public object Lamar_MsDI() => Measure(PrepareLamarMsDi());
 
             [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            //[Benchmark]
+            [Benchmark]
             public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
         }
 
@@ -1382,14 +1402,25 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
 |             DryIoc | 1.868 us | 0.0226 us | 0.0200 us |  0.44 |    0.01 | 0.7248 |     - |     - |   2.96 KB |
 | DryIoc_MsDIAdapter | 2.651 us | 0.0404 us | 0.0338 us |  0.63 |    0.02 | 0.7286 |     - |     - |   2.98 KB |
 
-### DryIoc v4.5.0 - no scope locking, Autofac 6, Grace 7.1.1
+### DryIoc 4.5.0 (.MsDI 5.0.0), MsDI 3.1.8, Grace 7.1.1 (.MsDI 7.0.1), Autofac 6.0.0 (.MsDI 7.0.2), Lamar 4.3.1
 
-|  Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|-------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
-|    MsDI |  6.233 us | 0.1235 us | 0.1994 us |  1.00 |    0.00 |  1.0605 |      - |     - |   4.35 KB |
-|  DryIoc |  2.377 us | 0.0475 us | 0.0915 us |  0.38 |    0.02 |  0.7248 |      - |     - |   2.96 KB |
-|   Grace |  2.997 us | 0.0592 us | 0.1274 us |  0.48 |    0.02 |  0.7744 |      - |     - |   3.17 KB |
-| Autofac | 86.368 us | 1.7046 us | 3.4820 us | 13.88 |    0.82 | 11.4746 | 0.1221 |     - |  47.34 KB |
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.19041
+Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical cores
+.NET Core SDK=3.1.402
+  [Host]     : .NET Core 3.1.8 (CoreCLR 4.700.20.41105, CoreFX 4.700.20.41903), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.8 (CoreCLR 4.700.20.41105, CoreFX 4.700.20.41903), X64 RyuJIT
+
+
+|       Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|         MsDI |  4.530 us | 0.0437 us | 0.0388 us |  1.00 |    0.00 |  1.0605 |      - |     - |   4.35 KB |
+|       DryIoc |  1.653 us | 0.0118 us | 0.0104 us |  0.37 |    0.00 |  0.7229 |      - |     - |   2.96 KB |
+|  DryIoc_MsDI |  2.629 us | 0.0524 us | 0.0644 us |  0.58 |    0.01 |  0.7286 |      - |     - |   2.98 KB |
+|        Grace |  2.229 us | 0.0432 us | 0.0546 us |  0.49 |    0.02 |  0.7744 |      - |     - |   3.17 KB |
+|   Grace_MsDI |  3.007 us | 0.0586 us | 0.0675 us |  0.67 |    0.02 |  0.8354 |      - |     - |   3.41 KB |
+|   Lamar_MsDI |  9.270 us | 0.0788 us | 0.0737 us |  2.05 |    0.03 |  0.9308 | 0.4578 |     - |    5.7 KB |
+|      Autofac | 60.151 us | 0.5309 us | 0.4707 us | 13.28 |    0.15 | 11.4746 |      - |     - |  47.28 KB |
+| Autofac_MsDI | 74.027 us | 0.5597 us | 0.4370 us | 16.36 |    0.21 | 16.1133 |      - |     - |  66.09 KB |
 
 */
             private IServiceProvider _msDi;
@@ -1434,7 +1465,7 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
             [Benchmark]
             public object DryIoc() => Measure(_dryIoc);
 
-            // [Benchmark]
+            [Benchmark]
             public object DryIoc_MsDIAdapter() => Measure(_dryIocMsDi);
 
             //[Benchmark]
@@ -1446,16 +1477,16 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
             [Benchmark]
             public object Grace() => Measure(_grace);
 
-            //[Benchmark]
+            [Benchmark]
             public object Grace_MsDIAdapter() => Measure(_graceMsDi);
 
-            //[Benchmark]
+            [Benchmark]
             public object Lamar_MsDI() => Measure(_lamarMsDi);
 
             [Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac_MsDIAdapter() => Measure(_autofacMsDi);
         }
     }
