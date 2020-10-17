@@ -5,7 +5,7 @@
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIocAttributes</Product>
-        <VersionPrefix>6.0.0</VersionPrefix>
+        <VersionPrefix>6.0.1</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -17,6 +17,10 @@
         <PackageTags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
             <![CDATA[
+
+## v6.0.1
+
+- fixed: #335 Why doesn't DryIocAttribute with a target of net45 use the System.ComponentModel.Composition NuGet package
 
 ## v6.0.0
 
