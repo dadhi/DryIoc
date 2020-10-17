@@ -27,7 +27,7 @@
         </PackageReleaseNotes>
     </PropertyGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-        <PackageReference Include="System.ComponentModel.Composition" Version="4.5.0" />
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net45'">
+        <PackageReference Include="System.ComponentModel.Composition" Version="4.7.0" />
     </ItemGroup>
 </Project>
