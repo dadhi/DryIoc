@@ -22,6 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
+#if NET35 || NET40 || PCL || NETSTANDARD1_0 || NETSTANDARD1_3 
+#define NO_CUSTOM_ATTRIBUTE_DATA
+#endif
+
 namespace DryIoc.MefAttributedModel
 {
     using System;
@@ -1854,11 +1858,11 @@ namespace DryIoc.MefAttributedModel
                 .AppendCode(DecoratedServiceKey).Append(", Order = ").AppendCode(Order)
                 .Append(", UseDecorateeReuse = ").AppendBool(UseDecorateeReuse).Append(" }");
     }
-#pragma warning restore 659
+    #pragma warning restore 659
     #endregion
 }
 
-#if NET35 || NET40 || PCL || NETSTANDARD1_0 || NETSTANDARD1_3 
+#if NO_CUSTOM_ATTRIBUTE_DATA
 namespace DryIoc.MefAttributedModel
 {
     using System;
