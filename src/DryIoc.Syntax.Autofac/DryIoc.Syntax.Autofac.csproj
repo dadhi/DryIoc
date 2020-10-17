@@ -12,7 +12,7 @@
     <PackageId>$(Product).dll</PackageId>
     <Title>$(Product).dll</Title>
     <Description>DryIoc implementation with Autofac surface API</Description>
-    <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc Autofac Facade</PackageTags>
+    <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc Autofac Facade Syntax DropIn Adapter API</PackageTags>
     <PackageReleaseNotes>
 <![CDATA[
 ## v2.0.0
