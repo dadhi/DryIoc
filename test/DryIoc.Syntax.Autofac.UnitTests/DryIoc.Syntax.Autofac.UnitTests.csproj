@@ -1,16 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-      <TargetFramework>net45</TargetFramework>
+     <TargetFrameworks>netcoreapp2.2;net45</TargetFrameworks>
+     <!-- <TargetFramework>netcoreapp3.1</TargetFramework> -->
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Net.Http" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\DryIoc.IssuesTests\Issue123_TipsForMigrationFromAutofac.cs" Link="Issue123_TipsForMigrationFromAutofac.cs" />
+     <Compile Include="..\DryIoc.IssuesTests\Issue123_TipsForMigrationFromAutofac.cs" Link="Issue123_TipsForMigrationFromAutofac.cs" />
+     <Compile Include="..\DryIoc.IssuesTests\Issue123_TipsForMigrationFromAutofac_WithParameter.cs" Link="Issue123_TipsForMigrationFromAutofac_WithParameter.cs" /> 
   </ItemGroup>
 
   <ItemGroup>

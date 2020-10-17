@@ -1,10 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net45;netstandard1.0;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net45;netstandard2.0</TargetFrameworks>
 
     <Product>DryIoc.Syntax.Autofac</Product>
-    <VersionPrefix>2.0.0-preview-01</VersionPrefix>
-    <VersionSuffix></VersionSuffix>
+    <VersionPrefix>2.0.0</VersionPrefix>
+    <VersionSuffix>preview-02</VersionSuffix>
 
     <AssemblyName>$(Product)</AssemblyName>
     <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
@@ -12,14 +12,21 @@
     <PackageId>$(Product).dll</PackageId>
     <Title>$(Product).dll</Title>
     <Description>DryIoc implementation with Autofac surface API</Description>
-    <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc Autofac</PackageTags>
+    <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc Autofac Facade</PackageTags>
     <PackageReleaseNotes>
 <![CDATA[
-v2.0.0:
-- added: .NET STandard 1.0, 2.0 support
+## v2.0.0
 
-v1.0.0:
-- added: Support for DryIoc v4.0
+### preview-02 
+
+Added NET Standard 2.0 support
+New features support:
+
+- WithParameter for the NamedParameter, TypedParameter, and ResolvedParameter
+- AsSelf
+- IsRegisteredService
+- ResolveService
+
 ]]>
     </PackageReleaseNotes>
   </PropertyGroup>
