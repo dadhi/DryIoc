@@ -13198,7 +13198,7 @@ namespace DryIoc
             where T : class
         {
             var arg1ti = arg1.GetTypeInfo();
-            if (arg0 == null && (!arg1ti.IsValueType || arg1ti.IsGenericType && arg1ti.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
+            if (arg0 == null && (!arg1ti.IsValueType || arg1ti.IsGenericType && arg1.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
                 arg1ti.IsAssignableFrom(arg0.GetType().GetTypeInfo()))
                 return arg0;
             throw GetMatchedException(ErrorCheck.IsNotOfType, error, arg0, arg1, arg2, arg3, null);
