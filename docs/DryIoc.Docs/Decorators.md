@@ -18,6 +18,8 @@
   - [Decorator of Wrapper](#decorator-of-wrapper)
   - [Decorator as Initializer](#decorator-as-initializer)
   - [Decorator as Interceptor with Castle DynamicProxy](#decorator-as-interceptor-with-castle-dynamicproxy)
+  - [Doing the interesting things with decorators](#doing-the-interesting-things-with-decorators)
+    - [Reusing the scoped service from the parent scope](#reusing-the-scoped-service-from-the-parent-scope)
 
 
 [FactoryMethod]:SelectConstructorOrFactoryMethod#factory-method-instead-of-constructor
@@ -49,16 +51,20 @@ aka __Initializer__.
 We start by defining the `IHandler` which we will decorate adding the logging capabilities:
 
 ```cs 
-using DryIoc;
-
-using NUnit.Framework;
+<details><summary><strong>usings...</strong></summary>
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-// ReSharper disable UnusedParameter.Local
+using NUnit.Framework;
 
+using DryIoc;
+using FastExpressionCompiler.LightExpression; // light alternative to the System.Linq.Expressions
+// ReSharper disable UnusedParameter.Local
+```
+</details>
+
+```cs
 public interface IHandler
 {
     bool IsHandled { get; }
@@ -599,8 +605,6 @@ invokes some initialization logic on the decorated instance,
 and returns this (or another) instance.
 
 ```cs 
-
-
 class Decorator_as_initializer
 {
     public class Foo
@@ -643,3 +647,75 @@ Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisp
 ## Decorator as Interceptor with Castle DynamicProxy
 
 [Explained here](Interception#decorator-with-castle-dynamicproxy)
+
+
+## Doing the interesting things with decorators
+
+### Reusing the scoped service from the parent scope
+
+Originated from the issue #333
+
+Let's imagine that we have a scoped service and number of the nested scopes,
+and we want the already created service from the parent scope instead of creating the new one in the child scope:
+
+```cs 
+class Reusing_the_scoped_service_from_the_parent_scope
+{
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+
+        // Generic wrapper to extract the FactoryID, we need it to lookup the scope for the created service
+        c.Register(typeof(FactoryInfo<>),
+           new ExpressionFactory(
+               req =>
+               {
+                   var wrapperType = req.ServiceType;
+                   var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
+                   var factory = req.Container.ResolveFactory(req.Push(serviceType));
+                   return Expression.New(wrapperType.SingleConstructor(), Expression.Constant(factory.FactoryID));
+               },
+               setup: Setup.Wrapper));
+
+        // Generic decorator applied to all Scoped services (see condition)
+        c.Register<object>(
+            made: Made.Of(req => GetType().SingleMethod(nameof(GetFromParentOrCurrent)).MakeGenericMethod(req.ServiceType)),
+            setup: Setup.DecoratorWith(condition: req => req.Reuse == Reuse.Scoped));
+
+        // Application code
+        c.Register<A>(Reuse.Scoped);
+
+        var s = c.OpenScope();
+        var a = s.Resolve<A>();
+
+        var ss = s.OpenScope();
+        var aa = ss.Resolve<A>();
+        Assert.AreSame(aa, a);
+
+        // health check that the other services are not affected
+        c.Register<B>(Reuse.Singleton);
+        Assert.IsNotNull(c.Resolve<B>());
+    }
+
+    // Application services
+    class A { }
+    class B { }
+
+    public class FactoryInfo<T>
+    {
+        public int Id;
+        public FactoryInfo(int id) => Id = id;
+    }
+
+    public static T GetFromParentOrCurrent<T>(FactoryDelegate<T> fd, FactoryInfo<T> fi, IResolverContext r)
+    {
+        var id = fi.Id;
+        for (var s = r.CurrentScope; s != null; s = s.Parent)
+            if (s.TryGet(out var res, id))
+                return (T)res;
+        return fd(r);
+    }
+} 
+```
+
