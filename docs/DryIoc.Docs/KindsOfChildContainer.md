@@ -246,7 +246,7 @@ so the cache from the parent will proceed to be valid and useful.
 
 class Child_container_per_test_disposed_at_the_end_without_disposing_the_parent
 {
-    [Test]public void Child_lifecycle_should_be_independent_of_parent_lifecycle()
+    [Test] public void Child_lifecycle_should_be_independent_of_parent_lifecycle()
     {
         var parent = new Container(rules => rules.WithConcreteTypeDynamicRegistrations());
         

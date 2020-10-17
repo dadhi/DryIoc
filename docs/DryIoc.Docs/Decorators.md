@@ -653,7 +653,7 @@ Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisp
 
 ### Reusing the scoped service from the parent scope
 
-Originated from the issue #333
+Originated from the issue [#333](https://github.com/dadhi/DryIoc/issues/333).
 
 Let's imagine that we have a scoped service and number of the nested scopes,
 and we want the already created service from the parent scope instead of creating the new one in the child scope:

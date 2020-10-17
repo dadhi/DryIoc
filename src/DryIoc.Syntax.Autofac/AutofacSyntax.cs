@@ -107,8 +107,8 @@ namespace Autofac
 
                                 case ResolvedParameter _:
                                 default:
-                                    ps = ps.Details((r, x) => 
-                                        p.CanSupplyValue(x, new ContainerAdapter(r.Container), out var fac)
+                                    ps = ps.Details((ctx, x) => 
+                                        p.CanSupplyValue(x, new ContainerAdapter(ctx.Container), out var fac)
                                             ? ServiceDetails.Of(fac())
                                             : null);
                                     break;
