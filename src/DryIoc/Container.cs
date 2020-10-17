@@ -13197,7 +13197,10 @@ namespace DryIoc
         public static T ThrowIfNotInstanceOf<T>(this T arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
             where T : class
         {
-            if (arg1.IsTypeOf(arg0)) return arg0;
+            var arg1ti = arg1.GetTypeInfo();
+            if (arg0 == null && (!arg1ti.IsValueType || arg1ti.IsGenericType && arg1ti.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
+                arg1ti.IsAssignableFrom(arg0.GetType().GetTypeInfo()))
+                return arg0;
             throw GetMatchedException(ErrorCheck.IsNotOfType, error, arg0, arg1, arg2, arg3, null);
         }
 
