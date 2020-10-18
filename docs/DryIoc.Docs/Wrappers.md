@@ -1,6 +1,6 @@
 <!--Auto-generated from .cs file, the edits here will be lost! -->
 
-[recursive dependency]: ErrorDetectionAndResolution#recursivedependencydetected
+[recursive dependency]: ErrorDetectionAndResolution.md#recursivedependencydetected
 
 # Wrappers
 
@@ -40,9 +40,9 @@ More info:
 
 - Wrappers are composable through nesting: e.g. `IEnumerable<Lazy<TService>>`.
 - A similar concept in Autofac is [relationship types](http://docs.autofac.org/en/latest/resolve/relationships.html).
-- DryIoc supports both predefined and [user-defined wrappers](Wrappers#user-defined-wrappers).
+- DryIoc supports both predefined and [user-defined wrappers](Wrappers.md#user-defined-wrappers).
 - Explicitly registering a wrapper type (e.g. `Func<>` or `Lazy<>`) as a normal service overrides corresponding wrapper registration.
-- The actual difference between normal open-generic service and wrapper is [explained here](Wrappers#user-defined-wrappers).
+- The actual difference between normal open-generic service and wrapper is [explained here](Wrappers.md#user-defined-wrappers).
 
 Wrapper example:
 ```cs 

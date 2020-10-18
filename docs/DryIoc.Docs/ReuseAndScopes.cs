@@ -54,10 +54,10 @@ Service setup options:
 
 You can create your own reuse by implementing `IReuse` interface.
 
-Container uses Scopes ([see below](ReuseAndScopes#what-scope-is)) to 
+Container uses Scopes ([see below](ReuseAndScopes.md#what-scope-is)) to 
 store resolved services of non-Transient reuse.
 Scope implements `IDisposable` and when disposed will dispose reused disposable services. You may prevent service disposal 
-via [setup option](ReuseAndScopes#prevent-disposal-of-reused-service).
+via [setup option](ReuseAndScopes.md#prevent-disposal-of-reused-service).
 
 __Note:__ Service disposal is always taken in the reverse registration order.
 
@@ -698,7 +698,7 @@ class Scoped_to_service_reuse_with_dispose
 
 ### Own the resolution scope disposal
 
-You else may get in control of disposing the resolution scope by injecting the `IResolverContext` ([automatically provided for you by Container](RulesAndDefaultConventions#implicitly-available-services)) 
+You else may get in control of disposing the resolution scope by injecting the `IResolverContext` ([automatically provided for you by Container](RulesAndDefaultConventions.md#implicitly-available-services)) 
 which holds the current scope and then dispose it manually.
 
 ```cs md*/

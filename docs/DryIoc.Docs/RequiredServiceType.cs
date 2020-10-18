@@ -236,7 +236,7 @@ Here in `Arg.Of<Lazy<object>, IFoo>()` DryIoc will look for required service typ
 
 ## Works with IEnumerable and collection wrappers
 
-[IEnumerable and the rest of supported collection types]((Wrappers#ienumerable-or-array-of-a)) are also Wrappers, 
+[IEnumerable and the rest of supported collection types]((Wrappers.md#ienumerable-or-array-of-a)) are also Wrappers, 
 so you may expect required service type to work with them too:
 ```cs md*/
 class Required_service_type_in_collection

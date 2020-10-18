@@ -277,14 +277,14 @@ __Note:__ When resolving collection of multiple defaults, it always ordered in r
 
 There are also a couple of ways to select a specific registration and avoid an exception in `Resolve<ICommand>`:
 
-- Using [condition](SpecifyDependencyAndPrimitiveValues#registering-with-condition): 
+- Using [condition](SpecifyDependencyAndPrimitiveValues.md#registering-with-condition): 
 `container.Register<ICommand, GetCommand>(setup: Setup.With(condition: req => req.IsResolutionRoot))` 
 and for the rest of registrations to specify opposite condition, e.g. `condition: r => !r.IsResolutionRoot`.
 - Using specific metadata type (`CommandId` enum) and resolving as `Meta<,>` wrapper: 
 `container.Register<ICommand, GetCommand>(setup: Setup.With(metadata: CommandId.Get));` 
 and then resolving as `container.Resolve<IEnumerable<Meta<ICommand, CommandId>>>().Where(m => m.Metadata == CommandId.Get))`
-- Using [reuse bound to specific parent scope](ReuseAndScopes#reuseinresolutionscopeof) 
-or to [named scope](ReuseAndScopes#reuseincurrentnamedscope-and-reuseinthread).
+- Using [reuse bound to specific parent scope](ReuseAndScopes.md#reuseinresolutionscopeof) 
+or to [named scope](ReuseAndScopes.md#reuseincurrentnamedscope-and-reuseinthread).
 - Registering with `serviceKey`.
 
 
@@ -772,8 +772,8 @@ Though powerful, registering delegate may lead to the problems:
 1. Memory leaks by capturing variables into delegate closure and keeping them for a container lifetime.
 2. Delegate is the black box for Container, mostly because it should use the `Resolve` call inside to resolve the dependency cutting of the object graph analysis, which makes it hard to find type mismatches or diagnose other potential problems. Among the un-catched problems are:
 
-    - [Recursive Dependency](ErrorDetectionAndResolution#RecursiveDependencyDetected)
-    - [Captive Dependency](ErrorDetectionAndResolution#using-validate-to-check-for-captive-dependency)
+    - [Recursive Dependency](ErrorDetectionAndResolution.md#RecursiveDependencyDetected)
+    - [Captive Dependency](ErrorDetectionAndResolution.md#using-validate-to-check-for-captive-dependency)
 
 Therefore, try to use it only as a last resort. DryIoc has plenty of tools to cover for custom delegate in more effective way. 
 The alternative would be a [FactoryMethod](ConstructorSelection).
@@ -786,7 +786,7 @@ It solves the two problems mentioned in the [RegisterDelegate](#registerdelegate
 it **injects** the requested dependencies as a delegate arguments so there is no need in calling `Resolve` inside.
 
 - The dependencies injection and their lifetime is controlled by container
-- There is no black-box service location involved and both [Recursive Dependency](ErrorDetectionAndResolution#RecursiveDependencyDetected) and [Captive Dependency](ErrorDetectionAndResolution#using-validate-to-check-for-captive-dependency) problems are catched by container.
+- There is no black-box service location involved and both [Recursive Dependency](ErrorDetectionAndResolution.md#RecursiveDependencyDetected) and [Captive Dependency](ErrorDetectionAndResolution.md#using-validate-to-check-for-captive-dependency) problems are catched by container.
 
 The example:
 ```cs md*/

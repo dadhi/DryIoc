@@ -568,7 +568,7 @@ class Using_WithMetadata
 
 ## Exporting disposable transient
 
-The attributes described below correspond to the specific [DryIoc registration options](..\ReuseAndScopes#disposable-transient).
+The attributes described below correspond to the specific [DryIoc registration options](..\ReuseAndScopes.md#disposable-transient).
 
 By default exporting transient service implementing `IDisposable` will throw the exception,
 until the container-wide rule is set `Rules.WithoutThrowOnRegisteringDisposableTransient`.
@@ -613,7 +613,7 @@ To enable the tracking see the `TrackDisposableTransientAttribute` below.
 ### TrackDisposableTransient
 
 Exported disposable transient marked with this attributed will be tracked by container and disposed on disposing the tracking scope.
-The attribute corresponds to DryIoc registration option [trackDisposableTransient](..\ReuseAndScopes#disposable-transient)
+The attribute corresponds to DryIoc registration option [trackDisposableTransient](..\ReuseAndScopes.md#disposable-transient)
 
 ```cs md*/
 class Exporting_with_TrackDisposableTransient
@@ -644,23 +644,23 @@ class Exporting_with_TrackDisposableTransient
 
 ### AsDecorator attribute
 
-Check the [Decorators](../Decorators#overview)
+Check the [Decorators](../Decorators.md#overview)
 
 ### AsWrapper attribute
 
-Check the [Wrappers](../Wrappers#overview)
+Check the [Wrappers](../Wrappers.md#overview)
 
 ## Other export options
 
 ### PreventDisposalAttribute
 
-Sets the registration option [preventDisposal](..\ReuseAndScopes#prevent-disposal-of-reused-service).
+Sets the registration option [preventDisposal](..\ReuseAndScopes.md#prevent-disposal-of-reused-service).
 
 ### WeaklyReferencedAttribute
 
-Set the registration option [weaklyReferenced](..\ReuseAndScopes#weakly-referenced-reused-service).
+Set the registration option [weaklyReferenced](..\ReuseAndScopes.md#weakly-referenced-reused-service).
 
 ### AsResolutionCall
 
-Set the registration option [asResolutionCall](..\RulesAndDefaultConventions#injecting-dependency-asresolutioncall).
+Set the registration option [asResolutionCall](..\RulesAndDefaultConventions.md#injecting-dependency-asresolutioncall).
 md*/

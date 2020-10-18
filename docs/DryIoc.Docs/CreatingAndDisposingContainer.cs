@@ -43,7 +43,7 @@ class Creating_container_with_explicit_defaults
 ```
 
 As you see, it is possible to additionally specify the `rules` and 
-the [`scopeContext`](ReuseAndScopes#what-scopecontext-is).
+the [`scopeContext`](ReuseAndScopes.md#what-scopecontext-is).
 
 
 ### Rules
@@ -83,7 +83,7 @@ class Adding_some_rules_with_action
 ### ScopeContext
 
 ScopeContext is an __optional__ ambient context for the new open scopes to be bound to. 
-It is described in details [here](ReuseAndScopes#scopecontext).
+It is described in details [here](ReuseAndScopes.md#scopecontext).
 
 
 ## Disposing Container

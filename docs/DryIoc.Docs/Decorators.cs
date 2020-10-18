@@ -23,7 +23,7 @@
     - [Reusing the scoped service from the parent scope](#reusing-the-scoped-service-from-the-parent-scope)
 
 
-[FactoryMethod]:SelectConstructorOrFactoryMethod#factory-method-instead-of-constructor
+[FactoryMethod]:SelectConstructorOrFactoryMethod.md#factory-method-instead-of-constructor
 
 ## Overview
 
@@ -536,7 +536,7 @@ class Nesting_decorators_of_wrapped_service
 
 DryIoc supports decorating of wrappers directly to adjust corresponding wrapper behavior, to add new functionality, to apply filtering, etc.
 
-Consider the decorating of [collection wrapper](Wrappers#ienumerable-or-array-of-a).
+Consider the decorating of [collection wrapper](Wrappers.md#ienumerable-or-array-of-a).
 Let`s say we want to change the default collection behavior and exclude keyed services from the result:
 
 ```cs md*/
@@ -647,7 +647,7 @@ Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisp
 
 ## Decorator as Interceptor with Castle DynamicProxy
 
-[Explained here](Interception#decorator-with-castle-dynamicproxy)
+[Explained here](Interception.md#decorator-with-castle-dynamicproxy)
 
 
 ## Doing the interesting things with decorators
