@@ -11,19 +11,23 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test()
         {
-            var container = new Container();
-            container.Register<A>(Reuse.Singleton);
+            var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
+
+            container.Register<IA, A>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             var ts = new Task[8];
             for (int i = 0; i < ts.Length; i++)
             {
-                ts[i] = Task.Run(() => container.Resolve<A>());
+                ts[i] = Task.Run(() => container.Resolve<IA>());
             }
 
             Task.WaitAll(ts);
+            Assert.AreEqual(1, A.Counter);
         }
 
-        class A 
+        interface IA {}
+
+        class A : IA
         { 
             public static int Counter;
             public A() 
