@@ -7,6 +7,7 @@
 - [Register and Resolve](#register-and-resolve)
   - [DryIoc Glossary](#dryioc-glossary)
   - [Registration API](#registration-api)
+    - [Registration API one level deep](#registration-api-one-level-deep)
   - [Registering as Singleton](#registering-as-singleton)
   - [Registering multiple implementations](#registering-multiple-implementations)
     - [Default registrations](#default-registrations)
@@ -135,6 +136,50 @@ class Register_implementation_as_service_type
     }
 }/*md
 ```
+
+### Registration API one level deep
+
+All this high-level registration API is calling a single method from the `IRegistrator` interface:
+
+```cs
+void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
+```
+
+You may call it directly by supplying the `factory` and the `serviceType`, 
+the other parameters are optional and maybe set to the default values (or the there is and overload where those parameters are optional).
+
+The factory in DryIoc is th entity holding all the required info and behavior for the service creation.
+The `Factory` is the abstract class with the following concrete implementations
+
+- `ReflectionFactory` - creates a service based on the supplied implementation type
+- `DelegateFactory`   - creates a service based on the supplied delegate
+- `ExpressionFactory` - creates a service using the expression tree
+
+In addition factory holds the `Reuse`. 
+
+You may use this API as following:
+
+```cs md*/
+class One_level_deep_registration_API
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register(typeof(IA), new ReflectionFactory(typeof(A), Reuse.Singleton));
+
+        var a = container.Resolve<IA>();
+        Assert.IsInstanceOf<A>(a);
+    }
+
+    interface IA {}
+    class A : IA {}
+}/*md
+```
+
+I would encourage you to investigate the constructors of the factories to see all the possible options, 
+and to [look inside the implementations](https://www.fuget.org/packages/DryIoc.dll/4.5.0/lib/netstandard2.0/DryIoc.dll/DryIoc/Registrator) of 
+the `Register` methods. 
 
 
 ## Registering as Singleton

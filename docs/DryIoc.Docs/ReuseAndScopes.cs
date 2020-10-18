@@ -307,9 +307,8 @@ Physically scope is the storage for resolved and injected services registered wi
 Once created, a reused object is stored in the scope internal collection and will live there until the scope is disposed.
 In addition, Scope ensures that __service instance will be created only once__ in multi-threading scenarios.
 
-__Note:__ The scope is the only place in DryIoc where `lock`, is used to prevent multiple creations of the same instance. The rest of DryIox is lock-free.
 
-Scope also has `Parent` and `Name` properties (see `ScopedTo(name)` reuse explained below).
+Scope also has `Parent` and `Name` properties, see the `ScopedTo(name)` reuse explained below.
 
 
 ### What Current Scope is?

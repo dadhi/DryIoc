@@ -995,7 +995,7 @@ public class Default_IfAlreadyRegistered_AppendNotKeyed
 
 ### WithoutImplicitCheckForReuseMatchingScope 
 
-This rule turns Off the default [Implicit registration selection based on scope](RulesAndDefaultConventions#implicit-registration-selection-based-on-scope).
+This rule turns Off the [Implicit registration selection based on scope](RulesAndDefaultConventions#implicit-registration-selection-based-on-scope).
 
 
 ### ResolveIEnumerableAsLazyEnumerable
