@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.MefAttributedModel</id>
-    <version>6.0.1</version>
+    <version>6.0.2</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,23 +13,16 @@
     <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
         <![CDATA[
+## v6.0.2
 
-## v6.0.1
-
-- uses ContainerException changes from the DryIoc v4.3.3
-
-## v6.0.0
-
-- Using the System.ComponentModel.Composition (netstandard2.0+ and netcoreapp2.0+) NuGet package instead of framework assembly reference
-- fixed: #306 Update DryIocAttributes for the .Net Core v3.1
-- fixed: #307 [DI.MEF] Lift up the requirement for the Export attribute for RegisterExports
+- The referenced DryIocAttributes is updated to v6.0.1 (because some types are now used from the System.ComponentModel.Composition package)
 
 ]]>
     </releaseNotes>
     <dependencies>
       <group>
         <dependency id="DryIoc" version="4.3.3" />
-        <dependency id="DryIocAttributes" version="6.0.0" />
+        <dependency id="DryIocAttributes" version="6.0.1" />
       </group>
     </dependencies>
     <contentFiles>
