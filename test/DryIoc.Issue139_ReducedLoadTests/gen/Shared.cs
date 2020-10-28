@@ -99,10 +99,10 @@ namespace Shared
         protected readonly IConnUserService ConnUserService;
         protected readonly IGlobalGuidService GlobalGuidService;
 
-        public ChangeEmailAddressService(IConnEmailChangeService ConnEmailChangeService,
+        public ChangeEmailAddressService(IConnEmailChangeService connEmailChangeService,
             IConnUserService ConnUserService, IGlobalGuidService globalGuidService)
         {
-            ConnEmailChangeService = ConnEmailChangeService;
+            ConnEmailChangeService = connEmailChangeService;
             this.ConnUserService = ConnUserService;
             GlobalGuidService = globalGuidService;
         }
@@ -134,13 +134,13 @@ namespace Shared
         protected readonly IConnUserService ConnUserService;
         protected readonly IUniqueUserRepository UniqueUserRepository;
 
-        public UserPasswordService(IConnClientService ConnClientService,
-            IConnPasswordPolicyService ConnPasswordPolicyService,
-            IConnUserService ConnUserService, IUniqueUserRepository uniqueUserRepository)
+        public UserPasswordService(IConnClientService connClientService,
+            IConnPasswordPolicyService connPasswordPolicyService,
+            IConnUserService connUserService, IUniqueUserRepository uniqueUserRepository)
         {
-            ConnClientService = ConnClientService;
-            ConnPasswordPolicyService = ConnPasswordPolicyService;
-            ConnUserService = ConnUserService;
+            ConnClientService = connClientService;
+            ConnPasswordPolicyService = connPasswordPolicyService;
+            ConnUserService = connUserService;
             UniqueUserRepository = uniqueUserRepository;
         }
     }

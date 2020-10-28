@@ -507,10 +507,10 @@ namespace Organizations
         protected readonly IEmailTemplateService EmailTemplateService;
         protected readonly IDistributorHelperService DistributorHelperService;
 
-        public UserEmailBuilder(IPsaContextService contextService, IConnClientService ConnClientService, IMasterOrganizationRepository masterOrganizationRepository, IDict dictionary, IAppSettings settings, IFeatureService featureService, IEmailTemplateService emailTemplateService, IDistributorHelperService distributorHelperService)
+        public UserEmailBuilder(IPsaContextService contextService, IConnClientService connClientService, IMasterOrganizationRepository masterOrganizationRepository, IDict dictionary, IAppSettings settings, IFeatureService featureService, IEmailTemplateService emailTemplateService, IDistributorHelperService distributorHelperService)
         {
             ContextService = contextService;
-            ConnClientService = ConnClientService;
+            ConnClientService = connClientService;
             MasterOrganizationRepository = masterOrganizationRepository;
             Dictionary = dictionary;
             Settings = settings;

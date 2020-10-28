@@ -51,6 +51,15 @@
     <file src="..\nuspecs\DryIoc.snk" />
     <file src="..\logo\logo128.png" target="logo.png" />
 
+    <file src="_._" target="lib\net35\" />
+    <file src="_._" target="lib\net40\" />
+    <file src="_._" target="lib\net45\" />
+    <file src="_._" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\" />
+    <file src="_._" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\" />
+    <file src="_._" target="lib\netstandard1.0\" />
+    <file src="_._" target="lib\netstandard1.3\" />
+    <file src="_._" target="lib\netstandard2.0\" />
+
     <!-- net35 -->
     <file src="..\src\DryIocAttributes\Attributes.cs" target="content\net35\DryIocAttributes" />
 

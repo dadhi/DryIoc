@@ -1202,9 +1202,9 @@ namespace DryIoc
 
             if (factories.Length > 1)
             {
-                var preferedFactories = factories.Match(f => f.Value.Setup.PreferInSingleServiceResolve);
-                if (preferedFactories.Length == 1)
-                    factories = preferedFactories;
+                var preferredFactories = factories.Match(f => f.Value.Setup.PreferInSingleServiceResolve);
+                if (preferredFactories.Length == 1)
+                    factories = preferredFactories;
             }
 
             // The result is a single matched factory
@@ -1846,7 +1846,7 @@ namespace DryIoc
             /// Switched off until I (or someone) will figure it out.
             public override bool UseInterpretation(Request request) => false;
 
-            /// Tries to return instance directly from scope or sigleton, and fallbacks to expression for decorator.
+            /// Tries to return instance directly from scope or singleton, and fallbacks to expression for decorator.
             public override FactoryDelegate GetDelegateOrDefault(Request request)
             {
                 if (request.IsResolutionRoot)
@@ -6646,8 +6646,8 @@ namespace DryIoc
                 var methodCallExpr = argExprs[i] as System.Linq.Expressions.MethodCallExpression;
                 if (methodCallExpr != null)
                 {
-                    Throw.If(methodCallExpr.Method.DeclaringType != typeof(Arg),
-                        Error.UnexpectedExpressionInsteadOfArgMethodInMadeOf, methodCallExpr, wholeServiceExpr);
+                    if (methodCallExpr.Method.DeclaringType != typeof(Arg))
+                        Throw.It(Error.UnexpectedExpressionInsteadOfArgMethodInMadeOf, methodCallExpr, wholeServiceExpr);
 
                     if (methodCallExpr.Method.Name == Arg.ArgIndexMethodName)
                     {
@@ -9848,7 +9848,7 @@ namespace DryIoc
             var setup = Setup;
             var rules = container.Rules;
 
-            var splitAsRsolutionCall = 
+            var getAsRsolutionCall = 
                 (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 
                 && !request.OpensResolutionScope
                 && (setup.OpenResolutionScope || 
@@ -9856,7 +9856,7 @@ namespace DryIoc
                         && (setup.AsResolutionCall || (setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration))
                         && request.GetActualServiceType() != typeof(void));
 
-            if (splitAsRsolutionCall)
+            if (getAsRsolutionCall)
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
 
             var cacheExpression = 
@@ -9893,7 +9893,10 @@ namespace DryIoc
 
             // Next, lookup for the already created service in the singleton scope
             Expression serviceExpr;
-            if (reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess)
+            if (request.Reuse is SingletonReuse && 
+                request.Rules.EagerCachingSingletonForFasterAccess
+                // && !request.IsWrappedInFunc() -- see the Note below for the reasons why it is commented out
+                )
             {
                 // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
                 var id = request.FactoryType == FactoryType.Decorator
@@ -9902,19 +9905,32 @@ namespace DryIoc
 
                 var itemRef = ((Scope)container.SingletonScope)._maps[id & Scope.MAP_COUNT_SUFFIX_MASK]
                     .GetEntryOrDefault(id);
-                if (itemRef != null) 
+                if (itemRef != null)
                 {
-                    // If the itemRef is found, its value will be either NoItem (not created yet) or some other value including null
-                    var singleton = itemRef.Value != Scope.NoItem ? itemRef.Value : Scope.WaitForItemIsSet(itemRef);
-                    serviceExpr = singleton == null ? Constant(null, request.GetActualServiceType())/*fixes #258*/ : Constant(singleton);
-                    
-                    if (Setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
-                        serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
-                            Property(Convert(serviceExpr, typeof(WeakReference)), ThrowInGeneratedCode.WeakReferenceValueProperty));
-                    else if (Setup.PreventDisposal)
-                        serviceExpr = Field(Convert(serviceExpr, typeof(HiddenDisposable)), HiddenDisposable.ValueField);
+                    // Note: (for details check the test for #340 and the `For_singleton_can_use_func_without_args_or_just_resolve_after_func_with_args`)
+                    //
+                    // Now we are in the danger zone if try to get the singleton wrapped in Func as a dependency of the same singleton, e.g.
+                    //
+                    // `class Singleton { public Singleton(Func<Singleton> fs) {} }`
+                    //
+                    // In this situation the `itemRef` will be creating but will stuck forever on the `WaitForItemIsSet` below.
+                    // So the way-out here is to abondon the attempt to wait for the item and proceed to normal Expression creation.
+                    //
+                    if (itemRef.Value != Scope.NoItem) // get the item if and only if it is already created
+                    {
+                        var singleton = itemRef.Value;
+                        serviceExpr = singleton == null
+                            ? Constant(null, request.GetActualServiceType()) // fixes #258
+                            : Constant(singleton);
+                        
+                        if (Setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
+                            serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
+                                Property(Convert(serviceExpr, typeof(WeakReference)), ThrowInGeneratedCode.WeakReferenceValueProperty));
+                        else if (Setup.PreventDisposal)
+                            serviceExpr = Field(Convert(serviceExpr, typeof(HiddenDisposable)), HiddenDisposable.ValueField);
 
-                    return serviceExpr;
+                        return serviceExpr;
+                    }
                 }
             }
 
@@ -11657,21 +11673,21 @@ namespace DryIoc
         internal static object WaitForItemIsSet(ImMapEntry<object> itemRef)
         {
 #if SUPPORTS_SPIN_WAIT
-            Debug.WriteLine("SpinWaiting!!!! ");
+            Debug.WriteLine("SpinWaiting!!! ");
 
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
                 spinWait.SpinOnce();
 
-            Debug.WriteLine("SpinWaiting!!!! Done");
+            Debug.WriteLine("SpinWaiting!!! Done");
 #else
-            Debug.WriteLine("LockWaiting!!!! ");
+            Debug.WriteLine("LockWaiting!!! ");
 
             lock (itemRef) 
                 while (itemRef.Value == NoItem)
                     Monitor.Wait(itemRef);
 
-            Debug.WriteLine("Lock waiting!!!! Done");
+            Debug.WriteLine("Lock waiting!!! Done");
 #endif
             return itemRef.Value;
         }

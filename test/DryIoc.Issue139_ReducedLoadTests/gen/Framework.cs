@@ -319,9 +319,9 @@ namespace Framework
         protected readonly IUniqueUserRepository UniqueUserRepository;
         protected readonly IForAuthUserRepository AuthUserRepository;
 
-        public AuthenticationService(IConnAuthenticationService ConnAuthenticationService, IUniqueUserRepository uniqueUserRepository, IForAuthUserRepository authUserRepository)
+        public AuthenticationService(IConnAuthenticationService connAuthenticationService, IUniqueUserRepository uniqueUserRepository, IForAuthUserRepository authUserRepository)
         {
-            ConnAuthenticationService = ConnAuthenticationService;
+            ConnAuthenticationService = connAuthenticationService;
             UniqueUserRepository = uniqueUserRepository;
             AuthUserRepository = authUserRepository;
         }
@@ -1715,7 +1715,7 @@ namespace Framework
         where TReport : IReport
     {
         /// <summary>
-        ///     ''' Returns report to be used as drill down. It can be of any kind, but tipically it is an list report
+        ///     ''' Returns report to be used as drill down. It can be of any kind, but typically it is an list report
         ///     ''' </summary>
         ///     ''' <param name="context"></param>
         ///     ''' <param name="parameters"></param>
@@ -1740,7 +1740,7 @@ namespace Framework
         }
 
         /// <summary>
-        ///     ''' Returns report to be used as drill down. It can be of any kind, but tipically it is an list report
+        ///     ''' Returns report to be used as drill down. It can be of any kind, but typically it is an list report
         ///     ''' </summary>
         ///     ''' <param name="context"></param>
         ///     ''' <param name="parameters"></param>
