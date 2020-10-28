@@ -7,6 +7,7 @@
         <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="DryIoc.snk" Visible="false" />
         <None Include="..\..\logo\logo128.png" Pack="true" PackagePath="logo.png" Visible="false" />
     </ItemGroup>
+
     <PropertyGroup>
         <NeutralLanguage>en-US</NeutralLanguage>
         <PackageLicense>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</PackageLicense>
@@ -15,8 +16,8 @@
         <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
         <RepositoryUrl>https://github.com/dadhi/DryIoc.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
+        <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo.png</PackageIconUrl>
         <PackageIcon>logo.png</PackageIcon>
-        <icon>logo.png</icon>
     </PropertyGroup>
 
     <!--Signing all packages, oh boy-->
