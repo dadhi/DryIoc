@@ -1,6 +1,11 @@
 Version History
 ---------------
 
+## v4.5.1 Bug-fix release / 2020-10-28
+
+- fixed: #332 Delegate returning null throws exception RegisteredDelegateResultIsNotOfServiceType
+- fixed: #340 WaitForItemIsSet waits forever in v4.5.0 for the case like that `Singleton(Func<Singlton> f)`
+
 ## v4.5.0 Performance and feature release / 2020-10-12
 
 - added: #203 [Perf] Avoid locking of service creation in scope if possible
