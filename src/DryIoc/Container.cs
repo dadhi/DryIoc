@@ -9893,10 +9893,7 @@ namespace DryIoc
 
             // Next, lookup for the already created service in the singleton scope
             Expression serviceExpr;
-            if (request.Reuse is SingletonReuse && 
-                request.Rules.EagerCachingSingletonForFasterAccess
-                // && !request.IsWrappedInFunc() -- see the Note below for the reasons why it is commented out
-                )
+            if (request.Reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess)
             {
                 // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
                 var id = request.FactoryType == FactoryType.Decorator
@@ -9913,16 +9910,22 @@ namespace DryIoc
                     //
                     // `class Singleton { public Singleton(Func<Singleton> fs) {} }`
                     //
-                    // In this situation the `itemRef` will be creating but will stuck forever on the `WaitForItemIsSet` below.
-                    // So the way-out here is to abondon the attempt to wait for the item and proceed to normal Expression creation.
+                    // In this situation the `itemRef` will stuck forever on the `WaitForItemIsSet` below.
+                    // So the way-out here is to abondon the attempt to wait for the item if we are not in the Func
+                    // and proceed to the normal Expression creation.
                     //
+                    if (itemRef.Value == Scope.NoItem)
+                    {
+                        if (!request.TracksTransientDisposable && !request.IsWrappedInFunc())
+                            Scope.WaitForItemIsSet(itemRef);
+                    }
+
                     if (itemRef.Value != Scope.NoItem) // get the item if and only if it is already created
                     {
                         var singleton = itemRef.Value;
-                        serviceExpr = singleton == null
-                            ? Constant(null, request.GetActualServiceType()) // fixes #258
-                            : Constant(singleton);
-                        
+                        serviceExpr = singleton != null ? Constant(singleton)
+                            : Constant(null, request.GetActualServiceType()); // fixes #258
+
                         if (Setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
                             serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
                                 Property(Convert(serviceExpr, typeof(WeakReference)), ThrowInGeneratedCode.WeakReferenceValueProperty));
@@ -10003,10 +10006,8 @@ namespace DryIoc
             // This optimization eagerly creates singleton during the construction of object graph
             // Singleton is created once and then is stred for the container lifetime (until Сontainer.SingletonScope is disposed).
             // That's why we are always intepreting them even if `Rules.WithoutInterpretationForTheFirstResolution()` is set.
-            if (request.Reuse is SingletonReuse && 
-                request.Rules.EagerCachingSingletonForFasterAccess &&
-                !request.TracksTransientDisposable &&
-                !request.IsWrappedInFunc())
+            if (request.Reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
+                !request.TracksTransientDisposable && !request.IsWrappedInFunc())
             {
                 var container = request.Container;
                 var scope = (Scope)container.SingletonScope;
