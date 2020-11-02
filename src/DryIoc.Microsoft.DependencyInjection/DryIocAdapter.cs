@@ -28,6 +28,60 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DryIoc.Microsoft.DependencyInjection
 {
+    /// <summary>
+    /// This DryIoc is supposed to be used with generic `IHostBuilder` like this:
+    /// 
+    /// <code><![CDATA[
+    /// public class Program
+    /// {
+    ///     public static async Task Main(string[] args) => 
+    ///         await CreateHostBuilder(args).Build().RunAsync();
+    /// 
+    ///     Rules WithMyRules(Rules currentRules) => currentRules;
+    ///
+    ///     public static IHostBuilder CreateHostBuilder(string[] args) =>
+    ///         Host.CreateDefaultBuilder(args)
+    ///             .UseServiceProviderFactory(new DryIocServiceProviderFactory(new Container(rules => WithMyRules(rules))))
+    ///             .ConfigureWebHostDefaults(webBuilder =>
+    ///             {
+    ///                 webBuilder.UseStartup<Startup>();
+    ///             });
+    /// }
+    /// ]]></code>
+    /// 
+    /// Then register your services in `Startup.ConfigureContainer`.
+    /// 
+    /// DON'T try to change the container rules there - they will be lost, 
+    /// instead pass the pre-configured container to `DryIocServiceProviderFactory` as in example above.
+    /// By default container will use <see href="DryIoc.Rules.MicrosoftDependencyInjectionRules" />
+    /// 
+    /// DON'T forget to add `services.AddControllers().AddControllersAsServices()` in `Startup.ConfigureServices` 
+    /// in order to access DryIoc diagnostics for controllers, property-injection, etc.
+    /// 
+    /// </summary>
+    public class DryIocServiceProviderFactory : IServiceProviderFactory<IContainer>
+    {
+        private readonly IContainer _container;
+        private readonly Func<IRegistrator, ServiceDescriptor, bool> _registerDescriptor;
+
+        /// <summary>Some options to push to `.WithDependencyInjectionAdapter(...)`</summary>
+        public DryIocServiceProviderFactory(
+            IContainer container = null,
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
+        {
+            _container = container; // we won't initialize the container here because it is logically expected to be done in `CreateBuilder`
+            _registerDescriptor = registerDescriptor;
+        }
+
+        /// <inheritdoc />
+        public IContainer CreateBuilder(IServiceCollection services) =>
+            (_container ?? new Container()).WithDependencyInjectionAdapter(services, _registerDescriptor);
+
+        /// <inheritdoc />
+        public IServiceProvider CreateServiceProvider(IContainer container) =>
+            container.BuildServiceProvider();
+    }
+
     /// <summary>Adapts DryIoc container to be used as MS.DI service provider, plus provides the helpers
     /// to simplify work with adapted container.</summary>
     public static class DryIocAdapter
@@ -111,7 +165,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         ///     container.Register<IMyService, MyService>(Reuse.Scoped)
         /// 
         ///     var adaptedContainer = container.WithDependencyInjectionAdapter(services);
-        ///     IServiceProvider serviceProvider = adaptedContainer; // the container implements IServiceProvider now
+        ///     IServiceProvider serviceProvider = adaptedContainer; // the container implements IServiceProvider
         ///
         ///]]></code>
         /// </example>
@@ -243,10 +297,7 @@ public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
 
         /// <summary>Stores passed scoped container to open nested scope.</summary>
         /// <param name="scopedResolver">Scoped container to be used to create nested scope.</param>
-        public DryIocServiceScopeFactory(IResolverContext scopedResolver)
-        {
-            _scopedResolver = scopedResolver;
-        }
+        public DryIocServiceScopeFactory(IResolverContext scopedResolver) => _scopedResolver = scopedResolver;
 
         /// <summary>Opens scope and wraps it into DI <see cref="IServiceScope"/> interface.</summary>
         /// <returns>DI wrapper of opened scope.</returns>
@@ -263,14 +314,10 @@ public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
     {
         /// <inheritdoc />
         public IServiceProvider ServiceProvider => _resolverContext;
-
         private readonly IResolverContext _resolverContext;
 
         /// <summary>Creating from resolver context</summary>
-        public DryIocServiceScope(IResolverContext resolverContext)
-        {
-            _resolverContext = resolverContext;
-        }
+        public DryIocServiceScope(IResolverContext resolverContext) => _resolverContext = resolverContext;
 
         /// <summary>Disposes the underlying resolver context</summary>
         public void Dispose() => _resolverContext.Dispose();

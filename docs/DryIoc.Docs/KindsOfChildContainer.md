@@ -30,8 +30,8 @@ The signature of `IContainer.With` describes what can be changed:
 IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope);
 ```
 
-- `rules` are described in details [here](RulesAndDefaultConventions#Rules-per-Container)
-- `scopeContext` and `singletonScope` are described [here](ReuseAndScopes#scopecontext) 
+- `rules` are described in details [here](RulesAndDefaultConventions.md#Rules-per-Container)
+- `scopeContext` and `singletonScope` are described [here](ReuseAndScopes.md#scopecontext) 
 
 `RegistrySharing` is the `enum` to specify how to re-use the parent registry:
 ```cs
@@ -41,7 +41,7 @@ public enum RegistrySharing { Share, CloneButKeepCache, CloneAndDropCache }
 The enum member names are self-explanatory.
 
 __Note__: `OpenScope` is another way to create a new container from existing one, but a bit different from `With`.
-It is explained in details [here](ReuseAndScopes#incurrentscope).
+It is explained in details [here](ReuseAndScopes.md#incurrentscope).
 
 
 ## Facade
@@ -246,7 +246,7 @@ so the cache from the parent will proceed to be valid and useful.
 
 class Child_container_per_test_disposed_at_the_end_without_disposing_the_parent
 {
-    [Test]public void Child_lifecycle_should_be_independent_of_parent_lifecycle()
+    [Test] public void Child_lifecycle_should_be_independent_of_parent_lifecycle()
     {
         var parent = new Container(rules => rules.WithConcreteTypeDynamicRegistrations());
         

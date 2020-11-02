@@ -10,37 +10,37 @@ namespace DryIoc.IssuesTests.FastExpressionCompiler
     [TestFixture]
     public class NestedNestedLambdaTests
     {
-        [Test]
-        public void Outer_parameters_should_be_correctly_used_for_the_nested_lambda()
-        {
-            var rParam = Parameter(typeof(IResolverContext), "r");
-            var sParam = Parameter(typeof(String), "_String0");
+    //     [Test]
+    //     public void Outer_parameters_should_be_correctly_used_for_the_nested_lambda()
+    //     {
+    //         var rParam = Parameter(typeof(IResolverContext), "r");
+    //         var sParam = Parameter(typeof(String), "_String0");
 
-            var logTableManType = typeof(LogTableManagerConsumer2).GetTypeInfo();
-            var rCtxType = typeof(IResolverContext).GetTypeInfo();
-            var scopeType = typeof(IScope).GetTypeInfo();
-            var body = MemberInit(
-                New(logTableManType.DeclaredConstructors.First()),
-                Bind(
-                    logTableManType.GetDeclaredProperty(nameof(LogTableManagerConsumer2.GetLogTableManager)),
-                    Lambda<Func<String, ILogTableManager>>(
-                        Convert(Call(
-                            Property(rParam, rCtxType.GetDeclaredProperty(nameof(IResolverContext.SingletonScope))),
-                                scopeType.SingleMethod(nameof(IScope.GetOrAdd)),
-                            Constant(174, typeof(int)),
-                            Lambda<CreateScopedValue>(
-                                Call(null, 
-                                    typeof(LogTableManager).GetTypeInfo().GetDeclaredMethod(nameof(LogTableManager.Create)), sParam)),
-                            Constant(0)), 
-                            typeof(ILogTableManager)),
-                        sParam)));
+    //         var logTableManType = typeof(LogTableManagerConsumer2).GetTypeInfo();
+    //         var rCtxType = typeof(IResolverContext).GetTypeInfo();
+    //         var scopeType = typeof(IScope).GetTypeInfo();
+    //         var body = MemberInit(
+    //             New(logTableManType.DeclaredConstructors.First()),
+    //             Bind(
+    //                 logTableManType.GetDeclaredProperty(nameof(LogTableManagerConsumer2.GetLogTableManager)),
+    //                 Lambda<Func<String, ILogTableManager>>(
+    //                     Convert(Call(
+    //                         Property(rParam, rCtxType.GetDeclaredProperty(nameof(IResolverContext.SingletonScope))),
+    //                             scopeType.SingleMethod(nameof(IScope.GetOrAdd)),
+    //                         Constant(174, typeof(int)),
+    //                         Lambda<CreateScopedValue>(
+    //                             Call(null, 
+    //                                 typeof(LogTableManager).GetTypeInfo().GetDeclaredMethod(nameof(LogTableManager.Create)), sParam)),
+    //                         Constant(0)), 
+    //                         typeof(ILogTableManager)),
+    //                     sParam)));
 
-            var fExpr = Lambda<Func<IResolverContext, object>>(body, rParam);
+    //         var fExpr = Lambda<Func<IResolverContext, object>>(body, rParam);
 
-            var f = fExpr.CompileFast(true);
+    //         var f = fExpr.CompileFast(true);
 
-            Assert.IsNotNull(f);
-        }
+    //         Assert.IsNotNull(f);
+    //     }
 
         [Test]
         public void I_can_compile_the_Expression_with_invocation_of_nested_lambda()

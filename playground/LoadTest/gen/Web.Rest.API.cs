@@ -10993,7 +10993,7 @@ namespace Web.Rest.API
             IRecurringItemService recurringItemService, ITaskService taskService, ITimeEntryService timeEntryService,
             IActivityService activityService, IHourRepository hourRepository, IReportRepository reportRepository,
             IPsaReportingRepository reportingRepository, ISalesProcessService salesProcessService,
-            IMailClient mailClient, IAppSettings AppSettings, IHourEmailService hourEmailService,
+            IMailClient mailClient, IAppSettings appSettings, IHourEmailService hourEmailService,
             ICaseTagService caseTagService, IAccountGroupMemberService accountGroupMemberService,
             ICurrencyService currencyService) : base(contextService)
         {
@@ -11016,7 +11016,7 @@ namespace Web.Rest.API
             _ReportingRepository = reportingRepository;
             SalesProcessService = salesProcessService;
             MailClient = mailClient;
-            AppSettings = AppSettings;
+            AppSettings = appSettings;
             _HourEmailService = hourEmailService;
             _CaseTagService = caseTagService;
             _AccountGroupMemberService = accountGroupMemberService;

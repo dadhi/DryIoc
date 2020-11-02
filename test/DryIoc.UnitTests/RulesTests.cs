@@ -476,6 +476,26 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Should_track_transient_disposable_dependency_in_singleton_scope_even_if_resolved_in_the_scope()
+        {
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
+
+            container.Register<AD>();
+            container.Register<ADConsumer>(Reuse.Singleton);
+
+            ADConsumer singleton;
+            using (var scope = container.OpenScope())
+            {
+                singleton = scope.Resolve<ADConsumer>();
+            }
+
+            Assert.IsFalse(singleton.Ad.IsDisposed);
+            container.Dispose();
+
+            Assert.IsTrue(singleton.Ad.IsDisposed);
+        }
+
+        [Test]
         public void Should_track_transient_service_in_open_scope_if_present()
         {
             var container = new Container();

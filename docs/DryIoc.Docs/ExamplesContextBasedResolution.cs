@@ -13,7 +13,7 @@
 
 Here is [the discussion](https://github.com/autofac/Autofac/issues/644) and example  [how to inject log4net](https://gist.github.com/piers7/81724d51a7ca158d721e) in Autofac.
 
-In DryIoc we may use [strongly-typed Factory Method](SelectConstructorOrFactoryMethod#factory-method-instead-of-constructor) specification to register log4net.ILog:
+In DryIoc we may use [strongly-typed Factory Method](SelectConstructorOrFactoryMethod.md#factory-method-instead-of-constructor) specification to register log4net.ILog:
 
 ```cs md*/
 using DryIoc;

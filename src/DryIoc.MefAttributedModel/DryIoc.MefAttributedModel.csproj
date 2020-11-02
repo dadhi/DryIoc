@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>net45;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc.MefAttributedModel</Product>
         <VersionPrefix>7.0.0</VersionPrefix>
@@ -18,8 +17,8 @@
 <![CDATA[
 v7.0.0:
 
-- Removing support for the .NET 4.0
-			
+- Keeping net45;netstandard2.0 targets only
+
 ]]>
         </PackageReleaseNotes>
     </PropertyGroup>

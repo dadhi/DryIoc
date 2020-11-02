@@ -1,9 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFrameworks>netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
-        <VersionPrefix>4.1.0</VersionPrefix>
+        <VersionPrefix>5.0.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -15,15 +15,12 @@
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-## v4.1.0
+## v5.0.0
 
-- fixed: Applying Microsoft.DependencyInjection rules the passed DryIoc container with modified Rules.
-- added: Upping dependency versions to DryIoc v4.3.0 and Microsoft.Extensions.DependencyInjection.Abstractions 3.1.6
+Updated DryIoc to v4.5.0 with the performance improvements and the new features
 
-## v4.0.0
-
-- removed: .NET Standard 1.0 target
-- updated: package references
+- added: 328 - Now you may use `Rules.WithVariantGenericTypesInResolvedCollection()`
+- added: 331 - [MS.DI] Add the Rules.WithServiceProviderGetServiceShouldThrowIfUnresolved
 
 ]]>
         </PackageReleaseNotes>
@@ -34,6 +31,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.6" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.8" />
     </ItemGroup>
 </Project>

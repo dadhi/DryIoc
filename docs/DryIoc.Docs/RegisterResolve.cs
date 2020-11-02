@@ -7,6 +7,7 @@
 - [Register and Resolve](#register-and-resolve)
   - [DryIoc Glossary](#dryioc-glossary)
   - [Registration API](#registration-api)
+    - [Registration API one level deep](#registration-api-one-level-deep)
   - [Registering as Singleton](#registering-as-singleton)
   - [Registering multiple implementations](#registering-multiple-implementations)
     - [Default registrations](#default-registrations)
@@ -21,6 +22,7 @@
     - [RegisterDelegate is harder to use when types are not known](#registerdelegate-is-harder-to-use-when-types-are-not-known)
   - [RegisterInstance](#registerinstance)
   - [RegisterInitializer](#registerinitializer)
+    - [RegisterInitializer with the reuse different from the initialized object](#registerinitializer-with-the-reuse-different-from-the-initialized-object)
   - [RegisterPlaceholder](#registerplaceholder)
   - [RegisterDisposer](#registerdisposer)
 
@@ -135,6 +137,50 @@ class Register_implementation_as_service_type
 }/*md
 ```
 
+### Registration API one level deep
+
+All this high-level registration API is calling a single method from the `IRegistrator` interface:
+
+```cs
+void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
+```
+
+You may call it directly by supplying the `factory` and the `serviceType`, 
+the other parameters are optional and maybe set to the default values (or the there is and overload where those parameters are optional).
+
+The factory in DryIoc is th entity holding all the required info and behavior for the service creation.
+The `Factory` is the abstract class with the following concrete implementations
+
+- `ReflectionFactory` - creates a service based on the supplied implementation type
+- `DelegateFactory`   - creates a service based on the supplied delegate
+- `ExpressionFactory` - creates a service using the expression tree
+
+In addition factory holds the `Reuse`. 
+
+You may use this API as following:
+
+```cs md*/
+class One_level_deep_registration_API
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register(typeof(IA), new ReflectionFactory(typeof(A), Reuse.Singleton));
+
+        var a = container.Resolve<IA>();
+        Assert.IsInstanceOf<A>(a);
+    }
+
+    interface IA {}
+    class A : IA {}
+}/*md
+```
+
+I would encourage you to investigate the constructors of the factories to see all the possible options, 
+and to [look inside the implementations](https://www.fuget.org/packages/DryIoc.dll/4.5.0/lib/netstandard2.0/DryIoc.dll/DryIoc/Registrator) of 
+the `Register` methods. 
+
 
 ## Registering as Singleton
 
@@ -231,14 +277,14 @@ __Note:__ When resolving collection of multiple defaults, it always ordered in r
 
 There are also a couple of ways to select a specific registration and avoid an exception in `Resolve<ICommand>`:
 
-- Using [condition](SpecifyDependencyAndPrimitiveValues#registering-with-condition): 
+- Using [condition](SpecifyDependencyAndPrimitiveValues.md#registering-with-condition): 
 `container.Register<ICommand, GetCommand>(setup: Setup.With(condition: req => req.IsResolutionRoot))` 
 and for the rest of registrations to specify opposite condition, e.g. `condition: r => !r.IsResolutionRoot`.
 - Using specific metadata type (`CommandId` enum) and resolving as `Meta<,>` wrapper: 
 `container.Register<ICommand, GetCommand>(setup: Setup.With(metadata: CommandId.Get));` 
 and then resolving as `container.Resolve<IEnumerable<Meta<ICommand, CommandId>>>().Where(m => m.Metadata == CommandId.Get))`
-- Using [reuse bound to specific parent scope](ReuseAndScopes#reuseinresolutionscopeof) 
-or to [named scope](ReuseAndScopes#reuseincurrentnamedscope-and-reuseinthread).
+- Using [reuse bound to specific parent scope](ReuseAndScopes.md#reuseinresolutionscopeof) 
+or to [named scope](ReuseAndScopes.md#reuseincurrentnamedscope-and-reuseinthread).
 - Registering with `serviceKey`.
 
 
@@ -726,8 +772,8 @@ Though powerful, registering delegate may lead to the problems:
 1. Memory leaks by capturing variables into delegate closure and keeping them for a container lifetime.
 2. Delegate is the black box for Container, mostly because it should use the `Resolve` call inside to resolve the dependency cutting of the object graph analysis, which makes it hard to find type mismatches or diagnose other potential problems. Among the un-catched problems are:
 
-    - [Recursive Dependency](ErrorDetectionAndResolution#RecursiveDependencyDetected)
-    - [Captive Dependency](ErrorDetectionAndResolution#using-validate-to-check-for-captive-dependency)
+    - [Recursive Dependency](ErrorDetectionAndResolution.md#RecursiveDependencyDetected)
+    - [Captive Dependency](ErrorDetectionAndResolution.md#using-validate-to-check-for-captive-dependency)
 
 Therefore, try to use it only as a last resort. DryIoc has plenty of tools to cover for custom delegate in more effective way. 
 The alternative would be a [FactoryMethod](ConstructorSelection).
@@ -740,7 +786,7 @@ It solves the two problems mentioned in the [RegisterDelegate](#registerdelegate
 it **injects** the requested dependencies as a delegate arguments so there is no need in calling `Resolve` inside.
 
 - The dependencies injection and their lifetime is controlled by container
-- There is no black-box service location involved and both [Recursive Dependency](ErrorDetectionAndResolution#RecursiveDependencyDetected) and [Captive Dependency](ErrorDetectionAndResolution#using-validate-to-check-for-captive-dependency) problems are catched by container.
+- There is no black-box service location involved and both [Recursive Dependency](ErrorDetectionAndResolution.md#RecursiveDependencyDetected) and [Captive Dependency](ErrorDetectionAndResolution.md#using-validate-to-check-for-captive-dependency) problems are catched by container.
 
 The example:
 ```cs md*/
@@ -896,17 +942,16 @@ class Typed_instance
 
 ## RegisterInitializer
 
-Initializer is an action to be invoked on created service before returning it from resolve method, 
+`RegisterInitializer` allows to pass the action to be invoked on created a service before returning it from resolve method, 
 or before injecting it as dependency. 
 
-__Note:__ Underneath Initializer is registered as [Decorator](Decorators).
+__Note:__ From the implementation perspective `RegisterInitializer` is just a sugar for registering a [Decorator](Decorators).
 
 Let's say we want to log the creation of our service:
 ```cs md*/
 class Register_initializer
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         container.Register<Logger>(Reuse.Singleton);
@@ -930,13 +975,12 @@ class Register_initializer
 }/*md
 ```
 
-OK, this works for specific service `IService`. What if I want to log creation of _any_ resolved or injected service.
+OK, this works for the specific service `IService` but what if I want to log the creation of _any_ resolved or injected service.
 
 ```cs md*/
 class Register_initializer_for_any_object
 {
-    [Test]
-    public void Example()
+    [Test] public void Example()
     {
         var container = new Container();
         var loggerKey = "logger";
@@ -962,19 +1006,58 @@ class Register_initializer_for_any_object
 }/*md
 ```
 
-Initializer maybe registered for an `object` service, which means _any_ service type.
+When registered for the `Object` type the initializer will be applied to _any_ target service type.
 
-__Note:__ Invoking initializer for any object means, that it will be invoked for the `Logger` itself causing a `StackOverflowException`. 
+__Note:__ In the example above invoking initializer for any object means 
+that it will be invoked for the `Logger` itself causing the `StackOverflowException`. 
 To avoid this, logger is registered with a `serviceKey` and excluded from initializer action via `condition` parameter.
 
 
-The `TTarget` of `RegisterInitializer<TTarget>()` maybe an any type implemented by registered service type, but not by implementation type.
+The `TTarget` of `RegisterInitializer<TTarget>()` maybe the type implemented by theregistered service type 
+but not by the implementation type.
 
 For instance, to register logger for disposable services:
 ```cs
 container.RegisterInitializer<IDisposable>(
     (disposable, resolver) => resolver.Resolve<Logger>().Log("resolved disposable " + disposable));
 ```
+
+### RegisterInitializer with the reuse different from the initialized object
+
+By default initializer decorator is registered with the `useDecorateeReuse` option which binds it to the initialized object lifetime.
+But there is an overload of `RegisterInitializer` (since the DryIoc v4.5.0) with the `reuse` parameter.
+Having a separate reuse option makes possible to apply initializer once per scope (Scoped), once per container (Singleton), or every time (Transient).
+
+```cs md*/
+class RegisterInitializer_with_reuse_different_from_initialized_object
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<IFoo, Boo>(Reuse.Singleton);
+        
+        var scopedUsages = 0;
+        container.RegisterInitializer<IFoo>((x, r) => ++scopedUsages, Reuse.Scoped);
+
+        using (var scope = container.OpenScope())
+            scope.Resolve<IFoo>();
+
+        using (var scope = container.OpenScope())
+            scope.Resolve<IFoo>();
+
+        using (var scope = container.OpenScope())
+            scope.Resolve<IFoo>();
+
+        Assert.AreEqual(3, scopedUsages);
+    }
+
+    interface IFoo { }
+    class Boo : IFoo { }
+}
+/*md
+```
+
 
 ## RegisterPlaceholder
 

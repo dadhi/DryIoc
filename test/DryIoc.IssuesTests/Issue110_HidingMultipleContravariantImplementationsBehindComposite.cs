@@ -79,31 +79,41 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(1, CustomerMovedAbroadEventHandler.HandleCount);
         }
 
-        [Test]
-        public void I_can_switch_off_variance_support_in_collection()
+        [Test] 
+        public void I_can_turn_off_variance_support_in_collection()
         {
-            var container = new Container(rules => rules
-                .WithResolveIEnumerableAsLazyEnumerable()
-                .WithoutVariantGenericTypesInResolvedCollection());
+            IContainer container = new Container(rules => rules.WithoutVariantGenericTypesInResolvedCollection());
 
-            container.Register(typeof(IV<>), typeof(V1<>));
-            container.Register(typeof(IV<>), typeof(V2<>));
+            container.RegisterMany(
+                implTypes: new[] { typeof(MoveHandler), typeof(MoveAbroadHandler) },
+                nonPublicServiceTypes: true);
 
-            var vs = container.Resolve<IV<A>[]>();
-
-            Assert.AreEqual(2, vs.Length);
+            var moveHandlers = container.Resolve<IEnumerable<IHandler<MoveEvent>>>();
+            Assert.AreEqual(1, moveHandlers.Count());
         }
 
-        public interface IV<T> { }
+        [Test] 
+        public void I_can_turn_on_variance_support_in_collection()
+        {
+            IContainer container = new Container(rules => rules.WithoutVariantGenericTypesInResolvedCollection());
 
-        public class V1<T> : IV<T> { }
+            container = container.With(rules => rules.WithVariantGenericTypesInResolvedCollection());
 
-        public class V2<T> : IV<T> { }
+            container.RegisterMany(
+                implTypes: new[] { typeof(MoveHandler), typeof(MoveAbroadHandler) },
+                nonPublicServiceTypes: true);
 
-        public class A { }
+            var moveHandlers = container.Resolve<IEnumerable<IHandler<MoveEvent>>>();
+            Assert.AreEqual(2, moveHandlers.Count());
+        }
 
-        public class B : A { }
+        interface IHandler<out TEvent> { } // contra-variant interface
+        class MoveEvent { }
+        class MoveHandler : IHandler<MoveEvent> { }
+        class MoveAbroadEvent : MoveEvent { }
+        class MoveAbroadHandler : IHandler<MoveAbroadEvent> { }
     }
+
     public interface IEventRaiser<TEvent>
     {
         void Raise(TEvent e);

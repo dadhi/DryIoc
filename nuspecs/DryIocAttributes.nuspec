@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
-  <metadata>
+  <metadata minClientVersion="3.3.0">
     <id>DryIocAttributes</id>
-    <version>6.0.0</version>
+    <version>6.0.1</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,6 +14,10 @@
     <releaseNotes>
     <![CDATA[
 
+## v6.0.1
+
+- fixed: #335 Why doesn't DryIocAttribute with a target of net45 use the System.ComponentModel.Composition NuGet package
+
 ## v6.0.0
 
 - Using the System.ComponentModel.Composition (netstandard2.0+ and netcoreapp2.0+) NuGet package instead of framework assembly reference
@@ -23,11 +27,38 @@
     <contentFiles>
       <files include="cs/**/*.*" buildAction="Compile" />
     </contentFiles>
+      <dependencies>
+          <group targetFramework="net35" />
+          <group targetFramework="net40" />
+          <group targetFramework="net45">
+              <dependency id="System.ComponentModel.Composition" version="4.7.0" exclude="Build,Analyzers" />
+          </group>
+          <group targetFramework="netstandard1.0">
+              <dependency id="NETStandard.Library" version="1.6.1" />
+          </group>
+          <group targetFramework="netstandard1.3">
+              <dependency id="NETStandard.Library" version="1.6.1" />
+          </group>
+          <group targetFramework="netstandard2.0">
+              <dependency id="System.ComponentModel.Composition" version="4.7.0" exclude="Build,Analyzers" />
+          </group>
+          <group targetFramework="portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+          <group targetFramework="portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1" />
+      </dependencies>
   </metadata>
   <files>
     <file src="..\LICENSE.txt" />
     <file src="..\nuspecs\DryIoc.snk" />
     <file src="..\logo\logo128.png" target="logo.png" />
+
+    <file src="_._" target="lib\net35\" />
+    <file src="_._" target="lib\net40\" />
+    <file src="_._" target="lib\net45\" />
+    <file src="_._" target="lib\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\" />
+    <file src="_._" target="lib\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\" />
+    <file src="_._" target="lib\netstandard1.0\" />
+    <file src="_._" target="lib\netstandard1.3\" />
+    <file src="_._" target="lib\netstandard2.0\" />
 
     <!-- net35 -->
     <file src="..\src\DryIocAttributes\Attributes.cs" target="content\net35\DryIocAttributes" />

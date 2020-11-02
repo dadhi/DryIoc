@@ -121,10 +121,7 @@ namespace DryIoc.IssuesTests
         {
             public bool IsDisposed { get; private set; }
 
-            public void Dispose()
-            {
-                IsDisposed = true;
-            }
+            public void Dispose() => IsDisposed = true;
         }
 
         [Test]
@@ -151,20 +148,14 @@ namespace DryIoc.IssuesTests
         {
             public Action Disposed;
 
-            public void Dispose()
-            {
-                Disposed();
-            }
+            public void Dispose() => Disposed();
         }
 
         public class Y : IDisposable
         {
             public Action Disposed;
 
-            public void Dispose()
-            {
-                Disposed();
-            }
+            public void Dispose() => Disposed();
         }
 
         [Test]
@@ -215,10 +206,7 @@ namespace DryIoc.IssuesTests
             }
 
             public bool IsDisposed { get; private set; }
-            public void Dispose()
-            {
-                IsDisposed = true;
-            }
+            public void Dispose() => IsDisposed = true;
         }
 
         [Test]
@@ -261,6 +249,18 @@ namespace DryIoc.IssuesTests
                     return new NotificationHub() as T;
                 return null;
             }
+        }
+
+        [Test]
+        public void Autofac_as_self()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<ANestedDep>().AsSelf();
+            var container = builder.Build();
+
+            var x = container.Resolve<ANestedDep>();
+
+            Assert.IsNotNull(x);
         }
 
         [Test]
@@ -345,10 +345,7 @@ namespace DryIoc.IssuesTests
         {
             public bool IsDisposed { get; private set; }
 
-            public void Dispose()
-            {
-                IsDisposed = true;
-            }
+            public void Dispose() => IsDisposed = true;
         }
 
         public class ADependency : IDisposable 
@@ -362,10 +359,7 @@ namespace DryIoc.IssuesTests
                 NestedDep = nestedDep;
             }
 
-            public void Dispose()
-            {
-                IsDisposed = true;
-            }
+            public void Dispose() => IsDisposed = true;
         }
 
         public class AService
@@ -389,10 +383,7 @@ namespace DryIoc.IssuesTests
                 Service = service;
             }
 
-            public void Dispose()
-            {
-                Service.Dispose();
-            }
+            public void Dispose() => Service.Dispose();
         }
 
         [Test]
@@ -414,10 +405,7 @@ namespace DryIoc.IssuesTests
         {
             public bool IsDisposed { get; private set; }
 
-            public void Dispose()
-            {
-                IsDisposed = true;
-            }
+            public void Dispose() => IsDisposed = true;
         }
 
         public class My : IDisposable
@@ -429,10 +417,7 @@ namespace DryIoc.IssuesTests
                 OwnedCake = ownedCake;
             }
 
-            public void Dispose()
-            {
-                OwnedCake.Dispose();
-            }
+            public void Dispose() => OwnedCake.Dispose();
         }
 
         public class DryIocOwned<TService> : IDisposable
@@ -446,10 +431,7 @@ namespace DryIoc.IssuesTests
                 _scope = scope;
             }
 
-            public void Dispose()
-            {
-                _scope.Dispose();
-            }
+            public void Dispose() => _scope.Dispose();
         }
 
         [Test]
@@ -593,10 +575,7 @@ namespace DryIoc.IssuesTests
 
         public class AutofacModule : Module
         {
-            protected override void Load(ContainerBuilder builder)
-            {
-                builder.RegisterType<BB>().SingleInstance();
-            }
+            protected override void Load(ContainerBuilder builder) => builder.RegisterType<BB>().SingleInstance();
         }
 
         public interface IModule
@@ -606,10 +585,7 @@ namespace DryIoc.IssuesTests
 
         public class DryIocModule : IModule
         {
-            public void Load(IRegistrator builder)
-            {
-                builder.Register<BB>(Reuse.Singleton);
-            }
+            public void Load(IRegistrator builder) => builder.Register<BB>(Reuse.Singleton);
         }
 
         public class B {}

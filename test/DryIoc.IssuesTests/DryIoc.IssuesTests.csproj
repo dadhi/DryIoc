@@ -2,11 +2,11 @@
 
     <PropertyGroup>
         <TargetFrameworks Condition="'$(DevMode)' == 'true'">netcoreapp3.1</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp3.1;net45</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp3.1;net472</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Autofac" Version="4.8.1" />
+        <PackageReference Include="Autofac" Version="6.0.0" />
         <PackageReference Include="Castle.Core" Version="4.3.1" />
         <PackageReference Include="JetBrains.dotMemoryUnit" Version="3.0.20171219.105559" />
         <PackageReference Include="MediatR" Version="5.1.0" />

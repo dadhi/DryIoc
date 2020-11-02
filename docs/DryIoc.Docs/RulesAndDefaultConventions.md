@@ -240,7 +240,7 @@ the expression would've been infinite:
 ```
 
 But sometimes the recursion or generally the "dynamic" resolution of dependency is required. 
-For instance when injecting a [Lazy](Wrappers#lazy-of-a) we can expect the recursion to be possible.
+For instance when injecting a [Lazy](Wrappers.md#lazy-of-a) we can expect the recursion to be possible.
 
 Given approach with embedded expression:
 ```cs
@@ -607,9 +607,9 @@ __Note:__ In DryIoc _Factory_ is the unit of registration. Speaking of factory s
 
 Allows to override default factory selection, especially when we have multiple registered default factories.
 
-DryIoc has two predefined rules that you can use instead of [default policy](RulesAndDefaultConventions#resolving-from-multiple-default-services):
+DryIoc has two predefined rules that you can use instead of [default policy](RulesAndDefaultConventions.md#resolving-from-multiple-default-services):
 
-- `Rules.SelectLastRegisteredFactory` - explained [here](RulesAndDefaultConventions#resolving-from-multiple-default-services).
+- `Rules.SelectLastRegisteredFactory` - explained [here](RulesAndDefaultConventions.md#resolving-from-multiple-default-services).
 - `Rules.SelectKeyedOverDefaultFactory(serviceKey)` - to prefer registration with the specific key over the default. 
     
 For example you may register some dependencies to be available only inside opened scope like this:
@@ -643,7 +643,7 @@ This way you may specify how to select constructor, parameters and properties.
 For instance [MefAttributedModel](Extensions/MefAttributedModel) uses these rules to instruct DryIoc to select constructor and properties 
 marked with `ImportingConstructor` and `Import` attributes.
 
-In addition you can use the rule to [select constructor with all resolvable parameters](RulesAndDefaultConventions#default-constructor-selection).
+In addition you can use the rule to [select constructor with all resolvable parameters](RulesAndDefaultConventions.md#default-constructor-selection).
 
 
 ### UnknownServiceResolvers
@@ -781,7 +781,7 @@ public class Auto_concrete_dynamic_type_registrations
 
 ### Fallback Containers
 
-[Explained in "Child" containers](KindsOfChildContainer#facade).
+[Explained in "Child" containers](KindsOfChildContainer.md#facade).
 
 
 ### ThrowIfDependencyHasShorterReuseLifespan
@@ -888,7 +888,7 @@ so the check does not make sense.
 
 ### ThrowOnRegisteringDisposableTransient
 
-DryIoc does not track disposable transients by default as described [here](ReuseAndScopes#disposable-transient).
+DryIoc does not track disposable transients by default as described [here](ReuseAndScopes.md#disposable-transient).
 
 That means you may register Transient `IDisposable` and forgot to dispose it, thinking that Container will do this for you.
 
@@ -939,12 +939,12 @@ If you disagree, you may silence this exception per registration or per Containe
 
 ### WithTrackingDisposableTransient
 
-In detail is described [here](ReuseAndScopes#disposabletransient).
+In detail is described [here](ReuseAndScopes.md#disposabletransient).
 
 
 ### WithDefaultReuseInsteadOfTransient
 
-Allows to specify different default Reuse per Container as described [here in Reuse and Scopes](ReuseAndScopes#different-default-reuse-instead-of-transient).
+Allows to specify different default Reuse per Container as described [here in Reuse and Scopes](ReuseAndScopes.md#different-default-reuse-instead-of-transient).
 
 
 ### WithDefaultIfAlreadyRegistered
@@ -995,15 +995,15 @@ public class Default_IfAlreadyRegistered_AppendNotKeyed
 
 ### WithoutImplicitCheckForReuseMatchingScope 
 
-This rule turns Off the default [Implicit registration selection based on scope](RulesAndDefaultConventions#implicit-registration-selection-based-on-scope).
+This rule turns Off the [Implicit registration selection based on scope](RulesAndDefaultConventions.md#implicit-registration-selection-based-on-scope).
 
 
 ### ResolveIEnumerableAsLazyEnumerable
 
-[Explained in Wrappers](Wrappers#lazyenumerable-of-a).
+[Explained in Wrappers](Wrappers.md#lazyenumerable-of-a).
 
 
 ### VariantGenericTypesInResolvedCollection
 
-[Explained in Wrappers](Wrappers#contravariant-generics).
+[Explained in Wrappers](Wrappers.md#contravariant-generics).
 
