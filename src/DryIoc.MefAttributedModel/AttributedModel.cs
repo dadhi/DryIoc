@@ -22,10 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#if NET35 || NET40 || PCL || NETSTANDARD1_0 || NETSTANDARD1_3 
-#define NO_CUSTOM_ATTRIBUTE_DATA
-#endif
-
 namespace DryIoc.MefAttributedModel
 {
     using System;
@@ -1861,53 +1857,3 @@ namespace DryIoc.MefAttributedModel
     #pragma warning restore 659
     #endregion
 }
-
-#if NO_CUSTOM_ATTRIBUTE_DATA
-namespace DryIoc.MefAttributedModel
-{
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Reflection;
-
-    /// <summary>The polyfill for the reflection API missing in the lower NET Standard targets.</summary>
-    public class CustomAttributeData
-    {
-        /// <summary>Gets or sets the constructor information.</summary>
-        public ConstructorInfo Constructor { get; set; }
-
-        /// <summary>Gets or sets the constructor arguments.</summary>
-        public IList<CustomAttributeTypedArgument> ConstructorArguments { get; set; }
-
-        /// <summary>Gets or sets the named arguments.</summary>
-        public IList<CustomAttributeNamedArgument> NamedArguments { get; set; }
-
-        /// <summary>The polyfill for the reflection API missing in the lower NET Standard targets.</summary>
-        public struct CustomAttributeTypedArgument
-        {
-            /// <summary>Gets or sets the type of the value.</summary>
-            public Type ArgumentType { get; set; }
-
-            /// <summary>Gets or sets the value.</summary>
-            public object Value { get; set; }
-        }
-
-        /// <summary>The polyfill for the reflection API missing in the lower NET Standard targets.</summary>
-        public struct CustomAttributeNamedArgument
-        {
-            /// <summary>Gets or sets the argument member information.</summary>
-            public MemberInfo MemberInfo { get; set; }
-
-            /// <summary>Gets or sets the value of the argument.</summary>
-            public CustomAttributeTypedArgument TypedValue { get; set; }
-        }
-
-        /// <summary>Returns an empty data list as the functionality is not available.</summary>
-        public static IEnumerable<CustomAttributeData> GetCustomAttributes(Type type)
-        {
-            return Enumerable.Empty<CustomAttributeData>();
-        }
-    }
-}
-#endif
- 
