@@ -11343,52 +11343,6 @@ private ParameterServiceInfo(ParameterInfo p)
         }
 
         /// <inheritdoc />
-        [Obsolete("Replaced by `GetOrAddViaFactoryDelegate`")]
-        public object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0)
-        {
-            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef != null && itemRef.Value != NoItem)
-                return itemRef.Value;
-            return TryGetOrAdd(ref map, id, createValue, disposalOrder);
-        }
-
-        [Obsolete("Not used - to be removed")]
-        private object TryGetOrAdd(ref ImMap<object> map, int id, CreateScopedValue createValue, int disposalOrder = 0)
-        {
-            if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
-
-            var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
-            var oldMap = map;
-            var newMap = oldMap.AddOrKeepEntry(itemRef);
-            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
-            {
-                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            }
-            else if (newMap == oldMap)
-            {
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            }
-
-            object result = null;
-            itemRef.Value = result = createValue();
-            if (result is IDisposable disp && !ReferenceEquals(disp, this))
-            {
-                if (disposalOrder == 0)
-                    AddUnorderedDisposable(disp);
-                else
-                    AddDisposable(disp, disposalOrder);
-            }
-
-            return result;
-        }
-
-        /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
         public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
@@ -11449,49 +11403,6 @@ private ParameterServiceInfo(ParameterInfo p)
             return itemRef.Value;
         }
 
-        [Obsolete("Not used - to be removed")] 
-        internal ImMapEntry<object> TryAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
-        {
-            if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
-
-            var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
-            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-            var oldMap = map;
-            var newMap = oldMap.AddOrKeepEntry(itemRef);
-            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
-            {
-                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                {
-                    if (otherItemRef.Value == Scope.NoItem)
-                        Scope.WaitForItemIsSet(otherItemRef);
-                    return otherItemRef;
-                }
-            }
-            else if (newMap == oldMap)
-            {
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef.Value == Scope.NoItem)
-                    Scope.WaitForItemIsSet(otherItemRef);
-                return otherItemRef;
-            }
-
-            object result = null;
-            itemRef.Value = result = createValue(r);
-
-            if (result is IDisposable disp && !ReferenceEquals(disp, this))
-            {
-                if (disposalOrder == 0)
-                    AddUnorderedDisposable(disp);
-                else
-                    AddDisposable(disp, disposalOrder);
-            }
-
-            return itemRef;
-        }
-
         /// <inheritdoc />
         public object TryGetOrAddWithoutClosure(int id,
             IResolverContext resolveContext, Expression expr, bool useFec,
@@ -11544,43 +11455,6 @@ private ParameterServiceInfo(ParameterInfo p)
 
             if (item is IDisposable disp && !ReferenceEquals(disp, this))
                 AddUnorderedDisposable(disp);
-        }
-
-        /// [Obsolete("Removing because it is not used")]
-        [Obsolete("Removing because it is not used")]
-        public object GetOrTryAdd(int id, object newItem, int disposalOrder)
-        {
-            if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
-
-            ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
-
-            var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
-            var oldMap = map;
-            var newMap = oldMap.AddOrKeepEntry(itemRef);
-            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
-            {
-                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            }
-            else if (newMap == oldMap)
-            {
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            }
-
-            itemRef.Value = newItem;
-            if (newItem is IDisposable disp && !ReferenceEquals(disp, this))
-            {
-                if (disposalOrder == 0)
-                    AddUnorderedDisposable(disp);
-                else
-                    AddDisposable(disp, disposalOrder);
-            }
-
-            return newItem;
         }
 
         internal void AddDisposable(IDisposable disposable, int disposalOrder)
