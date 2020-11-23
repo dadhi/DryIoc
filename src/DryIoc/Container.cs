@@ -23,9 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4 && !NETSTANDARD1_5 && !NETSTANDARD1_6 && !NETCOREAPP1_0 && !NETCOREAPP1_1
-#define SUPPORTS_ISERVICE_PROVIDER
-#endif
 #if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4 && !NETSTANDARD1_5 && !NETSTANDARD1_6
 #define SUPPORTS_SERIALIZABLE
 #define SUPPORTS_STACK_TRACE
@@ -282,7 +279,6 @@ namespace DryIoc
 
 #region IResolver
 
-#if SUPPORTS_ISERVICE_PROVIDER
         /// <summary>
         /// Resolves service with the <see cref="IfUnresolved.ReturnDefaultIfNotRegistered"/> policy,
         /// enabling the fallback resolution for not registered services (default MS convention).
@@ -292,7 +288,6 @@ namespace DryIoc
         object IServiceProvider.GetService(Type serviceType) =>
             ((IResolver)this).Resolve(serviceType, 
                 Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered);
-#endif
 
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
@@ -4702,10 +4697,7 @@ namespace DryIoc
                 .AddOrUpdate(typeof(IResolver), resolverContextExpr)
                 .AddOrUpdate(typeof(IContainer), containerExpr)
                 .AddOrUpdate(typeof(IRegistrator), containerExpr)
-#if SUPPORTS_ISERVICE_PROVIDER
-                .AddOrUpdate(typeof(IServiceProvider), resolverContextExpr)
-#endif
-                ;
+                .AddOrUpdate(typeof(IServiceProvider), resolverContextExpr);
 
             return wrappers;
         }
@@ -12313,11 +12305,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
     /// <summary>Declares minimal API for service resolution. 
     /// Resolve default and keyed is separated because of optimization for faster resolution of the former.</summary>
-    public interface IResolver
-#if SUPPORTS_ISERVICE_PROVIDER
-    : IServiceProvider
-#endif
-
+    public interface IResolver : IServiceProvider
     {
         /// <summary>Resolves default (non-keyed) service from container and returns created service object.</summary>
         /// <param name="serviceType">Service type to search and to return.</param>
