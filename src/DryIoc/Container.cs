@@ -352,9 +352,7 @@ namespace DryIoc
             var rules = Rules;
             FactoryDelegate factoryDelegate;
 
-            // todo: [Obsolete] - in v5.0 there should be no check nor the InstanceFactory
-            if (factory is InstanceFactory || 
-                !rules.UseInterpretationForTheFirstResolution)
+            if (!rules.UseInterpretationForTheFirstResolution)
             {
                 factoryDelegate = factory.GetDelegateOrDefault(request);
                 if (factoryDelegate == null)
@@ -374,8 +372,7 @@ namespace DryIoc
                     return value;
                 }
 
-                // Important to cache expression first before tying to interpret,
-                // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed.
+                // Important to cache expression first before tying to interpret, so that parallel resolutions may already use it.
                 if (factory.Caching != FactoryCaching.DoNotCache)
                     _registry.Value.TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
 
@@ -465,7 +462,7 @@ namespace DryIoc
             }
 
             FactoryDelegate factoryDelegate;
-            if (factory is InstanceFactory || !Rules.UseInterpretationForTheFirstResolution)
+            if (!Rules.UseInterpretationForTheFirstResolution)
             {
                 factoryDelegate = factory.GetDelegateOrDefault(request);
                 if (factoryDelegate == null)
@@ -485,8 +482,7 @@ namespace DryIoc
                     return value;
                 }
 
-                // Important to cache expression first before tying to interpret,
-                // so that parallel resolutions may already use it and UseInstance may correctly evict the cache if needed
+                // Important to cache expression first before tying to interpret, so that parallel resolutions may already use it
                 if (cacheKey != null)
                     _registry.Value.TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, expr);
 
@@ -696,215 +692,6 @@ namespace DryIoc
             return new Container(Rules, _registry, _singletonScope, _scopeContext,
                 scope, _disposed, _disposeStackTrace, parent: this);
         }
-
-        /// <summary>Obsolete - Please use `RegisterInstance` or `Use` method instead</summary>
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        public void UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
-            bool preventDisposal, bool weaklyReferenced, object serviceKey)
-        {
-            ThrowIfContainerDisposed();
-
-            if (instance != null)
-                instance.ThrowIfNotInstanceOf(serviceType, Error.RegisteringInstanceNotAssignableToServiceType);
-
-            if (weaklyReferenced)
-                instance = new WeakReference(instance);
-            else if (preventDisposal)
-                instance = new HiddenDisposable(instance);
-
-            var scope = _ownCurrentScope ?? _singletonScope;
-            var reuse = scope == _singletonScope ? Reuse.Singleton : Reuse.Scoped;
-            var instanceType = instance?.GetType() ?? typeof(object);
-
-            _registry.Swap(r =>
-            {
-                var entry = r.Services.GetValueOrDefault(serviceType);
-                var oldEntry = entry;
-
-                // no entries, first registration, usual/hot path
-                if (entry == null)
-                {
-                    // add new entry with instance factory
-                    var instanceFactory = new InstanceFactory(instance, instanceType, reuse, scope);
-                    entry = serviceKey == null
-                        ? (object)instanceFactory
-                        : FactoriesEntry.Empty.With(instanceFactory, serviceKey);
-                }
-                else
-                {
-                    // have some registrations of instance, find if we should replace, add, or throw
-                    var singleDefaultFactory = entry as Factory;
-                    if (singleDefaultFactory != null)
-                    {
-                        if (serviceKey != null)
-                        {
-                            // @ifAlreadyRegistered does not make sense for keyed, because there are no other keyed
-                            entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                .With(new InstanceFactory(instance, instanceType, reuse, scope), serviceKey);
-                        }
-                        else // for default instance
-                        {
-                            switch (ifAlreadyRegistered)
-                            {
-                                case IfAlreadyRegistered.AppendNotKeyed:
-                                    entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                        .With(new InstanceFactory(instance, instanceType, reuse, scope));
-                                    break;
-                                case IfAlreadyRegistered.Throw:
-                                    Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, singleDefaultFactory);
-                                    break;
-                                case IfAlreadyRegistered.Keep:
-                                    break;
-                                case IfAlreadyRegistered.Replace:
-                                    var reusedFactory = singleDefaultFactory as InstanceFactory;
-                                    if (reusedFactory != null)
-                                        scope.SetOrAdd(reusedFactory.FactoryID, instance);
-                                    else if (reuse != Reuse.Scoped) // for non-instance single registration, just replace with non-scoped instance only
-                                        entry = new InstanceFactory(instance, instanceType, reuse, scope);
-                                    else
-                                        entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                            .With(new InstanceFactory(instance, instanceType, reuse, scope));
-                                    break;
-                                case IfAlreadyRegistered.AppendNewImplementation: // otherwise Keep the old one
-                                    if (singleDefaultFactory.CanAccessImplementationType &&
-                                        singleDefaultFactory.ImplementationType != instanceType)
-                                        entry = FactoriesEntry.Empty.With(singleDefaultFactory)
-                                            .With(new InstanceFactory(instance, instanceType, reuse, scope));
-                                    break;
-                            }
-                        }
-                    }
-                    else // for multiple existing or single keyed factory
-                    {
-                        var singleKeyedOrManyDefaultFactories = (FactoriesEntry)entry;
-                        if (serviceKey != null)
-                        {
-                            var singleKeyedFactory = singleKeyedOrManyDefaultFactories.Factories.GetValueOrDefault(serviceKey);
-                            if (singleKeyedFactory == null)
-                            {
-                                entry = singleKeyedOrManyDefaultFactories
-                                    .With(new InstanceFactory(instance, instanceType, reuse, scope), serviceKey);
-                            }
-                            else // when keyed instance is found
-                            {
-                                switch (ifAlreadyRegistered)
-                                {
-                                    case IfAlreadyRegistered.Replace:
-                                        var reusedFactory = singleKeyedFactory as InstanceFactory;
-                                        if (reusedFactory != null)
-                                            scope.SetOrAdd(reusedFactory.FactoryID, instance);
-                                        else
-                                            entry = singleKeyedOrManyDefaultFactories
-                                                .With(new InstanceFactory(instance, instanceType, reuse, scope), serviceKey);
-                                        break;
-                                    case IfAlreadyRegistered.Keep:
-                                        break;
-                                    default:
-                                        Throw.It(Error.UnableToRegisterDuplicateKey, serviceType, serviceKey, singleKeyedFactory);
-                                        break;
-                                }
-                            }
-                        }
-                        else // for default instance
-                        {
-                            var defaultFactories = singleKeyedOrManyDefaultFactories.LastDefaultKey == null
-                                ? Empty<Factory>()
-                                : singleKeyedOrManyDefaultFactories.Factories.Enumerate()
-                                    .Match(it => it.Key is DefaultKey, it => it.Value)
-                                    .ToArrayOrSelf();
-
-                            if (defaultFactories.Length == 0) // no default factories among the multiple existing keyed factories
-                            {
-                                entry = singleKeyedOrManyDefaultFactories
-                                    .With(new InstanceFactory(instance, instanceType, reuse, scope));
-                            }
-                            else // there are existing default factories
-                            {
-                                switch (ifAlreadyRegistered)
-                                {
-                                    case IfAlreadyRegistered.AppendNotKeyed:
-                                        entry = singleKeyedOrManyDefaultFactories
-                                            .With(new InstanceFactory(instance, instanceType, reuse, scope));
-                                        break;
-                                    case IfAlreadyRegistered.Throw:
-                                        Throw.It(Error.UnableToRegisterDuplicateDefault, serviceType, defaultFactories);
-                                        break;
-                                    case IfAlreadyRegistered.Keep:
-                                        break; // entry does not change
-                                    case IfAlreadyRegistered.Replace:
-                                        var instanceFactories = defaultFactories.Match(f => f is InstanceFactory);
-                                        if (instanceFactories.Length == 1)
-                                        {
-                                            scope.SetOrAdd(instanceFactories[0].FactoryID, instance);
-                                        }
-                                        else // multiple default or a keyed factory
-                                        {
-                                            // scoped instance may be appended only, and not replacing anything
-                                            if (reuse == Reuse.Scoped)
-                                            {
-                                                entry = singleKeyedOrManyDefaultFactories
-                                                    .With(new InstanceFactory(instance, instanceType, reuse, scope));
-                                            }
-                                            else // here is the replacement goes on
-                                            {
-                                                var keyedFactories = singleKeyedOrManyDefaultFactories.Factories.Enumerate()
-                                                    .Match(it => !(it.Key is DefaultKey)).ToArrayOrSelf();
-
-                                                if (keyedFactories.Length == 0) // replaces all default factories?
-                                                    entry = new InstanceFactory(instance, instanceType, reuse, scope);
-                                                else
-                                                {
-                                                    var factoriesEntry = FactoriesEntry.Empty;
-                                                    for (var i = 0; i < keyedFactories.Length; i++)
-                                                        factoriesEntry = factoriesEntry
-                                                            .With(keyedFactories[i].Value, keyedFactories[i].Key);
-                                                    entry = factoriesEntry
-                                                        .With(new InstanceFactory(instance, instanceType, reuse, scope));
-                                                }
-                                            }
-                                        }
-                                        break;
-                                    case IfAlreadyRegistered.AppendNewImplementation: // otherwise Keep the old one
-                                        var duplicateImplIndex = defaultFactories.IndexOf(
-                                            x => x.CanAccessImplementationType && x.ImplementationType == instanceType);
-                                        if (duplicateImplIndex == -1) // add new implementation
-                                            entry = singleKeyedOrManyDefaultFactories
-                                                .With(new InstanceFactory(instance, instanceType, reuse, scope));
-                                        // otherwise do nothing - keep the old entry
-                                        break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
-                var registry = r.WithServices(r.Services.AddOrUpdate(serviceTypeHash, serviceType, entry));
-
-                // clearing the resolution cache for the updated factory if any
-                if (oldEntry != null && oldEntry != entry)
-                {
-                    var oldFactory = oldEntry as Factory;
-                    if (oldFactory != null)
-                        registry.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
-                    else
-                        ((FactoriesEntry)oldEntry).Factories.Enumerate().ToArray()
-                            .ForEach(x => registry.DropFactoryCache(x.Value, serviceTypeHash, serviceType, serviceKey));
-                }
-
-                return registry;
-            });
-        }
-
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        void IResolverContext.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
-            bool preventDisposal, bool weaklyReferenced, object serviceKey) =>
-            UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
-
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        void IRegistrator.UseInstance(Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
-            bool preventDisposal, bool weaklyReferenced, object serviceKey) =>
-            UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         void IResolverContext.InjectPropertiesAndFields(object instance, string[] propertyAndFieldNames)
         {
@@ -1827,65 +1614,6 @@ namespace DryIoc
         private readonly IScope _ownCurrentScope;
         private readonly IScopeContext _scopeContext;
         private readonly IResolverContext _parent;
-
-        internal sealed class InstanceFactory : Factory
-        {
-            public override Type ImplementationType { get; }
-            public override bool HasRuntimeState => true;
-
-            public InstanceFactory(object instance, Type instanceType, IReuse reuse, IScope scopeToAdd = null) : base(reuse)
-            {
-                ImplementationType = instanceType;
-                scopeToAdd?.SetOrAdd(FactoryID, instance);
-            }
-
-            /// <summary>Tries to return instance directly from scope or singleton, and fallbacks to expression for decorator.</summary>
-            public override FactoryDelegate GetDelegateOrDefault(Request request)
-            {
-                if (request.IsResolutionRoot)
-                {
-                    var decoratedExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
-                    if (decoratedExpr != null)
-                        return decoratedExpr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler, request.Rules.UseInterpretation);
-                }
-
-                return GetInstanceFromScopeChainOrSingletons;
-            }
-
-            /// <summary>Called for Injection as dependency.</summary>
-            public override Expression GetExpressionOrDefault(Request request)
-            {
-                request = request.WithResolvedFactory(this);
-                return request.Container.GetDecoratorExpressionOrDefault(request)
-                    ?? CreateExpressionOrDefault(request);
-            }
-
-            public override Expression CreateExpressionOrDefault(Request request) =>
-                Resolver.CreateResolutionExpression(request);
-
-            private object GetInstanceFromScopeChainOrSingletons(IResolverContext r)
-            {
-                for (var scope = r.CurrentScope; scope != null; scope = scope.Parent)
-                {
-                    var result = GetAndUnwrapOrDefault(scope, FactoryID);
-                    if (result != null)
-                        return result;
-                }
-
-                var instance = GetAndUnwrapOrDefault(r.SingletonScope, FactoryID);
-                return instance.ThrowIfNull(Error.UnableToFindSingletonInstance);
-            }
-
-            private static object GetAndUnwrapOrDefault(IScope scope, int factoryId)
-            {
-                object value;
-                if (!scope.TryGet(out value, factoryId))
-                    return null;
-                return (value as WeakReference)?.Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed)
-                   ?? (value as HiddenDisposable)?.Value
-                   ?? value;
-            }
-        }
 
         internal sealed class Registry
         {
@@ -4427,14 +4155,10 @@ namespace DryIoc
         /// <summary>Current opened scope. May return the current scope from <see cref="ScopeContext"/> if context is not null.</summary>
         IScope CurrentScope { get; }
 
-        /// Creates the resolver context with specified current Container-OWN scope 
+        /// <summary>Creates the resolver context with specified current Container-OWN scope</summary>
         IResolverContext WithCurrentScope(IScope scope);
 
-        /// Put instance into the current scope or singletons.
-        void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
-            bool preventDisposal, bool weaklyReferenced, object serviceKey);
-
-        /// Puts instance created via the passed factory on demand into the current or singleton scope
+        /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
         void Use(Type serviceType, FactoryDelegate factory);
 
         /// <summary>For given instance resolves and sets properties and fields.</summary>
@@ -7221,77 +6945,6 @@ namespace DryIoc
                     ? Setup.DecoratorWith(useDecorateeReuse: true) 
                     : Setup.DecoratorWith(condition, useDecorateeReuse: true));
         }
-
-        /// Will become OBSOLETE! in the next major version:
-        /// Please use `RegisterInstance` or `Use` method instead.
-        public static void UseInstance<TService>(this IResolverContext r, TService instance,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
-
-        /// Will become OBSOLETE! in the next major version:
-        /// Please use `RegisterInstance` or `Use` method instead.
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        public static void UseInstance<TService>(this IRegistrator r, TService instance,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            r.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
-
-        /// Will become OBSOLETE! in the next major version:
-        /// Please use `RegisterInstance` or `Use` method instead.
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        public static void UseInstance<TService>(this IContainer c, TService instance,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            c.UseInstance(typeof(TService), instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
-
-        /// Will become OBSOLETE! in the next major version:
-        /// Please use `RegisterInstance` or `Use` method instead.
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        public static void UseInstance(this IResolverContext r, Type serviceType, object instance,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
-
-        /// Will become OBSOLETE! in the next major version:
-        /// Please use `RegisterInstance` or `Use` method instead.
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        public static void UseInstance(this IRegistrator r, Type serviceType, object instance,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            r.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
-
-        /// Will become OBSOLETE! in the next major version:
-        /// Please use `RegisterInstance` or `Use` method instead.
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        public static void UseInstance(this IContainer c, Type serviceType, object instance,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            c.UseInstance(serviceType, instance, IfAlreadyRegistered.Replace, preventDisposal, weaklyReferenced, serviceKey);
-
-        /// Will become OBSOLETE! in the next major version:
-        /// Please use `RegisterInstance` or `Use` method instead.
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        public static void UseInstance<TService>(this IResolverContext r, TService instance, IfAlreadyRegistered ifAlreadyRegistered,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            r.UseInstance(typeof(TService), instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
-
-        /// Will become OBSOLETE! in the next major version:
-        /// Please use `RegisterInstance` or `Use` method instead.
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        public static void UseInstance(this IResolverContext r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
-
-        /// Will become OBSOLETE! in the next major version:
-        /// Please use `RegisterInstance` or `Use` method instead.
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        public static void UseInstance(this IRegistrator r, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            r.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
-
-        /// <summary>
-        /// Will become OBSOLETE in the next major version!
-        /// Please use `RegisterInstance` or `Use` method instead.
-        /// </summary>
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        public static void UseInstance(this IContainer c, Type serviceType, object instance, IfAlreadyRegistered ifAlreadyRegistered,
-            bool preventDisposal = false, bool weaklyReferenced = false, object serviceKey = null) =>
-            c.UseInstance(serviceType, instance, ifAlreadyRegistered, preventDisposal, weaklyReferenced, serviceKey);
 
         /// <summary>Adding the factory directly to scope for resolution</summary> 
         public static void Use<TService>(this IResolverContext r, Func<IResolverContext, TService> factory) =>
@@ -12245,11 +11898,6 @@ private ParameterServiceInfo(ParameterInfo p)
         /// May return empty, 1 or multiple factories.</summary>
         Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType);
 
-        /// Puts instance into the current scope or singletons.
-        [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
-        void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
-            bool preventDisposal, bool weaklyReferenced, object serviceKey);
-
         /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
         void Use(Type serviceType, FactoryDelegate factory);
     }
@@ -12352,11 +12000,6 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
         new void Use(Type serviceType, FactoryDelegate factory);
-
-        ///<summary>Obsolete - replaced by `Use` to put runtime data into container scopes and with `RegisterInstance` as a sugar for `RegisterDelegate(_ => instance)`")</summary>
-        [Obsolete("Replaced by `Use` to put runtime data into container scopes and with `RegisterInstance` as a sugar for `RegisterDelegate(_ => instance)`")]
-        new void UseInstance(Type serviceType, object instance, IfAlreadyRegistered IfAlreadyRegistered,
-            bool preventDisposal, bool weaklyReferenced, object serviceKey);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,
@@ -12578,7 +12221,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 "There is no explicit or implicit conversion operator found when interpreting {0} to {1} in expression: {2}"),
             StateIsRequiredToUseItem = Of(
                 "Runtime state is required to inject (or use) the: {0}. " + NewLine +
-                "The reason is using RegisterDelegate, Use (or UseInstance), RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + NewLine +
+                "The reason is using RegisterDelegate, Use, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + NewLine +
                 "You can convert run-time value to expression via container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_CONVERTER))."),
             ArgValueIndexIsProvidedButNoArgValues = Of(
                 "`Arg.Index` is provided but no values are passed in Made.Of expression: " + NewLine +
@@ -12620,9 +12263,6 @@ private ParameterServiceInfo(ParameterInfo p)
             NoImplementationForPlaceholder = Of(
                 "There is no real implementation, only a placeholder for the service {0}." + NewLine +
                 "Please Register the implementation with the ifAlreadyRegistered.Replace parameter to fill the placeholder."),
-            UnableToFindSingletonInstance = Of(
-                "Expecting the instance to be stored in singleton scope, but unable to find anything here." + NewLine +
-                "Likely, you've called UseInstance from the scoped container, but resolving from another container or injecting into a singleton."),
             DecoratorShouldNotBeRegisteredWithServiceKey = Of(
                 "Registering Decorator {0} with service key {1} is not supported," + NewLine +
                 "because instead of decorator with the key you actually want a decorator for service registered with the key." + NewLine +
@@ -12655,9 +12295,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 "You may also examine all container registrations via `container.container.GetServiceRegistrations()` method."),
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine +
-                "{0}"),
-            FuncOrActionDelegateWithSuchAmountOfArgumentsIsNotSupported = Of(
-                "The type '{0}' is not supported by Action or Func wrappers, maybe it has too many arguments or the wrong type is registered");
+                "{0}");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
