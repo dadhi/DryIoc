@@ -11857,17 +11857,10 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// <summary>Creates the reuse optionally specifying its name.</summary>
         public CurrentScopeReuse(object name = null, bool scopedOrSingleton = false) 
-            : this(name, scopedOrSingleton, DefaultLifespan)
-        {
-        }
+            : this(name, scopedOrSingleton, DefaultLifespan) {}
 
         /// <summary>Flag indicating that it is a scope or singleton.</summary>
         public readonly bool ScopedOrSingleton;
-
-        // [Obsolete("Replaced by `GetScopedOrSingletonViaFactoryDelegate`")]
-        // public static object GetScopedOrSingleton(IResolverContext r,
-        //     int id, CreateScopedValue createValue, int disposalIndex) =>
-        //     (r.CurrentScope ?? r.SingletonScope).GetOrAdd(id, createValue, disposalIndex);
 
         /// Subject
         public static object GetScopedOrSingletonViaFactoryDelegate(IResolverContext r,
@@ -11885,11 +11878,6 @@ private ParameterServiceInfo(ParameterInfo p)
         internal static readonly MethodInfo TrackScopedOrSingletonMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackScopedOrSingleton));
 
-        // [Obsolete("Replaced by `GetScopedViaFactoryDelegate`")]
-        // public static object GetScoped(IResolverContext r,
-        //     bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
-        //     r.GetCurrentScope(throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
-
         /// Subject
         public static object GetScopedViaFactoryDelegateNoDisposalIndex(IResolverContext r,
             bool throwIfNoScope, int id, FactoryDelegate createValue) =>
@@ -11905,11 +11893,6 @@ private ParameterServiceInfo(ParameterInfo p)
 
         internal static readonly MethodInfo GetScopedViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedViaFactoryDelegate));
-
-        // [Obsolete("Replaced by `GetNameScopedViaFactoryDelegate`")]
-        // public static object GetNameScoped(IResolverContext r,
-        //     object scopeName, bool throwIfNoScope, int id, CreateScopedValue createValue, int disposalIndex) =>
-        //     r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAdd(id, createValue, disposalIndex);
 
         /// Subject
         public static object GetNameScopedViaFactoryDelegate(IResolverContext r,
