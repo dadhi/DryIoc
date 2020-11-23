@@ -8,7 +8,7 @@
         <None Include="..\..\logo\logo128.png" Pack="true" PackagePath="logo.png" Visible="false" />
     </ItemGroup>
 
-    <PropertyGroup>
+    <PropertyGroup Label="Packaging">
         <NeutralLanguage>en-US</NeutralLanguage>
         <PackageLicense>https://github.com/dadhi/DryIoc/blob/master/LICENSE.txt</PackageLicense>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -27,7 +27,7 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <NoWarn>NU5104</NoWarn>
+        <NoWarn>$(NoWarn);NU5104</NoWarn>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     </PropertyGroup>
 
