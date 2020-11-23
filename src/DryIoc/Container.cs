@@ -26,9 +26,6 @@ THE SOFTWARE.
 #if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_5 && !NET45 && !NET451 && !NET452
 #define SUPPORTS_ASYNC_LOCAL
 #endif
-#if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2
-#define SUPPORTS_VARIANCE
-#endif
 #if !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 && !NET471 && !NET472 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4
 #define SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
 #endif
@@ -13880,7 +13877,6 @@ namespace DryIoc
 #endif
 
 
-#if SUPPORTS_VARIANCE
 namespace DryIoc.Messages
 {
     using System;
@@ -14011,4 +14007,3 @@ namespace DryIoc.Messages
             _resolver.Resolve<IMessageHandler<M, EmptyResponse>>().Handle(message, cancellationToken);
     }
 }
-#endif
