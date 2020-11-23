@@ -23,11 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4 && !NETSTANDARD1_5 && !NETSTANDARD1_6
-#define SUPPORTS_SERIALIZABLE
-#define SUPPORTS_STACK_TRACE
-#define SUPPORTS_MANAGED_THREAD_ID
-#endif
 #if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_5 && !NET45 && !NET451 && !NET452
 #define SUPPORTS_ASYNC_LOCAL
 #endif
@@ -12594,11 +12589,9 @@ private ParameterServiceInfo(ParameterInfo p)
         }
     }
 
-    /// Exception that container throws in case of error. Dedicated exception type simplifies
-    /// filtering or catching container relevant exceptions from client code.
-#if SUPPORTS_SERIALIZABLE
+    /// <summary>Exception that container throws in case of error. Dedicated exception type simplifies
+    /// filtering or catching container relevant exceptions from client code.</summary>
     [Serializable]
-#endif
     [SuppressMessage("Microsoft.Usage", "CA2237:MarkISerializableTypesWithSerializable", Justification = "Not available in PCL.")]
     public class ContainerException : InvalidOperationException
     {
@@ -12643,11 +12636,10 @@ private ParameterServiceInfo(ParameterInfo p)
             : base(formatMessage(errorCode, message, innerException), innerException) =>
             Error = errorCode;
 
-#if SUPPORTS_SERIALIZABLE
         /// <inheritdoc />
         protected ContainerException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context)
             : base(info, context) {}
-#endif
+
     }
 
     /// <summary>Defines error codes and error messages for all DryIoc exceptions (DryIoc extensions may define their own.)</summary>
@@ -13838,7 +13830,7 @@ namespace DryIoc
     }
 }
 #endif
-#if !SUPPORTS_ASYNC_LOCAL && SUPPORTS_SERIALIZABLE && !NETSTANDARD2_0
+#if !SUPPORTS_ASYNC_LOCAL && !NETSTANDARD2_0
 namespace DryIoc
 {
     using System;
@@ -13887,15 +13879,6 @@ namespace DryIoc
 }
 #endif
 
-#if !SUPPORTS_STACK_TRACE
-namespace DryIoc
-{
-    internal class StackTrace
-    {
-        public override string ToString() => "<stack trace is not available on this platform>";
-    }
-}
-#endif
 
 #if SUPPORTS_VARIANCE
 namespace DryIoc.Messages
