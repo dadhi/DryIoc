@@ -46,7 +46,7 @@ namespace DryIoc.IssuesTests
             c.Register<I, A>(Reuse.Singleton);
             c.Register<I, B>(Reuse.Singleton);
 
-            c.RegisterDelegateDecorator<I>(_ => i => new D(i));
+            c.RegisterDelegate<I, I>(i => new D(i), setup: Setup.DecoratorWith(useDecorateeReuse: true));
 
             var ii = c.ResolveMany<I>().ToArray();
 
@@ -61,7 +61,7 @@ namespace DryIoc.IssuesTests
 
             c.Register<I, A>(Reuse.Scoped);
 
-            c.RegisterDelegate<I, I>(i => new D(i), Reuse.Scoped, Setup.Decorator);
+            c.RegisterDelegate<I, I>(i => new D(i), Reuse.Scoped, Setup.DecoratorWith(useDecorateeReuse: true));
 
             using (var scope = c.OpenScope())
             {

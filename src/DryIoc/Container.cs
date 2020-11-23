@@ -2489,7 +2489,7 @@ namespace DryIoc
                 return newRegistry;
             }
 
-            // todo: optimize allocations away
+            // todo: @perf optimize allocations away
             public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
             {
                 if (_isChangePermitted != IsChangePermitted.Permitted)
@@ -2517,7 +2517,7 @@ namespace DryIoc
 
                     case FactoryType.Decorator:
                         Factory[] removedDecorators = null;
-                        // todo: minimize allocations in the lambdas below
+                        // todo: @perf minimize allocations in the lambdas below
                         if (condition == null)
                             registry = WithDecorators(Decorators.Update(serviceTypeHash, serviceType, null, (_, factories, _null) =>
                             {
@@ -2544,7 +2544,7 @@ namespace DryIoc
                 }
             }
 
-            // todo: optimize allocations away
+            // todo: @perf optimize allocations away
             private Registry UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
             {
                 object removed = null; // Factory or FactoriesEntry or Factory[]
@@ -2761,7 +2761,7 @@ namespace DryIoc
     /// <summary>Interpreter of expression - where possible uses knowledge of DryIoc internals to avoid reflection</summary>
     public static class Interpreter
     {
-        /// Calls `TryInterpret` inside try-catch and unwraps/re-throws `ContainerException` from the reflection `TargetInvocationException`
+        /// <summary>Calls `TryInterpret` inside try-catch and unwraps/re-throws `ContainerException` from the reflection `TargetInvocationException`</summary>
         public static bool TryInterpretAndUnwrapContainerException(
             IResolverContext r, Expression expr, bool useFec, out object result)
         {
@@ -3820,10 +3820,6 @@ namespace DryIoc
     {
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
         public static readonly ParameterExpression ResolverContextParamExpr = Parameter(typeof(IResolverContext), "r");
-
-        /// [Obsolete("Not used anymore")]
-        [Obsolete("Not used anymore")]
-        public static readonly Type[] FactoryDelegateParamTypes = { typeof(IResolverContext) };
 
         /// Optimization: singleton array with the parameter expression of IResolverContext
         public static readonly ParameterExpression[] FactoryDelegateParamExprs = { ResolverContextParamExpr };
@@ -5103,14 +5099,6 @@ namespace DryIoc
         /// <summary><see cref="WithServiceProviderGetServiceShouldThrowIfUnresolved"/></summary>
         public bool ServiceProviderGetServiceShouldThrowIfUnresolved =>
             (_settings & Settings.ServiceProviderGetServiceShouldThrowIfUnresolved) != 0;
-         
-        /// <summary>Does nothing</summary>
-        [Obsolete("Is not used anymore to split the graph - instead use the `DependencyCountInLambdaToSplitBigObjectGraph`")]
-        public const int DefaultDependencyDepthToSplitObjectGraph = 20;
-
-        /// <summary>Does nothing</summary>
-        [Obsolete("Is not used anymore to split the graph - instead use the `DependencyCountInLambdaToSplitBigObjectGraph`")]
-        public int DependencyDepthToSplitObjectGraph { get; private set; }
 
         /// <summary>The default total dependency count - a expression tree node count to split the object graph</summary>
         public const int DefaultDependencyCountInLambdaToSplitBigObjectGraph = 1024;
@@ -5131,24 +5119,12 @@ namespace DryIoc
         /// </summary>
         public int DependencyCountInLambdaToSplitBigObjectGraph { get; private set; }
 
-        /// <summary>Does nothing</summary>
-        [Obsolete("It does not work - use `WithDependencyCountInLambdaToSplitBigObjectGraph`")]
-        public Rules WithDependencyDepthToSplitObjectGraph(int depth) =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, depth < 1 ? 1 : depth,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
-
         /// <summary>Sets the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/></summary>
         public Rules WithDependencyCountInLambdaToSplitBigObjectGraph(int dependencyCount) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, dependencyCount < 1 ? 1 : dependencyCount,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
-
-        /// <summary>Does nothing</summary>
-        [Obsolete("It does not work - use `WithoutDependencyCountInLambdaToSplitBigObjectGraph`")]
-        public Rules WithoutDependencyDepthToSplitObjectGraph() => WithDependencyDepthToSplitObjectGraph(int.MaxValue);
 
         /// <summary>Disables the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/> limitation.</summary>
         public Rules WithoutDependencyCountInLambdaToSplitBigObjectGraph() =>
@@ -5471,10 +5447,6 @@ namespace DryIoc
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
-
-        /// <summary>Replaced by WithDefaultReuse because for some cases InsteadOfTransient does not make sense.</summary>
-        [Obsolete("Replaced by WithDefaultReuse because for some cases ..InsteadOfTransient does not make sense.", error: false)]
-        public Rules WithDefaultReuseInsteadOfTransient(IReuse reuse) => WithDefaultReuse(reuse);
 
         /// <summary>Given item object and its type should return item "pure" expression presentation,
         /// without side-effects or external dependencies.
@@ -7236,7 +7208,9 @@ namespace DryIoc
             registrator.Register(new DelegateFactory(factoryDelegate.ToFactoryDelegate, reuse, setup), 
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
-        ///<summary>[Obsolete("Replaced with RegisterDelegate{Dep1...Dep2, R}()")]</summary>
+
+        // [Obsolete("Replaced with RegisterDelegate{MyService, Dep1...Dep2, MyService}((service, d1, d2) => new MyServiceDecorator(service, d1, d2), setup: Setup.DecoratorWith(useDecorateeReuse: true, condition: optional))")]
+        ///<summary>Obsolete("Replaced with RegisterDelegate{MyService, Dep1...Dep2, MyService}((service, d1, d2) => new MyServiceDecorator(service, d1, d2), setup: Setup.DecoratorWith(useDecorateeReuse: true, condition: optional))")</summary>
         public static void RegisterDelegateDecorator<TService>(this IRegistrator registrator,
             Func<IResolverContext, Func<TService, TService>> getDecorator, Func<Request, bool> condition = null)
         {
@@ -8586,12 +8560,6 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Indicates the request is singleton or has singleton upper in dependency chain.</summary>
         public bool IsSingletonOrDependencyOfSingleton => (Flags & RequestFlags.IsSingletonOrDependencyOfSingleton) != 0;
 
-        /// <summary>Is not used</summary>
-        [Obsolete("Is not used - hides more than abstracts")]
-        public bool ShouldSplitObjectGraph() =>
-            FactoryType == FactoryType.Service &&
-            DependencyDepth > Rules.DependencyDepthToSplitObjectGraph;
-
         /// <summary>Current scope</summary>
         public IScope CurrentScope => Container.CurrentScope;
 
@@ -8964,9 +8932,6 @@ private ParameterServiceInfo(ParameterInfo p)
 
             return default(TResult);
         }
-
-        /// <summary>Obsolete: now request is directly implements the <see cref="IEnumerable{T}"/>.</summary>
-        public IEnumerable<Request> Enumerate() => this;
 
         /// <summary>Enumerates self and all request stack parents.</summary>
         public IEnumerator<Request> GetEnumerator()
@@ -11279,10 +11244,6 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Looks up for stored item by id.</summary>
         bool TryGet(out object item, int id);
 
-        // [Obsolete("Replaced by `GetOrAddViaFactoryDelegate`")]
-        // Creates, stores, and returns created item
-        // object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0);
-
         /// Create the value via `FactoryDelegate` passing the `IResolverContext`
         object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0);
 
@@ -11300,12 +11261,6 @@ private ParameterServiceInfo(ParameterInfo p)
 
         ///<summary>Sets or adds the service item directly to the scope services</summary>
         void SetOrAdd(int id, object item);
-
-        //[Obsolete("Removing because it is not used")]
-        // object GetOrTryAdd(int id, object item, int disposalOrder);
-
-        ///[Obsolete("Removing because it is not used")]
-        void SetUsedInstance(Type type, FactoryDelegate factory);
 
         /// Sets (replaces) the factory for specified type.
         void SetUsedInstance(int hash, Type type, FactoryDelegate factory);
