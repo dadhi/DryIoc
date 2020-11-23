@@ -65,6 +65,16 @@ __Note:__ In addition to providing thread-safety the described Container structu
 
 ## Locking is only used for reused service creation
 
+
+### Update: Since DryIoc v4.5 `lock` is no longer used for creation of scoped and singleton services (except for the older platforms)
+
+DryIoc now uses the spin-wait based approach to ensure that service creation happens once. 
+
+__Note:__ Until the DryIoc v5 the `lock` is still used for the older platforms (< .NET Standard 2.0, < NET 4.5). So the DryIoc v5 is fully lock-free. 
+
+
+### Outdated: Locking is used for creation of scoped and singleton services
+
 Lock is required to ensure that creation of reused service happens only once. For instance for singleton service A:
 ```cs 
 class Resolving_singleton_in_parallel 

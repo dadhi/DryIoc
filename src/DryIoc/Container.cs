@@ -3626,24 +3626,12 @@ namespace DryIoc
 #endif
 
             object result = null;
-#if SUPPORTS_SPIN_WAIT
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
             itemRef.Value = result;
-#else
-            lock (itemRef) 
-            {
-                if (lambda is ConstantExpression lambdaConstExpr)
-                    result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-                else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                    result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
-                
-                itemRef.Value = result;
-                Monitor.PulseAll(itemRef);
-            }
-#endif
+
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
                 scope.AddUnorderedDisposable(disp);
             return result;
@@ -3714,24 +3702,12 @@ namespace DryIoc
 #endif
 
             object result = null;
-#if SUPPORTS_SPIN_WAIT
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
             itemRef.Value = result;
-#else
-            lock (itemRef) 
-            {
-                if (lambda is ConstantExpression lambdaConstExpr)
-                    result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-                else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                    result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
-                
-                itemRef.Value = result;
-                Monitor.PulseAll(itemRef);
-            }
-#endif
+
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
             {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -3793,24 +3769,12 @@ namespace DryIoc
 
             var lambda = args[4];
             object result = null;
-#if SUPPORTS_SPIN_WAIT
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
             itemRef.Value = result;
-#else
-            lock (itemRef)
-            {
-                if (lambda is ConstantExpression lambdaConstExpr)
-                    result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-                else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                    result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
-                
-                itemRef.Value = result;
-                Monitor.PulseAll(itemRef);
-            }
-#endif
+
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
             {
                 var disposalOrder = (int)((ConstantExpression)args[5]).Value; //@perf no need for this if we have a overload without disposal index
@@ -3879,24 +3843,11 @@ namespace DryIoc
             var lambda = args[2];
 #endif
             object result = null;
-#if SUPPORTS_SPIN_WAIT
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
             itemRef.Value = result;
-#else
-            lock (itemRef) 
-            {
-                if (lambda is ConstantExpression lambdaConstExpr)
-                    result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-                else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                    result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
-                
-                itemRef.Value = result;
-                Monitor.PulseAll(itemRef);
-            }
-#endif
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
             {
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -10120,7 +10071,6 @@ private ParameterServiceInfo(ParameterInfo p)
 
                 if (singleton == Scope.NoItem)
                 {
-#if SUPPORTS_SPIN_WAIT
                     if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, container.Rules.UseFastExpressionCompiler, out singleton))
                         singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseFastExpressionCompiler, container.Rules.UseInterpretation)(container);
 
@@ -10129,24 +10079,6 @@ private ParameterServiceInfo(ParameterInfo p)
                     else if (Setup.PreventDisposal)
                         singleton = new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
                     itemRef.Value = singleton;
-#else
-                    lock (itemRef)
-                    {
-                        if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, container.Rules.UseFastExpressionCompiler, out singleton))
-                            singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseFastExpressionCompiler, container.Rules.UseInterpretation)(container);
-
-                        if (Setup.WeaklyReferenced)
-                            singleton = new WeakReference(singleton);
-                        // todo: @perf Do we need HiddenDisposable here or instead we may skip adding the object to Disposable items collection 
-                        // - just don't call the AddUnorderedDisposable or AddDisposable below.
-                        // Huh, but we need to handle the case when we have the expression createdfor not eager singleton.
-                        // So maybe we can optimize and simplify for the eager singleton only?
-                        else if (Setup.PreventDisposal) 
-                            singleton = new HiddenDisposable(singleton); 
-                        itemRef.Value = singleton;
-                        Monitor.PulseAll(itemRef);
-                    }
-#endif
                     if (singleton is IDisposable disp && !ReferenceEquals(disp, scope))
                     {
                         if (Setup.DisposalOrder == 0)
@@ -11663,17 +11595,7 @@ private ParameterServiceInfo(ParameterInfo p)
             }
 
             object result = null;
-#if SUPPORTS_SPIN_WAIT
             itemRef.Value = result = createValue();
-#else
-            lock (itemRef) 
-            {
-                // no need for the double check because this thread is the only one who can create the value
-                itemRef.Value = result = createValue();
-                Monitor.PulseAll(itemRef);
-            }
-#endif
-
             if (result is IDisposable disp && !ReferenceEquals(disp, this))
             {
                 if (disposalOrder == 0)
@@ -11721,16 +11643,7 @@ private ParameterServiceInfo(ParameterInfo p)
             }
 
             object result = null;
-#if SUPPORTS_SPIN_WAIT
             itemRef.Value = result = createValue(r);
-#else
-            lock (itemRef) 
-            {
-                // no need for the double check because this thread is the only one who can create the value
-                itemRef.Value = result = createValue(r);
-                Monitor.PulseAll(itemRef);
-            }
-#endif
 
             if (result is IDisposable disp && !ReferenceEquals(disp, this))
             {
@@ -11745,23 +11658,13 @@ private ParameterServiceInfo(ParameterInfo p)
 
         internal static object WaitForItemIsSet(ImMapEntry<object> itemRef)
         {
-#if SUPPORTS_SPIN_WAIT
-            Debug.WriteLine("SpinWaiting!!! ");
+            Debug.WriteLine("SpinWaiting!!! ...");
 
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
                 spinWait.SpinOnce();
 
-            Debug.WriteLine("SpinWaiting!!! Done");
-#else
-            Debug.WriteLine("LockWaiting!!! ");
-
-            lock (itemRef) 
-                while (itemRef.Value == NoItem)
-                    Monitor.Wait(itemRef);
-
-            Debug.WriteLine("Lock waiting!!! Done");
-#endif
+            Debug.WriteLine("SpinWaiting!!! is Done");
             return itemRef.Value;
         }
 
@@ -11795,16 +11698,7 @@ private ParameterServiceInfo(ParameterInfo p)
             }
 
             object result = null;
-#if SUPPORTS_SPIN_WAIT
             itemRef.Value = result = createValue(r);
-#else
-            lock (itemRef) 
-            {
-                // no need for the double check because this thread is the only one who can create the value
-                itemRef.Value = result = createValue(r);
-                Monitor.PulseAll(itemRef);
-            }
-#endif
 
             if (result is IDisposable disp && !ReferenceEquals(disp, this))
             {
@@ -11843,16 +11737,7 @@ private ParameterServiceInfo(ParameterInfo p)
             }
 
             object result = null;
-#if SUPPORTS_SPIN_WAIT
             itemRef.Value = result = createValue(resolveContext, expr, useFec);
-#else
-            lock (itemRef) 
-            {
-                // no need for the double check because this thread is the only one who can create the value
-                itemRef.Value = result = createValue(resolveContext, expr, useFec);
-                Monitor.PulseAll(itemRef);
-            }
-#endif
 
             if (result is IDisposable disp && !ReferenceEquals(disp, this))
                 if (disposalOrder == 0)
@@ -11905,17 +11790,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-#if SUPPORTS_SPIN_WAIT
             itemRef.Value = newItem;
-#else
-            lock (itemRef) 
-            {
-                // no need for the double check because this thread is the only one who can create the value
-                itemRef.Value = newItem;
-                Monitor.PulseAll(itemRef);
-            }
-#endif
-
             if (newItem is IDisposable disp && !ReferenceEquals(disp, this))
             {
                 if (disposalOrder == 0)
