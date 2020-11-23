@@ -6,6 +6,8 @@
 - [Thread Safety](#thread-safety)
   - [DryIoc is Thread-Safe](#dryioc-is-thread-safe)
   - [Locking is only used for reused service creation](#locking-is-only-used-for-reused-service-creation)
+    - [Update: Since DryIoc v4.5 `lock` is no longer used for creation of scoped and singleton services (except for the older platforms)](#update-since-dryioc-v45-lock-is-no-longer-used-for-creation-of-scoped-and-singleton-services-except-for-the-older-platforms)
+    - [Outdated: Locking is used for creation of scoped and singleton services](#outdated-locking-is-used-for-creation-of-scoped-and-singleton-services)
 
 
 ## DryIoc is Thread-Safe
