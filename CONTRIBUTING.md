@@ -47,7 +47,7 @@ If you found the problem with DryIoc:
 
 Before sending the Pull Request please build the solution with the `build.bat` located in the root folder.
 
-It will build all projects for in the Release configuration, will run unit tests and create the NuGet packages.
+It will build all projects for in the Release configuration, will run unit tests and [generate the documentation](#tldr).
 Make sure that there are no project build errors or failing tests.
 
 ### Develop in Visual Studio 2017+

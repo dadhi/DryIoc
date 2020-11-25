@@ -27,6 +27,11 @@ echo:
 echo:## Finished: DOCUMENTATION GENERATION ##
 echo:
 
+call build\NugetPack.bat
+if %ERRORLEVEL% neq 0 goto :error
+echo:
+echo:## Finished: PACKAGING ##
+echo:
 echo:## Finished: ALL Successful ##
 exit /b 0
 
