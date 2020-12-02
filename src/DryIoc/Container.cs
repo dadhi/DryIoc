@@ -11661,68 +11661,64 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Specifies to store single service instance per <see cref="Container"/>.</summary>
         public static readonly IReuse Singleton = new SingletonReuse();
 
-        /// <summary>Same as InCurrentScope. From now on will be the default name.</summary>
+        /// <summary>Scoped to the any scope - either with or without the name.</summary>
         public static readonly IReuse Scoped = new CurrentScopeReuse();
 
-        /// <summary>Same as InCurrentNamedScope. From now on will be the default name.</summary>
+        /// <summary>Scoped to the scope with the specified name only. 
+        /// The `name` may be null, so the service will be scoped to any scope.</summary>
         public static IReuse ScopedTo(object name) => new CurrentScopeReuse(name);
 
-        /// <summary>Specifies all the scope details</summary>
+        /// <summary>Scoped to the scope with the specified name only. 
+        /// The `name` may be null, so the service will be scoped to any scope. Specifies all the scope details</summary>
         public static IReuse ScopedTo(object name, bool scopedOrSingleton, int lifespan) =>
             new CurrentScopeReuse(name, scopedOrSingleton, lifespan);
 
-        // todo: Should be renamed to `ScopedToMany` to prevent overload ambiguity
-        /// <summary>Scoped to multiple names.</summary>
+        /// <summary>Scoped to the closest scope (in scope parent hierarchy) with the name from the specified names list. 
+        /// The `names` should no contain the `null`</summary>
         public static IReuse ScopedTo(params object[] names) =>
-            names.IsNullOrEmpty() ? Scoped
-            : names.Length == 1 ? ScopedTo(names[0]) 
-            : new CurrentScopeReuse(CompositeScopeName.Of(names));
+            names.IsNullOrEmpty() ? Scoped : names.Length == 1 ? ScopedTo(names[0]) : new CurrentScopeReuse(CompositeScopeName.Of(names));
 
-        // todo: Consider changing the name to remove the ambiguity
-        /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
+        /// <summary>Scoped to the scope created by the service with the specified `serviceType` and `serviceKey`,
+        /// The service should specify the creation of the scope in the registration call via `setup: Setup.With(opensResolutionScope: true)` argument.</summary>
         public static IReuse ScopedTo(Type serviceType = null, object serviceKey = null) =>
-            serviceType == null && serviceKey == null ? Scoped
-            : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
+            serviceType == null && serviceKey == null ? Scoped : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
 
-        /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
+        /// <summary>Scoped to the scope created by the service with the specified `TService` type and `serviceKey`,
+        /// The service should specify the creation of the scope in the registration call via `setup: Setup.With(opensResolutionScope: true)` argument.</summary>
         public static IReuse ScopedTo<TService>(object serviceKey = null) =>
             ScopedTo(typeof(TService), serviceKey);
 
-        /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Singleton"/></summary>
-        /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="InCurrentScope"/> reuse.</remarks>
+        /// <summary>The same as <see cref="Scoped"/> but in case of no scope available will fallback to the <see cref="Singleton"/> reuse</summary>
+        /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="Scoped"/> reuse.</remarks>
         public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(scopedOrSingleton: true);
 
         /// <summary>Obsolete: same as <see cref="Scoped"/>.</summary>
         [Obsolete("The same as Reuse.Scoped, please prefer to use Reuse.Scoped or the Reuse.ScopedTo to specify a bound service.")]
         public static readonly IReuse InResolutionScope = Scoped;
 
-        /// <summary>Obsolete: same as <see cref="Scoped"/>.</summary>
+        /// <summary>Obsolete: please use <see cref="Scoped"/> instead.</summary>
         public static readonly IReuse InCurrentScope = Scoped;
 
-        /// <summary>Returns current scope reuse with specific name to match with scope.
-        /// If name is not specified then function returns <see cref="InCurrentScope"/>.</summary>
-        /// <param name="name">(optional) Name to match with scope.</param>
-        /// <returns>Created current scope reuse.</returns>
+        /// <summary>Obsolete: please use `ScopedTo` instead.</summary>
         public static IReuse InCurrentNamedScope(object name = null) => ScopedTo(name);
 
-        /// <summary>Obsolete: please use ScopedTo instead.</summary>
+        /// <summary>Obsolete: please use `ScopedTo` instead.</summary>
         public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null) =>
             ScopedTo(assignableFromServiceType, serviceKey);
 
-        /// <summary>Obsolete: please use ScopedTo instead.</summary>
+        /// <summary>Obsolete: please use `ScopedTo` instead.</summary>
         public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null) =>
             ScopedTo<TAssignableFromServiceType>(serviceKey);
 
         /// <summary>Same as Scoped but requires <see cref="ThreadScopeContext"/>.</summary>
         public static readonly IReuse InThread = Scoped;
 
-        // todo: Minimize usage of name for scopes, it will be more performant. e.g. ASP.NET Core does not use one.
-        /// <summary>Special name that by convention recognized by <see cref="InWebRequest"/>.</summary>
+        /// <summary>A special name recognized by <see cref="InWebRequest"/>.
+        /// Note: The usage of the named scopes is the less performant than the unnamed ones. e.g. ASP.NET Core does not use the named scope.</summary>
         public static string WebRequestScopeName = "~WebRequestScopeName";
 
-        /// <summary>Obsolete: please prefer using <see cref="Reuse.Scoped"/> instead.
-        /// The named scope has performance drawback comparing to just a scope.
-        /// If you need to distinguish nested scope, give names to them instead of naming the top web request scope.</summary>
+        /// <summary>Obsolete: please prefer using `Scoped` without name instead. 
+        /// The usage of the named scopes is the less performant than the unnamed ones. e.g. ASP.NET Core does not use the named scope.</summary>
         public static readonly IReuse InWebRequest = ScopedTo(WebRequestScopeName);
 
 #region Implementation
