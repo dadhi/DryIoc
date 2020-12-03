@@ -8600,7 +8600,7 @@ namespace DryIoc
             return req;
         }
 
-        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored with request.</summary>
+        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
         public static Request Create(IContainer container, IServiceInfo serviceInfo,
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null)
         {
@@ -9135,9 +9135,9 @@ namespace DryIoc
 
             var isResolutionCall = false;
             if (isResolutionCall = IsNestedResolutionCall)
-                s.Append("Resolution call dependency ");
+                s.Append("resolution call dependency ");
             else if (isResolutionCall = IsResolutionRoot)
-                s.Append("Resolution root ");
+                s.Append("resolution root ");
 
             if (FactoryID != 0) // request is with resolved factory
             {
