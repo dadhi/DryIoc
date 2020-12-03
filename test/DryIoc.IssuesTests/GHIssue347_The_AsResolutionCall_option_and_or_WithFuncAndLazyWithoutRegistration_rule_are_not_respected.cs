@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue347_The_AsResolutionCall_option_and_or_WithFuncAndLazyWithoutRegistration_rule_are_not_respected
     {
-        [Test, Ignore("fixme")]
+        [Test]
         public void RecursiveDependencyIssue_with_asResolutionCall()
         {
             var container = new Container();
@@ -21,7 +21,7 @@ namespace DryIoc.IssuesTests
             Assert.AreSame(actual, serviceA);
         }
 
-        [Test, Ignore("fixme")]
+        [Test]
         public void RecursiveDependencyIssue_WithFuncAndLazyWithoutRegistration()
         {
             var container = new Container(rules => rules.WithFuncAndLazyWithoutRegistration());

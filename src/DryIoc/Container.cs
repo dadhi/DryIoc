@@ -5041,7 +5041,7 @@ namespace DryIoc
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
-            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
+            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
 
             // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
             // So that Func<Derived> may be used for Func<Base>
@@ -5087,7 +5087,7 @@ namespace DryIoc
             var serviceRequest = request.Push(serviceType, flags: RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
             var container = request.Container;
             var serviceExpr = container.Rules.FuncAndLazyWithoutRegistration && !isAction
-                ? Resolver.CreateResolutionExpression(serviceRequest)
+                ? Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true)
                 : container.ResolveFactory(serviceRequest)?.GetExpressionOrDefault(serviceRequest);
 
             if (serviceExpr == null)
@@ -7863,7 +7863,8 @@ namespace DryIoc
         private static readonly ConstantExpression _nullTypeExpr          = Constant(null, typeof(Type));
         private static readonly ConstantExpression _nullExpr              = Constant(null, typeof(object));
 
-        internal static Expression CreateResolutionExpression(Request request, bool opensResolutionScope = false)
+        internal static Expression CreateResolutionExpression(Request request, 
+            bool openResolutionScope = false, bool asResolutionCall = false)
         {
             if (request.Rules.DependencyResolutionCallExprs != null &&
                 request.Factory != null && !request.Factory.HasRuntimeState)
@@ -7889,7 +7890,7 @@ namespace DryIoc
                 : container.GetConstantExpression(details.ServiceKey, typeof(object));
 
             Expression resolverExpr;
-            if (!opensResolutionScope)
+            if (!openResolutionScope)
             {
                 resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             }
@@ -7909,9 +7910,9 @@ namespace DryIoc
             }
 
             var parentFlags = default(RequestFlags);
-            if (opensResolutionScope)
+            if (openResolutionScope)
                 parentFlags |= RequestFlags.OpensResolutionScope;
-            if ((request.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+            if (asResolutionCall || (request.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
                 parentFlags |= RequestFlags.StopRecursiveDependencyCheck;
 
             // Only parent is converted to be passed to Resolve.
@@ -9857,7 +9858,7 @@ namespace DryIoc
                         && request.GetActualServiceType() != typeof(void));
 
             if (getAsRsolutionCall)
-                return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
+                return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope, setup.AsResolutionCall);
 
             var cacheExpression = 
                 Caching != FactoryCaching.DoNotCache &&
@@ -9986,7 +9987,7 @@ namespace DryIoc
                             ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
                                 depCount, cacheEntry);
 
-                        return Resolver.CreateResolutionExpression(request, false);
+                        return Resolver.CreateResolutionExpression(request);
                     }
                 }
             }
@@ -11333,7 +11334,7 @@ namespace DryIoc
             if (// preventing recursion
                 (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 && !request.IsResolutionCall && 
                  (Setup.AsResolutionCall || Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
-                return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), Setup.OpenResolutionScope);
+                return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), Setup.OpenResolutionScope, Setup.AsResolutionCall);
 
             // First look for decorators if it is not already a decorator
             var serviceType = request.ServiceType;
