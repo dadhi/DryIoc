@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.5.2 Bug-fix release / 2020-12-03
+
+- fixed: #347 The AsResolutionCall option and/or WithFuncAndLazyWithoutRegistration rule are not respected
+
 ## v4.5.1 Bug-fix release / 2020-10-28
 
 - fixed: #332 Delegate returning null throws exception RegisteredDelegateResultIsNotOfServiceType
