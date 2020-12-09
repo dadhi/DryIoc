@@ -43,12 +43,12 @@ namespace DryIoc.MefAttributedModel
     public static class AttributedModel
     {
         /// <summary>Maps the supported reuse types to respective DryIoc reuse.</summary>
-        public static readonly ImHashMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes =
-            ImHashMap<ReuseType, Func<object, IReuse>>.Empty
-            .AddOrUpdate(ReuseType.Transient, _ => Reuse.Transient)
-            .AddOrUpdate(ReuseType.Singleton, _ => Reuse.Singleton)
-            .AddOrUpdate(ReuseType.Scoped, Reuse.ScopedTo)
-            .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.Scoped)
+        public static readonly ImHashMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes = ImHashMap<ReuseType, Func<object, IReuse>>
+            .Empty
+            .AddOrUpdate(ReuseType.Transient,         _ => Reuse.Transient)
+            .AddOrUpdate(ReuseType.Singleton,         _ => Reuse.Singleton)
+            .AddOrUpdate(ReuseType.Scoped,            n => n == null ? Reuse.Scoped : n is object[] names ? Reuse.ScopedTo(names) : Reuse.ScopedTo(n))
+            .AddOrUpdate(ReuseType.ResolutionScope,   _ => Reuse.Scoped)
             .AddOrUpdate(ReuseType.ScopedOrSingleton, _ => Reuse.ScopedOrSingleton);
 
         private static readonly PropertiesAndFieldsSelector _getImportedPropertiesAndFields =
@@ -523,8 +523,7 @@ namespace DryIoc.MefAttributedModel
             };
         }
 
-        private static bool CanBeExported(Type type) =>
-            type.IsClass() && !type.IsCompilerGenerated();
+        private static bool CanBeExported(Type type) => type.IsClass() && !type.IsCompilerGenerated();
 
         private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute) => 
             new ReuseInfo { ReuseType = attribute.CreationPolicy == CreationPolicy.NonShared ? ReuseType.Transient : ReuseType.Singleton };
@@ -536,13 +535,16 @@ namespace DryIoc.MefAttributedModel
                 return null; // unspecified reuse, decided by container rules
 
             if (reuseInfo.CustomReuseType != null)
-                return reuseInfo.ScopeName == null
-                    ? (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType)
-                    : (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType, reuseInfo.ScopeName);
+                return 
+                    reuseInfo.ScopeName == null && (reuseInfo.ScopeNames == null || reuseInfo.ScopeNames.Length == 0) ?
+                        (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType) :
+                    reuseInfo.ScopeName != null ? 
+                        (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType, reuseInfo.ScopeName) :
+                        (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType, reuseInfo.ScopeNames);
 
             return SupportedReuseTypes.GetValueOrDefault(reuseInfo.ReuseType)
                 .ThrowIfNull(Error.UnsupportedReuseType, reuseInfo.ReuseType)
-                .Invoke(reuseInfo.ScopeName);
+                .Invoke(reuseInfo.ScopeName ?? (object)reuseInfo.ScopeNames);
         }
 
         #region Rules
@@ -723,7 +725,7 @@ namespace DryIoc.MefAttributedModel
 
                 var reuseAttr = GetSingleAttributeOrDefault<ReuseAttribute>(attributes);
                 var reuse = reuseAttr == null ? null
-                    : GetReuse(new ReuseInfo { ReuseType = reuseAttr.ReuseType, ScopeName = reuseAttr.ScopeName });
+                    : GetReuse(new ReuseInfo { ReuseType = reuseAttr.ReuseType, ScopeName = reuseAttr.ScopeName, ScopeNames = reuseAttr.ScopeNames });
 
                 var impl = import.ConstructorSignature == null ? null
                     : Made.Of(t => t.GetConstructorOrNull(args: import.ConstructorSignature));
@@ -781,8 +783,8 @@ namespace DryIoc.MefAttributedModel
                 {
                     var reuseAttr = (ReuseAttribute)attribute;
                     info.Reuse = reuseAttr.CustomReuseType == null
-                        ? new ReuseInfo { ReuseType = reuseAttr.ReuseType, ScopeName = reuseAttr.ScopeName }
-                        : new ReuseInfo { CustomReuseType = reuseAttr.CustomReuseType, ScopeName = reuseAttr.ScopeName };
+                        ? new ReuseInfo { ReuseType       = reuseAttr.ReuseType,       ScopeName = reuseAttr.ScopeName, ScopeNames = reuseAttr.ScopeNames }
+                        : new ReuseInfo { CustomReuseType = reuseAttr.CustomReuseType, ScopeName = reuseAttr.ScopeName, ScopeNames = reuseAttr.ScopeNames };
                 }
                 else if (attribute is OpenResolutionScopeAttribute)
                 {
@@ -1694,18 +1696,19 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Name of the scope to pass to reuse factory from <see cref="AttributedModel.SupportedReuseTypes"/>.</summary>
         public string ScopeName;
 
+        /// <summary>The object names of the scope. Maybe overridden by <see cref="ScopeName"/></summary>
+        public object[] ScopeNames;
+
         /// <summary>Custom reuse type, overrides the <see cref="ReuseType"/>.</summary>
         public Type CustomReuseType;
 
         /// <summary>Compares with another info for equality.</summary>
-        public override bool Equals(object obj)
-        {
-            var other = obj as ReuseInfo;
-            return other != null
-                && other.ReuseType == ReuseType
-                && other.ScopeName == ScopeName
-                && other.CustomReuseType == CustomReuseType;
-        }
+        public override bool Equals(object obj) =>
+            obj is ReuseInfo other
+            && other.ReuseType       == ReuseType
+            && other.CustomReuseType == CustomReuseType
+            && other.ScopeName       == ScopeName
+            && (other.ScopeNames == null && ScopeNames == null || (other.ScopeNames?.SequenceEqual(ScopeNames) ?? false));
 
         /// <summary>Converts info to the C# code representation.</summary>
         public StringBuilder ToCode(StringBuilder code)
@@ -1716,6 +1719,8 @@ namespace DryIoc.MefAttributedModel
 
             if (ScopeName != null)
                 code = code.Append(", ScopeName = ").AppendString(ScopeName);
+            else if (ScopeNames != null && ScopeNames.Length > 0)
+                code = code.Append(", ScopeNames = ").AppendMany(ScopeNames);
 
             return code.Append(" }");
         }

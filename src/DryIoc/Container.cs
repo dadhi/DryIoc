@@ -12501,7 +12501,6 @@ namespace DryIoc
         public static IReuse ScopedTo(object name, bool scopedOrSingleton, int lifespan) =>
             new CurrentScopeReuse(name, scopedOrSingleton, lifespan);
 
-        // todo: Should be renamed to `ScopedToMany` to prevent overload ambiguity
         /// <summary>Scoped to multiple names.</summary>
         public static IReuse ScopedTo(params object[] names) =>
             names.IsNullOrEmpty() ? Scoped
