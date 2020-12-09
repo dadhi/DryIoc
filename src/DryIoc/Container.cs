@@ -4402,16 +4402,10 @@ namespace DryIoc
         /// <summary>Excluding open-generic registrations, cause you need to provide type arguments to actually create these types.</summary>
         public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
 
-        // todo: Should we have a version which is throws by default?
-        // todo: Should we break it by making the condition a mandatory? - because it the pass to avoid problems of validating the unnecessary dependencies
-        /// <summary>Helps to find potential problems in service registration setup.
-        /// Method tries to resolve the specified registrations, collects exceptions, and
-        /// returns them to user. Does not create any actual service objects.
-        /// You must specify <paramref name="condition"/> to define your resolution roots,
-        /// otherwise container will try to resolve all registrations, 
-        /// which usually is not realistic case to validate.</summary>
-        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container,
-            Func<ServiceRegistrationInfo, bool> condition = null)
+        /// <summary>Helps to find potential problems in service registration setup. Method tries to resolve the specified registrations, collects exceptions, 
+        /// and returns them to user. Does not create any actual service objects. You must specify <paramref name="condition"/> to define your resolution roots,
+        /// otherwise container will try to resolve all registrations, which usually is not realistic case to validate.</summary>
+        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, Func<ServiceRegistrationInfo, bool> condition = null)
         {
             var noOpenGenericsWithCondition = condition == null 
                 ? (Func<ServiceRegistrationInfo, bool>)DefaultValidateCondition 
@@ -4424,14 +4418,19 @@ namespace DryIoc
             return container.Validate(roots);
         }
 
+        /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
+        public static void ValidateAndThrow(this IContainer container, Func<ServiceRegistrationInfo, bool> condition = null)
+        {
+            var errors = container.Validate(condition);
+            if (!errors.IsNullOrEmpty())
+                Throw.Many(Error.ValidateFoundErrors, errors.Map(x => x.Value));
+        }
+
         /// <summary>Helps to find potential problems when resolving the <paramref name="roots"/>.
-        /// Method will collect the exceptions when resolving or injecting the specific root.
-        /// Does not create any actual service objects.
-        /// You must specify <paramref name="roots"/> to define your resolution roots,
-        /// otherwise container will try to resolve all registrations, 
-        /// which usually is not realistic case to validate. </summary>
-        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(
-            this IContainer container, params ServiceInfo[] roots)
+        /// Method will collect the exceptions when resolving or injecting the specific root. Does not create any actual service objects.
+        /// You must specify <paramref name="roots"/> to define your resolution roots, otherwise container will try to resolve all registrations, 
+        /// which usually is not realistic case to validate.</summary>
+        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, params ServiceInfo[] roots)
         {
             var validatingContainer = container.With(rules => rules.ForValidate());
 
@@ -4455,6 +4454,31 @@ namespace DryIoc
             }
 
             return errors?.ToArray() ?? ArrayTools.Empty<KeyValuePair<ServiceInfo, ContainerException>>();
+        }
+
+        /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
+        public static void ValidateAndThrow(this IContainer container, params ServiceInfo[] roots)
+        {
+            var errors = container.Validate(roots);
+            if (!errors.IsNullOrEmpty())
+                Throw.Many(Error.ValidateFoundErrors, errors.Map(x => x.Value));
+        }
+
+        /// <summary>Helps to find potential problems in service registration setup by trying to resolve the <paramref name="serviceTypes"/> and 
+        /// returning the found errors. This method does not throw.</summary>
+        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, params Type[] serviceTypes)
+        {
+            if (serviceTypes.IsNullOrEmpty())
+                Throw.It(Error.NoServiceTypesToValidate, container);
+            return container.Validate(serviceTypes.Map(t => ServiceInfo.Of(t)));
+        }
+
+        /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
+        public static void ValidateAndThrow(this IContainer container, params Type[] serviceTypes)
+        {
+            var errors = container.Validate(serviceTypes);
+            if (!errors.IsNullOrEmpty())
+                Throw.Many(Error.ValidateFoundErrors, errors.Map(x => x.Value));
         }
 
         /// <summary>Re-constructs the whole request chain as request creation expression.</summary>
@@ -5735,6 +5759,18 @@ namespace DryIoc
         public Rules WithoutThrowIfDependencyHasShorterReuseLifespan() =>
             WithSettings(_settings & ~Settings.ThrowIfDependencyHasShorterReuseLifespan);
 
+        /// <summary><see cref="WithThrowIfScopedOrSingletonHasTransientDependency"/>.</summary>
+        public bool ThrowIfScopedOrSingletonHasTransientDependency =>
+            (_settings & Settings.ThrowIfScopedOrSingletonHasTransientDependency) != 0;
+
+        /// <summary>Turns On throwing the exception when Singleton or Scope service has a Transient dependency</summary>
+        public Rules WithThrowIfScopedOrSingletonHasTransientDependency() =>
+            WithSettings(_settings | Settings.ThrowIfScopedOrSingletonHasTransientDependency);
+
+        /// <summary>Turns Off throwing the exception when Singleton or Scope service has a Transient dependency (the default)</summary>
+        public Rules WithoutThrowIfScopedOrSingletonHasTransientDependency() =>
+            WithSettings(_settings & ~Settings.ThrowIfScopedOrSingletonHasTransientDependency);
+
         /// <summary><see cref="WithoutThrowOnRegisteringDisposableTransient"/></summary>
         public bool ThrowOnRegisteringDisposableTransient =>
             (_settings & Settings.ThrowOnRegisteringDisposableTransient) != 0;
@@ -6038,6 +6074,7 @@ namespace DryIoc
             UseDecorateeReuseForDecorators = 1 << 20,
             UsedForValidation = 1 << 21, // informational flag, will appear in exceptions during validation
             ServiceProviderGetServiceShouldThrowIfUnresolved = 1 << 22,
+            ThrowIfScopedOrSingletonHasTransientDependency = 1 << 23,
             //ScopedOrSingletonShouldApplySingletonForResolutionRootOnly = ??? // todo: @consider (see #285) that what it should be initially
         }
 
@@ -9010,9 +9047,9 @@ namespace DryIoc
 
                 var reuseLifespan = reuse?.Lifespan ?? 0;
 
-                var checkCaptiveDependency = !skipCaptiveDependencyCheck && 
-                    Rules.ThrowIfDependencyHasShorterReuseLifespan && reuse != null && reuseLifespan != 0 && 
-                    !factory.Setup.OpenResolutionScope;
+                var checkCaptiveDependency = !skipCaptiveDependencyCheck && !factory.Setup.OpenResolutionScope &&
+                    (Rules.ThrowIfDependencyHasShorterReuseLifespan       && reuseLifespan >  0 ||
+                     Rules.ThrowIfScopedOrSingletonHasTransientDependency && reuseLifespan == 0);
 
                 var scopedOrSingleton = checkCaptiveDependency &&
                     (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true;
@@ -12905,6 +12942,9 @@ namespace DryIoc
         /// <summary>Simplifies the access to the error name.</summary>
         public string ErrorName => DryIoc.Error.NameOf(Error);
 
+        /// <summary>Many collected exceptions</summary>
+        public readonly ContainerException[] CollectedExceptions;
+
         /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and its message,
         /// optionally with <paramref name="innerException"/> exception.</summary>
         public static ContainerException Of(ErrorCheck errorCheck, int errorCode,
@@ -12920,6 +12960,11 @@ namespace DryIoc
         /// <summary>Prints argument for formatted message.</summary> <param name="arg">To print.</param> <returns>Printed string.</returns>
         protected static string Print(object arg) =>
             arg == null ? string.Empty : new StringBuilder().Print(arg).ToString();
+
+        /// <summary>Collects many exceptions.</summary>
+        public ContainerException(int error, ContainerException[] exceptions) 
+            : this(error, GetMessage(ErrorCheck.CollectedExceptions, error), null) =>
+            CollectedExceptions = exceptions;
 
         /// <summary>Creates exception with message describing cause and context of error.</summary>
         public ContainerException(int error, string message)
@@ -13150,6 +13195,10 @@ namespace DryIoc
             FoundNoRootsToValidate = Of(
                 "No roots to Validate found. Check the `condition` passed to Validate method for container: {0}" + NewLine +
                 "You may also examine all container registrations via `container.container.GetServiceRegistrations()` method."),
+            NoServiceTypesToValidate = Of(
+                "The `serviceTypes` passed to Validate method is null or empty. Please pass the type(s) you want to Validate."),
+            ValidateFoundErrors = Of(
+                "Validate found the errors, please check the ContainerException.CollectedExceptions for details."),
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine +
                 "{0}")
@@ -13166,6 +13215,7 @@ namespace DryIoc
 
         /// <summary>Returns the name of error with the provided error code.</summary>
         public static string NameOf(int error) => 
+            error == -1 ? "ErrorCheck" :
             typeof(Error).GetTypeInfo().DeclaredFields
                 .Where(f => f.FieldType == typeof(int)).Where((_, i) => i == error + 1)
                 .FirstOrDefault()?.Name;
@@ -13191,6 +13241,8 @@ namespace DryIoc
         TypeIsNotOfType,
         /// <summary>Invoked operation throws, it is source of inner exception.</summary>
         OperationThrows,
+        /// <summary>Just stores many collected exceptions.</summary>
+        CollectedExceptions,
     }
 
     /// <summary>Enables more clean error message formatting and a bit of code contracts.</summary>
@@ -13198,13 +13250,14 @@ namespace DryIoc
     {
         private static string[] CreateDefaultMessages()
         {
-            var messages = new string[(int)ErrorCheck.OperationThrows + 1];
-            messages[(int)ErrorCheck.Unspecified]      = "The error reason is unspecified, which is bad thing.";
-            messages[(int)ErrorCheck.InvalidCondition] = "Argument {0} of type {1} has invalid condition.";
-            messages[(int)ErrorCheck.IsNull]           = "Argument of type {0} is null.";
-            messages[(int)ErrorCheck.IsNotOfType]      = "Argument {0} is not of type {1}.";
-            messages[(int)ErrorCheck.TypeIsNotOfType]  = "Type argument {0} is not assignable from type {1}.";
-            messages[(int)ErrorCheck.OperationThrows]  = "Invoked operation throws the inner exception {0}.";
+            var messages = new string[(int)ErrorCheck.CollectedExceptions + 1];
+            messages[(int)ErrorCheck.Unspecified]          = "The error reason is unspecified, which is bad thing.";
+            messages[(int)ErrorCheck.InvalidCondition]     = "Argument {0} of type {1} has invalid condition.";
+            messages[(int)ErrorCheck.IsNull]               = "Argument of type {0} is null.";
+            messages[(int)ErrorCheck.IsNotOfType]          = "Argument {0} is not of type {1}.";
+            messages[(int)ErrorCheck.TypeIsNotOfType]      = "Type argument {0} is not assignable from type {1}.";
+            messages[(int)ErrorCheck.OperationThrows]      = "Invoked operation throws the inner exception {0}.";
+            messages[(int)ErrorCheck.CollectedExceptions]  = "Please check the `ContainerException.CollectedExceptions` for the details";
             return messages;
         }
 
@@ -13290,13 +13343,17 @@ namespace DryIoc
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
 
-        /// Throws if contidion is true, otherwise returns the `default(T)` value
+        /// <summary>Throws if contidion is true, otherwise returns the `default(T)` value</summary>
         public static T For<T>(bool throwCondition, int error, 
             object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition) return default(T);
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
+
+        /// <summary>Throws the one with manyh collected exceptions</summary>
+        public static void Many(int error, params ContainerException[] errors) => 
+            throw new ContainerException(error, errors);
     }
 
     /// <summary>Called from the generated code to check if WeakReference.Value is GCed.</summary>
