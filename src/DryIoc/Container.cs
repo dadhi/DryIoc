@@ -985,31 +985,40 @@ namespace DryIoc
 
         /// <inheritdoc />
         public IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope) =>
-            With(_parent, rules, scopeContext, registrySharing, singletonScope, _ownCurrentScope);
+            With(_parent, rules, scopeContext, registrySharing, singletonScope, _ownCurrentScope, null);
 
         /// <inheritdoc />
         public IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
-            RegistrySharing registrySharing, IScope singletonScope, IScope curentScope)
+            RegistrySharing registrySharing, IScope singletonScope, IScope currentScope) =>
+            With(_parent, rules, scopeContext, registrySharing, singletonScope, currentScope, null);
+
+        /// <inheritdoc />
+        public IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
+            RegistrySharing registrySharing, IScope singletonScope, IScope currentScope,
+            IsRegistryChangePermitted? isRegistryChangePermitted)
         {
             ThrowIfContainerDisposed();
 
             var registry =
-                registrySharing == RegistrySharing.Share ? _registry :
-                registrySharing == RegistrySharing.CloneButKeepCache ? Ref.Of(_registry.Value)
-                : Ref.Of(_registry.Value.WithoutCache());
+                registrySharing == RegistrySharing.Share ? 
+                    _registry :
+                registrySharing == RegistrySharing.CloneButKeepCache 
+                    ? Ref.Of(_registry.Value)
+                    : Ref.Of(_registry.Value.WithoutCache());
+
+            if (isRegistryChangePermitted != null &&
+                isRegistryChangePermitted.Value != registry.Value.IsChangePermitted)
+                registry = Ref.Of(registry.Value.WithIsChangePermitted(isRegistryChangePermitted.Value));
 
             return new Container(rules ?? Rules, registry, singletonScope ?? NewSingletonScope(), scopeContext,
-                curentScope ?? _ownCurrentScope, _disposed, _disposeStackTrace, parent ?? _parent);
+                currentScope ?? _ownCurrentScope, _disposed, _disposeStackTrace, parent ?? _parent);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
-        /// <param name="ignoreInsteadOfThrow">(optional) Controls what to do with the next registration: ignore or throw exception.
-        /// Throws exception by default.</param>
+        /// <param name="ignoreInsteadOfThrow">(optional) Controls what to do with the next registration: ignore or throw exception. Throws exception by default.</param>
         public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false) =>
-            new Container(Rules,
-                Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow)),
-                _singletonScope, _scopeContext, _ownCurrentScope,
-                _disposed, _disposeStackTrace, _parent);
+            With(_parent, Rules, _scopeContext, RegistrySharing.Share, _singletonScope, _ownCurrentScope, 
+                ignoreInsteadOfThrow ? IsRegistryChangePermitted.Ignored : IsRegistryChangePermitted.Error);
 
         /// <inheritdoc />
         public bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey)
@@ -2119,23 +2128,22 @@ namespace DryIoc
                     entry.Value.ScopeNameOrDependencyCount = scoped.Name ?? ExpressionCacheSlot.NoNameForScoped;
             }
 
-            private enum IsChangePermitted { Permitted, Error, Ignored }
-            private readonly IsChangePermitted _isChangePermitted;
+            internal readonly IsRegistryChangePermitted IsChangePermitted;
 
             private Registry(ImMap<ImMap.KValue<Type>> wrapperFactories = null)
                 : this(ImMap<ImMap.KValue<Type>>.Empty, ImMap<ImMap.KValue<Type>>.Empty, wrapperFactories ?? ImMap<ImMap.KValue<Type>>.Empty,
                     null, null, null, // caches are initialized to `null` to quickly check that they 
-                    IsChangePermitted.Permitted)
+                    IsRegistryChangePermitted.Permitted)
             { }
 
             private Registry(
                 ImMap<ImMap.KValue<Type>> services,
                 ImMap<ImMap.KValue<Type>> decorators,
                 ImMap<ImMap.KValue<Type>> wrappers,
-                ImMap<ImMap.KValue<Type>>[] defaultFactoryCache,
-                ImMap<ImMap.KValue<Type>>[] keyedFactoryCache,
+                ImMap<ImMap.KValue<Type>>[]  defaultFactoryCache,
+                ImMap<ImMap.KValue<Type>>[]  keyedFactoryCache,
                 ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
-                IsChangePermitted isChangePermitted)
+                IsRegistryChangePermitted isChangePermitted)
             {
                 Services   = services;
                 Decorators = decorators;
@@ -2143,28 +2151,28 @@ namespace DryIoc
                 DefaultFactoryCache = defaultFactoryCache;
                 KeyedFactoryCache = keyedFactoryCache;
                 FactoryExpressionCache = factoryExpressionCache;
-                _isChangePermitted = isChangePermitted;
+                IsChangePermitted = isChangePermitted;
             }
 
             public Registry WithoutCache() =>
-                new Registry(Services, Decorators, Wrappers, null, null, null, _isChangePermitted);
+                new Registry(Services, Decorators, Wrappers, null, null, null, IsChangePermitted);
 
             internal Registry WithServices(ImMap<ImMap.KValue<Type>> services) =>
                 services == Services ? this :
                 new Registry(services, Decorators, Wrappers,
                     // Using Copy is fine when you have only the registrations because the caches will be null and no actual copy will be done.
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
-                    _isChangePermitted);
+                    IsChangePermitted);
 
             private Registry WithDecorators(ImMap<ImMap.KValue<Type>> decorators) =>
                 decorators == Decorators ? this :
                 new Registry(Services, decorators, Wrappers, 
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
 
             private Registry WithWrappers(ImMap<ImMap.KValue<Type>> wrappers) =>
                 wrappers == Wrappers ? this :
                 new Registry(Services, Decorators, wrappers, 
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
             {
@@ -2183,8 +2191,8 @@ namespace DryIoc
 
             public Registry Register(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
             {
-                if (_isChangePermitted != IsChangePermitted.Permitted)
-                    return _isChangePermitted == IsChangePermitted.Ignored ? this
+                if (IsChangePermitted != IsRegistryChangePermitted.Permitted)
+                    return IsChangePermitted == IsRegistryChangePermitted.Ignored ? this
                         : Throw.For<Registry>(Error.NoMoreRegistrationsAllowed,
                             serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factory);
 
@@ -2400,7 +2408,7 @@ namespace DryIoc
 
                 var newServices = services.AddOrUpdate(serviceTypeHash, serviceType, newEntry);
                 var newRegistry = new Registry(newServices, Decorators, Wrappers,
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
 
                 if (oldEntry != null)
                 {
@@ -2467,7 +2475,7 @@ namespace DryIoc
                 var newServices = services.AddOrUpdate(serviceTypeHash, serviceType, newEntry);
                 var newRegistry = new Registry(newServices, Decorators, Wrappers,
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
-                    _isChangePermitted);
+                    IsChangePermitted);
 
                 if (oldEntry != null && ifAlreadyRegistered == IfAlreadyRegistered.Replace &&
                     oldEntry is FactoriesEntry updatedOldFactories &&
@@ -2480,8 +2488,8 @@ namespace DryIoc
             // todo: optimize allocations away
             public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
             {
-                if (_isChangePermitted != IsChangePermitted.Permitted)
-                    return _isChangePermitted == IsChangePermitted.Ignored ? this
+                if (IsChangePermitted != IsRegistryChangePermitted.Permitted)
+                    return IsChangePermitted == IsRegistryChangePermitted.Ignored ? this
                         : Throw.For<Registry>(Error.NoMoreUnregistrationsAllowed,
                             serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factoryType);
 
@@ -2655,10 +2663,8 @@ namespace DryIoc
                 }
             }
 
-            public Registry WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow) =>
-                new Registry(Services, Decorators, Wrappers,
-                    DefaultFactoryCache, KeyedFactoryCache, FactoryExpressionCache,
-                    ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error);
+            public Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
+                new Registry(Services, Decorators, Wrappers, DefaultFactoryCache, KeyedFactoryCache, FactoryExpressionCache, isChangePermitted);
         }
 
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
@@ -4103,6 +4109,15 @@ namespace DryIoc
             container.With(container.Rules, container.ScopeContext,
                 preserveCache ? RegistrySharing.CloneButKeepCache : RegistrySharing.CloneAndDropCache,
                 container.SingletonScope);
+
+        /// <summary>Shares the setup with original container but copies the registrations, so the new registrations
+        /// won't be visible in original. Registrations include decorators and wrappers as well.
+        /// You may control <see cref="IsRegistryChangePermitted" /> behavior and opt-in for the keeping or cloning the cache.</summary>
+        public static IContainer WithRegistrationsCopy(this IContainer container, IsRegistryChangePermitted isRegistryChangePermitted, 
+            bool preserveCache = false) =>
+            container.With(container.Parent, container.Rules, container.ScopeContext,
+                preserveCache ? RegistrySharing.CloneButKeepCache : RegistrySharing.CloneAndDropCache,
+                container.SingletonScope, container.OwnCurrentScope, isRegistryChangePermitted);
 
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="Rules.PropertiesAndFields"/> rules set per container,
@@ -7967,6 +7982,17 @@ namespace DryIoc
         AsLazyEnumerable,
         /// <summary>Fixed array of item at time of resolve, newly registered/removed services won't be listed.</summary>
         AsFixedArray
+    }
+
+    /// <summary>Controls the registry change</summary>
+    public enum IsRegistryChangePermitted
+    { 
+        /// <summary>Change is permitted - the default setting</summary>
+        Permitted,
+        /// <summary>Throws the error for the new registration</summary>
+        Error,
+        /// <summary>Ignores the next registration</summary>
+        Ignored 
     }
 
     /// <summary>Provides information required for service resolution: service type
@@ -12735,20 +12761,28 @@ namespace DryIoc
         /// <summary>Represents scope bound to container itself, and not an ambient (context) thingy.</summary>
         IScope OwnCurrentScope { get; }
 
-        // todo: replace with the below overload with more parameters
+        // todo: @api replace with the below overload with more parameters
         /// <summary>Creates new container from the current one by specifying the listed parameters.
         /// If the null or default values are provided then the default or new values will be applied.
         /// Nothing will be inherited from the current container.
         /// If you want to inherit something you need to provide it as parameter.</summary>
         IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope);
 
+        // todo: @api replace with the below overload with more parameters
         /// <summary>Creates new container from the current one by specifying the listed parameters.
         /// If the null or default values are provided then the default or new values will be applied.
-        /// Nothing will be inherited from the current container.
-        /// If you want to inherit something you need to provide it as parameter.</summary>
+        /// Nothing will be inherited from the current container. If you want to inherit something you need to provide it as parameter.</summary>
         IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
             RegistrySharing registrySharing, IScope singletonScope, IScope currentScope);
 
+        /// <summary>Creates new container from the current one by specifying the listed parameters.
+        /// If the null or default values are provided then the default or new values will be applied.
+        /// Nothing will be inherited from the current container. If you want to inherit something you need to provide it as parameter.</summary>
+        IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
+            RegistrySharing registrySharing, IScope singletonScope, IScope currentScope, 
+            IsRegistryChangePermitted? isRegistryChangePermitted);
+
+        // todo: @api no need for the interface definition because the it may be implemented (already) in terms of With as extension method
         /// <summary>Produces new container which prevents any further registrations.</summary>
         /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with registrations: ignore or throw exception.
         /// Throws exception by default.</param>
