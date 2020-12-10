@@ -889,10 +889,15 @@ class Reuse_lifespan_mismatch_error_suppress
 }/*md
 ```
 
-Another way to prevent the exception is wrapping a shorter reused dependency in a `Func` [wrapper](Wrappers). 
-Here dependency user decides when to create a dependency value and to start its lifetime, possibly creating multiple values. 
+**Note:** The `Transient` reuse as stated above is not a "real" reuse (because it will be recreated every time its used), 
+so you won't get the captive dependency exceptions for the `Transient` dependency inside the `Scoped` or `Singleton` services by default. 
+But wou may to disagree with the `Rules.WithThrowIfScopedOrSingletonHasTransientDependency`.
+
+Another way to prevent the exception is wrapping a shorter reused dependency in a `Func` or `Lazy` [wrapper](Wrappers). 
+The user may decide to delay the creation of the dependency via `Lazy` or create multiple dependency values via `Func` 
+and be fully in control of their lifetime.
 ```cs md*/
-class Avoiding_reuse_lifespan_mismatch_for_Lazy_dependency
+class Avoiding_reuse_lifespan_mismatch_for_Func_or_Lazy_dependency
 {
     [Test]
     public void Example()

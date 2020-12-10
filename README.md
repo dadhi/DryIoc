@@ -1,7 +1,7 @@
 DryIoc is fast, small, full-featured IoC Container for .NET
 ===========================================================
 
-<img src="./logo/logo.svg" alt="logo" width="200px"/>
+<img src="./logo/logo.svg" alt="logo" width="100px"/>
 
 [![Windows build](https://ci.appveyor.com/api/projects/status/8eypvhn6ae70vk09?svg=true)](https://ci.appveyor.com/project/MaksimVolkau/dryioc-qt8fa)
 [![Linux and MacOS build](https://travis-ci.org/dadhi/ImTools.svg?branch=master)](https://travis-ci.org/dadhi/ImTools)
