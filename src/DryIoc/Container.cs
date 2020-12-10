@@ -1313,8 +1313,8 @@ namespace DryIoc
             if (selectedFactory == null)
                 return null;
 
-            // Issue: #508
-            if (factories.Length > 1)
+            // BitBucket issue: #508, GH #350
+            if (request.IsResolutionCall && factories.Length > 1)
             {
                 var i = 0;
                 while (i < matchedFactories.Length && matchedFactories[i].Value.FactoryID != selectedFactory.FactoryID)
@@ -14568,12 +14568,12 @@ namespace DryIoc.Messages
     /// Message handler middleware to handle the message and pass the result to the next middleware
     public interface IMessageMiddleware<in M, R>
     {
-        /// `0` means the default registration order,
+        /// <summary>`0` means the default registration order,
         /// lesser numbers incuding the `-1`, `-2` mean execute as a first,
-        /// bigger numbers mean execute as a last
+        /// bigger numbers mean execute as a last</summary>
         int RelativeOrder { get; }
 
-        /// Handles message and passes to the next middleware
+        /// <summary>Handles message and passes to the next middleware</summary>
         Task<R> Handle(M message, CancellationToken cancellationToken, Func<Task<R>> nextMiddleware);
     }
 
@@ -14632,20 +14632,22 @@ namespace DryIoc.Messages
         }
     }
 
-    /// A subject
+    // todo: @feature add SendToAll with the reducing the results
+    // todo: @feature add NotifyAll without waiting for results
+    /// <summary>The central mediator entry-point</summary>
     public class MessageMediator
     {
         private readonly IResolver _resolver;
 
-        /// Constructs with resolver
+        /// <summary>Constructs the mediator</summary>
         public MessageMediator(IResolver resolver) => 
             _resolver = resolver;
 
-        /// Sends message with response to resolved handlers
+        /// <summary>Sends the message with response to the resolved Single handler</summary>
         public Task<R> Send<M, R>(M message, CancellationToken cancellationToken) where M : IMessage<R> =>
             _resolver.Resolve<IMessageHandler<M, R>>().Handle(message, cancellationToken);
 
-        /// Sends message with empty response to resolved handlers
+        /// <summary>Sends the message with empty response to resolved Single handler</summary>
         public Task Send<M>(M message, CancellationToken cancellationToken) where M : IMessage<EmptyResponse> =>
             _resolver.Resolve<IMessageHandler<M, EmptyResponse>>().Handle(message, cancellationToken);
     }
