@@ -4129,25 +4129,38 @@ namespace DryIoc
         /// <summary>The default key for services registered into container created by <see cref="CreateFacade"/></summary>
         public const string FacadeKey = "@facade"; // todo: use invisible keys #555
 
-        /// <summary>Allows to register new specially keyed services which will facade the same default service,
-        /// registered earlier. May be used to "override" registrations when testing the container</summary>
-        public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
-            container.With(rules => rules
-                .WithDefaultRegistrationServiceKey(facadeKey)
-                .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey)));
+        /// <summary>Uses the provided or the default <see cref="FacadeKey" /> to tweak the rules
+        /// to use with the `CreateFacade` methods</summary>
+        public static Rules WithFacadeRules(this Rules rules, string facadeKey = FacadeKey) =>
+            rules.WithDefaultRegistrationServiceKey(facadeKey)
+                 .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey));
+
 
         /// <summary>Allows to register new specially keyed services which will facade the same default service,
         /// registered earlier. May be used to "override" registrations when testing the container</summary>
-        public static IContainer CreateFacadeAndDetachScope(this IContainer container, string facadeKey = FacadeKey) =>
-            container.With(rules => rules
-                .WithDefaultRegistrationServiceKey(facadeKey)
-                .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey)));
+        public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
+            container.With(rules => rules.WithFacadeRules(facadeKey));
+
+        /// <summary>Allows to register new specially keyed services which will facade the same default service,
+        /// registered earlier. May be used to "override" registrations when testing the container.
+        /// Note: Facade will clone the source container singleton and open scope (if any) so
+        /// that you may safely disposing the facade without disposing the source container scopes.</summary>
+        public static IContainer CreateFacadeAndCloneScopes(this IContainer container, string facadeKey = FacadeKey) =>
+            container.With(
+                container.Parent,
+                container.Rules.WithFacadeRules(facadeKey),
+                container.ScopeContext,
+                RegistrySharing.CloneAndDropCache, 
+                container.SingletonScope.Clone(),
+                container.CurrentScope?.Clone());
 
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container,
             Func<Rules, Rules> configure = null, IScopeContext scopeContext = null) =>
-            container.With(configure?.Invoke(container.Rules) ?? container.Rules, scopeContext ?? container.ScopeContext,
-                RegistrySharing.CloneAndDropCache, container.SingletonScope);
+            container.With(configure?.Invoke(container.Rules) ?? container.Rules, 
+                scopeContext ?? container.ScopeContext,
+                RegistrySharing.CloneAndDropCache, 
+                container.SingletonScope);
 
         /// <summary>Prepares container for expression generation.</summary>
         public static IContainer WithExpressionGeneration(this IContainer container, bool allowRuntimeState = false) =>
@@ -11614,7 +11627,7 @@ namespace DryIoc
         /// Looks up for stored item by type.
         bool TryGetUsedInstance(IResolverContext r, Type type, out object instance);
 
-        /// Clones the scope.
+        /// <summary>Clones the scope.</summary>
         IScope Clone();
     }
 
@@ -11677,12 +11690,12 @@ namespace DryIoc
         public IScope Clone()
         {
             var slotsCopy = new ImMap<object>[MAP_COUNT];
-
-            // todo: @fix we need a way to copy all Refs in the slot - do we?
             for (var i = 0; i < MAP_COUNT; i++) 
                 slotsCopy[i] = _maps[i];
-
-            return new Scope(Parent, Name, slotsCopy, _factories, _unorderedDisposables, _disposables);
+            return new Scope(Parent?.Clone(), // Не забыть скопировать папу (коментарий для дочки) 
+                Name, slotsCopy,
+                // these things are immutable
+                _factories, _unorderedDisposables, _disposables);
         }
 
         /// <inheritdoc />
