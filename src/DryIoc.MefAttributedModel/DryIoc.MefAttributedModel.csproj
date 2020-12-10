@@ -5,7 +5,7 @@
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc.MefAttributedModel</Product>
-        <VersionPrefix>6.0.2</VersionPrefix>
+        <VersionPrefix>6.1.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -17,6 +17,12 @@
         <PackageTags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v6.1.0
+
+- fixed: #349 ReuseAttribute treats ScopeName as string instead of object type
+- added: ReuseAttribute supports multiple scope names
+- relies on DryIocAttributes v6.1.0 and DryIoc v4.5.2
+
 ## v6.0.2
 
 - The referenced DryIocAttributes is updated to v6.0.1 (because some types are now used from the System.ComponentModel.Composition package)

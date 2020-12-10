@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.MefAttributedModel</id>
-    <version>6.0.2</version>
+    <version>6.1.0</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,12 @@
     <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
         <![CDATA[
+## v6.1.0
+
+- fixed: #349 ReuseAttribute treats ScopeName as string instead of object type
+- added: ReuseAttribute supports multiple scope names
+- relies on DryIocAttributes v6.1.0 and DryIoc v4.5.2
+
 ## v6.0.2
 
 - The referenced DryIocAttributes is updated to v6.0.1 (because some types are now used from the System.ComponentModel.Composition package)
@@ -21,8 +27,8 @@
     </releaseNotes>
     <dependencies>
       <group>
-        <dependency id="DryIoc" version="4.3.3" />
-        <dependency id="DryIocAttributes" version="6.0.1" />
+        <dependency id="DryIoc" version="4.5.2" />
+        <dependency id="DryIocAttributes" version="6.1.0" />
       </group>
     </dependencies>
     <contentFiles>
