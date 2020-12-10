@@ -3,6 +3,12 @@
 # DryIoc.Messages
 
 
+- [DryIoc.Messages](#dryiocmessages)
+  - [What?](#what)
+  - [Example](#example)
+  - [Abstractions](#abstractions)
+
+
 ## What?
 
 `DryIoc.Messages` namespace introduces simple and extensible Message (Request), Response, Handler abstractions similar to the [MediatR](https://github.com/jbogard/MediatR) project.
