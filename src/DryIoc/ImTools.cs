@@ -2080,19 +2080,10 @@ namespace ImTools
             source is T[] arr ? arr.Map(map) : source?.Select(map);
 
         /// <summary>If <paramref name="source"/> is array uses more effective Match for array, otherwise just calls Where</summary>
-        /// <typeparam name="T">Type of source items.</typeparam>
-        /// <param name="source">If null, the null will be returned.</param>
-        /// <param name="condition">Condition to keep items.</param>
-        /// <returns>Result items, may be an array.</returns>
         public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition) =>
             source is T[] arr ? arr.Match(condition) : source?.Where(condition);
 
-        /// <summary>If <paramref name="source"/> is array uses more effective Match for array,
-        /// otherwise just calls Where, Select</summary>
-        /// <typeparam name="T">Type of source items.</typeparam> <typeparam name="R">Type of result items.</typeparam>
-        /// <param name="source">If null, the null will be returned.</param>
-        /// <param name="condition">Condition to keep items.</param>  <param name="map">Converter from source to result item.</param>
-        /// <returns>Result items, may be an array.</returns>
+        /// <summary>If <paramref name="source"/> is array uses more effective Match for array,otherwise just calls Where, Select</summary>
         public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map) =>
             source is T[] arr ? arr.Match(condition, map) : source?.Where(condition).Select(map);
     }

@@ -1118,13 +1118,43 @@ namespace DryIoc
             var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-            // For closed-generic type, when the entry is not found or the key in entry is not found,
-            // go for the open-generic services
+            // For closed-generic type, when the entry is not found or the key in entry is not found go for the open-generic services
             if (serviceType.IsClosedGeneric())
-                if (entry == null || serviceKey != null && (
+            {
+                if (entry == null || 
+                    serviceKey != null && (
                     entry is Factory && !serviceKey.Equals(DefaultKey.Value) ||
                     entry is FactoriesEntry factoriesEntry && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null))
                     entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) ?? entry;
+
+                if (entry == null && Rules.VariantGenericTypesInResolve)
+                {
+                    foreach (var e in serviceFactories.Enumerate())
+                    {
+                        if (e.Value.Value is Factory f)
+                        {
+                            if ((serviceKey == null || serviceKey == DefaultKey.Value) && 
+                                serviceType.IsAssignableVariantGenericTypeFrom(e.Value.Key) &&
+                                request.MatchFactoryConditionAndMetadata(f))
+                            {
+                                entry = f;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            foreach (var kf in ((FactoriesEntry)e.Value.Value).Factories.Enumerate())
+                                if (kf.Key.Equals(serviceKey) && 
+                                    serviceType.IsAssignableVariantGenericTypeFrom(e.Value.Key) &&
+                                    request.MatchFactoryConditionAndMetadata(kf.Value))
+                                {
+                                    entry = kf.Value;
+                                    break;
+                                }
+                        }
+                    }
+                }
+            }
 
             // Most common case when we have a single default factory and no dynamic rules in addition
             if (entry is Factory singleDefaultFactory && 
@@ -1175,10 +1205,8 @@ namespace DryIoc
             // For multiple matched factories, if the single one has a condition, then use it
             factories = factories.Match(request, (r, x) => r.MatchFactoryConditionAndMetadata(x));
 
-            // Check the for matching scopes. Only for more than 1 factory, 
-            // for the single factory the check will be down the road
-            // BitBucket issue: #175
-            if (factories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
+            // Check the for matching scopes. Only for more than 1 factory for the single factory the check will be down the road (BitBucket issue: #175)
+            if (factories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
             {
                 var reuseMatchedFactories = factories.Match(request, (r, x) => r.MatchFactoryReuse(x));
                 if (reuseMatchedFactories.Length == 1)
@@ -1263,6 +1291,32 @@ namespace DryIoc
                     openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
                     if (openGenericEntry != null)
                         factories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf();
+
+                    if (openGenericEntry == null && Rules.VariantGenericTypesInResolve)
+                    {
+                        foreach (var sf in serviceFactories.Enumerate())
+                        {
+                            if (sf.Value.Value is Factory f)
+                            {
+                                if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Value.Key) &&
+                                    request.MatchFactoryConditionAndMetadata(f))
+                                {
+                                    factories = KV.Of<object, Factory>(DefaultKey.Value, f).One();
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                foreach (var kf in ((FactoriesEntry)sf.Value.Value).Factories.Enumerate())
+                                    if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Value.Key) &&
+                                        request.MatchFactoryConditionAndMetadata(kf.Value))
+                                    {
+                                        factories = KV.Of(kf.Key, kf.Value).One();
+                                        break;
+                                    }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -4082,6 +4136,13 @@ namespace DryIoc
                 .WithDefaultRegistrationServiceKey(facadeKey)
                 .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey)));
 
+        /// <summary>Allows to register new specially keyed services which will facade the same default service,
+        /// registered earlier. May be used to "override" registrations when testing the container</summary>
+        public static IContainer CreateFacadeAndDetachScope(this IContainer container, string facadeKey = FacadeKey) =>
+            container.With(rules => rules
+                .WithDefaultRegistrationServiceKey(facadeKey)
+                .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey)));
+
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container,
             Func<Rules, Rules> configure = null, IScopeContext scopeContext = null) =>
@@ -4606,10 +4667,7 @@ namespace DryIoc
         /// <summary>Prints registration order to string.</summary>
         public override string ToString() => GetType().Name + "(" + RegistrationOrder + ")";
 
-        private DefaultKey(int registrationOrder)
-        {
-            RegistrationOrder = registrationOrder;
-        }
+        private DefaultKey(int registrationOrder) => RegistrationOrder = registrationOrder;
     }
 
     /// <summary>Represents default key for dynamic registrations</summary>
@@ -4976,14 +5034,10 @@ namespace DryIoc
 
             // Append registered generic types with compatible variance,
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
-            if (requiredItemType.IsGeneric() &&
-                rules.VariantGenericTypesInResolvedCollection)
+            if (requiredItemType.IsGeneric() && rules.VariantGenericTypesInResolvedCollection)
             {
                 var variantGenericItems = container.GetServiceRegistrations()
-                    .Match(x =>
-                        x.ServiceType.IsGeneric() &&
-                        x.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition() &&
-                        x.ServiceType != requiredItemType && x.ServiceType.IsAssignableTo(requiredItemType))
+                    .Match(x => requiredItemType.IsAssignableVariantGenericTypeFrom(x.ServiceType))
                     .ToArrayOrSelf();
                 items = items.Append(variantGenericItems);
             }
@@ -5880,6 +5934,18 @@ namespace DryIoc
         public Rules WithoutVariantGenericTypesInResolvedCollection() =>
             WithSettings(_settings & ~Settings.VariantGenericTypesInResolvedCollection);
 
+        /// <summary><see cref="WithVariantGenericTypesInResolve"/>.</summary>
+        public bool VariantGenericTypesInResolve =>
+            (_settings & Settings.VariantGenericTypesInResolve) != 0;
+
+        /// <summary>Flag instructs to include covariant compatible types into the resolved generic.</summary>
+        public Rules WithVariantGenericTypesInResolve() =>
+            WithSettings(_settings | Settings.VariantGenericTypesInResolve);
+
+        /// <summary>Flag instructs to exclude covariant compatible types into the resolved generic.</summary>
+        public Rules WithoutVariantGenericTypesInResolve() =>
+            WithSettings(_settings & ~Settings.VariantGenericTypesInResolve);
+
         /// <summary><see cref="WithDefaultIfAlreadyRegistered"/>.</summary>
         public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; }
 
@@ -6075,7 +6141,7 @@ namespace DryIoc
             UsedForValidation = 1 << 21, // informational flag, will appear in exceptions during validation
             ServiceProviderGetServiceShouldThrowIfUnresolved = 1 << 22,
             ThrowIfScopedOrSingletonHasTransientDependency = 1 << 23,
-            //ScopedOrSingletonShouldApplySingletonForResolutionRootOnly = ??? // todo: @consider (see #285) that what it should be initially
+            VariantGenericTypesInResolve = 1 << 24,
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -8578,13 +8644,11 @@ namespace DryIoc
             var metadata = request.Metadata;
             return (metadataKey == null && metadata == null) || factory.Setup.MatchesMetadata(metadataKey, metadata);
         }
-
         public static bool MatchFactoryConditionAndMetadata(this Request r, KV<object, Factory> f) => 
             r.MatchFactoryConditionAndMetadata(f.Value);
+        public static bool MatchFactoryReuse(this Request r, Factory f) => f.Reuse?.CanApply(r) ?? true;
 
-        public static bool MatchFactoryReuse(this Request r, KV<object, Factory> f) => 
-            f.Value.Reuse?.CanApply(r) ?? true;
-
+        public static bool MatchFactoryReuse(this Request r, KV<object, Factory> f) => r.MatchFactoryReuse(f.Value);
         public static bool MatchGeneratedFactory(this Request r, KV<object, Factory> f) =>
             f.Value.FactoryGenerator == null || f.Value.FactoryGenerator.GetGeneratedFactory(r, ifErrorReturnDefault: true) != null;
     }
@@ -13613,6 +13677,11 @@ namespace DryIoc
         /// <summary>Returns true if type is assignable to <typeparamref name="T"/> type.</summary>
         public static bool IsAssignableTo<T>(this Type type) =>
             type != null && typeof(T).GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
+
+        /// <summary>`to` should be the closed-generic type</summary>
+        public static bool IsAssignableVariantGenericTypeFrom(this Type to, Type from) =>
+            from != to && from.IsGeneric() && from.GetGenericTypeDefinition() == to.GetGenericTypeDefinition() && 
+            to.GetTypeInfo().IsAssignableFrom(from.GetTypeInfo());
 
         /// <summary>Returns true if type of <paramref name="obj"/> is assignable to source <paramref name="type"/>.</summary>
         public static bool IsTypeOf(this Type type, object obj) =>
