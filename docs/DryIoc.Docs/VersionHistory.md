@@ -1,6 +1,15 @@
 Version History
 ---------------
 
+## v4.6.0 Feature release / 2020-12-10
+
+- #216 Add Rules.WithThrowIfScopedOrSingletonHasTransientDependency 
+- #343 Scope validation for Transient does not work as expected 
+- #344 Scope is disposed before parent when using facade (added Scopes and Singleton cloning into CreateFacade)
+- #348 Create a child container without WithNoMoreRegistrationAllowed flag (surfacing IsRegistryChangePermitted in With method)
+- #350 Wrong scoped resolve (together with MS DI rules)
+- #352 Consider resolving the variance compatible open-generic the same as for collection of open-generics (added Rules.WithVarianceGenericTypesInResolve)
+
 ## v4.5.2 Bug-fix release / 2020-12-03
 
 - fixed: #347 The AsResolutionCall option and/or WithFuncAndLazyWithoutRegistration rule are not respected
