@@ -16,7 +16,7 @@ namespace DryIoc.Messages.MediatRLikeExample
         [Test]
         public Task Run()
         {
-            var container = new Container();
+            var container = new Container(rules => rules.WithTrackingDisposableTransients());
             var writer = new WrappingWriter(Console.Out);
 
             BuildMediator(container, writer);
@@ -318,6 +318,4 @@ namespace DryIoc.Messages.MediatRLikeExample
 
         public string Contents => _stringWriter.ToString();
     }
-
-
 }

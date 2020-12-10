@@ -154,8 +154,8 @@ or use the container rule `WithoutThrowOnRegisteringDisposableTransient()`.
 This option is similar to Autofac registration as `ExternallyOwned()`. 
 That way you do not need to use `Owned` to control disposal.
 
-To match default Autofac disposable tracking you need to use DryIoc `trackDisposableTransinet` registration setup option
-or specify the container rule `WithTrackingDisposableTransient()`.
+To match default Autofac disposable tracking you need to use DryIoc `trackDisposableTransient` registration setup option
+or specify the container rule `WithTrackingDisposableTransients()`.
 Then instead of `Owned` in DryIoc, just wrap dependency in `Func`. This way the tracking will be prevented.
 Using `Func` has a slight advantage over `Owned` because `Func` is not container specific type and does not
 require DryIoc reference.

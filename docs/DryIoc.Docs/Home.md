@@ -95,8 +95,9 @@ and to support the __extensibility__ and __testability__ of the code.
 - [Error Detection and Resolution](ErrorDetectionAndResolution.md)
 - [Rules and Default Conventions](RulesAndDefaultConventions.md)
 
-- Advanced topics:
+- Interesting topics:
 
+    - [DryIoc.Messages - MediatR rip-off](DryIoc.Messages.md)
     - [Resolution Pipeline](ResolutionPipeline.md)
     - ["Child" Containers](KindsOfChildContainer.md)
     - [Required Service Type](RequiredServiceType.md)
