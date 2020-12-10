@@ -24,12 +24,12 @@ namespace DryIoc.IssuesTests
             var container = scope.Resolve<IContainer>();
 
             // the service now creates a facade for and works with it. After it's done, the facade is disposed.
-            using (container.CreateFacadeAndCloneScopes()) // USING instead of CreateFacade()
+            using (container.CreateFacade())
             {
                 // do anything at all, it doesn't matter
             }
 
-            scope.Resolve<MyDisposable>(); // throws because scope is disposed
+            scope.Resolve<MyDisposable>(); // should not throw that the scope is disposed
         }
 
         class MyDisposable : IDisposable

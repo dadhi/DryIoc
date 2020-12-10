@@ -4135,17 +4135,11 @@ namespace DryIoc
             rules.WithDefaultRegistrationServiceKey(facadeKey)
                  .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey));
 
-
-        /// <summary>Allows to register new specially keyed services which will facade the same default service,
-        /// registered earlier. May be used to "override" registrations when testing the container</summary>
-        public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
-            container.With(rules => rules.WithFacadeRules(facadeKey));
-
         /// <summary>Allows to register new specially keyed services which will facade the same default service,
         /// registered earlier. May be used to "override" registrations when testing the container.
-        /// Note: Facade will clone the source container singleton and open scope (if any) so
+        /// Facade will clone the source container singleton and open scope (if any) so
         /// that you may safely disposing the facade without disposing the source container scopes.</summary>
-        public static IContainer CreateFacadeAndCloneScopes(this IContainer container, string facadeKey = FacadeKey) =>
+        public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
             container.With(
                 container.Parent,
                 container.Rules.WithFacadeRules(facadeKey),
@@ -4157,7 +4151,8 @@ namespace DryIoc
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container,
             Func<Rules, Rules> configure = null, IScopeContext scopeContext = null) =>
-            container.With(configure?.Invoke(container.Rules) ?? container.Rules, 
+            container.With(
+                configure?.Invoke(container.Rules) ?? container.Rules, 
                 scopeContext ?? container.ScopeContext,
                 RegistrySharing.CloneAndDropCache, 
                 container.SingletonScope);

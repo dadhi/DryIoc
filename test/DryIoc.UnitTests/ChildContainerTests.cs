@@ -118,7 +118,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Child_may_throw_if_parent_is_disposed()
+        public void Child_should_not_throw_if_parent_is_disposed()
         {
             var container = new Container();
             container.Register<FruitJuice>();
@@ -129,10 +129,8 @@ namespace DryIoc.UnitTests
 
             container.Dispose();
 
-            var ex = Assert.Throws<ContainerException>(() =>
+            Assert.DoesNotThrow(() =>
             facade.Resolve<FruitJuice>());
-
-            Assert.AreEqual(Error.ContainerIsDisposed, ex.Error);
         }
 
         [Test]
