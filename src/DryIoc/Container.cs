@@ -1214,15 +1214,9 @@ namespace DryIoc
                 else if (reuseMatchedFactories.Length > 1)
                     factories = FindFactoryWithTheMinReuseLifespan(factories)?.One() ?? factories;
 
-                if (factories.Length == 1)
-                {
-                    // Issue: #382
-                    // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
-                    if (request.IsResolutionCall)
-                        request.ChangeServiceKey(factories[0].Key);
-                    else // for injected dependency
-                        factories[0].Value.Setup = factories[0].Value.Setup.WithAsResolutionCall();
-                }
+                // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition (BBIssue: #382)
+                if (factories.Length == 1 && !request.IsResolutionCall)
+                    factories[0].Value.Setup = factories[0].Value.Setup.WithAsResolutionCall();
             }
 
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
@@ -1232,6 +1226,7 @@ namespace DryIoc
 
             if (factories.Length > 1)
             {
+                // prefer the factories with the condition (they should be evaluated / matched earlier anyway)
                 var conditionedFactories = factories.Match(f => f.Value.Setup.Condition != null);
                 if (conditionedFactories.Length == 1)
                     factories = conditionedFactories;
@@ -1239,6 +1234,7 @@ namespace DryIoc
 
             if (factories.Length > 1)
             {
+                // prefer the factories with the `Setup.PreferInSingleServiceResolve`
                 var preferredFactories = factories.Match(f => f.Value.Setup.PreferInSingleServiceResolve);
                 if (preferredFactories.Length == 1)
                     factories = preferredFactories;
@@ -1338,21 +1334,15 @@ namespace DryIoc
                 Array.Sort(factories, _lastFactoryIDWinsComparer);
 
             var matchedFactories = factories.Match(request.MatchFactoryConditionAndMetadata);
-            if (matchedFactories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
+
+            if (matchedFactories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
             {
-                // Check the for matching scopes. Only for more than 1 factory, 
-                // for the single factory the check will be down the road
-                // BitBucket issue: #175
+                // Check for the matching scopes. Only for more than one factory, 
+                // for the single factory the check will be down the road (BBIssue #175)
                 matchedFactories = matchedFactories.Match(request.MatchFactoryReuse);
-                if (matchedFactories.Length == 1)
-                {
-                    // Issue: #382
-                    // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
-                    if (request.IsResolutionCall)
-                        request.ChangeServiceKey(matchedFactories[0].Key);
-                    else // for injected dependency
-                        matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
-                }
+                // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition (BBIssue #382)
+                if (matchedFactories.Length == 1 && !request.IsResolutionCall)
+                    matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
             }
 
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
@@ -1367,7 +1357,7 @@ namespace DryIoc
             if (selectedFactory == null)
                 return null;
 
-            // BitBucket issue: #508, GH #350
+            // BBIssue: #508, GHIssue: #350
             if (request.IsResolutionCall && factories.Length > 1)
             {
                 var i = 0;
@@ -8655,7 +8645,6 @@ namespace DryIoc
         public static bool MatchFactoryConditionAndMetadata(this Request r, KV<object, Factory> f) => 
             r.MatchFactoryConditionAndMetadata(f.Value);
         public static bool MatchFactoryReuse(this Request r, Factory f) => f.Reuse?.CanApply(r) ?? true;
-
         public static bool MatchFactoryReuse(this Request r, KV<object, Factory> f) => r.MatchFactoryReuse(f.Value);
         public static bool MatchGeneratedFactory(this Request r, KV<object, Factory> f) =>
             f.Value.FactoryGenerator == null || f.Value.FactoryGenerator.GetGeneratedFactory(r, ifErrorReturnDefault: true) != null;

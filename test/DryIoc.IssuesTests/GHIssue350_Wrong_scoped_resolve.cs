@@ -5,11 +5,40 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue350_Wrong_scoped_resolve
     {
-        [Test, Ignore("todo: fixme")]
-        public void TheBug_2()
+        [Test]
+        public void TheBug_2_is_not_a_bug_and_depends_on_the_registration_order()
         {
             var container = new Container(rules => rules
                 .WithMicrosoftDependencyInjectionRules()
+                .WithFuncAndLazyWithoutRegistration());
+
+            container.Register<A>();
+            container.Register<S, S1>(Reuse.ScopedTo("FirstScope"));
+            container.Register<B, B2>(Reuse.ScopedTo("SecondScope"));
+            container.Register<B, B1>();
+
+            using (var scope = container.OpenScope("FirstScope"))
+            {
+                // no issue
+                var a = scope.Resolve<A>();
+                Assert.IsInstanceOf<B1>(a.B);
+                Assert.IsInstanceOf<S1>(a.B.S);
+            }
+
+            using (var context = container.OpenScope("SecondScope"))
+            {
+               //DryIoc.ContainerException : code: Error.NoMatchedScopeFound;
+               //message: Unable to find matching scope with name "FirstScope" starting from the current scope {Name=SecondScope}.
+                Assert.Throws<ContainerException>(() =>
+                context.Resolve<A>());
+            }
+        }
+
+        [Test]
+        public void TheBug_2_without_MS_DI_rules()
+        {
+            var container = new Container(rules => rules
+                // .WithMicrosoftDependencyInjectionRules()
                 .WithFuncAndLazyWithoutRegistration());
 
             container.Register<A>();
