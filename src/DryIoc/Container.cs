@@ -12605,14 +12605,23 @@ namespace DryIoc
             : names.Length == 1 ? ScopedTo(names[0]) 
             : new CurrentScopeReuse(CompositeScopeName.Of(names));
 
-        // todo: Consider changing the name to remove the ambiguity
-        /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
+        // todo: @api @v5 Consider changing the name (say to ScopedToService) to remove the ambiguity
+        /// <summary>[Obsolete("Use ScopedToService instead")]</summary>
         public static IReuse ScopedTo(Type serviceType = null, object serviceKey = null) =>
             serviceType == null && serviceKey == null ? Scoped
             : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
 
-        /// <summary>Same as InResolutionScopeOf. From now on will be the default name.</summary>
+        /// <summary>Scoped to the scope created by the service with the specified type and optional key</summary>
+        public static IReuse ScopedToService(Type serviceType = null, object serviceKey = null) =>
+            serviceType == null && serviceKey == null ? Scoped
+            : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
+
+        /// <summary>[Obsolete("Use ScopedToService instead")]</summary>
         public static IReuse ScopedTo<TService>(object serviceKey = null) =>
+            ScopedTo(typeof(TService), serviceKey);
+
+        /// <summary>Scoped to the scope created by the service with the specified type and optional key</summary>
+        public static IReuse ScopedToService<TService>(object serviceKey = null) =>
             ScopedTo(typeof(TService), serviceKey);
 
         /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Singleton"/></summary>
