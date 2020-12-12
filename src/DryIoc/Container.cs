@@ -12407,7 +12407,7 @@ namespace DryIoc
                 ? Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.Scoped)))
                 : ScopedOrSingleton 
                     ? (Expression)Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.ScopedOrSingleton)))
-                    : Call(typeof(Reuse).Method(nameof(Reuse.ScopedTo), typeof(object)), fallbackConverter(Name));
+                    : Call(typeof(Reuse).Method("ScopedTo", typeof(object)), fallbackConverter(Name));
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
@@ -12618,7 +12618,8 @@ namespace DryIoc
             : new CurrentScopeReuse(CompositeScopeName.Of(names));
 
         // todo: @api @v5 Consider changing the name (say to ScopedToService) to remove the ambiguity
-        /// <summary>[Obsolete("Use ScopedToService instead")]</summary>
+        /// <summary>[Obsolete("Use ScopedToService to prevent ambiguity with the ScopeTo(object name) where name is the Type")]</summary>
+        [Obsolete("Use ScopedToService to prevent ambiguity with the ScopeTo(object name) where name is the Type")]
         public static IReuse ScopedTo(Type serviceType = null, object serviceKey = null) =>
             serviceType == null && serviceKey == null ? Scoped
             : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
@@ -12628,13 +12629,13 @@ namespace DryIoc
             serviceType == null && serviceKey == null ? Scoped
             : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
 
-        /// <summary>[Obsolete("Use ScopedToService instead")]</summary>
+        /// <summary>Scoped to the scope created by the service with the specified type and optional key</summary>
         public static IReuse ScopedTo<TService>(object serviceKey = null) =>
-            ScopedTo(typeof(TService), serviceKey);
+            ScopedToService(typeof(TService), serviceKey);
 
         /// <summary>Scoped to the scope created by the service with the specified type and optional key</summary>
         public static IReuse ScopedToService<TService>(object serviceKey = null) =>
-            ScopedTo(typeof(TService), serviceKey);
+            ScopedToService(typeof(TService), serviceKey);
 
         /// <summary>The same as <see cref="InCurrentScope"/> but if no open scope available will fallback to <see cref="Singleton"/></summary>
         /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="InCurrentScope"/> reuse.</remarks>
@@ -12653,13 +12654,13 @@ namespace DryIoc
         /// <returns>Created current scope reuse.</returns>
         public static IReuse InCurrentNamedScope(object name = null) => ScopedTo(name);
 
-        /// <summary>Obsolete: please use ScopedTo instead.</summary>
+        /// <summary>Obsolete: will be soon - please use ScopedToService instead.</summary>
         public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null) =>
-            ScopedTo(assignableFromServiceType, serviceKey);
+            ScopedToService(assignableFromServiceType, serviceKey);
 
-        /// <summary>Obsolete: please use ScopedTo instead.</summary>
+        /// <summary>Obsolete: will be soon - please use ScopedToService instead.</summary>
         public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null) =>
-            ScopedTo<TAssignableFromServiceType>(serviceKey);
+            ScopedToService<TAssignableFromServiceType>(serviceKey);
 
         /// <summary>Same as Scoped but requires <see cref="ThreadScopeContext"/>.</summary>
         public static readonly IReuse InThread = Scoped;
