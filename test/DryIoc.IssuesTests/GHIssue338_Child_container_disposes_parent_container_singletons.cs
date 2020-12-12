@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue338_Child_container_disposes_parent_container_singletons
     {
-        [Test, Ignore("todo: fixme")]
+        [Test]
         public void Should_allow_registration_in_child_container()
         {
             var parent = new Container(rules => rules.WithConcreteTypeDynamicRegistrations());
@@ -16,7 +16,7 @@ namespace DryIoc.IssuesTests
             // var child = parent.WithRegistrationsCopy();
 
             // Basically it is the CreateFacade without WithFacadeRules and with IfAlreadyRegistered.Replace policy as default
-            var child = CreateChild(parent);
+            var child = CreateChildContainer(parent);
 
             var service2 = child.Resolve<IService>();
             Assert.AreEqual(service, service2);
@@ -28,15 +28,15 @@ namespace DryIoc.IssuesTests
             Assert.IsTrue(service.IsDisposed);
         }
 
-        private static IContainer CreateChild(IContainer parent, IfAlreadyRegistered childRegistrationPolicy = IfAlreadyRegistered.Replace) =>
+        private static IContainer CreateChildContainer(IContainer parent, 
+            IfAlreadyRegistered childRegistrationPolicy = IfAlreadyRegistered.Replace) =>
             parent.With(
-            parent.Parent,
-            parent.Rules.WithDefaultIfAlreadyRegistered(childRegistrationPolicy),
-            parent.ScopeContext,
-            RegistrySharing.CloneAndDropCache, 
-            parent.SingletonScope.Clone(),
-            parent.CurrentScope?.Clone());
-
+                parent.Parent,
+                parent.Rules.WithDefaultIfAlreadyRegistered(childRegistrationPolicy),
+                parent.ScopeContext,
+                RegistrySharing.CloneAndDropCache, 
+                parent.SingletonScope.CloneAndDropDisposables(),
+                parent.CurrentScope ?.CloneAndDropDisposables());
 
         public interface IService
         {

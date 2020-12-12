@@ -11613,6 +11613,10 @@ namespace DryIoc
 
         /// <summary>Clones the scope.</summary>
         IScope Clone();
+
+        /// <summary>The method will clone the scope factories and already created services,
+        /// but will drop the disposables thus ensuring that only the new disposables added in clone will be disposed</summary>
+        IScope CloneAndDropDisposables();
     }
 
     /// <summary>
@@ -11671,15 +11675,23 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
-        public IScope Clone()
+        public IScope Clone() => Clone(false);
+
+        /// <inheritdoc />
+        public IScope CloneAndDropDisposables() => Clone(true);
+
+        private IScope Clone(bool dropDisposables)
         {
             var slotsCopy = new ImMap<object>[MAP_COUNT];
             for (var i = 0; i < MAP_COUNT; i++) 
                 slotsCopy[i] = _maps[i];
+
+            if (dropDisposables)
+                return new Scope(Parent?.Clone(), Name, slotsCopy, _factories, 
+                    ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty); // dropping the disposables
+
             return new Scope(Parent?.Clone(), // Не забыть скопировать папу (коментарий для дочки) 
-                Name, slotsCopy,
-                // these things are immutable
-                _factories, _unorderedDisposables, _disposables);
+                Name, slotsCopy, _factories, _unorderedDisposables, _disposables);
         }
 
         /// <inheritdoc />
