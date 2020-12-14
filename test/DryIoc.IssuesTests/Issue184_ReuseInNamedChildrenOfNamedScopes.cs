@@ -3,7 +3,7 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issues184_ReuseInNamedChildrenOfNamedScopes
+    public class Issue184_ReuseInNamedChildrenOfNamedScopes
     {
         [Test]
         public void Test()

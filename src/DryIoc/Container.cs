@@ -1158,7 +1158,8 @@ namespace DryIoc
 
             // Most common case when we have a single default factory and no dynamic rules in addition
             if (entry is Factory singleDefaultFactory && 
-                Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+                (Rules.UseDynamicRegistrationsAsFallbackOnly ||
+                 Rules.DynamicRegistrationProviders.IsNullOrEmpty()))
             {
                 if (serviceKey != null && serviceKey != DefaultKey.Value || 
                     !singleDefaultFactory.CheckCondition(request) ||
@@ -1185,13 +1186,9 @@ namespace DryIoc
             // just lookup for the key and return whatever the result
             if (serviceKey != null)
             {
-                for (var i = 0; i < factories.Length; i++)
-                {
-                    var f = factories[i];
+                foreach (var f in factories)
                     if (serviceKey.Equals(f.Key) && f.Value.CheckCondition(request))
                         return f.Value;
-                }
-
                 return null;
             }
 
@@ -1375,9 +1372,8 @@ namespace DryIoc
             var minLifespan = int.MaxValue;
             var multipleFactories = false;
             KV<object, Factory> minLifespanFactory = null;
-            for (var i = 0; i < factories.Length; i++)
+            foreach (var factory in factories)
             {
-                var factory = factories[i];
                 var reuse = factory.Value.Reuse;
                 var lifespan = reuse == null || reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
                 if (lifespan < minLifespan)
@@ -1623,14 +1619,13 @@ namespace DryIoc
             if (!allDecorators.IsEmpty)
                 decorators = (Factory[])allDecorators.GetValueOrDefault(serviceType) ?? Empty<Factory>();
 
-            if (!decorators.IsNullOrEmpty() && Rules.UseDynamicRegistrationsAsFallbackOnly ||
-                Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+            if (Rules.DynamicRegistrationProviders.IsNullOrEmpty() || 
+                Rules.UseDynamicRegistrationsAsFallbackOnly && !decorators.IsNullOrEmpty())
                 return decorators;
 
-            return CombineRegisteredWithDynamicFactories(
-                    decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)), 
-                    true, FactoryType.Decorator, serviceType
-                ).Map(x => x.Value);
+            // todo: @perf find a way to skip dynamic registrations if there is no decorators without the creating of DynamicRegistration with the Factory which is wasteful
+            var ds = decorators?.Map(d => new KV<object, Factory>(DefaultKey.Value, d));
+            return CombineRegisteredWithDynamicFactories(ds, true, FactoryType.Decorator, serviceType).Map(x => x.Value);
         }
 
         Type IContainer.GetWrappedType(Type serviceType, Type requiredServiceType)
@@ -4130,13 +4125,26 @@ namespace DryIoc
         /// Facade will clone the source container singleton and open scope (if any) so
         /// that you may safely disposing the facade without disposing the source container scopes.</summary>
         public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
-            container.With(
+            container.CreateChild(newRules: container.Rules.WithFacadeRules(facadeKey));
+
+        /// <summary>The "child" container detached from the parent: 
+        /// Child has all parent registrations copied, then the registrations added or removed in the child are not affecting the parent.
+        /// By default child will use the parent <see cref="IfAlreadyRegistered"/> policy - you may specify `IfAlreadyRegistered.Replace` to "shadow" the parent registrations
+        /// Child we have access to the scoped services and singletons already created by parent.
+        /// Child can be disposed without affecting the parent, disposing the child will dispose only the scoped services and singletons created in child and not in parent (can be opt-out)</summary>
+        public static IContainer CreateChild(this IContainer container, 
+            IfAlreadyRegistered? ifAlreadyRegistered = null, Rules newRules = null, bool withDisposables = false)
+        {
+            var rules = newRules != null && newRules != container.Rules ? newRules : container.Rules;
+            return container.With(
                 container.Parent,
-                container.Rules.WithFacadeRules(facadeKey),
+                ifAlreadyRegistered == null ? rules : rules.WithDefaultIfAlreadyRegistered(ifAlreadyRegistered.Value),
                 container.ScopeContext,
-                RegistrySharing.CloneAndDropCache, 
-                container.SingletonScope.Clone(),
-                container.CurrentScope?.Clone());
+                RegistrySharing.CloneAndDropCache,
+                container.SingletonScope.Clone(withDisposables),
+                container.CurrentScope ?.Clone(withDisposables));
+
+        }
 
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container,
@@ -4196,24 +4204,20 @@ namespace DryIoc
         // todo: @bug does it OK to share the singletons though despite the promise of not affecting the original container?
         /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/> if the TYPE is not registered yet. 
         /// The note is that container will share the singletons though.</summary>
-        /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
-        /// <param name="concreteType">Type to instantiate. Wrappers (Func, Lazy, etc.) is also supported.</param>
-        /// <param name="setup">Setup for the concrete type, e.g. `TrackDisposableTransient`</param>
-        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, 
-        /// properties and fields.</param>
-        /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
-        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
         public static object New(this IContainer container, Type concreteType, Setup setup, Made made = null,
             RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache)
         {
-            var containerClone = container.With(container.Rules, container.ScopeContext,
-                registrySharing, container.SingletonScope); // reusing the singleton scope
+            var containerClone = container.With(
+                container.Parent, container.Rules, container.ScopeContext,
+                registrySharing, 
+                container.SingletonScope, container.OwnCurrentScope, // reusing the singletons and scopes
+                null); 
 
             var implType = containerClone.GetWrappedType(concreteType, null);
 
             var condition = setup == null && made == null ? null
-                : made == null  ? (Func<Factory, bool>)(f => f.Setup == setup)
-                : setup == null ? (Func<Factory, bool>)(f => f.Made == made)
+                : made  == null ? (Func<Factory, bool>)(f => f.Setup == setup)
+                : setup == null ? (Func<Factory, bool>)(f => f.Made  == made)
                 : (f => f.Made == made && f.Setup == setup);
 
             if (!containerClone.IsRegistered(implType, condition: condition))
@@ -5545,7 +5549,7 @@ namespace DryIoc
         private static Factory SelectLastRegisteredFactory(Request request, KeyValuePair<object, Factory>[] factories)
         {
             var serviceKey = request.ServiceKey;
-            for (var i = factories.Length - 1; i >= 0; i--)
+            for (var i = factories.Length - 1; i >= 0; --i)
             {
                 var factory = factories[i];
                 if (factory.Key.Equals(serviceKey))
@@ -5950,6 +5954,7 @@ namespace DryIoc
         /// <summary>Specifies default setting for container. By default is <see cref="IfAlreadyRegistered.AppendNotKeyed"/>.
         /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
         public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule) =>
+            rule == DefaultIfAlreadyRegistered ? this :
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, rule, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -11611,12 +11616,13 @@ namespace DryIoc
         /// Looks up for stored item by type.
         bool TryGetUsedInstance(IResolverContext r, Type type, out object instance);
 
+        // todo: @v5 @api @obsolete switch to the overload below
         /// <summary>Clones the scope.</summary>
         IScope Clone();
 
         /// <summary>The method will clone the scope factories and already created services,
-        /// but will drop the disposables thus ensuring that only the new disposables added in clone will be disposed</summary>
-        IScope CloneAndDropDisposables();
+        /// but may or may not drop the disposables thus ensuring that only the new disposables added in clone will be disposed</summary>
+        IScope Clone(bool withDisposables);
     }
 
     /// <summary>
@@ -11675,22 +11681,20 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
-        public IScope Clone() => Clone(false);
+        public IScope Clone() => Clone(true);
 
         /// <inheritdoc />
-        public IScope CloneAndDropDisposables() => Clone(true);
-
-        private IScope Clone(bool dropDisposables)
+        public IScope Clone(bool withDisposables)
         {
             var slotsCopy = new ImMap<object>[MAP_COUNT];
             for (var i = 0; i < MAP_COUNT; i++) 
                 slotsCopy[i] = _maps[i];
 
-            if (dropDisposables)
-                return new Scope(Parent?.Clone(), Name, slotsCopy, _factories, 
+            if (!withDisposables)
+                return new Scope(Parent?.Clone(withDisposables), Name, slotsCopy, _factories,
                     ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty); // dropping the disposables
 
-            return new Scope(Parent?.Clone(), // Не забыть скопировать папу (коментарий для дочки) 
+            return new Scope(Parent?.Clone(withDisposables), // Не забыть скопировать папу (коментарий для дочки)
                 Name, slotsCopy, _factories, _unorderedDisposables, _disposables);
         }
 

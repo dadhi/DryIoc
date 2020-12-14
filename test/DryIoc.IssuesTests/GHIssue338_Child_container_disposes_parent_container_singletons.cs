@@ -13,10 +13,8 @@ namespace DryIoc.IssuesTests
             parent.Register<IService, Service>(Reuse.Singleton);
             var service = parent.Resolve<IService>();
 
-            // var child = parent.WithRegistrationsCopy();
-
             // Basically it is the CreateFacade without WithFacadeRules and with IfAlreadyRegistered.Replace policy as default
-            var child = CreateChildContainer(parent);
+            var child = parent.CreateChild(IfAlreadyRegistered.Replace);
 
             var service2 = child.Resolve<IService>();
             Assert.AreEqual(service, service2);
@@ -27,16 +25,6 @@ namespace DryIoc.IssuesTests
             parent.Dispose();
             Assert.IsTrue(service.IsDisposed);
         }
-
-        private static IContainer CreateChildContainer(IContainer parent, 
-            IfAlreadyRegistered childRegistrationPolicy = IfAlreadyRegistered.Replace) =>
-            parent.With(
-                parent.Parent,
-                parent.Rules.WithDefaultIfAlreadyRegistered(childRegistrationPolicy),
-                parent.ScopeContext,
-                RegistrySharing.CloneAndDropCache, 
-                parent.SingletonScope.CloneAndDropDisposables(),
-                parent.CurrentScope ?.CloneAndDropDisposables());
 
         public interface IService
         {
