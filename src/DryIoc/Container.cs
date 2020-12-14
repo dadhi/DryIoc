@@ -5558,7 +5558,6 @@ namespace DryIoc
             return null;
         }
 
-        //we are watching you...public static
         /// <summary>Prefer specified service key (if found) over default key.
         /// Help to override default registrations in Open Scope scenarios:
         /// I may register service with key and resolve it as default in current scope.</summary>
@@ -5577,22 +5576,22 @@ namespace DryIoc
         public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
 
         // todo: Should I use Settings.UseDynamicRegistrationsAsFallback, 5 tests are failing only 
-        /// <summary>Appends dynamic registration rules.</summary>
+        /// <summary>Return the new rules with the passed dynamic registration rules appended.</summary>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
-        /// <summary>Appends dynamic registration rules 
-        /// And additionally specifies to use dynamic registrations only when no normal registrations found!</summary>
-        /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
+        // todo: @bug @api overwrites the whole container settings with the `UseDynamicRegistrationsAsFallbackOnly`
+        /// <summary>Return the new rules with the passed dynamic registration rules appended. The rules applied only when no normal registrations found!</summary>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings | Settings.UseDynamicRegistrationsAsFallbackOnly, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
+        // todo: @bug @api there is no way to have both fallback and not fallback settings
         /// Specifies to use dynamic registrations only when no normal registrations found
         public bool UseDynamicRegistrationsAsFallbackOnly =>
             (_settings & Settings.UseDynamicRegistrationsAsFallbackOnly) != 0;

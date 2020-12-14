@@ -66,6 +66,7 @@ namespace DryIoc.IssuesTests
             }
         }
 
+        // todo: @cleanup this test or remove it completely
         [Test]
         public void TestCase_Try_without_dynamic_registration()
         {
