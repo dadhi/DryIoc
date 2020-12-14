@@ -1199,21 +1199,28 @@ namespace DryIoc
             if (defaultFactoriesCount == 0)
                 return null;
 
-            // For multiple matched factories, if the single one has a condition, then use it
+            // For multiple matched factories if the single one has a condition, then use it
             factories = factories.Match(request, (r, x) => r.MatchFactoryConditionAndMetadata(x));
 
-            // Check the for matching scopes. Only for more than 1 factory for the single factory the check will be down the road (BitBucket issue: #175)
+            // Check the for the reuse matching scopes (for a single the check will be down the road) (BBIssue: #175)
             if (factories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
             {
+                KV<object, Factory> singleMatchedFactory = null;
                 var reuseMatchedFactories = factories.Match(request, (r, x) => r.MatchFactoryReuse(x));
                 if (reuseMatchedFactories.Length == 1)
-                    factories = reuseMatchedFactories;
+                    singleMatchedFactory = reuseMatchedFactories[0];
                 else if (reuseMatchedFactories.Length > 1)
-                    factories = FindFactoryWithTheMinReuseLifespan(factories)?.One() ?? factories;
+                    singleMatchedFactory = FindFactoryWithTheMinReuseLifespanOrDefault(factories);
 
-                // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition (BBIssue: #382)
-                if (factories.Length == 1 && !request.IsResolutionCall)
-                    factories[0].Value.Setup = factories[0].Value.Setup.WithAsResolutionCall();
+                if (singleMatchedFactory != null)
+                {
+                    // Add asResolutionCall or change the serviceKey to prevent the caching of expression as default (BBIssue: #382)
+                    if (!request.IsResolutionCall)
+                        singleMatchedFactory.Value.Setup = singleMatchedFactory.Value.Setup.WithAsResolutionCall();
+                    else
+                        request.ChangeServiceKey(singleMatchedFactory.Key);
+                    return singleMatchedFactory.Value; // we are done
+                }
             }
 
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
@@ -1367,24 +1374,24 @@ namespace DryIoc
             return selectedFactory;
         }
 
-        private static KV<object, Factory> FindFactoryWithTheMinReuseLifespan(KV<object, Factory>[] factories)
+        // Don't forget that we have the same public method Rules.SelectFactoryWithTheMinReuseLifespan
+        private static KV<object, Factory> FindFactoryWithTheMinReuseLifespanOrDefault(KV<object, Factory>[] factories)
         {
-            var minLifespan = int.MaxValue;
+            var minLifespan       = int.MaxValue;
             var multipleFactories = false;
             KV<object, Factory> minLifespanFactory = null;
+
             foreach (var factory in factories)
             {
                 var reuse = factory.Value.Reuse;
                 var lifespan = reuse == null || reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
-                if (lifespan < minLifespan)
-                {
-                    minLifespan = lifespan;
-                    minLifespanFactory = factory;
-                    multipleFactories = false;
-                }
-                else if (lifespan == minLifespan)
-                {
+                if (lifespan == minLifespan)
                     multipleFactories = true;
+                else if (lifespan < minLifespan)
+                {
+                    minLifespan        = lifespan;
+                    minLifespanFactory = factory;
+                    multipleFactories  = false;
                 }
             }
 
@@ -5556,6 +5563,37 @@ namespace DryIoc
                     return factory.Value;
             }
             return null;
+        }
+
+        /// <summary>Tries to select a single factory based on the minimal reuse life-span ignoring the Transients</summary>
+        public static FactorySelectorRule SelectFactoryWithTheMinReuseLifespan() => SelectFactoryWithTheMinReuseLifespan;
+
+        /// <summary>Tries either SelectFactoryWithTheMinReuseLifespan or SelectLastRegisteredFactory</summary>
+        public static FactorySelectorRule SelectFactoryWithTheMinReuseLifespanOrLastRegistered() => (request, factories) =>
+            SelectFactoryWithTheMinReuseLifespan(request, factories) ?? 
+            SelectLastRegisteredFactory(request, factories);
+
+        private static Factory SelectFactoryWithTheMinReuseLifespan(Request request, KeyValuePair<object, Factory>[] factories)
+        {
+            var minLifespan       = int.MaxValue;
+            var multipleFactories = false;
+            Factory minLifespanFactory = null;
+
+            foreach (var factory in factories)
+            {
+                var reuse = factory.Value.Reuse;
+                var lifespan = reuse == null || reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
+                if (lifespan == minLifespan)
+                    multipleFactories = true;
+                else if (lifespan < minLifespan)
+                {
+                    minLifespan        = lifespan;
+                    minLifespanFactory = factory.Value;
+                    multipleFactories  = false;
+                }
+            }
+
+            return !multipleFactories && minLifespanFactory != null ? minLifespanFactory : null;
         }
 
         /// <summary>Prefer specified service key (if found) over default key.
