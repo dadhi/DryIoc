@@ -4134,11 +4134,12 @@ namespace DryIoc
         public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
             container.CreateChild(newRules: container.Rules.WithFacadeRules(facadeKey));
 
-        /// <summary>The "child" container detached from the parent: 
+        /// <summary>The "child" container detached from the parent:
+        /// Child creation has O(1) cost - it is cheap thanks to the fast immutable collections cloning.
         /// Child has all parent registrations copied, then the registrations added or removed in the child are not affecting the parent.
         /// By default child will use the parent <see cref="IfAlreadyRegistered"/> policy - you may specify `IfAlreadyRegistered.Replace` to "shadow" the parent registrations
-        /// Child we have access to the scoped services and singletons already created by parent.
-        /// Child can be disposed without affecting the parent, disposing the child will dispose only the scoped services and singletons created in child and not in parent (can be opt-out)</summary>
+        /// Child has an access to the scoped services and singletons already created by parent.
+        /// Child can be disposed without affecting the parent, disposing the child will dispose only the scoped services and singletons created in the child and not in the parent (can be opt-out)</summary>
         public static IContainer CreateChild(this IContainer container, 
             IfAlreadyRegistered? ifAlreadyRegistered = null, Rules newRules = null, bool withDisposables = false)
         {
@@ -4150,7 +4151,6 @@ namespace DryIoc
                 RegistrySharing.CloneAndDropCache,
                 container.SingletonScope.Clone(withDisposables),
                 container.CurrentScope ?.Clone(withDisposables));
-
         }
 
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
