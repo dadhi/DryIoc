@@ -1600,7 +1600,7 @@ namespace DryIoc
             {
                 if (p.FactoryType == FactoryType.Decorator &&
                     p.DecoratedFactoryID == request.FactoryID)
-                    appliedIDs = appliedIDs.AppendOrUpdate(p.FactoryID);
+                    appliedIDs = appliedIDs.Append(p.FactoryID);
             }
             return appliedIDs;
         }
@@ -5089,7 +5089,7 @@ namespace DryIoc
                     var itemFactory = container.ResolveFactory(itemRequest);
                     var itemExpr = itemFactory?.GetExpressionOrDefault(itemRequest);
                     if (itemExpr != null)
-                        itemExprs = itemExprs.AppendOrUpdate(itemExpr);
+                        itemExprs = itemExprs.Append(itemExpr);
                 }
             }
 
@@ -5393,6 +5393,20 @@ namespace DryIoc
         }
     }
 
+    /// <summary>The options for the single dynamic registration provider</summary>
+    [Flags]
+    public enum DynamicRegistrationProviderFlags : byte
+    { 
+        /// <summary>Self explanatory</summary>
+        UseAsFallbackOnly = 1,
+        /// <summary>Provider may have the services provided</summary>
+        Service           = 1 << 1,
+        /// <summary>Provider may have the decorators provided</summary>
+        Decorator         = 1 << 2,
+        /// <summary>Provider may have the wrappers provided</summary>
+        Wrapper           = 1 << 3,
+    } 
+
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
     {
@@ -5613,16 +5627,27 @@ namespace DryIoc
         /// <summary>Providers for resolving multiple not-registered services. Null by default.</summary>
         public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
 
+        // private DynamicRegistrationProviderFlags[] _dynamicRegistrationProvidersFlags; // todo: @wip
+
+        /// <summary>Returns the new rules with the passed dynamic registration rule appended.</summary>
+        public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, DynamicRegistrationProviderFlags flags) =>
+            new Rules(_settings, FactorySelector, DefaultReuse,
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
+                DependencyResolutionCallExprs, ItemToExpressionConverter,
+                DynamicRegistrationProviders.Append(provider),
+                UnknownServiceResolvers, DefaultRegistrationServiceKey);
+
         // todo: Should I use Settings.UseDynamicRegistrationsAsFallback, 5 tests are failing only 
-        /// <summary>Return the new rules with the passed dynamic registration rules appended.</summary>
+        /// <summary>Returns the new rules with the passed dynamic registration rules appended.</summary>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders.Append(rules), 
+                UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         // todo: @bug @api overwrites the whole container settings with the `UseDynamicRegistrationsAsFallbackOnly`
-        /// <summary>Return the new rules with the passed dynamic registration rules appended. The rules applied only when no normal registrations found!</summary>
+        /// <summary>Returns the new rules with the passed dynamic registration rules appended. The rules applied only when no normal registrations found!</summary>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
             new Rules(_settings | Settings.UseDynamicRegistrationsAsFallbackOnly, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
@@ -6503,7 +6528,7 @@ namespace DryIoc
         private enum MadeDetails
         {
             NoConditionals = 0,
-            ImplTypeDependsOnRequest = 1 << 1,
+            ImplTypeDependsOnRequest = 1 << 1, // todo: @unclear I am not sure why I am using shift to 1 as first and then shift to 3
             ImplMemberDependsOnRequest = 1 << 3,
             HasCustomDependencyValue = 1 << 4
         }
@@ -10872,7 +10897,7 @@ namespace DryIoc
                         TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, member.Details)
                         ?? container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
                     if (memberExpr != null)
-                        assignments = ArrayTools.AppendOrUpdate(assignments, Bind(member.Member, memberExpr));
+                        assignments = assignments.Append(Bind(member.Member, memberExpr));
                     else if (request.IfUnresolved == IfUnresolved.ReturnDefault)
                         return null;
                 }

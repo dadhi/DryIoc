@@ -1527,6 +1527,18 @@ namespace ImTools
             return result;
         }
 
+        /// <summary>Append a single item value at the end of source array and returns its copy</summary>
+        public static T[] Append<T>(this T[] source, T value)
+        {
+            if (source == null || source.Length == 0)
+                return new[] { value };
+            var count = source.Length;
+            var result = new T[count + 1];
+            Array.Copy(source, 0, result, 0, count);
+            result[count] = value;
+            return result;
+        }
+
         /// <summary>Performant concat of enumerables in case of arrays.
         /// But performance will degrade if you use Concat().Where().</summary>
         /// <typeparam name="T">Type of item.</typeparam>
