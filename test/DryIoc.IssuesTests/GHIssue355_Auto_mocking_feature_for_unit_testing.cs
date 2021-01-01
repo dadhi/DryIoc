@@ -66,38 +66,34 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        // todo: @cleanup this test or remove it completely
         [Test]
         public void TestCase_Try_without_dynamic_registration()
         {
+            var testDynamicResolutionAttempts = 0;
+
             var prodContainer = new Container();
 
             using (var container = prodContainer.CreateChild(IfAlreadyRegistered.Replace,
-                prodContainer.Rules.WithDynamicRegistrationsAsFallback(
+                prodContainer.Rules.WithDynamicRegistration(
                     (serviceType, serviceKey) =>
                     {
+                        ++testDynamicResolutionAttempts;
                         if (serviceType.IsInterface && serviceType.IsOpenGeneric() == false)
                         {
                             var mockType = typeof(Mock<>).MakeGenericType(serviceType);
                             return new[]
                             {
                                 new DynamicRegistration(
-                                    new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton, null, serviceType),
+                                    new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton, Setup.Default, serviceType),
                                     IfAlreadyRegistered.Keep),
                             };
                         }
                         return null;
-                    })))
+                    },
+                    DynamicRegistrationProviderFlags.Service | DynamicRegistrationProviderFlags.UseAsFallback)
+                ))
             {
                 container.Register(typeof(Mock<>), Reuse.Singleton, made: FactoryMethod.DefaultConstructor());
-
-                // todo: does not work and probably won't work
-                // container.Register<object>(
-                //     made: Made.Of(r => FactoryMethod.Of(
-                //         typeof(Mock).GetProperty(nameof(Mock.Object)),
-                //         ServiceInfo.Of(typeof(Mock<>).MakeGenericType(r.ServiceType)))),
-                //     setup: Setup.With(condition: 
-                //         r => r.ServiceType.IsInterface && r.ServiceType.IsOpenGeneric() == false));
 
                 container.Register<UnitOfWork>(Reuse.Singleton);
 
@@ -119,6 +115,8 @@ namespace DryIoc.IssuesTests
                 Assert.AreEqual(expected, actual);
                 container.Resolve<Mock<IDep>>()
                     .Verify(instance => instance.Method());
+
+                Assert.AreEqual(1, testDynamicResolutionAttempts);
             }
         }
 
