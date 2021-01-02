@@ -67,7 +67,7 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void TestCase_Try_without_dynamic_registration()
+        public void TestCase_with_dynamic_registration()
         {
             var testDynamicResolutionAttempts = 0;
 
@@ -117,6 +117,71 @@ namespace DryIoc.IssuesTests
                     .Verify(instance => instance.Method());
 
                 Assert.AreEqual(1, testDynamicResolutionAttempts);
+            }
+        }
+
+        [Test]
+        public void TestCase_with_dynamic_registration_full_example()
+        {
+            var prodContainer = new Container();
+
+            using (var container = prodContainer.CreateChild(IfAlreadyRegistered.Replace,
+                prodContainer.Rules.WithDynamicRegistration(
+                    (serviceType, serviceKey) =>
+                    {
+                        // ignore services with non-default key
+                        if (serviceKey != null)
+                            return null;
+
+                        // ignore objects
+                        if (serviceType == typeof(object))
+                            return null;
+
+                        // get the Mock object for the abstract class or interface
+                        if (serviceType.IsInterface || serviceType.IsAbstract)
+                        {
+                            // except for the open-generic ones
+                            if (serviceType.IsGenericType && serviceType.IsOpenGeneric())
+                                return null;
+
+                            var mockType = typeof(Mock<>).MakeGenericType(serviceType);
+
+                            var mockFactory = new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton);
+
+                            return new[] { new DynamicRegistration(mockFactory, IfAlreadyRegistered.Keep) };
+                        }
+
+                        // concrete types
+                        var concreteTypeFactory = new ReflectionFactory(serviceType, Reuse.Singleton,
+                            FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
+
+                        return new[] { new DynamicRegistration(concreteTypeFactory) };
+                    }, 
+                    DynamicRegistrationProviderFlags.Service | DynamicRegistrationProviderFlags.UseAsFallback)
+                ))
+            {
+                container.Register(typeof(Mock<>), Reuse.Singleton, FactoryMethod.DefaultConstructor());
+
+                container.Register<UnitOfWork>(Reuse.Singleton);
+
+                // Arrangements
+                const bool expected = true;
+
+                container.Resolve<Mock<IDep>>()
+                    .Setup(instance => instance.Method())
+                    .Returns(expected);
+
+                // Get concrete type instance of tested unit 
+                // all dependencies are fulfilled with mocked instances
+                var unit = container.Resolve<UnitOfWork>();
+
+                // Action
+                var actual = unit.InvokeDep();
+
+                // Assertion
+                Assert.AreEqual(expected, actual);
+                container.Resolve<Mock<IDep>>()
+                    .Verify(instance => instance.Method());
             }
         }
 
