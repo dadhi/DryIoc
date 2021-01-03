@@ -133,7 +133,6 @@ namespace DryIoc.IssuesTests
                         if (serviceKey != null)
                             return null;
 
-                        // ignore objects
                         if (serviceType == typeof(object))
                             return null;
 

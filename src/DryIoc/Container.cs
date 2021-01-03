@@ -5732,16 +5732,18 @@ namespace DryIoc
 
         // todo: @bug @api overwrites the whole container settings with the `UseDynamicRegistrationsAsFallbackOnly`
         /// <summary>Returns the new rules with the passed dynamic registration rules appended. The rules applied only when no normal registrations found!</summary>
-        public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
-            new Rules(_settings | Settings.UseDynamicRegistrationsAsFallbackOnly, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders.Append(rules),
-                WithDynamicRegistrationProviderFlags(rules?.Length ?? 0, _defaultDynamicRegistrationProviderFlags | DynamicRegistrationProviderFlags.UseAsFallback),
-                UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules)
+        {
+            var newRules = Clone(cloneMade: false);
+            newRules._settings |= Settings.UseDynamicRegistrationsAsFallbackOnly;
+            newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(rules);
+            newRules._dynamicRegistrationProviderFlags = WithDynamicRegistrationProviderFlags(
+                rules?.Length ?? 0, _defaultDynamicRegistrationProviderFlags | DynamicRegistrationProviderFlags.UseAsFallback);
+            return newRules;
+        }
 
         private DynamicRegistrationProviderFlags[] WithDynamicRegistrationProviderFlags(int count, DynamicRegistrationProviderFlags flags)
-        {   
+        {
             if (count == 0)
                 return _dynamicRegistrationProviderFlags;
 
@@ -6262,8 +6264,8 @@ namespace DryIoc
         }
 
         private Rules Clone(bool cloneMade) =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                cloneMade ? _made.Copy() : _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
+            new Rules(_settings, FactorySelector, DefaultReuse, cloneMade ? _made.Copy() : _made, 
+                DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter, DynamicRegistrationProviders, 
                 _dynamicRegistrationProviderFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
