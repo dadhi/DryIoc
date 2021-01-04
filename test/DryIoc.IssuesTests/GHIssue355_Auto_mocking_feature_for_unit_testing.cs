@@ -34,7 +34,7 @@ namespace DryIoc.IssuesTests
                 Assert.AreEqual(expected, actual);
                 container.Resolve<Mock<IDep>>()
                     .Verify(instance => instance.Method());
-                // Assert.AreEqual(1, container.MockAttempts);// todo: does not work yet
+                Assert.AreEqual(1, container.MockAttempts);
             }
         }
 
@@ -62,7 +62,7 @@ namespace DryIoc.IssuesTests
 
                 // Assertion
                 Assert.AreEqual(expected, actual);
-                // Assert.AreEqual(0, container.MockAttempts); // todo: does not work yet
+                Assert.AreEqual(0, container.MockAttempts);
             }
         }
 
@@ -125,42 +125,8 @@ namespace DryIoc.IssuesTests
         {
             var prodContainer = new Container();
 
-            using (var container = prodContainer.CreateChild(IfAlreadyRegistered.Replace,
-                prodContainer.Rules.WithDynamicRegistration(
-                    (serviceType, serviceKey) =>
-                    {
-                        // ignore services with non-default key
-                        if (serviceKey != null)
-                            return null;
-
-                        if (serviceType == typeof(object))
-                            return null;
-
-                        // get the Mock object for the abstract class or interface
-                        if (serviceType.IsInterface || serviceType.IsAbstract)
-                        {
-                            // except for the open-generic ones
-                            if (serviceType.IsGenericType && serviceType.IsOpenGeneric())
-                                return null;
-
-                            var mockType = typeof(Mock<>).MakeGenericType(serviceType);
-
-                            var mockFactory = new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton);
-
-                            return new[] { new DynamicRegistration(mockFactory, IfAlreadyRegistered.Keep) };
-                        }
-
-                        // concrete types
-                        var concreteTypeFactory = new ReflectionFactory(serviceType, Reuse.Singleton,
-                            FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
-
-                        return new[] { new DynamicRegistration(concreteTypeFactory) };
-                    }, 
-                    DynamicRegistrationProviderFlags.Service | DynamicRegistrationProviderFlags.UseAsFallback)
-                ))
+            using (var container = CreateTestContainer(prodContainer))
             {
-                container.Register(typeof(Mock<>), Reuse.Singleton, FactoryMethod.DefaultConstructor());
-
                 container.Register<UnitOfWork>(Reuse.Singleton);
 
                 // Arrangements
@@ -182,6 +148,45 @@ namespace DryIoc.IssuesTests
                 container.Resolve<Mock<IDep>>()
                     .Verify(instance => instance.Method());
             }
+        }
+
+        public static IContainer CreateTestContainer(IContainer container)
+        {
+            var c = container.CreateChild(IfAlreadyRegistered.Replace,
+                container.Rules.WithDynamicRegistration((serviceType, serviceKey) =>
+                {
+                    // ignore services with non-default key
+                    if (serviceKey != null)
+                        return null;
+
+                    if (serviceType == typeof(object))
+                        return null;
+
+                    // get the Mock object for the abstract class or interface
+                    if (serviceType.IsInterface || serviceType.IsAbstract)
+                    {
+                        // except for the open-generic ones
+                        if (serviceType.IsGenericType && serviceType.IsOpenGeneric())
+                            return null;
+
+                        var mockType = typeof(Mock<>).MakeGenericType(serviceType);
+
+                        var mockFactory = new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton);
+
+                        return new[] { new DynamicRegistration(mockFactory, IfAlreadyRegistered.Keep) };
+                    }
+
+                    // concrete types
+                    var concreteTypeFactory = new ReflectionFactory(serviceType, Reuse.Singleton,
+                        FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
+
+                    return new[] { new DynamicRegistration(concreteTypeFactory) };
+                }, 
+                DynamicRegistrationProviderFlags.Service | DynamicRegistrationProviderFlags.UseAsFallback));
+
+            c.Register(typeof(Mock<>), Reuse.Singleton, FactoryMethod.DefaultConstructor());
+
+            return c;
         }
 
         public interface IDep
@@ -218,7 +223,7 @@ namespace DryIoc.IssuesTests
 
             public TestContainer(IContainer container = null)
             {
-                _container = (container ?? new Container()).With(rules => rules.WithDynamicRegistrationsAsFallback(
+                _container = (container ?? new Container()).With(rules => rules.WithDynamicRegistration(
                     (serviceType, serviceKey) =>
                     {
                         ++MockAttempts;
@@ -233,7 +238,8 @@ namespace DryIoc.IssuesTests
                             };
                         }
                         return null;
-                    }
+                    },
+                    DynamicRegistrationProviderFlags.Service | DynamicRegistrationProviderFlags.UseAsFallback
                 ));
 
                 _container.Register(typeof(Mock<>), Reuse.Singleton, made: FactoryMethod.DefaultConstructor());

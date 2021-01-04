@@ -4167,7 +4167,7 @@ namespace DryIoc
     public static class ContainerTools
     {
         /// <summary>The default key for services registered into container created by <see cref="CreateFacade"/></summary>
-        public const string FacadeKey = "@facade"; // todo: use invisible keys #555
+        public const string FacadeKey = "@facade";
 
         /// <summary>Uses the provided or the default <see cref="FacadeKey" /> to tweak the rules
         /// to use with the `CreateFacade` methods</summary>
@@ -13720,7 +13720,7 @@ namespace DryIoc
         /// <summary>Returns true if class is compiler generated. Checking for CompilerGeneratedAttribute
         /// is not enough, because this attribute is not applied for classes generated from "async/await".</summary>
         public static bool IsCompilerGenerated(this Type type) =>
-            type.FullName != null && type.FullName.Contains("<>c__DisplayClass");
+            type.FullName != null && type.FullName.Contains("<>c__DisplayClass"); // todo: @perf simplify the check
 
         /// <summary>Returns true if type is generic.</summary>
         public static bool IsGeneric(this Type type) =>
