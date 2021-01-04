@@ -1158,7 +1158,7 @@ namespace DryIoc
 
             // Most common case when we have a single default factory and no dynamic rules to always apply
             if (entry is Factory singleDefaultFactory && !Rules.HasDynamicRegistrationProvider(
-                DynamicRegistrationProviderFlags.Service, withoutFlags: DynamicRegistrationProviderFlags.UseAsFallback)) 
+                DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)) 
             {
                 if (serviceKey != null && serviceKey != DefaultKey.Value || 
                     !singleDefaultFactory.CheckCondition(request) ||
@@ -1176,16 +1176,16 @@ namespace DryIoc
             if (!factories.IsNullOrEmpty()) // check for the additional (not the fallback) factories, because we have the standard factories
             {
                 if (Rules.HasDynamicRegistrationProvider(
-                    DynamicRegistrationProviderFlags.Service, withoutFlags: DynamicRegistrationProviderFlags.UseAsFallback))
+                    DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
                     factories = CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationProviderFlags.Service, DynamicRegistrationProviderFlags.UseAsFallback,
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback,
                         factories, true, FactoryType.Service, serviceType, serviceKey);
             }
             else // otherwise when no standard factories are found get the fallback as well as always applied dynamic registrations
             {
-                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationProviderFlags.Service))
+                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service))
                     factories = CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationProviderFlags.Service, DynamicRegistrationProviderFlags.NoFlags,
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.NoFlags,
                         factories, true, FactoryType.Service, serviceType, serviceKey);
             }
 
@@ -1279,7 +1279,7 @@ namespace DryIoc
             if (entry is Factory singleDefaultFactory)
             {
                 if (!Rules.HasDynamicRegistrationProvider(
-                    DynamicRegistrationProviderFlags.Service, withoutFlags: DynamicRegistrationProviderFlags.UseAsFallback))
+                    DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
                     return request.MatchFactoryConditionAndMetadata(singleDefaultFactory)
                         ? Rules.FactorySelector(request, DefaultKey.Value.Pair<object, Factory>(singleDefaultFactory).One())
                         : null;
@@ -1332,16 +1332,16 @@ namespace DryIoc
             if (factories.Length != 0)
             {
                 if (Rules.HasDynamicRegistrationProvider(
-                    DynamicRegistrationProviderFlags.Service, withoutFlags: DynamicRegistrationProviderFlags.UseAsFallback))
+                    DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
                     factories = CombineRegisteredWithDynamicFactories( 
-                        DynamicRegistrationProviderFlags.Service, DynamicRegistrationProviderFlags.UseAsFallback,
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback,
                         factories, true, FactoryType.Service, serviceType);
             }
             else
             {
-                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationProviderFlags.Service))
+                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service))
                     factories = CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationProviderFlags.Service, DynamicRegistrationProviderFlags.NoFlags,
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.NoFlags,
                         factories, true, FactoryType.Service, serviceType);
             }
 
@@ -1437,16 +1437,16 @@ namespace DryIoc
             if (!factories.IsNullOrEmpty())
             {
                 if (Rules.HasDynamicRegistrationProvider(
-                    DynamicRegistrationProviderFlags.Service, DynamicRegistrationProviderFlags.UseAsFallback))
+                    DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback))
                     return CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationProviderFlags.Service, DynamicRegistrationProviderFlags.UseAsFallback,
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback,
                         factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
             }
             else
             {
-                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationProviderFlags.Service))
+                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service))
                     return CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationProviderFlags.Service, DynamicRegistrationProviderFlags.NoFlags,
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.NoFlags,
                         factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
             }
 
@@ -1662,17 +1662,17 @@ namespace DryIoc
             if (!decorators.IsNullOrEmpty())
             {
                 if (Rules.HasDynamicRegistrationProvider(
-                    DynamicRegistrationProviderFlags.Decorator, withoutFlags: DynamicRegistrationProviderFlags.UseAsFallback))
+                    DynamicRegistrationFlags.Decorator, withoutFlags: DynamicRegistrationFlags.AsFallback))
                     return CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationProviderFlags.Decorator, DynamicRegistrationProviderFlags.UseAsFallback,
+                        DynamicRegistrationFlags.Decorator, DynamicRegistrationFlags.AsFallback,
                         decorators?.Map(d => new KV<object, Factory>(DefaultKey.Value, d)),
                         true, FactoryType.Decorator, serviceType).Map(x => x.Value);
             }
             else
             {
-                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationProviderFlags.Decorator))
+                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Decorator))
                     return CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationProviderFlags.Decorator, DynamicRegistrationProviderFlags.NoFlags,
+                        DynamicRegistrationFlags.Decorator, DynamicRegistrationFlags.NoFlags,
                         Empty<KV<object, Factory>>(), true, FactoryType.Decorator, serviceType).Map(x => x.Value);
             }
 
@@ -1789,7 +1789,7 @@ namespace DryIoc
         }
 
         private KV<object, Factory>[] CombineRegisteredWithDynamicFactories( 
-            DynamicRegistrationProviderFlags withFlags, DynamicRegistrationProviderFlags withoutFlags,
+            DynamicRegistrationFlags withFlags, DynamicRegistrationFlags withoutFlags,
             KV<object, Factory>[] registeredFactories, bool bothClosedAndOpenGenerics, FactoryType factoryType, Type serviceType, object serviceKey = null)
         {
             var dynamicServices = Rules.DynamicRegistrationProviders;
@@ -5441,20 +5441,19 @@ namespace DryIoc
         }
     }
 
-    /// <summary>The options for the single dynamic registration provider</summary>
+    /// <summary>The options for the single dynamic registration provider.
+    /// The dynamic Wrapper registration is not supported.</summary>
     [Flags]
-    public enum DynamicRegistrationProviderFlags : byte
+    public enum DynamicRegistrationFlags : byte
     {
         /// <summary>No flags - to use in `GetDynamicRegistrationProvidersOrDefault`</summary>
         NoFlags       = 0,
         /// <summary>Use as AsFallback only</summary>
-        UseAsFallback = 1,
+        AsFallback = 1,
         /// <summary>Provider may have the services provided</summary>
         Service       = 1 << 1,
         /// <summary>Provider may have the decorators provided</summary>
-        Decorator     = 1 << 2,
-        /// <summary>Provider may have the wrappers provided</summary>
-        Wrapper       = 1 << 3,
+        Decorator     = 1 << 2
     } 
 
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
@@ -5679,13 +5678,13 @@ namespace DryIoc
         public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
 
         /// <summary>The flags per dynamic registration provider</summary>
-        public DynamicRegistrationProviderFlags[] _dynamicRegistrationProviderFlags { get; private set; }
-        private static DynamicRegistrationProviderFlags _defaultDynamicRegistrationProviderFlags = 
-            DynamicRegistrationProviderFlags.Service | DynamicRegistrationProviderFlags.Decorator | DynamicRegistrationProviderFlags.Wrapper;
+        public DynamicRegistrationFlags[] _dynamicRegistrationProviderFlags { get; private set; }
+        private static DynamicRegistrationFlags _defaultDynamicRegistrationProviderFlags = 
+            DynamicRegistrationFlags.Service | DynamicRegistrationFlags.Decorator;
 
         /// <summary>Get the specific providers with the specified flags and without the flags or return `null` if nothing found</summary>
-        public bool HasDynamicRegistrationProvider(DynamicRegistrationProviderFlags withFlags, 
-            DynamicRegistrationProviderFlags withoutFlags = DynamicRegistrationProviderFlags.NoFlags)
+        public bool HasDynamicRegistrationProvider(DynamicRegistrationFlags withFlags, 
+            DynamicRegistrationFlags withoutFlags = DynamicRegistrationFlags.NoFlags)
         {
             var allFlags   = _dynamicRegistrationProviderFlags;
             if (allFlags == null || allFlags.Length == 0)
@@ -5699,7 +5698,7 @@ namespace DryIoc
         }
 
         /// <summary>Returns the new rules with the passed dynamic registration rule appended.</summary>
-        public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, DynamicRegistrationProviderFlags flags) =>
+        public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, DynamicRegistrationFlags flags) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
@@ -5724,11 +5723,11 @@ namespace DryIoc
             newRules._settings |= Settings.UseDynamicRegistrationsAsFallbackOnly;
             newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(rules);
             newRules._dynamicRegistrationProviderFlags = WithDynamicRegistrationProviderFlags(
-                rules?.Length ?? 0, _defaultDynamicRegistrationProviderFlags | DynamicRegistrationProviderFlags.UseAsFallback);
+                rules?.Length ?? 0, _defaultDynamicRegistrationProviderFlags | DynamicRegistrationFlags.AsFallback);
             return newRules;
         }
 
-        private DynamicRegistrationProviderFlags[] WithDynamicRegistrationProviderFlags(int count, DynamicRegistrationProviderFlags flags)
+        private DynamicRegistrationFlags[] WithDynamicRegistrationProviderFlags(int count, DynamicRegistrationFlags flags)
         {
             if (count == 0)
                 return _dynamicRegistrationProviderFlags;
@@ -5736,7 +5735,7 @@ namespace DryIoc
             if (count == 1)
                 return _dynamicRegistrationProviderFlags.Append(flags);
 
-            var newFlags = new DynamicRegistrationProviderFlags[count];
+            var newFlags = new DynamicRegistrationFlags[count];
             for (var i = 0; i < newFlags.Length; i++)
                 newFlags[i] = flags;
             return _dynamicRegistrationProviderFlags.Append(newFlags);
@@ -6231,7 +6230,7 @@ namespace DryIoc
             int dependencyCountInLambdaToSplitBigObjectGraph,
             Ref<ImHashMap<Request, System.Linq.Expressions.Expression>> dependencyResolutionCallExprs,
             ItemToExpressionConverterRule itemToExpressionConverter,
-            DynamicRegistrationProvider[] dynamicRegistrationProviders, DynamicRegistrationProviderFlags[] dynamicRegistrationProvidersFlags,
+            DynamicRegistrationProvider[] dynamicRegistrationProviders, DynamicRegistrationFlags[] dynamicRegistrationProvidersFlags,
             UnknownServiceResolver[] unknownServiceResolvers,
             object defaultRegistrationServiceKey)
         {

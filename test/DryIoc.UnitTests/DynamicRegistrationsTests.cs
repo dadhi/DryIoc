@@ -86,6 +86,12 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<B>(x);
         }
 
+        public class F<T> 
+        {
+            public readonly T X;
+            public F(T x) => X = x;
+        }
+
         [Test]
         public void Can_replace_normal_by_dynamic_registration()
         {

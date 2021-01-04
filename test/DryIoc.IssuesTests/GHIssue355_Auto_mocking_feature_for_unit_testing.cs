@@ -90,7 +90,7 @@ namespace DryIoc.IssuesTests
                         }
                         return null;
                     },
-                    DynamicRegistrationProviderFlags.Service | DynamicRegistrationProviderFlags.UseAsFallback)
+                    DynamicRegistrationFlags.Service | DynamicRegistrationFlags.AsFallback)
                 ))
             {
                 container.Register(typeof(Mock<>), Reuse.Singleton, made: FactoryMethod.DefaultConstructor());
@@ -182,7 +182,7 @@ namespace DryIoc.IssuesTests
 
                     return new[] { new DynamicRegistration(concreteTypeFactory) };
                 }, 
-                DynamicRegistrationProviderFlags.Service | DynamicRegistrationProviderFlags.UseAsFallback));
+                DynamicRegistrationFlags.Service | DynamicRegistrationFlags.AsFallback));
 
             c.Register(typeof(Mock<>), Reuse.Singleton, FactoryMethod.DefaultConstructor());
 
@@ -239,7 +239,7 @@ namespace DryIoc.IssuesTests
                         }
                         return null;
                     },
-                    DynamicRegistrationProviderFlags.Service | DynamicRegistrationProviderFlags.UseAsFallback
+                    DynamicRegistrationFlags.Service | DynamicRegistrationFlags.AsFallback
                 ));
 
                 _container.Register(typeof(Mock<>), Reuse.Singleton, made: FactoryMethod.DefaultConstructor());
