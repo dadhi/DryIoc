@@ -30,7 +30,7 @@ Updated DryIoc to v4.5.0 with the performance improvements and the new features
     </releaseNotes>
     <dependencies>
       <group>
-        <dependency id="DryIoc" version="4.5.0" />
+        <dependency id="DryIoc" version="4.7.0" />
         <dependency id="Microsoft.Extensions.DependencyInjection.Abstractions" version="3.1.8" />
       </group>
     </dependencies>

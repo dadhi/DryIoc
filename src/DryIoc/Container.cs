@@ -12607,8 +12607,7 @@ private ParameterServiceInfo(ParameterInfo p)
             ValidateFoundErrors = Of(
                 "Validate found the errors, please check the ContainerException.CollectedExceptions for details."),
             UnableToInterpretTheNestedLambda = Of(
-                "Unable to interpret the nested lambda with Body:" + NewLine +
-                "{0}");
+                "Unable to interpret the nested lambda with Body:" + NewLine + "{0}");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
