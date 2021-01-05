@@ -11998,12 +11998,12 @@ private ParameterServiceInfo(ParameterInfo p)
         public static IReuse InCurrentNamedScope(object name = null) => ScopedTo(name);
 
         /// <summary>Obsolete: Please use `ScopedToService` instead.</summary>
-		[Obsolete("Please use `ScopedToService` instead")]
+        [Obsolete("Please use `ScopedToService` instead")]
         public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null) =>
             ScopedToService(assignableFromServiceType, serviceKey);
 
         /// <summary>Obsolete: Please use `ScopedToService` instead.</summary>
-		[Obsolete("Please use `ScopedToService` instead.")]
+        [Obsolete("Please use `ScopedToService` instead.")]
         public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null) =>
             ScopedToService<TAssignableFromServiceType>(serviceKey);
 
