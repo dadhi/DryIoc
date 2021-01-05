@@ -48,7 +48,7 @@ __Note__: `OpenScope` is another way to create a new container from the existing
 
 ## CreateChild
 
-**Note:** The method is the recent addition in v4.8.0
+**Note:** The method is the recent addition in v4.7.0
 
 I was hesitating to add the method with such name for the long time because the users expected the different things from the "child" container as the default behavior. 
 

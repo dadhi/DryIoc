@@ -578,9 +578,10 @@ Basically `Reuse.InWebRequest` and `Reuse.InThread` are just a scope reuses:
 
 ## Reuse.ScopedTo service type
 
-`ScopedTo<TService>()` is the reuse of the same dependency instance in the service sub-tree.
-The concept is similar to the assigning of dependency object to variable and then passing (re-using) this variable 
-in the service tree.
+`ScopedTo<TService>(object serviceKey = null)` and `ScopedToService(Type serviceType, object serviceKey = null)` 
+define the reuse of the same dependency value in the service sub-graph.
+The concept is similar to the assigning of dependency value to the variable and then passing (re-using) this variable 
+inside the service and its other dependencies.
 
 ```cs md*/
 class Example_of_reusing_dependency_as_variable

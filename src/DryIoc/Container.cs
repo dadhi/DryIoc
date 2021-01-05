@@ -1793,7 +1793,7 @@ namespace DryIoc
             KV<object, Factory>[] registeredFactories, bool bothClosedAndOpenGenerics, FactoryType factoryType, Type serviceType, object serviceKey = null)
         {
             var dynamicServices = Rules.DynamicRegistrationProviders;
-            var dynamicFlags    = Rules._dynamicRegistrationProviderFlags;
+            var dynamicFlags    = Rules._dynamicRegistrationFlags;
             var resultFactories = registeredFactories;
 
             // Assign unique continuous keys across all of dynamic providers,
@@ -4378,7 +4378,7 @@ namespace DryIoc
                      changeDefaultReuse, condition);
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             Func<Type, object, IEnumerable<Type>> getImplTypes, Func<Type, Factory> factory = null) =>
             container.ThrowIfNull()
@@ -4386,18 +4386,18 @@ namespace DryIoc
                     Rules.AutoFallbackDynamicRegistrations(getImplTypes, factory)));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations((_, __) => implTypes);
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IReuse reuse, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations((_, __) => implTypes, implType => new ReflectionFactory(implType, reuse));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IReuse reuse, Setup setup, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations(
@@ -4405,7 +4405,7 @@ namespace DryIoc
                 implType => new ReflectionFactory(implType, reuse, setup: setup));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             Func<Type, object, IEnumerable<Assembly>> getImplTypeAssemblies,
             Func<Type, Factory> factory = null) =>
@@ -4424,13 +4424,13 @@ namespace DryIoc
                     factory)));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             params Assembly[] implTypeAssemblies) =>
             container.WithAutoFallbackDynamicRegistrations((_, __) => implTypeAssemblies);
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IEnumerable<Assembly> implTypeAssemblies) =>
             container.WithAutoFallbackDynamicRegistrations((_, __) => implTypeAssemblies);
@@ -5520,14 +5520,14 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, depth < 1 ? 1 : depth,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationProviderFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Sets the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/></summary>
         public Rules WithDependencyCountInLambdaToSplitBigObjectGraph(int dependencyCount) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, dependencyCount < 1 ? 1 : dependencyCount,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationProviderFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Does nothing</summary>
         [Obsolete("It does not work - use `WithoutDependencyCountInLambdaToSplitBigObjectGraph`")]
@@ -5584,7 +5584,7 @@ namespace DryIoc
                         made.PropertiesAndFields ?? _made.PropertiesAndFields),
                 DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationProviderFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Service key to be used instead on `null` in registration.</summary>
         public object DefaultRegistrationServiceKey { get; }
@@ -5595,7 +5595,7 @@ namespace DryIoc
                 new Rules(_settings, FactorySelector, DefaultReuse,
                     _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                     DependencyResolutionCallExprs, ItemToExpressionConverter,
-                    DynamicRegistrationProviders, _dynamicRegistrationProviderFlags, UnknownServiceResolvers, serviceKey);
+                    DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, serviceKey);
 
         /// <summary>Defines single factory selector delegate.</summary>
         /// <param name="request">Provides service request leading to factory selection.</param>
@@ -5613,7 +5613,7 @@ namespace DryIoc
             new Rules(_settings | (rule == SelectLastRegisteredFactory ? Settings.SelectLastRegisteredFactory : default(Settings)),
                 rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationProviderFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Select last registered factory from the multiple default.</summary>
         public static FactorySelectorRule SelectLastRegisteredFactory() => SelectLastRegisteredFactory;
@@ -5678,15 +5678,15 @@ namespace DryIoc
         public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
 
         /// <summary>The flags per dynamic registration provider</summary>
-        public DynamicRegistrationFlags[] _dynamicRegistrationProviderFlags { get; private set; }
-        private static DynamicRegistrationFlags _defaultDynamicRegistrationProviderFlags = 
+        public DynamicRegistrationFlags[] _dynamicRegistrationFlags { get; private set; }
+        private static DynamicRegistrationFlags _defaultDynamicRegistrationFlags = 
             DynamicRegistrationFlags.Service | DynamicRegistrationFlags.Decorator;
 
         /// <summary>Get the specific providers with the specified flags and without the flags or return `null` if nothing found</summary>
         public bool HasDynamicRegistrationProvider(DynamicRegistrationFlags withFlags, 
             DynamicRegistrationFlags withoutFlags = DynamicRegistrationFlags.NoFlags)
         {
-            var allFlags   = _dynamicRegistrationProviderFlags;
+            var allFlags   = _dynamicRegistrationFlags;
             if (allFlags == null || allFlags.Length == 0)
                 return false;
 
@@ -5698,47 +5698,47 @@ namespace DryIoc
         }
 
         /// <summary>Returns the new rules with the passed dynamic registration rule appended.</summary>
-        public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, DynamicRegistrationFlags flags) =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders.Append(provider), _dynamicRegistrationProviderFlags.Append(flags), 
-                UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, DynamicRegistrationFlags flags)
+        {
+            var newRules = Clone(cloneMade: false);
+            newRules._settings |= Settings.UseDynamicRegistrationsAsFallbackOnly;
+            newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(provider);
+            newRules._dynamicRegistrationFlags = _dynamicRegistrationFlags.Append(flags);
+            return newRules;
+        }
 
-        // todo: Should I use Settings.UseDynamicRegistrationsAsFallback, 5 tests are failing only 
         /// <summary>Returns the new rules with the passed dynamic registration rules appended.</summary>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders.Append(rules), 
-                WithDynamicRegistrationProviderFlags(rules?.Length ?? 0, _defaultDynamicRegistrationProviderFlags),
-                UnknownServiceResolvers, DefaultRegistrationServiceKey);
+            WithDynamicRegistrations(_defaultDynamicRegistrationFlags, rules);
 
-        // todo: @bug @api overwrites the whole container settings with the `UseDynamicRegistrationsAsFallbackOnly`
-        /// <summary>Returns the new rules with the passed dynamic registration rules appended. The rules applied only when no normal registrations found!</summary>
-        public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules)
+        /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
+        /// The rules applied only when no normal registrations found!</summary>
+        public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
+            WithDynamicRegistrations(_defaultDynamicRegistrationFlags | DynamicRegistrationFlags.AsFallback, rules);
+
+        /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
+        /// The rules applied only when no normal registrations found!</summary>
+        public Rules WithDynamicRegistrations(DynamicRegistrationFlags flags, params DynamicRegistrationProvider[] rules)
         {
             var newRules = Clone(cloneMade: false);
             newRules._settings |= Settings.UseDynamicRegistrationsAsFallbackOnly;
             newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(rules);
-            newRules._dynamicRegistrationProviderFlags = WithDynamicRegistrationProviderFlags(
-                rules?.Length ?? 0, _defaultDynamicRegistrationProviderFlags | DynamicRegistrationFlags.AsFallback);
+            newRules._dynamicRegistrationFlags = WithDynamicRegistrationProviderFlags(rules?.Length ?? 0, flags);
             return newRules;
         }
 
         private DynamicRegistrationFlags[] WithDynamicRegistrationProviderFlags(int count, DynamicRegistrationFlags flags)
         {
             if (count == 0)
-                return _dynamicRegistrationProviderFlags;
+                return _dynamicRegistrationFlags;
 
             if (count == 1)
-                return _dynamicRegistrationProviderFlags.Append(flags);
+                return _dynamicRegistrationFlags.Append(flags);
 
             var newFlags = new DynamicRegistrationFlags[count];
             for (var i = 0; i < newFlags.Length; i++)
                 newFlags[i] = flags;
-            return _dynamicRegistrationProviderFlags.Append(newFlags);
+            return _dynamicRegistrationFlags.Append(newFlags);
         }
 
         // todo: @obsolete
@@ -5757,7 +5757,7 @@ namespace DryIoc
         public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
-                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationProviderFlags, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags, 
                 UnknownServiceResolvers.Append(rules), DefaultRegistrationServiceKey);
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
@@ -5766,7 +5766,7 @@ namespace DryIoc
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
-                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationProviderFlags, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags, 
                 UnknownServiceResolvers.Remove(rule), DefaultRegistrationServiceKey);
 
         /// <summary>Sugar on top of <see cref="WithUnknownServiceResolvers"/> to simplify setting the diagnostic action.
@@ -5843,7 +5843,7 @@ namespace DryIoc
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
             new Rules(_settings | Settings.AutoConcreteTypeResolution, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
-                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationProviderFlags,
+                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags,
                 UnknownServiceResolvers.Append(AutoResolveConcreteTypeRule(condition)), DefaultRegistrationServiceKey);
 
         /// <summary>Creates dynamic fallback registrations for the requested service type
@@ -5927,7 +5927,7 @@ namespace DryIoc
         public Rules WithDefaultReuse(IReuse reuse) =>
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
-                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationProviderFlags,
+                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags,
                 UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Replaced by WithDefaultReuse because for some cases InsteadOfTransient does not make sense.</summary>
@@ -5949,7 +5949,7 @@ namespace DryIoc
         public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
-                itemToExpressionOrDefault, DynamicRegistrationProviders, _dynamicRegistrationProviderFlags,
+                itemToExpressionOrDefault, DynamicRegistrationProviders, _dynamicRegistrationFlags,
                 UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithoutThrowIfDependencyHasShorterReuseLifespan"/>.</summary>
@@ -6030,7 +6030,7 @@ namespace DryIoc
             new Rules(GetSettingsForExpressionGeneration(allowRuntimeState), FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty), ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationProviderFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Indicates that rules are used for the validation, e.g. the rules created in `Validate` method</summary>
         public bool UsedForValidation => (_settings & Settings.UsedForValidation) != 0;
@@ -6045,7 +6045,7 @@ namespace DryIoc
         public Rules ForValidate() =>
             new Rules(GetSettingsForValidation(), 
                 FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, int.MaxValue, null, 
-                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationProviderFlags, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags, 
                 UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="ImplicitCheckForReuseMatchingScope"/></summary>
@@ -6101,7 +6101,7 @@ namespace DryIoc
             rule == DefaultIfAlreadyRegistered ? this :
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, rule, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationProviderFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
         public bool ThrowIfRuntimeStateRequired =>
@@ -6243,7 +6243,7 @@ namespace DryIoc
             DependencyResolutionCallExprs = dependencyResolutionCallExprs;
             ItemToExpressionConverter = itemToExpressionConverter;
             DynamicRegistrationProviders = dynamicRegistrationProviders;
-            _dynamicRegistrationProviderFlags = dynamicRegistrationProvidersFlags;
+            _dynamicRegistrationFlags = dynamicRegistrationProvidersFlags;
             UnknownServiceResolvers = unknownServiceResolvers;
             DefaultRegistrationServiceKey = defaultRegistrationServiceKey;
         }
@@ -6252,7 +6252,7 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse, cloneMade ? _made.Copy() : _made, 
                 DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter, DynamicRegistrationProviders, 
-                _dynamicRegistrationProviderFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         private Rules WithSettings(Settings newSettings)
         {
