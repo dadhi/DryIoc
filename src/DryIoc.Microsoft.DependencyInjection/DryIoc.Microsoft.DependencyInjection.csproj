@@ -3,7 +3,7 @@
         <TargetFrameworks>netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
-        <VersionPrefix>5.0.0</VersionPrefix>
+        <VersionPrefix>5.1.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -15,6 +15,12 @@
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+
+## v5.1.0
+
+- #364: [MS.DI] Allow to provide RegistrySharing parameter to DryIocServiceProviderFactory to avoid cache dropping
+- Updated DryIoc to v4.7.0
+
 ## v5.0.0
 
 Updated DryIoc to v4.5.0 with the performance improvements and the new features

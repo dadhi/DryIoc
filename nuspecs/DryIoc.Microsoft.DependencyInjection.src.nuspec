@@ -2,9 +2,9 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.Microsoft.DependencyInjection.src</id>
-    <version>5.0.0</version>
+    <version>5.1.0</version>
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
+    <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
     <license type="expression">MIT</license>
     <icon>logo.png</icon>
@@ -13,6 +13,12 @@
     <tags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</tags>
     <releaseNotes>
 <![CDATA[
+
+## v5.1.0
+
+- #364: [MS.DI] Allow to provide RegistrySharing parameter to DryIocServiceProviderFactory to avoid cache dropping
+- Updated DryIoc to v4.7.0
+
 ## v5.0.0
 
 Updated DryIoc to v4.5.0 with the performance improvements and the new features

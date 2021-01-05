@@ -1,6 +1,17 @@
 Version History
 ---------------
 
+## v4.7.0 Feature release / 2021-01-05
+
+- #338 Child container disposes parent container singletons
+- #355 Auto mocking feature for unit testing
+- #356 Surface the FindFactoryWithTheMinReuseLifespan so it can be used together with the FactorySelector
+- #357 Avoid overload ambiguity for the ScopedTo(Type) by adding the separate ScopedToService
+- #358 Add and surface the Scope.Clone(withDisposables=false) to enable more ChildContainer scenarios
+- #359 DynamicRegistrationsAsFallback being unnecessary called multiple times
+- #360 Mark DynamicRegistrationProvider with the FactoryType (Service, Decorator or combination) to avoid unnecessary provider call and factory creation
+- #363 Add CreateChild method as the basis for CreateFacade and such
+
 ## v4.6.0 Feature release / 2020-12-10
 
 - #216 Add Rules.WithThrowIfScopedOrSingletonHasTransientDependency 

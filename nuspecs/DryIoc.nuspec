@@ -4,7 +4,7 @@
         <id>DryIoc</id>
         <version>4.7.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
         <icon>logo.png</icon>
@@ -14,6 +14,18 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+
+## v4.7.0 Feature release
+
+- #338 Child container disposes parent container singletons
+- #355 Auto mocking feature for unit testing
+- #356 Surface the FindFactoryWithTheMinReuseLifespan so it can be used together with the FactorySelector
+- #357 Avoid overload ambiguity for the ScopedTo(Type) by adding the separate ScopedToService
+- #358 Add and surface the Scope.Clone(withDisposables=false) to enable more ChildContainer scenarios
+- #359 DynamicRegistrationsAsFallback being unnecessary called multiple times
+- #360 Mark DynamicRegistrationProvider with the FactoryType (Service, Decorator or combination) to avoid unnecessary provider call and factory creation
+- #363 Add CreateChild method as the basis for CreateFacade and such
+
 
 ## v4.6.0 Feature release
 
