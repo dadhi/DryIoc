@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2020 Maksim Volkau
+Copyright (c) 2016-2021 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1523,6 +1523,18 @@ namespace DryIoc.ImTools
             return result;
         }
 
+        /// <summary>Append a single item value at the end of source array and returns its copy</summary>
+        public static T[] Append<T>(this T[] source, T value)
+        {
+            if (source == null || source.Length == 0)
+                return new[] { value };
+            var count = source.Length;
+            var result = new T[count + 1];
+            Array.Copy(source, 0, result, 0, count);
+            result[count] = value;
+            return result;
+        }
+
         /// <summary>Performant concat of enumerables in case of arrays.
         /// But performance will degrade if you use Concat().Where().</summary>
         /// <typeparam name="T">Type of item.</typeparam>
@@ -2076,19 +2088,10 @@ namespace DryIoc.ImTools
             source is T[] arr ? arr.Map(map) : source?.Select(map);
 
         /// <summary>If <paramref name="source"/> is array uses more effective Match for array, otherwise just calls Where</summary>
-        /// <typeparam name="T">Type of source items.</typeparam>
-        /// <param name="source">If null, the null will be returned.</param>
-        /// <param name="condition">Condition to keep items.</param>
-        /// <returns>Result items, may be an array.</returns>
         public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition) =>
             source is T[] arr ? arr.Match(condition) : source?.Where(condition);
 
-        /// <summary>If <paramref name="source"/> is array uses more effective Match for array,
-        /// otherwise just calls Where, Select</summary>
-        /// <typeparam name="T">Type of source items.</typeparam> <typeparam name="R">Type of result items.</typeparam>
-        /// <param name="source">If null, the null will be returned.</param>
-        /// <param name="condition">Condition to keep items.</param>  <param name="map">Converter from source to result item.</param>
-        /// <returns>Result items, may be an array.</returns>
+        /// <summary>If <paramref name="source"/> is array uses more effective Match for array,otherwise just calls Where, Select</summary>
         public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map) =>
             source is T[] arr ? arr.Match(condition, map) : source?.Where(condition).Select(map);
     }

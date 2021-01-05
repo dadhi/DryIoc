@@ -20,6 +20,7 @@
     - [FactorySelector](#factoryselector)
     - [FactoryMethod, Parameters and Properties selector](#factorymethod-parameters-and-properties-selector)
     - [UnknownServiceResolvers](#unknownserviceresolvers)
+    - [DynamicRegistrationProvider](#dynamicregistrationprovider)
       - [AutoFallbackDynamicRegistrations](#autofallbackdynamicregistrations)
       - [WithConcreteTypeDynamicRegistrations](#withconcretetypedynamicregistrations)
     - [Fallback Containers](#fallback-containers)
@@ -659,7 +660,10 @@ The `UnknownServiceResolvers` is **obsolete** Today because they did not support
 The reason is because the `UnknownServiceResolvers` were implemented as a mechanism different from the registration resolution pipeline.
 The newer alternative is the `WithDynamicRegistrations` and the features based on it. See below.
 
-Example of `ResolveMany` not working with the `UnknownServiceResolvers` and working with the `WithDynamicRegistrationsAsFallback`:
+
+### DynamicRegistrationProvider 
+
+Example of how `ResolveMany` is not working with the `UnknownServiceResolvers` and working with the `WithDynamicRegistration`:
 
 ```cs md*/
 class ResolveMany_does_not_work_WithUnknownResolvers 
@@ -695,9 +699,9 @@ class ResolveMany_does_not_work_WithUnknownResolvers
         
         // we need a double dynamic registrations here because we have a two default services and 
         // the service key translation is the "key" to distinguish between the services
-        var child = new Container(Rules.Default.WithDynamicRegistrationsAsFallback(
-            dynamicRegistration, 
-            dynamicRegistration));
+        var child = new Container(Rules.Default.WithDynamicRegistrations(
+            DynamicRegistrationFlags.AsFallback | DynamicRegistrationFlags.Service,
+            dynamicRegistration, dynamicRegistration));
 
         // works
         var actual = child.ResolveMany<IService>().ToArray();

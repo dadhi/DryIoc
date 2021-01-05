@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2020 Maksim Volkau
+Copyright (c) 2016-2021 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -63,19 +63,47 @@ namespace DryIoc.Microsoft.DependencyInjection
     {
         private readonly IContainer _container;
         private readonly Func<IRegistrator, ServiceDescriptor, bool> _registerDescriptor;
+        private readonly RegistrySharing _registrySharing;
 
-        /// <summary>Some options to push to `.WithDependencyInjectionAdapter(...)`</summary>
+        /// <summary>
+        /// We won't initialize the container here because it is logically expected to be done in `CreateBuilder`,
+        /// so the factory constructor is just saving some options to use later.
+        /// </summary>
         public DryIocServiceProviderFactory(
             IContainer container = null,
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null) : 
+            this(container, RegistrySharing.CloneAndDropCache, registerDescriptor) {}
+
+        /// <summary>
+        /// `container` is the existing container which will be cloned with the MS.DI rules and its cache will be dropped,
+        /// unless the `registrySharing` is set to the `RegistrySharing.Share` or to `RegistrySharing.CloneButKeepCache`.
+        /// `registerDescriptor` is the custom service descriptor handler.
+        /// </summary>
+        public DryIocServiceProviderFactory(IContainer container, RegistrySharing registrySharing,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
-            _container = container; // we won't initialize the container here because it is logically expected to be done in `CreateBuilder`
+            _container = container;
+            _registrySharing = registrySharing;
             _registerDescriptor = registerDescriptor;
         }
 
         /// <inheritdoc />
-        public IContainer CreateBuilder(IServiceCollection services) =>
-            (_container ?? new Container()).WithDependencyInjectionAdapter(services, _registerDescriptor);
+        public IContainer CreateBuilder(IServiceCollection services)
+        {
+            var container = _container;
+            if (container == null)
+                container = new Container(Rules.MicrosoftDependencyInjectionRules);
+            else if (container.Rules != Rules.MicrosoftDependencyInjectionRules)
+                container = container.With(container.Rules.WithMicrosoftDependencyInjectionRules(), 
+                    container.ScopeContext, _registrySharing, container.SingletonScope);
+
+            container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
+
+            if (services != null)
+                container.Populate(services, _registerDescriptor);
+
+            return container;
+        }
 
         /// <inheritdoc />
         public IServiceProvider CreateServiceProvider(IContainer container) =>

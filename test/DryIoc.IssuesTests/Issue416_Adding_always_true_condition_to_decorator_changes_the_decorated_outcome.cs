@@ -163,8 +163,8 @@ namespace DryIoc.IssuesTests
             c.Register<Command1>();
             c.Register<CommandFactory>();
 
-            c.Register<DbContext, Model1>(Reuse.ScopedTo(typeof(IRequestHandler<,>)));
-            c.Register<DbContext, Model1>(Reuse.ScopedTo(typeof(INotificationHandler<>)));
+            c.Register<DbContext, Model1>(Reuse.ScopedToService(typeof(IRequestHandler<,>)));
+            c.Register<DbContext, Model1>(Reuse.ScopedToService(typeof(INotificationHandler<>)));
 
             var mediator = c.Resolve<IMediator>();
 

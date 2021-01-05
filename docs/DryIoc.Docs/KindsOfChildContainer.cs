@@ -6,21 +6,21 @@
 
 - [Kinds of Child Container](#kinds-of-child-container)
   - [No child containers](#no-child-containers)
+  - [CreateChild](#createchild)
   - [Facade](#facade)
   - [With different Rules and ScopeContext](#with-different-rules-and-scopecontext)
   - [Without Cache](#without-cache)
   - [Without Singletons](#without-singletons)
   - [With registrations copy](#with-registrations-copy)
   - [With no more registration allowed](#with-no-more-registration-allowed)
-  - [Scenarios from the actual Users](#scenarios-from-the-actual-users)
-    - [The child container for each test disposed at end of the test without disposing the parent](#the-child-container-for-each-test-disposed-at-end-of-the-test-without-disposing-the-parent)
 
 
 ## No child containers 
 
-DryIoc has no "usual" notion of child and parent container.  
+DryIoc has no "usual" notion of child - the container which is have the link to the "parent" and will look for the
+registrations in parent once it did not found its own registration.
 
-Instead, DryIoc has a number of APIs to address specific related scenarios, 
+Instead, DryIoc has a number of APIs to address specific related scenarios 
 taking advantage of Container immutable state with very fast `O(1)` copy snapshots.
 
 To create a kind of child container from the existing one, 
@@ -28,32 +28,86 @@ you may use one of the extension `With(out)..` methods based on the `IContainer.
 
 The signature of `IContainer.With` describes what can be changed:
 ```cs
-IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope);
+IContainer With(IResolverContext parent, 
+    Rules rules, 
+    IScopeContext scopeContext,
+    RegistrySharing registrySharing, 
+    IScope singletonScope, 
+    IScope currentScope, 
+    IsRegistryChangePermitted? isRegistryChangePermitted);
 ```
 
 - `rules` are described in details [here](RulesAndDefaultConventions.md#Rules-per-Container)
-- `scopeContext` and `singletonScope` are described [here](ReuseAndScopes.md#scopecontext) 
+- `scopeContext` is described [here](ReuseAndScopes.md#scopecontext) 
+- `registrySharing` specifies how or whether to reuse the parent registry and cache and has the values: `Share, CloneButKeepCache, CloneAndDropCache`
+- `singletonScope` and `currentScope` may be reused ot cloned with the `Clone(bool withDisposables)` method
+- `isRegistryChangePermitted` is self-explanatory and may have the following values: `Permitted, Error, Ignored`
 
-`RegistrySharing` is the `enum` to specify how to re-use the parent registry:
-```cs
-public enum RegistrySharing { Share, CloneButKeepCache, CloneAndDropCache }
-```
-
-The enum member names are self-explanatory.
-
-__Note__: `OpenScope` is another way to create a new container from existing one, but a bit different from `With`.
-It is explained in details [here](ReuseAndScopes.md#incurrentscope).
+__Note__: `OpenScope` is another way to create a new container from the existing one as explained in details [here](ReuseAndScopes.md#incurrentscope).
 
 
-## Facade
+## CreateChild
 
-Facade is a new container which allows to have __a new separate registrations__ from the parent container,
-making them override the default resolutions of the parent. To make it more concrete, think of example where 
-you need to replace the `prod` service in tests with `test` service or mock. 
+**Note:** The method is the recent addition in v4.7.0
+
+I was hesitating to add the method with such name for the long time because the users expected the different things from the "child" container as the default behavior. 
+
+But collecting the requirements over time I decided to add the method to help with the basic needs and provide the example of how to 
+use the `With(...)` method to brew your own "child" container.
+
+Here the whole method:
 
 ```cs md*/
 using DryIoc;
 using NUnit.Framework;
+
+public static partial class ContainerTools
+{
+    public static IContainer CreateChild(this IContainer container, 
+        IfAlreadyRegistered? ifAlreadyRegistered = null, Rules newRules = null, bool withDisposables = false)
+    {
+        var rules = newRules != null && newRules != container.Rules ? newRules : container.Rules;
+        return container.With(
+            container.Parent,
+            ifAlreadyRegistered == null ? rules : rules.WithDefaultIfAlreadyRegistered(ifAlreadyRegistered.Value),
+            container.ScopeContext,
+            RegistrySharing.CloneAndDropCache,
+            container.SingletonScope.Clone(withDisposables),
+            container.CurrentScope ?.Clone(withDisposables));
+    }
+}
+
+/*md
+```
+
+The result container will have the following traits:
+
+- It has all parent registrations copied, so that the registrations added or removed in the child are not affecting the parent. By default child will use the parent `IfAlreadyRegistered` policy but you may specify `IfAlreadyRegistered.Replace` to "shadow" the parent registrations
+- It has an access to the scoped services and singletons already created by parent.
+- It can be disposed without affecting the parent, disposing the child will dispose only the scoped services and singletons created in the child and not in the parent (can be opt-out with `withDisposables` parameter).
+- Its creation has O(1) cost - it is cheap thanks to the fast immutable collections cloning.
+
+
+## Facade
+
+`CreateFacade` is based on `CreateChild` with addition of rules to mark all the registration with the special service key and
+prefer the key over the default one for the resolutions:
+```cs md*/
+
+public static partial class ContainerTools
+{
+    public const string FacadeKey = "@facade";
+    public static Rules WithFacadeRules(this Rules rules, string facadeKey = FacadeKey) =>
+        rules.WithDefaultRegistrationServiceKey(facadeKey)
+             .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey));
+}
+
+/*md
+```
+
+Let's look into example:
+
+```cs md*/
 
 class FacadeExample
 {
@@ -85,25 +139,6 @@ class FacadeExample
     }
 } /*md
 ```
-
-Actually, `CreateFacade` does not do anything magic. It uses a `With` method to create a new container with
-a new default `serviceKey` and set a rule to prefer this `serviceKey` over default:
-
-```cs md*/
-static class CreateFacade_implementation 
-{
-    public const string FacadeKey = "@facade";
-
-    public static IContainer CreateFacade_example(this IContainer container, string facadeKey = FacadeKey) =>
-        container.With(rules => rules
-            .WithDefaultRegistrationServiceKey(facadeKey)
-            .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey)));
-}
-/*md
-```
-
-__Note:__ In case the `CreateFacade` does no meet your use-case, you may always go one level deeper in API and
-select your set of rules and arguments for the `With` method.
 
 
 ## With different Rules and ScopeContext
@@ -238,56 +273,4 @@ so the cache from the parent will proceed to be valid and useful.
 
 [Explained in detail here](FaqAutofacMigration#separate-build-stage)
 
-
-## Scenarios from the actual Users
-
-### The child container for each test disposed at end of the test without disposing the parent
-
-[The related case](https://github.com/dadhi/DryIoc/issues/269)
-
-```cs md*/
-
-class Child_container_per_test_disposed_at_the_end_without_disposing_the_parent
-{
-    [Test] public void Child_lifecycle_should_be_independent_of_parent_lifecycle()
-    {
-        var parent = new Container(rules => rules.WithConcreteTypeDynamicRegistrations());
-        
-        parent.Register<IService, Service>(Reuse.Singleton);
-
-        var child = CreateChildContainer(parent);
-
-        // child can override parent registrations and parent is unchanged
-        child.Use<IService>(new TestService());
-
-        Assert.IsInstanceOf<TestService>(child.Resolve<Concrete>().Service);
-        Assert.IsInstanceOf<Service>(parent.Resolve<Concrete>().Service);
-        
-        child.Dispose();
-        Assert.IsTrue(child.IsDisposed);
-
-        // when child is disposed parent is unaffected
-        Assert.IsFalse(parent.IsDisposed);
-        Assert.IsInstanceOf<Service>(parent.Resolve<Concrete>().Service);
-    }
-
-    private static IContainer CreateChildContainer(Container parent) => 
-        parent.With(
-            parent.Rules,
-            parent.ScopeContext,
-            RegistrySharing.CloneAndDropCache,
-            parent.SingletonScope.Clone());
-
-    public interface IService { }
-    public class Service : IService { }
-    public class TestService : IService { }
-    public class Concrete
-    {
-        public IService Service { get; }
-        public Concrete(IService service) => Service = service;
-    }
-}
-
-/*md
-```
 md*/

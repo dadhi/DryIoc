@@ -2,11 +2,9 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.5.1</version>
-
+        <version>4.7.0</version>
         <authors>Maksim Volkau</authors>
-
-        <copyright>Copyright © 2013-2020 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
         <icon>logo.png</icon>
@@ -17,18 +15,26 @@
         <releaseNotes>
 <![CDATA[
 
-## v4.5.1 Bug-fix release
+## v4.7.0 Feature release
 
-- fixed: #332 Delegate returning null throws exception RegisteredDelegateResultIsNotOfServiceType
-- fixed: #340 WaitForItemIsSet waits forever in v4.5.0 for the case like that `Singleton(Func<Singlton> f)`
+- #338 Child container disposes parent container singletons
+- #355 Auto mocking feature for unit testing
+- #356 Surface the FindFactoryWithTheMinReuseLifespan so it can be used together with the FactorySelector
+- #357 Avoid overload ambiguity for the ScopedTo(Type) by adding the separate ScopedToService
+- #358 Add and surface the Scope.Clone(withDisposables=false) to enable more ChildContainer scenarios
+- #359 DynamicRegistrationsAsFallback being unnecessary called multiple times
+- #360 Mark DynamicRegistrationProvider with the FactoryType (Service, Decorator or combination) to avoid unnecessary provider call and factory creation
+- #363 Add CreateChild method as the basis for CreateFacade and such
 
-## v4.5.0 Performance and feature release
 
-- added: #203 [Perf] Avoid locking of service creation in scope if possible
-- added: #13 Make New() method available on IResolver/IResolverContext interface
-- added: #328 Why is there no WithVariantGenericTypesInResolvedCollection?
-- added: #329 Add RegisterInitializer with the IReuse parameter overload to allow separate initializer lifetime
-- added: #331 [MS.DI] Add the Rules.WithServiceProviderGetServiceShouldThrowIfUnresolved
+## v4.6.0 Feature release
+
+- #216 Add Rules.WithThrowIfScopedOrSingletonHasTransientDependency 
+- #343 Scope validation for Transient does not work as expected 
+- #344 Scope is disposed before parent when using facade (added Scopes and Singleton cloning into CreateFacade)
+- #348 Create a child container without WithNoMoreRegistrationAllowed flag (surfacing IsRegistryChangePermitted in With method)
+- #350 Wrong scoped resolve (together with MS DI rules)
+- #352 Consider resolving the variance compatible open-generic the same as for collection of open-generics (added Rules.WithVarianceGenericTypesInResolve)
 
 ]]>
         </releaseNotes>

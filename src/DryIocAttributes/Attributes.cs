@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2020 Maksim Volkau
+Copyright (c) 2013-2021 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -115,26 +115,38 @@ namespace DryIocAttributes
         /// <summary>Implementation type for reuse.</summary>
         public readonly Type CustomReuseType;
 
-        /// <summary>Optional name, valid only for Current Scope Reuse.</summary>
-        public readonly string ScopeName;
+        /// <summary>Optional name, valid only for the Scoped Reuse. If specified, it overrides the <see cref="ScopeNames"/>.</summary>
+        public readonly string ScopeName; // todo: @api convert to the property and change the type to object
 
-        /// <summary>Create attribute with specified type implementing reuse.</summary>
-        /// <param name="reuseType">Supported reuse type.</param>
-        /// <param name="scopeName">(optional) Scope name.</param>
+        /// <summary>Optional names, valid only for the Scoped Reuse. May be overridden by the <see cref="ScopeName"/>.</summary>
+        public readonly object[] ScopeNames;
+
+        /// <summary>Specify the reuse type and the optional scope name.</summary>
         public ReuseAttribute(ReuseType reuseType, string scopeName = null)
         {
             ReuseType = reuseType;
             ScopeName = scopeName;
         }
 
-        /// <summary>Specify the reuse via the Reuse implementation type. 
-        /// The meaning of the type is interpreted by attribute inspection side.</summary>
-        /// <param name="customReuseType">The type.</param>
-        /// <param name="scopeName">(optional) Scope name.</param>
+        /// <summary>Specify the reuse via the `DryIoc.IReuse` implementation type and optional scope name</summary>
         public ReuseAttribute(Type customReuseType, string scopeName = null)
         {
             CustomReuseType = customReuseType;
             ScopeName = scopeName;
+        }
+
+        /// <summary>Specify the reuse type and the scope name.</summary>
+        public ReuseAttribute(ReuseType reuseType, params object[] scopeNames)
+        {
+            ReuseType  = reuseType;
+            ScopeNames = scopeNames;
+        }
+
+        /// <summary>Specify the reuse via the `DryIoc.IReuse` implementation type and the scope name</summary>
+        public ReuseAttribute(Type customReuseType, params object[] scopeNames)
+        {
+            CustomReuseType = customReuseType;
+            ScopeNames      = scopeNames;
         }
     }
 

@@ -1,7 +1,7 @@
 DryIoc is fast, small, full-featured IoC Container for .NET
 ===========================================================
 
-<img src="./logo/logo.svg" alt="logo" width="200px"/>
+<img src="./logo/logo.svg" alt="logo" width="100px"/>
 
 [![Windows, Linux, MacOS](https://ci.appveyor.com/api/projects/status/8eypvhn6ae70vk09?svg=true)](https://ci.appveyor.com/project/MaksimVolkau/dryioc-qt8fa)
 [![SOQnA](https://img.shields.io/badge/StackOverflow-QnA-green.svg)](http://stackoverflow.com/questions/tagged/dryioc)
@@ -28,9 +28,9 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
     - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-- [Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.5.1) :: [Previous Versions](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/VersionHistory.md)
+- [Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.7.0) :: [Previous Versions](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/VersionHistory.md)
 - [Extensions and Companions](Extensions.md)
-- [Documentation][WikiHome] (is fully moved from the BitBucket wiki to the _docs\DryIoc.Docs_ inside this GitHub repo on 2020-09-01)
+- [Documentation][WikiHome]
 - [Contribution guide](CONTRIBUTING.md)
 - Check the old issues on [BitBucket](https://bitbucket.org/dadhi/dryioc)
 - Two original parts of DryIoc are now separate projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)

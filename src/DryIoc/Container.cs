@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2020 Maksim Volkau
+Copyright (c) 2013-2021 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -751,31 +751,40 @@ namespace DryIoc
 
         /// <inheritdoc />
         public IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope) =>
-            With(_parent, rules, scopeContext, registrySharing, singletonScope, _ownCurrentScope);
+            With(_parent, rules, scopeContext, registrySharing, singletonScope, _ownCurrentScope, null);
+
+            /// <inheritdoc />
+            public IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
+                RegistrySharing registrySharing, IScope singletonScope, IScope currentScope) =>
+                With(_parent, rules, scopeContext, registrySharing, singletonScope, currentScope, null);
 
         /// <inheritdoc />
         public IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
-            RegistrySharing registrySharing, IScope singletonScope, IScope currentScope)
+            RegistrySharing registrySharing, IScope singletonScope, IScope currentScope,
+            IsRegistryChangePermitted? isRegistryChangePermitted)
         {
             ThrowIfContainerDisposed();
 
             var registry =
-                registrySharing == RegistrySharing.Share ? _registry :
-                registrySharing == RegistrySharing.CloneButKeepCache ? Ref.Of(_registry.Value)
-                : Ref.Of(_registry.Value.WithoutCache());
+                registrySharing == RegistrySharing.Share ? 
+                    _registry :
+                registrySharing == RegistrySharing.CloneButKeepCache 
+                    ? Ref.Of(_registry.Value)
+                    : Ref.Of(_registry.Value.WithoutCache());
+
+            if (isRegistryChangePermitted != null &&
+                isRegistryChangePermitted.Value != registry.Value.IsChangePermitted)
+                registry = Ref.Of(registry.Value.WithIsChangePermitted(isRegistryChangePermitted.Value));
 
             return new Container(rules ?? Rules, registry, singletonScope ?? NewSingletonScope(), scopeContext,
                 currentScope ?? _ownCurrentScope, _disposed, _disposeStackTrace, parent ?? _parent);
         }
 
         /// <summary>Produces new container which prevents any further registrations.</summary>
-        /// <param name="ignoreInsteadOfThrow">(optional) Controls what to do with the next registration: ignore or throw exception.
-        /// Throws exception by default.</param>
+        /// <param name="ignoreInsteadOfThrow">(optional) Controls what to do with the next registration: ignore or throw exception. Throws exception by default.</param>
         public IContainer WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow = false) =>
-            new Container(Rules,
-                Ref.Of(_registry.Value.WithNoMoreRegistrationAllowed(ignoreInsteadOfThrow)),
-                _singletonScope, _scopeContext, _ownCurrentScope,
-                _disposed, _disposeStackTrace, _parent);
+            With(_parent, Rules, _scopeContext, RegistrySharing.Share, _singletonScope, _ownCurrentScope, 
+                ignoreInsteadOfThrow ? IsRegistryChangePermitted.Ignored : IsRegistryChangePermitted.Error);
 
         /// <inheritdoc />
         public bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey)
@@ -875,17 +884,47 @@ namespace DryIoc
             var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-            // For closed-generic type, when the entry is not found or the key in entry is not found,
-            // go for the open-generic services
+            // For closed-generic type, when the entry is not found or the key in entry is not found go for the open-generic services
             if (serviceType.IsClosedGeneric())
-                if (entry == null || serviceKey != null && (
+            {
+                if (entry == null || 
+                    serviceKey != null && (
                     entry is Factory && !serviceKey.Equals(DefaultKey.Value) ||
                     entry is FactoriesEntry factoriesEntry && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null))
                     entry = serviceFactories.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) ?? entry;
 
-            // Most common case when we have a single default factory and no dynamic rules in addition
-            if (entry is Factory singleDefaultFactory && 
-                Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+                if (entry == null && Rules.VariantGenericTypesInResolve)
+                {
+                    foreach (var e in serviceFactories.Enumerate())
+                    {
+                        if (e.Value.Value is Factory f)
+                        {
+                            if ((serviceKey == null || serviceKey == DefaultKey.Value) && 
+                                serviceType.IsAssignableVariantGenericTypeFrom(e.Value.Key) &&
+                                request.MatchFactoryConditionAndMetadata(f))
+                            {
+                                entry = f;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            foreach (var kf in ((FactoriesEntry)e.Value.Value).Factories.Enumerate())
+                                if (kf.Key.Equals(serviceKey) && 
+                                    serviceType.IsAssignableVariantGenericTypeFrom(e.Value.Key) &&
+                                    request.MatchFactoryConditionAndMetadata(kf.Value))
+                                {
+                                    entry = kf.Value;
+                                    break;
+                                }
+                        }
+                    }
+                }
+            }
+
+            // Most common case when we have a single default factory and no dynamic rules to always apply
+            if (entry is Factory singleDefaultFactory && !Rules.HasDynamicRegistrationProvider(
+                DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)) 
             {
                 if (serviceKey != null && serviceKey != DefaultKey.Value || 
                     !singleDefaultFactory.CheckCondition(request) ||
@@ -899,11 +938,22 @@ namespace DryIoc
                 : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
                 : entry.To<FactoriesEntry>().Factories
                        .Visit(new List<KV<object, Factory>>(2), (x, list) => list.Add(KV.Of(x.Key, x.Value))).ToArray(); // todo: optimize - we may not need ToArray here
-
-            if (!Rules.DynamicRegistrationProviders.IsNullOrEmpty() &&
-                (factories.IsNullOrEmpty() || !Rules.UseDynamicRegistrationsAsFallbackOnly))
-                factories = CombineRegisteredWithDynamicFactories(factories,
-                    true, FactoryType.Service, serviceType, serviceKey);
+ 
+            if (!factories.IsNullOrEmpty()) // check for the additional (not the fallback) factories, because we have the standard factories
+            {
+                if (Rules.HasDynamicRegistrationProvider(
+                    DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
+                    factories = CombineRegisteredWithDynamicFactories(
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback,
+                        factories, true, FactoryType.Service, serviceType, serviceKey);
+            }
+            else // otherwise when no standard factories are found get the fallback as well as always applied dynamic registrations
+            {
+                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service))
+                    factories = CombineRegisteredWithDynamicFactories(
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.NoFlags,
+                        factories, true, FactoryType.Service, serviceType, serviceKey);
+            }
 
             if (factories.IsNullOrEmpty())
                 return null;
@@ -912,13 +962,9 @@ namespace DryIoc
             // just lookup for the key and return whatever the result
             if (serviceKey != null)
             {
-                for (var i = 0; i < factories.Length; i++)
-                {
-                    var f = factories[i];
+                foreach (var f in factories)
                     if (serviceKey.Equals(f.Key) && f.Value.CheckCondition(request))
                         return f.Value;
-                }
-
                 return null;
             }
 
@@ -929,28 +975,27 @@ namespace DryIoc
             if (defaultFactoriesCount == 0)
                 return null;
 
-            // For multiple matched factories, if the single one has a condition, then use it
+            // For multiple matched factories if the single one has a condition, then use it
             factories = factories.Match(request, (r, x) => r.MatchFactoryConditionAndMetadata(x));
 
-            // Check the for matching scopes. Only for more than 1 factory, 
-            // for the single factory the check will be down the road
-            // BitBucket issue: #175
-            if (factories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
+            // Check the for the reuse matching scopes (for a single the check will be down the road) (BBIssue: #175)
+            if (factories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
             {
+                KV<object, Factory> singleMatchedFactory = null;
                 var reuseMatchedFactories = factories.Match(request, (r, x) => r.MatchFactoryReuse(x));
                 if (reuseMatchedFactories.Length == 1)
-                    factories = reuseMatchedFactories;
+                    singleMatchedFactory = reuseMatchedFactories[0];
                 else if (reuseMatchedFactories.Length > 1)
-                    factories = FindFactoryWithTheMinReuseLifespan(factories)?.One() ?? factories;
+                    singleMatchedFactory = FindFactoryWithTheMinReuseLifespanOrDefault(factories);
 
-                if (factories.Length == 1)
+                if (singleMatchedFactory != null)
                 {
-                    // Issue: #382
-                    // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
-                    if (request.IsResolutionCall)
-                        request.ChangeServiceKey(factories[0].Key);
-                    else // for injected dependency
-                        factories[0].Value.Setup = factories[0].Value.Setup.WithAsResolutionCall();
+                    // Add asResolutionCall or change the serviceKey to prevent the caching of expression as default (BBIssue: #382)
+                    if (!request.IsResolutionCall)
+                        singleMatchedFactory.Value.Setup = singleMatchedFactory.Value.Setup.WithAsResolutionCall();
+                    else
+                        request.ChangeServiceKey(singleMatchedFactory.Key);
+                    return singleMatchedFactory.Value; // we are done
                 }
             }
 
@@ -961,6 +1006,7 @@ namespace DryIoc
 
             if (factories.Length > 1)
             {
+                // prefer the factories with the condition (they should be evaluated / matched earlier anyway)
                 var conditionedFactories = factories.Match(f => f.Value.Setup.Condition != null);
                 if (conditionedFactories.Length == 1)
                     factories = conditionedFactories;
@@ -968,6 +1014,7 @@ namespace DryIoc
 
             if (factories.Length > 1)
             {
+                // prefer the factories with the `Setup.PreferInSingleServiceResolve`
                 var preferredFactories = factories.Match(f => f.Value.Setup.PreferInSingleServiceResolve);
                 if (preferredFactories.Length == 1)
                     factories = preferredFactories;
@@ -997,9 +1044,8 @@ namespace DryIoc
             KV<object, Factory>[] factories;
             if (entry is Factory singleDefaultFactory)
             {
-                // optimize for the most usual case - a single factory and no dynamic rules
-                if (Rules.UseDynamicRegistrationsAsFallbackOnly || 
-                    Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+                if (!Rules.HasDynamicRegistrationProvider(
+                    DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
                     return request.MatchFactoryConditionAndMetadata(singleDefaultFactory)
                         ? Rules.FactorySelector(request, DefaultKey.Value.Pair<object, Factory>(singleDefaultFactory).One())
                         : null;
@@ -1020,12 +1066,50 @@ namespace DryIoc
                     openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
                     if (openGenericEntry != null)
                         factories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf();
+
+                    if (openGenericEntry == null && Rules.VariantGenericTypesInResolve)
+                    {
+                        foreach (var sf in serviceFactories.Enumerate())
+                        {
+                            if (sf.Value.Value is Factory f)
+                            {
+                                if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Value.Key) &&
+                                    request.MatchFactoryConditionAndMetadata(f))
+                                {
+                                    factories = KV.Of<object, Factory>(DefaultKey.Value, f).One();
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                foreach (var kf in ((FactoriesEntry)sf.Value.Value).Factories.Enumerate())
+                                    if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Value.Key) &&
+                                        request.MatchFactoryConditionAndMetadata(kf.Value))
+                                    {
+                                        factories = KV.Of(kf.Key, kf.Value).One();
+                                        break;
+                                    }
+                            }
+                        }
+                    }
                 }
             }
 
-            if ((factories.Length == 0 || !Rules.UseDynamicRegistrationsAsFallbackOnly) &&
-                !Rules.DynamicRegistrationProviders.IsNullOrEmpty())
-                factories = CombineRegisteredWithDynamicFactories(factories, true, FactoryType.Service, serviceType);
+            if (factories.Length != 0)
+            {
+                if (Rules.HasDynamicRegistrationProvider(
+                    DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
+                    factories = CombineRegisteredWithDynamicFactories( 
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback,
+                        factories, true, FactoryType.Service, serviceType);
+            }
+            else
+            {
+                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service))
+                    factories = CombineRegisteredWithDynamicFactories(
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.NoFlags,
+                        factories, true, FactoryType.Service, serviceType);
+            }
 
             if (factories.Length == 0)
                 return null;
@@ -1041,21 +1125,15 @@ namespace DryIoc
                 Array.Sort(factories, _lastFactoryIDWinsComparer);
 
             var matchedFactories = factories.Match(request.MatchFactoryConditionAndMetadata);
-            if (matchedFactories.Length > 1 && request.Rules.ImplicitCheckForReuseMatchingScope)
+
+            if (matchedFactories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
             {
-                // Check the for matching scopes. Only for more than 1 factory, 
-                // for the single factory the check will be down the road
-                // BitBucket issue: #175
+                // Check for the matching scopes. Only for more than one factory, 
+                // for the single factory the check will be down the road (BBIssue #175)
                 matchedFactories = matchedFactories.Match(request.MatchFactoryReuse);
-                if (matchedFactories.Length == 1)
-                {
-                    // Issue: #382
-                    // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition
-                    if (request.IsResolutionCall)
-                        request.ChangeServiceKey(matchedFactories[0].Key);
-                    else // for injected dependency
-                        matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
-                }
+                // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition (BBIssue #382)
+                if (matchedFactories.Length == 1 && !request.IsResolutionCall)
+                    matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
             }
 
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
@@ -1070,8 +1148,8 @@ namespace DryIoc
             if (selectedFactory == null)
                 return null;
 
-            // Issue: #508
-            if (factories.Length > 1)
+            // BBIssue: #508, GHIssue: #350
+            if (request.IsResolutionCall && factories.Length > 1)
             {
                 var i = 0;
                 while (i < matchedFactories.Length && matchedFactories[i].Value.FactoryID != selectedFactory.FactoryID)
@@ -1083,25 +1161,24 @@ namespace DryIoc
             return selectedFactory;
         }
 
-        private static KV<object, Factory> FindFactoryWithTheMinReuseLifespan(KV<object, Factory>[] factories)
+        // Don't forget that we have the same public method Rules.SelectFactoryWithTheMinReuseLifespan
+        private static KV<object, Factory> FindFactoryWithTheMinReuseLifespanOrDefault(KV<object, Factory>[] factories)
         {
-            var minLifespan = int.MaxValue;
+            var minLifespan       = int.MaxValue;
             var multipleFactories = false;
             KV<object, Factory> minLifespanFactory = null;
-            for (var i = 0; i < factories.Length; i++)
+
+            foreach (var factory in factories)
             {
-                var factory = factories[i];
                 var reuse = factory.Value.Reuse;
                 var lifespan = reuse == null || reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
-                if (lifespan < minLifespan)
-                {
-                    minLifespan = lifespan;
-                    minLifespanFactory = factory;
-                    multipleFactories = false;
-                }
-                else if (lifespan == minLifespan)
-                {
+                if (lifespan == minLifespan)
                     multipleFactories = true;
+                else if (lifespan < minLifespan)
+                {
+                    minLifespan        = lifespan;
+                    minLifespanFactory = factory;
+                    multipleFactories  = false;
                 }
             }
 
@@ -1123,11 +1200,23 @@ namespace DryIoc
                     factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
             }
 
-            if (!factories.IsNullOrEmpty() && Rules.UseDynamicRegistrationsAsFallbackOnly ||
-                Rules.DynamicRegistrationProviders.IsNullOrEmpty())
-                return factories;
+            if (!factories.IsNullOrEmpty())
+            {
+                if (Rules.HasDynamicRegistrationProvider(
+                    DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback))
+                    return CombineRegisteredWithDynamicFactories(
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback,
+                        factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
+            }
+            else
+            {
+                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service))
+                    return CombineRegisteredWithDynamicFactories(
+                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.NoFlags,
+                        factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
+            }
 
-            return CombineRegisteredWithDynamicFactories(factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
+            return factories;
         }
 
         private static IEnumerable<KV<object, Factory>> GetRegistryEntryKeyFactoryPairs(object entry) =>
@@ -1327,7 +1416,7 @@ namespace DryIoc
             {
                 if (p.FactoryType == FactoryType.Decorator &&
                     p.DecoratedFactoryID == request.FactoryID)
-                    appliedIDs = appliedIDs.AppendOrUpdate(p.FactoryID);
+                    appliedIDs = appliedIDs.Append(p.FactoryID);
             }
             return appliedIDs;
         }
@@ -1353,14 +1442,24 @@ namespace DryIoc
             if (!allDecorators.IsEmpty)
                 decorators = (Factory[])allDecorators.GetValueOrDefault(serviceType) ?? Empty<Factory>();
 
-            if (decorators.Length > 0 && Rules.UseDynamicRegistrationsAsFallbackOnly ||
-                Rules.DynamicRegistrationProviders.IsNullOrEmpty())
-                return decorators;
+            if (!decorators.IsNullOrEmpty())
+            {
+                if (Rules.HasDynamicRegistrationProvider(
+                    DynamicRegistrationFlags.Decorator, withoutFlags: DynamicRegistrationFlags.AsFallback))
+                    return CombineRegisteredWithDynamicFactories(
+                        DynamicRegistrationFlags.Decorator, DynamicRegistrationFlags.AsFallback,
+                        decorators?.Map(d => new KV<object, Factory>(DefaultKey.Value, d)),
+                        true, FactoryType.Decorator, serviceType).Map(x => x.Value);
+            }
+            else
+            {
+                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Decorator))
+                    return CombineRegisteredWithDynamicFactories(
+                        DynamicRegistrationFlags.Decorator, DynamicRegistrationFlags.NoFlags,
+                        Empty<KV<object, Factory>>(), true, FactoryType.Decorator, serviceType).Map(x => x.Value);
+            }
 
-            return CombineRegisteredWithDynamicFactories(
-                decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)), 
-                true, FactoryType.Decorator, serviceType)
-               .Map(x => x.Value);
+            return decorators;
         }
 
         Type IContainer.GetWrappedType(Type serviceType, Type requiredServiceType)
@@ -1472,12 +1571,13 @@ namespace DryIoc
                 new FactoriesEntry(LastDefaultKey, Factories.AddOrUpdate(serviceKey, factory));
         }
 
-        private KV<object, Factory>[] CombineRegisteredWithDynamicFactories(
-            KV<object, Factory>[] registeredFactories, bool bothClosedAndOpenGenerics,
-            FactoryType factoryType, Type serviceType, object serviceKey = null)
+        private KV<object, Factory>[] CombineRegisteredWithDynamicFactories( 
+            DynamicRegistrationFlags withFlags, DynamicRegistrationFlags withoutFlags,
+            KV<object, Factory>[] registeredFactories, bool bothClosedAndOpenGenerics, FactoryType factoryType, Type serviceType, object serviceKey = null)
         {
+            var dynamicServices = Rules.DynamicRegistrationProviders;
+            var dynamicFlags    = Rules._dynamicRegistrationFlags;
             var resultFactories = registeredFactories;
-            var dynamicRegistrationProviders = Rules.DynamicRegistrationProviders;
 
             // Assign unique continuous keys across all of dynamic providers,
             // to prevent duplicate keys and peeking the wrong factory by collection wrappers
@@ -1485,9 +1585,12 @@ namespace DryIoc
             // then the dynamic key will be assigned deterministically, so that even if `CombineRegisteredWithDynamicFactories`
             // is called multiple times during the resolution (like for `ResolveMany`) it is possible to match the required factory by its order.
             DefaultDynamicKey dynamicKey = null;
-            for (var i = 0; i < dynamicRegistrationProviders.Length; i++)
+            for (var i = 0; i < dynamicServices.Length; i++)
             { 
-                var dynamicRegistrationProvider = dynamicRegistrationProviders[i];
+                if ((dynamicFlags[i] & withFlags) != withFlags || (dynamicFlags[i] & withoutFlags) != 0)
+                    continue;
+
+                var dynamicRegistrationProvider = dynamicServices[i];
 
                 var dynamicRegistrations = dynamicRegistrationProvider(serviceType, serviceKey).ToArrayOrSelf();
                 if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
@@ -1836,23 +1939,22 @@ namespace DryIoc
                     entry.Value.ScopeNameOrDependencyCount = scoped.Name ?? ExpressionCacheSlot.NoNameForScoped;
             }
 
-            private enum IsChangePermitted { Permitted, Error, Ignored }
-            private readonly IsChangePermitted _isChangePermitted;
+            internal readonly IsRegistryChangePermitted IsChangePermitted;
 
             private Registry(ImMap<ImMap.KValue<Type>> wrapperFactories = null)
                 : this(ImMap<ImMap.KValue<Type>>.Empty, ImMap<ImMap.KValue<Type>>.Empty, wrapperFactories ?? ImMap<ImMap.KValue<Type>>.Empty,
                     null, null, null, // caches are initialized to `null` to quickly check that they 
-                    IsChangePermitted.Permitted)
+                    IsRegistryChangePermitted.Permitted)
             { }
 
             private Registry(
                 ImMap<ImMap.KValue<Type>> services,
                 ImMap<ImMap.KValue<Type>> decorators,
                 ImMap<ImMap.KValue<Type>> wrappers,
-                ImMap<ImMap.KValue<Type>>[] defaultFactoryCache,
-                ImMap<ImMap.KValue<Type>>[] keyedFactoryCache,
+                ImMap<ImMap.KValue<Type>>[]  defaultFactoryCache,
+                ImMap<ImMap.KValue<Type>>[]  keyedFactoryCache,
                 ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
-                IsChangePermitted isChangePermitted)
+                IsRegistryChangePermitted isChangePermitted)
             {
                 Services   = services;
                 Decorators = decorators;
@@ -1860,28 +1962,28 @@ namespace DryIoc
                 DefaultFactoryCache = defaultFactoryCache;
                 KeyedFactoryCache = keyedFactoryCache;
                 FactoryExpressionCache = factoryExpressionCache;
-                _isChangePermitted = isChangePermitted;
+                IsChangePermitted = isChangePermitted;
             }
 
             public Registry WithoutCache() =>
-                new Registry(Services, Decorators, Wrappers, null, null, null, _isChangePermitted);
+                new Registry(Services, Decorators, Wrappers, null, null, null, IsChangePermitted);
 
             internal Registry WithServices(ImMap<ImMap.KValue<Type>> services) =>
                 services == Services ? this :
                 new Registry(services, Decorators, Wrappers,
                     // Using Copy is fine when you have only the registrations because the caches will be null and no actual copy will be done.
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
-                    _isChangePermitted);
+                    IsChangePermitted);
 
             private Registry WithDecorators(ImMap<ImMap.KValue<Type>> decorators) =>
                 decorators == Decorators ? this :
                 new Registry(Services, decorators, Wrappers, 
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
 
             private Registry WithWrappers(ImMap<ImMap.KValue<Type>> wrappers) =>
                 wrappers == Wrappers ? this :
                 new Registry(Services, Decorators, wrappers, 
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
             {
@@ -1922,8 +2024,8 @@ namespace DryIoc
 
             public Registry Register(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
             {
-                if (_isChangePermitted != IsChangePermitted.Permitted)
-                    return _isChangePermitted == IsChangePermitted.Ignored ? this
+                if (IsChangePermitted != IsRegistryChangePermitted.Permitted)
+                    return IsChangePermitted == IsRegistryChangePermitted.Ignored ? this
                         : Throw.For<Registry>(Error.NoMoreRegistrationsAllowed,
                             serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factory);
 
@@ -2140,7 +2242,7 @@ namespace DryIoc
 
                 var newServices = services.AddOrUpdate(serviceTypeHash, serviceType, newEntry);
                 var newRegistry = new Registry(newServices, Decorators, Wrappers,
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), _isChangePermitted);
+                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
 
                 if (oldEntry != null)
                 {
@@ -2207,7 +2309,7 @@ namespace DryIoc
                 var newServices = services.AddOrUpdate(serviceTypeHash, serviceType, newEntry);
                 var newRegistry = new Registry(newServices, Decorators, Wrappers,
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
-                    _isChangePermitted);
+                    IsChangePermitted);
 
                 if (oldEntry != null && ifAlreadyRegistered == IfAlreadyRegistered.Replace &&
                     oldEntry is FactoriesEntry updatedOldFactories &&
@@ -2220,8 +2322,8 @@ namespace DryIoc
             // todo: @perf optimize allocations away
             public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
             {
-                if (_isChangePermitted != IsChangePermitted.Permitted)
-                    return _isChangePermitted == IsChangePermitted.Ignored ? this
+                if (IsChangePermitted != IsRegistryChangePermitted.Permitted)
+                    return IsChangePermitted == IsRegistryChangePermitted.Ignored ? this
                         : Throw.For<Registry>(Error.NoMoreUnregistrationsAllowed,
                             serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factoryType);
 
@@ -2395,10 +2497,8 @@ namespace DryIoc
                 }
             }
 
-            public Registry WithNoMoreRegistrationAllowed(bool ignoreInsteadOfThrow) =>
-                new Registry(Services, Decorators, Wrappers,
-                    DefaultFactoryCache, KeyedFactoryCache, FactoryExpressionCache,
-                    ignoreInsteadOfThrow ? IsChangePermitted.Ignored : IsChangePermitted.Error);
+            public Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
+                new Registry(Services, Decorators, Wrappers, DefaultFactoryCache, KeyedFactoryCache, FactoryExpressionCache, isChangePermitted);
         }
 
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
@@ -3636,14 +3736,39 @@ namespace DryIoc
     public static class ContainerTools
     {
         /// <summary>The default key for services registered into container created by <see cref="CreateFacade"/></summary>
-        public const string FacadeKey = "@facade"; // todo: use invisible keys #555
+        public const string FacadeKey = "@facade";
+
+        /// <summary>Uses the provided or the default <see cref="FacadeKey" /> to tweak the rules
+        /// to use with the `CreateFacade` methods</summary>
+        public static Rules WithFacadeRules(this Rules rules, string facadeKey = FacadeKey) =>
+            rules.WithDefaultRegistrationServiceKey(facadeKey)
+                 .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey));
 
         /// <summary>Allows to register new specially keyed services which will facade the same default service,
-        /// registered earlier. May be used to "override" registrations when testing the container</summary>
+        /// registered earlier. May be used to "override" registrations when testing the container.
+        /// Facade will clone the source container singleton and open scope (if any) so
+        /// that you may safely disposing the facade without disposing the source container scopes.</summary>
         public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
-            container.With(rules => rules
-                .WithDefaultRegistrationServiceKey(facadeKey)
-                .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(facadeKey)));
+            container.CreateChild(newRules: container.Rules.WithFacadeRules(facadeKey));
+
+        /// <summary>The "child" container detached from the parent:
+        /// Child creation has O(1) cost - it is cheap thanks to the fast immutable collections cloning.
+        /// Child has all parent registrations copied, then the registrations added or removed in the child are not affecting the parent.
+        /// By default child will use the parent <see cref="IfAlreadyRegistered"/> policy - you may specify `IfAlreadyRegistered.Replace` to "shadow" the parent registrations
+        /// Child has an access to the scoped services and singletons already created by parent.
+        /// Child can be disposed without affecting the parent, disposing the child will dispose only the scoped services and singletons created in the child and not in the parent (can be opt-out)</summary>
+        public static IContainer CreateChild(this IContainer container, 
+            IfAlreadyRegistered? ifAlreadyRegistered = null, Rules newRules = null, bool withDisposables = false)
+        {
+            var rules = newRules != null && newRules != container.Rules ? newRules : container.Rules;
+            return container.With(
+                container.Parent,
+                ifAlreadyRegistered == null ? rules : rules.WithDefaultIfAlreadyRegistered(ifAlreadyRegistered.Value),
+                container.ScopeContext,
+                RegistrySharing.CloneAndDropCache,
+                container.SingletonScope.Clone(withDisposables),
+                container.CurrentScope ?.Clone(withDisposables));
+        }
 
         /// <summary>Shares all of container state except the cache and the new rules.</summary>
         public static IContainer With(this IContainer container,
@@ -3673,6 +3798,15 @@ namespace DryIoc
                 preserveCache ? RegistrySharing.CloneButKeepCache : RegistrySharing.CloneAndDropCache,
                 container.SingletonScope);
 
+        /// <summary>Shares the setup with original container but copies the registrations, so the new registrations
+        /// won't be visible in original. Registrations include decorators and wrappers as well.
+        /// You may control <see cref="IsRegistryChangePermitted" /> behavior and opt-in for the keeping or cloning the cache.</summary>
+        public static IContainer WithRegistrationsCopy(this IContainer container, IsRegistryChangePermitted isRegistryChangePermitted, 
+            bool preserveCache = false) =>
+            container.With(container.Parent, container.Rules, container.ScopeContext,
+                preserveCache ? RegistrySharing.CloneButKeepCache : RegistrySharing.CloneAndDropCache,
+                container.SingletonScope, container.OwnCurrentScope, isRegistryChangePermitted);
+
         /// <summary>For given instance resolves and sets properties and fields.
         /// It respects <see cref="Rules.PropertiesAndFields"/> rules set per container,
         /// or if rules are not set it uses <see cref="PropertiesAndFields.Auto"/>.</summary>
@@ -3691,24 +3825,20 @@ namespace DryIoc
         // todo: @bug does it OK to share the singletons though despite the promise of not affecting the original container?
         /// <summary>Creates service using container for injecting parameters without registering anything in <paramref name="container"/> if the TYPE is not registered yet. 
         /// The note is that container will share the singletons though.</summary>
-        /// <param name="container">Container to use for type creation and injecting its dependencies.</param>
-        /// <param name="concreteType">Type to instantiate. Wrappers (Func, Lazy, etc.) is also supported.</param>
-        /// <param name="setup">Setup for the concrete type, e.g. `TrackDisposableTransient`</param>
-        /// <param name="made">(optional) Injection rules to select constructor/factory method, inject parameters, 
-        /// properties and fields.</param>
-        /// <param name="registrySharing">The default is <see cref="RegistrySharing.CloneButKeepCache"/></param>
-        /// <returns>Object instantiated by constructor or object returned by factory method.</returns>
         public static object New(this IContainer container, Type concreteType, Setup setup, Made made = null,
             RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache)
         {
-            var containerClone = container.With(container.Rules, container.ScopeContext,
-                registrySharing, container.SingletonScope); // reusing the singleton scope
+            var containerClone = container.With(
+                container.Parent, container.Rules, container.ScopeContext,
+                registrySharing, 
+                container.SingletonScope, container.OwnCurrentScope, // reusing the singletons and scopes
+                null); 
 
             var implType = containerClone.GetWrappedType(concreteType, null);
 
             var condition = setup == null && made == null ? null
-                : made == null  ? (Func<Factory, bool>)(f => f.Setup == setup)
-                : setup == null ? (Func<Factory, bool>)(f => f.Made == made)
+                : made  == null ? (Func<Factory, bool>)(f => f.Setup == setup)
+                : setup == null ? (Func<Factory, bool>)(f => f.Made  == made)
                 : (f => f.Made == made && f.Setup == setup);
 
             if (!containerClone.IsRegistered(implType, condition: condition))
@@ -3772,7 +3902,7 @@ namespace DryIoc
                      changeDefaultReuse, condition);
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             Func<Type, object, IEnumerable<Type>> getImplTypes, Func<Type, Factory> factory = null) =>
             container.ThrowIfNull()
@@ -3780,18 +3910,18 @@ namespace DryIoc
                     Rules.AutoFallbackDynamicRegistrations(getImplTypes, factory)));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations((_, __) => implTypes);
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IReuse reuse, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations((_, __) => implTypes, implType => new ReflectionFactory(implType, reuse));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IReuse reuse, Setup setup, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations(
@@ -3799,7 +3929,7 @@ namespace DryIoc
                 implType => new ReflectionFactory(implType, reuse, setup: setup));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             Func<Type, object, IEnumerable<Assembly>> getImplTypeAssemblies,
             Func<Type, Factory> factory = null) =>
@@ -3818,13 +3948,13 @@ namespace DryIoc
                     factory)));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             params Assembly[] implTypeAssemblies) =>
             container.WithAutoFallbackDynamicRegistrations((_, __) => implTypeAssemblies);
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
-        /// services. Underneath uses <see cref="Rules.WithDynamicRegistrations"/>.</summary>
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IEnumerable<Assembly> implTypeAssemblies) =>
             container.WithAutoFallbackDynamicRegistrations((_, __) => implTypeAssemblies);
@@ -3909,16 +4039,10 @@ namespace DryIoc
         /// <summary>Excluding open-generic registrations, cause you need to provide type arguments to actually create these types.</summary>
         public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
 
-        // todo: Should we have a version which is throws by default?
-        // todo: Should we break it by making the condition a mandatory? - because it the pass to avoid problems of validating the unnecessary dependencies
-        /// <summary>Helps to find potential problems in service registration setup.
-        /// Method tries to resolve the specified registrations, collects exceptions, and
-        /// returns them to user. Does not create any actual service objects.
-        /// You must specify <paramref name="condition"/> to define your resolution roots,
-        /// otherwise container will try to resolve all registrations, 
-        /// which usually is not realistic case to validate.</summary>
-        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container,
-            Func<ServiceRegistrationInfo, bool> condition = null)
+        /// <summary>Helps to find potential problems in service registration setup. Method tries to resolve the specified registrations, collects exceptions, 
+        /// and returns them to user. Does not create any actual service objects. You must specify <paramref name="condition"/> to define your resolution roots,
+        /// otherwise container will try to resolve all registrations, which usually is not realistic case to validate.</summary>
+        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, Func<ServiceRegistrationInfo, bool> condition = null)
         {
             var noOpenGenericsWithCondition = condition == null 
                 ? (Func<ServiceRegistrationInfo, bool>)DefaultValidateCondition 
@@ -3931,14 +4055,19 @@ namespace DryIoc
             return container.Validate(roots);
         }
 
+        /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
+        public static void ValidateAndThrow(this IContainer container, Func<ServiceRegistrationInfo, bool> condition = null)
+        {
+            var errors = container.Validate(condition);
+            if (!errors.IsNullOrEmpty())
+                Throw.Many(Error.ValidateFoundErrors, errors.Map(x => x.Value));
+        }
+
         /// <summary>Helps to find potential problems when resolving the <paramref name="roots"/>.
-        /// Method will collect the exceptions when resolving or injecting the specific root.
-        /// Does not create any actual service objects.
-        /// You must specify <paramref name="roots"/> to define your resolution roots,
-        /// otherwise container will try to resolve all registrations, 
-        /// which usually is not realistic case to validate. </summary>
-        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(
-            this IContainer container, params ServiceInfo[] roots)
+        /// Method will collect the exceptions when resolving or injecting the specific root. Does not create any actual service objects.
+        /// You must specify <paramref name="roots"/> to define your resolution roots, otherwise container will try to resolve all registrations, 
+        /// which usually is not realistic case to validate.</summary>
+        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, params ServiceInfo[] roots)
         {
             var validatingContainer = container.With(rules => rules.ForValidate());
 
@@ -3962,6 +4091,14 @@ namespace DryIoc
             }
 
             return errors?.ToArray() ?? ArrayTools.Empty<KeyValuePair<ServiceInfo, ContainerException>>();
+        }
+
+        /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
+        public static void ValidateAndThrow(this IContainer container, params ServiceInfo[] roots)
+        {
+            var errors = container.Validate(roots);
+            if (!errors.IsNullOrEmpty())
+                Throw.Many(Error.ValidateFoundErrors, errors.Map(x => x.Value));
         }
 
         /// <summary>Re-constructs the whole request chain as request creation expression.</summary>
@@ -4035,10 +4172,27 @@ namespace DryIoc
                 factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr, flagsExpr, decoratedFactoryIDExpr);
         }
 
+        /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
+        public static void ValidateAndThrow(this IContainer container, params Type[] serviceTypes)
+        {
+            var errors = container.Validate(serviceTypes);
+            if (!errors.IsNullOrEmpty())
+                Throw.Many(Error.ValidateFoundErrors, errors.Map(x => x.Value));
+        }
+
         /// <summary>Clears delegate and expression cache for specified <typeparamref name="T"/>.
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
         public static bool ClearCache<T>(this IContainer container, FactoryType? factoryType = null, object serviceKey = null) =>
             container.ClearCache(typeof(T), factoryType, serviceKey);
+
+        /// <summary>Helps to find potential problems in service registration setup by trying to resolve the <paramref name="serviceTypes"/> and 
+        /// returning the found errors. This method does not throw.</summary>
+        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, params Type[] serviceTypes)
+        {
+            if (serviceTypes.IsNullOrEmpty())
+                Throw.It(Error.NoServiceTypesToValidate, container);
+            return container.Validate(serviceTypes.Map(t => ServiceInfo.Of(t)));
+        }
 
         /// <summary>Clears delegate and expression cache for specified service.
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
@@ -4089,10 +4243,7 @@ namespace DryIoc
         /// <summary>Prints registration order to string.</summary>
         public override string ToString() => GetType().Name + "(" + RegistrationOrder + ")";
 
-        private DefaultKey(int registrationOrder)
-        {
-            RegistrationOrder = registrationOrder;
-        }
+        private DefaultKey(int registrationOrder) => RegistrationOrder = registrationOrder;
     }
 
     /// <summary>Represents default key for dynamic registrations</summary>
@@ -4451,14 +4602,10 @@ namespace DryIoc
 
             // Append registered generic types with compatible variance,
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
-            if (requiredItemType.IsGeneric() &&
-                rules.VariantGenericTypesInResolvedCollection)
+            if (requiredItemType.IsGeneric() && rules.VariantGenericTypesInResolvedCollection)
             {
                 var variantGenericItems = container.GetServiceRegistrations()
-                    .Match(x =>
-                        x.ServiceType.IsGeneric() &&
-                        x.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition() &&
-                        x.ServiceType != requiredItemType && x.ServiceType.IsAssignableTo(requiredItemType))
+                    .Match(x => requiredItemType.IsAssignableVariantGenericTypeFrom(x.ServiceType))
                     .ToArrayOrSelf();
                 items = items.Append(variantGenericItems);
             }
@@ -4501,7 +4648,7 @@ namespace DryIoc
                     var itemFactory = container.ResolveFactory(itemRequest);
                     var itemExpr = itemFactory?.GetExpressionOrDefault(itemRequest);
                     if (itemExpr != null)
-                        itemExprs = itemExprs.AppendOrUpdate(itemExpr);
+                        itemExprs = itemExprs.Append(itemExpr);
                 }
             }
 
@@ -4555,7 +4702,7 @@ namespace DryIoc
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
-            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest);
+            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
 
             // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
             // So that Func<Derived> may be used for Func<Base>
@@ -4598,7 +4745,7 @@ namespace DryIoc
             var serviceRequest = request.Push(serviceType, flags: RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
             var container = request.Container;
             var serviceExpr = !isAction && container.Rules.FuncAndLazyWithoutRegistration
-                ? Resolver.CreateResolutionExpression(serviceRequest)
+                ? Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true)
                 : container.ResolveFactory(serviceRequest)?.GetExpressionOrDefault(serviceRequest);
 
             if (serviceExpr == null)
@@ -4793,6 +4940,21 @@ namespace DryIoc
         }
     }
 
+    /// <summary>The options for the single dynamic registration provider.
+    /// The dynamic Wrapper registration is not supported.</summary>
+    [Flags]
+    public enum DynamicRegistrationFlags : byte
+    {
+        /// <summary>No flags - to use in `GetDynamicRegistrationProvidersOrDefault`</summary>
+        NoFlags       = 0,
+        /// <summary>Use as AsFallback only</summary>
+        AsFallback = 1,
+        /// <summary>Provider may have the services provided</summary>
+        Service       = 1 << 1,
+        /// <summary>Provider may have the decorators provided</summary>
+        Decorator     = 1 << 2
+    } 
+
     // todo: @incomplete use Copy for setting the rules
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
@@ -4800,8 +4962,9 @@ namespace DryIoc
         /// <summary>Default rules as a staring point.</summary>
         public static readonly Rules Default = new Rules();
 
-        private static Rules SetMicrosoftDependencyInjectionRules(Rules rules)
+        private static Rules WithMicrosoftDependencyInjectionRules(Rules rules)
         {
+            rules = rules.Clone(cloneMade: true);
             rules._settings |= Settings.TrackingDisposableTransients;
             rules._settings &= ~Settings.ThrowOnRegisteringDisposableTransient;
             rules._settings &= ~Settings.VariantGenericTypesInResolvedCollection;
@@ -4811,10 +4974,10 @@ namespace DryIoc
         }
 
         /// <summary>The rules implementing the conventions of Microsoft.Extension.DependencyInjection library.</summary>
-        public static readonly Rules MicrosoftDependencyInjectionRules = SetMicrosoftDependencyInjectionRules(Default.Clone());
+        public static readonly Rules MicrosoftDependencyInjectionRules = WithMicrosoftDependencyInjectionRules(Default);
 
         /// <summary>Returns the copy of the rules with the applied conventions of Microsoft.Extension.DependencyInjection library.</summary>
-        public Rules WithMicrosoftDependencyInjectionRules() => SetMicrosoftDependencyInjectionRules(Clone());
+        public Rules WithMicrosoftDependencyInjectionRules() => WithMicrosoftDependencyInjectionRules(this);
 
         /// <summary></summary>
         public Rules WithServiceProviderGetServiceShouldThrowIfUnresolved() =>
@@ -4848,7 +5011,7 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, dependencyCount < 1 ? 1 : dependencyCount,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Disables the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/> limitation.</summary>
         public Rules WithoutDependencyCountInLambdaToSplitBigObjectGraph() =>
@@ -4901,7 +5064,7 @@ namespace DryIoc
                         made.PropertiesAndFields ?? _made.PropertiesAndFields),
                 DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Service key to be used instead on `null` in registration.</summary>
         public object DefaultRegistrationServiceKey { get; }
@@ -4912,7 +5075,7 @@ namespace DryIoc
                 new Rules(_settings, FactorySelector, DefaultReuse,
                     _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                     DependencyResolutionCallExprs, ItemToExpressionConverter,
-                    DynamicRegistrationProviders, UnknownServiceResolvers, serviceKey);
+                    DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, serviceKey);
 
         /// <summary>Defines single factory selector delegate.</summary>
         /// <param name="request">Provides service request leading to factory selection.</param>
@@ -4930,14 +5093,14 @@ namespace DryIoc
             new Rules(_settings | (rule == SelectLastRegisteredFactory ? Settings.SelectLastRegisteredFactory : default(Settings)),
                 rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Select last registered factory from the multiple default.</summary>
         public static FactorySelectorRule SelectLastRegisteredFactory() => SelectLastRegisteredFactory;
         private static Factory SelectLastRegisteredFactory(Request request, KeyValuePair<object, Factory>[] factories)
         {
             var serviceKey = request.ServiceKey;
-            for (var i = factories.Length - 1; i >= 0; i--)
+            for (var i = factories.Length - 1; i >= 0; --i)
             {
                 var factory = factories[i];
                 if (factory.Key.Equals(serviceKey))
@@ -4946,13 +5109,43 @@ namespace DryIoc
             return null;
         }
 
-        //we are watching you...public static
+        /// <summary>Tries to select a single factory based on the minimal reuse life-span ignoring the Transients</summary>
+        public static FactorySelectorRule SelectFactoryWithTheMinReuseLifespan() => SelectFactoryWithTheMinReuseLifespan;
+
+        /// <summary>Tries either SelectFactoryWithTheMinReuseLifespan or SelectLastRegisteredFactory</summary>
+        public static FactorySelectorRule SelectFactoryWithTheMinReuseLifespanOrLastRegistered() => (request, factories) =>
+            SelectFactoryWithTheMinReuseLifespan(request, factories) ?? 
+            SelectLastRegisteredFactory(request, factories);
+
         /// <summary>Prefer specified service key (if found) over default key.
         /// Help to override default registrations in Open Scope scenarios:
         /// I may register service with key and resolve it as default in current scope.</summary>
         public static FactorySelectorRule SelectKeyedOverDefaultFactory(object serviceKey) =>
             (r, fs) => fs.FindFirst(serviceKey, (key, f) => f.Key.Equals(key)).Value ??
                        fs.FindFirst(f => f.Key.Equals(null)).Value;
+
+        private static Factory SelectFactoryWithTheMinReuseLifespan(Request request, KeyValuePair<object, Factory>[] factories)
+        {
+            var minLifespan       = int.MaxValue;
+            var multipleFactories = false;
+            Factory minLifespanFactory = null;
+
+            foreach (var factory in factories)
+            {
+                var reuse = factory.Value.Reuse;
+                var lifespan = reuse == null || reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
+                if (lifespan == minLifespan)
+                    multipleFactories = true;
+                else if (lifespan < minLifespan)
+                {
+                    minLifespan        = lifespan;
+                    minLifespanFactory = factory.Value;
+                    multipleFactories  = false;
+                }
+            }
+
+            return !multipleFactories && minLifespanFactory != null ? minLifespanFactory : null;
+        }
 
         /// <summary>Specify the method signature for returning multiple keyed factories.
         /// This is dynamic analog to the normal Container Registry.</summary>
@@ -4964,24 +5157,72 @@ namespace DryIoc
         /// <summary>Providers for resolving multiple not-registered services. Null by default.</summary>
         public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
 
-        // todo: Should I use Settings.UseDynamicRegistrationsAsFallback, 5 tests are failing only 
-        /// <summary>Appends dynamic registration rules.</summary>
+        /// <summary>The flags per dynamic registration provider</summary>
+        public DynamicRegistrationFlags[] _dynamicRegistrationFlags { get; private set; }
+        private static DynamicRegistrationFlags _defaultDynamicRegistrationFlags = 
+            DynamicRegistrationFlags.Service | DynamicRegistrationFlags.Decorator;
+
+        /// <summary>Get the specific providers with the specified flags and without the flags or return `null` if nothing found</summary>
+        public bool HasDynamicRegistrationProvider(DynamicRegistrationFlags withFlags, 
+            DynamicRegistrationFlags withoutFlags = DynamicRegistrationFlags.NoFlags)
+        {
+            var allFlags   = _dynamicRegistrationFlags;
+            if (allFlags == null || allFlags.Length == 0)
+                return false;
+
+            for (var i = 0; i < allFlags.Length; ++i)
+                if ((allFlags[i] & withFlags) == withFlags && (allFlags[i] & withoutFlags) == 0)
+                    return true;
+
+            return false;
+        }
+
+        /// <summary>Returns the new rules with the passed dynamic registration rule appended.</summary>
+        public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, DynamicRegistrationFlags flags)
+        {
+            var newRules = Clone(cloneMade: false);
+            newRules._settings |= Settings.UseDynamicRegistrationsAsFallbackOnly;
+            newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(provider);
+            newRules._dynamicRegistrationFlags = _dynamicRegistrationFlags.Append(flags);
+            return newRules;
+        }
+
+        /// <summary>Returns the new rules with the passed dynamic registration rules appended.</summary>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
+            WithDynamicRegistrations(_defaultDynamicRegistrationFlags, rules);
 
-        /// <summary>Appends dynamic registration rules 
-        /// And additionally specifies to use dynamic registrations only when no normal registrations found!</summary>
-        /// <param name="rules">Rules to append.</param> <returns>New Rules.</returns>
+        /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
+        /// The rules applied only when no normal registrations found!</summary>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
-            new Rules(_settings | Settings.UseDynamicRegistrationsAsFallbackOnly, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders.Append(rules), UnknownServiceResolvers, DefaultRegistrationServiceKey);
+            WithDynamicRegistrations(_defaultDynamicRegistrationFlags | DynamicRegistrationFlags.AsFallback, rules);
 
-        /// Specifies to use dynamic registrations only when no normal registrations found
+        /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
+        /// The rules applied only when no normal registrations found!</summary>
+        public Rules WithDynamicRegistrations(DynamicRegistrationFlags flags, params DynamicRegistrationProvider[] rules)
+        {
+            var newRules = Clone(cloneMade: false);
+            newRules._settings |= Settings.UseDynamicRegistrationsAsFallbackOnly;
+            newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(rules);
+            newRules._dynamicRegistrationFlags = WithDynamicRegistrationProviderFlags(rules?.Length ?? 0, flags);
+            return newRules;
+        }
+
+        private DynamicRegistrationFlags[] WithDynamicRegistrationProviderFlags(int count, DynamicRegistrationFlags flags)
+        {
+            if (count == 0)
+                return _dynamicRegistrationFlags;
+
+            if (count == 1)
+                return _dynamicRegistrationFlags.Append(flags);
+
+            var newFlags = new DynamicRegistrationFlags[count];
+            for (var i = 0; i < newFlags.Length; i++)
+                newFlags[i] = flags;
+            return _dynamicRegistrationFlags.Append(newFlags);
+        }
+
+        // todo: @obsolete
+        /// <summary>Obsolete["Instead use <![CDATA[(GetDynamicRegistrationProvidersOrDefault(DynamicRegistrationProviderFlags.UseAsFallback)]]>"]</summary>
         public bool UseDynamicRegistrationsAsFallbackOnly =>
             (_settings & Settings.UseDynamicRegistrationsAsFallbackOnly) != 0;
 
@@ -4995,20 +5236,18 @@ namespace DryIoc
         /// <summary>Appends resolver to current unknown service resolvers.</summary>
         public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers.Append(rules),
-                DefaultRegistrationServiceKey);
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags, 
+                UnknownServiceResolvers.Append(rules), DefaultRegistrationServiceKey);
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
         /// If no resolver was found then <see cref="UnknownServiceResolvers"/> will stay the same instance,
         /// so it could be check for remove success or fail.</summary>
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers.Remove(rule),
-                DefaultRegistrationServiceKey);
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags, 
+                UnknownServiceResolvers.Remove(rule), DefaultRegistrationServiceKey);
 
         /// <summary>Sugar on top of <see cref="WithUnknownServiceResolvers"/> to simplify setting the diagnostic action.
         /// Does not guard you from action throwing an exception. Actually can be used to throw your custom exception
@@ -5083,10 +5322,9 @@ namespace DryIoc
         /// Replaced with `WithConcreteTypeDynamicRegistrations`
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
             new Rules(_settings | Settings.AutoConcreteTypeResolution, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers.Append(AutoResolveConcreteTypeRule(condition)),
-                DefaultRegistrationServiceKey);
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags,
+                UnknownServiceResolvers.Append(AutoResolveConcreteTypeRule(condition)), DefaultRegistrationServiceKey);
 
         /// <summary>Creates dynamic fallback registrations for the requested service type
         /// with provided <paramref name="getImplementationTypes"/>.
@@ -5168,9 +5406,9 @@ namespace DryIoc
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
         public Rules WithDefaultReuse(IReuse reuse) =>
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags,
+                UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Given item object and its type should return item "pure" expression presentation,
         /// without side-effects or external dependencies.
@@ -5186,9 +5424,9 @@ namespace DryIoc
         /// To enable non-primitive values support DryIoc need a way to recreate them as expression tree.</summary>
         public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, itemToExpressionOrDefault,
-                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
+                itemToExpressionOrDefault, DynamicRegistrationProviders, _dynamicRegistrationFlags,
+                UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithoutThrowIfDependencyHasShorterReuseLifespan"/>.</summary>
         public bool ThrowIfDependencyHasShorterReuseLifespan =>
@@ -5198,6 +5436,18 @@ namespace DryIoc
         /// <returns>New rules with new setting value.</returns>
         public Rules WithoutThrowIfDependencyHasShorterReuseLifespan() =>
             WithSettings(_settings & ~Settings.ThrowIfDependencyHasShorterReuseLifespan);
+
+        /// <summary><see cref="WithThrowIfScopedOrSingletonHasTransientDependency"/>.</summary>
+        public bool ThrowIfScopedOrSingletonHasTransientDependency =>
+            (_settings & Settings.ThrowIfScopedOrSingletonHasTransientDependency) != 0;
+
+        /// <summary>Turns On throwing the exception when Singleton or Scope service has a Transient dependency</summary>
+        public Rules WithThrowIfScopedOrSingletonHasTransientDependency() =>
+            WithSettings(_settings | Settings.ThrowIfScopedOrSingletonHasTransientDependency);
+
+        /// <summary>Turns Off throwing the exception when Singleton or Scope service has a Transient dependency (the default)</summary>
+        public Rules WithoutThrowIfScopedOrSingletonHasTransientDependency() =>
+            WithSettings(_settings & ~Settings.ThrowIfScopedOrSingletonHasTransientDependency);
 
         /// <summary><see cref="WithoutThrowOnRegisteringDisposableTransient"/></summary>
         public bool ThrowOnRegisteringDisposableTransient =>
@@ -5257,7 +5507,7 @@ namespace DryIoc
             new Rules(GetSettingsForExpressionGeneration(allowRuntimeState), FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty), ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Indicates that rules are used for the validation, e.g. the rules created in `Validate` method</summary>
         public bool UsedForValidation => (_settings & Settings.UsedForValidation) != 0;
@@ -5271,11 +5521,9 @@ namespace DryIoc
         /// in the-per rules collection.</summary>
         public Rules ForValidate() =>
             new Rules(GetSettingsForValidation(), 
-                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, 
-                int.MaxValue,
-                null, 
-                ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, int.MaxValue, null, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags, 
+                UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="ImplicitCheckForReuseMatchingScope"/></summary>
         public bool ImplicitCheckForReuseMatchingScope =>
@@ -5309,15 +5557,28 @@ namespace DryIoc
         public Rules WithoutVariantGenericTypesInResolvedCollection() =>
             WithSettings(_settings & ~Settings.VariantGenericTypesInResolvedCollection);
 
+        /// <summary><see cref="WithVariantGenericTypesInResolve"/>.</summary>
+        public bool VariantGenericTypesInResolve =>
+            (_settings & Settings.VariantGenericTypesInResolve) != 0;
+
+        /// <summary>Flag instructs to include covariant compatible types into the resolved generic.</summary>
+        public Rules WithVariantGenericTypesInResolve() =>
+            WithSettings(_settings | Settings.VariantGenericTypesInResolve);
+
+        /// <summary>Flag instructs to exclude covariant compatible types into the resolved generic.</summary>
+        public Rules WithoutVariantGenericTypesInResolve() =>
+            WithSettings(_settings & ~Settings.VariantGenericTypesInResolve);
+
         /// <summary><see cref="WithDefaultIfAlreadyRegistered"/>.</summary>
         public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; }
 
         /// <summary>Specifies default setting for container. By default is <see cref="IfAlreadyRegistered.AppendNotKeyed"/>.
         /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
         public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule) =>
+            rule == DefaultIfAlreadyRegistered ? this :
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, rule, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
         public bool ThrowIfRuntimeStateRequired =>
@@ -5446,7 +5707,7 @@ namespace DryIoc
             int dependencyCountInLambdaToSplitBigObjectGraph,
             Ref<ImHashMap<Request, System.Linq.Expressions.Expression>> dependencyResolutionCallExprs,
             ItemToExpressionConverterRule itemToExpressionConverter,
-            DynamicRegistrationProvider[] dynamicRegistrationProviders,
+            DynamicRegistrationProvider[] dynamicRegistrationProviders, DynamicRegistrationFlags[] dynamicRegistrationProvidersFlags,
             UnknownServiceResolver[] unknownServiceResolvers,
             object defaultRegistrationServiceKey)
         {
@@ -5459,19 +5720,20 @@ namespace DryIoc
             DependencyResolutionCallExprs = dependencyResolutionCallExprs;
             ItemToExpressionConverter = itemToExpressionConverter;
             DynamicRegistrationProviders = dynamicRegistrationProviders;
+            _dynamicRegistrationFlags = dynamicRegistrationProvidersFlags;
             UnknownServiceResolvers = unknownServiceResolvers;
             DefaultRegistrationServiceKey = defaultRegistrationServiceKey;
         }
 
-        private Rules Clone() =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made.Copy(), DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        private Rules Clone(bool cloneMade) =>
+            new Rules(_settings, FactorySelector, DefaultReuse, cloneMade ? _made.Copy() : _made, 
+                DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
+                DependencyResolutionCallExprs, ItemToExpressionConverter, DynamicRegistrationProviders, 
+                _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         private Rules WithSettings(Settings newSettings)
         {
-            var newRules = Clone();
+            var newRules = Clone(false);
             newRules._settings = newSettings;
             return newRules;
         }
@@ -5490,11 +5752,11 @@ namespace DryIoc
             EagerCachingSingletonForFasterAccess = 1 << 7,
             ThrowIfRuntimeStateRequired = 1 << 8,
             CaptureContainerDisposeStackTrace = 1 << 9,
-            UseDynamicRegistrationsAsFallbackOnly = 1 << 10,
+            UseDynamicRegistrationsAsFallbackOnly = 1 << 10, // todo: @obsolete now there are individual flags per provider
             IgnoringReuseForFuncWithArgs = 1 << 11,
             OverrideRegistrationMade = 1 << 12,
             FuncAndLazyWithoutRegistration = 1 << 13,
-            AutoConcreteTypeResolution = 1 << 14, // informational flag
+            AutoConcreteTypeResolution = 1 << 14, // informational flag // todo: @clarify consider for the obsoleting
             SelectLastRegisteredFactory = 1 << 15,// informational flag
             UsedForExpressionGeneration = 1 << 16,
             UseFastExpressionCompilerIfPlatformSupported = 1 << 17,
@@ -5503,7 +5765,8 @@ namespace DryIoc
             UseDecorateeReuseForDecorators = 1 << 20,
             UsedForValidation = 1 << 21, // informational flag, will appear in exceptions during validation
             ServiceProviderGetServiceShouldThrowIfUnresolved = 1 << 22,
-            //ScopedOrSingletonShouldApplySingletonForResolutionRootOnly = ??? // todo: @consider (see #285) that what it should be initially
+            ThrowIfScopedOrSingletonHasTransientDependency = 1 << 23,
+            VariantGenericTypesInResolve = 1 << 24,
         }
 
         private const Settings DEFAULT_SETTINGS
@@ -5868,7 +6131,7 @@ namespace DryIoc
         private enum MadeDetails
         {
             NoConditionals = 0,
-            ImplTypeDependsOnRequest = 1 << 1,
+            ImplTypeDependsOnRequest = 1 << 1, // todo: @unclear I am not sure why I am using shift to 1 as first and then shift to 3
             ImplMemberDependsOnRequest = 1 << 3,
             HasCustomDependencyValue = 1 << 4
         }
@@ -7343,7 +7606,8 @@ namespace DryIoc
         private static readonly ConstantExpression _nullTypeExpr          = Constant(null, typeof(Type));
         private static readonly ConstantExpression _nullExpr              = Constant(null, typeof(object));
 
-        internal static Expression CreateResolutionExpression(Request request, bool opensResolutionScope = false)
+        internal static Expression CreateResolutionExpression(Request request, 
+            bool openResolutionScope = false, bool asResolutionCall = false)
         {
             if (request.Rules.DependencyResolutionCallExprs != null &&
                 request.Factory != null && !request.Factory.HasRuntimeState)
@@ -7369,7 +7633,7 @@ namespace DryIoc
                 : container.GetConstantExpression(details.ServiceKey, typeof(object));
 
             Expression resolverExpr;
-            if (!opensResolutionScope)
+            if (!openResolutionScope)
             {
                 resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             }
@@ -7389,9 +7653,9 @@ namespace DryIoc
             }
 
             var parentFlags = default(RequestFlags);
-            if (opensResolutionScope)
+            if (openResolutionScope)
                 parentFlags |= RequestFlags.OpensResolutionScope;
-            if ((request.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+            if (asResolutionCall || (request.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
                 parentFlags |= RequestFlags.StopRecursiveDependencyCheck;
 
             // Only parent is converted to be passed to Resolve.
@@ -7442,6 +7706,17 @@ namespace DryIoc
         AsLazyEnumerable,
         /// <summary>Fixed array of item at time of resolve, newly registered/removed services won't be listed.</summary>
         AsFixedArray
+    }
+
+    /// <summary>Controls the registry change</summary>
+    public enum IsRegistryChangePermitted
+    { 
+        /// <summary>Change is permitted - the default setting</summary>
+        Permitted,
+        /// <summary>Throws the error for the new registration</summary>
+        Error,
+        /// <summary>Ignores the next registration</summary>
+        Ignored 
     }
 
     /// <summary>Provides information required for service resolution: service type
@@ -7995,9 +8270,8 @@ private ParameterServiceInfo(ParameterInfo p)
 
         public static bool MatchFactoryConditionAndMetadata(this Request r, KV<object, Factory> f) => 
             r.MatchFactoryConditionAndMetadata(f.Value);
-
-        public static bool MatchFactoryReuse(this Request r, KV<object, Factory> f) => 
-            f.Value.Reuse?.CanApply(r) ?? true;
+        public static bool MatchFactoryReuse(this Request r, Factory f) => f.Reuse?.CanApply(r) ?? true;
+        public static bool MatchFactoryReuse(this Request r, KV<object, Factory> f) => r.MatchFactoryReuse(f.Value);
 
         public static bool MatchGeneratedFactory(this Request r, KV<object, Factory> f) =>
             f.Value.FactoryGenerator == null || f.Value.FactoryGenerator.GetGeneratedFactory(r, ifErrorReturnDefault: true) != null;
@@ -8078,7 +8352,7 @@ private ParameterServiceInfo(ParameterInfo p)
             return req;
         }
 
-        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored with request.</summary>
+        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
         public static Request Create(IContainer container, IServiceInfo serviceInfo,
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null)
         {
@@ -8456,9 +8730,9 @@ private ParameterServiceInfo(ParameterInfo p)
 
                 var reuseLifespan = reuse?.Lifespan ?? 0;
 
-                var checkCaptiveDependency = !skipCaptiveDependencyCheck && 
-                    Rules.ThrowIfDependencyHasShorterReuseLifespan && reuse != null && reuseLifespan != 0 && 
-                    !factory.Setup.OpenResolutionScope;
+                var checkCaptiveDependency = !skipCaptiveDependencyCheck && !factory.Setup.OpenResolutionScope &&
+                    (Rules.ThrowIfDependencyHasShorterReuseLifespan       && reuseLifespan >  0 ||
+                     Rules.ThrowIfScopedOrSingletonHasTransientDependency && reuseLifespan == 0);
 
                 var scopedOrSingleton = checkCaptiveDependency &&
                     (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true;
@@ -8605,9 +8879,9 @@ private ParameterServiceInfo(ParameterInfo p)
 
             var isResolutionCall = false;
             if (isResolutionCall = IsNestedResolutionCall)
-                s.Append("Resolution call dependency ");
+                s.Append("resolution call dependency ");
             else if (isResolutionCall = IsResolutionRoot)
-                s.Append("Resolution root ");
+                s.Append("resolution root ");
 
             if (FactoryID != 0) // request is with resolved factory
             {
@@ -9328,7 +9602,7 @@ private ParameterServiceInfo(ParameterInfo p)
                         && request.GetActualServiceType() != typeof(void));
 
             if (getAsRsolutionCall)
-                return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope);
+                return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope, setup.AsResolutionCall);
 
             var cacheExpression = 
                 Caching != FactoryCaching.DoNotCache &&
@@ -9453,7 +9727,7 @@ private ParameterServiceInfo(ParameterInfo p)
                             ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
                                 depCount, cacheEntry);
 
-                        return Resolver.CreateResolutionExpression(request, false);
+                        return Resolver.CreateResolutionExpression(request);
                     }
                 }
             }
@@ -10149,7 +10423,7 @@ private ParameterServiceInfo(ParameterInfo p)
                         TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, member.Details)
                         ?? container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
                     if (memberExpr != null)
-                        assignments = ArrayTools.AppendOrUpdate(assignments, Bind(member.Member, memberExpr));
+                        assignments = assignments.Append(Bind(member.Member, memberExpr));
                     else if (request.IfUnresolved == IfUnresolved.ReturnDefault)
                         return null;
                 }
@@ -10778,7 +11052,7 @@ private ParameterServiceInfo(ParameterInfo p)
             if (// preventing recursion
                 (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 && !request.IsResolutionCall && 
                  (Setup.AsResolutionCall || Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
-                return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), false);
+                return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), Setup.OpenResolutionScope, Setup.AsResolutionCall);
 
             // First look for decorators if it is not already a decorator
             var serviceType = request.ServiceType;
@@ -10924,8 +11198,13 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Try retrieve instance from the the scope.</summary>
         bool TryGetUsedInstance(IResolverContext r, int hash, Type type, out object instance);
 
+        // todo: @v5 @api @obsolete switch to the overload below
         /// <summary>Clones the scope.</summary>
         IScope Clone();
+
+        /// <summary>The method will clone the scope factories and already created services,
+        /// but may or may not drop the disposables thus ensuring that only the new disposables added in clone will be disposed</summary>
+        IScope Clone(bool withDisposables);
     }
 
     /// <summary>
@@ -10984,15 +11263,21 @@ private ParameterServiceInfo(ParameterInfo p)
         }
 
         /// <inheritdoc />
-        public IScope Clone()
+        public IScope Clone() => Clone(true);
+
+        /// <inheritdoc />
+        public IScope Clone(bool withDisposables)
         {
             var slotsCopy = new ImMap<object>[MAP_COUNT];
-
-            // todo: @fix we need a way to copy all Refs in the slot - do we?
             for (var i = 0; i < MAP_COUNT; i++) 
                 slotsCopy[i] = _maps[i];
 
-            return new Scope(Parent, Name, slotsCopy, _factories, _unorderedDisposables, _disposables);
+            if (!withDisposables)
+                return new Scope(Parent?.Clone(withDisposables), Name, slotsCopy, _factories,
+                    ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty); // dropping the disposables
+
+            return new Scope(Parent?.Clone(withDisposables), // Не забыть скопировать папу (коментарий для дочки)
+                Name, slotsCopy, _factories, _unorderedDisposables, _disposables);
         }
 
         /// <inheritdoc />
@@ -11484,7 +11769,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 ? Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.Scoped)))
                 : ScopedOrSingleton 
                     ? (Expression)Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.ScopedOrSingleton)))
-                    : Call(typeof(Reuse).Method(nameof(Reuse.ScopedTo), typeof(object)), fallbackConverter(Name));
+                    : Call(typeof(Reuse).Method("ScopedTo", typeof(object)), fallbackConverter(Name));
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
@@ -11673,20 +11958,30 @@ private ParameterServiceInfo(ParameterInfo p)
         public static IReuse ScopedTo(object name, bool scopedOrSingleton, int lifespan) =>
             new CurrentScopeReuse(name, scopedOrSingleton, lifespan);
 
+
         /// <summary>Scoped to the closest scope (in scope parent hierarchy) with the name from the specified names list. 
         /// The `names` should no contain the `null`</summary>
         public static IReuse ScopedTo(params object[] names) =>
             names.IsNullOrEmpty() ? Scoped : names.Length == 1 ? ScopedTo(names[0]) : new CurrentScopeReuse(CompositeScopeName.Of(names));
 
-        /// <summary>Scoped to the scope created by the service with the specified `serviceType` and `serviceKey`,
-        /// The service should specify the creation of the scope in the registration call via `setup: Setup.With(opensResolutionScope: true)` argument.</summary>
+        /// <summary>[Obsolete("Use ScopedToService to prevent ambiguity with the ScopeTo(object name) where name is the Type")]</summary>
+        [Obsolete("Use ScopedToService to prevent ambiguity with the ScopeTo(object name) where name is the Type")]
         public static IReuse ScopedTo(Type serviceType = null, object serviceKey = null) =>
             serviceType == null && serviceKey == null ? Scoped : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
+
+        /// <summary>Scoped to the scope created by the service with the specified type and optional key</summary>
+        public static IReuse ScopedToService(Type serviceType = null, object serviceKey = null) =>
+            serviceType == null && serviceKey == null ? Scoped
+            : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
 
         /// <summary>Scoped to the scope created by the service with the specified `TService` type and `serviceKey`,
         /// The service should specify the creation of the scope in the registration call via `setup: Setup.With(opensResolutionScope: true)` argument.</summary>
         public static IReuse ScopedTo<TService>(object serviceKey = null) =>
-            ScopedTo(typeof(TService), serviceKey);
+            ScopedToService(typeof(TService), serviceKey);
+
+        /// <summary>Scoped to the scope created by the service with the specified type and optional key</summary>
+        public static IReuse ScopedToService<TService>(object serviceKey = null) =>
+            ScopedToService(typeof(TService), serviceKey);
 
         /// <summary>The same as <see cref="Scoped"/> but in case of no scope available will fallback to the <see cref="Singleton"/> reuse</summary>
         /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="Scoped"/> reuse.</remarks>
@@ -11702,13 +11997,15 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Obsolete: please use `ScopedTo` instead.</summary>
         public static IReuse InCurrentNamedScope(object name = null) => ScopedTo(name);
 
-        /// <summary>Obsolete: please use `ScopedTo` instead.</summary>
+        /// <summary>Obsolete: Please use `ScopedToService` instead.</summary>
+		[Obsolete("Please use `ScopedToService` instead")]
         public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null) =>
-            ScopedTo(assignableFromServiceType, serviceKey);
+            ScopedToService(assignableFromServiceType, serviceKey);
 
-        /// <summary>Obsolete: please use `ScopedTo` instead.</summary>
+        /// <summary>Obsolete: Please use `ScopedToService` instead.</summary>
+		[Obsolete("Please use `ScopedToService` instead.")]
         public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null) =>
-            ScopedTo<TAssignableFromServiceType>(serviceKey);
+            ScopedToService<TAssignableFromServiceType>(serviceKey);
 
         /// <summary>Same as Scoped but requires <see cref="ThreadScopeContext"/>.</summary>
         public static readonly IReuse InThread = Scoped;
@@ -11918,20 +12215,28 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Represents scope bound to container itself, and not an ambient (context) thingy.</summary>
         IScope OwnCurrentScope { get; }
 
-        // todo: replace with the below overload with more parameters
+        // todo: @api replace with the below overload with more parameters
         /// <summary>Creates new container from the current one by specifying the listed parameters.
         /// If the null or default values are provided then the default or new values will be applied.
         /// Nothing will be inherited from the current container.
         /// If you want to inherit something you need to provide it as parameter.</summary>
         IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope);
 
+        // todo: @api replace with the below overload with more parameters
         /// <summary>Creates new container from the current one by specifying the listed parameters.
         /// If the null or default values are provided then the default or new values will be applied.
-        /// Nothing will be inherited from the current container.
-        /// If you want to inherit something you need to provide it as parameter.</summary>
+        /// Nothing will be inherited from the current container. If you want to inherit something you need to provide it as parameter.</summary>
         IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
             RegistrySharing registrySharing, IScope singletonScope, IScope currentScope);
 
+        /// <summary>Creates new container from the current one by specifying the listed parameters.
+        /// If the null or default values are provided then the default or new values will be applied.
+        /// Nothing will be inherited from the current container. If you want to inherit something you need to provide it as parameter.</summary>
+        IContainer With(IResolverContext parent, Rules rules, IScopeContext scopeContext,
+            RegistrySharing registrySharing, IScope singletonScope, IScope currentScope, 
+            IsRegistryChangePermitted? isRegistryChangePermitted);
+
+        // todo: @api no need for the interface definition because the it may be implemented (already) in terms of With as extension method
         /// <summary>Produces new container which prevents any further registrations.</summary>
         /// <param name="ignoreInsteadOfThrow">(optional)Controls what to do with registrations: ignore or throw exception.
         /// Throws exception by default.</param>
@@ -12049,6 +12354,9 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Simplifies the access to the error name.</summary>
         public string ErrorName => DryIoc.Error.NameOf(Error);
 
+        /// <summary>Many collected exceptions</summary>
+        public readonly ContainerException[] CollectedExceptions;
+
         /// <summary>Creates exception by wrapping <paramref name="errorCode"/> and its message,
         /// optionally with <paramref name="innerException"/> exception.</summary>
         public static ContainerException Of(ErrorCheck errorCheck, int errorCode,
@@ -12064,6 +12372,11 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Prints argument for formatted message.</summary> <param name="arg">To print.</param> <returns>Printed string.</returns>
         protected static string Print(object arg) =>
             arg == null ? string.Empty : new StringBuilder().Print(arg).ToString();
+
+        /// <summary>Collects many exceptions.</summary>
+        public ContainerException(int error, ContainerException[] exceptions) 
+            : this(error, GetMessage(ErrorCheck.CollectedExceptions, error), null) =>
+            CollectedExceptions = exceptions;
 
         /// <summary>Creates exception with message describing cause and context of error.</summary>
         public ContainerException(int error, string message)
@@ -12289,6 +12602,10 @@ private ParameterServiceInfo(ParameterInfo p)
             FoundNoRootsToValidate = Of(
                 "No roots to Validate found. Check the `condition` passed to Validate method for container: {0}" + NewLine +
                 "You may also examine all container registrations via `container.container.GetServiceRegistrations()` method."),
+            NoServiceTypesToValidate = Of(
+                "The `serviceTypes` passed to Validate method is null or empty. Please pass the type(s) you want to Validate."),
+            ValidateFoundErrors = Of(
+                "Validate found the errors, please check the ContainerException.CollectedExceptions for details."),
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine +
                 "{0}");
@@ -12303,7 +12620,8 @@ private ParameterServiceInfo(ParameterInfo p)
         }
 
         /// <summary>Returns the name of error with the provided error code.</summary>
-        public static string NameOf(int error) =>
+        public static string NameOf(int error) => 
+            error == -1 ? "ErrorCheck" :
             typeof(Error).GetTypeInfo().DeclaredFields
                 .Where(f => f.FieldType == typeof(int)).Where((_, i) => i == error + 1)
                 .FirstOrDefault()?.Name;
@@ -12329,6 +12647,8 @@ private ParameterServiceInfo(ParameterInfo p)
         TypeIsNotOfType,
         /// <summary>Invoked operation throws, it is source of inner exception.</summary>
         OperationThrows,
+        /// <summary>Just stores many collected exceptions.</summary>
+        CollectedExceptions,
     }
 
     /// <summary>Enables more clean error message formatting and a bit of code contracts.</summary>
@@ -12336,13 +12656,14 @@ private ParameterServiceInfo(ParameterInfo p)
     {
         private static string[] CreateDefaultMessages()
         {
-            var messages = new string[(int)ErrorCheck.OperationThrows + 1];
-            messages[(int)ErrorCheck.Unspecified]      = "The error reason is unspecified, which is bad thing.";
-            messages[(int)ErrorCheck.InvalidCondition] = "Argument {0} of type {1} has invalid condition.";
-            messages[(int)ErrorCheck.IsNull]           = "Argument of type {0} is null.";
-            messages[(int)ErrorCheck.IsNotOfType]      = "Argument {0} is not of type {1}.";
-            messages[(int)ErrorCheck.TypeIsNotOfType]  = "Type argument {0} is not assignable from type {1}.";
-            messages[(int)ErrorCheck.OperationThrows]  = "Invoked operation throws the inner exception {0}.";
+            var messages = new string[(int)ErrorCheck.CollectedExceptions + 1];
+            messages[(int)ErrorCheck.Unspecified]          = "The error reason is unspecified, which is bad thing.";
+            messages[(int)ErrorCheck.InvalidCondition]     = "Argument {0} of type {1} has invalid condition.";
+            messages[(int)ErrorCheck.IsNull]               = "Argument of type {0} is null.";
+            messages[(int)ErrorCheck.IsNotOfType]          = "Argument {0} is not of type {1}.";
+            messages[(int)ErrorCheck.TypeIsNotOfType]      = "Type argument {0} is not assignable from type {1}.";
+            messages[(int)ErrorCheck.OperationThrows]      = "Invoked operation throws the inner exception {0}.";
+            messages[(int)ErrorCheck.CollectedExceptions]  = "Please check the `ContainerException.CollectedExceptions` for the details";
             return messages;
         }
 
@@ -12428,13 +12749,17 @@ private ParameterServiceInfo(ParameterInfo p)
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
 
-        /// Throws if contidion is true, otherwise returns the `default(T)` value
+        /// <summary>Throws if contidion is true, otherwise returns the `default(T)` value</summary>
         public static T For<T>(bool throwCondition, int error, 
             object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwCondition) return default(T);
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
+
+        /// <summary>Throws the one with manyh collected exceptions</summary>
+        public static void Many(int error, params ContainerException[] errors) => 
+            throw new ContainerException(error, errors);
     }
 
     /// <summary>Called from the generated code to check if WeakReference.Value is GCed.</summary>
@@ -12560,7 +12885,7 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Returns true if class is compiler generated. Checking for CompilerGeneratedAttribute
         /// is not enough, because this attribute is not applied for classes generated from "async/await".</summary>
         public static bool IsCompilerGenerated(this Type type) =>
-            type.FullName != null && type.FullName.Contains("<>c__DisplayClass");
+            type.FullName != null && type.FullName.Contains("<>c__DisplayClass"); // todo: @perf simplify the check
 
         /// <summary>Returns true if type is generic.</summary>
         public static bool IsGeneric(this Type type) =>
@@ -12686,6 +13011,11 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Returns true if type is assignable to <typeparamref name="T"/> type.</summary>
         public static bool IsAssignableTo<T>(this Type type) =>
             type != null && typeof(T).GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
+
+        /// <summary>`to` should be the closed-generic type</summary>
+        public static bool IsAssignableVariantGenericTypeFrom(this Type to, Type from) =>
+            from != to && from.IsGeneric() && from.GetGenericTypeDefinition() == to.GetGenericTypeDefinition() && 
+            to.GetTypeInfo().IsAssignableFrom(from.GetTypeInfo());
 
         /// <summary>Returns true if type of <paramref name="obj"/> is assignable to source <paramref name="type"/>.</summary>
         public static bool IsTypeOf(this Type type, object obj) =>
@@ -13371,12 +13701,12 @@ namespace DryIoc.Messages
     /// Message handler middleware to handle the message and pass the result to the next middleware
     public interface IMessageMiddleware<in M, R>
     {
-        /// `0` means the default registration order,
+        /// <summary>`0` means the default registration order,
         /// lesser numbers incuding the `-1`, `-2` mean execute as a first,
-        /// bigger numbers mean execute as a last
+        /// bigger numbers mean execute as a last</summary>
         int RelativeOrder { get; }
 
-        /// Handles message and passes to the next middleware
+        /// <summary>Handles message and passes to the next middleware</summary>
         Task<R> Handle(M message, CancellationToken cancellationToken, Func<Task<R>> nextMiddleware);
     }
 
@@ -13435,20 +13765,22 @@ namespace DryIoc.Messages
         }
     }
 
-    /// A subject
+    // todo: @feature add SendToAll with the reducing the results
+    // todo: @feature add NotifyAll without waiting for results
+    /// <summary>The central mediator entry-point</summary>
     public class MessageMediator
     {
         private readonly IResolver _resolver;
 
-        /// Constructs with resolver
+        /// <summary>Constructs the mediator</summary>
         public MessageMediator(IResolver resolver) => 
             _resolver = resolver;
 
-        /// Sends message with response to resolved handlers
+        /// <summary>Sends the message with response to the resolved Single handler</summary>
         public Task<R> Send<M, R>(M message, CancellationToken cancellationToken) where M : IMessage<R> =>
             _resolver.Resolve<IMessageHandler<M, R>>().Handle(message, cancellationToken);
 
-        /// Sends message with empty response to resolved handlers
+        /// <summary>Sends the message with empty response to resolved Single handler</summary>
         public Task Send<M>(M message, CancellationToken cancellationToken) where M : IMessage<EmptyResponse> =>
             _resolver.Resolve<IMessageHandler<M, EmptyResponse>>().Handle(message, cancellationToken);
     }

@@ -213,7 +213,7 @@ namespace DryIoc.UnitTests
 
             public void Track(IDisposable disposable)
             {
-                _items.Swap(i => i.AppendOrUpdate(disposable));
+                _items.Swap(i => i.Append(disposable));
             }
 
             public void Dispose()

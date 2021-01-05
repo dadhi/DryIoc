@@ -14,6 +14,7 @@ md*/
 
 //md{ usings ...
 //md ```cs
+using System;
 using System.Collections.Concurrent;
 using NUnit.Framework;
 using DryIoc;
@@ -120,39 +121,98 @@ class NSubstitute_example_with_singleton_mocks
 
 Let's implement auto-mocking with popular [Moq library](https://github.com/moq/moq).
 
+We will create a testing container which dynamically provides the mock implementation for any interface or abstract class 
+and automatically will resolve any concrete class. We will use the `DynamicRegistrationProvider` feature for those and `CreateChild` 
+container to detach from the production container but provide the access to its services.
+
 ```cs md*/
-class Moq_example_with_singleton_mocks
+public class Moq_example_with_test_container
 {
-    readonly ConcurrentDictionary<System.Type, ReflectionFactory> _mockFactories = 
-        new ConcurrentDictionary<System.Type, ReflectionFactory>();
-
-    // Let's define a method to configure our container with auto-mocking of interfaces or abstract classes.
-    // Optional `reuse` parameter will allow to specify a mock reuse.
-    private IContainer WithAutoMocking(IContainer container, IReuse reuse = null) =>
-        container.With(rules => rules.WithUnknownServiceResolvers(request =>
-        {
-            var serviceType = request.ServiceType;
-            if (!serviceType.IsAbstract) // Mock interface or abstract class only.
-                return null;
-
-            return _mockFactories.GetOrAdd(serviceType, 
-                _ => new ReflectionFactory(reuse: reuse, 
-                    made: Made.Of(typeof(Mock).Method(nameof(Mock.Of)))));
-        }));
-
-
     [Test] public void Test()
     {
-        var container = WithAutoMocking(new Container(), Reuse.Singleton);
+        var prodContainer = new Container();
 
-        container.Register<SomeConsumer>();
-        container.Register<OtherConsumer>();
+        using (var container = CreateTestContainer(prodContainer))
+        {
+            container.Register<UnitOfWork>(Reuse.Singleton);
 
-        var consumer1 = container.Resolve<SomeConsumer>();
-        var consumer2 = container.Resolve<OtherConsumer>();
+            // Arrangements
+            const bool expected = true;
 
-        // Verify that `Service` dependency is indeed a singleton in a different consumers
-        Assert.AreSame(consumer1.Service, consumer2.Service);
+            container.Resolve<Mock<IDep>>()
+                .Setup(instance => instance.Method())
+                .Returns(expected);
+
+            // Get concrete type instance of tested unit 
+            // all dependencies are fulfilled with mocked instances
+            var unit = container.Resolve<UnitOfWork>();
+
+            // Action
+            var actual = unit.InvokeDep();
+
+            // Assertion
+            Assert.AreEqual(expected, actual);
+            container.Resolve<Mock<IDep>>()
+                .Verify(instance => instance.Method());
+        }
+    }
+
+    public static IContainer CreateTestContainer(IContainer container)
+    {
+        var c = container.CreateChild(IfAlreadyRegistered.Replace,
+            container.Rules.WithDynamicRegistration((serviceType, serviceKey) =>
+            {
+                // ignore services with non-default key
+                if (serviceKey != null)
+                    return null;
+
+                if (serviceType == typeof(object))
+                    return null;
+
+                // get the Mock object for the abstract class or interface
+                if (serviceType.IsInterface || serviceType.IsAbstract)
+                {
+                    // except for the open-generic ones
+                    if (serviceType.IsGenericType && serviceType.IsOpenGeneric())
+                        return null;
+
+                    var mockType = typeof(Mock<>).MakeGenericType(serviceType);
+
+                    var mockFactory = new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton);
+
+                    return new[] { new DynamicRegistration(mockFactory, IfAlreadyRegistered.Keep) };
+                }
+
+                // concrete types
+                var concreteTypeFactory = new ReflectionFactory(serviceType, Reuse.Singleton,
+                    FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
+
+                return new[] { new DynamicRegistration(concreteTypeFactory) };
+            }, 
+            DynamicRegistrationFlags.Service | DynamicRegistrationFlags.AsFallback));
+
+        c.Register(typeof(Mock<>), Reuse.Singleton, FactoryMethod.DefaultConstructor());
+
+        return c;
+    }
+
+    public interface IDep
+    {
+        bool Method();
+    }
+
+    public class Dep1 : IDep 
+    {
+        public bool Method() => true;
+    }
+
+    public class UnitOfWork : IDisposable
+    {
+        public readonly IDep Dep;
+        public UnitOfWork(IDep d) => Dep = d;
+        public void Dispose() { }
+
+        public bool InvokeDep() => Dep.Method();
     }
 }
 /*md

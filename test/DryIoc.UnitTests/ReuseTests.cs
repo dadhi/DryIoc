@@ -156,7 +156,7 @@ namespace DryIoc.UnitTests
 
             container.Register<AccountUser>(made: Parameters.Of.Type<Account>(serviceKey: "account"));
             container.Register<Account>(serviceKey: "account", setup: Setup.With(openResolutionScope: true));
-            container.Register<Log>(Reuse.ScopedTo(serviceKey: "account"));
+            container.Register<Log>(Reuse.ScopedToService(serviceKey: "account"));
 
             var user = container.Resolve<AccountUser>();
 
@@ -169,7 +169,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(Aaa<>), setup: Setup.With(openResolutionScope: true));
-            container.Register<Bbb>(Reuse.ScopedTo(typeof(Aaa<>)));
+            container.Register<Bbb>(Reuse.ScopedToService(typeof(Aaa<>)));
 
             var aaa = container.Resolve<Aaa<Bbb>>();
 

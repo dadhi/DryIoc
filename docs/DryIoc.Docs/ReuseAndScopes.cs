@@ -578,9 +578,10 @@ Basically `Reuse.InWebRequest` and `Reuse.InThread` are just a scope reuses:
 
 ## Reuse.ScopedTo service type
 
-`ScopedTo<TService>()` is the reuse of the same dependency instance in the service sub-tree.
-The concept is similar to the assigning of dependency object to variable and then passing (re-using) this variable 
-in the service tree.
+`ScopedTo<TService>(object serviceKey = null)` and `ScopedToService(Type serviceType, object serviceKey = null)` 
+define the reuse of the same dependency value in the service sub-graph.
+The concept is similar to the assigning of dependency value to the variable and then passing (re-using) this variable 
+inside the service and its other dependencies.
 
 ```cs md*/
 class Example_of_reusing_dependency_as_variable
@@ -889,10 +890,15 @@ class Reuse_lifespan_mismatch_error_suppress
 }/*md
 ```
 
-Another way to prevent the exception is wrapping a shorter reused dependency in a `Func` [wrapper](Wrappers). 
-Here dependency user decides when to create a dependency value and to start its lifetime, possibly creating multiple values. 
+**Note:** The `Transient` reuse as stated above is not a "real" reuse (because it will be recreated every time its used), 
+so you won't get the captive dependency exceptions for the `Transient` dependency inside the `Scoped` or `Singleton` services by default. 
+But wou may to disagree with the `Rules.WithThrowIfScopedOrSingletonHasTransientDependency`.
+
+Another way to prevent the exception is wrapping a shorter reused dependency in a `Func` or `Lazy` [wrapper](Wrappers). 
+The user may decide to delay the creation of the dependency via `Lazy` or create multiple dependency values via `Func` 
+and be fully in control of their lifetime.
 ```cs md*/
-class Avoiding_reuse_lifespan_mismatch_for_Lazy_dependency
+class Avoiding_reuse_lifespan_mismatch_for_Func_or_Lazy_dependency
 {
     [Test]
     public void Example()
