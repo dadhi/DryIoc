@@ -79,7 +79,7 @@ Version History
 - fixed: #156 Xamarin Forms iOS System.PlatformNotSupportedException: Operation is not supported on this platform.
 - fixed: #283 Open-generic decorators are no applied to the service registered via RegisterInstance
 
-## v4.2.0 Feature release
+## v4.2.0 Feature release / 2020-05-18
 
 - feature: #270 Add FEC.LightExpression.LambdaExpression wrapper to work the same as System LambdaExpression  
 
@@ -90,21 +90,21 @@ Version History
 - fixed: #254 ResolveMany if singleton decorators decorates the first item only
 - fixed: #280 Possibility to make source files which are embedded to the project internal? 
 
-## v4.1.4 Bug-fix release
+## v4.1.4 Bug-fix release / 2020-04-03
 
 - #242 Validate call hangs when there are many singletons
 - #245 Validate may not create the actual expressions to be more performant
 - #250 Original stack trace is lost at Interpreter.TryInterpretAndUnwrapContainerException
 
-## v4.1.3 Bug-fix releases
+## v4.1.3 Bug-fix releases / 2020-03-27
 
 - #248 WithConcreteTypeDynamicRegistrations condition gets called with serviceKey always null
 
-## v4.1.2 Bug-fix release
+## v4.1.2 Bug-fix release / 2020-03-12
 
 - #236 Additional default parameter for Made creation public API introduced binary incompatibility
 
-## v4.1.1 Bug-fix release
+## v4.1.1 Bug-fix release / 2020-03-05
 
 - #118 Validate issue
 - #215 RegisterInitializer<TService> causes additional call(s) to TService.Dispose when container is disposed
@@ -113,7 +113,7 @@ Version History
 - #228 Updated DryIoc from 4.0.4.0 to 4.1.0 in Unity Engine project, keyed register/resolve wont work anymore
 - #230 Add the error code into the ContainerException message to simplify error finding
 
-## v4.1.0 Feature release
+## v4.1.0 Feature release / 2020-01-20
 
 ### Highlights
 
@@ -173,7 +173,7 @@ Version History
 - fixed: #121: FastExpressionCompiler.cs and Expression.cs code comment out in .NetFramework 4.7
 - fixed: #124: Stackoverflow exception 4.0.3
 
-## v4.0.3 Release notes
+## v4.0.3 Release notes / 2019-04-10
 
 - fixed: #109: Cannot inject a struct using a Func wrapper
 - fixed: #114: Resolve Action{T}
@@ -182,13 +182,13 @@ Version History
 
 - fixed: #100: ResolveMany with Meta does NOT work but collection with Meta does work
 
-## v4.0.1 Release notes
+## v4.0.1 Release notes / 2019-03-28
 
 - added: #95: Serializable ContainerException for supported targets
 - fixed: #97: Resolving last registration from multiple default services bug
 - fixed: #89: DryIoC.CommonServiceLocator.dll package out-of-date link
 
-## v4.0.0 Release notes
+## v4.0.0 Release notes / 2019-03-04
 
 ### Highlights
 
