@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.7.1 Bug-fix release / 2021-01-15
+
+- #365 Made.Of() Parameters incorrectly reused depending on Register() usage
+
 ## v4.7.0 Feature release / 2021-01-05
 
 - #338 Child container disposes parent container singletons
