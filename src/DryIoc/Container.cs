@@ -6674,10 +6674,10 @@ namespace DryIoc
         public static implicit operator Made(FactoryMethodSelector factoryMethod) => new Made(factoryMethod);
 
         /// <summary>Creates rules with only <see cref="Parameters"/> specified.</summary>
-        public static implicit operator Made(ParameterSelector parameters) => new Made(null, parameters);
+        public static implicit operator Made(ParameterSelector parameters) => new Made(null, parameters, implMemberDependsOnRequest: true);
 
         /// <summary>Creates rules with only <see cref="PropertiesAndFields"/> specified.</summary>
-        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields) => new Made(null, null, propertiesAndFields);
+        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields) => new Made(null, null, propertiesAndFields, implMemberDependsOnRequest: true);
 
         // todo: @bug fix the spelling for `isConditionalImlementation`
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
@@ -6721,14 +6721,14 @@ namespace DryIoc
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
             new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo),
-                parameters, propertiesAndFields, isImplMemberDependsOnRequest: true);
+                parameters, propertiesAndFields, implMemberDependsOnRequest: true);
 
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, Func<Request, ServiceInfo> factoryInfo,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
             new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)),
-                parameters, propertiesAndFields, isImplMemberDependsOnRequest: true);
+                parameters, propertiesAndFields, implMemberDependsOnRequest: true);
 
         /// <summary>Defines how to select constructor from implementation type.
         /// Where <paramref name="getConstructor"/> is delegate taking implementation type as input 
@@ -6863,7 +6863,7 @@ namespace DryIoc
         internal Made(
             FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false,
-            bool isImplMemberDependsOnRequest = false)
+            bool implMemberDependsOnRequest = false)
         {
             FactoryMethod = factoryMethod;
             Parameters = parameters;
@@ -6875,7 +6875,7 @@ namespace DryIoc
                 details |= MadeDetails.HasCustomDependencyValue;
             if (isConditionalImlementation)
                 details |= MadeDetails.ImplTypeDependsOnRequest;
-            if (isImplMemberDependsOnRequest)
+            if (implMemberDependsOnRequest)
                 details |= MadeDetails.ImplMemberDependsOnRequest;
             _details = details;
         }
