@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.7.2 Bug-fix release / 2021-01-15
+
+- #365 Really fixing: Made.Of() Parameters incorrectly reused depending on Register() usage
+
 ## v4.7.1 Bug-fix release / 2021-01-15
 
 - #365 Made.Of() Parameters incorrectly reused depending on Register() usage
