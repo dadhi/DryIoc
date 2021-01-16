@@ -6674,10 +6674,10 @@ namespace DryIoc
         public static implicit operator Made(FactoryMethodSelector factoryMethod) => new Made(factoryMethod);
 
         /// <summary>Creates rules with only <see cref="Parameters"/> specified.</summary>
-        public static implicit operator Made(ParameterSelector parameters) => new Made(null, parameters, implMemberDependsOnRequest: true);
+        public static implicit operator Made(ParameterSelector parameters) => new Made(null, parameters);
 
         /// <summary>Creates rules with only <see cref="PropertiesAndFields"/> specified.</summary>
-        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields) => new Made(null, null, propertiesAndFields, implMemberDependsOnRequest: true);
+        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields) => new Made(null, null, propertiesAndFields);
 
         // todo: @bug fix the spelling for `isConditionalImlementation`
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
@@ -6865,12 +6865,16 @@ namespace DryIoc
             Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImlementation = false,
             bool implMemberDependsOnRequest = false)
         {
-            FactoryMethod = factoryMethod;
-            Parameters = parameters;
+            FactoryMethod       = factoryMethod;
+            Parameters          = parameters;
             PropertiesAndFields = propertiesAndFields;
             FactoryMethodKnownResultType = factoryMethodKnownResultType;
 
             var details = default(MadeDetails);
+
+            if (parameters != null || propertiesAndFields != null)
+                details |= MadeDetails.ImplMemberDependsOnRequest;
+
             if (hasCustomValue)
                 details |= MadeDetails.HasCustomDependencyValue;
             if (isConditionalImlementation)
