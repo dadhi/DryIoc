@@ -161,7 +161,7 @@ namespace FastExpressionCompiler.LightExpression
             if (type.IsValueType())
                 return new NewValueTypeExpression(type);
 
-            foreach (var x in type.GetTypeInfo().DeclaredConstructors)
+            foreach (var x in type.GetTypeInfoUniversal().DeclaredConstructors)
                 if (x.GetParameters().Length == 0)
                     return new NewExpression(x);
 
@@ -574,7 +574,7 @@ namespace FastExpressionCompiler.LightExpression
 
         private static Type GetDelegateReturnType(Type delType)
         {
-            var typeInfo = delType.GetTypeInfo();
+            var typeInfo = delType.GetTypeInfoUniversal();
             if (typeInfo.IsGenericType)
             {
                 var typeArguments = typeInfo.GenericTypeArguments;
@@ -1108,19 +1108,19 @@ namespace FastExpressionCompiler.LightExpression
 
         private static Type GetCoalesceType(Type left, Type right)
         {
-            var leftTypeInfo = left.GetTypeInfo();
+            var leftTypeInfo = left.GetTypeInfoUniversal();
             if (leftTypeInfo.IsGenericType && leftTypeInfo.GetGenericTypeDefinition() == typeof(Nullable<>))
                 left = leftTypeInfo.GenericTypeArguments[0];
 
             if (right == left)
                 return left;
 
-            if (leftTypeInfo.IsAssignableFrom(right.GetTypeInfo()) ||
+            if (leftTypeInfo.IsAssignableFrom(right.GetTypeInfoUniversal()) ||
                 right.IsImplicitlyBoxingConvertibleTo(left) ||
                 right.IsImplicitlyNumericConvertibleTo(left))
                 return left;
 
-            if (right.GetTypeInfo().IsAssignableFrom(leftTypeInfo) ||
+            if (right.GetTypeInfoUniversal().IsAssignableFrom(leftTypeInfo) ||
                 left.IsImplicitlyBoxingConvertibleTo(right) ||
                 left.IsImplicitlyNumericConvertibleTo(right))
                 return right;
@@ -1141,35 +1141,35 @@ namespace FastExpressionCompiler.LightExpression
         }
 
         internal static bool IsImplicitlyBoxingConvertibleTo(this Type source, Type target) =>
-            source.GetTypeInfo().IsValueType &&
+            source.GetTypeInfoUniversal().IsValueType &&
             (target == typeof(object) ||
              target == typeof(ValueType)) ||
-             source.GetTypeInfo().IsEnum && target == typeof(Enum);
+             source.GetTypeInfoUniversal().IsEnum && target == typeof(Enum);
 
         internal static PropertyInfo FindProperty(this Type type, string propertyName)
         {
-            var properties = type.GetTypeInfo().DeclaredProperties.AsArray();
+            var properties = type.GetTypeInfoUniversal().DeclaredProperties.AsArray();
             for (var i = 0; i < properties.Length; i++)
                 if (properties[i].Name == propertyName)
                     return properties[i];
 
-            return type.GetTypeInfo().BaseType?.FindProperty(propertyName);
+            return type.GetTypeInfoUniversal().BaseType?.FindProperty(propertyName);
         }
 
         internal static FieldInfo FindField(this Type type, string fieldName)
         {
-            var fields = type.GetTypeInfo().DeclaredFields.AsArray();
+            var fields = type.GetTypeInfoUniversal().DeclaredFields.AsArray();
             for (var i = 0; i < fields.Length; i++)
                 if (fields[i].Name == fieldName)
                     return fields[i];
 
-            return type.GetTypeInfo().BaseType?.FindField(fieldName);
+            return type.GetTypeInfoUniversal().BaseType?.FindField(fieldName);
         }
 
         internal static MethodInfo FindMethod(this Type type,
             string methodName, Type[] typeArgs, IReadOnlyList<Expression> args, bool isStatic = false)
         {
-            var methods = type.GetTypeInfo().DeclaredMethods.AsArray();
+            var methods = type.GetTypeInfoUniversal().DeclaredMethods.AsArray();
             for (var i = 0; i < methods.Length; i++)
             {
                 var m = methods[i];
@@ -1190,7 +1190,7 @@ namespace FastExpressionCompiler.LightExpression
                 }
             }
 
-            return type.GetTypeInfo().BaseType?.FindMethod(methodName, typeArgs, args, isStatic);
+            return type.GetTypeInfoUniversal().BaseType?.FindMethod(methodName, typeArgs, args, isStatic);
         }
 
         private static bool AreTypesTheSame(Type[] source, Type[] target)
@@ -1352,7 +1352,7 @@ namespace FastExpressionCompiler.LightExpression
 
             typeString = typeString.Replace('+', '.');
 
-            var typeInfo = type.GetTypeInfo();
+            var typeInfo = type.GetTypeInfoUniversal();
             if (!typeInfo.IsGenericType)
                 return printType?.Invoke(type, typeString) ?? typeString;
 
@@ -1393,7 +1393,7 @@ namespace FastExpressionCompiler.LightExpression
         /// Prints valid c# Enum literal
         public static string ToEnumValueCode(this Type enumType, object x)
         {
-            var enumTypeInfo = enumType.GetTypeInfo();
+            var enumTypeInfo = enumType.GetTypeInfoUniversal();
             if (enumTypeInfo.IsGenericType && enumTypeInfo.GetGenericTypeDefinition() == typeof(Nullable<>))
             {
                 if (x == null)
@@ -1451,7 +1451,7 @@ namespace FastExpressionCompiler.LightExpression
             if (x is Type t)
                 return t.ToCode(stripNamespace, printType);
 
-            var xTypeInfo = x.GetType().GetTypeInfo();
+            var xTypeInfo = x.GetType().GetTypeInfoUniversal();
             if (xTypeInfo.IsEnum)
                 return x.GetType().ToEnumValueCode(x);
 
@@ -1541,9 +1541,9 @@ namespace FastExpressionCompiler.LightExpression
             if (NodeType == ExpressionType.Convert && Method != null)
             {
                 sb.Append(',');
-                var methodIndex = Method.DeclaringType.GetTypeInfo().GetDeclaredMethods(Method.Name).AsArray().GetFirstIndex(Method);
+                var methodIndex = Method.DeclaringType.GetTypeInfoUniversal().GetDeclaredMethods(Method.Name).AsArray().GetFirstIndex(Method);
                 sb.AppendLineIdent(lineIdent).AppendTypeof(Method.DeclaringType, stripNamespace, printType)
-                    .Append(".GetTypeInfo().GetDeclaredMethods(\"").Append(Method.Name).Append("\")[").Append(methodIndex).Append("]");
+                    .Append(".GetTypeInfoUniversal().GetDeclaredMethods(\"").Append(Method.Name).Append("\")[").Append(methodIndex).Append("]");
             }
 
             return sb.Append(')');
@@ -1978,9 +1978,9 @@ namespace FastExpressionCompiler.LightExpression
         {
             var args = Arguments;
             sb.Append("New(/*").Append(args.Count).Append(" args*/");
-            var ctorIndex = Constructor.DeclaringType.GetTypeInfo().DeclaredConstructors.ToArray().GetFirstIndex(Constructor);
+            var ctorIndex = Constructor.DeclaringType.GetTypeInfoUniversal().DeclaredConstructors.ToArray().GetFirstIndex(Constructor);
             sb.AppendLineIdent(lineIdent).AppendTypeof(Type, stripNamespace, printType)
-                .Append(".GetTypeInfo().DeclaredConstructors.ToArray()[").Append(ctorIndex).Append("],");
+                .Append(".GetTypeInfoUniversal().DeclaredConstructors.ToArray()[").Append(ctorIndex).Append("],");
             sb.AppendLineIdent(args, lineIdent, stripNamespace, printType, identSpaces);
             return sb.Append(')');
         }
@@ -2148,9 +2148,9 @@ namespace FastExpressionCompiler.LightExpression
             sb.Append("Call(");
             sb.AppendLineIdent(Object, lineIdent, stripNamespace, printType, identSpaces).Append(',');
 
-            var methodIndex = Method.DeclaringType.GetTypeInfo().GetDeclaredMethods(Method.Name).AsArray().GetFirstIndex(Method);
+            var methodIndex = Method.DeclaringType.GetTypeInfoUniversal().GetDeclaredMethods(Method.Name).AsArray().GetFirstIndex(Method);
             sb.AppendLineIdent(lineIdent).AppendTypeof(Method.DeclaringType, stripNamespace, printType)
-                .Append(".GetTypeInfo().GetDeclaredMethods(\"").Append(Method.Name).Append("\")[").Append(methodIndex).Append("],");
+                .Append(".GetTypeInfoUniversal().GetDeclaredMethods(\"").Append(Method.Name).Append("\")[").Append(methodIndex).Append("],");
 
             sb.AppendLineIdent(Arguments, lineIdent, stripNamespace, printType, identSpaces);
             return sb.Append(')');
@@ -2340,7 +2340,7 @@ namespace FastExpressionCompiler.LightExpression
             sb.Append("Property(");
             sb.AppendLineIdent(Expression, lineIdent, stripNamespace, printType, identSpaces).Append(',');
             sb.AppendLineIdent(lineIdent).AppendTypeof(PropertyInfo.DeclaringType, stripNamespace, printType)
-                .Append(".GetTypeInfo().GetDeclaredProperty(\"").Append(PropertyInfo.Name).Append("\")");
+                .Append(".GetTypeInfoUniversal().GetDeclaredProperty(\"").Append(PropertyInfo.Name).Append("\")");
             return sb.Append(')');
         }
 
@@ -2363,7 +2363,7 @@ namespace FastExpressionCompiler.LightExpression
             sb.Append("Field(");
             sb.AppendLineIdent(Expression, lineIdent, stripNamespace, printType, identSpaces).Append(',');
             sb.AppendLineIdent(lineIdent).AppendTypeof(FieldInfo.DeclaringType, stripNamespace, printType)
-                .Append(".GetTypeInfo().GetDeclaredField(\"").Append(FieldInfo.Name).Append("\")");
+                .Append(".GetTypeInfoUniversal().GetDeclaredField(\"").Append(FieldInfo.Name).Append("\")");
             return sb.Append(')');
         }
 
@@ -2406,10 +2406,10 @@ namespace FastExpressionCompiler.LightExpression
 
             if (Member is FieldInfo)
                 sb.AppendLineIdent(lineIdent).AppendTypeof(Member.DeclaringType, stripNamespace, printType)
-                    .Append(".GetTypeInfo().GetDeclaredField(\"").Append(Member.Name).Append("\"),");
+                    .Append(".GetTypeInfoUniversal().GetDeclaredField(\"").Append(Member.Name).Append("\"),");
             else // or the property to assign
                 sb.AppendLineIdent(lineIdent).AppendTypeof(Member.DeclaringType, stripNamespace, printType)
-                    .Append(".GetTypeInfo().GetDeclaredProperty(\"").Append(Member.Name).Append("\"),");
+                    .Append(".GetTypeInfoUniversal().GetDeclaredProperty(\"").Append(Member.Name).Append("\"),");
 
             sb.AppendLineIdent(Expression, lineIdent, stripNamespace, printType, identSpaces);
             return sb.Append(")");
@@ -2519,9 +2519,9 @@ namespace FastExpressionCompiler.LightExpression
             sb.Append("MakeIndex(");
             sb.AppendLineIdent(Object, lineIdent, stripNamespace, printType, identSpaces);
 
-            var propIndex = Indexer.DeclaringType.GetTypeInfo().DeclaredProperties.AsArray().GetFirstIndex(Indexer);
+            var propIndex = Indexer.DeclaringType.GetTypeInfoUniversal().DeclaredProperties.AsArray().GetFirstIndex(Indexer);
             sb.AppendLineIdent(lineIdent).AppendTypeof(Indexer.DeclaringType)
-                .Append(".GetTypeInfo().DeclaredProperties.ToArray()[").Append(propIndex).Append("],");
+                .Append(".GetTypeInfoUniversal().DeclaredProperties.ToArray()[").Append(propIndex).Append("],");
 
             sb.AppendLineIdent(Arguments, lineIdent, stripNamespace, printType, identSpaces);
             return sb.Append(')');
@@ -2886,9 +2886,9 @@ namespace FastExpressionCompiler.LightExpression
             sb.AppendLineIdent(SwitchValue, lineIdent, stripNamespace, printType, identSpaces).Append(',');
             sb.AppendLineIdent(DefaultBody, lineIdent, stripNamespace, printType, identSpaces).Append(',');
 
-            var methodIndex = Comparison.DeclaringType.GetTypeInfo().DeclaredMethods.AsArray().GetFirstIndex(Comparison);
+            var methodIndex = Comparison.DeclaringType.GetTypeInfoUniversal().DeclaredMethods.AsArray().GetFirstIndex(Comparison);
             sb.AppendLineIdent(lineIdent).AppendTypeof(Comparison.DeclaringType, stripNamespace, printType)
-                .Append(".GetTypeInfo().GetDeclaredMethods(\"").Append(Comparison.Name).Append("\"[")
+                .Append(".GetTypeInfoUniversal().GetDeclaredMethods(\"").Append(Comparison.Name).Append("\"[")
                 .Append(methodIndex).Append("],");
 
             ToCodeString(_cases, sb, lineIdent, stripNamespace, printType, identSpaces);

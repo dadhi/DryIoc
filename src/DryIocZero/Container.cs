@@ -543,7 +543,7 @@ namespace DryIocZero
             {
                 var service = factoryDelegate(context);
                 if (service != null)
-                    Throw.If(!serviceType.GetTypeInfo().IsAssignableFrom(service.GetType().GetTypeInfo()),
+                    Throw.If(!serviceType.GetTypeInfoUniversal().IsAssignableFrom(service.GetType().GetTypeInfoUniversal()),
                         Error.ProducedServiceIsNotAssignableToRequiredServiceType, service, serviceType);
                 return service;
             };
@@ -680,7 +680,7 @@ namespace DryIocZero
         }
 
         internal static readonly MethodInfo GetOrAddMethod =
-            typeof(IScope).GetTypeInfo().DeclaredMethods.First(m => m.Name == nameof(IScope.GetOrAdd));
+            typeof(IScope).GetTypeInfoUniversal().DeclaredMethods.First(m => m.Name == nameof(IScope.GetOrAdd));
 
         /// <inheritdoc />
         public object GetOrAdd(int id, CreateScopedValue createValue, int disposalIndex = -1)
@@ -737,7 +737,7 @@ namespace DryIocZero
         }
 
         internal static readonly MethodInfo TrackDisposableMethod =
-            typeof(IScope).GetTypeInfo().DeclaredMethods.First(m => m.Name == nameof(IScope.TrackDisposable));
+            typeof(IScope).GetTypeInfoUniversal().DeclaredMethods.First(m => m.Name == nameof(IScope.TrackDisposable));
 
         /// <summary>Can be used to manually add service for disposal</summary>
         public object TrackDisposable(object item, int disposalIndex = -1)
@@ -987,10 +987,10 @@ namespace DryIocZero
                 return false;
 
             return (ServiceType == null ||
-                ServiceType.GetTypeInfo().IsAssignableFrom(name.ServiceType.GetTypeInfo()) ||
-                ServiceType.GetTypeInfo().ContainsGenericParameters &&
-                name.ServiceType.GetTypeInfo().IsGenericType && ServiceType.GetTypeInfo()
-                    .IsAssignableFrom(name.ServiceType.GetGenericTypeDefinition().GetTypeInfo())) &&
+                ServiceType.GetTypeInfoUniversal().IsAssignableFrom(name.ServiceType.GetTypeInfoUniversal()) ||
+                ServiceType.GetTypeInfoUniversal().ContainsGenericParameters &&
+                name.ServiceType.GetTypeInfoUniversal().IsGenericType && ServiceType.GetTypeInfoUniversal()
+                    .IsAssignableFrom(name.ServiceType.GetGenericTypeDefinition().GetTypeInfoUniversal())) &&
                 (ServiceKey == null || ServiceKey.Equals(name.ServiceKey));
         }
 
@@ -1518,7 +1518,7 @@ namespace DryIocZero
             Func<TypeInfo, IEnumerable<TMember>> getMembers,
             bool includeBase = false)
         {
-            var typeInfo = type.GetTypeInfo();
+            var typeInfo = type.GetTypeInfoUniversal();
             var members = getMembers(typeInfo);
             if (!includeBase)
                 return members;

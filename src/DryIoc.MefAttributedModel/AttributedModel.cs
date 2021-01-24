@@ -1090,7 +1090,7 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Returns the name of error with the provided error code.</summary>
         public static string NameOf(int error) => 
-            typeof(Error).GetTypeInfo().DeclaredFields
+            typeof(Error).GetTypeInfoUniversal().DeclaredFields
                 .Where(f => f.FieldType == typeof(int))
                 .Where((_, i) => i == error - _containerErrorCount + 1)
                 .FirstOrDefault()?.Name;
@@ -1153,7 +1153,7 @@ namespace DryIoc.MefAttributedModel
             {
                 if (x == null)
                     return code.Print("null");
-                enumType = enumType.GetTypeInfo().GenericTypeArguments.Single();
+                enumType = enumType.GetTypeInfoUniversal().GenericTypeArguments.Single();
             }
 
             return code.Print(enumType, t => t.FullName ?? t.Name).Append('.').Append(Enum.GetName(enumType, x));
@@ -1188,7 +1188,7 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Determines whether the type is null-able.</summary>
         public static bool IsNullable(this Type type) => 
-            type.GetTypeInfo().IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+            type.GetTypeInfoUniversal().IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
 
         /// <summary>Prints code items.</summary>
         public static StringBuilder AppendMany<T>(this StringBuilder code, IEnumerable<T> items)
@@ -1564,7 +1564,7 @@ namespace DryIoc.MefAttributedModel
                     var metaType = metaAttr.GetType();
                     while (metaType != null && metaType != typeof(Attribute) && metaType != typeof(ExportAttribute))
                     {
-                        var metaTypeInfo = metaType.GetTypeInfo();
+                        var metaTypeInfo = metaType.GetTypeInfoUniversal();
                         metaTypes.Add(metaTypeInfo);
                         metaType = metaTypeInfo.BaseType;
                     }

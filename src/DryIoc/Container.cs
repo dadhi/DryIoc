@@ -936,7 +936,7 @@ namespace DryIoc
             PropertiesAndFieldsSelector propertiesAndFields = null;
             if (!propertyAndFieldNames.IsNullOrEmpty())
             {
-                var matchedMembers = instanceType.GetTypeInfo().DeclaredMembers.Match(
+                var matchedMembers = instanceType.GetTypeInfoUniversal().DeclaredMembers.Match(
                     m => (m is PropertyInfo || m is FieldInfo) && propertyAndFieldNames.IndexOf(m.Name) != -1,
                     PropertyOrFieldServiceInfo.Of);
                 // todo: Should we throw when no props are found?
@@ -1721,8 +1721,8 @@ namespace DryIoc
             {
                 var kvArgTypes = actualItemType.GetGenericParamsAndArgs();
                 return Call(_kvOfMethod.MakeGenericMethod(kvArgTypes),
-                    GetConstantExpression(actualItemType.GetTypeInfo().GetDeclaredField("Key").GetValue(item), kvArgTypes[0], throwIfStateRequired),
-                    GetConstantExpression(actualItemType.GetTypeInfo().GetDeclaredField("Value").GetValue(item), kvArgTypes[1], throwIfStateRequired));
+                    GetConstantExpression(actualItemType.GetTypeInfoUniversal().GetDeclaredField("Key").GetValue(item), kvArgTypes[0], throwIfStateRequired),
+                    GetConstantExpression(actualItemType.GetTypeInfoUniversal().GetDeclaredField("Value").GetValue(item), kvArgTypes[1], throwIfStateRequired));
             }
 
             if (actualItemType.IsPrimitive() ||
@@ -1748,7 +1748,7 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _kvOfMethod =
-            typeof(KV).GetTypeInfo().GetDeclaredMethod(nameof(KV.Of));
+            typeof(KV).GetTypeInfoUniversal().GetDeclaredMethod(nameof(KV.Of));
 
 #endregion
 
@@ -2830,14 +2830,14 @@ namespace DryIoc
             New(_ctor, Constant(RequiredServiceType, typeof(Type)), fallbackConverter(ServiceKey));
 
         private static readonly ConstructorInfo _ctor = typeof(OpenGenericTypeKey)
-            .GetTypeInfo().DeclaredConstructors.First(x => x.GetParameters().Length == 2);
+            .GetTypeInfoUniversal().DeclaredConstructors.First(x => x.GetParameters().Length == 2);
     }
 
     ///<summary>Hides/wraps object with disposable interface.</summary> 
     public sealed class HiddenDisposable
     {
-        internal static ConstructorInfo Ctor = typeof(HiddenDisposable).GetTypeInfo().DeclaredConstructors.First();
-        internal static FieldInfo ValueField = typeof(HiddenDisposable).GetTypeInfo().GetDeclaredField(nameof(Value));
+        internal static ConstructorInfo Ctor = typeof(HiddenDisposable).GetTypeInfoUniversal().DeclaredConstructors.First();
+        internal static FieldInfo ValueField = typeof(HiddenDisposable).GetTypeInfoUniversal().GetDeclaredField(nameof(Value));
 
         /// <summary>Wrapped value</summary>
         public readonly object Value;
@@ -3040,7 +3040,7 @@ namespace DryIoc
                         // skip conversion for null and for directly assignable type
                         if (instance == null)
                             result = instance;
-                        else if (convertExpr.Type.GetTypeInfo().IsAssignableFrom(instance.GetType().GetTypeInfo()))
+                        else if (convertExpr.Type.GetTypeInfoUniversal().IsAssignableFrom(instance.GetType().GetTypeInfoUniversal()))
                             result = instance;
                         else
                             result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
@@ -3198,7 +3198,7 @@ namespace DryIoc
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
             var returnType = lambdaExpr.ReturnType;
 #else
-            var returnType = lambdaExpr.Type.GetTypeInfo().GetDeclaredMethod("Invoke").ReturnType;
+            var returnType = lambdaExpr.Type.GetTypeInfoUniversal().GetDeclaredMethod("Invoke").ReturnType;
 #endif
             if (paramExprs != null)
                 parentArgs = new ParentLambdaArgs(parentArgs, paramExprs, paramValues);
@@ -3333,31 +3333,31 @@ namespace DryIoc
         }
 
         internal static Func<R> ConvertFunc<R>(Func<object> f) => () => (R)f();
-        private static readonly MethodInfo _convertFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFunc));
+        private static readonly MethodInfo _convertFuncMethod = typeof(Interpreter).GetTypeInfoUniversal().GetDeclaredMethod(nameof(ConvertFunc));
 
         internal static Func<T, R> ConvertOneArgFunc<T, R>(Func<object, object> f) => a => (R)f(a);
-        private static readonly MethodInfo _convertOneArgFuncMethod   = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgFunc));
+        private static readonly MethodInfo _convertOneArgFuncMethod   = typeof(Interpreter).GetTypeInfoUniversal().GetDeclaredMethod(nameof(ConvertOneArgFunc));
         
         internal static Action<T> ConvertOneArgAction<T>(Action<object> f) => a => f(a);
-        private static readonly MethodInfo _convertOneArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertOneArgAction));
+        private static readonly MethodInfo _convertOneArgActionMethod = typeof(Interpreter).GetTypeInfoUniversal().GetDeclaredMethod(nameof(ConvertOneArgAction));
 
         internal static Func<T0, T1, R> ConvertTwoArgFunc<T0, T1, R>(Func<object, object, object> f) => (a0, a1) => (R)f(a0, a1);
-        private static readonly MethodInfo _convertTwoArgFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertTwoArgFunc));
+        private static readonly MethodInfo _convertTwoArgFuncMethod = typeof(Interpreter).GetTypeInfoUniversal().GetDeclaredMethod(nameof(ConvertTwoArgFunc));
 
         internal static Action<T0, T1> ConvertTwoArgAction<T0, T1>(Action<object, object> f) => (a0, a1) => f(a0, a1);
-        private static readonly MethodInfo _convertTwoArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertTwoArgAction));
+        private static readonly MethodInfo _convertTwoArgActionMethod = typeof(Interpreter).GetTypeInfoUniversal().GetDeclaredMethod(nameof(ConvertTwoArgAction));
 
         internal static Func<T0, T1, T2, R> ConvertThreeArgFunc<T0, T1, T2, R>(Func<object[], object> f) => (a0, a1, a2) => (R)f(new object[] {a0, a1, a2});
-        private static readonly MethodInfo _convertThreeArgFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertThreeArgFunc));
+        private static readonly MethodInfo _convertThreeArgFuncMethod = typeof(Interpreter).GetTypeInfoUniversal().GetDeclaredMethod(nameof(ConvertThreeArgFunc));
 
         internal static Action<T0, T1, T2> ConvertThreeArgAction<T0, T1, T2>(Action<object[]> f) => (a0, a1, a2) => f(new object[] {a0, a1, a2});
-        private static readonly MethodInfo _convertThreeArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertThreeArgAction));
+        private static readonly MethodInfo _convertThreeArgActionMethod = typeof(Interpreter).GetTypeInfoUniversal().GetDeclaredMethod(nameof(ConvertThreeArgAction));
 
         internal static Func<T0, T1, T2, T3, R> ConvertFourArgFunc<T0, T1, T2, T3, R>(Func<object[], object> f) => (a0, a1, a2, a3) => (R)f(new object[] { a0, a1, a2, a3 });
-        private static readonly MethodInfo _convertFourArgFuncMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFourArgFunc));
+        private static readonly MethodInfo _convertFourArgFuncMethod = typeof(Interpreter).GetTypeInfoUniversal().GetDeclaredMethod(nameof(ConvertFourArgFunc));
 
         internal static Action<T0, T1, T2, T3> ConvertFourArgAction<T0, T1, T2, T3>(Action<object[]> f) => (a0, a1, a2, a3) => f(new object[] { a0, a1, a2, a3 });
-        private static readonly MethodInfo _convertFourArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFourArgAction));
+        private static readonly MethodInfo _convertFourArgActionMethod = typeof(Interpreter).GetTypeInfoUniversal().GetDeclaredMethod(nameof(ConvertFourArgAction));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
@@ -4018,7 +4018,7 @@ namespace DryIoc
         }
 
         private static readonly MethodInfo _convertManyMethod =
-            typeof(Converter).GetTypeInfo().GetDeclaredMethod(nameof(DoConvertMany));
+            typeof(Converter).GetTypeInfoUniversal().GetDeclaredMethod(nameof(DoConvertMany));
     }
 
     /// <summary>Compiles expression to factory delegate.</summary>
@@ -4705,7 +4705,7 @@ namespace DryIoc
             registrationOrder == 0 ? Value : new DefaultKey(registrationOrder);
 
         private static readonly MethodInfo _ofMethod =
-            typeof(DefaultKey).GetTypeInfo().GetDeclaredMethod(nameof(Of));
+            typeof(DefaultKey).GetTypeInfoUniversal().GetDeclaredMethod(nameof(Of));
 
         /// <summary>Converts to expression</summary>
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
@@ -4741,7 +4741,7 @@ namespace DryIoc
             registrationOrder == 0 ? Value : new DefaultDynamicKey(registrationOrder);
 
         private static readonly MethodInfo _ofMethod =
-            typeof(DefaultDynamicKey).GetTypeInfo().GetDeclaredMethod(nameof(Of));
+            typeof(DefaultDynamicKey).GetTypeInfoUniversal().GetDeclaredMethod(nameof(Of));
 
         /// <summary>Converts to expression</summary>
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
@@ -4811,7 +4811,7 @@ namespace DryIoc
             typeof(IResolverContext).Property(nameof(IResolverContext.Parent));
 
         internal static readonly MethodInfo OpenScopeMethod =
-            typeof(ResolverContext).GetTypeInfo().GetDeclaredMethod(nameof(OpenScope));
+            typeof(ResolverContext).GetTypeInfoUniversal().GetDeclaredMethod(nameof(OpenScope));
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
@@ -4828,7 +4828,7 @@ namespace DryIoc
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
         public static readonly Expression RootOrSelfExpr =
-            Call(typeof(ResolverContext).GetTypeInfo().GetDeclaredMethod(nameof(RootOrSelf)), 
+            Call(typeof(ResolverContext).GetTypeInfoUniversal().GetDeclaredMethod(nameof(RootOrSelf)), 
                 FactoryDelegateCompiler.ResolverContextParamExpr);
 
         /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
@@ -4960,7 +4960,7 @@ namespace DryIoc
         /// <summary>Returns true if type is supported <see cref="FuncTypes"/>, and false otherwise.</summary>
         public static bool IsFunc(this Type type)
         {
-            if (type.GetTypeInfo().IsGenericType)
+            if (type.GetTypeInfoUniversal().IsGenericType)
             {
                 var typeDef = type.GetGenericTypeDefinition();
                 for (var i = 0; i < FuncTypes.Length; ++i)
@@ -5055,7 +5055,7 @@ namespace DryIoc
         }
 
         internal static readonly MethodInfo ToArrayMethod =
-            typeof(ArrayTools).GetTypeInfo().GetDeclaredMethod(nameof(ArrayTools.ToArrayOrSelf));
+            typeof(ArrayTools).GetTypeInfoUniversal().GetDeclaredMethod(nameof(ArrayTools.ToArrayOrSelf));
 
         private static Expression GetArrayExpression(Request request)
         {
@@ -5162,13 +5162,13 @@ namespace DryIoc
                 request.GetInputArgsExpr());
 
             return New(typeof(LazyEnumerable<>).MakeGenericType(itemType)
-                .GetTypeInfo().DeclaredConstructors.First(x => x.GetParameters().Length == 1),
+                .GetTypeInfoUniversal().DeclaredConstructors.First(x => x.GetParameters().Length == 1),
                 // cast to object is not required cause Resolve already returns IEnumerable<object>
                 itemType == typeof(object) ? (Expression)resolveManyExpr : Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr));
         }
 
         private static readonly MethodInfo _enumerableCastMethod =
-            typeof(Enumerable).GetTypeInfo().GetDeclaredMethod(nameof(Enumerable.Cast));
+            typeof(Enumerable).GetTypeInfoUniversal().GetDeclaredMethod(nameof(Enumerable.Cast));
 
         /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
         /// <param name="request">The resolution request.</param>
@@ -5196,7 +5196,7 @@ namespace DryIoc
             // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
             // So that Func<Derived> may be used for Func<Base>
             if (serviceExpr.Type != serviceType && 
-                !serviceType.GetTypeInfo().IsAssignableFrom(serviceExpr.Type.GetTypeInfo()))
+                !serviceType.GetTypeInfoUniversal().IsAssignableFrom(serviceExpr.Type.GetTypeInfoUniversal()))
                 serviceExpr = Convert(serviceExpr, serviceType);
 
             var lazyValueFactoryType = typeof(Func<>).MakeGenericType(serviceType);
@@ -5247,7 +5247,7 @@ namespace DryIoc
             // So that Func<Derived> may be used for Func<Base>
             if (!isAction && 
                 serviceExpr.Type != serviceType &&
-                !serviceType.GetTypeInfo().IsAssignableFrom(serviceExpr.Type.GetTypeInfo()))
+                !serviceType.GetTypeInfoUniversal().IsAssignableFrom(serviceExpr.Type.GetTypeInfoUniversal()))
                 serviceExpr = Convert(serviceExpr, serviceType);
 
             return Lambda(wrapperType, serviceExpr, argExprs
@@ -5324,7 +5324,7 @@ namespace DryIoc
 
             var keyExpr = request.Container.GetConstantExpression(serviceKey, serviceKeyType);
             return New(
-                keyValueType.GetTypeInfo().DeclaredConstructors.First(x => x.GetParameters().Length == 2), 
+                keyValueType.GetTypeInfoUniversal().DeclaredConstructors.First(x => x.GetParameters().Length == 2), 
                 keyExpr, serviceExpr);
         }
 
@@ -6818,7 +6818,7 @@ namespace DryIoc
             {
                 var invokeExpr = (System.Linq.Expressions.InvocationExpression)callExpr;
                 var invokedDelegateExpr = invokeExpr.Expression;
-                var invokeMethod = invokedDelegateExpr.Type.GetTypeInfo().GetDeclaredMethod(nameof(Action.Invoke));
+                var invokeMethod = invokedDelegateExpr.Type.GetTypeInfoUniversal().GetDeclaredMethod(nameof(Action.Invoke));
                 ctorOrMethodOrMember = invokeMethod;
                 parameters = invokeMethod.GetParameters();
                 argExprs = invokeExpr.Arguments;
@@ -7355,7 +7355,7 @@ namespace DryIoc
             if (serviceType == type || serviceType == typeof(object))
                 return true;
 
-            var implTypeInfo = type.GetTypeInfo();
+            var implTypeInfo = type.GetTypeInfoUniversal();
             if (!implTypeInfo.IsGenericTypeDefinition)
             {
                 if (serviceType.IsInterface())
@@ -7367,7 +7367,7 @@ namespace DryIoc
                 else
                 {
                     var baseType = implTypeInfo.BaseType;
-                    for (; baseType != null && baseType != typeof(object); baseType = baseType.GetTypeInfo().BaseType)
+                    for (; baseType != null && baseType != typeof(object); baseType = baseType.GetTypeInfoUniversal().BaseType)
                         if (serviceType == baseType)
                             return true;
                 }
@@ -7385,7 +7385,7 @@ namespace DryIoc
                 else
                 {
                     var baseType = implTypeInfo.BaseType;
-                    for (; baseType != null && baseType != typeof(object); baseType = baseType.GetTypeInfo().BaseType)
+                    for (; baseType != null && baseType != typeof(object); baseType = baseType.GetTypeInfoUniversal().BaseType)
                         if (baseType.GetGenericDefinitionOrNull() == serviceType &&
                             baseType.ContainsAllGenericTypeParameters(implTypeParams))
                             return true;
@@ -7628,7 +7628,7 @@ namespace DryIoc
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
             TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
         {
-            var invokeMethod = typeof(TFunc).GetTypeInfo().GetDeclaredMethod(InvokeMethodName);
+            var invokeMethod = typeof(TFunc).GetTypeInfoUniversal().GetDeclaredMethod(InvokeMethodName);
             var made = new Made(new FactoryMethod(invokeMethod, Constant(factory)), serviceType);
             r.Register(new ReflectionFactory(serviceType, reuse, made, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
@@ -7992,7 +7992,7 @@ namespace DryIoc
                 typeof(IfUnresolved), typeof(Type), typeof(Request), typeof(object[]));
 
         internal static readonly MethodInfo ResolveManyMethod =
-            typeof(IResolver).GetTypeInfo().GetDeclaredMethod(nameof(IResolver.ResolveMany));
+            typeof(IResolver).GetTypeInfoUniversal().GetDeclaredMethod(nameof(IResolver.ResolveMany));
 
         /// <summary>Resolves instance of service type from container. Throws exception if unable to resolve.</summary>
         public static object Resolve(this IResolver resolver, Type serviceType) =>
@@ -8127,7 +8127,7 @@ namespace DryIoc
             (T)resolver.New(typeof(T), made, registrySharing);
 
         internal static readonly ConstructorInfo ResolutionScopeNameCtor =
-            typeof(ResolutionScopeName).GetTypeInfo().DeclaredConstructors.First();
+            typeof(ResolutionScopeName).GetTypeInfoUniversal().DeclaredConstructors.First();
 
         private static readonly ConstantExpression _ifUnresolvedThrowExpr = Constant(IfUnresolved.Throw);
         private static readonly ConstantExpression _nullTypeExpr          = Constant(null, typeof(Type));
@@ -9320,7 +9320,7 @@ namespace DryIoc
                 // check for disposable transient
                 if (!setup.PreventDisposal &&
                     (setup.TrackDisposableTransient || !setup.AllowDisposableTransient && Rules.TrackingDisposableTransients) &&
-                    typeof(IDisposable).GetTypeInfo().IsAssignableFrom((factory.ImplementationType ?? _actualServiceType).GetTypeInfo()))
+                    typeof(IDisposable).GetTypeInfoUniversal().IsAssignableFrom((factory.ImplementationType ?? _actualServiceType).GetTypeInfoUniversal()))
                 {
                     if (firstParentNonTransientReuseOrNull != null)
                     {
@@ -10235,7 +10235,7 @@ namespace DryIoc
 
                     if (serviceExpr.NodeType != ExprType.Constant &&
                         serviceExpr.Type != originalServiceExprType &&
-                        !originalServiceExprType.GetTypeInfo().IsAssignableFrom(serviceExpr.Type.GetTypeInfo()))
+                        !originalServiceExprType.GetTypeInfoUniversal().IsAssignableFrom(serviceExpr.Type.GetTypeInfoUniversal()))
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
             }
@@ -10996,7 +10996,7 @@ namespace DryIoc
         {
             var actualServiceType = request.GetActualServiceType();
             var serviceExprType = serviceExpr.Type;
-            return serviceExprType == actualServiceType || actualServiceType.GetTypeInfo().IsAssignableFrom(serviceExprType.GetTypeInfo()) 
+            return serviceExprType == actualServiceType || actualServiceType.GetTypeInfoUniversal().IsAssignableFrom(serviceExprType.GetTypeInfoUniversal()) 
                     ? serviceExpr
                 : serviceExprType == typeof(object) 
                     ? Convert(serviceExpr, actualServiceType)
@@ -11063,7 +11063,7 @@ namespace DryIoc
             var implType = ImplementationType;
             if (Made.FactoryMethod == null && rules.FactoryMethod == null)
             {
-                var ctors = implType.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
+                var ctors = implType.GetTypeInfoUniversal().DeclaredConstructors.ToArrayOrSelf();
                 var ctorCount = 0;
                 for (var i = 0; ctorCount != 2 && i < ctors.Length; i++)
                 {
@@ -11475,7 +11475,7 @@ namespace DryIoc
                         factoryMember = targetMethods[0];
                     else // Fallback to MethodHandle only if methods have similar signatures
                     {
-                        var methodHandleProperty = typeof(MethodBase).GetTypeInfo()
+                        var methodHandleProperty = typeof(MethodBase).GetTypeInfoUniversal()
                             .DeclaredProperties
                             .FindFirst(it => it.Name == "MethodHandle")
                             .ThrowIfNull(Error.OpenGenericFactoryMethodDeclaringTypeIsNotSupportedOnThisPlatform,
@@ -11592,7 +11592,7 @@ namespace DryIoc
             // unpacks the weak-reference
             if (Setup.WeaklyReferenced)
                 return Call(
-                    typeof(ThrowInGeneratedCode).GetTypeInfo()
+                    typeof(ThrowInGeneratedCode).GetTypeInfoUniversal()
                         .GetDeclaredMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
                     Property(
                         Constant(Instance, typeof(WeakReference)),
@@ -11601,7 +11601,7 @@ namespace DryIoc
             // otherwise just return a constant
             var instanceExpr = request.Container.GetConstantExpression(Instance);
             var serviceType = request.GetActualServiceType();
-            if (serviceType.GetTypeInfo().IsAssignableFrom(ImplementationType.GetTypeInfo()))
+            if (serviceType.GetTypeInfoUniversal().IsAssignableFrom(ImplementationType.GetTypeInfoUniversal()))
                 return instanceExpr;
             return Convert(instanceExpr, serviceType);
         }
@@ -11616,7 +11616,7 @@ namespace DryIoc
 
             // First look for decorators if it is not already a decorator
             var serviceType = request.ServiceType;
-            var serviceTypeInfo = serviceType.GetTypeInfo();
+            var serviceTypeInfo = serviceType.GetTypeInfoUniversal();
             if (serviceTypeInfo.IsArray)
                 serviceType = typeof(IEnumerable<>).MakeGenericType(serviceTypeInfo.GetElementType());
 
@@ -11914,7 +11914,7 @@ namespace DryIoc
         }
 
         internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod =
-            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.GetOrAddViaFactoryDelegate));
+            typeof(IScope).GetTypeInfoUniversal().GetDeclaredMethod(nameof(IScope.GetOrAddViaFactoryDelegate));
 
         internal object TryGetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
@@ -12188,7 +12188,7 @@ namespace DryIoc
         }
 
         internal static readonly MethodInfo TrackDisposableMethod =
-            typeof(IScope).GetTypeInfo().GetDeclaredMethod(nameof(IScope.TrackDisposable));
+            typeof(IScope).GetTypeInfoUniversal().GetDeclaredMethod(nameof(IScope.TrackDisposable));
 
         /// <summary>Tracked item will be disposed with the scope.</summary> 
         public T TrackDisposableWithoutDisposalOrder<T>(T disposable) where T : IDisposable 
@@ -12557,9 +12557,9 @@ namespace DryIoc
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
             Name == null && !ScopedOrSingleton 
-                ? Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.Scoped)))
+                ? Field(null, typeof(Reuse).GetTypeInfoUniversal().GetDeclaredField(nameof(Reuse.Scoped)))
                 : ScopedOrSingleton 
-                    ? (Expression)Field(null, typeof(Reuse).GetTypeInfo().GetDeclaredField(nameof(Reuse.ScopedOrSingleton)))
+                    ? (Expression)Field(null, typeof(Reuse).GetTypeInfoUniversal().GetDeclaredField(nameof(Reuse.ScopedOrSingleton)))
                     : Call(typeof(Reuse).Method("ScopedTo", typeof(object)), fallbackConverter(Name));
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
@@ -12604,7 +12604,7 @@ namespace DryIoc
             (r.CurrentScope ?? r.SingletonScope).GetOrAddViaFactoryDelegate(id, createValue, r, disposalIndex);
 
         internal static readonly MethodInfo GetScopedOrSingletonViaFactoryDelegateMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedOrSingletonViaFactoryDelegate));
+            typeof(CurrentScopeReuse).GetTypeInfoUniversal().GetDeclaredMethod(nameof(GetScopedOrSingletonViaFactoryDelegate));
 
         /// <summary>Tracks the Unordered disposal in the current scope or in the singleton as fallback</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -12612,7 +12612,7 @@ namespace DryIoc
             item is IDisposable d ? (r.CurrentScope ?? r.SingletonScope).TrackDisposableWithoutDisposalOrder(d) : item;
 
         internal static readonly MethodInfo TrackScopedOrSingletonMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackScopedOrSingleton));
+            typeof(CurrentScopeReuse).GetTypeInfoUniversal().GetDeclaredMethod(nameof(TrackScopedOrSingleton));
 
         // [Obsolete("Replaced by `GetScopedViaFactoryDelegate`")]
         // public static object GetScoped(IResolverContext r,
@@ -12625,7 +12625,7 @@ namespace DryIoc
             r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r);
 
         internal static readonly MethodInfo GetScopedViaFactoryDelegateNoDisposalIndexMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedViaFactoryDelegateNoDisposalIndex));
+            typeof(CurrentScopeReuse).GetTypeInfoUniversal().GetDeclaredMethod(nameof(GetScopedViaFactoryDelegateNoDisposalIndex));
 
         /// Subject
         public static object GetScopedViaFactoryDelegate(IResolverContext r,
@@ -12633,7 +12633,7 @@ namespace DryIoc
             r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r, disposalIndex);
 
         internal static readonly MethodInfo GetScopedViaFactoryDelegateMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetScopedViaFactoryDelegate));
+            typeof(CurrentScopeReuse).GetTypeInfoUniversal().GetDeclaredMethod(nameof(GetScopedViaFactoryDelegate));
 
         // [Obsolete("Replaced by `GetNameScopedViaFactoryDelegate`")]
         // public static object GetNameScoped(IResolverContext r,
@@ -12646,21 +12646,21 @@ namespace DryIoc
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r, disposalIndex);
 
         internal static readonly MethodInfo GetNameScopedViaFactoryDelegateMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(GetNameScopedViaFactoryDelegate));
+            typeof(CurrentScopeReuse).GetTypeInfoUniversal().GetDeclaredMethod(nameof(GetNameScopedViaFactoryDelegate));
 
         /// Subject
         public static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
             item is IDisposable d ? r.GetCurrentScope(throwIfNoScope)?.TrackDisposableWithoutDisposalOrder(d) : item;
 
         internal static readonly MethodInfo TrackScopedMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackScoped));
+            typeof(CurrentScopeReuse).GetTypeInfoUniversal().GetDeclaredMethod(nameof(TrackScoped));
 
         /// Subject
         public static object TrackNameScoped(IResolverContext r, object scopeName, bool throwIfNoScope, object item) =>
             item is IDisposable d ? r.GetNamedScope(scopeName, throwIfNoScope)?.TrackDisposableWithoutDisposalOrder(d) : item;
 
         internal static readonly MethodInfo TrackNameScopedMethod =
-            typeof(CurrentScopeReuse).GetTypeInfo().GetDeclaredMethod(nameof(TrackNameScoped));
+            typeof(CurrentScopeReuse).GetTypeInfoUniversal().GetDeclaredMethod(nameof(TrackNameScoped));
     }
 
     /// <summary>Abstracts way to match reuse and scope names</summary>
@@ -13452,7 +13452,7 @@ namespace DryIoc
         /// <summary>Returns the name of error with the provided error code.</summary>
         public static string NameOf(int error) => 
             error == -1 ? "ErrorCheck" :
-            typeof(Error).GetTypeInfo().DeclaredFields
+            typeof(Error).GetTypeInfoUniversal().DeclaredFields
                 .Where(f => f.FieldType == typeof(int)).Where((_, i) => i == error + 1)
                 .FirstOrDefault()?.Name;
 
@@ -13537,9 +13537,9 @@ namespace DryIoc
         public static T ThrowIfNotInstanceOf<T>(this T arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
             where T : class
         {
-            var arg1ti = arg1.GetTypeInfo();
+            var arg1ti = arg1.GetTypeInfoUniversal();
             if (arg0 == null && (!arg1ti.IsValueType || arg1ti.IsGenericType && arg1.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
-                arg1ti.IsAssignableFrom(arg0.GetType().GetTypeInfo()))
+                arg1ti.IsAssignableFrom(arg0.GetType().GetTypeInfoUniversal()))
                 return arg0;
             throw GetMatchedException(ErrorCheck.IsNotOfType, error, arg0, arg1, arg2, arg3, null);
         }
@@ -13603,7 +13603,7 @@ namespace DryIoc
         }
 
         internal static readonly MethodInfo WeakRefReuseWrapperGCedMethod =
-            typeof(ThrowInGeneratedCode).GetTypeInfo().GetDeclaredMethod(nameof(WeakRefReuseWrapperGCed));
+            typeof(ThrowInGeneratedCode).GetTypeInfoUniversal().GetDeclaredMethod(nameof(WeakRefReuseWrapperGCed));
         internal static readonly PropertyInfo WeakReferenceValueProperty =
             typeof(WeakReference).Property(nameof(WeakReference.Target));
         internal static readonly ConstructorInfo WeakReferenceCtor =
@@ -13656,13 +13656,13 @@ namespace DryIoc
             var includingObjectType = (asImplementedType & AsImplementedType.ObjectType) == 0 ? 0 : 1;
             var sourcePlusInterfaceCount = interfaceStartIndex + interfaces.Length;
 
-            var baseType = sourceType.GetTypeInfo().BaseType;
+            var baseType = sourceType.GetTypeInfoUniversal().BaseType;
             if (baseType == null || baseType == typeof(object))
                 results = new Type[sourcePlusInterfaceCount + includingObjectType];
             else
             {
                 List<Type> baseBaseTypes = null;
-                for (var bb = baseType.GetTypeInfo().BaseType; bb != null && bb != typeof(object); bb = bb.GetTypeInfo().BaseType)
+                for (var bb = baseType.GetTypeInfoUniversal().BaseType; bb != null && bb != typeof(object); bb = bb.GetTypeInfoUniversal().BaseType)
                     (baseBaseTypes ?? (baseBaseTypes = new List<Type>(2))).Add(bb);
 
                 if (baseBaseTypes == null)
@@ -13691,7 +13691,7 @@ namespace DryIoc
 
         /// <summary>Gets a collection of the interfaces implemented by the current type and its base types.</summary>
         public static Type[] GetImplementedInterfaces(this Type type) =>
-            type.GetTypeInfo().ImplementedInterfaces.ToArrayOrSelf();
+            type.GetTypeInfoUniversal().ImplementedInterfaces.ToArrayOrSelf();
 
         /// <summary>Gets all declared and if specified, the base members too.</summary>
         public static IEnumerable<MemberInfo> GetAllMembers(this Type type, bool includeBase = false) =>
@@ -13727,16 +13727,16 @@ namespace DryIoc
 
         /// <summary>Returns true if type is generic.</summary>
         public static bool IsGeneric(this Type type) =>
-            type.GetTypeInfo().IsGenericType;
+            type.GetTypeInfoUniversal().IsGenericType;
 
         /// <summary>Returns true if type is generic type definition (open type).</summary>
         public static bool IsGenericDefinition(this Type type) =>
-            type.GetTypeInfo().IsGenericTypeDefinition;
+            type.GetTypeInfoUniversal().IsGenericTypeDefinition;
 
         /// <summary>Returns true if type is closed generic: does not have open generic parameters, only closed/concrete ones.</summary>
         public static bool IsClosedGeneric(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
+            var typeInfo = type.GetTypeInfoUniversal();
             return typeInfo.IsGenericType && !typeInfo.ContainsGenericParameters;
         }
 
@@ -13744,70 +13744,70 @@ namespace DryIoc
         /// generic type definition as well.</summary>
         public static bool IsOpenGeneric(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
+            var typeInfo = type.GetTypeInfoUniversal();
             return typeInfo.IsGenericType && typeInfo.ContainsGenericParameters;
         }
 
         /// <summary>Returns generic type definition if type is generic and null otherwise.</summary>
         public static Type GetGenericDefinitionOrNull(this Type type) =>
-            type != null && type.GetTypeInfo().IsGenericType ? type.GetGenericTypeDefinition() : null;
+            type != null && type.GetTypeInfoUniversal().IsGenericType ? type.GetGenericTypeDefinition() : null;
 
         /// <summary>Returns generic type parameters and arguments in order they specified. If type is not generic, returns empty array.</summary>
         public static Type[] GetGenericParamsAndArgs(this Type type)
         {
-            var ti = type.GetTypeInfo();
+            var ti = type.GetTypeInfoUniversal();
             return ti.IsGenericTypeDefinition ? ti.GenericTypeParameters : ti.GenericTypeArguments;
         }
 
         /// <summary>Returns array of interface and base class constraints for provider generic parameter type.</summary>
         public static Type[] GetGenericParamConstraints(this Type type) =>
-            type.GetTypeInfo().GetGenericParameterConstraints();
+            type.GetTypeInfoUniversal().GetGenericParameterConstraints();
 
         /// <summary>If type is array returns is element type, otherwise returns null.</summary>
         /// <param name="type">Source type.</param> <returns>Array element type or null.</returns>
         public static Type GetArrayElementTypeOrNull(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
+            var typeInfo = type.GetTypeInfoUniversal();
             return typeInfo.IsArray ? typeInfo.GetElementType() : null;
         }
 
         /// <summary>Return base type or null, if not exist (the case for only for object type).</summary>
         public static Type GetBaseType(this Type type) =>
-            type.GetTypeInfo().BaseType;
+            type.GetTypeInfoUniversal().BaseType;
 
         /// <summary>Checks if type is public or nested public in public type.</summary>
         public static bool IsPublicOrNestedPublic(this Type type)
         {
-            var ti = type.GetTypeInfo();
+            var ti = type.GetTypeInfoUniversal();
             return ti.IsPublic || ti.IsNestedPublic && ti.DeclaringType.IsPublicOrNestedPublic();
         }
 
         /// <summary>Returns true if type is class.</summary>
         public static bool IsClass(this Type type) =>
-            type.GetTypeInfo().IsClass;
+            type.GetTypeInfoUniversal().IsClass;
 
         /// <summary>Returns true if type is value type.</summary>
         public static bool IsValueType(this Type type) =>
-            type.GetTypeInfo().IsValueType;
+            type.GetTypeInfoUniversal().IsValueType;
 
         /// <summary>Returns true if type is interface.</summary>
         public static bool IsInterface(this Type type) =>
-            type.GetTypeInfo().IsInterface;
+            type.GetTypeInfoUniversal().IsInterface;
 
         /// <summary>Returns true if type if abstract or interface.</summary>
         public static bool IsAbstract(this Type type) =>
-            type.GetTypeInfo().IsAbstract;
+            type.GetTypeInfoUniversal().IsAbstract;
 
         /// <summary>Returns true if type is static.</summary>
         public static bool IsStatic(this Type type)
         {
-            var typeInfo = type.GetTypeInfo();
+            var typeInfo = type.GetTypeInfoUniversal();
             return typeInfo.IsAbstract && typeInfo.IsSealed;
         }
 
         /// <summary>Returns true if type is enum type.</summary>
         public static bool IsEnum(this Type type) =>
-            type.GetTypeInfo().IsEnum;
+            type.GetTypeInfoUniversal().IsEnum;
 
         /// <summary>Returns true if type can be casted with conversion operators.</summary>
         public static bool HasConversionOperatorTo(this Type sourceType, Type targetType) =>
@@ -13824,7 +13824,7 @@ namespace DryIoc
 
         internal static MethodInfo FindConvertOperator(this Type type, Type sourceType, Type targetType)
         {
-            var methods = type.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            var methods = type.GetTypeInfoUniversal().DeclaredMethods.ToArrayOrSelf();
             for (var i = 0; i < methods.Length; i++)
             {
                 var m = methods[i];
@@ -13844,16 +13844,16 @@ namespace DryIoc
 
         /// <summary>Returns true if type is assignable to <paramref name="other"/> type.</summary>
         public static bool IsAssignableTo(this Type type, Type other) =>
-            type != null && other != null && other.GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
+            type != null && other != null && other.GetTypeInfoUniversal().IsAssignableFrom(type.GetTypeInfoUniversal());
 
         /// <summary>Returns true if type is assignable to <typeparamref name="T"/> type.</summary>
         public static bool IsAssignableTo<T>(this Type type) =>
-            type != null && typeof(T).GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
+            type != null && typeof(T).GetTypeInfoUniversal().IsAssignableFrom(type.GetTypeInfoUniversal());
 
         /// <summary>`to` should be the closed-generic type</summary>
         public static bool IsAssignableVariantGenericTypeFrom(this Type to, Type from) =>
             from != to && from.IsGeneric() && from.GetGenericTypeDefinition() == to.GetGenericTypeDefinition() && 
-            to.GetTypeInfo().IsAssignableFrom(from.GetTypeInfo());
+            to.GetTypeInfoUniversal().IsAssignableFrom(from.GetTypeInfoUniversal());
 
         /// <summary>Returns true if type of <paramref name="obj"/> is assignable to source <paramref name="type"/>.</summary>
         public static bool IsTypeOf(this Type type, object obj) =>
@@ -13863,14 +13863,14 @@ namespace DryIoc
         /// or array of primitives if <paramref name="orArrayOfPrimitives"/> is true.</summary>
         public static bool IsPrimitive(this Type type, bool orArrayOfPrimitives = false)
         {
-            var typeInfo = type.GetTypeInfo();
+            var typeInfo = type.GetTypeInfoUniversal();
             return typeInfo.IsPrimitive || typeInfo.IsEnum || type == typeof(string)
                 || orArrayOfPrimitives && typeInfo.IsArray && typeInfo.GetElementType().IsPrimitive(true);
         }
 
         /// <summary>Returns all attributes defined on <paramref name="type"/>.</summary>
         public static Attribute[] GetAttributes(this Type type, Type attributeType = null, bool inherit = false) =>
-            type.GetTypeInfo().GetCustomAttributes(attributeType ?? typeof(Attribute), inherit)
+            type.GetTypeInfoUniversal().GetCustomAttributes(attributeType ?? typeof(Attribute), inherit)
                 // ReSharper disable once RedundantEnumerableCastCall
                 .Cast<Attribute>() // required in .NET 4.5
                 .ToArrayOrSelf();
@@ -13880,7 +13880,7 @@ namespace DryIoc
         public static IEnumerable<TMember> GetMembers<TMember>(
             this Type type, Func<TypeInfo, IEnumerable<TMember>> getMembers, bool includeBase = false)
         {
-            var typeInfo = type.GetTypeInfo();
+            var typeInfo = type.GetTypeInfoUniversal();
             var members = getMembers(typeInfo);
             if (!includeBase || typeInfo.BaseType == null || typeInfo.BaseType == typeof(object))
                 return members;
@@ -13890,7 +13890,7 @@ namespace DryIoc
         /// <summary>Returns all public instance constructors for the type</summary>
         public static IEnumerable<ConstructorInfo> PublicConstructors(this Type type)
         {
-            foreach (var x in type.GetTypeInfo().DeclaredConstructors)
+            foreach (var x in type.GetTypeInfoUniversal().DeclaredConstructors)
                 if (x.IsPublic && !x.IsStatic)
                     yield return x;
         }
@@ -13898,7 +13898,7 @@ namespace DryIoc
         /// <summary>Returns all public instance constructors for the type</summary>
         public static IEnumerable<ConstructorInfo> PublicAndInternalConstructors(this Type type)
         {
-            foreach (var x in type.GetTypeInfo().DeclaredConstructors)
+            foreach (var x in type.GetTypeInfoUniversal().DeclaredConstructors)
                 if (!x.IsPrivate && !x.IsStatic)
                     yield return x;
         }
@@ -13907,7 +13907,7 @@ namespace DryIoc
         public static IEnumerable<ConstructorInfo> Constructors(this Type type,
             bool includeNonPublic = false, bool includeStatic = false)
         {
-            var ctors = type.GetTypeInfo().DeclaredConstructors.ToArrayOrSelf();
+            var ctors = type.GetTypeInfoUniversal().DeclaredConstructors.ToArrayOrSelf();
             if (ctors.Length == 0)
                 return ctors;
 
@@ -13999,13 +13999,13 @@ namespace DryIoc
         {
             if (includeNonPublic)
             {
-                foreach (var method in type.GetTypeInfo().DeclaredMethods)
+                foreach (var method in type.GetTypeInfoUniversal().DeclaredMethods)
                     if (method.Name == name)
                         return method;
             }
             else
             {
-                foreach (var method in type.GetTypeInfo().DeclaredMethods)
+                foreach (var method in type.GetTypeInfoUniversal().DeclaredMethods)
                     if (method.IsPublic && method.Name == name)
                         return method;
             }
@@ -14027,7 +14027,7 @@ namespace DryIoc
         public static MethodInfo GetMethodOrNull(this Type type, string name, params Type[] paramTypes)
         {
             var pTypesCount = paramTypes.Length;
-            var methods = type.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            var methods = type.GetTypeInfoUniversal().DeclaredMethods.ToArrayOrSelf();
             foreach (var method in methods)
             {
                 if (method.Name == name)
@@ -14059,7 +14059,7 @@ namespace DryIoc
         /// <summary>Returns property by name, including inherited. Or null if not found.</summary>
         public static PropertyInfo GetPropertyOrNull(this Type type, string name, bool includeBase = false)
         {
-            var props = type.GetTypeInfo().DeclaredProperties.ToArrayOrSelf();
+            var props = type.GetTypeInfoUniversal().DeclaredProperties.ToArrayOrSelf();
             for (var i = 0; i < props.Length; i++)
             {
                 var p = props[i];
@@ -14067,7 +14067,7 @@ namespace DryIoc
                     return p;
             }
 
-            return !includeBase ? null : type.GetTypeInfo().BaseType?.GetPropertyOrNull(name, includeBase);
+            return !includeBase ? null : type.GetTypeInfoUniversal().BaseType?.GetPropertyOrNull(name, includeBase);
         }
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
@@ -14077,7 +14077,7 @@ namespace DryIoc
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
         public static FieldInfo GetFieldOrNull(this Type type, string name, bool includeBase = false)
         {
-            var fields = type.GetTypeInfo().DeclaredFields.ToArrayOrSelf();
+            var fields = type.GetTypeInfoUniversal().DeclaredFields.ToArrayOrSelf();
             for (var i = 0; i < fields.Length; i++)
             {
                 var f = fields[i];
@@ -14085,11 +14085,11 @@ namespace DryIoc
                     return f;
             }
 
-            return !includeBase ? null : type.GetTypeInfo().BaseType?.GetFieldOrNull(name, includeBase);
+            return !includeBase ? null : type.GetTypeInfoUniversal().BaseType?.GetFieldOrNull(name, includeBase);
         }
 
         /// <summary>Returns type assembly.</summary>
-        public static Assembly GetAssembly(this Type type) => type.GetTypeInfo().Assembly;
+        public static Assembly GetAssembly(this Type type) => type.GetTypeInfoUniversal().Assembly;
 
         /// <summary>Is <c>true</c> for interface declared property explicitly implemented, e.g. <c>IInterface.Prop</c></summary>
         public static bool IsExplicitlyImplemented(this PropertyInfo property) => property.Name.Contains(".");
@@ -14105,7 +14105,7 @@ namespace DryIoc
         {
             // e.g.: set_Blah or get_Blah
             var propName = property.Name;
-            var methods = property.DeclaringType.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            var methods = property.DeclaringType.GetTypeInfoUniversal().DeclaredMethods.ToArrayOrSelf();
             for (var index = 0; index < methods.Length; index++)
             {
                 var m = methods[index];
@@ -14343,7 +14343,7 @@ namespace DryIoc
         {
             var asmExpr = Parameter(typeof(Assembly), "a");
 
-            var definedTypesProperty = typeof(Assembly).GetTypeInfo().GetDeclaredProperty("DefinedTypes");
+            var definedTypesProperty = typeof(Assembly).GetTypeInfoUniversal().GetDeclaredProperty("DefinedTypes");
             if (definedTypesProperty != null)
             {
                 if (definedTypesProperty.PropertyType == typeof(IEnumerable<TypeInfo>))
@@ -14351,7 +14351,7 @@ namespace DryIoc
                 return a => (IEnumerable<Type>)definedTypesProperty.GetValue(a, null);
             }
 
-            var getTypesMethod = typeof(Assembly).GetTypeInfo().GetDeclaredMethod("GetTypes");
+            var getTypesMethod = typeof(Assembly).GetTypeInfoUniversal().GetDeclaredMethod("GetTypes");
             return a => (IEnumerable<Type>)getTypesMethod.Invoke(a, Empty<object>());
         }
 
@@ -14359,7 +14359,7 @@ namespace DryIoc
         public static MethodInfo GetGetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
         {
             var name = "get_" + p.Name;
-            var methods = p.DeclaringType.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            var methods = p.DeclaringType.GetTypeInfoUniversal().DeclaredMethods.ToArrayOrSelf();
             for (var i = 0; i < methods.Length; i++)
             {
                 var m = methods[i];
@@ -14374,7 +14374,7 @@ namespace DryIoc
         public static MethodInfo GetSetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
         {
             var name = "set_" + p.Name;
-            var methods = p.DeclaringType.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
+            var methods = p.DeclaringType.GetTypeInfoUniversal().DeclaredMethods.ToArrayOrSelf();
             for (var i = 0; i < methods.Length; i++)
             {
                 var m = methods[i];
@@ -14520,12 +14520,12 @@ namespace System.Reflection
     using Collections.Generic;
     using Linq;
 
-    /// <summary>Provides <see cref="GetTypeInfo"/> for the type.</summary>
+    /// <summary>Provides <see cref="M:System.Type.GetTypeInfo"/> for the type.</summary>
     public static class TypeInfoTools
     {
         /// <summary>Wraps input type into <see cref="TypeInfo"/> structure.</summary>
         /// <param name="type">Input type.</param> <returns>Type info wrapper.</returns>
-        public static TypeInfo GetTypeInfo(this Type type) => new TypeInfo(type);
+        public static TypeInfo GetTypeInfoUniversal(this Type type) => new TypeInfo(type);
     }
 
     /// <summary>Partial analog of TypeInfo existing in .NET 4.5 and higher.</summary>
@@ -14600,6 +14600,20 @@ namespace System.Reflection
             BindingFlags.DeclaredOnly;
     }
 }
+
+#else
+
+namespace System.Reflection
+{
+    /// <summary>Provides <see cref="M:System.Type.GetTypeInfo"/> for the type.</summary>
+    public static class TypeInfoTools
+    {
+        /// <summary>Wraps input type into <see cref="TypeInfo"/> structure.</summary>
+        /// <param name="type">Input type.</param> <returns>Type info wrapper.</returns>
+        public static TypeInfo GetTypeInfoUniversal(this Type type) => type.GetTypeInfo();
+    }
+}
+
 #endif
 
 #if NET35

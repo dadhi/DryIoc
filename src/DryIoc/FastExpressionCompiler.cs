@@ -729,13 +729,13 @@ namespace FastExpressionCompiler.LightExpression
         public static readonly ArrayClosure EmptyArrayClosure = new ArrayClosure(null);
 
         public static FieldInfo ArrayClosureArrayField =
-            typeof(ArrayClosure).GetTypeInfo().GetDeclaredField(nameof(ArrayClosure.ConstantsAndNestedLambdas));
+            typeof(ArrayClosure).GetTypeInfoUniersal().GetDeclaredField(nameof(ArrayClosure.ConstantsAndNestedLambdas));
 
         public static FieldInfo ArrayClosureWithNonPassedParamsField =
-            typeof(ArrayClosureWithNonPassedParams).GetTypeInfo().GetDeclaredField(nameof(ArrayClosureWithNonPassedParams.NonPassedParams));
+            typeof(ArrayClosureWithNonPassedParams).GetTypeInfoUniersal().GetDeclaredField(nameof(ArrayClosureWithNonPassedParams.NonPassedParams));
 
         public static ConstructorInfo ArrayClosureWithNonPassedParamsConstructor =
-            typeof(ArrayClosureWithNonPassedParams).GetTypeInfo().DeclaredConstructors.GetFirst();
+            typeof(ArrayClosureWithNonPassedParams).GetTypeInfoUniersal().DeclaredConstructors.GetFirst();
 
         public class ArrayClosure
         {
@@ -754,10 +754,10 @@ namespace FastExpressionCompiler.LightExpression
         public sealed class NestedLambdaWithConstantsAndNestedLambdas
         {
             public static FieldInfo NestedLambdaField =
-                typeof(NestedLambdaWithConstantsAndNestedLambdas).GetTypeInfo().GetDeclaredField(nameof(NestedLambda));
+                typeof(NestedLambdaWithConstantsAndNestedLambdas).GetTypeInfoUniersal().GetDeclaredField(nameof(NestedLambda));
 
             public static FieldInfo ConstantsAndNestedLambdasField =
-                typeof(NestedLambdaWithConstantsAndNestedLambdas).GetTypeInfo().GetDeclaredField(nameof(ConstantsAndNestedLambdas));
+                typeof(NestedLambdaWithConstantsAndNestedLambdas).GetTypeInfoUniersal().GetDeclaredField(nameof(ConstantsAndNestedLambdas));
 
             public readonly object NestedLambda;
             public readonly object ConstantsAndNestedLambdas;
@@ -786,7 +786,7 @@ namespace FastExpressionCompiler.LightExpression
         internal static class CurryClosureFuncs
         {
             public static readonly MethodInfo[] Methods =
-                typeof(CurryClosureFuncs).GetTypeInfo().DeclaredMethods.AsArray();
+                typeof(CurryClosureFuncs).GetTypeInfoUniersal().DeclaredMethods.AsArray();
 
             public static Func<R> Curry<C, R>(Func<C, R> f, C c) =>
                 () => f(c);
@@ -814,7 +814,7 @@ namespace FastExpressionCompiler.LightExpression
         internal static class CurryClosureActions
         {
             public static readonly MethodInfo[] Methods =
-                typeof(CurryClosureActions).GetTypeInfo().DeclaredMethods.AsArray();
+                typeof(CurryClosureActions).GetTypeInfoUniersal().DeclaredMethods.AsArray();
 
             public static Action Curry<C>(Action<C> a, C c) =>
                 () => a(c);
@@ -865,7 +865,7 @@ namespace FastExpressionCompiler.LightExpression
                             // todo: find the way to speed-up this, track the usage in constant itself?
 
                             var valueType = value.GetType();
-                            if (IsClosureBoundConstant(value, valueType.GetTypeInfo()))
+                            if (IsClosureBoundConstant(value, valueType.GetTypeInfoUniersal()))
                                 closure.AddConstantOrIncrementUsageCount(value, valueType);
                         }
 
@@ -873,7 +873,7 @@ namespace FastExpressionCompiler.LightExpression
 
                     case ExpressionType.Quote:
                         //var operand = ((UnaryExpression)expr).Operand;
-                        //if (operand != null && IsClosureBoundConstant(operand, expr.Type.GetTypeInfo()))
+                        //if (operand != null && IsClosureBoundConstant(operand, expr.Type.GetTypeInfoUniersal()))
                         //    closure.AddConstant(operand);
                         return false;
 
@@ -1466,12 +1466,12 @@ namespace FastExpressionCompiler.LightExpression
         {
 #if NETSTANDARD1_1 || NETSTANDARD1_2 || NETSTANDARD1_3 || NETSTANDARD1_4 || NETSTANDARD1_5 || NETSTANDARD1_6
             private static readonly MethodInfo _getTypeFromHandleMethod =
-                typeof(Type).GetTypeInfo().GetDeclaredMethod("GetTypeFromHandle");
+                typeof(Type).GetTypeInfoUniersal().GetDeclaredMethod("GetTypeFromHandle");
 
             private static readonly MethodInfo _objectEqualsMethod = GetObjectEquals();
             private static MethodInfo GetObjectEquals()
             {
-                var ms = typeof(object).GetTypeInfo().GetDeclaredMethods("Equals");
+                var ms = typeof(object).GetTypeInfoUniersal().GetDeclaredMethods("Equals");
                 foreach (var m in ms)
                     if (m.GetParameters().Length == 2)
                         return m;
@@ -1999,7 +1999,7 @@ namespace FastExpressionCompiler.LightExpression
 
             private static void EmitDefault(Type type, ILGenerator il)
             {
-                if (!type.GetTypeInfo().IsValueType)
+                if (!type.GetTypeInfoUniersal().IsValueType)
                 {
                     il.Emit(OpCodes.Ldnull);
                 }
@@ -2359,7 +2359,7 @@ namespace FastExpressionCompiler.LightExpression
                 var underlyingNullableTargetType = Nullable.GetUnderlyingType(targetType);
                 if (targetTypeIsNullable && sourceType == underlyingNullableTargetType)
                 {
-                    il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                    il.Emit(OpCodes.Newobj, targetType.GetTypeInfoUniersal().DeclaredConstructors.GetFirst());
                     return true;
                 }
 
@@ -2383,7 +2383,7 @@ namespace FastExpressionCompiler.LightExpression
                         il.Emit(OpCodes.Call, convertOpMethod);
 
                         if (targetTypeIsNullable)
-                            il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                            il.Emit(OpCodes.Newobj, targetType.GetTypeInfoUniersal().DeclaredConstructors.GetFirst());
 
                         if ((parent & ParentFlags.IgnoreResult) != 0)
                             il.Emit(OpCodes.Pop);
@@ -2442,7 +2442,7 @@ namespace FastExpressionCompiler.LightExpression
                         il.Emit(OpCodes.Call, convertOpMethod);
 
                         if (targetTypeIsNullable)
-                            il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                            il.Emit(OpCodes.Newobj, targetType.GetTypeInfoUniersal().DeclaredConstructors.GetFirst());
 
                         if ((parent & ParentFlags.IgnoreResult) != 0)
                             il.Emit(OpCodes.Pop);
@@ -2463,7 +2463,7 @@ namespace FastExpressionCompiler.LightExpression
                         if (!TryEmitValueConvert(underlyingNullableTargetType, il, isChecked: false))
                             return false;
 
-                        il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                        il.Emit(OpCodes.Newobj, targetType.GetTypeInfoUniersal().DeclaredConstructors.GetFirst());
                     }
                     else
                     {
@@ -2494,13 +2494,13 @@ namespace FastExpressionCompiler.LightExpression
                             il.Emit(OpCodes.Call, convertOpMethod);
                         }
 
-                        il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                        il.Emit(OpCodes.Newobj, targetType.GetTypeInfoUniersal().DeclaredConstructors.GetFirst());
                         il.MarkLabel(labelDone);
                     }
                 }
                 else
                 {
-                    if (targetType.GetTypeInfo().IsEnum)
+                    if (targetType.GetTypeInfoUniersal().IsEnum)
                         targetType = Enum.GetUnderlyingType(targetType);
 
                     // fixes #159
@@ -2552,7 +2552,7 @@ namespace FastExpressionCompiler.LightExpression
                 bool considerClosure, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure)
             {
                 var constValueType = constantValue.GetType();
-                if (considerClosure && IsClosureBoundConstant(constantValue, constValueType.GetTypeInfo()))
+                if (considerClosure && IsClosureBoundConstant(constantValue, constValueType.GetTypeInfoUniersal()))
                 {
                     var constItems = closure.Constants.Items;
                     var constIndex = closure.Constants.Count - 1;
@@ -2589,7 +2589,7 @@ namespace FastExpressionCompiler.LightExpression
                     }
 
                     // get raw enum type to light
-                    if (constValueType.GetTypeInfo().IsEnum)
+                    if (constValueType.GetTypeInfoUniersal().IsEnum)
                         constValueType = Enum.GetUnderlyingType(constValueType);
 
                     if (!TryEmitNumberConstant(il, constantValue, constValueType))
@@ -2598,7 +2598,7 @@ namespace FastExpressionCompiler.LightExpression
 
                 var underlyingNullableType = Nullable.GetUnderlyingType(exprType);
                 if (underlyingNullableType != null)
-                    il.Emit(OpCodes.Newobj, exprType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                    il.Emit(OpCodes.Newobj, exprType.GetTypeInfoUniersal().DeclaredConstructors.GetFirst());
 
                 // boxing the value type, otherwise we can get a strange result when 0 is treated as Null.
                 else if (exprType == typeof(object) && constValueType.IsValueType())
@@ -2784,13 +2784,13 @@ namespace FastExpressionCompiler.LightExpression
 
                 if (value == decimal.MinValue)
                 {
-                    il.Emit(OpCodes.Ldsfld, typeof(decimal).GetTypeInfo().GetDeclaredField(nameof(decimal.MinValue)));
+                    il.Emit(OpCodes.Ldsfld, typeof(decimal).GetTypeInfoUniersal().GetDeclaredField(nameof(decimal.MinValue)));
                     return;
                 }
 
                 if (value == decimal.MaxValue)
                 {
-                    il.Emit(OpCodes.Ldsfld, typeof(decimal).GetTypeInfo().GetDeclaredField(nameof(decimal.MaxValue)));
+                    il.Emit(OpCodes.Ldsfld, typeof(decimal).GetTypeInfoUniersal().GetDeclaredField(nameof(decimal.MaxValue)));
                     return;
                 }
 
@@ -2812,7 +2812,7 @@ namespace FastExpressionCompiler.LightExpression
 
             private static readonly Lazy<ConstructorInfo> _decimalCtor = new Lazy<ConstructorInfo>(() =>
             {
-                foreach (var ctor in typeof(decimal).GetTypeInfo().DeclaredConstructors)
+                foreach (var ctor in typeof(decimal).GetTypeInfoUniersal().DeclaredConstructors)
                     if (ctor.GetParameters().Length == 5)
                         return ctor;
                 return null;
@@ -2846,7 +2846,7 @@ namespace FastExpressionCompiler.LightExpression
                         if (!TryEmit(elems[i], paramExprs, il, ref closure, parent, i))
                             return false;
 
-                    il.Emit(OpCodes.Newobj, arrayType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                    il.Emit(OpCodes.Newobj, arrayType.GetTypeInfoUniersal().DeclaredConstructors.GetFirst());
                     return true;
                 }
 
@@ -3642,7 +3642,7 @@ namespace FastExpressionCompiler.LightExpression
                 il.Emit(OpCodes.Newobj, ArrayClosureWithNonPassedParamsConstructor);
 
                 // - call `Curry` method with nested lambda and array closure to produce a closed lambda with the expected signature
-                var lambdaTypeArgs = nestedLambda.GetType().GetTypeInfo().GenericTypeArguments;
+                var lambdaTypeArgs = nestedLambda.GetType().GetTypeInfoUniersal().GenericTypeArguments;
 
                 var closureMethod = nestedLambdaInfo.LambdaExpression.ReturnType == typeof(void)
                     ? CurryClosureActions.Methods[lambdaTypeArgs.Length - 1].MakeGenericMethod(lambdaTypeArgs)
@@ -3782,7 +3782,7 @@ namespace FastExpressionCompiler.LightExpression
                     rightOpType = Nullable.GetUnderlyingType(rightOpType);
                 }
 
-                var leftOpTypeInfo = leftOpType.GetTypeInfo();
+                var leftOpTypeInfo = leftOpType.GetTypeInfoUniersal();
                 if (!leftOpTypeInfo.IsPrimitive && !leftOpTypeInfo.IsEnum)
                 {
                     var methodName
@@ -3997,7 +3997,7 @@ namespace FastExpressionCompiler.LightExpression
                         EmitLoadLocalVariable(il, locIndex);
                         il.Emit(OpCodes.Br_S, endL);
                         il.MarkLabel(valueLabel);
-                        il.Emit(OpCodes.Newobj, exprType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                        il.Emit(OpCodes.Newobj, exprType.GetTypeInfoUniersal().DeclaredConstructors.GetFirst());
                         il.MarkLabel(endL);
                     }
                     else
@@ -4027,7 +4027,7 @@ namespace FastExpressionCompiler.LightExpression
                             if (expr.Left.Type != expr.Right.Type || expr.Left.Type != typeof(string))
                                 paraType = typeof(object);
 
-                            var methods = typeof(string).GetTypeInfo().DeclaredMethods.AsArray();
+                            var methods = typeof(string).GetTypeInfoUniersal().DeclaredMethods.AsArray();
                             for (var i = 0; i < methods.Length; i++)
                             {
                                 var m = methods[i];
@@ -4054,7 +4054,7 @@ namespace FastExpressionCompiler.LightExpression
 
                             if (methodName != null)
                             {
-                                var methods = exprType.GetTypeInfo().DeclaredMethods.AsArray();
+                                var methods = exprType.GetTypeInfoUniersal().DeclaredMethods.AsArray();
                                 for (var i = 0; method == null && i < methods.Length; i++)
                                 {
                                     var m = methods[i];
@@ -4394,24 +4394,24 @@ namespace FastExpressionCompiler.LightExpression
     // in order to prevent conflicts with YOUR helpers with standard names
     internal static class Tools
     {
-        internal static bool IsValueType(this Type type) => type.GetTypeInfo().IsValueType;
-        internal static bool IsPrimitive(this Type type) => type.GetTypeInfo().IsPrimitive;
-        internal static bool IsClass(this Type type) => type.GetTypeInfo().IsClass;
+        internal static bool IsValueType(this Type type) => type.GetTypeInfoUniersal().IsValueType;
+        internal static bool IsPrimitive(this Type type) => type.GetTypeInfoUniersal().IsPrimitive;
+        internal static bool IsClass(this Type type) => type.GetTypeInfoUniersal().IsClass;
 
         internal static bool IsUnsigned(this Type type) =>
             type == typeof(byte) || type == typeof(ushort) || type == typeof(uint) || type == typeof(ulong);
 
         internal static bool IsNullable(this Type type) =>
-            type.GetTypeInfo().IsGenericType && type.GetTypeInfo().GetGenericTypeDefinition() == typeof(Nullable<>);
+            type.GetTypeInfoUniersal().IsGenericType && type.GetTypeInfoUniersal().GetGenericTypeDefinition() == typeof(Nullable<>);
 
         internal static MethodInfo FindMethod(this Type type, string methodName)
         {
-            var methods = type.GetTypeInfo().DeclaredMethods.AsArray();
+            var methods = type.GetTypeInfoUniersal().DeclaredMethods.AsArray();
             for (var i = 0; i < methods.Length; i++)
                 if (methods[i].Name == methodName)
                     return methods[i];
 
-            return type.GetTypeInfo().BaseType?.FindMethod(methodName);
+            return type.GetTypeInfoUniersal().BaseType?.FindMethod(methodName);
         }
 
         internal static MethodInfo DelegateTargetGetterMethod = typeof(Delegate).FindPropertyGetMethod("Target");
@@ -4420,7 +4420,7 @@ namespace FastExpressionCompiler.LightExpression
 
         internal static MethodInfo FindNullableGetValueOrDefaultMethod(this Type type)
         {
-            var methods = type.GetTypeInfo().DeclaredMethods.AsArray();
+            var methods = type.GetTypeInfoUniersal().DeclaredMethods.AsArray();
             for (var i = 0; i < methods.Length; i++)
             {
                 var m = methods[i];
@@ -4439,7 +4439,7 @@ namespace FastExpressionCompiler.LightExpression
 
         internal static MethodInfo FindPropertyGetMethod(this Type propHolderType, string propName)
         {
-            var methods = propHolderType.GetTypeInfo().DeclaredMethods.AsArray();
+            var methods = propHolderType.GetTypeInfoUniersal().DeclaredMethods.AsArray();
             for (var i = 0; i < methods.Length; i++)
             {
                 var method = methods[i];
@@ -4456,12 +4456,12 @@ namespace FastExpressionCompiler.LightExpression
                 }
             }
 
-            return propHolderType.GetTypeInfo().BaseType?.FindPropertyGetMethod(propName);
+            return propHolderType.GetTypeInfoUniersal().BaseType?.FindPropertyGetMethod(propName);
         }
 
         internal static MethodInfo FindPropertySetMethod(this Type propHolderType, string propName)
         {
-            var methods = propHolderType.GetTypeInfo().DeclaredMethods.AsArray();
+            var methods = propHolderType.GetTypeInfoUniersal().DeclaredMethods.AsArray();
             for (var i = 0; i < methods.Length; i++)
             {
                 var method = methods[i];
@@ -4478,12 +4478,12 @@ namespace FastExpressionCompiler.LightExpression
                 }
             }
 
-            return propHolderType.GetTypeInfo().BaseType?.FindPropertySetMethod(propName);
+            return propHolderType.GetTypeInfoUniersal().BaseType?.FindPropertySetMethod(propName);
         }
 
         internal static MethodInfo FindConvertOperator(this Type type, Type sourceType, Type targetType)
         {
-            var methods = type.GetTypeInfo().DeclaredMethods.AsArray();
+            var methods = type.GetTypeInfoUniersal().DeclaredMethods.AsArray();
             for (var i = 0; i < methods.Length; i++)
             {
                 var m = methods[i];
@@ -4503,7 +4503,7 @@ namespace FastExpressionCompiler.LightExpression
 
         internal static ConstructorInfo FindSingleParamConstructor(this Type type, Type paramType)
         {
-            var ctors = type.GetTypeInfo().DeclaredConstructors.AsArray();
+            var ctors = type.GetTypeInfoUniersal().DeclaredConstructors.AsArray();
             for (var i = 0; i < ctors.Length; i++)
             {
                 var ctor = ctors[i];
@@ -4658,7 +4658,7 @@ namespace FastExpressionCompiler.LightExpression
             _getNextLocalVarIndex = (i, t) => i.DeclareLocal(t).LocalIndex;
 
             // now let's try to acquire the more efficient less allocating method
-            var ilGenTypeInfo = typeof(ILGenerator).GetTypeInfo();
+            var ilGenTypeInfo = typeof(ILGenerator).GetTypeInfoUniersal();
             var localSignatureField = ilGenTypeInfo.GetDeclaredField("m_localSignature");
             if (localSignatureField == null)
                 return;
@@ -4669,7 +4669,7 @@ namespace FastExpressionCompiler.LightExpression
 
             // looking for the `SignatureHelper.AddArgument(Type argument, bool pinned)`
             MethodInfo addArgumentMethod = null;
-            foreach (var m in typeof(SignatureHelper).GetTypeInfo().GetDeclaredMethods("AddArgument"))
+            foreach (var m in typeof(SignatureHelper).GetTypeInfoUniersal().GetDeclaredMethods("AddArgument"))
             {
                 var ps = m.GetParameters();
                 if (ps.Length == 2 && ps[0].ParameterType == typeof(Type) && ps[1].ParameterType == typeof(bool))
@@ -4683,7 +4683,7 @@ namespace FastExpressionCompiler.LightExpression
                 return;
 
             // our own helper - always available
-            var postIncMethod = typeof(ILGeneratorHacks).GetTypeInfo().GetDeclaredMethod(nameof(PostInc));
+            var postIncMethod = typeof(ILGeneratorHacks).GetTypeInfoUniersal().GetDeclaredMethod(nameof(PostInc));
 
             // now let's compile the following method without allocating the LocalBuilder class:
             /*
