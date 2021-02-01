@@ -19,13 +19,14 @@ In DryIoc we may use [strongly-typed Factory Method](SelectConstructorOrFactoryM
 using DryIoc;
 using NUnit.Framework;
 using System;
+using log4net;
 
-class NLog_logger
+class Log4net_logger_example
 {
     public class A
     {
-        public NLog.ILogger Logger { get; }
-        public A(NLog.ILogger logger)
+        public ILog Logger { get; }
+        public A(ILog logger)
         {
             Logger = logger;
         }
@@ -37,8 +38,8 @@ class NLog_logger
         var container = new Container();
         container.Register<A>();
 
-        container.Register(Made.Of<NLog.ILogger>(() => 
-                NLog.LogManager.GetLogger(Arg.Index<string>(0)),
+        container.Register(Made.Of<ILog>(() => 
+                LogManager.GetLogger(Arg.Index<string>(0)),
                 request => request.Parent.ImplementationType.Name.ToString()));
 
         var a = container.Resolve<A>();
@@ -58,7 +59,7 @@ In addition, the condition allows to use default logger where context is not ava
 
 ```cs md*/
 
-class Serilog_logger
+class Serilog_logger_example
 {
     public class LogSubject
     {
