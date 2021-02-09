@@ -3526,8 +3526,13 @@ namespace DryIoc
             // fallback to reflection invocation
             object instance = null;
             var callObjectExpr = callExpr.Object;
-            if (callObjectExpr != null && !TryInterpret(r, callObjectExpr, paramExprs, paramValues, parentArgs, useFec, out instance)) 
-                return false;
+            if (callObjectExpr != null) 
+            {
+                if (callObjectExpr is ConstantExpression objConst)
+                    instance = objConst.Value;
+                else if (!TryInterpret(r, callObjectExpr, paramExprs, paramValues, parentArgs, useFec, out instance)) 
+                    return false;
+            }
 
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
             var fewArgCount = callExpr.FewArgumentCount;
@@ -6574,7 +6579,7 @@ namespace DryIoc
         public FactoryMethod(ConstructorInfo constructor) => 
             ConstructorOrMethodOrMember = constructor;
 
-        private FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
+        internal FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
         {
             ConstructorOrMethodOrMember = constructorOrMethodOrMember;
             FactoryServiceInfo = factoryServiceInfo;
@@ -10814,7 +10819,7 @@ namespace DryIoc
                     var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
                     factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
                     if (factoryExpr == null)
-                            return null; // todo: @check should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
+                        return null; // todo: @check should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
                 }
 
                 // return earlier if already have the parameters resolved, e.g. when using `ConstructorWithResolvableArguments`
@@ -11525,7 +11530,10 @@ namespace DryIoc
                     return null;
             }
 
-            return FactoryMethod.Of(factoryMember, factoryInfo);
+            var factoryInstance = factoryMethod.FactoryExpression;
+            return factoryInstance != null 
+                ? new FactoryMethod(factoryMember, factoryInstance) 
+                : new FactoryMethod(factoryMember, factoryInfo);
         }
 
 #endregion

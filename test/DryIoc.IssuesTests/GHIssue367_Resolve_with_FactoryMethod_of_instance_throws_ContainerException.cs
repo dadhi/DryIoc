@@ -65,7 +65,7 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual("String", abs.Description);
         }
 
-        [Test][Ignore("fixme")]
+        [Test]
         public void Test_Factory_as_Instance()
         {
             var container = new Container();
@@ -74,10 +74,11 @@ namespace DryIoc.IssuesTests
             var factoryMethod = FactoryMethod.Of(typeof(Factory).GetMethods()
                 .Single(m => m.Name == "Create" && m.IsGenericMethodDefinition), 
                 factoryInstance: factory);
-    
+
             container.Register(typeof(IAbstraction<>), made: Made.Of(factoryMethod: factoryMethod));
-            
+
             var abs = container.Resolve<IAbstraction<string>>();
+
             Assert.IsNotNull(abs);
             Assert.AreEqual("String", abs.Description);
         }
