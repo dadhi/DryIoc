@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.7.3 Bug-fix release / 2021-02-09
+
+- #367 Resolve with FactoryMethod of instance throws DryIoc.ContainerException
+
 ## v4.7.2 Bug-fix release / 2021-01-15
 
 - #365 Really fixing: Made.Of() Parameters incorrectly reused depending on Register() usage
