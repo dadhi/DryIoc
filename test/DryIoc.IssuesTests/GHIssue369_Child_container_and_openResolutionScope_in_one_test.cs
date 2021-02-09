@@ -6,42 +6,67 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue369_Child_container_and_openResolutionScope_in_one_test
     {
-        public interface IActionBehaviorContext
+        public interface IServiceLocator
         {
+            IResolverContext Resolver { get; }
         }
 
-        public class ActionBehaviorContext : IActionBehaviorContext
+        public class DryIocServiceLocator : IServiceLocator
         {
+            public DryIocServiceLocator(IResolverContext resolver)
+            {
+                Resolver = resolver;
+            }
+
+            public IResolverContext Resolver { get; }
         }
 
-        public interface IActionBehavior
+
+        public interface IContext
         {
-            IActionBehaviorContext Context { get; }
+            Session Session { get; }
         }
 
-        public class ActionBehavior : IActionBehavior
+
+        public class Context : IContext
         {
-            public IActionBehaviorContext Context { get; }
-            public ActionBehavior(IActionBehaviorContext ctx) => Context = ctx;
+
+            public Context(Session session)
+            {
+                Session = session;
+            }
+
+            public Session Session { get; }
+        }
+        
+        public class Session
+        {
+            public int Code { get; set; }
+            public Session()
+            {
+                Code = new System.Random().Next(99999999);
+            }
         }
 
-        // [Test] // won't work
-        public void Emulating_the_original_test()
+        [Test]
+        public void Should_resolve_context_from_the_new_scope()
         {
             var container = new Container();
 
-            container.Register<IActionBehaviorContext, ActionBehaviorContext>(reuse: Reuse.Scoped);
-            container.RegisterDelegate(typeof(IActionBehavior), 
-                r => new ActionBehavior(r.Resolve<IActionBehaviorContext>()), 
-                setup: Setup.With(openResolutionScope: true));
+            container.Register<IServiceLocator, DryIocServiceLocator>();
+            container.RegisterInstance<Session>(new Session());
 
-            using (var child = container.CreateChild(ifAlreadyRegistered:IfAlreadyRegistered.Replace))
+            using (var nested = container.CreateChild(ifAlreadyRegistered: IfAlreadyRegistered.Replace))
             {
-                var s1 = child.Resolve<IActionBehaviorContext>(); // WONT WORK, because the we need a scope to resolve the scoped context and we have none 
-                var s2 = child.Resolve<IActionBehavior>();
- 
-                Assert.AreSame(s1, s2.Context); //failed. With my reasoning they should be the same!
-                //factory resolve IActionBehaviorContext with help of request
+                nested.RegisterInstance<Session>(new Session());
+
+                using (var inner = nested.OpenScope())
+                {
+                    var session1 = nested.Resolve<Session>();
+                    var session2 = nested.Resolve<IServiceLocator>().Resolver.Resolve<Session>();
+
+                    Assert.AreSame(session2, session1);
+                }
             }
         }
     }
