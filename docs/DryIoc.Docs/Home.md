@@ -118,7 +118,7 @@ and to support the __extensibility__ and __testability__ of the code.
 
 ## Extensions
 
-- [DryIoc.MefAttributedModel](Extensions/MefAttributedModel) 
+- [DryIoc.MefAttributedModel](Extensions/MefAttributedModel.md) 
 for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx)
 
 - ASP.NET: 
