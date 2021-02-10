@@ -11232,9 +11232,34 @@ namespace DryIoc
                     Caching = openFactory.Caching
                 };
 
+                // todo: @perf attempt 2 to remove closedGenericFactory from the closure
                 // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
+                // var genFacs = _generatedFactories.SwapAndGetNewValue(generatedFactoryKey, closedGenericFactory,
+                //     (x, genFacKey, closedGenFac) => x.AddDefaultOrKeepEntry(genFacKey));
+                // var entry = genFacs.GetSurePresentEntry();
+                // var closedGenericFactory = entry.Value;
+                // if (closedGenericFactory == null)
+                //     Interlocked.Exhange(ref entry.Value, 
+                //         closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup)
+                //         {
+                //             GeneratorFactoryID = openFactory.FactoryID,
+                //             Caching = openFactory.Caching
+                //         });
+
+                // todo: @perf attempt 1 to remove closedGenericFactory from the closure
+                // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
+                // _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
+                //     (x, genFacKey, closedGenFac) => 
+                //     {
+                //         var currFac = x.GetValueOrDefault(genFacKey);
+                //         if (currFac == null)
+                //             return x.AddOrUpdate(genFacKey, closedGenFac); // todo: @api should be the AddUnsafe instead
+                //         closedGenericFactory = currFac;
+                //         return x;
+                //     });
+
                 _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
-                    (x, genFacKey, fac) => x.AddOrUpdate(genFacKey, fac, (oldFac, _) => closedGenericFactory = oldFac));
+                    (x, genFacKey, closedGenFac) => x.AddOrUpdate(genFacKey, closedGenFac, (oldFac, _) => closedGenericFactory = oldFac));
 
                 return closedGenericFactory;
             }

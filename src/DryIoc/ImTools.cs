@@ -2127,6 +2127,7 @@ namespace ImTools
         /// Option without allocation for capturing `a` in closure of `getNewValue`
         public T Swap<A>(A a, Func<T, A, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
 
+        // todo: @api @perf the return value of Swap is not used. On the other hand there are case when we need to assign the closed variable inside the `getNewValue` (`getValue`) delegate - so we may consider the variant of returning the state A instead to assign it to prevent the closure.
         /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
         public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue) => Ref.Swap(ref _value, a, b, getNewValue);
 
@@ -2152,7 +2153,7 @@ namespace ImTools
     /// <summary>Provides optimistic-concurrency consistent <see cref="Swap{T}"/> operation.</summary>
     public static class Ref
     {
-        /// The default max retry count - can be overriden by `Swap` optional parameter 
+        /// The default max retry count - can be overridden by `Swap` optional parameter 
         public const int RETRY_COUNT_UNTIL_THROW = 50;
 
         /// <summary>Factory for <see cref="Ref{T}"/> with type of value inference.</summary>
