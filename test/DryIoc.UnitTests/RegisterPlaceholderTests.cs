@@ -129,8 +129,8 @@ namespace DryIoc.UnitTests
             c.Register<IN, N1>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             var m2 = c.Resolve<M>();
             Assert.IsInstanceOf<D2>(m.N);
-            //Assert.IsInstanceOf<N1>(((D2)m.N).Fn());              // todo: does not work
-            //Assert.IsInstanceOf<N1>(((D2)((D2)m.N).Fn()).Fn());   // todo: does not work
+            //Assert.IsInstanceOf<N1>(((D2)m.N).Fn());              // todo: does not work - we got the infinite recursion getting the D2
+            //Assert.IsInstanceOf<N1>(((D2)((D2)m.N).Fn()).Fn());   // todo: does not work - we got the infinite recursion getting the D2
         }
 
         class M
