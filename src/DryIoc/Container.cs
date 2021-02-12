@@ -10309,29 +10309,26 @@ namespace DryIoc
                 ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK]; // got a live reference to the map where value can be queried and stored
 
                 var oldMap = map; // get a reference to the map available now as an oldMap
-                // If the `newMap` is the same as an `oldMap` it means there is item already in the map.
                 var newMap = oldMap.AddOrKeepEntry(itemRef);
 
-                // The check before the CAS operation is only here for Singleton and not in a Scope 
-                // because the race for the Singletons is far more likely and the race for the Scoped services is almost non-existent
+                // If the `newMap` is the same as an `oldMap` it means there is item already in the map.
+                // The check before the CAS operation is only here for Singleton and not for the scope 
+                // because the race for the Singletons and the situation where singleton is already create in parallel 
+                // is far more likely and the race for the Scoped services is almost non-existent 
+                // (because Scoped is almost equal to the single thread or the single invocation flow)
                 if (newMap == oldMap)
                 {
                     // It does not matter if the live `map` changed because the item can only be added and not removed ever
                     var otherItemRef = newMap.GetSurePresentEntry(id);
                     singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
                 }
-                else if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
+                else if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap) // set map to newMap if the map did no change since getting oldMap
                 {
-                    // if the map wa changed by the other party, let's retry using the Swap thing
+                    // if the map was changed in parallel, let's retry using the Swap
                     newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
                     var otherItemRef = newMap.GetSurePresentEntry(id);
                     if (otherItemRef != itemRef)
                         singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-                }
-                else if (newMap == oldMap)
-                {
-                    var otherItemRef = newMap.GetSurePresentEntry(id);
-                    singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
                 }
 
                 if (singleton == Scope.NoItem)
@@ -11234,17 +11231,16 @@ namespace DryIoc
 
                 // todo: @perf attempt 2 to remove closedGenericFactory from the closure
                 // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
-                // var genFacs = _generatedFactories.SwapAndGetNewValue(generatedFactoryKey, closedGenericFactory,
-                //     (x, genFacKey, closedGenFac) => x.AddDefaultOrKeepEntry(genFacKey));
-                // var entry = genFacs.GetSurePresentEntry();
-                // var closedGenericFactory = entry.Value;
-                // if (closedGenericFactory == null)
-                //     Interlocked.Exhange(ref entry.Value, 
-                //         closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup)
-                //         {
-                //             GeneratorFactoryID = openFactory.FactoryID,
-                //             Caching = openFactory.Caching
-                //         });
+                // var entry = _generatedFactories.SwapAndGetNewValue(generatedFactoryKey, closedGenericFactory,
+                //     (x, genFacKey, closedGenFac) => x.GetOrAddEntry(Entry.Of(genFacKey, default(ReflectionFactory)));
+                // if (entry.Value != null)
+                //     closedGenericFactory = entry.Value
+                // else
+                //     entry.Value = closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup)
+                //     {
+                //         GeneratorFactoryID = openFactory.FactoryID,
+                //         Caching = openFactory.Caching
+                //     };
 
                 // todo: @perf attempt 1 to remove closedGenericFactory from the closure
                 // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
@@ -11912,6 +11908,26 @@ namespace DryIoc
                 var otherItemRef = newMap.GetSurePresentEntry(id);
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
+
+            // todo: @api @perf designing the better ImMap API returning the present item without GetSurePresentEntry call
+            // var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            // var oldMap = map;
+            // var refOrMap = oldMap != ImMap<object>.Empty && oldMap.GetOrAddEntry(id, itemRef);
+            // if (refOrMap is ImMapEntry<object> currRef)
+            //     return currRef.Value != Scope.NoItem ? currRef.Value : Scope.WaitForItemIsSet(currRef);
+
+            // if (Interlocked.CompareExchange(ref map, refOrMap, oldMap) != oldMap)
+            // {
+            //     newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+            //     var otherItemRef = newMap.GetSurePresentEntry(id);
+            //     if (otherItemRef != itemRef)
+            //         return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+            // }
+            // else if (newMap == oldMap)
+            // {
+            //     var otherItemRef = newMap.GetSurePresentEntry(id);
+            //     return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+            // }
 
             object result = null;
 #if SUPPORTS_SPIN_WAIT
