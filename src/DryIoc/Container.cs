@@ -11912,21 +11912,16 @@ namespace DryIoc
             // todo: @api @perf designing the better ImMap API returning the present item without GetSurePresentEntry call
             // var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
             // var oldMap = map;
-            // var refOrMap = oldMap != ImMap<object>.Empty && oldMap.GetOrAddEntry(id, itemRef);
-            // if (refOrMap is ImMapEntry<object> currRef)
-            //     return currRef.Value != Scope.NoItem ? currRef.Value : Scope.WaitForItemIsSet(currRef);
-
-            // if (Interlocked.CompareExchange(ref map, refOrMap, oldMap) != oldMap)
+            // var oldRefOrNewMap = oldMap.GetOrAddEntry(id, itemRef);
+            // if (oldRefOrNewMap is ImMapEntry<object> oldRef && oldMap != ImMap<object>.Empty)
+            //     return oldRef.Value != Scope.NoItem ? oldRef.Value : Scope.WaitForItemIsSet(oldRef);
+            
+            // if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
             // {
-            //     newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-            //     var otherItemRef = newMap.GetSurePresentEntry(id);
+            //     oldRefOrNewMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+            //     var otherItemRef = oldRefOrNewMap.GetSurePresentEntry(id);
             //     if (otherItemRef != itemRef)
             //         return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            // }
-            // else if (newMap == oldMap)
-            // {
-            //     var otherItemRef = newMap.GetSurePresentEntry(id);
-            //     return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             // }
 
             object result = null;
