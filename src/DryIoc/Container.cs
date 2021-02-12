@@ -11764,6 +11764,7 @@ namespace DryIoc
         // Creates, stores, and returns created item
         // object GetOrAdd(int id, CreateScopedValue createValue, int disposalOrder = 0);
 
+        // todo: @v5 @obsolete split the method into the one with disposalOrder and with the one without
         /// Create the value via `FactoryDelegate` passing the `IResolverContext`
         object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0);
 
@@ -11909,21 +11910,6 @@ namespace DryIoc
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            // todo: @api @perf designing the better ImMap API returning the present item without GetSurePresentEntry call
-            // var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
-            // var oldMap = map;
-            // var oldRefOrNewMap = oldMap.GetOrAddEntry(id, itemRef);
-            // if (oldRefOrNewMap is ImMapEntry<object> oldRef && oldMap != ImMap<object>.Empty)
-            //     return oldRef.Value != Scope.NoItem ? oldRef.Value : Scope.WaitForItemIsSet(oldRef);
-            
-            // if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
-            // {
-            //     oldRefOrNewMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-            //     var otherItemRef = oldRefOrNewMap.GetSurePresentEntry(id);
-            //     if (otherItemRef != itemRef)
-            //         return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            // }
-
             object result = null;
 #if SUPPORTS_SPIN_WAIT
             itemRef.Value = result = createValue();
@@ -11981,6 +11967,21 @@ namespace DryIoc
                 var otherItemRef = newMap.GetSurePresentEntry(id);
                 return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
             }
+
+            // todo: @api @perf designing the better ImMap API returning the present item without GetSurePresentEntry call
+            // var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            // var oldMap = map;
+            // var oldRefOrNewMap = oldMap.GetOrAddEntry(id, itemRef);
+            // if (oldRefOrNewMap is ImMapEntry<object> oldRef && oldMap != ImMap<object>.Empty)
+            //     return oldRef.Value != Scope.NoItem ? oldRef.Value : Scope.WaitForItemIsSet(oldRef);
+            
+            // if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
+            // {
+            //     oldRefOrNewMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+            //     var otherItemRef = oldRefOrNewMap.GetSurePresentEntry(id);
+            //     if (otherItemRef != itemRef)
+            //         return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+            // }
 
             object result = null;
 #if SUPPORTS_SPIN_WAIT
