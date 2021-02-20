@@ -17,7 +17,7 @@ namespace DryIoc.IssuesTests
             // this line should be the top stack frame
             const string expectedCallFrame = "DryIoc.IssuesTests.GHIssue376_MessedUpStackTrace.ThrowMyExportException()";
 
-            // normal call — works fine
+            // normal call
             try
             {
                 ThrowMyExportException();
@@ -28,8 +28,7 @@ namespace DryIoc.IssuesTests
                 Assert.IsTrue(ex.StackTrace.Trim().Contains(expectedCallFrame));
             }
 
-            // imported action call — doesn't work
-            // call stack is messed up
+            // imported action call
             try
             {
                 var action = c.Resolve<Action>(nameof(MyExportAttribute));

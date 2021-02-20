@@ -3327,7 +3327,8 @@ namespace DryIoc
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
-                // restore the original excpetion which is expected by the consumer code
+                // restore the original exception which is expected by the consumer code
+                tex.InnerException.TryRethrowWithPreservedStackTrace();
                 throw tex.InnerException;
             }
         }
