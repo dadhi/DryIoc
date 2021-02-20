@@ -3251,8 +3251,13 @@ namespace DryIoc
             // fallback to reflection invocation
             object instance = null;
             var callObjectExpr = callExpr.Object;
-            if (callObjectExpr != null && !TryInterpret(r, callObjectExpr, paramExprs, paramValues, parentArgs, useFec, out instance)) 
-                return false;
+            if (callObjectExpr != null) 
+            {
+                if (callObjectExpr is ConstantExpression objConst)
+                    instance = objConst.Value;
+                else if (!TryInterpret(r, callObjectExpr, paramExprs, paramValues, parentArgs, useFec, out instance)) 
+                    return false;
+            }
 
             // todo: @wip simplify with the FECv3 IArgumentProvider support
             var fewArgCount = callExpr.FewArgumentCount;
@@ -6094,7 +6099,7 @@ namespace DryIoc
         public FactoryMethod(ConstructorInfo constructor) => 
             ConstructorOrMethodOrMember = constructor;
 
-        private FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
+        internal FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
         {
             ConstructorOrMethodOrMember = constructorOrMethodOrMember;
             FactoryServiceInfo = factoryServiceInfo;
@@ -6240,14 +6245,14 @@ namespace DryIoc
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
             new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo),
-                parameters, propertiesAndFields, isImplMemberDependsOnRequest: true);
+                parameters, propertiesAndFields, implMemberDependsOnRequest: true);
 
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, Func<Request, ServiceInfo> factoryInfo,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)), 
-                parameters, propertiesAndFields, isImplMemberDependsOnRequest: true);
+            new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)),
+                parameters, propertiesAndFields, implMemberDependsOnRequest: true);
 
         /// <summary>Defines how to select constructor from implementation type.
         /// Where <paramref name="getConstructor"/> is delegate taking implementation type as input 
@@ -6382,19 +6387,23 @@ namespace DryIoc
         internal Made(
             FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImplementation = false, 
-            bool isImplMemberDependsOnRequest = false)
+            bool implMemberDependsOnRequest = false)
         {
-            FactoryMethod = factoryMethod;
-            Parameters = parameters;
+            FactoryMethod       = factoryMethod;
+            Parameters          = parameters;
             PropertiesAndFields = propertiesAndFields;
             FactoryMethodKnownResultType = factoryMethodKnownResultType;
 
             var details = default(MadeDetails);
+
+            if (parameters != null || propertiesAndFields != null)
+                details |= MadeDetails.ImplMemberDependsOnRequest;
+
             if (hasCustomValue)
                 details |= MadeDetails.HasCustomDependencyValue;
             if (isConditionalImplementation)
                 details |= MadeDetails.ImplTypeDependsOnRequest;
-            if (isImplMemberDependsOnRequest)
+            if (implMemberDependsOnRequest)
                 details |= MadeDetails.ImplMemberDependsOnRequest;
             _details = details;
         }
@@ -9766,29 +9775,26 @@ private ParameterServiceInfo(ParameterInfo p)
                 ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK]; // got a live reference to the map where value can be queried and stored
 
                 var oldMap = map; // get a reference to the map available now as an oldMap
-                // If the `newMap` is the same as an `oldMap` it means there is item already in the map.
                 var newMap = oldMap.AddOrKeepEntry(itemRef);
 
-                // The check before the CAS operation is only here for Singleton and not in a Scope 
-                // because the race for the Singletons is far more likely and the race for the Scoped services is almost non-existent
+                // If the `newMap` is the same as an `oldMap` it means there is item already in the map.
+                // The check before the CAS operation is only here for Singleton and not for the scope 
+                // because the race for the Singletons and the situation where singleton is already create in parallel 
+                // is far more likely and the race for the Scoped services is almost non-existent 
+                // (because Scoped is almost equal to the single thread or the single invocation flow)
                 if (newMap == oldMap)
                 {
                     // It does not matter if the live `map` changed because the item can only be added and not removed ever
                     var otherItemRef = newMap.GetSurePresentEntry(id);
                     singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
                 }
-                else if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
+                else if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap) // set map to newMap if the map did no change since getting oldMap
                 {
-                    // if the map wa changed by the other party, let's retry using the Swap thing
+                    // if the map was changed in parallel, let's retry using the Swap
                     newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
                     var otherItemRef = newMap.GetSurePresentEntry(id);
                     if (otherItemRef != itemRef)
                         singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-                }
-                else if (newMap == oldMap)
-                {
-                    var otherItemRef = newMap.GetSurePresentEntry(id);
-                    singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
                 }
 
                 if (singleton == Scope.NoItem)
@@ -10667,9 +10673,33 @@ private ParameterServiceInfo(ParameterInfo p)
                     Caching = openFactory.Caching
                 };
 
+                // todo: @perf attempt 2 to remove closedGenericFactory from the closure
                 // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
+                // var entry = _generatedFactories.SwapAndGetNewValue(generatedFactoryKey, closedGenericFactory,
+                //     (x, genFacKey, closedGenFac) => x.GetOrAddEntry(Entry.Of(genFacKey, default(ReflectionFactory)));
+                // if (entry.Value != null)
+                //     closedGenericFactory = entry.Value
+                // else
+                //     entry.Value = closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup)
+                //     {
+                //         GeneratorFactoryID = openFactory.FactoryID,
+                //         Caching = openFactory.Caching
+                //     };
+
+                // todo: @perf attempt 1 to remove closedGenericFactory from the closure
+                // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
+                // _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
+                //     (x, genFacKey, closedGenFac) => 
+                //     {
+                //         var currFac = x.GetValueOrDefault(genFacKey);
+                //         if (currFac == null)
+                //             return x.AddOrUpdate(genFacKey, closedGenFac); // todo: @api should be the AddUnsafe instead
+                //         closedGenericFactory = currFac;
+                //         return x;
+                //     });
+
                 _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
-                    (x, genFacKey, fac) => x.AddOrUpdate(genFacKey, fac, (oldFac, _) => closedGenericFactory = oldFac));
+                    (x, genFacKey, closedGenFac) => x.AddOrUpdate(genFacKey, closedGenFac, (oldFac, _) => closedGenericFactory = oldFac));
 
                 return closedGenericFactory;
             }
@@ -10965,7 +10995,10 @@ private ParameterServiceInfo(ParameterInfo p)
                     return null;
             }
 
-            return FactoryMethod.Of(factoryMember, factoryInfo);
+            var factoryInstance = factoryMethod.FactoryExpression;
+            return factoryInstance != null 
+                ? new FactoryMethod(factoryMember, factoryInstance) 
+                : new FactoryMethod(factoryMember, factoryInfo);
         }
 
 #endregion
@@ -11314,6 +11347,21 @@ private ParameterServiceInfo(ParameterInfo p)
                 var otherItemRef = newMap.GetSurePresentEntry(id);
                 return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
             }
+
+            // todo: @api @perf designing the better ImMap API returning the present item without GetSurePresentEntry call
+            // var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            // var oldMap = map;
+            // var oldRefOrNewMap = oldMap.GetOrAddEntry(id, itemRef);
+            // if (oldRefOrNewMap is ImMapEntry<object> oldRef && oldMap != ImMap<object>.Empty)
+            //     return oldRef.Value != Scope.NoItem ? oldRef.Value : Scope.WaitForItemIsSet(oldRef);
+            
+            // if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
+            // {
+            //     oldRefOrNewMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+            //     var otherItemRef = oldRefOrNewMap.GetSurePresentEntry(id);
+            //     if (otherItemRef != itemRef)
+            //         return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+            // }
 
             object result = null;
             itemRef.Value = result = createValue(r);

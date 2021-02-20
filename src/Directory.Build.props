@@ -3,9 +3,9 @@
 
     <!--Packages details-->
     <ItemGroup>
-        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="license.txt" Visible="false" />
-        <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="DryIoc.snk" Visible="false" />
-        <None Include="..\..\logo\logo128.png" Pack="true" PackagePath="logo.png" Visible="false" />
+        <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="\" Visible="false" />
+        <None Include="..\..\DryIoc.snk" Pack="true" PackagePath="\" Visible="false" />
+        <None Include="..\..\logo\icon.png" Pack="true" PackagePath="\" Visible="false" />
     </ItemGroup>
 
     <PropertyGroup Label="Packaging">
@@ -16,8 +16,8 @@
         <PackageProjectUrl>https://github.com/dadhi/DryIoc</PackageProjectUrl>
         <RepositoryUrl>https://github.com/dadhi/DryIoc.git</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <PackageIcon>logo.png</PackageIcon>
-        <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo.png</PackageIconUrl>
+        <PackageIcon>icon.png</PackageIcon>
+        <PackageIconUrl>https://github.com/dadhi/DryIoc/blob/master/logo/icon.png</PackageIconUrl>
     </PropertyGroup>
 
     <!--Signing all packages, oh boy-->

@@ -62,7 +62,7 @@ Enables the [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/l
 * MEF catalog system. DryIoc implements its own assembly scan defined in `AttributedModel` class. Scan methods produce serializable DTOs with registration information.
 * `RequiredCreationPolicyAttribute`.
 * `ExportMetadata` is replaced with `ExportWithMetadata` instead, but use of custom exports  with `MetadataAttributeAttribute` is supported.
-* Dynamic re-composition and _Satisfied_ events are not supported. You may use `LazyEnumerable<TService>` to be aware of newly registered services.
+* Dynamic re-composition is not supported. You may use `LazyEnumerable<TService>` to be aware of newly registered services.
 
 
 ## Concept

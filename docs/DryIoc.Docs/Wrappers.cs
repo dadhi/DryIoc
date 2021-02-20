@@ -96,9 +96,9 @@ __Note:__ `DryIoc.Meta<,>` type may just help to migrate from Autofac but you ma
 
 ### Func of A
 
-- Delegates creation of `A` to user code.
-- By default, injected as inline service creation: `new B(() => new A())`. Therefore `A` should be available at the moment of `Func<A>` resolution.
-- By default, does not permit [recursive dependency].
+- Delegates creation of `A` to the user code.
+- By default injected as inline service creation: `new B(() => new A())`. Therefore `A` should be available at the moment of `Func<A>` resolution.
+- By default does not permit [recursive dependency].
 - Alternatively, inline `A` creation may be changed to a `Resolve` call:
 
     `container.Register<A>(setup: Setup.With(asResolutionCall: true));`
@@ -164,12 +164,12 @@ More details:
 - It may be viewed as an override of normally injected dependencies with custom ones, provided via arguments. 
 - Or as "currying" of service creation constructor or method.
 - Sometimes Func with parameters is used to pass primitive values, e.g. `string`, `int`, etc.
-- Always injected as inline creation expression: `new B((dep1, dep2) => new A(dep1, new D(), dep2))`
-- [recursive dependency] is permitted.
+- Injected as an inline creation expression: `new B((dep1, dep2) => new A(dep1, new D(), dep2))`
+- Permits the [recursive dependency].
 
 
 Provided arguments are matched with parameters by type and in passed order. 
-If the matched argument is not found then the argument will be injected by the container, like `D` in the example above. 
+If the matched argument is not found then the argument will be injected by the container. 
 The arguments order may differ from parameters order.
 
 What if provided arguments are of the same type? DryIoc will track already used arguments and will skip them in the subsequent match. 

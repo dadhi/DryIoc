@@ -84,17 +84,69 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<N2>(arrFuncN[1]());
         }
 
+        [Test]
+        public void Can_register_the_decorator_without_the_actual_implementation_using_the_placeholder()
+        {
+            var c = new Container();
+
+            c.Register<M>();
+            c.RegisterPlaceholder<IN>();
+            c.Register<IN, D>(setup: Setup.Decorator);
+
+            var m = c.Resolve<M>();
+
+            Assert.IsInstanceOf<D>(m.N);
+        }
+
+        [Test]
+        public void Can_register_the_decorator_without_the_actual_implementation_using_the_placeholder_2()
+        {
+            var c = new Container();
+
+            c.Register<M>();
+            c.RegisterPlaceholder<IN>();
+            c.Register<IN, D2>(setup: Setup.Decorator);
+
+            var m = c.Resolve<M>();
+
+            Assert.IsInstanceOf<D2>(m.N);
+        }
+
+        [Test]
+        public void Can_register_the_decorator_without_the_actual_implementation_using_the_placeholder_2_and_replace_implementation_later()
+        {
+            var c = new Container();
+
+            c.Register<M>();
+            c.RegisterPlaceholder<IN>();
+            c.Register<IN, D2>(setup: Setup.Decorator);
+
+            var m = c.Resolve<M>();
+            Assert.IsInstanceOf<D2>(m.N);
+            var ex = Assert.Throws<ContainerException>(() => ((D2)m.N).Fn());
+            Assert.AreEqual(Error.NameOf(Error.NoImplementationForPlaceholder), ex.ErrorName);
+
+            c.Register<IN, N1>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            var m2 = c.Resolve<M>();
+            Assert.IsInstanceOf<D2>(m.N);
+            //Assert.IsInstanceOf<N1>(((D2)m.N).Fn());              // todo: does not work - we got the infinite recursion getting the D2
+            //Assert.IsInstanceOf<N1>(((D2)((D2)m.N).Fn()).Fn());   // todo: does not work - we got the infinite recursion getting the D2
+        }
+
         class M
         {
             public IN N;
-            public M(IN n)
-            {
-                N = n;
-            }
+            public M(IN n) => N = n;
         }
 
-        interface IN { }
+        interface  IN {}
         class N1 : IN {}
         class N2 : IN {}
+        class  D : IN {}
+        class  D2 : IN 
+        {
+            public Func<IN> Fn;
+            public D2(Func<IN> fn) => Fn = fn;
+        }
     }
 }
