@@ -348,3 +348,4 @@ DryIoc.Internal/
 ApiKey.txt
 
 .metals/
+.temp/
