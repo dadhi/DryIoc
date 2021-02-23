@@ -1,7 +1,8 @@
-using DryIoc.MefAttributedModel;
-using NUnit.Framework;
 using System;
 using System.ComponentModel.Composition;
+using System.Runtime.CompilerServices;
+using NUnit.Framework;
+using DryIoc.MefAttributedModel;
 
 namespace DryIoc.IssuesTests
 {
@@ -24,8 +25,7 @@ namespace DryIoc.IssuesTests
             }
             catch (MyExportException ex)
             {
-                Assert.IsNotNull(ex.StackTrace);
-                Assert.IsTrue(ex.StackTrace.Trim().Contains(expectedCallFrame));
+                StringAssert.Contains(expectedCallFrame, ex.StackTrace);
             }
 
             // imported action call
@@ -36,8 +36,7 @@ namespace DryIoc.IssuesTests
             }
             catch (MyExportException ex)
             {
-                Assert.IsNotNull(ex.StackTrace);
-                Assert.IsTrue(ex.StackTrace.Trim().Contains(expectedCallFrame),
+                StringAssert.Contains(expectedCallFrame, ex.StackTrace,
                     "Stack trace should have this stack frame:\n{0},\nbut it doesnt. Stack trace:\n{1}",
                     expectedCallFrame, ex.StackTrace);
             }
@@ -55,6 +54,7 @@ namespace DryIoc.IssuesTests
         { 
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         [MyExport]
         public void ThrowMyExportException()
         {

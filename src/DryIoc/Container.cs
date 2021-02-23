@@ -166,7 +166,7 @@ namespace DryIoc
             }
         }
 
-        #region Compile-time generated parts - former DryIocZero
+#region Compile-time generated parts - former DryIocZero
 
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID);
 
@@ -229,9 +229,9 @@ namespace DryIoc
             return manyGenerated;
         }
 
-        #endregion
+#endregion
 
-        #region IRegistrator
+#region IRegistrator
 
         /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
         /// <remarks>Decorator and Wrapper types are not included.</remarks>
@@ -2859,10 +2859,7 @@ namespace DryIoc
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
-                // restore the original exception which is expected by the consumer code
-                tex.InnerException.TryRethrowWithPreservedStackTrace();
-                result = null;
-                return false;
+                throw tex.InnerException.TryRethrowWithPreservedStackTrace();
             }
         }
 
@@ -3327,9 +3324,7 @@ namespace DryIoc
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
-                // restore the original exception which is expected by the consumer code
-                tex.InnerException.TryRethrowWithPreservedStackTrace();
-                throw tex.InnerException;
+                throw tex.InnerException.TryRethrowWithPreservedStackTrace();
             }
         }
 
@@ -13664,18 +13659,15 @@ namespace DryIoc
             typeof(Exception).GetSingleMethodOrNull("InternalPreserveStackTrace", true)
             ?.To(x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));
 
-        /// <summary>Preserves the stack trace becfore re-throwing.</summary>
-        public static void TryRethrowWithPreservedStackTrace(this Exception ex)
+        /// <summary>Preserves the stack trace before re-throwing.</summary>
+        public static Exception TryRethrowWithPreservedStackTrace(this Exception ex)
         {
             _preserveExceptionStackTraceAction.Value?.Invoke(ex);
-            throw ex;
+            return ex;
         }
 #else
-        /// <summary>Preserves the stack trace becfore re-throwing.</summary>
-        public static void TryRethrowWithPreservedStackTrace(this Exception ex)
-        {
-            throw ex;
-        }
+        /// <summary>Preserves the stack trace before re-throwing.</summary>
+        public static Exception TryRethrowWithPreservedStackTrace(this Exception ex) => ex;
 #endif
 
         /// <summary>Flags for <see cref="GetImplementedTypes"/> method.</summary>
