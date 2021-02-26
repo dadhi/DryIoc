@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.Composition;
-using System.Text;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
@@ -10,8 +8,8 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue378_InconsistentResolutionFailure
     {
-        [Test, Ignore("Fails on DryIoc v4.7.3")]
-        public void Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_fails()
+        [Test]
+        public void Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_FactoryMethod_fails()
         {
             var c = new Container().WithMef()
                 .With(rules => rules
@@ -23,7 +21,7 @@ namespace DryIoc.IssuesTests
 
             // 2. IDecoratedService should be created via a factory method
             var decoratorSetup = Setup.DecoratorWith(useDecorateeReuse: false);
-            var factoryMethod = new Func<Lazy<IDecoratedService>, IDecoratedService>(CreateDecoratedService).Method;
+            var factoryMethod = new Func<Lazy<IDecoratedService>, IDecoratedService>(DecorateService).Method;
             c.Register(typeof(IDecoratedService), reuse: Reuse.Transient, made: Made.Of(factoryMethod), setup: decoratorSetup);
 
             // global scope is opened once on application startup
@@ -51,13 +49,78 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        static IDecoratedService CreateDecoratedService(Lazy<IDecoratedService> lazy)
+        [Test]
+        public void Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_RegisterDelegate_fails()
+        {
+            var c = new Container().WithMef()
+                .With(rules => rules
+                .WithoutThrowIfDependencyHasShorterReuseLifespan()
+                .WithDefaultReuse(Reuse.Scoped));
+
+            // 1. default registrations
+            c.RegisterExports(typeof(DecoratedService), typeof(DependencyService));
+
+            // 2. IDecoratedService should be created via a factory method
+            var decoratorSetup = Setup.DecoratorWith(useDecorateeReuse: false);
+            c.RegisterDelegate<Lazy<IDecoratedService>, IDecoratedService>(DecorateService, Reuse.Transient, decoratorSetup);
+
+            // global scope is opened once on application startup
+            using (var globalScope = c.OpenScope())
+            {
+                // request scopes are created for each request
+                using (var requestScope = globalScope.OpenScope())
+                {
+                    Assert.DoesNotThrow(() =>
+                    {
+                        var decorated = requestScope.Resolve<IDecoratedService>();
+                        decorated.Hello();
+                    },
+                    "Failed to use the decorated service!");
+                }
+            }
+        }
+
+        [Test]
+        public void Nested_scopes_decorated_resolution_should_throw_the_DependencyHasShorterReuseLifespan()
+        {
+            var c = new Container().WithMef()
+                .With(rules => rules
+                .WithDefaultReuse(Reuse.Scoped));
+
+            // 1. default registrations
+            c.RegisterExports(typeof(DecoratedService), typeof(DependencyService));
+
+            // 2. IDecoratedService should be created via a factory method
+            var decoratorSetup = Setup.DecoratorWith(useDecorateeReuse: false);
+            c.RegisterDelegate<Lazy<IDecoratedService>, IDecoratedService>(DecorateService, setup: decoratorSetup);
+
+            // global scope is opened once on application startup
+            using (var globalScope = c.OpenScope())
+            {
+                // request scopes are created for each request
+                using (var requestScope = globalScope.OpenScope())
+                {
+                    var ex = Assert.Throws<ContainerException>(() =>
+                    {
+                        var decorated = requestScope.Resolve<IDecoratedService>();
+                        decorated.Hello();
+                    });
+                    Assert.AreEqual(Error.NameOf(Error.DependencyHasShorterReuseLifespan), ex.ErrorName);
+                }
+            }
+        }
+
+        static IDecoratedService DecorateService(Lazy<IDecoratedService> lazy)
         {
             WriteLine("CreateDecoratedService is called!");
             return lazy.Value;
         }
 
+#if DEBUG
         private static void WriteLine(string s) => TestContext.Progress.WriteLine(s);
+#else
+        private static void WriteLine(string s) {}
+#endif
 
         public interface IUndecoratedService
         {

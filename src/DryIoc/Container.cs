@@ -1483,7 +1483,7 @@ namespace DryIoc
 
             // Define the list of ids for the already applied decorators
             int[] appliedDecoratorIDs = null;
-            if (!decorators.IsNullOrEmpty())
+            if (!decorators.IsNullOrEmpty()) // todo: @perf check earlier for `p.DirectParent.IsEmpty && p.DirectParent.FactoryType != FactoryType.Service` to avoid method calling and check inside
             {
                 appliedDecoratorIDs = GetAppliedDecoratorIDs(request);
                 if (!appliedDecoratorIDs.IsNullOrEmpty())
@@ -4817,9 +4817,10 @@ namespace DryIoc
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
              request.Reuse is CurrentScopeReuse == false &&
-             request.DirectParent.IsSingletonOrDependencyOfSingleton && 
+             request.DirectParent.IsSingletonOrDependencyOfSingleton &&
             !request.OpensResolutionScope && 
-            !request.IsDirectlyWrappedInFunc()
+            !request.IsDirectlyWrappedInFunc() &&
+            request.Rules.ThrowIfDependencyHasShorterReuseLifespan
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
