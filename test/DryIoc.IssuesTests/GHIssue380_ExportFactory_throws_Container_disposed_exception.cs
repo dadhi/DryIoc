@@ -95,8 +95,10 @@ namespace DryIoc.IssuesTests
 
             public string CreateSession()
             {
-                using var export = HelperFactory.CreateExport();
-                return export.Value.GetNewId();
+                using (var export = HelperFactory.CreateExport())
+                {
+                    return export.Value.GetNewId();
+                }
             }
         }
 
