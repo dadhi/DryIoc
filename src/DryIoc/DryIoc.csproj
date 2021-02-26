@@ -5,7 +5,7 @@
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.7.3</VersionPrefix>
+        <VersionPrefix>4.7.4</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -17,6 +17,12 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+
+## v4.7.4 Bug-fix release
+
+- #376 DryIoc.Interpreter seems to mess up the exception call stack
+- #378 Inconsistent resolution failure 
+
 
 ## v4.7.3 Bug-fix release
 
