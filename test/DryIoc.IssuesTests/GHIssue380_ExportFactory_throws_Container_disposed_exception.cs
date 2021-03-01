@@ -10,8 +10,8 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            MefExportFactoryDoesntThrow();
-            // DryIocExportFactoryDoesntThrow();
+            // MefExportFactoryDoesntThrow();
+            DryIocExportFactoryDoesntThrow();
 
             return 2;
         }
@@ -57,7 +57,7 @@ namespace DryIoc.IssuesTests
             "Second request has thrown an exception");
         }
 
-        [Test, Ignore("fixme")]
+        [Test]
         public void DryIocExportFactoryDoesntThrow()
         {
             var rootContainer = new Container().WithMef()
@@ -70,27 +70,23 @@ namespace DryIoc.IssuesTests
 
             Assert.DoesNotThrow(() =>
             {
-                // first request works
                 using (var requestScope = rootContainer.OpenScope())
                 {
                     var sessionManager = requestScope.Resolve<ISessionManager>();
                     var sessionId = sessionManager.CreateSession();
                     Assert.AreEqual("123", sessionId);
                 }
-            },
-            "First request has thrown an exception");
+            });
 
             Assert.DoesNotThrow(() =>
             {
-                // second request doesn't work because ExportFactory is linked to the first scope
                 using (var requestScope = rootContainer.OpenScope())
                 {
                     var sessionManager = requestScope.Resolve<ISessionManager>();
                     var sessionId = sessionManager.CreateSession();
                     Assert.AreEqual("321", sessionId);
                 }
-            },
-            "Second request has thrown an exception");
+            });
         }
 
         public interface ISessionManager { string CreateSession(); }

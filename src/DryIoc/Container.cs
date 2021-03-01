@@ -5927,6 +5927,7 @@ namespace DryIoc
 
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
         public Rules WithDefaultReuse(IReuse reuse) =>
+            reuse == DefaultReuse ? this : 
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
                 ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags,

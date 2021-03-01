@@ -9,7 +9,9 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            RunAllTests();
+            // RunAllTests();
+
+            new GHIssue380_ExportFactory_throws_Container_disposed_exception().Run();
         }
 
         public static void RunAllTests()
