@@ -64,6 +64,7 @@ using FastExpressionCompiler.LightExpression; // light alternative to the System
 ```
 </details>
 
+
 ```cs
 public interface IHandler
 {
