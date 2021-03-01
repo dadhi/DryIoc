@@ -6,11 +6,19 @@ using System.ComponentModel.Composition.Hosting;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue380_ExportFactory_throws_Container_disposed_exception
+    public class GHIssue380_ExportFactory_throws_Container_disposed_exception : ITest
     {
+        public int Run()
+        {
+            MefExportFactoryDoesntThrow();
+            // DryIocExportFactoryDoesntThrow();
+
+            return 2;
+        }
+
         [Test]
         public void MefExportFactoryDoesntThrow()
-        { 
+        {
             var rootCatalog = new TypeCatalog(typeof(SessionManager), typeof(Helper));
             var nonSharedPartsCatalog = new FilteredCatalog(rootCatalog, def =>
             {
@@ -49,7 +57,7 @@ namespace DryIoc.IssuesTests
             "Second request has thrown an exception");
         }
 
-        [Test, Ignore("Works in DryIoc v4.7.3, but fails in DryIoc v4.7.4")]
+        [Test, Ignore("fixme")]
         public void DryIocExportFactoryDoesntThrow()
         {
             var rootContainer = new Container().WithMef()
@@ -105,7 +113,7 @@ namespace DryIoc.IssuesTests
         public interface IHelper { string GetNewId(); }
 
         [Export(typeof(IHelper))]
-        public class Helper : IHelper 
+        public class Helper : IHelper
         {
             public static bool flag;
 

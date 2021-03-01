@@ -31,11 +31,16 @@ echo:
 echo:## Finished: BUILD and PACKAGING ##
 
 echo:
-echo:## Running: TESTS... ##
+echo:## Starting: TestRunner... ##
+echo:
+dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+if %ERRORLEVEL% neq 0 goto :error
+echo:## Finished: TestRunner ##
 
 echo:
+echo:## Running: TESTS... ##
+echo:
 dotnet test -c Release -p:GeneratePackageOnBuild=false
-
 if %ERRORLEVEL% neq 0 goto :error
 echo:## Finished: TESTS ##
 

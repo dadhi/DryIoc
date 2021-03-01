@@ -148,6 +148,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{83610519
 		nuspecs\DryIoc\build\DryIoc.props = nuspecs\DryIoc\build\DryIoc.props
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.TestRunner", "test\DryIoc.TestRunner\DryIoc.TestRunner.csproj", "{36ED80AF-CA4B-4B9A-AA89-7D24336E9191}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -286,6 +288,10 @@ Global
 		{A5187898-16F4-4573-8628-E58A6AD53E9F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A5187898-16F4-4573-8628-E58A6AD53E9F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A5187898-16F4-4573-8628-E58A6AD53E9F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{36ED80AF-CA4B-4B9A-AA89-7D24336E9191}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{36ED80AF-CA4B-4B9A-AA89-7D24336E9191}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{36ED80AF-CA4B-4B9A-AA89-7D24336E9191}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{36ED80AF-CA4B-4B9A-AA89-7D24336E9191}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -329,6 +335,7 @@ Global
 		{A5187898-16F4-4573-8628-E58A6AD53E9F} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
 		{1858EED6-74EE-4BCC-96DB-95867E3B9922} = {78204655-2AD6-4729-B436-44B370317EC1}
 		{83610519-3793-469D-8BAA-93FBB5206292} = {1858EED6-74EE-4BCC-96DB-95867E3B9922}
+		{36ED80AF-CA4B-4B9A-AA89-7D24336E9191} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}
