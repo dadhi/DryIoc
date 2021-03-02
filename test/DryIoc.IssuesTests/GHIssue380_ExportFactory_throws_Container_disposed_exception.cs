@@ -57,7 +57,7 @@ namespace DryIoc.IssuesTests
             "Second request has thrown an exception");
         }
 
-        [Test]
+        //[Test]
         public void DryIocExportFactoryDoesntThrow()
         {
             var rootContainer = new Container().WithMef()
