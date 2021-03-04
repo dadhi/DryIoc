@@ -30,6 +30,7 @@
     <Target Name="MdGenerate" BeforeTargets="BeforeBuild"
         Condition=" '$(Configuration)' == 'Debug' ">
         <Message Text="Generating the Markdown documentation..." Importance="high"/>
+        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet tool restore" />
         <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet cstomd %(DocFile.Identity)" />
     </Target>
 
