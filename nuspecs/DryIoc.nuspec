@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>4.7.3</version>
+        <version>4.7.4</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,6 +14,12 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+
+## v4.7.4 Bug-fix release
+
+- #376 DryIoc.Interpreter seems to mess up the exception call stack
+- #378 Inconsistent resolution failure 
+
 
 ## v4.7.3 Bug-fix release
 

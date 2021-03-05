@@ -783,10 +783,10 @@ Another alternative would be the **RegisterDelegate with the dependency paramete
 ### The cure - RegisterDelegate with the dependency parameters
 
 It solves the two problems mentioned in the [RegisterDelegate](#registerdelegate) above because 
-it **injects** the requested dependencies as a delegate arguments so there is no need in calling `Resolve` inside.
+it **injects** the requested dependencies as the delegate arguments so there is no need to call `Resolve` inside the delegate.
 
 - The dependencies injection and their lifetime is controlled by container
-- There is no black-box service location involved and both [Recursive Dependency](ErrorDetectionAndResolution.md#RecursiveDependencyDetected) and [Captive Dependency](ErrorDetectionAndResolution.md#using-validate-to-check-for-captive-dependency) problems are catched by container.
+- There is no black-box service location involved and both the [Recursive Dependency](ErrorDetectionAndResolution.md#RecursiveDependencyDetected) and the [Captive Dependency](ErrorDetectionAndResolution.md#using-validate-to-check-for-captive-dependency) problems are catched by the container.
 
 The example:
 ```cs md*/

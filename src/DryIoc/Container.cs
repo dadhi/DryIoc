@@ -1308,7 +1308,7 @@ namespace DryIoc
 
             // Define the list of ids for the already applied decorators
             int[] appliedDecoratorIDs = null;
-            if (!decorators.IsNullOrEmpty())
+            if (!decorators.IsNullOrEmpty()) // todo: @perf check earlier for `p.DirectParent.IsEmpty && p.DirectParent.FactoryType != FactoryType.Service` to avoid method calling and check inside
             {
                 appliedDecoratorIDs = GetAppliedDecoratorIDs(request);
                 if (!appliedDecoratorIDs.IsNullOrEmpty())
@@ -2599,10 +2599,7 @@ namespace DryIoc
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
-                // restore the original exception which is expected by the consumer code
-                tex.InnerException.TryRethrowWithPreservedStackTrace();
-                result = null;
-                return false;
+                throw tex.InnerException.TryRethrowWithPreservedStackTrace();
             }
         }
 
@@ -3052,8 +3049,7 @@ namespace DryIoc
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
-                // restore the original excpetion which is expected by the consumer code
-                throw tex.InnerException;
+                throw tex.InnerException.TryRethrowWithPreservedStackTrace();
             }
         }
 
@@ -4336,9 +4332,10 @@ namespace DryIoc
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
              request.Reuse is CurrentScopeReuse == false &&
-             request.DirectParent.IsSingletonOrDependencyOfSingleton && 
+             request.DirectParent.IsSingletonOrDependencyOfSingleton &&
             !request.OpensResolutionScope && 
-            !request.IsDirectlyWrappedInFunc()
+            !request.IsDirectlyWrappedInFunc() &&
+            request.Rules.ThrowIfDependencyHasShorterReuseLifespan
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
@@ -5410,6 +5407,7 @@ namespace DryIoc
 
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
         public Rules WithDefaultReuse(IReuse reuse) =>
+            reuse == DefaultReuse ? this : 
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
                 ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags,
@@ -12834,11 +12832,11 @@ private ParameterServiceInfo(ParameterInfo p)
             typeof(Exception).GetSingleMethodOrNull("InternalPreserveStackTrace", true)
             ?.To(x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));
 
-        /// <summary>Preserves the stack trace becfore re-throwing.</summary>
-        public static void TryRethrowWithPreservedStackTrace(this Exception ex)
+        /// <summary>Preserves the stack trace before re-throwing.</summary>
+        public static Exception TryRethrowWithPreservedStackTrace(this Exception ex)
         {
             _preserveExceptionStackTraceAction.Value?.Invoke(ex);
-            throw ex;
+            return ex;
         }
 
         /// <summary>Flags for <see cref="GetImplementedTypes"/> method.</summary>

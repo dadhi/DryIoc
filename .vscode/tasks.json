@@ -4,21 +4,18 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "dotnet build",
+            "label": "build_testrunner",
+            "type": "process",
             "command": "dotnet",
-            "type": "shell",
             "args": [
                 "build",
-                // Ask dotnet build to generate full paths for file names.
-                "/property:GenerateFullPaths=true",
-                // Do not generate summary otherwise it leads to duplicate errors in Problems panel
-                "/consoleloggerparameters:NoSummary"
+                "${workspaceFolder}/test/DryIoc.TestRunner/DryIoc.TestRunner.csproj"
             ],
-            "group": "build",
-            "presentation": {
-                "reveal": "silent"
-            },
-            "problemMatcher": "$msCompile"
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }

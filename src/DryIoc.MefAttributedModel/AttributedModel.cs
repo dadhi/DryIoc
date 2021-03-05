@@ -182,12 +182,15 @@ namespace DryIoc.MefAttributedModel
             if (func == null)
                 return null;
 
+            if (container.Rules.DefaultReuse != Reuse.Scoped)
+                container = container.With(r => r.WithDefaultReuse(Reuse.Scoped));
+
             return new ExportFactory<T>(() =>
             {
-                var scope = container.With(r => r.WithDefaultReuse(Reuse.Scoped)).OpenScope();
+                var scope = container.OpenScope();
                 try
                 {
-                    return new PartAndDisposeActionPair<T>(scope.Resolve<T>(), scope.Dispose);
+                    return new PartAndDisposeActionPair<T>(scope.Resolve<T>(), () => scope.Dispose());
                 }
                 catch
                 {

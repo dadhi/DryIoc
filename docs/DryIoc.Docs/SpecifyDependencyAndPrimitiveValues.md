@@ -33,6 +33,7 @@ using DryIoc;
 ```
 </details>
 
+
 ```cs 
 class Resolving_with_a_service_type 
 {

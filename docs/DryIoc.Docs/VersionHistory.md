@@ -1,6 +1,11 @@
 Version History
 ---------------
 
+## v4.7.4 Bug-fix release / 2021-02-26
+
+- #376 DryIoc.Interpreter seems to mess up the exception call stack
+- #378 Inconsistent resolution failure 
+
 ## v4.7.3 Bug-fix release / 2021-02-09
 
 - #367 Resolve with FactoryMethod of instance throws DryIoc.ContainerException

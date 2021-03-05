@@ -23,6 +23,7 @@ using Moq;
 </details>
 
 
+
 ## Auto-mocking with NSubstitute
 
 Auto-mocking here means that we can setup container to return mocks for unregistered services. 

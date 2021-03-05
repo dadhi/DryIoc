@@ -5,15 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET Core Launch DryIoc.IssuesTests",
+            "name": "TestRunner .NET Core",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/test/DryIoc.IssuesTests/bin/Debug/netcoreapp2.1/DryIoc.IssuesTests.dll",
+            "preLaunchTask": "build_testrunner",
+            // If you have changed target frameworks, make sure to update the program path.
+            "program": "${workspaceFolder}/test/DryIoc.TestRunner/bin/Debug/netcoreapp2.1/DryIoc.TestRunner.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/test/DryIoc.IssuesTests",
+            "cwd": "${workspaceFolder}/test/DryIoc.TestRunner",
+            // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
             "console": "internalConsole",
-            "stopAtEntry": false
+            "stopAtEntry": false,
+            "internalConsoleOptions": "openOnSessionStart",
+            "requireExactSource": false // allows to for moderate code editing while debugging
         },
         {
             "name": ".NET Core Attach",

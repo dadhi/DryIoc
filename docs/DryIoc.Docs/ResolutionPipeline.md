@@ -24,7 +24,9 @@ This is because they need to be created once and one-time interpretation is fast
 - Expression interpretation is 10x times slower than the delegate invocation
 - Delegate compilation is 100x slower than interpretation.
 
-Now, spot the problem for the multi-threaded resolution of the same service (#208)
+That's mean you need **once** to spend 100x more time than interpretation to get 10x boost, 
+and DryIoc by default is not paying this price.
+
 
 ## Rules.WithUseInterpretation
 
