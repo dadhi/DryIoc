@@ -101,7 +101,7 @@ namespace DryIoc.ImTools
     /// e.g. `()` in Haskell https://en.wikipedia.org/wiki/Unit_type
     public struct Unit : IEquatable<Unit>
     {
-        /// Singleton unit value - making it a lower-case so you could import `using static DryIoc.ImTools.Unit;` and write `return unit;`
+        /// Singleton unit value - making it a lower-case so you could import `using static ImTools.Unit;` and write `return unit;`
         public static readonly Unit unit = new Unit();
 
         /// <inheritdoc />
@@ -179,7 +179,7 @@ namespace DryIoc.ImTools
     public abstract class Item<TItem> where TItem : Item<TItem>
     {
         /// Single item value
-        public static readonly item Single = new item();
+        public static readonly item Value = new item();
 
         /// Nested structure that hosts a value.
         /// All nested types by convention here are lowercase
@@ -200,8 +200,8 @@ namespace DryIoc.ImTools
     }
 
     /// Wraps the `T` in a named `TBox` class in a one-line declaration,
-    /// so the <c><![CDATA[class Name : Data<Name, string>]]></c>
-    /// is different from the <c><![CDATA[class Address : Data<Address, string>]]></c> 
+    /// so the <c><![CDATA[class Name : Box<Name, string>]]></c>
+    /// is different from the <c><![CDATA[class Address : Box<Address, string>]]></c> 
     public abstract class Box<TBox, T> : I<T>, IEquatable<Box<TBox, T>>
         where TBox : Box<TBox, T>, new()
     {
@@ -223,7 +223,7 @@ namespace DryIoc.ImTools
         public override int GetHashCode() => EqualityComparer<T>.Default.GetHashCode(Value);
 
         /// <inheritdoc />
-        public override string ToString() => UnionTools.ToString<TBox, T>(Value, "data(");
+        public override string ToString() => UnionTools.ToString<TBox, T>(Value, "box(");
     }
 
     /// Unnamed discriminated union (with Empty name), shorter name for simplified inline usage
@@ -1055,7 +1055,7 @@ namespace DryIoc.ImTools
         public interface union
         {
             Tag Tag { get; }
-            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9);
         }
 
@@ -1076,7 +1076,7 @@ namespace DryIoc.ImTools
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
 
             [MethodImpl((MethodImplOptions)256)]
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map1(Case);
 
             public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1095,7 +1095,7 @@ namespace DryIoc.ImTools
             public static implicit operator case2(T2 x) => new case2(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map2(Case);
 
             public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1114,7 +1114,7 @@ namespace DryIoc.ImTools
             public static implicit operator case3(T3 x) => new case3(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case3; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map3(Case);
 
             public T3 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1133,7 +1133,7 @@ namespace DryIoc.ImTools
             public static implicit operator case4(T4 x) => new case4(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case4; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map4(Case);
 
             public T4 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1152,7 +1152,7 @@ namespace DryIoc.ImTools
             public static implicit operator case5(T5 x) => new case5(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case5; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map5(Case);
 
             public T5 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1171,7 +1171,7 @@ namespace DryIoc.ImTools
             public static implicit operator case6(T6 x) => new case6(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case6; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map6(Case);
 
             public T6 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1190,7 +1190,7 @@ namespace DryIoc.ImTools
             public static implicit operator case7(T7 x) => new case7(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case7; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map7(Case);
 
             public T7 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1209,7 +1209,7 @@ namespace DryIoc.ImTools
             public static implicit operator case8(T8 x) => new case8(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case8; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map8(Case);
 
             public T8 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1490,13 +1490,16 @@ namespace DryIoc.ImTools
         public static IList<T> ToListOrSelf<T>(this IEnumerable<T> source) =>
             source == null ? Empty<T>() : source as IList<T> ?? source.ToList();
 
-        /// <summary>Array copy</summary>
+        /// <summary>
+        /// Array copy
+        /// </summary>
         public static T[] Copy<T>(this T[] items)
         {
             if (items == null)
                 return null;
             var copy = new T[items.Length];
-            Array.Copy(items, 0, copy, 0, copy.Length);
+            for (var i = 0; i < copy.Length; i++)
+                copy[i] = items[i];
             return copy;
         }
 
@@ -1523,18 +1526,6 @@ namespace DryIoc.ImTools
             return result;
         }
 
-        /// <summary>Append a single item value at the end of source array and returns its copy</summary>
-        public static T[] Append<T>(this T[] source, T value)
-        {
-            if (source == null || source.Length == 0)
-                return new[] { value };
-            var count = source.Length;
-            var result = new T[count + 1];
-            Array.Copy(source, 0, result, 0, count);
-            result[count] = value;
-            return result;
-        }
-
         /// <summary>Performant concat of enumerables in case of arrays.
         /// But performance will degrade if you use Concat().Where().</summary>
         /// <typeparam name="T">Type of item.</typeparam>
@@ -1549,7 +1540,7 @@ namespace DryIoc.ImTools
         /// If source array could be null or empty, then single value item array will be created despite any index.</summary>
         /// <typeparam name="T">Array item type.</typeparam>
         /// <param name="source">Array to append value to.</param>
-        /// <param name="value">Value to append.</param>
+        /// <param name="value"> value to append.</param>
         /// <param name="index">(optional) Index of value to update.</param>
         /// <returns>New array with appended or updated value.</returns>
         public static T[] AppendOrUpdate<T>(this T[] source, T value, int index = -1)
@@ -1592,26 +1583,28 @@ namespace DryIoc.ImTools
         /// <summary>Looks up for item in source array equal to provided value, and returns its index, or -1 if not found.</summary>
         /// <typeparam name="T">Type of array items.</typeparam>
         /// <param name="source">Source array: if null or empty, then method will return -1.</param>
-        /// <param name="value">Value to look up.</param>
+        /// <param name="value"> value to look up.</param>
         /// <returns>Index of item equal to value, or -1 item is not found.</returns>
         public static int IndexOf<T>(this T[] source, T value)
         {
             if (source != null && source.Length != 0)
                 for (var i = 0; i < source.Length; ++i)
-                    if (Equals(source[i], value))
+                {
+                    var item = source[i];
+                    if (Equals(item, value))
                         return i;
+                }
 
             return -1;
         }
 
-        /// <summary>The same as `IndexOf` but searching the item by reference</summary>
+        /// <summary>The same as `IndexOf` but searching for the item by reference</summary>
         public static int IndexOfReference<T>(this T[] source, T reference) where T : class
         {
             if (source != null && source.Length != 0)
                 for (var i = 0; i < source.Length; ++i)
                     if (ReferenceEquals(source[i], reference))
                         return i;
-
             return -1;
         }
 
@@ -1636,7 +1629,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Looks for item in array using equality comparison, and returns new array with found item remove, or original array if not item found.</summary>
         /// <typeparam name="T">Type of array item.</typeparam>
-        /// <param name="source">Input array.</param> <param name="value">Value to find and remove.</param>
+        /// <param name="source">Input array.</param> <param name="value"> value to find and remove.</param>
         /// <returns>New array with value removed or original array if value is not found.</returns>
         public static T[] Remove<T>(this T[] source, T value) =>
             source.RemoveAt(source.IndexOf(value));
@@ -1797,59 +1790,6 @@ namespace DryIoc.ImTools
             }
 
             return appendedResults;
-        }
-
-        /// <summary>MUTATES the source by updating its item or creates another array with the copies,
-        /// the source then maybe a partially updated</summary>
-        public static T[] UpdateItemOrShrinkUnsafe<T, S>(this T[] source, S state, Func<S, T, T> tryMap) where T : class
-        {
-            if (source.Length == 1)
-            {
-                var result0 = tryMap(state, source[0]);
-                if (result0 == null)
-                    return Empty<T>();
-                source[0] = result0;
-                return source;
-            }
-
-            if (source.Length == 2)
-            {
-                var result0 = tryMap(state, source[0]);
-                var result1 = tryMap(state, source[1]);
-                if (result0 == null && result1 == null)
-                    return Empty<T>();
-                if (result0 == null)
-                    return new[] { result1 };
-                if (result1 == null)
-                    return new[] { result0 };
-                source[0] = result0;
-                source[1] = result1;
-                return source;
-            }
-
-            var matchStart = 0;
-            T[] matches = null;
-            T   result = null;
-            var i = 0;
-            for (; i < source.Length; ++i)
-            {
-                result = tryMap(state, source[i]);
-                if (result != null)
-                    source[i] = result;
-                else
-                {
-                    // for accumulated matched items
-                    if (i != 0 && i > matchStart)
-                        matches = AppendTo(source, matchStart, i - matchStart, matches);
-                    matchStart = i + 1; // guess the next match start will be after the non-matched item
-                }
-            }
-
-            // when last match was found but not all items are matched (hence matchStart != 0)
-            if (result != null && matchStart != 0)
-                return AppendTo(source, matchStart, i - matchStart, matches);
-
-            return matches ?? (matchStart != 0 ? Empty<T>() : source);
         }
 
         /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
@@ -2088,10 +2028,19 @@ namespace DryIoc.ImTools
             source is T[] arr ? arr.Map(map) : source?.Select(map);
 
         /// <summary>If <paramref name="source"/> is array uses more effective Match for array, otherwise just calls Where</summary>
+        /// <typeparam name="T">Type of source items.</typeparam>
+        /// <param name="source">If null, the null will be returned.</param>
+        /// <param name="condition">Condition to keep items.</param>
+        /// <returns>Result items, may be an array.</returns>
         public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition) =>
             source is T[] arr ? arr.Match(condition) : source?.Where(condition);
 
-        /// <summary>If <paramref name="source"/> is array uses more effective Match for array,otherwise just calls Where, Select</summary>
+        /// <summary>If <paramref name="source"/> is array uses more effective Match for array,
+        /// otherwise just calls Where, Select</summary>
+        /// <typeparam name="T">Type of source items.</typeparam> <typeparam name="R">Type of result items.</typeparam>
+        /// <param name="source">If null, the null will be returned.</param>
+        /// <param name="condition">Condition to keep items.</param>  <param name="map">Converter from source to result item.</param>
+        /// <returns>Result items, may be an array.</returns>
         public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map) =>
             source is T[] arr ? arr.Match(condition, map) : source?.Where(condition).Select(map);
     }
@@ -2115,15 +2064,9 @@ namespace DryIoc.ImTools
         public T Swap(Func<T, T> getNewValue) =>
             Ref.Swap(ref _value, getNewValue);
 
-        // todo: @feature A good candidate to implement
-        // <summary>The same as `Swap` but instead of the old known value it returns the new one</summary>
-        //public T SwapAndGetNewValue(Func<T, T> getNewValue) =>
-        //    Ref.Swap(ref _value, getNewValue);
-
         /// Option without allocation for capturing `a` in closure of `getNewValue`
         public T Swap<A>(A a, Func<T, A, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
 
-        // todo: @api @perf the return value of Swap is not used. On the other hand there are case when we need to assign the closed variable inside the `getNewValue` (`getValue`) delegate - so we may consider the variant of returning the state A instead to assign it to prevent the closure.
         /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
         public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue) => Ref.Swap(ref _value, a, b, getNewValue);
 
@@ -2198,24 +2141,21 @@ namespace DryIoc.ImTools
         /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
         /// May prevent closure creation for the delegate</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue,
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+        public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue, 
+            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW) 
             where T : class
         {
-#if SUPPORTS_SPIN_WAIT
             var spinWait = new SpinWait();
-#endif
             var retryCount = 0;
             while (true)
             {
                 var oldValue = value;
-                if (Interlocked.CompareExchange(ref value, getNewValue(oldValue, a), oldValue) == oldValue)
+                var newValue = getNewValue(oldValue, a);
+                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > retryCountUntilThrow)
                     ThrowRetryCountExceeded(retryCountUntilThrow);
-#if SUPPORTS_SPIN_WAIT
                 spinWait.SpinOnce();
-#endif
             }
         }
 
@@ -2226,9 +2166,7 @@ namespace DryIoc.ImTools
             int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
             where T : class
         {
-#if SUPPORTS_SPIN_WAIT
             var spinWait = new SpinWait();
-#endif
             var retryCount = 0;
             while (true)
             {
@@ -2238,9 +2176,7 @@ namespace DryIoc.ImTools
                     return newValue;
                 if (++retryCount > retryCountUntilThrow)
                     ThrowRetryCountExceeded(retryCountUntilThrow);
-#if SUPPORTS_SPIN_WAIT
                 spinWait.SpinOnce();
-#endif
             }
         }
 
@@ -2280,28 +2216,6 @@ namespace DryIoc.ImTools
             {
                 var oldValue = value;
                 var newValue = getNewValue(oldValue, a, b, c);
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return oldValue;
-
-                if (++retryCount > retryCountUntilThrow)
-                    ThrowRetryCountExceeded(retryCountUntilThrow);
-
-                spinWait.SpinOnce();
-            }
-        }
-
-        /// Option without allocation for capturing `a`, `b`, `c`, `d` in closure of `getNewValue`
-        [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<T, A, B, C, D>(ref T value, A a, B b, C c, D d, Func<T, A, B, C, D, T> getNewValue,
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
-            where T : class
-        {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = getNewValue(oldValue, a, b, c, d);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
 
@@ -2454,20 +2368,20 @@ namespace DryIoc.ImTools
         /// <summary>Default initial capacity </summary>
         public const int DefaultInitialCapacity = 2;
 
-        /// The items array
+        /// <summary>The items array</summary>
         public T[] Items;
 
-        /// The count
+        /// <summary>The count</summary>
         public int Count;
 
-        /// Constructs the thing 
+        /// <summary>Constructs the thing</summary>
         public GrowingList(T[] items, int count = 0)
         {
             Items = items;
             Count = count;
         }
 
-        /// Push the new slot and return the ref to it
+        /// <summary>Push the new slot and return the ref to it</summary>
         public ref T PushSlot()
         {
             if (Items == null)
@@ -2477,7 +2391,7 @@ namespace DryIoc.ImTools
             return ref Items[Count++];
         }
 
-        /// Adds the new item possibly extending the item collection
+        /// <summary>Adds the new item possibly extending the item collection</summary>
         public void PushSlot(T item)
         {
             if (Items == null)
@@ -2487,10 +2401,14 @@ namespace DryIoc.ImTools
             Items[Count++] = item;
         }
 
-        /// Pops the item - just moving the counter back
+        /// <summary>Pops the item - just moving the counter back</summary>
         public void Pop() => --Count;
 
-        /// Expands the items starting with 2
+        // todo: @naming think of the better name
+        /// <summary>Pops the item - just moving the counter back</summary>
+        public T PopItem() => Items[--Count];
+
+        /// <summary>Expands the items starting with 2</summary>
         private static T[] Expand(T[] items)
         {
             var count = items.Length;
@@ -2853,3401 +2771,3703 @@ namespace DryIoc.ImTools
     /// Update handler including the key
     public delegate V Update<K, V>(K key, V oldValue, V newValue);
 
-    /// <summary>
-    /// Fold reducer. Designed as a alternative to `Func{V, S, S}` but with possibility of inlining on the call side.
-    /// Note: To get the advantage of inlining the <see cref="Reduce"/> can the interface should be implemented and passed as a NON-GENERIC STRUCT
-    /// </summary>
-    public interface IFoldReducer<T, S>
+    /// <summary>Entry containing the Key and Value in addition to the Hash</summary>
+    public sealed class ImHashMapEntry<K, V> : ImHashMap<K, V>.Entry
     {
-        /// <summary>Reduce method</summary>
-        S Reduce(T x, S state);
-    }
-
-    /// <summary>
-    /// Immutable http://en.wikipedia.org/wiki/AVL_tree with integer keys and <typeparamref name="V"/> values.
-    /// </summary>
-    public class ImMap<V>
-    {
-        /// <summary>Empty tree to start with.</summary>
-        public static readonly ImMap<V> Empty = new ImMap<V>();
-
-        /// <summary>Returns true if tree is empty.</summary>
-        public bool IsEmpty => this == Empty;
-
-        /// Prevents multiple creation of an empty tree
-        protected ImMap() { }
-
-        /// <summary>Height of the longest sub-tree/branch - 0 for the empty tree</summary>
-        public virtual int Height => 0;
-
-        /// <summary>Prints "empty"</summary>
-        public override string ToString() => "empty";
-    }
-
-    /// <summary>Wraps the stored data with "fixed" reference semantics - when added to the tree it did not change or reconstructed in memory</summary>
-    public sealed class ImMapEntry<V> : ImMap<V>
-    {
-        /// <inheritdoc />
-        public override int Height => 1;
-
-        /// The Key is basically the hash, or the Height for ImMapTree
-        public readonly int Key;
-
-        /// The value - may be modified if you need a Ref{V} semantics
+        /// <summary>The key</summary>
+        public readonly K Key;
+        /// <summary>The value. Maybe modified if you need the Ref{Value} semantics. 
+        /// You may add the entry with the default Value to the map, and calculate and set it later (e.g. using the CAS).</summary>
         public V Value;
-
-        /// <summary>Constructs the entry with the default value</summary>
-        public ImMapEntry(int key) => Key = key;
-
-        /// <summary>Constructs the entry</summary>
-        public ImMapEntry(int key, V value)
+        /// <summary>Constructs the entry with the key and value</summary>
+        public ImHashMapEntry(int hash, K key) : base(hash) => Key = key;
+        /// <summary>Constructs the entry with the key and value</summary>
+        public ImHashMapEntry(int hash, K key, V value) : base(hash) 
         {
             Key = key;
             Value = value;
         }
 
-        /// Prints the key value pair
-        public override string ToString() => Key + ":" + Value;
+        /// <inheritdoc />
+        public override int Count() => 1;
+
+#if !DEBUG
+        /// <inheritdoc />
+        public override string ToString() => "{KVE: {H: " + Hash + ", K: " + Key + ", V: " + Value + "}}";
+#endif
     }
 
-    /// <summary>
-    /// The two level - two node tree with either left or right
-    /// </summary>
-    public sealed class ImMapBranch<V> : ImMap<V>
+    /// <summary>The composite containing the list of entries with the same conflicting Hash.</summary>
+    public sealed class HashConflictKeyValuesEntry<K, V> : ImHashMap<K, V>.Entry
     {
-        /// <summary>Always two</summary>
-        public override int Height => 2;
+        /// <summary>The 2 and more conflicts.</summary>
+        public ImHashMapEntry<K, V>[] Conflicts;
+        internal HashConflictKeyValuesEntry(int hash, params ImHashMapEntry<K, V>[] conflicts) : base(hash) => Conflicts = conflicts;
 
-        /// Contains the once created data node
-        public readonly ImMapEntry<V> Entry;
+        /// <inheritdoc />
+        public override int Count() => Conflicts.Length;
 
-        /// Right branch or empty.
-        public ImMapEntry<V> RightEntry;
-
-        /// Constructor
-        public ImMapBranch(ImMapEntry<V> entry, ImMapEntry<V> rightEntry)
+#if !DEBUG
+        /// <inheritdoc />
+        public override string ToString()
         {
-            Entry = entry;
-            RightEntry = rightEntry;
+            var sb = new System.Text.StringBuilder("HashConflictingKVE: [");
+            foreach (var x in Conflicts) 
+                sb.Append(x.ToString()).Append(", ");
+            return sb.Append("]").ToString();
         }
-
-        /// Prints the key value pair
-        public override string ToString() => "h2:" + Entry + "->" + RightEntry;
+#endif
     }
 
-    /// <summary>
-    /// The tree always contains Left and Right node, for the missing leaf we have <see cref="ImMapBranch{V}"/>
-    /// </summary>
-    public sealed class ImMapTree<V> : ImMap<V>
+    /// <summary>The base and the holder class for the map tree leafs and branches, also defines the Empty tree.
+    /// The map implementation is based on the "modified" 2-3-4 tree.</summary>
+    public class ImHashMap<K, V>
     {
-        /// Starts from 2
-        public override int Height => TreeHeight;
+        /// <summary>Empty map to start with. Exists as a single instance.</summary>
+        public static readonly ImHashMap<K, V> Empty = new ImHashMap<K, V>();
 
-        /// Starts from 2 - allows to access the field directly when you know it is a Tree
-        public int TreeHeight;
+        /// <summary>Hide the base constructor to prevent the multiple Empty trees creation</summary>
+        protected ImHashMap() { } // todo: @perf does the call to empty constructor hurt the perf?
 
-        /// Contains the once created data node
-        public readonly ImMapEntry<V> Entry;
-
-        /// Left sub-tree/branch, or empty.
-        public ImMap<V> Left;
-
-        /// Right sub-tree/branch, or empty.md
-        public ImMap<V> Right;
-
-        internal ImMapTree(ImMapEntry<V> entry, ImMap<V> left, ImMap<V> right, int height)
+        /// <summary>Prints the map tree in JSON-ish format in release mode and enumerates the keys in DEBUG.</summary>
+        public override string ToString() 
         {
-            Entry = entry;
-            Left = left;
-            Right = right;
-            TreeHeight = height;
+#if DEBUG
+            // for the debug purposes we just output the first N keys in array
+            const int outputCount = 101;
+            var itemsInHashOrder = this.Enumerate().Take(outputCount).Select(x => x.Key).ToList();
+            return $"new int[{(itemsInHashOrder.Count >= 100 ? ">=" : "") + itemsInHashOrder.Count}] {{" + string.Join(", ", itemsInHashOrder) + "}";
+#else
+            return "{}";
+#endif
         }
 
-        internal ImMapTree(ImMapEntry<V> entry, ImMapEntry<V> leftEntry, ImMapEntry<V> rightEntry)
+        /// <summary>Indicates that the map is empty</summary>
+        public bool IsEmpty => this == Empty;
+
+        /// <summary>The count of entries in the map</summary>
+        public virtual int Count() => 0;
+
+        /// <summary>Lookup for the entry by hash. If nothing the method returns `null`</summary>
+        internal virtual Entry GetEntryOrDefault(int hash) => null;
+
+        /// <summary>Returns the found entry with the same hash or the new map with added new entry.
+        /// Note that the empty map will return the entry the same as if the entry was found - so the consumer should check for the empty map.
+        /// Note that the method cannot return the `null` - when the existing entry is not found it will alway be the new map with the added entry.</summary>
+        internal virtual ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) => entry;
+
+        /// <summary>Returns the new map with old entry replaced by the new entry. Note that the old entry should be present.</summary>
+        internal virtual ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) => this;
+
+        /// <summary>Removes the certainly present old entry and returns the new map without it.</summary>
+        internal virtual ImHashMap<K, V> RemoveEntry(int hash, Entry entry) => this;
+
+        /// <summary>The base map entry for holding the hash and payload</summary>
+        public abstract class Entry : ImHashMap<K, V>
         {
-            Entry = entry;
-            Left = leftEntry;
-            Right = rightEntry;
-            TreeHeight = 2;
+            /// <summary>The Hash</summary>
+            public readonly int Hash;
+
+            /// <summary>Constructs the entry with the hash</summary>
+            protected Entry(int hash) => Hash = hash;
+
+            internal sealed override Entry GetEntryOrDefault(int hash) => hash == Hash ? this : null;
+
+            internal sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) =>
+                hash > Hash ? new Leaf2(this, entry) : hash < Hash ? new Leaf2(entry, this) : (ImHashMap<K, V>)this;
+
+            internal sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) => 
+                this == oldEntry ? newEntry : oldEntry;
+
+            internal sealed override ImHashMap<K, V> RemoveEntry(int hash, Entry removedEntry) =>
+                this == removedEntry ? Empty : this;
         }
 
-        /// <summary>Outputs the brief tree info - mostly for debugging purposes</summary>
-        public override string ToString() =>
-            "h" + Height + ":" + Entry
-                + "->(" + (Left  is ImMapTree<V> leftTree  ? "h" + leftTree.TreeHeight  + ":" + leftTree.Entry  : "" + Left)
-                +  ", " + (Right is ImMapTree<V> rightTree ? "h" + rightTree.TreeHeight + ":" + rightTree.Entry : "" + Right)
-                + ")";
-
-        /// <summary>Adds or updates the left or right branch</summary>
-        public ImMapTree<V> AddOrUpdateLeftOrRightEntry(int key, ImMapEntry<V> entry)
+        /// Tombstone for the removed entry. It still keeps the hash to preserve the tree operations.
+        internal sealed class RemovedEntry : Entry 
         {
-            if (key < Entry.Key)
+            public RemovedEntry(int hash) : base(hash) {}
+            public override string ToString() => "{RemovedE: {H: " + Hash + "}}";
+        }
+
+        /// <summary>Leaf with 2 hash-ordered entries. Important: the both or either of entries may be null for the removed entries</summary>
+        public sealed class Leaf2 : ImHashMap<K, V>
+        {
+            /// <summary>Left entry</summary>
+            public readonly Entry Entry0;
+            /// <summary>Right entry</summary>
+            public readonly Entry Entry1;
+            /// <summary>Constructs the leaf</summary>
+            public Leaf2(Entry e0, Entry e1)
             {
-                var left = Left;
-                if (left is ImMapTree<V> leftTree)
+                Debug.Assert(e0 == null || e1 == null || e0.Hash < e1.Hash);
+                Entry0 = e0; Entry1 = e1;
+            }
+
+            /// <inheritdoc />
+            public override int Count() => (Entry0?.Count() ?? 0) + (Entry1?.Count() ?? 0);
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{L2: {E0: " + Entry0 + ", E1: " + Entry1 + "}}";
+#endif
+
+            internal override Entry GetEntryOrDefault(int hash) => 
+                Entry0?.Hash == hash ? Entry0 : Entry1?.Hash == hash ? Entry1 : null;
+
+            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var e0 = Entry0;
+                var e1 = Entry1;
+                if (e0 == null)
+                    return e1 == null ? new Leaf2(null, entry)
+                        : e1.Hash == hash ? (ImHashMap<K, V>)e1
+                        : e1.Hash <  hash ? new Leaf2(entry, e1) : new Leaf2(e1, entry);
+
+                if (e1 == null)
+                    return e0.Hash == hash ? (ImHashMap<K, V>)e0
+                        :  e0.Hash <  hash ? new Leaf2(e0, entry) : new Leaf2(entry, e0);
+
+                return hash == e0.Hash ? e0
+                     : hash == e1.Hash ? e1
+                     : (ImHashMap<K, V>)new Leaf2Plus1(entry, this);
+            }
+
+            internal override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
+                oldEntry == Entry0 ? new Leaf2(newEntry, Entry1) : new Leaf2(Entry0, newEntry);
+
+            internal override ImHashMap<K, V> RemoveEntry(int hash, Entry removedEntry) =>
+                Entry0 == removedEntry ? new Leaf2(null, Entry1) : new Leaf2(Entry0, null); // the Entry0 or Entry1 maybe null already and it is fine
+        }
+
+        /// <summary>The leaf containing the Leaf2 plus the newest added entry.</summary>
+        public sealed class Leaf2Plus1 : ImHashMap<K, V>
+        {
+            /// <summary>Plus entry</summary>
+            public readonly Entry Plus;
+            /// <summary>The dangling leaf</summary>
+            public readonly Leaf2 L;
+            /// <summary>Constructs the leaf</summary>
+            public Leaf2Plus1(Entry plus, Leaf2 leaf)
+            {
+                Plus = plus;
+                L    = leaf;
+            }
+
+            /// <inheritdoc />
+            public override int Count() => Plus.Count() + L.Entry0.Count() + L.Entry1.Count();
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{L21: {P: " + Plus + ", L: " + L + "}}";
+#endif
+
+            internal override Entry GetEntryOrDefault(int hash)
+            {
+                if (hash == Plus.Hash) 
+                    return Plus;
+                Entry e0 = L.Entry0, e1 = L.Entry1;
+                return e0.Hash == hash ? e0 : e1.Hash == hash ? e1 : null;
+            }
+
+            internal sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var p = Plus;
+                if (hash == p.Hash) 
+                    return p;
+                Entry e0 = L.Entry0, e1 = L.Entry1;
+                return hash == e0.Hash ? e0 : hash == e1.Hash ? e1 : (ImHashMap<K, V>)new Leaf2Plus1Plus1(entry, this);
+            }
+
+            internal sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
+                oldEntry == Plus     ? new Leaf2Plus1(newEntry, L) :
+                oldEntry == L.Entry0 ? new Leaf2Plus1(Plus, new Leaf2(newEntry, L.Entry1)) :
+                                       new Leaf2Plus1(Plus, new Leaf2(L.Entry0, newEntry));
+
+            internal override ImHashMap<K, V> RemoveEntry(int hash, Entry removedEntry) =>
+                removedEntry == Plus ? L :
+                removedEntry == L.Entry0 ? 
+                    (Plus.Hash < L.Entry1.Hash ? new Leaf2(Plus, L.Entry1) : new Leaf2(L.Entry1, Plus)) :
+                    (Plus.Hash < L.Entry0.Hash ? new Leaf2(Plus, L.Entry0) : new Leaf2(L.Entry0, Plus));
+        }
+
+        /// <summary>Leaf with the Leaf2 plus added entry, plus added entry</summary>
+        public sealed class Leaf2Plus1Plus1 : ImHashMap<K, V>
+        {
+            /// <summary>New entry</summary>
+            public readonly Entry Plus;
+            /// <summary>The existing leaf to add entry to</summary>
+            public readonly Leaf2Plus1 L;
+
+            /// <summary>Constructs the leaf</summary>
+            public Leaf2Plus1Plus1(Entry plus, Leaf2Plus1 l)
+            {
+                Plus = plus;
+                L = l;
+            }
+
+            /// <inheritdoc />
+            public override int Count() => Plus.Count() + L.Plus.Count() + L.L.Entry0.Count() + L.L.Entry1.Count();
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{L211: {P: " + Plus + ", L: " + L + "}}";
+#endif
+
+            internal override Entry GetEntryOrDefault(int hash)
+            {
+                if (hash == Plus.Hash) 
+                    return Plus;
+                if (hash == L.Plus.Hash) 
+                    return L.Plus;
+                Entry e0 = L.L.Entry0, e1 = L.L.Entry1;
+                return e0.Hash == hash ? e0 : e1.Hash == hash ? e1 : null;
+            }
+
+            internal sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var p = Plus;
+                var ph = p.Hash;
+                if (ph == hash)
+                    return p;
+
+                var pp = L.Plus;
+                var pph = pp.Hash;
+                if (pph == hash)
+                    return pp;
+
+                var l = L.L;
+                Entry e0 = l.Entry0, e1 = l.Entry1;
+
+                if (hash == e0.Hash)
+                    return e0;
+                if (hash == e1.Hash)
+                    return e1;
+
+                Entry swap = null;
+                if (pph < e1.Hash)
                 {
-                    if (key == leftTree.Entry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(entry, leftTree.Left, leftTree.Right, leftTree.TreeHeight),
-                            Right, TreeHeight);
-
-                    var newLeftTree = leftTree.AddOrUpdateLeftOrRightEntry(key, entry);
-                    return newLeftTree.TreeHeight == leftTree.TreeHeight
-                        ? new ImMapTree<V>(Entry, newLeftTree, Right, TreeHeight)
-                        : BalanceNewLeftTree(newLeftTree);
-                }
-
-                if (left is ImMapBranch<V> leftBranch)
-                {
-                    if (key < leftBranch.Entry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(leftBranch.Entry, entry, leftBranch.RightEntry),
-                            Right, TreeHeight);
-
-                    if (key > leftBranch.Entry.Key)
+                    swap = e1; e1 = pp; pp = swap;
+                    if (pph < e0.Hash)
                     {
-                        var newLeft =
-                            //            5                         5
-                            //       2        ?  =>             3        ?
-                            //         3                      2   4
-                            //          4
-                            key > leftBranch.RightEntry.Key ? new ImMapTree<V>(leftBranch.RightEntry, leftBranch.Entry, entry)
-                            //            5                         5
-                            //      2          ?  =>            2.5        ?
-                            //          3                      2   3
-                            //       2.5  
-                            : key < leftBranch.RightEntry.Key ? new ImMapTree<V>(entry, leftBranch.Entry, leftBranch.RightEntry)
-                            : (ImMap<V>)new ImMapBranch<V>(leftBranch.Entry, entry);
-
-                        return new ImMapTree<V>(Entry, newLeft, Right, TreeHeight);
+                        swap = e0; e0 = e1; e1 = swap;
                     }
-
-                    return new ImMapTree<V>(Entry,
-                        new ImMapBranch<V>(entry, leftBranch.RightEntry), Right, TreeHeight);
                 }
 
-                var leftLeaf = (ImMapEntry<V>)left;
-                return key > leftLeaf.Key ? new ImMapTree<V>(Entry, new ImMapBranch<V>(leftLeaf, entry), Right, 3)
-                    : key < leftLeaf.Key ? new ImMapTree<V>(Entry, new ImMapBranch<V>(entry, leftLeaf), Right, 3)
-                    : new ImMapTree<V>(Entry, entry, Right, TreeHeight);
-            }
-            else
-            {
-                var right = Right;
-                if (right is ImMapTree<V> rightTree)
+                if (ph < pp.Hash)
                 {
-                    if (key == rightTree.Entry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(entry, rightTree.Left, rightTree.Right, rightTree.TreeHeight),
-                            TreeHeight);
-
-                    var newRightTree = rightTree.AddOrUpdateLeftOrRightEntry(key, entry);
-                    return newRightTree.TreeHeight == rightTree.TreeHeight
-                        ? new ImMapTree<V>(Entry, Left, newRightTree, TreeHeight)
-                        : BalanceNewRightTree(newRightTree);
-                }
-
-                if (right is ImMapBranch<V> rightBranch)
-                {
-                    if (key > rightBranch.Entry.Key)
+                    swap = pp; pp = p; p = swap;
+                    if (ph < e1.Hash)
                     {
-                        var newRight =
-                            //      5                5      
-                            //  ?       6    =>  ?       8  
-                            //            8            6   !
-                            //              !               
-                            key > rightBranch.RightEntry.Key ? new ImMapTree<V>(rightBranch.RightEntry, rightBranch.Entry, entry)
-                            //      5                 5      
-                            //  ?       6     =>  ?       7  
-                            //              8            6  8
-                            //            7               
-                            : key < rightBranch.RightEntry.Key ? new ImMapTree<V>(entry, rightBranch.Entry, rightBranch.RightEntry)
-                            : (ImMap<V>)new ImMapBranch<V>(rightBranch.Entry, entry);
-
-                        return new ImMapTree<V>(Entry, Left, newRight, TreeHeight);
+                        swap = e1; e1 = pp; pp = swap;
+                        if (ph < e0.Hash)
+                        {
+                            swap = e0; e0 = e1; e1 = swap;
+                        }
                     }
-
-                    if (key < rightBranch.Entry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(rightBranch.Entry, entry, rightBranch.RightEntry),
-                            TreeHeight);
-
-                    return new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(entry, rightBranch.RightEntry), TreeHeight);
                 }
 
-                var rightLeaf = (ImMapEntry<V>)right;
-                return key > rightLeaf.Key
-                        ? new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(rightLeaf, entry), 3)
-                    : key < rightLeaf.Key
-                        ? new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(entry, rightLeaf), 3)
-                        : new ImMapTree<V>(Entry, Left, entry, TreeHeight);
-            }
-        }
-
-        /// <summary>Adds the left or right branch</summary>
-        public ImMapTree<V> AddUnsafeLeftOrRightEntry(int key, ImMapEntry<V> entry)
-        {
-            if (key < Entry.Key)
-            {
-                var left = Left;
-                if (left is ImMapTree<V> leftTree)
+                Entry e = entry;
+                if (hash < p.Hash)
                 {
-                    var newLeftTree = leftTree.AddUnsafeLeftOrRightEntry(key, entry);
-                    return newLeftTree.TreeHeight == leftTree.TreeHeight
-                        ? new ImMapTree<V>(Entry, newLeftTree, Right, TreeHeight)
-                        : BalanceNewLeftTree(newLeftTree);
-                }
-
-                if (left is ImMapBranch<V> leftBranch)
-                {
-                    if (key < leftBranch.Entry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(leftBranch.Entry, entry, leftBranch.RightEntry),
-                            Right, TreeHeight);
-
-                    var newLeft = key > leftBranch.RightEntry.Key
-                            ? new ImMapTree<V>(leftBranch.RightEntry, leftBranch.Entry, entry)
-                            : new ImMapTree<V>(entry, leftBranch.Entry, leftBranch.RightEntry);
-
-                    return new ImMapTree<V>(Entry, newLeft, Right, TreeHeight);
-                }
-
-                var leftLeaf = (ImMapEntry<V>)left;
-                return key > leftLeaf.Key
-                    ? new ImMapTree<V>(Entry, new ImMapBranch<V>(leftLeaf, entry), Right, 3)
-                    : new ImMapTree<V>(Entry, new ImMapBranch<V>(entry, leftLeaf), Right, 3);
-            }
-            else
-            {
-                var right = Right;
-                if (right is ImMapTree<V> rightTree)
-                {
-                    var newRightTree = rightTree.AddUnsafeLeftOrRightEntry(key, entry);
-                    return newRightTree.TreeHeight == rightTree.TreeHeight
-                        ? new ImMapTree<V>(Entry, Left, newRightTree, TreeHeight)
-                        : BalanceNewRightTree(newRightTree);
-                }
-
-                if (right is ImMapBranch<V> rightBranch)
-                {
-                    if (key > rightBranch.Entry.Key)
+                    swap = p; p = e; e = swap;
+                    if (hash < pp.Hash)
                     {
-                        var newRight = key > rightBranch.RightEntry.Key
-                            ? new ImMapTree<V>(rightBranch.RightEntry, rightBranch.Entry, entry)
-                            : new ImMapTree<V>(entry, rightBranch.Entry, rightBranch.RightEntry);
-
-                        return new ImMapTree<V>(Entry, Left, newRight, TreeHeight);
+                        swap = pp; pp = p; p = swap;
+                        if (hash < e1.Hash)
+                        {
+                            swap = e1; e1 = pp; pp = swap;
+                            if (hash < e0.Hash)
+                            {
+                                swap = e0; e0 = e1; e1 = swap;
+                            }
+                        }
                     }
-
-                    return new ImMapTree<V>(Entry, Left,
-                        new ImMapTree<V>(rightBranch.Entry, entry, rightBranch.RightEntry),
-                        TreeHeight);
                 }
 
-                var rightLeaf = (ImMapEntry<V>)right;
-                return key > rightLeaf.Key
-                    ? new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(rightLeaf, entry), 3)
-                    : new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(entry, rightLeaf), 3);
+                return new Leaf5(e0, e1, pp, p, e);
             }
+
+            internal sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
+                oldEntry == Plus       ? new Leaf2Plus1Plus1(newEntry, L) :
+                oldEntry == L.Plus     ? new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(newEntry, L.L)) :
+                oldEntry == L.L.Entry0 ? new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(L.Plus, new Leaf2(newEntry, L.L.Entry1))) :
+                                         new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(L.Plus, new Leaf2(L.L.Entry0, newEntry)));
+
+            internal override ImHashMap<K, V> RemoveEntry(int hash, Entry removedEntry) =>
+                removedEntry == Plus ? L : 
+                removedEntry == L.Plus ? new Leaf2Plus1(Plus, L.L) :
+                removedEntry == L.L.Entry0 ? 
+                    (L.Plus.Hash < L.L.Entry1.Hash ? new Leaf2Plus1(Plus, new Leaf2(L.Plus, L.L.Entry1)) : new Leaf2Plus1(Plus, new Leaf2(L.L.Entry1, L.Plus))) :
+                    (L.Plus.Hash < L.L.Entry0.Hash ? new Leaf2Plus1(Plus, new Leaf2(L.Plus, L.L.Entry0)) : new Leaf2Plus1(Plus, new Leaf2(L.L.Entry0, L.Plus)));
         }
 
-        /// <summary>Adds to the left or right branch, or keeps the un-modified map</summary>
-        public ImMapTree<V> AddOrKeepLeftOrRight(int key, V value)
+        /// <summary>Leaf with 5 hash-ordered entries</summary>
+        public sealed class Leaf5 : ImHashMap<K, V>
         {
-            if (key < Entry.Key)
+            /// <summary>Left entry</summary>
+            public readonly Entry Entry0;
+            /// <summary>Middle-left entry</summary>
+            public readonly Entry Entry1;
+            /// <summary>Middle entry</summary>
+            public readonly Entry Entry2;
+            /// <summary>Middle-right entry</summary>
+            public readonly Entry Entry3;
+            /// <summary>Right entry</summary>
+            public readonly Entry Entry4;
+
+            /// <summary>Constructs the leaf</summary>
+            public Leaf5(Entry e0, Entry e1, Entry e2, Entry e3, Entry e4)
             {
-                var left = Left;
-                if (left is ImMapTree<V> leftTree)
-                {
-                    if (key == leftTree.Entry.Key)
-                        return this;
-
-                    var newLeftTree = leftTree.AddOrKeepLeftOrRight(key, value);
-                    return newLeftTree == leftTree ? this
-                        : newLeftTree.TreeHeight == leftTree.TreeHeight
-                            ? new ImMapTree<V>(Entry, newLeftTree, Right, TreeHeight)
-                            : BalanceNewLeftTree(newLeftTree);
-                }
-
-                if (left is ImMapBranch<V> leftBranch)
-                {
-                    if (key < leftBranch.Entry.Key)
-                        return new ImMapTree<V>(Entry, 
-                            new ImMapTree<V>(leftBranch.Entry, new ImMapEntry<V>(key, value), leftBranch.RightEntry),
-                            Right, TreeHeight);
-                    if (key > leftBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(leftBranch.RightEntry, leftBranch.Entry, new ImMapEntry<V>(key, value)),
-                            Right, TreeHeight);
-                    if (key > leftBranch.Entry.Key && key < leftBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(new ImMapEntry<V>(key, value), leftBranch.Entry, leftBranch.RightEntry),
-                            Right, TreeHeight);
-                    return this;
-                }
-
-                var leftLeaf = (ImMapEntry<V>)left;
-                return key > leftLeaf.Key
-                        ? new ImMapTree<V>(Entry, new ImMapBranch<V>(leftLeaf, new ImMapEntry<V>(key, value)), Right, 3)
-                    : key < leftLeaf.Key
-                        ? new ImMapTree<V>(Entry, new ImMapBranch<V>(new ImMapEntry<V>(key, value), leftLeaf), Right, 3)
-                    : this;
+                Debug.Assert(e0.Hash < e1.Hash, "e0 < e1");
+                Debug.Assert(e1.Hash < e2.Hash, "e1 < e2");
+                Debug.Assert(e2.Hash < e3.Hash, "e2 < e3");
+                Debug.Assert(e3.Hash < e4.Hash, "e3 < e4");
+                Entry0 = e0; Entry1 = e1; Entry2 = e2; Entry3 = e3; Entry4 = e4;
             }
-            else
-            {
-                var right = Right;
-                if (right is ImMapTree<V> rightTree)
-                {
-                    if (key == rightTree.Entry.Key)
-                        return this;
 
-                    var newRightTree = rightTree.AddOrKeepLeftOrRight(key, value);
-                    return newRightTree == rightTree ? this
-                        : newRightTree.TreeHeight == rightTree.TreeHeight
-                            ? new ImMapTree<V>(Entry, Left, newRightTree, TreeHeight)
-                            : BalanceNewRightTree(newRightTree);
-                }
+            /// <inheritdoc />
+            public override int Count() => Entry0.Count() + Entry1.Count() + Entry2.Count() + Entry3.Count() + Entry4.Count();
 
-                if (right is ImMapBranch<V> rightBranch)
-                {
-                    if (key > rightBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(rightBranch.RightEntry, rightBranch.Entry, new ImMapEntry<V>(key, value)),
-                            TreeHeight);
-                    if (key < rightBranch.Entry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(rightBranch.Entry, new ImMapEntry<V>(key, value), rightBranch.RightEntry),
-                            TreeHeight);
-                    if (key > rightBranch.Entry.Key && key < rightBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(new ImMapEntry<V>(key, value), rightBranch.Entry, rightBranch.RightEntry),
-                            TreeHeight);
-                    return this;
-                }
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => 
+                "{L2: {E0: " + Entry0 + ", E1: " + Entry1 + ", E2: " + Entry2 + ", E3: " + Entry3 + ", E4: " + Entry4 + "}}";
+#endif
 
-                var rightLeaf = (ImMapEntry<V>)right;
-                return key > rightLeaf.Key
-                    ? new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(rightLeaf, new ImMapEntry<V>(key, value)), 3)
-                    : key < rightLeaf.Key
-                        ? new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(new ImMapEntry<V>(key, value), rightLeaf), 3)
-                    : this;
-            }
+            internal override Entry GetEntryOrDefault(int hash) =>
+                hash == Entry0.Hash ? Entry0 :
+                hash == Entry1.Hash ? Entry1 :
+                hash == Entry2.Hash ? Entry2 :
+                hash == Entry3.Hash ? Entry3 :
+                hash == Entry4.Hash ? Entry4 :
+                null;
+
+            internal sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) =>
+                hash == Entry0.Hash ? Entry0 :
+                hash == Entry1.Hash ? Entry1 :
+                hash == Entry2.Hash ? Entry2 :
+                hash == Entry3.Hash ? Entry3 :
+                hash == Entry4.Hash ? Entry4 :
+                (ImHashMap<K, V>)new Leaf5Plus1(entry, this);
+
+            internal sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
+                oldEntry == Entry0 ? new Leaf5(newEntry, Entry1, Entry2, Entry3, Entry4) : 
+                oldEntry == Entry1 ? new Leaf5(Entry0, newEntry, Entry2, Entry3, Entry4) :
+                oldEntry == Entry2 ? new Leaf5(Entry0, Entry1, newEntry, Entry3, Entry4) :
+                oldEntry == Entry3 ? new Leaf5(Entry0, Entry1, Entry2, newEntry, Entry4) :
+                                     new Leaf5(Entry0, Entry1, Entry2, Entry3, newEntry);
+
+            internal override ImHashMap<K, V> RemoveEntry(int hash, Entry removedEntry) =>
+                removedEntry == Entry0 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry1, Entry2))) : 
+                removedEntry == Entry1 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry0, Entry2))) :
+                removedEntry == Entry2 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry0, Entry1))) :
+                removedEntry == Entry3 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry2, new Leaf2(Entry0, Entry1))) :
+                                         new Leaf2Plus1Plus1(Entry3, new Leaf2Plus1(Entry2, new Leaf2(Entry0, Entry1)));
         }
 
-        /// <summary>Adds to the left or right branch, or keeps the un-modified map</summary>
-        public ImMapTree<V> AddOrKeepLeftOrRight(int key)
+        /// <summary>Leaf with 5 existing ordered entries plus 1 newly added entry.</summary>
+        public sealed class Leaf5Plus1 : ImHashMap<K, V>
         {
-            if (key < Entry.Key)
+            /// <summary>New entry</summary>
+            public readonly Entry Plus;
+            /// <summary>Dangling leaf</summary>
+            public readonly Leaf5 L;
+
+            /// <summary>Constructs the leaf</summary>
+            public Leaf5Plus1(Entry plus, Leaf5 l)
             {
-                var left = Left;
-                if (left is ImMapTree<V> leftTree)
-                {
-                    if (key == leftTree.Entry.Key)
-                        return this;
-
-                    var newLeftTree = leftTree.AddOrKeepLeftOrRight(key);
-                    return newLeftTree == leftTree ? this
-                        : newLeftTree.TreeHeight == leftTree.TreeHeight
-                            ? new ImMapTree<V>(Entry, newLeftTree, Right, TreeHeight)
-                            : BalanceNewLeftTree(newLeftTree);
-                }
-
-                if (left is ImMapBranch<V> leftBranch)
-                {
-                    if (key < leftBranch.Entry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(leftBranch.Entry, new ImMapEntry<V>(key), leftBranch.RightEntry),
-                            Right, TreeHeight);
-                    if (key > leftBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(leftBranch.RightEntry, leftBranch.Entry, new ImMapEntry<V>(key)),
-                            Right, TreeHeight);
-                    if (key > leftBranch.Entry.Key && key < leftBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(new ImMapEntry<V>(key), leftBranch.Entry, leftBranch.RightEntry),
-                            Right, TreeHeight);
-                    return this;
-                }
-
-                var leftLeaf = (ImMapEntry<V>)left;
-                return key > leftLeaf.Key
-                        ? new ImMapTree<V>(Entry, new ImMapBranch<V>(leftLeaf, new ImMapEntry<V>(key)), Right, 3)
-                    : key < leftLeaf.Key
-                        ? new ImMapTree<V>(Entry, new ImMapBranch<V>(new ImMapEntry<V>(key), leftLeaf), Right, 3)
-                    : this;
+                Plus = plus;
+                L    = l;
             }
-            else
+
+            /// <inheritdoc />
+            public override int Count() => Plus.Count() + L.Count();
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{L51: {P: " + Plus + ", L: " + L + "}}";
+#endif
+
+            internal override Entry GetEntryOrDefault(int hash)
             {
-                var right = Right;
-                if (right is ImMapTree<V> rightTree)
-                {
-                    if (key == rightTree.Entry.Key)
-                        return this;
-
-                    // note: tree always contains left and right (for the missing leaf we have a Branch)
-                    var newRightTree = rightTree.AddOrKeepLeftOrRight(key);
-                    return newRightTree == rightTree ? this
-                        : newRightTree.TreeHeight == rightTree.TreeHeight
-                            ? new ImMapTree<V>(Entry, Left, newRightTree, TreeHeight)
-                            : BalanceNewRightTree(newRightTree);
-                }
-
-                if (right is ImMapBranch<V> rightBranch)
-                {
-                    if (key > rightBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(rightBranch.RightEntry, rightBranch.Entry, new ImMapEntry<V>(key)),
-                            TreeHeight);
-                    if (key < rightBranch.Entry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(rightBranch.Entry, new ImMapEntry<V>(key), rightBranch.RightEntry),
-                            TreeHeight);
-                    if (key > rightBranch.Entry.Key && key < rightBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(new ImMapEntry<V>(key), rightBranch.Entry, rightBranch.RightEntry),
-                            TreeHeight);
-                    return this;
-                }
-
-                var rightLeaf = (ImMapEntry<V>)right;
-                return key > rightLeaf.Key
-                        ? new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(rightLeaf, new ImMapEntry<V>(key)), 3)
-                    : key < rightLeaf.Key 
-                        ? new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(new ImMapEntry<V>(key), rightLeaf), 3)
-                    : this;
+                if (hash == Plus.Hash) 
+                    return Plus; 
+                var l = L;
+                return hash == l.Entry0.Hash ? l.Entry0 
+                    :  hash == l.Entry1.Hash ? l.Entry1 
+                    :  hash == l.Entry2.Hash ? l.Entry2 
+                    :  hash == l.Entry3.Hash ? l.Entry3 
+                    :  hash == l.Entry4.Hash ? l.Entry4 
+                    :  null;
             }
-        }
 
-        /// <summary>Adds to the left or right branch, or keeps the un-modified map</summary>
-        public ImMapTree<V> AddOrKeepLeftOrRightEntry(int key, ImMapEntry<V> entry)
-        {
-            if (key < Entry.Key)
+            internal sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
             {
-                var left = Left;
-                if (left is ImMapTree<V> leftTree)
-                {
-                    if (key == leftTree.Entry.Key)
-                        return this;
-
-                    var newLeftTree = leftTree.AddOrKeepLeftOrRightEntry(key, entry);
-                    return newLeftTree == leftTree ? this
-                        : newLeftTree.TreeHeight == leftTree.TreeHeight
-                            ? new ImMapTree<V>(Entry, newLeftTree, Right, TreeHeight)
-                            : BalanceNewLeftTree(newLeftTree);
-                }
-
-                if (left is ImMapBranch<V> leftBranch)
-                {
-                    if (key < leftBranch.Entry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(leftBranch.Entry, entry, leftBranch.RightEntry),
-                            Right, TreeHeight);
-                    if (key > leftBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(leftBranch.RightEntry, leftBranch.Entry, entry),
-                            Right, TreeHeight);
-                    if (key > leftBranch.Entry.Key && key < leftBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry,
-                            new ImMapTree<V>(entry, leftBranch.Entry, leftBranch.RightEntry),
-                            Right, TreeHeight);
-                    return this;
-                }
-
-                var leftLeaf = (ImMapEntry<V>)left;
-                return key > leftLeaf.Key
-                        ? new ImMapTree<V>(Entry, new ImMapBranch<V>(leftLeaf, entry), Right, 3)
-                    : key < leftLeaf.Key
-                        ? new ImMapTree<V>(Entry, new ImMapBranch<V>(entry, leftLeaf), Right, 3)
-                    : this;
+                var p = Plus;
+                var ph = p.Hash;
+                if (ph == hash)
+                    return p;
+                var l = L; 
+                return hash == l.Entry0.Hash ? l.Entry0
+                    :  hash == l.Entry1.Hash ? l.Entry1 
+                    :  hash == l.Entry2.Hash ? l.Entry2
+                    :  hash == l.Entry3.Hash ? l.Entry3
+                    :  hash == l.Entry4.Hash ? l.Entry4
+                    :  (ImHashMap<K, V>)new Leaf5Plus1Plus1(entry, this);
             }
-            else
+
+            internal sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
             {
-                var right = Right;
-                if (right is ImMapTree<V> rightTree)
-                {
-                    if (key == rightTree.Entry.Key)
-                        return this;
-
-                    // note: tree always contains left and right (for the missing leaf we have a Branch)
-                    var newRightTree = rightTree.AddOrKeepLeftOrRightEntry(key, entry);
-                    return newRightTree == rightTree ? this
-                        : newRightTree.TreeHeight == rightTree.TreeHeight
-                            ? new ImMapTree<V>(Entry, Left, newRightTree, TreeHeight)
-                            : BalanceNewRightTree(newRightTree);
-                }
-
-                if (right is ImMapBranch<V> rightBranch)
-                {
-                    if (key > rightBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(rightBranch.RightEntry, rightBranch.Entry, entry),
-                            TreeHeight);
-                    if (key < rightBranch.Entry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(rightBranch.Entry, entry, rightBranch.RightEntry),
-                            TreeHeight);
-                    if (key > rightBranch.Entry.Key && key < rightBranch.RightEntry.Key)
-                        return new ImMapTree<V>(Entry, Left,
-                            new ImMapTree<V>(entry, rightBranch.Entry, rightBranch.RightEntry),
-                            TreeHeight);
-                    return this;
-                }
-
-                var rightLeaf = (ImMapEntry<V>)right;
-                return key > rightLeaf.Key
-                    ? new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(rightLeaf, entry), 3)
-                    : key < rightLeaf.Key
-                        ? new ImMapTree<V>(Entry, Left, new ImMapBranch<V>(entry, rightLeaf), 3)
-                    : this;
+                var p = Plus;
+                if (oldEntry == p)
+                    return new Leaf5Plus1(newEntry, L);
+                var l = L; 
+                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+                return oldEntry == e0 ? new Leaf5Plus1(p, new Leaf5(newEntry, e1, e2, e3, e4)) 
+                    :  oldEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, newEntry, e2, e3, e4)) 
+                    :  oldEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, newEntry, e3, e4)) 
+                    :  oldEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, newEntry, e4)) 
+                    :                   new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, newEntry));
             }
-        }
 
-        private ImMapTree<V> BalanceNewLeftTree(ImMapTree<V> newLeftTree)
-        {
-            var rightHeight = Right.Height;
-            var delta = newLeftTree.TreeHeight - rightHeight;
-            if (delta <= 0)
-                return new ImMapTree<V>(Entry, newLeftTree, Right, TreeHeight);
-
-            if (delta == 1)
-                return new ImMapTree<V>(Entry, newLeftTree, Right, newLeftTree.TreeHeight + 1);
-
-            // here is the balancing art comes into place
-            if (rightHeight == 1)
+            internal override ImHashMap<K, V> RemoveEntry(int hash, Entry removedEntry)
             {
-                if (newLeftTree.Left is ImMapEntry<V> leftLeftLeaf)
+                var p = Plus;
+                if (p == removedEntry)
+                    return L;
+
+                var ph = p.Hash;
+                var l = L; 
+                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
+
+                if (ph < e4.Hash)
                 {
-                    //            30                    15
-                    //    10            40 =>    10           20
-                    //  5     15               5    12     30    40
-                    //     12   20                     
-                    if (newLeftTree.Right is ImMapTree<V> leftRightTree)
+                    swap = e4; e4 = p; p = swap;
+                    if (ph < e3.Hash)
                     {
-                        newLeftTree.Right = leftRightTree.Left;
-                        newLeftTree.TreeHeight = 2;
-                        return new ImMapTree<V>(leftRightTree.Entry,
-                            newLeftTree,
-                            new ImMapTree<V>(Entry, leftRightTree.Right, Right, 2),
-                            3);
+                        swap = e3; e3 = e4; e4 = swap;
+                        if (ph < e2.Hash)
+                        {
+                            swap = e2; e2 = e3; e3 = swap;
+                            if (ph < e1.Hash)
+                            {
+                                swap = e1; e1 = e2; e2 = swap;
+                                if (ph < e0.Hash)
+                                {
+                                    swap = e0; e0 = e1; e1 = swap;
+                                }
+                            }
+                        }
                     }
-
-                    // we cannot reuse the new left tree here because it is reduced into the branch
-                    //           30                     15
-                    //    10            40 =>    5           20
-                    //  5    15                    10     30    40
-                    //         20                     
-                    var leftRightBranch = (ImMapBranch<V>)newLeftTree.Right;
-                    return new ImMapTree<V>(leftRightBranch.Entry,
-                        new ImMapBranch<V>(leftLeftLeaf, newLeftTree.Entry),
-                        new ImMapTree<V>(Entry, leftRightBranch.RightEntry, Right, 2),
-                        3);
                 }
 
-                newLeftTree.Right = new ImMapTree<V>(Entry, newLeftTree.Right, Right, 2);
-                newLeftTree.TreeHeight = 3;
-                return newLeftTree;
+                return removedEntry == e0 ? new Leaf5(e1, e2, e3, e4, p)
+                    :  removedEntry == e1 ? new Leaf5(e0, e2, e3, e4, p)
+                    :  removedEntry == e2 ? new Leaf5(e0, e1, e3, e4, p)
+                    :  removedEntry == e3 ? new Leaf5(e0, e1, e2, e4, p)
+                    :  removedEntry == e4 ? new Leaf5(e0, e1, e2, e3, p)
+                    :                       new Leaf5(e0, e1, e2, e3, e4);
             }
-
-            var leftLeftHeight = (newLeftTree.Left as ImMapTree<V>)?.TreeHeight ?? 2;
-            var leftRightHeight = (newLeftTree.Right as ImMapTree<V>)?.TreeHeight ?? 2;
-            if (leftLeftHeight < leftRightHeight)
-            {
-                var leftRightTree = (ImMapTree<V>)newLeftTree.Right;
-
-                newLeftTree.Right = leftRightTree.Left;
-                newLeftTree.TreeHeight = leftLeftHeight + 1;
-                return new ImMapTree<V>(leftRightTree.Entry,
-                    newLeftTree,
-                    new ImMapTree<V>(Entry, leftRightTree.Right, Right, rightHeight + 1),
-                    leftLeftHeight + 2);
-
-                //return new ImMapTree<V>(leftRightTree.Entry,
-                //    new ImMapTree<V>(newLeftTree.Entry, leftLeftHeight, newLeftTree.Left, leftRightTree.Left),
-                //    new ImMapTree<V>(Entry, leftRightTree.Right, rightHeight, Right));
-            }
-
-            newLeftTree.Right = new ImMapTree<V>(Entry, newLeftTree.Right, Right, leftRightHeight + 1);
-            newLeftTree.TreeHeight = leftRightHeight + 2;
-            return newLeftTree;
         }
 
-        private ImMapTree<V> BalanceNewRightTree(ImMapTree<V> newRightTree)
+        /// <summary>Leaf with 5 existing ordered entries plus 1 newly added, plus 1 newly added.</summary>
+        public sealed class Leaf5Plus1Plus1 : ImHashMap<K, V>
         {
-            var leftHeight = Left.Height;
-            var delta = newRightTree.Height - leftHeight;
-            if (delta <= 0)
-                return new ImMapTree<V>(Entry, Left, newRightTree, TreeHeight);
-            if (delta == 1)
-                return new ImMapTree<V>(Entry, Left, newRightTree, newRightTree.TreeHeight + 1);
+            /// <summary>New entry</summary>
+            public readonly Entry Plus;
+            /// <summary>Dangling leaf</summary>
+            public readonly Leaf5Plus1 L;
 
-            if (leftHeight == 1)
+            /// <summary>Constructs the leaf</summary>
+            public Leaf5Plus1Plus1(Entry plus, Leaf5Plus1 l)
             {
-                // here we need to re-balance by default, because the new right tree is at least 3 level (actually exactly 3 or it would be too unbalanced)
-                // double rotation needed if only the right-right is a leaf
-                if (newRightTree.Right is ImMapEntry<V> == false)
-                {
-                    newRightTree.Left = new ImMapTree<V>(Entry, Left, newRightTree.Left, 2);
-                    newRightTree.TreeHeight = 3;
-                    return newRightTree;
-                }
-
-                //        20                        30       
-                // 10             40     =>    20        40  
-                //            30      50     10  25    35  50
-                //          25  35                           
-                if (newRightTree.Left is ImMapTree<V> rightLeftTree)
-                {
-                    newRightTree.Left = rightLeftTree.Right;
-                    newRightTree.TreeHeight = 2;
-                    return new ImMapTree<V>(rightLeftTree.Entry,
-                        new ImMapTree<V>(Entry, Left, rightLeftTree.Left, 2),
-                        newRightTree, 3);
-                }
-
-                //        20                        30       
-                // 10             40     =>    10        40  
-                //            30      50         20    35  50
-                //              35                           
-                var rightLeftBranch = (ImMapBranch<V>)newRightTree.Left;
-                newRightTree.Left = rightLeftBranch.RightEntry;
-                newRightTree.TreeHeight = 2;
-                return new ImMapTree<V>(rightLeftBranch.Entry,
-                    new ImMapBranch<V>((ImMapEntry<V>)Left, Entry),
-                    newRightTree, 3);
+                Plus = plus;
+                L    = l;
             }
 
-            var rightRightHeight = (newRightTree.Right as ImMapTree<V>)?.TreeHeight ?? 2;
-            var rightLeftHeight = (newRightTree.Left as ImMapTree<V>)?.TreeHeight ?? 2;
-            if (rightRightHeight < rightLeftHeight)
-            {
-                var rightLeftTree = (ImMapTree<V>)newRightTree.Left;
-                newRightTree.Left = rightLeftTree.Right;
-                // the height now should be defined by rr - because left now is shorter by 1
-                newRightTree.TreeHeight = rightRightHeight + 1;
-                // the whole height consequentially can be defined by `newRightTree` (rr+1) because left is consist of short Left and -2 rl.Left
-                return new ImMapTree<V>(rightLeftTree.Entry,
-                    // Left should be >= rightLeft.Left because it maybe rightLeft.Right which defines rl height
-                    new ImMapTree<V>(Entry, Left, rightLeftTree.Left, leftHeight + 1),
-                    newRightTree,
-                    rightRightHeight + 2);
+            /// <inheritdoc />
+            public override int Count() => Plus.Count() + L.Count();
 
-                //return new ImMapTree<V>(rightLeftTree.Entry,
-                //    new ImMapTree<V>(Entry, leftHeight, Left, rightLeftTree.Left),
-                //    new ImMapTree<V>(newRightTree.Entry, rightLeftTree.Right, rightRightHeight, newRightTree.Right));
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{L511: {P: " + Plus + ", L: " + L + "}}";
+#endif
+
+            internal override Entry GetEntryOrDefault(int hash)
+            {
+                if (hash == Plus.Hash)
+                    return Plus;
+                if (hash == L.Plus.Hash)
+                    return L.Plus;
+                var l = L.L;
+                return hash == l.Entry0.Hash ? l.Entry0 
+                    :  hash == l.Entry1.Hash ? l.Entry1 
+                    :  hash == l.Entry2.Hash ? l.Entry2 
+                    :  hash == l.Entry3.Hash ? l.Entry3 
+                    :  hash == l.Entry4.Hash ? l.Entry4 
+                    :  null;
             }
 
-            Debug.Assert(rightLeftHeight >= leftHeight, "The whole rightHeight > leftHeight by 2, and rightRight >= leftHeight but not more than by 2");
+            internal sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var p = Plus;
+                var ph = p.Hash;
+                if (ph == hash)
+                    return p;
 
-            // we may decide on the height because the Left smaller by 2
-            newRightTree.Left = new ImMapTree<V>(Entry, Left, newRightTree.Left, rightLeftHeight + 1);
-            // if rr was > rl by 1 than new rl+1 should be equal height to rr now, if rr was == rl than new rl wins anyway
-            newRightTree.TreeHeight = rightLeftHeight + 2;
-            return newRightTree;
+                var pp = L.Plus;
+                var pph = pp.Hash;
+                if (pph == hash)
+                    return pp;
+
+                var l = L.L;
+                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+
+                if (hash == e0.Hash)
+                    return e0;
+                if (hash == e1.Hash)
+                    return e1;
+                if (hash == e2.Hash)
+                    return e2;
+                if (hash == e3.Hash)
+                    return e3;
+                if (hash == e4.Hash)
+                    return e4;
+
+                var right = hash > e4.Hash && ph > e4.Hash && pph > e4.Hash;
+                var left  = !right && hash < e0.Hash && ph < e0.Hash && pph < e0.Hash;
+
+                Entry swap = null;
+                if (pph < e4.Hash)
+                {
+                    swap = e4; e4 = pp; pp = swap;
+                    if (pph < e3.Hash)
+                    {
+                        swap = e3; e3 = e4; e4 = swap;
+                        if (pph < e2.Hash)
+                        {
+                            swap = e2; e2 = e3; e3 = swap;
+                            if (pph < e1.Hash)
+                            {
+                                swap = e1; e1 = e2; e2 = swap;
+                                if (pph < e0.Hash)
+                                {
+                                    swap = e0; e0 = e1; e1 = swap;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (ph < pp.Hash)
+                {
+                    swap = pp; pp = p; p = swap;
+                    if (ph < e4.Hash)
+                    {
+                        swap = e4; e4 = pp; pp = swap;
+                        if (ph < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (ph < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (ph < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (ph < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Entry e = entry;
+                if (hash < p.Hash)
+                {
+                    swap = p; p = e; e = swap;
+                    if (hash < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (hash < e4.Hash)
+                        {
+                            swap = e4; e4 = pp; pp = swap;
+                            if (hash < e3.Hash)
+                            {
+                                swap = e3; e3 = e4; e4 = swap;
+                                if (hash < e2.Hash)
+                                {
+                                    swap = e2; e2 = e3; e3 = swap;
+                                    if (hash < e1.Hash)
+                                    {
+                                        swap = e1; e1 = e2; e2 = swap;
+                                        if (hash < e0.Hash)
+                                        {
+                                            swap = e0; e0 = e1; e1 = swap;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (right)
+                    return new Branch2(l, pp, new Leaf2(p, e));
+                if (left)
+                    return new Branch2(new Leaf2(e0, e1), e2, l);
+                return new Branch2(new Leaf5(e0, e1, e2, e3, e4), pp, new Leaf2(p, e));
+            }
+
+            internal sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
+            {
+                var p = Plus;
+                if (p == oldEntry)
+                    return new Leaf5Plus1Plus1(newEntry, L);
+
+                var pp = L.Plus;
+                if (pp == oldEntry)
+                    return new Leaf5Plus1Plus1(p, new Leaf5Plus1(newEntry, L.L));
+
+                var l = L.L;
+                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+                return
+                    oldEntry == e0 ? new Leaf5Plus1Plus1(p, new Leaf5Plus1(pp, new Leaf5(newEntry, e1, e2, e3, e4))) :
+                    oldEntry == e1 ? new Leaf5Plus1Plus1(p, new Leaf5Plus1(pp, new Leaf5(e0, newEntry, e2, e3, e4))) :
+                    oldEntry == e2 ? new Leaf5Plus1Plus1(p, new Leaf5Plus1(pp, new Leaf5(e0, e1, newEntry, e3, e4))) :
+                    oldEntry == e3 ? new Leaf5Plus1Plus1(p, new Leaf5Plus1(pp, new Leaf5(e0, e1, e2, newEntry, e4))) :
+                                     new Leaf5Plus1Plus1(p, new Leaf5Plus1(pp, new Leaf5(e0, e1, e2, e3, newEntry)));
+            }
+
+            internal override ImHashMap<K, V> RemoveEntry(int hash, Entry removedEntry)
+            {
+                var p = Plus;
+                if (p == removedEntry)
+                    return L;
+
+                var pp = L.Plus;
+                if (pp == removedEntry)
+                    return new Leaf5Plus1(p, L.L);
+
+                var l = L.L;
+                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
+                int pph = pp.Hash, ph = p.Hash; 
+                if (pph < e4.Hash)
+                {
+                    swap = e4; e4 = pp; pp = swap;
+                    if (pph < e3.Hash)
+                    {
+                        swap = e3; e3 = e4; e4 = swap;
+                        if (pph < e2.Hash)
+                        {
+                            swap = e2; e2 = e3; e3 = swap;
+                            if (pph < e1.Hash)
+                            {
+                                swap = e1; e1 = e2; e2 = swap;
+                                if (pph < e0.Hash)
+                                {
+                                    swap = e0; e0 = e1; e1 = swap;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (ph < pp.Hash)
+                {
+                    swap = pp; pp = p; p = swap;
+                    if (ph < e4.Hash)
+                    {
+                        swap = e4; e4 = pp; pp = swap;
+                        if (ph < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (ph < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (ph < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (ph < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return removedEntry == e0 ? new Leaf5Plus1(p, new Leaf5(e1, e2, e3, e4, pp)) 
+                    :  removedEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, e2, e3, e4, pp))
+                    :  removedEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e3, e4, pp))
+                    :  removedEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e4, pp))
+                    :  removedEntry == e4 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, pp))
+                    :  removedEntry == pp ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, e4))
+                    :                       new Leaf5Plus1(pp,new Leaf5(e0, e1, e2, e3, e4));
+            }
+        }
+
+        /// <summary>Branch of 2 leafs or branches with entry in the middle</summary>
+        public class Branch2 : ImHashMap<K, V>
+        {
+            /// <summary>Left branch</summary>
+            public readonly ImHashMap<K, V> Left;
+            /// <summary>Entry in the middle</summary>
+            public readonly Entry MidEntry;
+            /// <summary>Right branch</summary>
+            public readonly ImHashMap<K, V> Right;
+            /// <summary>Constructs</summary>
+            public Branch2(ImHashMap<K, V> left, Entry entry, ImHashMap<K, V> right)
+            {
+                Debug.Assert(left  != Empty && left  is Entry == false);
+                Debug.Assert(right != Empty && right is Entry == false);
+                MidEntry = entry;
+                Left     = left;
+                Right    = right;
+            }
+
+            /// <inheritdoc />
+            public sealed override int Count() => (MidEntry is RemovedEntry ? 0 : 1) + Left.Count() + Right.Count();
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{B2: {E: " + MidEntry + ", L: " + Left + ", R: " + Right + "}}";
+#endif
+
+            internal override Entry GetEntryOrDefault(int hash) 
+            {
+                var mh = MidEntry.Hash;
+                return hash > mh ? Right.GetEntryOrDefault(hash) 
+                    :  hash < mh ? Left .GetEntryOrDefault(hash) 
+                    :  MidEntry is RemovedEntry ? null : MidEntry;
+            }
+
+            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var e = MidEntry;
+                if (hash > e.Hash)
+                {
+                    var right = Right;
+                    var newRight = right.AddOrGetEntry(hash, entry);
+                    return newRight is Entry ? newRight
+                         : right.GetType() != typeof(Branch2) && newRight.GetType() == typeof(Branch2) 
+                         ? new RightyBranch3(Left, e, newRight) : new Branch2(Left, e, newRight);
+                }
+
+                if (hash < e.Hash)
+                {
+                    var left = Left;
+                    var newLeft = left.AddOrGetEntry(hash, entry);
+                    return newLeft is Entry ? newLeft 
+                         : left.GetType() != typeof(Branch2) && newLeft.GetType() == typeof(Branch2) 
+                         ? new LeftyBranch3(newLeft, e, Right) : new Branch2(newLeft, e, Right);
+                }
+
+                return e is RemovedEntry ? new Branch2(Left, entry, Right) : (ImHashMap<K, V>)e;
+            }
+
+            internal override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new Branch2(Left, MidEntry, Right.ReplaceEntry(hash, oldEntry, newEntry))
+                    :  hash < h ? new Branch2(Left.ReplaceEntry(hash, oldEntry, newEntry), MidEntry, Right)
+                    :  new Branch2(Left, newEntry, Right);
+            }
+
+            internal override ImHashMap<K, V> RemoveEntry(int hash, Entry removedEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new Branch2(Left, MidEntry, Right.RemoveEntry(hash, removedEntry))
+                    :  hash < h ? new Branch2(Left.RemoveEntry(hash, removedEntry), MidEntry, Right)
+                    :  new Branch2(Left, new RemovedEntry(hash), Right);
+            }
+        }
+
+        /// <summary>Right-skewed Branch of 3 - actually a branch of 2 with the right branch of 2</summary>
+        public sealed class RightyBranch3 : Branch2
+        {
+            /// <summary>Creating the branch</summary>
+            public RightyBranch3(ImHashMap<K, V> left, Entry entry, ImHashMap<K, V>  right) : base(left, entry, right) {}
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{RB3: {"  + base.ToString() + "}";
+#endif
+
+            internal override Entry GetEntryOrDefault(int hash) 
+            {
+                var mh = MidEntry.Hash;
+                if (mh > hash)
+                    return Left.GetEntryOrDefault(hash);
+                if (mh < hash)
+                {
+                    var r = (Branch2)Right;
+                    mh = r.MidEntry.Hash;
+                    return hash > mh ? r.Right.GetEntryOrDefault(hash) 
+                        :  hash < mh ? r.Left .GetEntryOrDefault(hash) 
+                        :  r.MidEntry is RemovedEntry ? null : r.MidEntry;
+                }
+                return MidEntry is RemovedEntry ? null : MidEntry;
+            }
+
+            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var h0 = MidEntry.Hash;
+                var rb = (Branch2)Right;
+                var h1 = rb.MidEntry.Hash;
+                
+                if (hash > h1)
+                {
+                    var right = rb.Right;
+                    var newRight = right.AddOrGetEntry(hash, entry);
+                    if (newRight is Entry)
+                        return newRight;
+                    if (right.GetType() != typeof(Branch2) && newRight.GetType() == typeof(Branch2))
+                        return new Branch2(new Branch2(Left, MidEntry, rb.Left), rb.MidEntry, newRight);
+                    return new RightyBranch3(Left, MidEntry, new Branch2(rb.Left, rb.MidEntry, newRight));
+                }
+
+                if (hash < h0)
+                {
+                    var left = Left;
+                    var newLeft = left.AddOrGetEntry(hash, entry);
+                    if (newLeft is Entry)
+                        return newLeft;
+                    if (left.GetType() != typeof(Branch2) && newLeft.GetType() == typeof(Branch2))
+                        return new Branch2(newLeft, MidEntry, rb);
+                    return new RightyBranch3(newLeft, MidEntry, rb);
+                }
+
+                if (hash > h0 && hash < h1)
+                {
+                    var middle = rb.Left;
+                    var newMiddle = middle.AddOrGetEntry(hash, entry);
+                    if (newMiddle is Entry)
+                        return newMiddle;
+                    if (middle.GetType() != typeof(Branch2) && newMiddle.GetType() == typeof(Branch2))
+                    {
+                        var nmb2 = (Branch2)newMiddle;
+                        return new Branch2(new Branch2(Left, MidEntry, nmb2.Left), nmb2.MidEntry, new Branch2(nmb2.Right, rb.MidEntry, rb.Right));
+                    }
+                    return new RightyBranch3(Left, MidEntry, new Branch2(newMiddle, rb.MidEntry, rb.Right));
+                }
+
+                var e0 = MidEntry;
+                if (hash == h0)
+                    return e0 is RemovedEntry ? new RightyBranch3(Left, entry, rb) : (ImHashMap<K, V>)e0;
+
+                var e1 = rb.MidEntry;
+                return  e1 is RemovedEntry ? new RightyBranch3(Left, e0, new Branch2(rb.Left, entry, rb.Right)) : (ImHashMap<K, V>)e1;
+            }
+
+            internal override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new RightyBranch3(Left, MidEntry, Right.ReplaceEntry(hash, oldEntry, newEntry)) 
+                    :  hash < h ? new RightyBranch3(Left.ReplaceEntry(hash, oldEntry, newEntry), MidEntry, Right)
+                    :  new RightyBranch3(Left, newEntry, Right);
+            }
+
+            internal override ImHashMap<K, V> RemoveEntry(int hash, Entry removedEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new RightyBranch3(Left, MidEntry, Right.RemoveEntry(hash, removedEntry))
+                    :  hash < h ? new RightyBranch3(Left.RemoveEntry(hash, removedEntry), MidEntry, Right)
+                    :  new RightyBranch3(Left, new RemovedEntry(hash), Right);
+            }
+        }
+
+        /// <summary>Left-skewed Branch of 3 - actually a branch of 2 with the left branch of 2</summary>
+        public sealed class LeftyBranch3 : Branch2
+        {
+            /// <summary>Creating the branch</summary>
+            public LeftyBranch3(ImHashMap<K, V> leftBranch, Entry entry, ImHashMap<K, V> right) : base(leftBranch, entry, right) {}
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{LB3: {"  + base.ToString() + "}";
+#endif
+
+            internal override Entry GetEntryOrDefault(int hash) 
+            {
+                var mh = MidEntry.Hash;
+                if (mh < hash)
+                    return Right.GetEntryOrDefault(hash);
+                if (mh > hash)
+                {
+                    var l = (Branch2)Left;
+                    mh = l.MidEntry.Hash;
+                    return hash > mh ? l.Right.GetEntryOrDefault(hash) 
+                        :  hash < mh ? l.Left .GetEntryOrDefault(hash) 
+                        :  l.MidEntry is RemovedEntry ? null : l.MidEntry;
+                }
+                return MidEntry is RemovedEntry ? null : MidEntry;
+            }
+
+            internal override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var lb = (Branch2)Left;
+                var h0 = lb.MidEntry.Hash;
+                var h1 = MidEntry.Hash;
+                
+                if (hash > h1)
+                {
+                    var right = Right;
+                    var newRight = right.AddOrGetEntry(hash, entry);
+                    if (newRight is Entry)
+                        return newRight;
+                    if (right.GetType() != typeof(Branch2) && newRight.GetType() == typeof(Branch2))
+                        return new Branch2(lb, MidEntry, newRight);
+                    return new LeftyBranch3(lb, MidEntry, newRight);
+                }
+
+                if (hash < h0)
+                {
+                    var left = lb.Left;
+                    var newLeft = left.AddOrGetEntry(hash, entry);
+                    if (newLeft is Entry)
+                        return newLeft;
+                    if (left.GetType() != typeof(Branch2) && newLeft.GetType() == typeof(Branch2))
+                        return new Branch2(newLeft, lb.MidEntry, new Branch2(lb.Right, MidEntry, Right));
+                    return new LeftyBranch3(new Branch2(newLeft, lb.MidEntry, lb.Right), MidEntry, Right);
+                }
+
+                if (hash > h0 && hash < h1)
+                {
+                    var middle = lb.Right;
+                    var newMiddle = middle.AddOrGetEntry(hash, entry);
+                    if (newMiddle is Entry)
+                        return newMiddle;
+                    if (middle.GetType() != typeof(Branch2) && newMiddle.GetType() == typeof(Branch2))
+                    {
+                        var nmb2 = (Branch2)newMiddle;
+                        return new Branch2(new Branch2(lb.Left, lb.MidEntry, nmb2.Left), nmb2.MidEntry, new Branch2(nmb2.Right, MidEntry, Right));
+                    }
+                    return new LeftyBranch3(new Branch2(lb.Left, lb.MidEntry, newMiddle), MidEntry, Right);
+                }
+
+                var e0 = lb.MidEntry;
+                var e1 = MidEntry;
+                return hash == h0
+                    ? (e0 is RemovedEntry ? new LeftyBranch3(new Branch2(lb.Left, entry, lb.Right), e1, Right) : (ImHashMap<K, V>)e0)
+                    : (e1 is RemovedEntry ? new LeftyBranch3(lb, entry, Right) : (ImHashMap<K, V>)e1);
+            }
+
+            internal override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new LeftyBranch3(Left, MidEntry, Right.ReplaceEntry(hash, oldEntry, newEntry))
+                    :  hash < h ? new LeftyBranch3(Left.ReplaceEntry(hash, oldEntry, newEntry), MidEntry, Right)
+                    :  new LeftyBranch3(Left, newEntry, Right);
+            }
+
+            internal override ImHashMap<K, V> RemoveEntry(int hash, Entry removedEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new LeftyBranch3(Left, MidEntry, Right.RemoveEntry(hash, removedEntry))
+                    :  hash < h ? new LeftyBranch3(Left.RemoveEntry(hash, removedEntry), MidEntry, Right)
+                    :  new LeftyBranch3(Left, new RemovedEntry(hash), Right);
+            }
         }
     }
 
-    /// <summary>ImMap methods</summary>
-    public static class ImMap
+    /// <summary>Entry containing the Value in addition to the Hash</summary>
+    public sealed class ImMapEntry<V> : ImMap<V>.Entry
     {
-        /// <summary> Adds or updates the value by key in the map, always returns a modified map </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> AddOrUpdateEntry<V>(this ImMap<V> map, ImMapEntry<V> entry)
+        /// <summary>The value. Maybe modified if you need the Ref{Value} semantics. 
+        /// You may add the entry with the default Value to the map, and calculate and set it later (e.g. using the CAS).</summary>
+        public V Value;
+        /// <summary>Constructs the entry with the default value</summary>
+        public ImMapEntry(int hash) : base(hash) {}
+        /// <summary>Constructs the entry with the value</summary>
+        public ImMapEntry(int hash, V value) : base(hash) => Value = value;
+
+#if !DEBUG
+        /// <inheritdoc />
+        public override string ToString() => "{VE: {H: " + Hash + ", V: " + Value + "}}";
+#endif
+
+        /// <inheritdoc />
+        public override int Count() => 1;
+    }
+
+    /// <summary>The base and the holder class for the map tree leafs and branches, also defines the Empty tree.
+    /// The map implementation is based on the "modified" 2-3-4 tree.</summary>
+    public class ImMap<V>
+    {
+        /// <summary>Empty map to start with. Exists as a single instance.</summary>
+        public static readonly ImMap<V> Empty = new ImMap<V>();
+
+        /// <summary>Hide the base constructor to prevent the multiple Empty trees creation</summary>
+        protected ImMap() { } // todo: @perf does the call to empty constructor hurt the perf?
+
+        /// <summary>Prints the map tree in JSON-ish format in release mode and enumerates the keys in DEBUG.</summary>
+        public override string ToString() 
         {
-            if (map == ImMap<V>.Empty)
-                return entry;
+#if DEBUG
+            // for the debug purposes we just output the first N keys in array
+            const int outputCount = 101;
+            var itemsInHashOrder = this.Enumerate().Take(outputCount).Select(x => x.Hash).ToList();
+            return $"new int[{(itemsInHashOrder.Count >= 100 ? ">=" : "") + itemsInHashOrder.Count}] {{" + string.Join(", ", itemsInHashOrder) + "}";
+#else
+            return "{}";
+#endif
+        }
 
-            var key = entry.Key;
-            if (map is ImMapEntry<V> leaf)
-                return key > leaf.Key ? new ImMapBranch<V>(leaf, entry)
-                    : key < leaf.Key ? new ImMapBranch<V>(entry, leaf)
-                    : (ImMap<V>)entry;
+        /// <summary>Indicates that the map is empty</summary>
+        public bool IsEmpty => this == Empty;
 
-            if (map is ImMapBranch<V> branch)
+        /// <summary>The count of entries in the map</summary>
+        public virtual int Count() => 0;
+
+        /// <summary>Lookup for the entry by hash. 
+        /// You need to check the returned entry type because it maybe the `HashConflictKeyValuesEntry` which contain multiple key value entries for the same hash. For the `int` key you may be sure that the `ImHashMapEntry{V}` is always returned.
+        /// If nothing the method returns `null`</summary>
+        internal virtual Entry GetEntryOrNull(int hash) => null;
+
+        /// <summary>Returns the found entry with the same hash or the new map with added new entry.
+        /// Note that the empty map will return the entry the same as if the entry was found - so the consumer should check for the empty map.
+        /// Note that the method cannot return the `null` - when the existing entry is not found it will alway be the new map with the added entry.</summary>
+        internal virtual ImMap<V> AddOrGetEntry(int hash, Entry entry) => entry;
+
+        /// <summary>Returns the new map with old entry replaced by the new entry. Note that the old entry should be present.</summary>
+        internal virtual ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) => this;
+
+        /// <summary>Removes the certainly present old entry and returns the new map without it.</summary>
+        internal virtual ImMap<V> RemoveEntry(int hash, Entry entry) => this;
+
+        /// <summary>The base map entry for holding the hash and payload</summary>
+        public abstract class Entry : ImMap<V>
+        {
+            /// <summary>The Hash</summary>
+            public readonly int Hash;
+
+            /// <summary>Constructs the entry with the hash</summary>
+            protected Entry(int hash) => Hash = hash;
+
+            internal sealed override Entry GetEntryOrNull(int hash) => hash == Hash ? this : null;
+
+            internal sealed override ImMap<V> AddOrGetEntry(int hash, Entry entry) =>
+                hash > Hash ? new Leaf2(this, entry) : hash < Hash ? new Leaf2(entry, this) : (ImMap<V>)this;
+
+            internal sealed override ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) => 
+                this == oldEntry ? newEntry : oldEntry;
+
+            internal sealed override ImMap<V> RemoveEntry(int hash, Entry removedEntry) =>
+                this == removedEntry ? Empty : this;
+        }
+
+        internal sealed class RemovedEntry : Entry 
+        {
+            public RemovedEntry(int hash) : base(hash) {}
+            public override string ToString() => "{RemovedE: {H: " + Hash + "}}";
+        }
+
+        /// <summary>Leaf with 2 hash-ordered entries. Important: the both or either of entries may be null for the removed entries</summary>
+        public sealed class Leaf2 : ImMap<V>
+        {
+            /// <summary>Left entry</summary>
+            public readonly Entry Entry0;
+            /// <summary>Right entry</summary>
+            public readonly Entry Entry1;
+            /// <summary>Constructs the leaf</summary>
+            public Leaf2(Entry e0, Entry e1)
             {
-                if (key > branch.Entry.Key)
-                    //   5                  10
-                    //        10     =>  5     11
-                    //           11           
-                    return key > branch.RightEntry.Key
-                        ? new ImMapTree<V>(branch.RightEntry, branch.Entry, entry)
-                        //   5               7
-                        //        10  =>  5     10
-                        //      7           
-                        : key < branch.RightEntry.Key // rotate if right
-                            ? new ImMapTree<V>(entry, branch.Entry, branch.RightEntry)
-                            : (ImMap<V>)new ImMapBranch<V>(branch.Entry, entry);
-
-                return key < branch.Entry.Key
-                    ? new ImMapTree<V>(branch.Entry, entry, branch.RightEntry)
-                    : (ImMap<V>)new ImMapBranch<V>(entry, branch.RightEntry);
+                Debug.Assert(e0 == null || e1 == null || e0.Hash < e1.Hash);
+                Entry0 = e0; Entry1 = e1;
             }
 
-            var tree = (ImMapTree<V>)map;
-            return key == tree.Entry.Key
-                ? new ImMapTree<V>(entry, tree.Left, tree.Right, tree.TreeHeight)
-                : tree.AddOrUpdateLeftOrRightEntry(key, entry);
-        }
+            /// <inheritdoc />
+            public override int Count() => (Entry0?.Count() ?? 0) + (Entry1?.Count() ?? 0);
 
-        /// <summary> Adds or updates the value by key in the map, always returns a modified map </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> AddOrUpdate<V>(this ImMap<V> map, int key, V value) =>
-            map.AddOrUpdateEntry(new ImMapEntry<V>(key, value));
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{L2: {E0: " + Entry0 + ", E1: " + Entry1 + "}}";
+#endif
 
-        /// <summary> Adds the value by key in the map - ASSUMES that the key is not in the map, always returns a modified map </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> AddEntryUnsafe<V>(this ImMap<V> map, ImMapEntry<V> entry)
-        {
-            if (map == ImMap<V>.Empty)
-                return entry;
+            internal override Entry GetEntryOrNull(int hash) => 
+                Entry0?.Hash == hash ? Entry0 : Entry1?.Hash == hash ? Entry1 : null;
 
-            var key = entry.Key;
-            if (map is ImMapEntry<V> leaf)
-                return key > leaf.Key
-                    ? new ImMapBranch<V>(leaf, entry)
-                    : new ImMapBranch<V>(entry, leaf);
-
-            if (map is ImMapBranch<V> branch)
-                return key < branch.Entry.Key 
-                        ? new ImMapTree<V>(branch.Entry, entry, branch.RightEntry)
-                    : key > branch.RightEntry.Key 
-                        ? new ImMapTree<V>(branch.RightEntry, branch.Entry, entry)
-                        : new ImMapTree<V>(entry, branch.Entry, branch.RightEntry);
-
-            return ((ImMapTree<V>)map).AddUnsafeLeftOrRightEntry(key, entry);
-        }
-
-        /// <summary> Adds the value for the key or returns the un-modified map if key is already present </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> AddOrKeep<V>(this ImMap<V> map, int key, V value)
-        {
-            if (map == ImMap<V>.Empty)
-                return new ImMapEntry<V>(key, value);
-
-            if (map is ImMapEntry<V> leaf)
-                return key > leaf.Key ? new ImMapBranch<V>(leaf, new ImMapEntry<V>(key, value))
-                    : key < leaf.Key ? new ImMapBranch<V>(new ImMapEntry<V>(key, value), leaf)
-                    : map;
-
-            if (map is ImMapBranch<V> branch)
-                return key < branch.Entry.Key
-                        ? new ImMapTree<V>(branch.Entry, new ImMapEntry<V>(key, value), branch.RightEntry)
-                     : key > branch.RightEntry.Key
-                        ? new ImMapTree<V>(branch.RightEntry, branch.Entry, new ImMapEntry<V>(key, value))
-                     : key > branch.Entry.Key && key < branch.RightEntry.Key
-                        ? new ImMapTree<V>(new ImMapEntry<V>(key, value), branch.Entry, branch.RightEntry)
-                     : map;
-
-            var tree = (ImMapTree<V>)map;
-            return key != tree.Entry.Key ? tree.AddOrKeepLeftOrRight(key, value) : map;
-        }
-
-        /// <summary> Adds the entry with default value for the key or returns the un-modified map if key is already present </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> AddOrKeep<V>(this ImMap<V> map, int key)
-        {
-            if (map == ImMap<V>.Empty)
-                return new ImMapEntry<V>(key);
-
-            if (map is ImMapEntry<V> leaf)
-                return key > leaf.Key ? new ImMapBranch<V>(leaf, new ImMapEntry<V>(key))
-                    : key < leaf.Key ? new ImMapBranch<V>(new ImMapEntry<V>(key), leaf)
-                    : map;
-
-            if (map is ImMapBranch<V> branch)
-                return key < branch.Entry.Key
-                        ? new ImMapTree<V>(branch.Entry, new ImMapEntry<V>(key), branch.RightEntry)
-                     : key > branch.RightEntry.Key
-                        ? new ImMapTree<V>(branch.RightEntry, branch.Entry, new ImMapEntry<V>(key))
-                     : key > branch.Entry.Key && key < branch.RightEntry.Key
-                        ? new ImMapTree<V>(new ImMapEntry<V>(key), branch.Entry, branch.RightEntry)
-                     : map;
-
-            var tree = (ImMapTree<V>)map;
-            return key != tree.Entry.Key ? tree.AddOrKeepLeftOrRight(key) : map;
-        }
-
-        /// <summary> Adds the entry for the key or returns the un-modified map if key is already present </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> AddOrKeepEntry<V>(this ImMap<V> map, ImMapEntry<V> entry)
-        {
-            if (map == ImMap<V>.Empty)
-                return entry;
-
-            var key = entry.Key;
-            if (map is ImMapEntry<V> leaf)
-                return key > leaf.Key ? new ImMapBranch<V>(leaf, entry)
-                    : key < leaf.Key ? new ImMapBranch<V>(entry, leaf)
-                    : map;
-
-            if (map is ImMapBranch<V> branch)
-                return key < branch.Entry.Key 
-                        ? new ImMapTree<V>(branch.Entry, entry, branch.RightEntry)
-                     : key > branch.RightEntry.Key 
-                         ? new ImMapTree<V>(branch.RightEntry, branch.Entry, entry)
-                     : key > branch.Entry.Key && key < branch.RightEntry.Key
-                        ? new ImMapTree<V>(entry, branch.Entry, branch.RightEntry)
-                     : map;
-
-            var tree = (ImMapTree<V>)map;
-            return key != tree.Entry.Key ? tree.AddOrKeepLeftOrRightEntry(key, entry) : map;
-        }
-
-        ///<summary>Returns the new map with the updated value for the key, or the same map if the key was not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> Update<V>(this ImMap<V> map, int key, V value) =>
-            map.Contains(key) ? map.UpdateImpl(key, new ImMapEntry<V>(key, value)) : map;
-
-        ///<summary>Returns the new map with the updated value for the key, ASSUMES that the key is not in the map.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> UpdateEntryUnsafe<V>(this ImMap<V> map, ImMapEntry<V> entry) =>
-            map.UpdateImpl(entry.Key, entry);
-
-        internal static ImMap<V> UpdateImpl<V>(this ImMap<V> map, int key, ImMapEntry<V> entry)
-        {
-            if (map is ImMapTree<V> tree)
-                return key > tree.Entry.Key ? new ImMapTree<V>(tree.Entry, tree.Left, tree.Right.UpdateImpl(key, entry), tree.TreeHeight)
-                    : key < tree.Entry.Key ? new ImMapTree<V>(tree.Entry, tree.Left.UpdateImpl(key, entry), tree.Right, tree.TreeHeight)
-                    : new ImMapTree<V>(entry, tree.Left, tree.Right, tree.TreeHeight);
-
-            // the key was found - so it should be either entry or right entry
-            if (map is ImMapBranch<V> branch)
-                return key == branch.Entry.Key
-                    ? new ImMapBranch<V>(entry, branch.RightEntry)
-                    : new ImMapBranch<V>(branch.Entry, entry);
-
-            return entry;
-        }
-
-        ///<summary>Returns the new map with the value set to default, or the same map if the key was not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> UpdateToDefault<V>(this ImMap<V> map, int key) =>
-            map.Contains(key) ? map.UpdateToDefaultImpl(key) : map;
-
-        internal static ImMap<V> UpdateToDefaultImpl<V>(this ImMap<V> map, int key)
-        {
-            if (map is ImMapTree<V> tree)
-                return key > tree.Entry.Key
-                    ? new ImMapTree<V>(tree.Entry, tree.Left, tree.Right.UpdateToDefaultImpl(key), tree.TreeHeight)
-                    : key < tree.Entry.Key
-                        ? new ImMapTree<V>(tree.Entry, tree.Left.UpdateToDefaultImpl(key), tree.Right, tree.TreeHeight)
-                        : new ImMapTree<V>(new ImMapEntry<V>(key), tree.Left, tree.Right, tree.TreeHeight);
-
-            // the key was found - so it should be either entry or right entry
-            if (map is ImMapBranch<V> branch)
-                return key == branch.Entry.Key
-                    ? new ImMapBranch<V>(new ImMapEntry<V>(key), branch.RightEntry)
-                    : new ImMapBranch<V>(branch.Entry, new ImMapEntry<V>(key));
-
-            return new ImMapEntry<V>(key);
-        }
-
-        /// <summary> Returns `true` if key is found or `false` otherwise. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool Contains<V>(this ImMap<V> map, int key)
-        {
-            ImMapEntry<V> entry;
-            while (map is ImMapTree<V> tree)
+            internal override ImMap<V> AddOrGetEntry(int hash, Entry entry)
             {
-                entry = tree.Entry;
-                if (key > entry.Key)
-                    map = tree.Right;
-                else if (key < entry.Key)
-                    map = tree.Left;
-                else
-                    return true;
+                var e0 = Entry0;
+                var e1 = Entry1;
+                if (e0 == null)
+                    return e1 == null ? new Leaf2(null, entry)
+                        : e1.Hash == hash ? (ImMap<V>)e1
+                        : e1.Hash <  hash ? new Leaf2(entry, e1) : new Leaf2(e1, entry);
+
+                if (e1 == null)
+                    return e0.Hash == hash ? (ImMap<V>)e0
+                        :  e0.Hash <  hash ? new Leaf2(e0, entry) : new Leaf2(entry, e0);
+
+                return hash == e0.Hash ? e0
+                     : hash == e1.Hash ? e1
+                     : (ImMap<V>)new Leaf2Plus1(entry, this);
             }
 
-            if (map is ImMapBranch<V> branch)
-                return branch.Entry.Key == key || branch.RightEntry.Key == key;
+            internal override ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
+                oldEntry == Entry0 ? new Leaf2(newEntry, Entry1) : new Leaf2(Entry0, newEntry);
 
-            entry = map as ImMapEntry<V>;
-            return entry != null && entry.Key == key;
+            internal override ImMap<V> RemoveEntry(int hash, Entry removedEntry) =>
+                Entry0 == removedEntry ? new Leaf2(null, Entry1) : new Leaf2(Entry0, null); // the Entry0 or Entry1 maybe null already and it is fine
         }
 
-        /// <summary> Returns the entry if key is found or null otherwise. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMapEntry<V> GetEntryOrDefault<V>(this ImMap<V> map, int key)
+        /// <summary>The leaf containing the Leaf2 plus the newest added entry.</summary>
+        public sealed class Leaf2Plus1 : ImMap<V>
         {
-            ImMapEntry<V> entry;
-            while (map is ImMapTree<V> tree)
+            /// <summary>Plus entry</summary>
+            public readonly Entry Plus;
+            /// <summary>The dangling leaf</summary>
+            public readonly Leaf2 L;
+            /// <summary>Constructs the leaf</summary>
+            public Leaf2Plus1(Entry plus, Leaf2 leaf)
             {
-                entry = tree.Entry;
-                if (key > entry.Key)
-                    map = tree.Right;
-                else if (key < entry.Key)
-                    map = tree.Left;
-                else
-                    return entry;
+                Plus = plus;
+                L    = leaf;
             }
 
-            if (map is ImMapBranch<V> branch)
-                return branch.Entry.Key == key ? branch.Entry
-                    : branch.RightEntry.Key == key ? branch.RightEntry
-                    : null;
+            /// <inheritdoc />
+            public override int Count() => 3;
 
-            entry = map as ImMapEntry<V>;
-            return entry != null && entry.Key == key ? entry : null;
-        }
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{L21: {P: " + Plus + ", L: " + L + "}}";
+#endif
 
-        /// <summary>Looks for the sure present entry - in cases when we know for certain that the map contains the entry</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMapEntry<V> GetSurePresentEntry<V>(this ImMap<V> map, int key)
-        {
-            ImMapEntry<V> entry;
-            while (map is ImMapTree<V> tree)
+            internal override Entry GetEntryOrNull(int hash)
             {
-                entry = tree.Entry;
-                if (key > entry.Key)
-                    map = tree.Right;
-                else if (key < entry.Key)
-                    map = tree.Left;
-                else
-                    return entry;
+                if (hash == Plus.Hash) 
+                    return Plus;
+                Entry e0 = L.Entry0, e1 = L.Entry1;
+                return e0.Hash == hash ? e0 : e1.Hash == hash ? e1 : null;
             }
 
-            if (map is ImMapBranch<V> branch)
-                return branch.Entry.Key == key ? branch.Entry : branch.RightEntry;
-
-            return (ImMapEntry<V>)map;
-        }
-
-        /// <summary> Returns the value if key is found or default value otherwise. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<V>(this ImMap<V> map, int key)
-        {
-            ImMapEntry<V> entry;
-            while (map is ImMapTree<V> tree)
+            internal override ImMap<V> AddOrGetEntry(int hash, Entry entry)
             {
-                entry = tree.Entry;
-                if (key > entry.Key)
-                    map = tree.Right;
-                else if (key < entry.Key)
-                    map = tree.Left;
-                else
-                    return entry.Value;
+                var p = Plus;
+                if (hash == p.Hash) 
+                    return p;
+                Entry e0 = L.Entry0, e1 = L.Entry1;
+                return hash == e0.Hash ? e0 : hash == e1.Hash ? e1 : (ImMap<V>)new Leaf2Plus1Plus1(entry, this);
             }
 
-            if (map is ImMapBranch<V> branch)
-                return branch.Entry.Key == key ? branch.Entry.Value
-                    : branch.RightEntry.Key == key ? branch.RightEntry.Value
-                    : default;
+            internal override ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
+                oldEntry == Plus     ? new Leaf2Plus1(newEntry, L) :
+                oldEntry == L.Entry0 ? new Leaf2Plus1(Plus, new Leaf2(newEntry, L.Entry1)) :
+                                       new Leaf2Plus1(Plus, new Leaf2(L.Entry0, newEntry));
 
-            entry = map as ImMapEntry<V>;
-            if (entry != null && entry.Key == key)
-                return entry.Value;
-
-            return default;
+            internal override ImMap<V> RemoveEntry(int hash, Entry removedEntry) =>
+                removedEntry == Plus ? L :
+                removedEntry == L.Entry0 ? 
+                    (Plus.Hash < L.Entry1.Hash ? new Leaf2(Plus, L.Entry1) : new Leaf2(L.Entry1, Plus)) :
+                    (Plus.Hash < L.Entry0.Hash ? new Leaf2(Plus, L.Entry0) : new Leaf2(L.Entry0, Plus));
         }
 
-        /// <summary> Returns true if key is found and sets the value. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<V>(this ImMap<V> map, int key, out V value)
+        /// <summary>Leaf with the Leaf2 plus added entry, plus added entry</summary>
+        public sealed class Leaf2Plus1Plus1 : ImMap<V>
         {
-            ImMapEntry<V> entry;
-            while (map is ImMapTree<V> tree)
+            /// <summary>New entry</summary>
+            public readonly Entry Plus;
+            /// <summary>The existing leaf to add entry to</summary>
+            public readonly Leaf2Plus1 L;
+
+            /// <summary>Constructs the leaf</summary>
+            public Leaf2Plus1Plus1(Entry plus, Leaf2Plus1 l)
             {
-                entry = tree.Entry;
-                if (key > entry.Key)
-                    map = tree.Right;
-                else if (key < entry.Key)
-                    map = tree.Left;
-                else
+                Plus = plus;
+                L = l;
+            }
+
+            /// <inheritdoc />
+            public override int Count() => 4;
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{L211: {P: " + Plus + ", L: " + L + "}}";
+#endif
+
+            internal override Entry GetEntryOrNull(int hash)
+            {
+                if (hash == Plus.Hash) 
+                    return Plus;
+                if (hash == L.Plus.Hash) 
+                    return L.Plus;
+                Entry e0 = L.L.Entry0, e1 = L.L.Entry1;
+                return e0.Hash == hash ? e0 : e1.Hash == hash ? e1 : null;
+            }
+
+            internal override ImMap<V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var p = Plus;
+                var ph = p.Hash;
+                if (ph == hash)
+                    return p;
+
+                var pp = L.Plus;
+                var pph = pp.Hash;
+                if (pph == hash)
+                    return pp;
+
+                var l = L.L;
+                Entry e0 = l.Entry0, e1 = l.Entry1;
+
+                if (hash == e0.Hash)
+                    return e0;
+                if (hash == e1.Hash)
+                    return e1;
+
+                Entry swap = null;
+                if (pph < e1.Hash)
                 {
-                    value = entry.Value;
-                    return true;
-                }
-            }
-
-            if (map is ImMapBranch<V> branch)
-            {
-                if (branch.Entry.Key == key)
-                {
-                    value = branch.Entry.Value;
-                    return true;
+                    swap = e1; e1 = pp; pp = swap;
+                    if (pph < e0.Hash)
+                    {
+                        swap = e0; e0 = e1; e1 = swap;
+                    }
                 }
 
-                if (branch.RightEntry.Key == key)
+                if (ph < pp.Hash)
                 {
-                    value = branch.RightEntry.Value;
-                    return true;
+                    swap = pp; pp = p; p = swap;
+                    if (ph < e1.Hash)
+                    {
+                        swap = e1; e1 = pp; pp = swap;
+                        if (ph < e0.Hash)
+                        {
+                            swap = e0; e0 = e1; e1 = swap;
+                        }
+                    }
                 }
 
-                value = default;
-                return false;
+                Entry e = entry;
+                if (hash < p.Hash)
+                {
+                    swap = p; p = e; e = swap;
+                    if (hash < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (hash < e1.Hash)
+                        {
+                            swap = e1; e1 = pp; pp = swap;
+                            if (hash < e0.Hash)
+                            {
+                                swap = e0; e0 = e1; e1 = swap;
+                            }
+                        }
+                    }
+                }
+
+                return new Leaf5(e0, e1, pp, p, e);
             }
 
-            entry = map as ImMapEntry<V>;
-            if (entry != null && entry.Key == key)
-            {
-                value = entry.Value;
-                return true;
-            }
+            internal override ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
+                oldEntry == Plus       ? new Leaf2Plus1Plus1(newEntry, L) :
+                oldEntry == L.Plus     ? new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(newEntry, L.L)) :
+                oldEntry == L.L.Entry0 ? new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(L.Plus, new Leaf2(newEntry, L.L.Entry1))) :
+                                         new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(L.Plus, new Leaf2(L.L.Entry0, newEntry)));
 
-            value = default;
-            return false;
+            internal override ImMap<V> RemoveEntry(int hash, Entry removedEntry) =>
+                removedEntry == Plus ? L : 
+                removedEntry == L.Plus ? new Leaf2Plus1(Plus, L.L) :
+                removedEntry == L.L.Entry0 ? 
+                    (L.Plus.Hash < L.L.Entry1.Hash ? new Leaf2Plus1(Plus, new Leaf2(L.Plus, L.L.Entry1)) : new Leaf2Plus1(Plus, new Leaf2(L.L.Entry1, L.Plus))) :
+                    (L.Plus.Hash < L.L.Entry0.Hash ? new Leaf2Plus1(Plus, new Leaf2(L.Plus, L.L.Entry0)) : new Leaf2Plus1(Plus, new Leaf2(L.L.Entry0, L.Plus)));
         }
 
-        /// <summary> Returns true if key is found and sets the value. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFindEntry<V>(this ImMap<V> map, int key, out ImMapEntry<V> result)
+        /// <summary>Leaf with 5 hash-ordered entries</summary>
+        public sealed class Leaf5 : ImMap<V>
         {
-            ImMapEntry<V> entry;
-            while (map is ImMapTree<V> tree)
+            /// <summary>Left entry</summary>
+            public readonly Entry Entry0;
+            /// <summary>Middle-left entry</summary>
+            public readonly Entry Entry1;
+            /// <summary>Middle entry</summary>
+            public readonly Entry Entry2;
+            /// <summary>Middle-right entry</summary>
+            public readonly Entry Entry3;
+            /// <summary>Right entry</summary>
+            public readonly Entry Entry4;
+
+            /// <summary>Constructs the leaf</summary>
+            public Leaf5(Entry e0, Entry e1, Entry e2, Entry e3, Entry e4)
             {
-                entry = tree.Entry;
-                if (key > entry.Key)
-                    map = tree.Right;
-                else if (key < entry.Key)
-                    map = tree.Left;
-                else
-                {
-                    result = entry;
-                    return true;
-                }
+                Debug.Assert(e0.Hash < e1.Hash, "e0 < e1");
+                Debug.Assert(e1.Hash < e2.Hash, "e1 < e2");
+                Debug.Assert(e2.Hash < e3.Hash, "e2 < e3");
+                Debug.Assert(e3.Hash < e4.Hash, "e3 < e4");
+                Entry0 = e0; Entry1 = e1; Entry2 = e2; Entry3 = e3; Entry4 = e4;
             }
 
-            if (map is ImMapBranch<V> branch)
-            {
-                if (branch.Entry.Key == key)
-                {
-                    result = branch.Entry;
-                    return true;
-                }
+            /// <inheritdoc />
+            public override int Count() => 5;
 
-                if (branch.RightEntry.Key == key)
-                {
-                    result = branch.RightEntry;
-                    return true;
-                }
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => 
+                "{L2: {E0: " + Entry0 + ", E1: " + Entry1 + ", E2: " + Entry2 + ", E3: " + Entry3 + ", E4: " + Entry4 + "}}";
+#endif
 
-                result = null;
-                return false;
-            }
+            internal override Entry GetEntryOrNull(int hash) =>
+                hash == Entry0.Hash ? Entry0 :
+                hash == Entry1.Hash ? Entry1 :
+                hash == Entry2.Hash ? Entry2 :
+                hash == Entry3.Hash ? Entry3 :
+                hash == Entry4.Hash ? Entry4 :
+                null;
 
-            entry = map as ImMapEntry<V>;
-            if (entry != null && entry.Key == key)
-            {
-                result = entry;
-                return true;
-            }
+            internal override ImMap<V> AddOrGetEntry(int hash, Entry entry) =>
+                hash == Entry0.Hash ? Entry0 :
+                hash == Entry1.Hash ? Entry1 :
+                hash == Entry2.Hash ? Entry2 :
+                hash == Entry3.Hash ? Entry3 :
+                hash == Entry4.Hash ? Entry4 :
+                (ImMap<V>)new Leaf5Plus1(entry, this);
 
-            result = null;
-            return false;
+            internal override ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
+                oldEntry == Entry0 ? new Leaf5(newEntry, Entry1, Entry2, Entry3, Entry4) : 
+                oldEntry == Entry1 ? new Leaf5(Entry0, newEntry, Entry2, Entry3, Entry4) :
+                oldEntry == Entry2 ? new Leaf5(Entry0, Entry1, newEntry, Entry3, Entry4) :
+                oldEntry == Entry3 ? new Leaf5(Entry0, Entry1, Entry2, newEntry, Entry4) :
+                                     new Leaf5(Entry0, Entry1, Entry2, Entry3, newEntry);
+
+            internal override ImMap<V> RemoveEntry(int hash, Entry removedEntry) =>
+                removedEntry == Entry0 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry1, Entry2))) : 
+                removedEntry == Entry1 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry0, Entry2))) :
+                removedEntry == Entry2 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry0, Entry1))) :
+                removedEntry == Entry3 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry2, new Leaf2(Entry0, Entry1))) :
+                                         new Leaf2Plus1Plus1(Entry3, new Leaf2Plus1(Entry2, new Leaf2(Entry0, Entry1)));
         }
 
-        /// <summary>
-        /// Enumerates all the map nodes from the left to the right and from the bottom to top
-        /// You may pass `parentStacks` to reuse the array memory.
-        /// NOTE: the length of `parentStack` should be at least of map (height - 2) - the stack want be used for 0, 1, 2 height maps,
-        /// the content of the stack is not important and could be erased.
-        /// </summary>
-        public static IEnumerable<ImMapEntry<V>> Enumerate<V>(this ImMap<V> map, ImMapTree<V>[] parentStack = null)
+        /// <summary>Leaf with 5 existing ordered entries plus 1 newly added entry.</summary>
+        public sealed class Leaf5Plus1 : ImMap<V>
+        {
+            /// <summary>New entry</summary>
+            public readonly Entry Plus;
+            /// <summary>Dangling leaf</summary>
+            public readonly Leaf5 L;
+
+            /// <summary>Constructs the leaf</summary>
+            public Leaf5Plus1(Entry plus, Leaf5 l)
+            {
+                Plus = plus;
+                L    = l;
+            }
+
+            /// <inheritdoc />
+            public override int Count() => 6;
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{L51: {P: " + Plus + ", L: " + L + "}}";
+#endif
+
+            internal override Entry GetEntryOrNull(int hash)
+            {
+                if (hash == Plus.Hash) 
+                    return Plus; 
+                var l = L;
+                return hash == l.Entry0.Hash ? l.Entry0 
+                    :  hash == l.Entry1.Hash ? l.Entry1 
+                    :  hash == l.Entry2.Hash ? l.Entry2 
+                    :  hash == l.Entry3.Hash ? l.Entry3 
+                    :  hash == l.Entry4.Hash ? l.Entry4 
+                    :  null;
+            }
+
+            internal override ImMap<V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var p = Plus;
+                var ph = p.Hash;
+                if (ph == hash)
+                    return p;
+                var l = L; 
+                return hash == l.Entry0.Hash ? l.Entry0
+                    :  hash == l.Entry1.Hash ? l.Entry1 
+                    :  hash == l.Entry2.Hash ? l.Entry2
+                    :  hash == l.Entry3.Hash ? l.Entry3
+                    :  hash == l.Entry4.Hash ? l.Entry4
+                    :  (ImMap<V>)new Leaf5Plus1Plus1(entry, this);
+            }
+
+            internal override ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
+            {
+                var p = Plus;
+                if (oldEntry == p)
+                    return new Leaf5Plus1(newEntry, L);
+                var l = L; 
+                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+                return oldEntry == e0 ? new Leaf5Plus1(p, new Leaf5(newEntry, e1, e2, e3, e4)) 
+                    :  oldEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, newEntry, e2, e3, e4)) 
+                    :  oldEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, newEntry, e3, e4)) 
+                    :  oldEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, newEntry, e4)) 
+                    :                   new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, newEntry));
+            }
+
+            internal override ImMap<V> RemoveEntry(int hash, Entry removedEntry)
+            {
+                var p = Plus;
+                if (p == removedEntry)
+                    return L;
+
+                var ph = p.Hash;
+                var l = L; 
+                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
+
+                if (ph < e4.Hash)
+                {
+                    swap = e4; e4 = p; p = swap;
+                    if (ph < e3.Hash)
+                    {
+                        swap = e3; e3 = e4; e4 = swap;
+                        if (ph < e2.Hash)
+                        {
+                            swap = e2; e2 = e3; e3 = swap;
+                            if (ph < e1.Hash)
+                            {
+                                swap = e1; e1 = e2; e2 = swap;
+                                if (ph < e0.Hash)
+                                {
+                                    swap = e0; e0 = e1; e1 = swap;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return removedEntry == e0 ? new Leaf5(e1, e2, e3, e4, p)
+                    :  removedEntry == e1 ? new Leaf5(e0, e2, e3, e4, p)
+                    :  removedEntry == e2 ? new Leaf5(e0, e1, e3, e4, p)
+                    :  removedEntry == e3 ? new Leaf5(e0, e1, e2, e4, p)
+                    :  removedEntry == e4 ? new Leaf5(e0, e1, e2, e3, p)
+                    :                       new Leaf5(e0, e1, e2, e3, e4);
+            }
+        }
+
+        /// <summary>Leaf with 5 existing ordered entries plus 1 newly added, plus 1 newly added.</summary>
+        public sealed class Leaf5Plus1Plus1 : ImMap<V>
+        {
+            /// <summary>New entry</summary>
+            public readonly Entry Plus;
+            /// <summary>Dangling leaf</summary>
+            public readonly Leaf5Plus1 L;
+
+            /// <summary>Constructs the leaf</summary>
+            public Leaf5Plus1Plus1(Entry plus, Leaf5Plus1 l)
+            {
+                Plus = plus;
+                L    = l;
+            }
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{L511: {P: " + Plus + ", L: " + L + "}}";
+#endif
+
+            /// <inheritdoc />
+            public sealed override int Count() => 7;
+
+            internal override Entry GetEntryOrNull(int hash)
+            {
+                if (hash == Plus.Hash)
+                    return Plus;
+                if (hash == L.Plus.Hash)
+                    return L.Plus;
+                var l = L.L;
+                return hash == l.Entry0.Hash ? l.Entry0 
+                    :  hash == l.Entry1.Hash ? l.Entry1 
+                    :  hash == l.Entry2.Hash ? l.Entry2 
+                    :  hash == l.Entry3.Hash ? l.Entry3 
+                    :  hash == l.Entry4.Hash ? l.Entry4 
+                    :  null;
+            }
+
+            internal override ImMap<V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var p = Plus;
+                var ph = p.Hash;
+                if (ph == hash)
+                    return p;
+
+                var pp = L.Plus;
+                var pph = pp.Hash;
+                if (pph == hash)
+                    return pp;
+
+                var l = L.L;
+                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+
+                if (hash == e0.Hash)
+                    return e0;
+                if (hash == e1.Hash)
+                    return e1;
+                if (hash == e2.Hash)
+                    return e2;
+                if (hash == e3.Hash)
+                    return e3;
+                if (hash == e4.Hash)
+                    return e4;
+
+                var right = hash > e4.Hash && ph > e4.Hash && pph > e4.Hash;
+                var left  = !right && hash < e0.Hash && ph < e0.Hash && pph < e0.Hash;
+
+                Entry swap = null;
+                if (pph < e4.Hash)
+                {
+                    swap = e4; e4 = pp; pp = swap;
+                    if (pph < e3.Hash)
+                    {
+                        swap = e3; e3 = e4; e4 = swap;
+                        if (pph < e2.Hash)
+                        {
+                            swap = e2; e2 = e3; e3 = swap;
+                            if (pph < e1.Hash)
+                            {
+                                swap = e1; e1 = e2; e2 = swap;
+                                if (pph < e0.Hash)
+                                {
+                                    swap = e0; e0 = e1; e1 = swap;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (ph < pp.Hash)
+                {
+                    swap = pp; pp = p; p = swap;
+                    if (ph < e4.Hash)
+                    {
+                        swap = e4; e4 = pp; pp = swap;
+                        if (ph < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (ph < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (ph < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (ph < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Entry e = entry;
+                if (hash < p.Hash)
+                {
+                    swap = p; p = e; e = swap;
+                    if (hash < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (hash < e4.Hash)
+                        {
+                            swap = e4; e4 = pp; pp = swap;
+                            if (hash < e3.Hash)
+                            {
+                                swap = e3; e3 = e4; e4 = swap;
+                                if (hash < e2.Hash)
+                                {
+                                    swap = e2; e2 = e3; e3 = swap;
+                                    if (hash < e1.Hash)
+                                    {
+                                        swap = e1; e1 = e2; e2 = swap;
+                                        if (hash < e0.Hash)
+                                        {
+                                            swap = e0; e0 = e1; e1 = swap;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (right)
+                    return new Branch2(l, pp, new Leaf2(p, e));
+                if (left)
+                    return new Branch2(new Leaf2(e0, e1), e2, l);
+                return new Branch2(new Leaf5(e0, e1, e2, e3, e4), pp, new Leaf2(p, e));
+            }
+
+            internal override ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
+            {
+                var p = Plus;
+                if (p == oldEntry)
+                    return new Leaf5Plus1Plus1(newEntry, L);
+
+                var pp = L.Plus;
+                if (pp == oldEntry)
+                    return new Leaf5Plus1Plus1(p, new Leaf5Plus1(newEntry, L.L));
+
+                var l = L.L;
+                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
+                return
+                    oldEntry == e0 ? new Leaf5Plus1Plus1(p, new Leaf5Plus1(pp, new Leaf5(newEntry, e1, e2, e3, e4))) :
+                    oldEntry == e1 ? new Leaf5Plus1Plus1(p, new Leaf5Plus1(pp, new Leaf5(e0, newEntry, e2, e3, e4))) :
+                    oldEntry == e2 ? new Leaf5Plus1Plus1(p, new Leaf5Plus1(pp, new Leaf5(e0, e1, newEntry, e3, e4))) :
+                    oldEntry == e3 ? new Leaf5Plus1Plus1(p, new Leaf5Plus1(pp, new Leaf5(e0, e1, e2, newEntry, e4))) :
+                                     new Leaf5Plus1Plus1(p, new Leaf5Plus1(pp, new Leaf5(e0, e1, e2, e3, newEntry)));
+            }
+
+            internal override ImMap<V> RemoveEntry(int hash, Entry removedEntry)
+            {
+                var p = Plus;
+                if (p == removedEntry)
+                    return L;
+
+                var pp = L.Plus;
+                if (pp == removedEntry)
+                    return new Leaf5Plus1(p, L.L);
+
+                var l = L.L;
+                Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
+                int pph = pp.Hash, ph = p.Hash; 
+                if (pph < e4.Hash)
+                {
+                    swap = e4; e4 = pp; pp = swap;
+                    if (pph < e3.Hash)
+                    {
+                        swap = e3; e3 = e4; e4 = swap;
+                        if (pph < e2.Hash)
+                        {
+                            swap = e2; e2 = e3; e3 = swap;
+                            if (pph < e1.Hash)
+                            {
+                                swap = e1; e1 = e2; e2 = swap;
+                                if (pph < e0.Hash)
+                                {
+                                    swap = e0; e0 = e1; e1 = swap;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (ph < pp.Hash)
+                {
+                    swap = pp; pp = p; p = swap;
+                    if (ph < e4.Hash)
+                    {
+                        swap = e4; e4 = pp; pp = swap;
+                        if (ph < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (ph < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (ph < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (ph < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return removedEntry == e0 ? new Leaf5Plus1(p, new Leaf5(e1, e2, e3, e4, pp)) 
+                    :  removedEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, e2, e3, e4, pp))
+                    :  removedEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e3, e4, pp))
+                    :  removedEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e4, pp))
+                    :  removedEntry == e4 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, pp))
+                    :  removedEntry == pp ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, e4))
+                    :                       new Leaf5Plus1(pp,new Leaf5(e0, e1, e2, e3, e4));
+            }
+        }
+
+        /// <summary>Branch of 2 leafs or branches with entry in the middle</summary>
+        public class Branch2 : ImMap<V>
+        {
+            /// <summary>Left branch</summary>
+            public readonly ImMap<V> Left;
+            /// <summary>Entry in the middle</summary>
+            public readonly Entry MidEntry;
+            /// <summary>Right branch</summary>
+            public readonly ImMap<V> Right;
+            /// <summary>Constructs</summary>
+            public Branch2(ImMap<V> left, Entry entry, ImMap<V> right)
+            {
+                Debug.Assert(left  != Empty && left  is Entry == false);
+                Debug.Assert(right != Empty && right is Entry == false);
+                MidEntry = entry;
+                Left     = left;
+                Right    = right;
+            }
+
+            /// <inheritdoc />
+            public sealed override int Count() => (MidEntry is RemovedEntry ? 0 : 1) + Left.Count() + Right.Count();
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{B2: {E: " + MidEntry + ", L: " + Left + ", R: " + Right + "}}";
+#endif
+
+            internal override Entry GetEntryOrNull(int hash) 
+            {
+                var mh = MidEntry.Hash;
+                return hash > mh ? Right.GetEntryOrNull(hash) 
+                    :  hash < mh ? Left .GetEntryOrNull(hash) 
+                    :  MidEntry is RemovedEntry ? null : MidEntry;
+            }
+
+            internal override ImMap<V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var e = MidEntry;
+                if (hash > e.Hash)
+                {
+                    var right = Right;
+                    var newRight = right.AddOrGetEntry(hash, entry);
+                    return newRight is Entry ? newRight
+                         : right.GetType() != typeof(Branch2) && newRight.GetType() == typeof(Branch2) 
+                         ? new RightyBranch3(Left, e, newRight) : new Branch2(Left, e, newRight);
+                }
+
+                if (hash < e.Hash)
+                {
+                    var left = Left;
+                    var newLeft = left.AddOrGetEntry(hash, entry);
+                    return newLeft is Entry ? newLeft 
+                         : left.GetType() != typeof(Branch2) && newLeft.GetType() == typeof(Branch2) 
+                         ? new LeftyBranch3(newLeft, e, Right) : new Branch2(newLeft, e, Right);
+                }
+
+                return e is RemovedEntry ? new Branch2(Left, entry, Right) : (ImMap<V>)e;
+            }
+
+            internal override ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new Branch2(Left, MidEntry, Right.ReplaceEntry(hash, oldEntry, newEntry))
+                    :  hash < h ? new Branch2(Left.ReplaceEntry(hash, oldEntry, newEntry), MidEntry, Right)
+                    :  new Branch2(Left, newEntry, Right);
+            }
+
+            internal override ImMap<V> RemoveEntry(int hash, Entry removedEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new Branch2(Left, MidEntry, Right.RemoveEntry(hash, removedEntry))
+                    :  hash < h ? new Branch2(Left.RemoveEntry(hash, removedEntry), MidEntry, Right)
+                    :  new Branch2(Left, new RemovedEntry(hash), Right);
+            }
+        }
+
+        /// <summary>Right-skewed Branch of 3 - actually a branch of 2 with the right branch of 2</summary>
+        public sealed class RightyBranch3 : Branch2
+        {
+            /// <summary>Creating the branch</summary>
+            public RightyBranch3(ImMap<V> left, Entry entry, ImMap<V> right) : base(left, entry, right) {}
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{RB3: {"  + base.ToString() + "}";
+#endif
+
+            internal override Entry GetEntryOrNull(int hash) 
+            {
+                var mh = MidEntry.Hash;
+                if (mh > hash)
+                    return Left.GetEntryOrNull(hash);
+                if (mh < hash)
+                {
+                    var r = (Branch2)Right;
+                    mh = r.MidEntry.Hash;
+                    return hash > mh ? r.Right.GetEntryOrNull(hash) 
+                        :  hash < mh ? r.Left .GetEntryOrNull(hash) 
+                        :  r.MidEntry is RemovedEntry ? null : r.MidEntry;
+                }
+                return MidEntry is RemovedEntry ? null : MidEntry;
+            }
+
+            internal override ImMap<V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var h0 = MidEntry.Hash;
+                var rb = (Branch2)Right;
+                var h1 = rb.MidEntry.Hash;
+                
+                if (hash > h1)
+                {
+                    var right = rb.Right;
+                    var newRight = right.AddOrGetEntry(hash, entry);
+                    if (newRight is Entry)
+                        return newRight;
+                    if (right.GetType() != typeof(Branch2) && newRight.GetType() == typeof(Branch2))
+                        return new Branch2(new Branch2(Left, MidEntry, rb.Left), rb.MidEntry, newRight);
+                    return new RightyBranch3(Left, MidEntry, new Branch2(rb.Left, rb.MidEntry, newRight));
+                }
+
+                if (hash < h0)
+                {
+                    var left = Left;
+                    var newLeft = left.AddOrGetEntry(hash, entry);
+                    if (newLeft is Entry)
+                        return newLeft;
+                    if (left.GetType() != typeof(Branch2) && newLeft.GetType() == typeof(Branch2))
+                        return new Branch2(newLeft, MidEntry, rb);
+                    return new RightyBranch3(newLeft, MidEntry, rb);
+                }
+
+                if (hash > h0 && hash < h1)
+                {
+                    var middle = rb.Left;
+                    var newMiddle = middle.AddOrGetEntry(hash, entry);
+                    if (newMiddle is Entry)
+                        return newMiddle;
+                    if (middle.GetType() != typeof(Branch2) && newMiddle.GetType() == typeof(Branch2))
+                    {
+                        var nmb2 = (Branch2)newMiddle;
+                        return new Branch2(new Branch2(Left, MidEntry, nmb2.Left), nmb2.MidEntry, new Branch2(nmb2.Right, rb.MidEntry, rb.Right));
+                    }
+                    return new RightyBranch3(Left, MidEntry, new Branch2(newMiddle, rb.MidEntry, rb.Right));
+                }
+
+                var e0 = MidEntry;
+                if (hash == h0)
+                    return e0 is RemovedEntry ? new RightyBranch3(Left, entry, rb) : (ImMap<V>)e0;
+
+                var e1 = rb.MidEntry;
+                return  e1 is RemovedEntry ? new RightyBranch3(Left, e0, new Branch2(rb.Left, entry, rb.Right)) : (ImMap<V>)e1;
+            }
+
+            internal override ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new RightyBranch3(Left, MidEntry, Right.ReplaceEntry(hash, oldEntry, newEntry)) 
+                    :  hash < h ? new RightyBranch3(Left.ReplaceEntry(hash, oldEntry, newEntry), MidEntry, Right)
+                    :  new RightyBranch3(Left, newEntry, Right);
+            }
+
+            internal override ImMap<V> RemoveEntry(int hash, Entry removedEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new RightyBranch3(Left, MidEntry, Right.RemoveEntry(hash, removedEntry))
+                    :  hash < h ? new RightyBranch3(Left.RemoveEntry(hash, removedEntry), MidEntry, Right)
+                    :  new RightyBranch3(Left, new RemovedEntry(hash), Right);
+            }
+        }
+
+        /// <summary>Left-skewed Branch of 3 - actually a branch of 2 with the left branch of 2</summary>
+        public sealed class LeftyBranch3 : Branch2
+        {
+            /// <summary>Creating the branch</summary>
+            public LeftyBranch3(ImMap<V> leftBranch, Entry entry, ImMap<V> right) : base(leftBranch, entry, right) {}
+
+#if !DEBUG
+            /// <inheritdoc />
+            public override string ToString() => "{LB3: {"  + base.ToString() + "}";
+#endif
+
+            internal override Entry GetEntryOrNull(int hash) 
+            {
+                var mh = MidEntry.Hash;
+                if (mh < hash)
+                    return Right.GetEntryOrNull(hash);
+                if (mh > hash)
+                {
+                    var l = (Branch2)Left;
+                    mh = l.MidEntry.Hash;
+                    return hash > mh ? l.Right.GetEntryOrNull(hash) 
+                        :  hash < mh ? l.Left .GetEntryOrNull(hash) 
+                        :  l.MidEntry is RemovedEntry ? null : l.MidEntry;
+                }
+                return MidEntry is RemovedEntry ? null : MidEntry;
+            }
+
+            internal override ImMap<V> AddOrGetEntry(int hash, Entry entry)
+            {
+                var lb = (Branch2)Left;
+                var h0 = lb.MidEntry.Hash;
+                var h1 = MidEntry.Hash;
+                
+                if (hash > h1)
+                {
+                    var right = Right;
+                    var newRight = right.AddOrGetEntry(hash, entry);
+                    if (newRight is Entry)
+                        return newRight;
+                    if (right.GetType() != typeof(Branch2) && newRight.GetType() == typeof(Branch2))
+                        return new Branch2(lb, MidEntry, newRight);
+                    return new LeftyBranch3(lb, MidEntry, newRight);
+                }
+
+                if (hash < h0)
+                {
+                    var left = lb.Left;
+                    var newLeft = left.AddOrGetEntry(hash, entry);
+                    if (newLeft is Entry)
+                        return newLeft;
+                    if (left.GetType() != typeof(Branch2) && newLeft.GetType() == typeof(Branch2))
+                        return new Branch2(newLeft, lb.MidEntry, new Branch2(lb.Right, MidEntry, Right));
+                    return new LeftyBranch3(new Branch2(newLeft, lb.MidEntry, lb.Right), MidEntry, Right);
+                }
+
+                if (hash > h0 && hash < h1)
+                {
+                    var middle = lb.Right;
+                    var newMiddle = middle.AddOrGetEntry(hash, entry);
+                    if (newMiddle is Entry)
+                        return newMiddle;
+                    if (middle.GetType() != typeof(Branch2) && newMiddle.GetType() == typeof(Branch2))
+                    {
+                        var nmb2 = (Branch2)newMiddle;
+                        return new Branch2(new Branch2(lb.Left, lb.MidEntry, nmb2.Left), nmb2.MidEntry, new Branch2(nmb2.Right, MidEntry, Right));
+                    }
+                    return new LeftyBranch3(new Branch2(lb.Left, lb.MidEntry, newMiddle), MidEntry, Right);
+                }
+
+                var e0 = lb.MidEntry;
+                var e1 = MidEntry;
+                return hash == h0
+                    ? (e0 is RemovedEntry ? new LeftyBranch3(new Branch2(lb.Left, entry, lb.Right), e1, Right) : (ImMap<V>)e0)
+                    : (e1 is RemovedEntry ? new LeftyBranch3(lb, entry, Right) : (ImMap<V>)e1);
+            }
+
+            internal override ImMap<V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new LeftyBranch3(Left, MidEntry, Right.ReplaceEntry(hash, oldEntry, newEntry))
+                    :  hash < h ? new LeftyBranch3(Left.ReplaceEntry(hash, oldEntry, newEntry), MidEntry, Right)
+                    :  new LeftyBranch3(Left, newEntry, Right);
+            }
+
+            internal override ImMap<V> RemoveEntry(int hash, Entry removedEntry)
+            {
+                var h = MidEntry.Hash;
+                return hash > h ? new LeftyBranch3(Left, MidEntry, Right.RemoveEntry(hash, removedEntry))
+                    :  hash < h ? new LeftyBranch3(Left.RemoveEntry(hash, removedEntry), MidEntry, Right)
+                    :  new LeftyBranch3(Left, new RemovedEntry(hash), Right);
+            }
+        }
+    }
+
+    /// <summary>The map methods</summary>
+    public static class ImHashMap
+    {
+        /// <summary>Helper stack wrapper for the array</summary>
+        public sealed class Stack<T>
+        {
+            private const int DefaultInitialCapacity = 4;
+            private T[] _items;
+
+            /// <summary>Creates the list of the `DefaultInitialCapacity`</summary>
+            public Stack() => _items = new T[DefaultInitialCapacity];
+
+            /// <summary>Pushes the item</summary>
+            public void Push(T item, int count)
+            {
+                if (count >= _items.Length)
+                    _items = Expand(_items);
+                _items[count] = item;
+            }
+
+            /// <summary>Gets the item by index</summary>
+            public T Get(int index) => _items[index];
+
+            private static T[] Expand(T[] items)
+            {
+                var count = items.Length;
+                var newItems = new T[count << 1]; // count * 2
+                Array.Copy(items, 0, newItems, 0, count);
+                return newItems;
+            }
+        }
+
+        /// <summary>Enumerates all the map entries in the hash order.
+        /// The `parents` parameter allow sto reuse the stack memory used for traversal between multiple enumerates.
+        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent `Enumerate` calls</summary>
+        public static IEnumerable<ImHashMapEntry<K, V>> Enumerate<K, V>(this ImHashMap<K, V> map, Stack<ImHashMap<K, V>> parents = null)
+        {
+            if (map == ImHashMap<K, V>.Empty)
+                yield break;
+            if (map is ImHashMap<K, V>.Entry e)
+            {
+                if (e is ImHashMapEntry<K, V> v) yield return v;
+                else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e).Conflicts) yield return c;
+                yield break;
+            }
+
+            var count = 0;
+            while (true)
+            {
+                if (map is ImHashMap<K, V>.Branch2 b2)
+                {
+                    if (parents == null)
+                        parents = new Stack<ImHashMap<K, V>>();
+                    parents.Push(map, count++);
+                    map = b2.Left;
+                    continue;
+                }
+                
+                if (map is ImHashMap<K, V>.Leaf2 l2)
+                {
+                    if (l2.Entry0 is ImHashMapEntry<K, V> v0) yield return v0;
+                    else if (l2.Entry0 != null) foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l2.Entry0).Conflicts) yield return c;
+                    if (l2.Entry1 is ImHashMapEntry<K, V> v1) yield return v1;
+                    else if (l2.Entry1 != null) foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l2.Entry1).Conflicts) yield return c;
+                }
+                else if (map is ImHashMap<K, V>.Leaf2Plus1 l21)
+                {
+                    var p  = l21.Plus;
+                    var ph = p.Hash;
+                    var l  = l21.L;
+                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
+                    if (ph < e1.Hash)
+                    {
+                        swap = e1; e1 = p; p = swap;
+                        if (ph < e0.Hash)
+                        {
+                            swap = e0; e0 = e1; e1 = swap;
+                        }
+                    }
+
+                    if (e0 is ImHashMapEntry<K, V> v0) yield return v0;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e0).Conflicts) yield return c;
+                    if (e1 is ImHashMapEntry<K, V> v1) yield return v1;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e1).Conflicts) yield return c;
+                    if (p  is ImHashMapEntry<K, V> v2) yield return v2;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)p ).Conflicts) yield return c;
+                }
+                else if (map is ImHashMap<K, V>.Leaf2Plus1Plus1 l211)
+                {
+                    var p  = l211.Plus;
+                    var pp = l211.L.Plus;
+                    var ph = pp.Hash;
+                    var l  = l211.L.L;
+                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
+                    if (ph < e1.Hash)
+                    {
+                        swap = e1; e1 = pp; pp = swap;
+                        if (ph < e0.Hash)
+                        {
+                            swap = e0; e0 = e1; e1 = swap;
+                        }
+                    }
+
+                    ph = p.Hash;
+                    if (ph < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (ph < e1.Hash)
+                        {
+                            swap = e1; e1 = pp; pp = swap;
+                            if (ph < e0.Hash)
+                            {
+                                swap = e0; e0 = e1; e1 = swap;
+                            }
+                        }
+                    }
+
+                    if (e0 is ImHashMapEntry<K, V> v0) yield return v0;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e0).Conflicts) yield return c;
+                    if (e1 is ImHashMapEntry<K, V> v1) yield return v1;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e1).Conflicts) yield return c;
+                    if (pp is ImHashMapEntry<K, V> v2) yield return v2;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)pp).Conflicts) yield return c;
+                    if (p  is ImHashMapEntry<K, V> v3) yield return v3;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)p).Conflicts)  yield return c;
+                }
+                else if (map is ImHashMap<K, V>.Leaf5 l5)
+                {
+                    if (l5.Entry0 is ImHashMapEntry<K, V> v0) yield return v0;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l5.Entry0).Conflicts) yield return c;
+                    if (l5.Entry1 is ImHashMapEntry<K, V> v1) yield return v1;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l5.Entry1).Conflicts) yield return c;
+                    if (l5.Entry2 is ImHashMapEntry<K, V> v2) yield return v2;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l5.Entry2).Conflicts) yield return c;
+                    if (l5.Entry3 is ImHashMapEntry<K, V> v3) yield return v3;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l5.Entry3).Conflicts) yield return c;
+                    if (l5.Entry4 is ImHashMapEntry<K, V> v4) yield return v4;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l5.Entry4).Conflicts) yield return c;
+                }
+                else if (map is ImHashMap<K, V>.Leaf5Plus1 l51)
+                {
+                    var p  = l51.Plus;
+                    var ph = p.Hash;
+                    var l  = l51.L;
+                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
+                    if (ph < e4.Hash)
+                    {
+                        swap = e4; e4 = p; p = swap;
+                        if (ph < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (ph < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (ph < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (ph < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (e0 is ImHashMapEntry<K, V> v0) yield return v0;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e0).Conflicts) yield return c;
+                    if (e1 is ImHashMapEntry<K, V> v1) yield return v1;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e1).Conflicts) yield return c;
+                    if (e2 is ImHashMapEntry<K, V> v2) yield return v2;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e2).Conflicts) yield return c;
+                    if (e3 is ImHashMapEntry<K, V> v3) yield return v3;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e3).Conflicts) yield return c;
+                    if (e4 is ImHashMapEntry<K, V> v4) yield return v4;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e4).Conflicts) yield return c;
+                    if (p  is ImHashMapEntry<K, V> v5) yield return v5;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)p).Conflicts)  yield return c;
+                }
+                else if (map is ImHashMap<K, V>.Leaf5Plus1Plus1 l511)
+                {
+                    var l = l511.L.L;
+                    ImHashMap<K, V>.Entry 
+                        e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus, swap = null;
+                    var h = pp.Hash;
+                    if (h < e4.Hash)
+                    {
+                        swap = e4; e4 = pp; pp = swap;
+                        if (h < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (h < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (h < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (h < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    h = p.Hash;
+                    if (h < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (h < e4.Hash)
+                        {
+                            swap = e4; e4 = pp; pp = swap;
+                            if (h < e3.Hash)
+                            {
+                                swap = e3; e3 = e4; e4 = swap;
+                                if (h < e2.Hash)
+                                {
+                                    swap = e2; e2 = e3; e3 = swap;
+                                    if (h < e1.Hash)
+                                    {
+                                        swap = e1; e1 = e2; e2 = swap;
+                                        if (h < e0.Hash)
+                                        {
+                                            swap = e0; e0 = e1; e1 = swap;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (e0 is ImHashMapEntry<K, V> v0) yield return v0;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e0).Conflicts) yield return c;
+                    if (e1 is ImHashMapEntry<K, V> v1) yield return v1;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e1).Conflicts) yield return c;
+                    if (e2 is ImHashMapEntry<K, V> v2) yield return v2;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e2).Conflicts) yield return c;
+                    if (e3 is ImHashMapEntry<K, V> v3) yield return v3;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e3).Conflicts) yield return c;
+                    if (e4 is ImHashMapEntry<K, V> v4) yield return v4;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e4).Conflicts) yield return c;
+                    if (pp is ImHashMapEntry<K, V> v5) yield return v5;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)pp).Conflicts) yield return c;
+                    if (p  is ImHashMapEntry<K, V> v6) yield return v6;
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)p).Conflicts)  yield return c;
+                }
+
+                if (count == 0)
+                    break; // we yield the leaf and there is nothing in stack - we are DONE!
+
+                var pb2 = (ImHashMap<K, V>.Branch2)parents.Get(--count); // otherwise get the parent
+                if (pb2.MidEntry is ImHashMapEntry<K, V> v)
+                    yield return v;
+                else if (pb2.MidEntry is HashConflictKeyValuesEntry<K, V> hkv) foreach (var c in hkv.Conflicts)
+                    yield return c;
+                map = pb2.Right;
+            }
+        }
+
+        /// <summary>Enumerates all the map entries in the hash order.
+        /// `parents` parameter allows to reuse the stack memory used for traversal between multiple enumerates.
+        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent `Enumerate` calls</summary>
+        public static IEnumerable<ImMapEntry<V>> Enumerate<V>(this ImMap<V> map, Stack<ImMap<V>> parents = null)
         {
             if (map == ImMap<V>.Empty)
                 yield break;
-
-            if (map is ImMapEntry<V> leaf)
-                yield return leaf;
-            else if (map is ImMapBranch<V> branch)
+            if (map is ImMapEntry<V> v)
             {
-                yield return branch.Entry;
-                yield return branch.RightEntry;
+                yield return v;
+                yield break;
             }
-            else if (map is ImMapTree<V> tree)
+
+            var count = 0;
+            while (true)
             {
-                if (tree.TreeHeight == 2)
+                if (map is ImMap<V>.Branch2 b2)
                 {
-                    yield return (ImMapEntry<V>)tree.Left;
-                    yield return tree.Entry;
-                    yield return (ImMapEntry<V>)tree.Right;
+                    if (parents == null)
+                        parents = new Stack<ImMap<V>>();
+                    parents.Push(map, count++);
+                    map = b2.Left;
+                    continue;
                 }
-                else
-                {
-                    parentStack = parentStack ?? new ImMapTree<V>[tree.TreeHeight - 2];
-                    var parentIndex = -1;
-                    while (true)
-                    {
-                        if ((tree = map as ImMapTree<V>) != null)
-                        {
-                            if (tree.TreeHeight == 2)
-                            {
-                                yield return (ImMapEntry<V>)tree.Left;
-                                yield return tree.Entry;
-                                yield return (ImMapEntry<V>)tree.Right;
-                                if (parentIndex == -1)
-                                    break;
-                                tree = parentStack[parentIndex--];
-                                yield return tree.Entry;
-                                map = tree.Right;
-                            }
-                            else
-                            {
-                                parentStack[++parentIndex] = tree;
-                                map = tree.Left;
-                            }
-                        }
-                        else if ((branch = map as ImMapBranch<V>) != null)
-                        {
-                            yield return branch.Entry;
-                            yield return branch.RightEntry;
-                            if (parentIndex == -1)
-                                break;
-                            tree = parentStack[parentIndex--];
-                            yield return tree.Entry;
-                            map = tree.Right;
-                        }
-                        else
-                        {
-                            yield return (ImMapEntry<V>)map;
-                            if (parentIndex == -1)
-                                break;
-                            tree = parentStack[parentIndex--];
-                            yield return tree.Entry;
-                            map = tree.Right;
-                        }
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Folds all the map nodes with the state from left to right and from the bottom to top
-        /// You may pass `parentStacks` to reuse the array memory.
-        /// NOTE: the length of `parentStack` should be at least of map (height - 2) - the stack want be used for 0, 1, 2 height maps,
-        /// the content of the stack is not important and could be erased.
-        /// </summary>
-        public static S Fold<V, S>(this ImMap<V> map, S state, Func<ImMapEntry<V>, S, S> reduce, ImMapTree<V>[] parentStack = null)
-        {
-            if (map == ImMap<V>.Empty)
-                return state;
-
-            if (map is ImMapEntry<V> leaf)
-                state = reduce(leaf, state);
-            else if (map is ImMapBranch<V> branch)
-            {
-                state = reduce(branch.Entry, state);
-                state = reduce(branch.RightEntry, state);
-            }
-            else if (map is ImMapTree<V> tree)
-            {
-                if (tree.TreeHeight == 2)
-                {
-                    state = reduce((ImMapEntry<V>)tree.Left, state);
-                    state = reduce(tree.Entry, state);
-                    state = reduce((ImMapEntry<V>)tree.Right, state);
-                }
-                else
-                {
-                    parentStack = parentStack ?? new ImMapTree<V>[tree.TreeHeight - 2];
-                    var parentIndex = -1;
-                    while (true)
-                    {
-                        if ((tree = map as ImMapTree<V>) != null)
-                        {
-                            if (tree.TreeHeight == 2)
-                            {
-                                state = reduce((ImMapEntry<V>)tree.Left, state);
-                                state = reduce(tree.Entry, state);
-                                state = reduce((ImMapEntry<V>)tree.Right, state);
-                                if (parentIndex == -1)
-                                    break;
-                                tree = parentStack[parentIndex--];
-                                state = reduce(tree.Entry, state);
-                                map = tree.Right;
-                            }
-                            else
-                            {
-                                parentStack[++parentIndex] = tree;
-                                map = tree.Left;
-                            }
-                        }
-                        else if ((branch = map as ImMapBranch<V>) != null)
-                        {
-                            state = reduce(branch.Entry, state);
-                            state = reduce(branch.RightEntry, state);
-                            if (parentIndex == -1)
-                                break;
-                            tree = parentStack[parentIndex--];
-                            state = reduce(tree.Entry, state);
-                            map = tree.Right;
-                        }
-                        else
-                        {
-                            state = reduce((ImMapEntry<V>)map, state);
-                            if (parentIndex == -1)
-                                break;
-                            tree = parentStack[parentIndex--];
-                            state = reduce(tree.Entry, state);
-                            map = tree.Right;
-                        }
-                    }
-                }
-            }
-
-            return state;
-        }
-
-        /// <summary>
-        /// Folds all the map nodes with the state from left to right and from the bottom to top
-        /// You may pass `parentStacks` to reuse the array memory.
-        /// NOTE: the length of `parentStack` should be at least of map (height - 2) - the stack want be used for 0, 1, 2 height maps,
-        /// the content of the stack is not important and could be erased.
-        /// </summary>
-        public static S Fold<V, S, A>(this ImMap<V> map, S state, A a, Func<ImMapEntry<V>, S, A, S> reduce, ImMapTree<V>[] parentStack = null)
-        {
-            if (map == ImMap<V>.Empty)
-                return state;
-
-            if (map is ImMapEntry<V> leaf)
-                state = reduce(leaf, state, a);
-            else if (map is ImMapBranch<V> branch)
-            {
-                state = reduce(branch.Entry, state, a);
-                state = reduce(branch.RightEntry, state, a);
-            }
-            else if (map is ImMapTree<V> tree)
-            {
-                if (tree.TreeHeight == 2)
-                {
-                    state = reduce((ImMapEntry<V>)tree.Left, state, a);
-                    state = reduce(tree.Entry, state, a);
-                    state = reduce((ImMapEntry<V>)tree.Right, state, a);
-                }
-                else
-                {
-                    parentStack = parentStack ?? new ImMapTree<V>[tree.TreeHeight - 2];
-                    var parentIndex = -1;
-                    while (true)
-                    {
-                        if ((tree = map as ImMapTree<V>) != null)
-                        {
-                            if (tree.TreeHeight == 2)
-                            {
-                                state = reduce((ImMapEntry<V>)tree.Left, state, a);
-                                state = reduce(tree.Entry, state, a);
-                                state = reduce((ImMapEntry<V>)tree.Right, state, a);
-                                if (parentIndex == -1)
-                                    break;
-                                tree = parentStack[parentIndex--];
-                                state = reduce(tree.Entry, state, a);
-                                map = tree.Right;
-                            }
-                            else
-                            {
-                                parentStack[++parentIndex] = tree;
-                                map = tree.Left;
-                            }
-                        }
-                        else if ((branch = map as ImMapBranch<V>) != null)
-                        {
-                            state = reduce(branch.Entry, state, a);
-                            state = reduce(branch.RightEntry, state, a);
-                            if (parentIndex == -1)
-                                break;
-                            tree = parentStack[parentIndex--];
-                            state = reduce(tree.Entry, state, a);
-                            map = tree.Right;
-                        }
-                        else
-                        {
-                            state = reduce((ImMapEntry<V>)map, state, a);
-                            if (parentIndex == -1)
-                                break;
-                            tree = parentStack[parentIndex--];
-                            state = reduce(tree.Entry, state, a);
-                            map = tree.Right;
-                        }
-                    }
-                }
-            }
-
-            return state;
-        }
-
-        /// <summary>
-        /// Visits all the map nodes with from the left to the right and from the bottom to the top
-        /// You may pass `parentStacks` to reuse the array memory.
-        /// NOTE: the length of `parentStack` should be at least of map height, content is not important and could be erased.
-        /// </summary>
-        public static void Visit<V>(this ImMap<V> map, Action<ImMapEntry<V>> visit, ImMapTree<V>[] parentStack = null)
-        {
-            if (map == ImMap<V>.Empty)
-                return;
-
-            if (map is ImMapEntry<V> leaf)
-                visit(leaf);
-            else if (map is ImMapBranch<V> branch)
-            {
-                visit(branch.Entry);
-                visit(branch.RightEntry);
-            }
-            else if (map is ImMapTree<V> tree)
-            {
-                if (tree.TreeHeight == 2)
-                {
-                    visit((ImMapEntry<V>)tree.Left);
-                    visit(tree.Entry);
-                    visit((ImMapEntry<V>)tree.Right);
-                }
-                else
-                {
-                    parentStack = parentStack ?? new ImMapTree<V>[tree.TreeHeight - 2];
-                    var parentIndex = -1;
-                    while (true)
-                    {
-                        if ((tree = map as ImMapTree<V>) != null)
-                        {
-                            if (tree.TreeHeight == 2)
-                            {
-                                visit((ImMapEntry<V>)tree.Left);
-                                visit(tree.Entry);
-                                visit((ImMapEntry<V>)tree.Right);
-                                if (parentIndex == -1)
-                                    break;
-                                tree = parentStack[parentIndex--];
-                                visit(tree.Entry);
-                                map = tree.Right;
-                            }
-                            else
-                            {
-                                parentStack[++parentIndex] = tree;
-                                map = tree.Left;
-                            }
-                        }
-                        else if ((branch = map as ImMapBranch<V>) != null)
-                        {
-                            visit(branch.Entry);
-                            visit(branch.RightEntry);
-                            if (parentIndex == -1)
-                                break;
-                            tree = parentStack[parentIndex--];
-                            visit(tree.Entry);
-                            map = tree.Right;
-                        }
-                        else
-                        {
-                            visit((ImMapEntry<V>)map);
-                            if (parentIndex == -1)
-                                break;
-                            tree = parentStack[parentIndex--];
-                            visit(tree.Entry);
-                            map = tree.Right;
-                        }
-                    }
-                }
-            }
-        }
-
-        /// <summary>Wraps Key and Value payload to store inside ImMapEntry</summary>
-        public struct KValue<K>
-        {
-            /// <summary>The key</summary>
-            public K Key;
-            /// <summary>The value</summary>
-            public object Value;
-
-            /// <summary>Constructs a pair</summary>
-            public KValue(K key, object value)
-            {
-                Key = key;
-                Value = value;
-            }
-        }
-
-        /// <summary>Uses the user provided hash and adds or updates the tree with passed key-value. Returns a new tree.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, K key, object value, Update<K, object> update)
-        {
-            var oldEntry = map.GetEntryOrDefault(hash);
-            return oldEntry == null
-                ? map.AddEntryUnsafe(CreateKValueEntry(hash, key, value))
-                : UpdateEntryOrAddOrUpdateConflict(map, hash, oldEntry, key, value, update);
-        }
-
-        private static ImMap<KValue<K>> UpdateEntryOrAddOrUpdateConflict<K>(ImMap<KValue<K>> map, int hash,
-            ImMapEntry<KValue<K>> oldEntry, K key, object value, Update<K, object> update = null)
-        {
-            if (key.Equals(oldEntry.Value.Key))
-            {
-                value = update == null ? value : update(key, oldEntry.Value.Value, value);
-                return map.UpdateEntryUnsafe(CreateKValueEntry(hash, key, value));
-            }
-
-            // add a new conflicting key value
-            ImMapEntry<KValue<K>>[] newConflicts;
-            if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
-            {
-                // entry is already containing the conflicted entries
-                var conflictCount = conflicts.Length;
-                var conflictIndex = conflictCount - 1;
-                while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Value.Key))
-                    --conflictIndex;
-
-                if (conflictIndex != -1)
-                {
-                    // update the existing conflict
-                    newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
-                    Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                    value = update == null ? value : update(key, conflicts[conflictIndex].Value.Value, value);
-                    newConflicts[conflictIndex] = CreateKValueEntry(hash, key, value);
-                }
-                else
-                {
-                    // add the new conflicting value
-                    newConflicts = new ImMapEntry<KValue<K>>[conflictCount + 1];
-                    Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                    newConflicts[conflictCount] = CreateKValueEntry(hash, key, value);
-                }
-            }
-            else
-            {
-                newConflicts = new[] { oldEntry, CreateKValueEntry(hash, key, value) };
-            }
-
-            return map.UpdateEntryUnsafe(new ImMapEntry<KValue<K>>(hash) { Value = { Value = newConflicts }});
-        }
-
-        /// <summary>Creates the new entry</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        private static ImMapEntry<KValue<K>> CreateKValueEntry<K>(int hash, K key, object value) =>
-            new ImMapEntry<KValue<K>>(hash) { Value = { Key = key, Value = value } };
-
-        /// <summary>Creates the new entry with the conflicts - the Key for the new entry is not set, but the value contains the actual conflict entries array</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        private static ImMapEntry<KValue<K>> CreateConflictsKValueEntry<K>(int hash, ImMapEntry<KValue<K>>[] conflicts) =>
-            new ImMapEntry<KValue<K>>(hash) { Value = { Value = conflicts } };
-
-        /// <summary>Creates the new entry</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMapEntry<KValue<K>> CreateKValueEntry<K>(int hash, K key) =>
-            new ImMapEntry<KValue<K>>(hash) { Value = { Key = key } };
-
-        /// <summary>Adds or updates the Type-keyed entry with the value. Returns a new tree.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KValue<Type>> AddOrUpdate(this ImMap<KValue<Type>> map, Type type, object value)
-        {
-            var hash = RuntimeHelpers.GetHashCode(type);
-            return map.AddOrUpdate(hash, CreateKValueEntry(hash, type, value));
-        }
-
-        /// <summary>Uses the user provided hash and adds or updates the tree with passed key-value. Returns a new tree.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, K key, object value) =>
-            map.AddOrUpdate(hash, CreateKValueEntry(hash, key, value));
-
-        /// <summary>Uses the provided hash and adds or updates the tree with the passed key-value. Returns a new tree.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KValue<K>> AddOrUpdate<K>(this ImMap<KValue<K>> map, int hash, ImMapEntry<KValue<K>> entry)
-        {
-            var oldEntry = map.GetEntryOrDefault(hash);
-            return oldEntry == null
-                ? map.AddEntryUnsafe(entry)
-                : UpdateEntryOrAddOrUpdateConflict(map, hash, oldEntry, entry);
-        }
-
-        private static ImMap<KValue<K>> UpdateEntryOrAddOrUpdateConflict<K>(ImMap<KValue<K>> map, int hash,
-            ImMapEntry<KValue<K>> oldEntry, ImMapEntry<KValue<K>> newEntry)
-        {
-            if (newEntry.Value.Key.Equals(oldEntry.Value.Key))
-                return map.UpdateEntryUnsafe(newEntry);
-
-            // add a new conflicting key value
-            ImMapEntry<KValue<K>>[] newConflicts;
-            if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
-            {
-                // entry is already containing the conflicted entries
-                var key = newEntry.Value.Key;
-                var conflictCount = conflicts.Length;
-                var conflictIndex = conflictCount - 1;
-                while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Value.Key))
-                    --conflictIndex;
-
-                if (conflictIndex != -1)
-                {
-                    // update the existing conflict
-                    newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
-                    Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                    newConflicts[conflictIndex] = newEntry;
-                }
-                else
-                {
-                    // add the new conflicting value
-                    newConflicts = new ImMapEntry<KValue<K>>[conflictCount + 1];
-                    Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                    newConflicts[conflictCount] = newEntry;
-                }
-            }
-            else
-            {
-                newConflicts = new[] { oldEntry, newEntry };
-            }
-
-            return map.UpdateEntryUnsafe(CreateConflictsKValueEntry(hash, newConflicts));
-        }
-
-        /// <summary>Adds the new entry or keeps the current map if entry key is already present</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KValue<K>> AddOrKeep<K>(this ImMap<KValue<K>> map, int hash, K key)
-        {
-            var oldEntry = map.GetEntryOrDefault(hash);
-            return oldEntry == null
-                ? map.AddEntryUnsafe(CreateKValueEntry(hash, key))
-                : AddOrKeepConflict(map, hash, oldEntry, key);
-        }
-
-        /// <summary>Adds the new entry or keeps the current map if entry key is already present</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<KValue<K>> AddOrKeep<K>(this ImMap<KValue<K>> map, int hash, K key, object value)
-        {
-            var oldEntry = map.GetEntryOrDefault(hash);
-            return oldEntry == null
-                ? map.AddEntryUnsafe(CreateKValueEntry(hash, key, value))
-                : AddOrKeepConflict(map, hash, oldEntry, key, value);
-        }
-
-        private static ImMap<KValue<K>> AddOrKeepConflict<K>(ImMap<KValue<K>> map, int hash,
-            ImMapEntry<KValue<K>> oldEntry, K key, object value = null)
-        {
-            if (key.Equals(oldEntry.Value.Key))
-                return map;
-
-            // add a new conflicting key value
-            ImMapEntry<KValue<K>>[] newConflicts;
-            if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
-            {
-                // entry is already containing the conflicted entries
-                var conflictCount = conflicts.Length;
-                var conflictIndex = conflictCount - 1;
-                while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Value.Key))
-                    --conflictIndex;
-
-                if (conflictIndex != -1)
-                    return map;
                 
-                // add the new conflicting value
-                newConflicts = new ImMapEntry<KValue<K>>[conflictCount + 1];
-                Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                newConflicts[conflictCount] = CreateKValueEntry(hash, key, value);
-            }
-            else
-            {
-                newConflicts = new[] { oldEntry, CreateKValueEntry(hash, key, value) };
-            }
+                if (map is ImMap<V>.Leaf2 l2)
+                {
+                    yield return (ImMapEntry<V>)l2.Entry0;
+                    yield return (ImMapEntry<V>)l2.Entry1;
+                }
+                else if (map is ImMap<V>.Leaf2Plus1 l21)
+                {
+                    var p  = l21.Plus;
+                    var ph = p.Hash;
+                    var l  = l21.L;
+                    ImMap<V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
+                    if (ph < e1.Hash)
+                    {
+                        swap = e1; e1 = p; p = swap;
+                        if (ph < e0.Hash)
+                        {
+                            swap = e0; e0 = e1; e1 = swap;
+                        }
+                    }
 
-            return map.UpdateEntryUnsafe(CreateConflictsKValueEntry(hash, newConflicts));
+                    yield return (ImMapEntry<V>)e0;
+                    yield return (ImMapEntry<V>)e1;
+                    yield return (ImMapEntry<V>)p ;
+                }
+                else if (map is ImMap<V>.Leaf2Plus1Plus1 l211)
+                {
+                    var p  = l211.Plus;
+                    var pp = l211.L.Plus;
+                    var ph = pp.Hash;
+                    var l  = l211.L.L;
+                    ImMap<V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
+                    if (ph < e1.Hash)
+                    {
+                        swap = e1; e1 = pp; pp = swap;
+                        if (ph < e0.Hash)
+                        {
+                            swap = e0; e0 = e1; e1 = swap;
+                        }
+                    }
+
+                    ph = p.Hash;
+                    if (ph < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (ph < e1.Hash)
+                        {
+                            swap = e1; e1 = pp; pp = swap;
+                            if (ph < e0.Hash)
+                            {
+                                swap = e0; e0 = e1; e1 = swap;
+                            }
+                        }
+                    }
+
+                    yield return (ImMapEntry<V>)e0;
+                    yield return (ImMapEntry<V>)e1;
+                    yield return (ImMapEntry<V>)pp;
+                    yield return (ImMapEntry<V>)p ;
+                }
+                else if (map is ImMap<V>.Leaf5 l5)
+                {
+                    yield return (ImMapEntry<V>)l5.Entry0;
+                    yield return (ImMapEntry<V>)l5.Entry1;
+                    yield return (ImMapEntry<V>)l5.Entry2;
+                    yield return (ImMapEntry<V>)l5.Entry3;
+                    yield return (ImMapEntry<V>)l5.Entry4;
+                }
+                else if (map is ImMap<V>.Leaf5Plus1 l51)
+                {
+                    var p  = l51.Plus;
+                    var ph = p.Hash;
+                    var l  = l51.L;
+                    ImMap<V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
+                    if (ph < e4.Hash)
+                    {
+                        swap = e4; e4 = p; p = swap;
+                        if (ph < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (ph < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (ph < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (ph < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    yield return (ImMapEntry<V>)e0;
+                    yield return (ImMapEntry<V>)e1;
+                    yield return (ImMapEntry<V>)e2;
+                    yield return (ImMapEntry<V>)e3;
+                    yield return (ImMapEntry<V>)e4;
+                    yield return (ImMapEntry<V>)p ;
+                }
+                else if (map is ImMap<V>.Leaf5Plus1Plus1 l511)
+                {
+                    var l = l511.L.L;
+                    ImMap<V>.Entry 
+                        e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus, swap = null;
+                    var h = pp.Hash;
+                    if (h < e4.Hash)
+                    {
+                        swap = e4; e4 = pp; pp = swap;
+                        if (h < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (h < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (h < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (h < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    h = p.Hash;
+                    if (h < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (h < e4.Hash)
+                        {
+                            swap = e4; e4 = pp; pp = swap;
+                            if (h < e3.Hash)
+                            {
+                                swap = e3; e3 = e4; e4 = swap;
+                                if (h < e2.Hash)
+                                {
+                                    swap = e2; e2 = e3; e3 = swap;
+                                    if (h < e1.Hash)
+                                    {
+                                        swap = e1; e1 = e2; e2 = swap;
+                                        if (h < e0.Hash)
+                                        {
+                                            swap = e0; e0 = e1; e1 = swap;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    yield return (ImMapEntry<V>)e0;
+                    yield return (ImMapEntry<V>)e1;
+                    yield return (ImMapEntry<V>)e2;
+                    yield return (ImMapEntry<V>)e3;
+                    yield return (ImMapEntry<V>)e4;
+                    yield return (ImMapEntry<V>)pp;
+                    yield return (ImMapEntry<V>)p ;
+                }
+
+                if (count == 0)
+                    break; // we yield the leaf and there is nothing in stack - we are DONE!
+
+                var pb2 = (ImMap<V>.Branch2)parents.Get(--count); // otherwise get the parent
+                if (pb2.MidEntry is ImMapEntry<V> m)
+                    yield return m;
+
+                map = pb2.Right;
+            }
         }
 
-        /// <summary>Updates the map with the new value if key is found, otherwise returns the same unchanged map.</summary>
-        public static ImMap<KValue<K>> Update<K>(this ImMap<KValue<K>> map, int hash, K key, object value, Update<K, object> update = null)
+        /// <summary>
+        /// Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
+        /// The `parents` parameter allows to reuse the stack memory used for traversal between multiple enumerates.
+        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent `Enumerate` calls</summary>
+        public static S Fold<K, V, S>(this ImHashMap<K, V> map, S state, Func<ImHashMapEntry<K, V>, S, S> reduce, Stack<ImHashMap<K, V>> parents = null)
         {
-            var oldEntry = map.GetEntryOrDefault(hash);
-            return oldEntry == null ? map : UpdateEntryOrReturnSelf(map, hash, oldEntry, key, value, update);
+            if (map == ImHashMap<K, V>.Empty)
+                return state;
+            if (map is ImHashMap<K, V>.Entry e)
+            {
+                if (e is ImHashMapEntry<K, V> kv) state = reduce(kv, state);
+                else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e).Conflicts) state = reduce(c, state);
+                return state;
+            }
+
+            var count = 0;
+            while (true)
+            {
+                if (map is ImHashMap<K, V>.Branch2 b2)
+                {
+                    if (parents == null)
+                        parents = new Stack<ImHashMap<K, V>>();
+                    parents.Push(map, count++);
+                    map = b2.Left;
+                    continue;
+                }
+                
+                if (map is ImHashMap<K, V>.Leaf2 l2)
+                {
+                    if (l2.Entry0 is ImHashMapEntry<K, V> v0) state = reduce(v0, state);
+                    else if (l2.Entry0 != null) foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l2.Entry0).Conflicts) state = reduce(c, state);
+                    if (l2.Entry1 is ImHashMapEntry<K, V> v1) state = reduce(v1, state);
+                    else if (l2.Entry1 != null) foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l2.Entry1).Conflicts) state = reduce(c, state);
+                }
+                else if (map is ImHashMap<K, V>.Leaf2Plus1 l21)
+                {
+                    var p  = l21.Plus;
+                    var ph = p.Hash;
+                    var l  = l21.L;
+                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
+                    if (ph < e1.Hash)
+                    {
+                        swap = e1; e1 = p; p = swap;
+                        if (ph < e0.Hash)
+                        {
+                            swap = e0; e0 = e1; e1 = swap;
+                        }
+                    }
+
+                    if (e0 is ImHashMapEntry<K, V> v0) state = reduce(v0, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e0).Conflicts) state = reduce(c, state);
+                    if (e1 is ImHashMapEntry<K, V> v1) state = reduce(v1, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e1).Conflicts) state = reduce(c, state);
+                    if (p  is ImHashMapEntry<K, V> v2) state = reduce(v2, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)p ).Conflicts) state = reduce(c, state);
+                }
+                else if (map is ImHashMap<K, V>.Leaf2Plus1Plus1 l211)
+                {
+                    var p  = l211.Plus;
+                    var pp = l211.L.Plus;
+                    var ph = pp.Hash;
+                    var l  = l211.L.L;
+                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
+                    if (ph < e1.Hash)
+                    {
+                        swap = e1; e1 = pp; pp = swap;
+                        if (ph < e0.Hash)
+                        {
+                            swap = e0; e0 = e1; e1 = swap;
+                        }
+                    }
+
+                    ph = p.Hash;
+                    if (ph < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (ph < e1.Hash)
+                        {
+                            swap = e1; e1 = pp; pp = swap;
+                            if (ph < e0.Hash)
+                            {
+                                swap = e0; e0 = e1; e1 = swap;
+                            }
+                        }
+                    }
+
+                    if (e0 is ImHashMapEntry<K, V> v0) state = reduce(v0, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e0).Conflicts) state = reduce(c, state);
+                    if (e1 is ImHashMapEntry<K, V> v1) state = reduce(v1, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e1).Conflicts) state = reduce(c, state);
+                    if (pp is ImHashMapEntry<K, V> v2) state = reduce(v2, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)pp).Conflicts) state = reduce(c, state);
+                    if (p  is ImHashMapEntry<K, V> v3) state = reduce(v3, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)p).Conflicts)  state = reduce(c, state);
+                }
+                else if (map is ImHashMap<K, V>.Leaf5 l5)
+                {
+                    if (l5.Entry0 is ImHashMapEntry<K, V> v0) state = reduce(v0, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l5.Entry0).Conflicts) state = reduce(c, state);
+                    if (l5.Entry1 is ImHashMapEntry<K, V> v1) state = reduce(v1, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l5.Entry1).Conflicts) state = reduce(c, state);
+                    if (l5.Entry2 is ImHashMapEntry<K, V> v2) state = reduce(v2, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l5.Entry2).Conflicts) state = reduce(c, state);
+                    if (l5.Entry3 is ImHashMapEntry<K, V> v3) state = reduce(v3, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l5.Entry3).Conflicts) state = reduce(c, state);
+                    if (l5.Entry4 is ImHashMapEntry<K, V> v4) state = reduce(v4, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)l5.Entry4).Conflicts) state = reduce(c, state);
+                }
+                else if (map is ImHashMap<K, V>.Leaf5Plus1 l51)
+                {
+                    var p  = l51.Plus;
+                    var ph = p.Hash;
+                    var l  = l51.L;
+                    ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
+                    if (ph < e4.Hash)
+                    {
+                        swap = e4; e4 = p; p = swap;
+                        if (ph < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (ph < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (ph < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (ph < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (e0 is ImHashMapEntry<K, V> v0) state = reduce(v0, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e0).Conflicts) state = reduce(c, state);
+                    if (e1 is ImHashMapEntry<K, V> v1) state = reduce(v1, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e1).Conflicts) state = reduce(c, state);
+                    if (e2 is ImHashMapEntry<K, V> v2) state = reduce(v2, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e2).Conflicts) state = reduce(c, state);
+                    if (e3 is ImHashMapEntry<K, V> v3) state = reduce(v3, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e3).Conflicts) state = reduce(c, state);
+                    if (e4 is ImHashMapEntry<K, V> v4) state = reduce(v4, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e4).Conflicts) state = reduce(c, state);
+                    if (p  is ImHashMapEntry<K, V> v5) state = reduce(v5, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)p).Conflicts)  state = reduce(c, state);
+                }
+                else if (map is ImHashMap<K, V>.Leaf5Plus1Plus1 l511)
+                {
+                    var l = l511.L.L;
+                    ImHashMap<K, V>.Entry 
+                        e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus, swap = null;
+                    var h = pp.Hash;
+                    if (h < e4.Hash)
+                    {
+                        swap = e4; e4 = pp; pp = swap;
+                        if (h < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (h < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (h < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (h < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    h = p.Hash;
+                    if (h < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (h < e4.Hash)
+                        {
+                            swap = e4; e4 = pp; pp = swap;
+                            if (h < e3.Hash)
+                            {
+                                swap = e3; e3 = e4; e4 = swap;
+                                if (h < e2.Hash)
+                                {
+                                    swap = e2; e2 = e3; e3 = swap;
+                                    if (h < e1.Hash)
+                                    {
+                                        swap = e1; e1 = e2; e2 = swap;
+                                        if (h < e0.Hash)
+                                        {
+                                            swap = e0; e0 = e1; e1 = swap;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (e0 is ImHashMapEntry<K, V> v0) state = reduce(v0, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e0).Conflicts) state = reduce(c, state);
+                    if (e1 is ImHashMapEntry<K, V> v1) state = reduce(v1, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e1).Conflicts) state = reduce(c, state);
+                    if (e2 is ImHashMapEntry<K, V> v2) state = reduce(v2, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e2).Conflicts) state = reduce(c, state);
+                    if (e3 is ImHashMapEntry<K, V> v3) state = reduce(v3, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e3).Conflicts) state = reduce(c, state);
+                    if (e4 is ImHashMapEntry<K, V> v4) state = reduce(v4, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)e4).Conflicts) state = reduce(c, state);
+                    if (pp is ImHashMapEntry<K, V> v5) state = reduce(v5, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)pp).Conflicts) state = reduce(c, state);
+                    if (p  is ImHashMapEntry<K, V> v6) state = reduce(v6, state);
+                    else foreach (var c in ((HashConflictKeyValuesEntry<K, V>)p).Conflicts)  state = reduce(c, state);
+                }
+
+                if (count == 0)
+                    break; // we yield the leaf and there is nothing in stack - we are DONE!
+
+                var pb2 = (ImHashMap<K, V>.Branch2)parents.Get(--count); // otherwise get the parent
+                if (pb2.MidEntry is ImHashMapEntry<K, V> kv) state = reduce(kv, state);
+                else if (pb2.MidEntry is HashConflictKeyValuesEntry<K, V> hkv) foreach (var c in hkv.Conflicts) state = reduce(c, state);
+                map = pb2.Right;
+            }
+
+            return state;
         }
 
-        private static ImMap<KValue<K>> UpdateEntryOrReturnSelf<K>(ImMap<KValue<K>> map,
-            int hash, ImMapEntry<KValue<K>> oldEntry, K key, object value, Update<K, object> update = null)
+        /// <summary> 
+        /// Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
+        /// The `parents` parameter allows to reuse the stack memory used for traversal between multiple enumerates.
+        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent `Enumerate` calls</summary>
+        public static S Fold<V, S>(this ImMap<V> map, S state, Func<ImMapEntry<V>, S, S> reduce, Stack<ImMap<V>> parents = null)
         {
-            if (key.Equals(oldEntry.Value.Key))
+            if (map == ImMap<V>.Empty)
+                return state;
+            if (map is ImMapEntry<V> v)
+                return reduce(v, state);
+
+            var count = 0;
+            while (true)
             {
-                value = update == null ? value : update(key, oldEntry.Value.Value, value);
-                return map.UpdateEntryUnsafe(CreateKValueEntry(hash, key, value));
+                if (map is ImMap<V>.Branch2 b2)
+                {
+                    if (parents == null)
+                        parents = new Stack<ImMap<V>>();
+                    parents.Push(map, count++);
+                    map = b2.Left;
+                    continue;
+                }
+                
+                if (map is ImMap<V>.Leaf2 l2)
+                {
+                    state = reduce((ImMapEntry<V>)l2.Entry1, reduce((ImMapEntry<V>)l2.Entry0, state));
+                }
+                else if (map is ImMap<V>.Leaf2Plus1 l21)
+                {
+                    var p  = l21.Plus;
+                    var ph = p.Hash;
+                    var l  = l21.L;
+                    ImMap<V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
+                    if (ph < e1.Hash)
+                    {
+                        swap = e1; e1 = p; p = swap;
+                        if (ph < e0.Hash)
+                        {
+                            swap = e0; e0 = e1; e1 = swap;
+                        }
+                    }
+
+                    state = reduce((ImMapEntry<V>)e0, state);
+                    state = reduce((ImMapEntry<V>)e1, state);
+                    state = reduce((ImMapEntry<V>)p,  state);
+                }
+                else if (map is ImMap<V>.Leaf2Plus1Plus1 l211)
+                {
+                    var p  = l211.Plus;
+                    var pp = l211.L.Plus;
+                    var ph = pp.Hash;
+                    var l  = l211.L.L;
+                    ImMap<V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
+                    if (ph < e1.Hash)
+                    {
+                        swap = e1; e1 = pp; pp = swap;
+                        if (ph < e0.Hash)
+                        {
+                            swap = e0; e0 = e1; e1 = swap;
+                        }
+                    }
+
+                    ph = p.Hash;
+                    if (ph < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (ph < e1.Hash)
+                        {
+                            swap = e1; e1 = pp; pp = swap;
+                            if (ph < e0.Hash)
+                            {
+                                swap = e0; e0 = e1; e1 = swap;
+                            }
+                        }
+                    }
+
+                    state = reduce((ImMapEntry<V>)e0, state);
+                    state = reduce((ImMapEntry<V>)e1, state);
+                    state = reduce((ImMapEntry<V>)pp, state);
+                    state = reduce((ImMapEntry<V>)p,  state);
+                }
+                else if (map is ImMap<V>.Leaf5 l5)
+                {
+                    state = reduce((ImMapEntry<V>)l5.Entry0, state);
+                    state = reduce((ImMapEntry<V>)l5.Entry1, state);
+                    state = reduce((ImMapEntry<V>)l5.Entry2, state);
+                    state = reduce((ImMapEntry<V>)l5.Entry3, state);
+                    state = reduce((ImMapEntry<V>)l5.Entry4, state);
+                }
+                else if (map is ImMap<V>.Leaf5Plus1 l51)
+                {
+                    var p  = l51.Plus;
+                    var ph = p.Hash;
+                    var l  = l51.L;
+                    ImMap<V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
+                    if (ph < e4.Hash)
+                    {
+                        swap = e4; e4 = p; p = swap;
+                        if (ph < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (ph < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (ph < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (ph < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    state = reduce((ImMapEntry<V>)e0, state);
+                    state = reduce((ImMapEntry<V>)e1, state);
+                    state = reduce((ImMapEntry<V>)e2, state);
+                    state = reduce((ImMapEntry<V>)e3, state);
+                    state = reduce((ImMapEntry<V>)e4, state);
+                    state = reduce((ImMapEntry<V>)p , state);
+                }
+                else if (map is ImMap<V>.Leaf5Plus1Plus1 l511)
+                {
+                    var l = l511.L.L;
+                    ImMap<V>.Entry 
+                        e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus, swap = null;
+                    var h = pp.Hash;
+                    if (h < e4.Hash)
+                    {
+                        swap = e4; e4 = pp; pp = swap;
+                        if (h < e3.Hash)
+                        {
+                            swap = e3; e3 = e4; e4 = swap;
+                            if (h < e2.Hash)
+                            {
+                                swap = e2; e2 = e3; e3 = swap;
+                                if (h < e1.Hash)
+                                {
+                                    swap = e1; e1 = e2; e2 = swap;
+                                    if (h < e0.Hash)
+                                    {
+                                        swap = e0; e0 = e1; e1 = swap;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    h = p.Hash;
+                    if (h < pp.Hash)
+                    {
+                        swap = pp; pp = p; p = swap;
+                        if (h < e4.Hash)
+                        {
+                            swap = e4; e4 = pp; pp = swap;
+                            if (h < e3.Hash)
+                            {
+                                swap = e3; e3 = e4; e4 = swap;
+                                if (h < e2.Hash)
+                                {
+                                    swap = e2; e2 = e3; e3 = swap;
+                                    if (h < e1.Hash)
+                                    {
+                                        swap = e1; e1 = e2; e2 = swap;
+                                        if (h < e0.Hash)
+                                        {
+                                            swap = e0; e0 = e1; e1 = swap;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    state = reduce((ImMapEntry<V>)e0, state);
+                    state = reduce((ImMapEntry<V>)e1, state);
+                    state = reduce((ImMapEntry<V>)e2, state);
+                    state = reduce((ImMapEntry<V>)e3, state);
+                    state = reduce((ImMapEntry<V>)e4, state);
+                    state = reduce((ImMapEntry<V>)pp, state);
+                    state = reduce((ImMapEntry<V>)p , state);
+                }
+
+                if (count == 0)
+                    break; // we yield the leaf and there is nothing in stack - we are DONE!
+
+                var pb2 = (ImMap<V>.Branch2)parents.Get(--count); // otherwise get the parent
+                if (pb2.MidEntry is ImMapEntry<V> m)
+                    state = reduce(m, state);
+
+                map = pb2.Right;
             }
 
-            // add a new conflicting key value
-            ImMapEntry<KValue<K>>[] newConflicts;
-            if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
-            {
-                // entry is already containing the conflicted entries
-                var conflictCount = conflicts.Length;
-                var conflictIndex = conflictCount - 1;
-                while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Value.Key))
-                    --conflictIndex;
-
-                if (conflictIndex == -1)
-                    return map;
-
-                // update the existing conflict
-                newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
-                Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                value = update == null ? value : update(key, conflicts[conflictIndex].Value.Value, value);
-                newConflicts[conflictIndex] = CreateKValueEntry(hash, key, value);
-            }
-            else
-            {
-                return map;
-            }
-
-            return map.UpdateEntryUnsafe(CreateConflictsKValueEntry(hash, newConflicts));
+            return state;
         }
 
-        /// <summary>Updates the map with the default value if the key is found, otherwise returns the same unchanged map.</summary>
-        public static ImMap<KValue<K>> UpdateToDefault<K>(this ImMap<KValue<K>> map, int hash, K key)
-        {
-            var oldEntry = map.GetEntryOrDefault(hash);
-            return oldEntry == null ? map : UpdateEntryOrReturnSelf(map, hash, oldEntry, key);
-        }
-
-        private static ImMap<KValue<K>> UpdateEntryOrReturnSelf<K>(ImMap<KValue<K>> map,
-            int hash, ImMapEntry<KValue<K>> oldEntry, K key)
-        {
-            if (key.Equals(oldEntry.Value.Key))
-                return map.UpdateEntryUnsafe(CreateKValueEntry(hash, key));
-
-            // add a new conflicting key value
-            ImMapEntry<KValue<K>>[] newConflicts;
-            if (oldEntry.Value.Value is ImMapEntry<KValue<Type>>[] conflicts)
-            {
-                // entry is already containing the conflicted entries
-                var conflictCount = conflicts.Length;
-                var conflictIndex = conflictCount - 1;
-                while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Value.Key))
-                    --conflictIndex;
-
-                if (conflictIndex == -1)
-                    return map;
-
-                // update the existing conflict
-                newConflicts = new ImMapEntry<KValue<K>>[conflictCount];
-                Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                newConflicts[conflictIndex] = CreateKValueEntry(hash, key);
-            }
-            else
-            {
-                return map;
-            }
-
-            var conflictsEntry = new ImMapEntry<KValue<K>>(hash);
-            conflictsEntry.Value.Value = newConflicts;
-            return map.UpdateEntryUnsafe(conflictsEntry);
-        }
-
-        /// <summary> Returns the entry if key is found or default value otherwise. </summary>
+        /// <summary>Get the key value entry if the hash and key is in the map or the default `null` value otherwise.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMapEntry<KValue<K>> GetEntryOrDefault<K>(this ImMap<KValue<K>> map, int hash, K key)
+        public static ImHashMapEntry<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
         {
-            var entry = map.GetEntryOrDefault(hash);
-            return entry != null
-                ? key.Equals(entry.Value.Key) ? entry : GetConflictedEntryOrDefault(entry, key)
-                : null;
-        }
+            var e = map.GetEntryOrDefault(hash);
 
-        /// <summary> Returns the value if key is found or default value otherwise. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static object GetValueOrDefault<K>(this ImMap<KValue<K>> map, int hash, K key) =>
-            map.GetEntryOrDefault(hash, key)?.Value.Value;
+            if (e is ImHashMapEntry<K, V> kv)
+                return kv.Key.Equals(key) ? kv : null;
 
-        /// <summary> Sets the value if key is found or returns false otherwise. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<K>(this ImMap<KValue<K>> map, int hash, K key, out object value)
-        {
-            var entry = map.GetEntryOrDefault(hash, key);
-            if (entry != null)
-            {
-                value = entry.Value.Value;
-                return true;
-            }
+            if (e is HashConflictKeyValuesEntry<K, V> hc)
+                foreach (var x in hc.Conflicts) 
+                    if (x.Key.Equals(key))
+                        return x;
 
-            value = null;
-            return false;
-        }
-
-        /// <summary> Returns the entry if key is found or `null` otherwise. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMapEntry<KValue<Type>> GetEntryOrDefault(this ImMap<KValue<Type>> map, int hash, Type type)
-        {
-            var entry = map.GetEntryOrDefault(hash);
-            return entry != null
-                ? entry.Value.Key == type ? entry : GetConflictedEntryOrDefault(entry, type)
-                : null;
-        }
-
-        /// <summary> Returns the value if the Type key is found or default value otherwise. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static object GetValueOrDefault(this ImMap<KValue<Type>> map, int hash, Type typeKey) =>
-            map.GetEntryOrDefault(hash, typeKey)?.Value.Value;
-
-        /// <summary> Returns the value if the Type key is found or default value otherwise. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static object GetValueOrDefault(this ImMap<KValue<Type>> map, Type typeKey) =>
-            map.GetEntryOrDefault(RuntimeHelpers.GetHashCode(typeKey), typeKey)?.Value.Value;
-
-        internal static ImMapEntry<KValue<K>> GetConflictedEntryOrDefault<K>(ImMapEntry<KValue<K>> entry, K key)
-        {
-            if (entry.Value.Value is ImMapEntry<KValue<K>>[] conflicts)
-                for (var i = 0; i < conflicts.Length; ++i)
-                    if (key.Equals(conflicts[i].Value.Key))
-                        return conflicts[i];
             return null;
         }
 
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up.
-        /// </summary>
-        public static IEnumerable<ImMapEntry<KValue<K>>> Enumerate<K>(this ImMap<KValue<K>> map)
+        /// <summary>Get the key value entry if the key is in the map or the default `null` value otherwise.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMapEntry<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, K key) =>
+            GetEntryOrDefault(map, key.GetHashCode(), key);
+
+        /// <summary>Returns <see langword="true"/> if map contains the hash and key, otherwise returns <see langword="false"/></summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool Contains<K, V>(this ImHashMap<K, V> map, int hash, K key) => map.GetEntryOrDefault(hash, key) != null;
+
+        /// <summary>Returns <see langword="true"/> if map contains the key, otherwise returns <see langword="false"/></summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool Contains<K, V>(this ImHashMap<K, V> map, K key) => map.GetEntryOrDefault(key.GetHashCode(), key) != null;
+
+        /// <summary>Get the key value entry if the hash and key is in the map or the default `null` value otherwise.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMapEntry<V> GetEntryOrDefault<V>(this ImMap<V> map, int hash) => (ImMapEntry<V>)map.GetEntryOrNull(hash);
+
+        /// <summary>Returns <see langword="true"/> if map contains the key, otherwise returns <see langword="false"/></summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool Contains<V>(this ImMap<V> map, int hash) => map.GetEntryOrNull(hash) != null;
+
+        /// <summary>Returns the entry ASSUMING it is present otherwise its behavior is UNDEFINED.
+        /// You can use the method after the Add and Update methods on the same map instance - because the map is immutable it is for sure contains added or updated entry.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMapEntry<K, V> GetSurePresentEntry<K, V>(this ImHashMap<K, V> map, int hash, K key)
         {
-            foreach (var entry in map.Enumerate(null))
+            var e = map.GetEntryOrDefault(hash);
+            if (e is HashConflictKeyValuesEntry<K, V> c)
+                foreach (var x in c.Conflicts) 
+                    if (x.Key.Equals(key))
+                        return x;
+
+            return (ImHashMapEntry<K, V>)e; // we don't need the comparison of the key because there is only one entry with the key
+        }
+
+        /// <summary>Returns the entry ASSUMING it is present otherwise its behavior is UNDEFINED.
+        /// You can use the method after the Add and Update methods on the same map instance - because the map is immutable it is for sure contains added or updated entry.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMapEntry<V> GetSurePresentEntry<V>(this ImMap<V> map, int hash) =>
+            (ImMapEntry<V>)map.GetEntryOrNull(hash);
+
+        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.Equals` for equality, 
+        /// returns the default `V` if hash, key are not found.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
+        {
+            var e = map.GetEntryOrDefault(hash);
+            if (e is ImHashMapEntry<K, V> kv)
             {
-                if (entry.Value.Value is ImMapEntry<KValue<K>>[] conflicts)
-                    for (var i = 0; i < conflicts.Length; i++)
-                        yield return conflicts[i];
-                else
+                if (kv.Key.Equals(key))
+                    return kv.Value;
+            }
+            else if (e is HashConflictKeyValuesEntry<K, V> hc)
+            {
+                foreach (var x in hc.Conflicts) 
+                    if (x.Key.Equals(key))
+                        return x.Value;
+            }
+            return default(V);
+        }
+
+        /// <summary>Lookup for the value by key using its hash and checking the key with the `object.Equals` for equality, 
+        /// returns the default `V` if hash, key are not found.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key) =>
+            map.GetValueOrDefault(key.GetHashCode(), key);
+
+        /// <summary>Lookup for the value by hash, returns the default `V` if hash is not found.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<V>(this ImMap<V> map, int hash) =>
+            map.GetEntryOrNull(hash) is ImMapEntry<V> kv ? kv.Value : default(V);
+
+        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals` for equality,
+        ///  returns found value or the default value if not found</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key) where K : class
+        {
+            var e = map.GetEntryOrDefault(hash);
+            if (e is ImHashMapEntry<K, V> kv)
+            {
+                if (kv.Key == key)
+                    return kv.Value;
+            }
+            else if (e is HashConflictKeyValuesEntry<K, V> hc)
+            {
+                foreach (var x in hc.Conflicts) 
+                    if (x.Key == key)
+                        return x.Value;
+            }
+            return default(V);
+        }
+
+        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.Equals` for equality,
+        /// returns the `true` and the found value or the `false` otherwise</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<K, V>(this ImHashMap<K, V> map, int hash, K key, out V value)
+        {
+            var e = map.GetEntryOrDefault(hash);
+            if (e is ImHashMapEntry<K, V> kv)
+            {
+                if (kv.Key.Equals(key))
+                {
+                    value = kv.Value;
+                    return true;
+                }
+            }
+            else if (e is HashConflictKeyValuesEntry<K, V> hc)
+            {
+                foreach (var x in hc.Conflicts) 
+                    if (x.Key.Equals(key)) 
+                    {
+                        value = x.Value;
+                        return true;
+                    }
+            }
+
+            value = default(V);
+            return false;
+        }
+
+        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals`, 
+        /// returns the `true` and the found value or the `false` otherwise</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key, out V value) where K : class
+        {
+            var e = map.GetEntryOrDefault(hash);
+            if (e is ImHashMapEntry<K, V> kv)
+            {
+                if (kv.Key == key)
+                {
+                    value = kv.Value;
+                    return true;
+                }
+            }
+            else if (e is HashConflictKeyValuesEntry<K, V> hc)
+            {
+                foreach (var x in hc.Conflicts) 
+                    if (x.Key == key) 
+                    {
+                        value = x.Value;
+                        return true;
+                    }
+            }
+
+            value = default(V);
+            return false;
+        }
+
+        /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.Equals` for equality,
+        /// returns the `true` and the found value or the `false` otherwise</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<K, V>(this ImHashMap<K, V> map, K key, out V value) =>
+            map.TryFind(key.GetHashCode(), key, out value);
+
+        /// <summary>Lookup for the value by its hash, returns the `true` and the found value or the `false` otherwise</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<V>(this ImMap<V> map, int hash, out V value)
+        {
+            if (map is ImMapEntry<V> v && v.Hash == hash)
+            {
+                value = v.Value;
+                return true;
+            }
+
+            var e = map.GetEntryOrNull(hash);
+            if (e != null)
+            {
+                value = ((ImMapEntry<V>)e).Value;
+                return true;
+            }
+
+            value = default(V);
+            return false;
+        }
+
+
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
+        public static ImHashMap<K, V> AddOrGetEntry<K, V>(this ImHashMap<K, V> map, int hash, K key, V value)
+        {
+            var newEntry = new ImHashMapEntry<K, V>(hash, key, value);
+            if (map == ImHashMap<K, V>.Empty)
+                return newEntry;
+
+            var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
+            if (oldEntryOrMap is ImHashMap<K, V>.Entry == false)
+                return oldEntryOrMap;
+
+            if (oldEntryOrMap is ImHashMapEntry<K, V> kv)
+                return kv.Key.Equals(newEntry.Key) ? oldEntryOrMap 
+                    : map.ReplaceEntry(hash, kv, new HashConflictKeyValuesEntry<K, V>(hash, kv, newEntry));
+
+            var hc = (HashConflictKeyValuesEntry<K, V>)oldEntryOrMap;
+            var cs = hc.Conflicts;
+            var n = cs.Length;
+            var i = n - 1;
+            while (i != -1 && !key.Equals(cs[i].Key)) --i;
+            if (i != -1)
+                return cs[i];
+
+            var newConflicts = new ImHashMapEntry<K, V>[n + 1];
+            Array.Copy(cs, 0, newConflicts, 0, n);
+            newConflicts[n] = newEntry;
+            return map.ReplaceEntry(hash, hc, new HashConflictKeyValuesEntry<K, V>(hash, newConflicts));
+        }
+
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) 
+        {
+            var newEntry = new ImHashMapEntry<K, V>(hash, key, value);
+            if (map == ImHashMap<K, V>.Empty)
+                return newEntry;
+
+            var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
+            if (oldEntryOrMap is ImHashMap<K, V>.Entry oldEntry)
+                return map.ReplaceEntry(hash, oldEntry, UpdateEntry(oldEntry, newEntry));
+
+            return oldEntryOrMap;
+        }
+
+        /// <summary>Adds or updates (no in-place mutation) the map with the new entry, always returning the NEW map!</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrUpdateEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) 
+        {
+            if (map == ImHashMap<K, V>.Empty)
+                return newEntry;
+
+            var hash = newEntry.Hash;
+            var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
+            if (oldEntryOrMap is ImHashMap<K, V>.Entry oldEntry)
+                return map.ReplaceEntry(hash, oldEntry, UpdateEntry(oldEntry, newEntry));
+
+            return oldEntryOrMap;
+        }
+
+        private static ImHashMap<K, V>.Entry UpdateEntry<K, V>(ImHashMap<K, V>.Entry oldEntry, ImHashMapEntry<K, V> newEntry)
+        {
+            if (oldEntry is ImHashMapEntry<K, V> kv)
+                return kv.Key.Equals(newEntry.Key) ? newEntry 
+                     : (ImHashMap<K, V>.Entry)new HashConflictKeyValuesEntry<K, V>(oldEntry.Hash, kv, newEntry);
+
+            var hc = (HashConflictKeyValuesEntry<K, V>)oldEntry;
+            var key = newEntry.Key;
+            var cs = hc.Conflicts;
+            var n = cs.Length;
+            var i = n - 1;
+            while (i != -1 && !key.Equals(cs[i].Key)) --i;
+            var newConflicts = new ImHashMapEntry<K, V>[i != -1 ? n : n + 1];
+            Array.Copy(cs, 0, newConflicts, 0, n);
+            newConflicts[i != -1 ? i : n] = newEntry;
+
+            return new HashConflictKeyValuesEntry<K, V>(oldEntry.Hash, newConflicts);
+        }
+
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, K key, V value) =>
+            map.AddOrUpdate(key.GetHashCode(), key, value);
+
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update) 
+        {
+            var newEntry = new ImHashMapEntry<K, V>(hash, key, value);
+            if (map == ImHashMap<K, V>.Empty)
+                return newEntry;
+
+            var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
+            if (oldEntryOrMap is ImHashMap<K, V>.Entry oldEntry)
+                return map.ReplaceEntry(hash, oldEntry, UpdateEntry(oldEntry, newEntry, update));
+
+            return oldEntryOrMap;
+        }
+
+        private static ImHashMap<K, V>.Entry UpdateEntry<K, V>(ImHashMap<K, V>.Entry oldEntry, ImHashMapEntry<K, V> newEntry, Update<K, V> update)
+        {
+            var key = newEntry.Key;
+            if (oldEntry is ImHashMapEntry<K, V> kv)
+                return kv.Key.Equals(key) ? new ImHashMapEntry<K, V>(newEntry.Hash, key, update(key, kv.Value, newEntry.Value))
+                    : (ImHashMap<K, V>.Entry)new HashConflictKeyValuesEntry<K, V>(oldEntry.Hash, kv, newEntry);
+
+            var hc = (HashConflictKeyValuesEntry<K, V>)oldEntry;
+            var cs = hc.Conflicts;
+            var n = cs.Length;
+            var i = n - 1;
+            while (i != -1 && !key.Equals(cs[i].Key)) --i;
+
+            var newConflicts = new ImHashMapEntry<K, V>[i != -1 ? n : n + 1];
+            Array.Copy(cs, 0, newConflicts, 0, n);
+            if (i != -1)
+                newConflicts[i] = new ImHashMapEntry<K, V>(newEntry.Hash, key, update(key, cs[i].Value, newEntry.Value));
+            else
+                newConflicts[n] = newEntry;
+
+            return new HashConflictKeyValuesEntry<K, V>(oldEntry.Hash, newConflicts);
+        }
+
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> AddOrUpdate<V>(this ImMap<V> map, int hash, V value)
+        {
+            var newEntry = new ImMapEntry<V>(hash, value);
+            if (map == ImMap<V>.Empty)
+                return newEntry;
+
+            var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
+            if (oldEntryOrMap is ImMapEntry<V> oldEntry)
+                return map.ReplaceEntry(hash, oldEntry, newEntry); // todo: @perf here we have a chance to compare the old and the new value and prevent the updated if the values are equal
+
+            return oldEntryOrMap;
+        }
+
+        /// <summary>Adds or updates (no in-place mutation) the map with the new entry, always returning the NEW map!</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> AddOrUpdateEntry<V>(this ImMap<V> map, ImMapEntry<V> newEntry)
+        {
+            if (map == ImMap<V>.Empty)
+                return newEntry;
+
+            var hash = newEntry.Hash;
+            var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
+            if (oldEntryOrMap is ImMapEntry<V> oldEntry)
+                return map.ReplaceEntry(hash, oldEntry, newEntry); // todo: @perf here we have a chance to compare the old and the new value and prevent the updated if the values are equal
+
+            return oldEntryOrMap;
+        }
+
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> AddOrUpdate<V>(this ImMap<V> map, int hash, V value, Update<int, V> update)
+        {
+            var newEntry = new ImMapEntry<V>(hash, value);
+            if (map == ImMap<V>.Empty)
+                return newEntry;
+
+            var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
+            if (oldEntryOrMap is ImMapEntry<V> oldEntry)
+                return map.ReplaceEntry(hash, oldEntry, new ImMapEntry<V>(hash, update(hash, oldEntry.Value, value))); // todo: @perf here we have a chance to compare the old and the new value and prevent the updated if the values are equal
+
+            return oldEntryOrMap;
+        }
+
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, K key, V value, Update<K, V> update) =>
+            map.AddOrUpdate(key.GetHashCode(), key, value, update);
+
+        /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
+        public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) 
+        {
+            var entry = map.GetEntryOrDefault(hash);
+            if (entry == null)
+                return map;
+
+            if (entry is ImHashMapEntry<K, V> kv)
+                return kv.Key.Equals(key) ? map.ReplaceEntry(hash, entry, new ImHashMapEntry<K, V>(hash, key, value)) : map;
+
+            var hc = (HashConflictKeyValuesEntry<K, V>)entry;
+            var cs = hc.Conflicts;
+            var n = cs.Length;
+            var i = n - 1;
+            while (i != -1 && !key.Equals(cs[i].Key)) --i;
+            if (i == -1)
+                return map;
+            
+            var newConflicts = new ImHashMapEntry<K, V>[n];
+            Array.Copy(cs, 0, newConflicts, 0, n);
+            newConflicts[i] = new ImHashMapEntry<K, V>(hash, key, value);
+
+            return map.ReplaceEntry(hash, entry, new HashConflictKeyValuesEntry<K, V>(hash, newConflicts));
+        }
+
+        /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, K key, V value) =>
+            map.Update(key.GetHashCode(), key, value);
+
+        /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
+        public static ImHashMap<K, V> UpdateToDefault<K, V>(this ImHashMap<K, V> map, int hash, K key) 
+        {
+            var entry = map.GetEntryOrDefault(hash);
+            if (entry == null)
+                return map;
+
+            if (entry is ImHashMapEntry<K, V> kv)
+                return kv.Key.Equals(key) ? map.ReplaceEntry(hash, entry, new ImHashMapEntry<K, V>(hash, key)) : map;
+
+            var hc = (HashConflictKeyValuesEntry<K, V>)entry;
+            var cs = hc.Conflicts;
+            var n = cs.Length;
+            var i = n - 1;
+            while (i != -1 && !key.Equals(cs[i].Key)) --i;
+            if (i == -1)
+                return map;
+            var newConflicts = new ImHashMapEntry<K, V>[n];
+            Array.Copy(cs, 0, newConflicts, 0, n);
+            newConflicts[i] = new ImHashMapEntry<K, V>(hash, key);
+            return map.ReplaceEntry(hash, entry, new HashConflictKeyValuesEntry<K, V>(hash, newConflicts));
+        }
+
+        /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> UpdateToDefault<K, V>(this ImHashMap<K, V> map, K key) =>
+            map.UpdateToDefault(key.GetHashCode(), key);
+
+        /// <summary>Updates the map with the new value and the `update` function if the key is found otherwise returns the same unchanged map.
+        /// If `update` returns the same map if the updated result is the same</summary>
+        public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update)
+        {
+            var entry = map.GetEntryOrDefault(hash);
+            if (entry == null)
+                return map;
+
+            if (entry is ImHashMapEntry<K, V> kv)
+                return !kv.Key.Equals(key) || ReferenceEquals(kv.Value, value = update(key, kv.Value, value)) 
+                    ? map 
+                    : map.ReplaceEntry(hash, entry, new ImHashMapEntry<K, V>(hash, key, value));
+
+            var hc = (HashConflictKeyValuesEntry<K, V>)entry;
+            var cs = hc.Conflicts;
+            var n = cs.Length;
+            var i = n - 1;
+            while (i != -1 && !key.Equals(cs[i].Key)) --i;
+            if (i == -1 || ReferenceEquals(cs[i].Value, value = update(key, cs[i].Value, value)))
+                return map;
+
+            var newConflicts = new ImHashMapEntry<K, V>[n];
+            Array.Copy(cs, 0, newConflicts, 0, n);
+            newConflicts[i] = new ImHashMapEntry<K, V>(hash, key, value);
+
+            return map.ReplaceEntry(hash, entry, new HashConflictKeyValuesEntry<K, V>(hash, newConflicts));
+        }
+
+        /// <summary>Updates the map with the new value and the `update` function if the key is found otherwise returns the same unchanged map.
+        /// If `update` returns the same map if the updated result is the same</summary>
+        public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, K key, V value, Update<K, V> update) =>
+            map.Update(key.GetHashCode(), key, value, update);
+
+        /// <summary>Updates the map with the new value if the hash is found otherwise returns the same unchanged map.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> Update<V>(this ImMap<V> map, int hash, V value) 
+        {
+            var entry = map.GetEntryOrNull(hash);
+            return entry == null ? map : map.ReplaceEntry(hash, entry, new ImMapEntry<V>(hash, value));
+        }
+
+        /// <summary>Updates the map with the default value if the hash is found otherwise returns the same unchanged map.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> UpdateToDefault<V>(this ImMap<V> map, int hash)
+        {
+            var entry = map.GetEntryOrNull(hash);
+            return entry == null ? map : map.ReplaceEntry(hash, entry, new ImMapEntry<V>(hash));
+        }
+
+        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrKeepEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) 
+        {
+            if (map == ImHashMap<K, V>.Empty)
+                return newEntry;
+
+            var hash = newEntry.Hash;
+            var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
+            if (oldEntryOrMap is ImHashMap<K, V>.Entry oldEntry)
+            {
+                var e = KeepOrAddEntry(oldEntry, newEntry);
+                return e == oldEntry ? map : map.ReplaceEntry(hash, oldEntry, e);
+            }
+
+            return oldEntryOrMap;
+        }
+
+        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrKeep<K, V>(this ImHashMap<K, V> map, int hash, K key, V value)
+        {
+            var newEntry = new ImHashMapEntry<K, V>(hash, key, value); // todo: @perf newEntry may not be needed here - consider the pooling of entries here
+            if (map == ImHashMap<K, V>.Empty)
+                return newEntry;
+
+            var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
+            if (oldEntryOrMap is ImHashMap<K, V>.Entry oldEntry)
+            {
+                var e = KeepOrAddEntry(oldEntry, newEntry);
+                return e == oldEntry ? map : map.ReplaceEntry(hash, oldEntry, e);
+            }
+
+            return oldEntryOrMap;
+        }
+
+        private static ImHashMap<K, V>.Entry KeepOrAddEntry<K, V>(ImHashMap<K, V>.Entry oldEntry, ImHashMapEntry<K, V> newEntry)
+        {
+            if (oldEntry is ImHashMapEntry<K, V> kv)
+                return kv.Key.Equals(newEntry.Key) ? oldEntry : (ImHashMap<K, V>.Entry)new HashConflictKeyValuesEntry<K, V>(oldEntry.Hash, kv, newEntry);
+
+            var hc = (HashConflictKeyValuesEntry<K, V>)oldEntry;
+            var key  = newEntry.Key;
+            var cs = hc.Conflicts;
+            var n = cs.Length;
+            var i = n - 1;
+            while (i != -1 && !key.Equals(cs[i].Key)) --i;
+            if (i != -1) // return the existing map
+                return oldEntry;
+
+            var newConflicts = new ImHashMapEntry<K, V>[n + 1];
+            Array.Copy(cs, 0, newConflicts, 0, n);
+            newConflicts[n] = newEntry;
+
+            return new HashConflictKeyValuesEntry<K, V>(oldEntry.Hash, newConflicts);
+        }
+
+        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrKeep<K, V>(this ImHashMap<K, V> map, K key, V value) => 
+            map.AddOrKeep(key.GetHashCode(), key, value);
+
+        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> AddOrKeepEntry<V>(this ImMap<V> map, ImMapEntry<V> newEntry) 
+        {
+            if (map == ImMap<V>.Empty)
+                return newEntry;
+            var oldEntryOrMap = map.AddOrGetEntry(newEntry.Hash, newEntry);
+            return oldEntryOrMap is ImMapEntry<V> ? map : oldEntryOrMap;
+        }
+
+        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the hash is already present</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> AddOrKeep<V>(this ImMap<V> map, int hash, V value) 
+        {
+            var newEntry = new ImMapEntry<V>(hash, value); // todo: @perf newEntry may not be needed here - consider the pooling of entries here
+            if (map == ImMap<V>.Empty)
+                return newEntry;
+            var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
+            return oldEntryOrMap is ImMapEntry<V> ? map : oldEntryOrMap;
+        }
+
+        /// <summary>Returns the new map without the specified hash and key (if found) or returns the same map otherwise</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> Remove<K, V>(this ImHashMap<K, V> map, int hash, K key)
+        {
+            var entryToRemove = map.GetEntryOrDefault(hash);
+            if (entryToRemove is ImHashMapEntry<K, V>)
+                return map.RemoveEntry(hash, entryToRemove);
+
+            if (entryToRemove is HashConflictKeyValuesEntry<K, V> hc)
+            {
+                var entryToReplace = RemoveEntryToReplaceOrDefault(hc, key);
+                return entryToReplace == null ? map : map.ReplaceEntry(hash, entryToRemove, entryToReplace);
+            }
+
+            return map;
+        }
+
+        private static ImHashMap<K, V>.Entry RemoveEntryToReplaceOrDefault<K, V>(HashConflictKeyValuesEntry<K, V> hc, K key)
+        {
+            var cs = hc.Conflicts;
+            var n = cs.Length;
+            var i = n - 1;
+            while (i != -1 && !cs[i].Key.Equals(key)) --i;
+            if (i != -1)
+            {
+                if (n == 2)
+                    return i == 0 ? cs[1] : cs[0];
+                var newConflicts = new ImHashMapEntry<K, V>[n -= 1]; // the new n is less by one
+                if (i > 0) // copy the 1st part
+                    Array.Copy(cs, 0, newConflicts, 0, i);
+                if (i < n) // copy the 2nd part
+                    Array.Copy(cs, i + 1, newConflicts, i, n - i);
+                return new HashConflictKeyValuesEntry<K, V>(hc.Hash, newConflicts);
+            }
+
+            return null;
+        }
+
+        /// <summary>Returns the new map without the specified hash (if found) or returns the same map otherwise</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> Remove<V>(this ImMap<V> map, int hash)
+        {
+            var entryToRemove = map.GetEntryOrNull(hash);
+            return entryToRemove == null ? map : map.RemoveEntry(hash, entryToRemove);
+        }
+
+        /// <summary>Returns the new map without the specified hash and key (if found) or returns the same map otherwise</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> Remove<K, V>(this ImHashMap<K, V> map, K key) =>
+            map == ImHashMap<K, V>.Empty ? map : map.Remove(key.GetHashCode(), key); // it make sense to have the empty map condition here to prevent the probably costly `GetHashCode()` for the empty map.
+    }
+
+    /// <summary>
+    /// The fixed array of maps (partitions) where the key first (lower) bits are used to locate the partion to lookup into.
+    /// Note: The partition array is NOT immutable and operates by swapping the updated partition with the new one.
+    /// The number of partitions may be specified by user or you can use the default number 16.
+    /// The default number 16 was selected to be not so big to pay for the few items and not so small to diminish the use of partitions.
+    /// </summary>
+    public static class PartitionedHashMap
+    {
+        /// <summary>The default number of partions</summary>
+        public const int PARTITION_COUNT_POWER_OF_TWO = 16;
+
+        /// <summary>The default mask to partition the key</summary>
+        public const int PARTITION_HASH_MASK = PARTITION_COUNT_POWER_OF_TWO - 1;
+
+        /// <summary>Creates the new collection with the empty partions</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V>[] CreateEmpty<K, V>(int partionCountOfPowerOfTwo = PARTITION_COUNT_POWER_OF_TWO)
+        {
+            var parts = new ImHashMap<K, V>[partionCountOfPowerOfTwo];
+            for (var i = 0; i < parts.Length; ++i)
+                parts[i] = ImHashMap<K, V>.Empty;
+            return parts;
+        }
+
+        /// <summary>Creates the new collection with the empty partions</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V>[] CreateEmpty<V>(int partionCountOfPowerOfTwo = PARTITION_COUNT_POWER_OF_TWO)
+        {
+            var parts = new ImMap<V>[partionCountOfPowerOfTwo];
+            for (var i = 0; i < parts.Length; ++i)
+                parts[i] = ImMap<V>.Empty;
+            return parts;
+        }
+
+        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.Equals` for equality, 
+        /// returns the default `V` if hash, key are not found.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, int partHashMask = PARTITION_HASH_MASK)
+        {
+            var p = parts[hash & partHashMask];
+            return p != null ? p.GetValueOrDefault(hash, key) : default(V);
+        }
+
+        /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.Equals` for equality, 
+        /// returns the default `V` if hash, key are not found.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V>[] parts, K key, int partHashMask = PARTITION_HASH_MASK) =>
+            parts.GetValueOrDefault(key.GetHashCode(), key, partHashMask);
+
+        /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.Equals` for equality, 
+        /// returns the default `V` if hash, key are not found.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefault<V>(this ImMap<V>[] parts, int hash, int partHashMask = PARTITION_HASH_MASK)
+        {
+            var p = parts[hash & partHashMask];
+            return p != null && p.GetEntryOrNull(hash) is ImMapEntry<V> kv ? kv.Value : default(V);
+        }
+
+        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals` for equality, 
+        /// returns the default `V` if hash, key are not found.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, int partHashMask = PARTITION_HASH_MASK) where K : class
+        {
+            var p = parts[hash & partHashMask];
+            return p != null ? p.GetValueOrDefaultByReferenceEquals(hash, key) : default(V);
+        }
+
+        /// <summary>Lookup for the value by the key using the hash code and checking the key with the `object.Equals` for equality,
+        /// returns the `true` and the found value or the `false`</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, out V value, int partHashMask = PARTITION_HASH_MASK)
+        {
+            var p = parts[hash & partHashMask];
+            if (p != null) 
+                return p.TryFind(hash, key, out value);
+            value = default(V);
+            return false;
+        }
+
+        /// <summary>Lookup for the value by the key using its hash code and checking the key with the `object.Equals` for equality,
+        /// returns the `true` and the found value or the `false`</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFind<K, V>(this ImHashMap<K, V>[] parts, K key, out V value, int partHashMask = PARTITION_HASH_MASK) =>
+            parts.TryFind(key.GetHashCode(), key, out value, partHashMask);
+
+        /// <summary>Lookup for the value by the key using the hash code and checking the key with the `object.ReferenceEquals` for equality,
+        /// returns the `true` and the found value or the `false`</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, out V value, int partHashMask = PARTITION_HASH_MASK)
+            where K : class
+        {
+            var p = parts[hash & partHashMask];
+            if (p != null) 
+                return p.TryFindByReferenceEquals(hash, key, out value);
+            value = default(V);
+            return false;
+        }
+
+        /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.ReferenceEquals` for equality, 
+        /// returns the default `V` if hash, key are not found.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, K key, int partHashMask = PARTITION_HASH_MASK) where K : class => 
+            parts.GetValueOrDefaultByReferenceEquals(key.GetHashCode(), key, partHashMask);
+
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, 
+            int partHashMask = PARTITION_HASH_MASK)
+        {
+            ref var part = ref parts[hash & partHashMask];
+            var p = part;
+            if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, key, value), p) != p)
+                RefAddOrUpdatePart(ref part, hash, key, value);
+        }
+
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        [MethodImpl((MethodImplOptions) 256)]
+        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, K key, V value, 
+            int partHashMask = PARTITION_HASH_MASK) =>
+            parts.AddOrUpdate(key.GetHashCode(), key, value, partHashMask);
+
+        private static void RefAddOrUpdatePart<K, V>(ref ImHashMap<K, V> part, int hash, K key, V value) =>
+            Ref.Swap(ref part, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v));
+
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        [MethodImpl((MethodImplOptions) 256)]
+        public static void AddOrUpdate<V>(this ImMap<V>[] parts, int hash, V value, 
+            int partHashMask = PARTITION_HASH_MASK) 
+        {
+            ref var part = ref parts[hash & partHashMask];
+            var p = part;
+            if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, value), p) != p)
+                RefAddOrUpdatePart(ref part, hash, value);
+        }
+
+        private static void RefAddOrUpdatePart<V>(ref ImMap<V> part, int hash, V value) =>
+            Ref.Swap(ref part, hash, value, (x, h, v) => x.AddOrUpdate(h, v));
+
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        [MethodImpl((MethodImplOptions) 256)]
+        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, Update<K, V> update,
+            int partHashMask = PARTITION_HASH_MASK)
+        {
+            ref var part = ref parts[hash & partHashMask];
+            var p = part;
+            if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, key, value, update), p) != p)
+                Ref.Swap(ref part, new ImHashMapEntry<K, V>(hash, key, value), update, (x, e, u) => x.AddOrUpdate(e.Hash, e.Key, e.Value, u));
+        }
+
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        [MethodImpl((MethodImplOptions) 256)]
+        public static void AddOrUpdate<V>(this ImMap<V>[] parts, int hash, V value, Update<int, V> update,
+            int partHashMask = PARTITION_HASH_MASK)
+        {
+            ref var part = ref parts[hash & partHashMask];
+            var p = part;
+            if (Interlocked.CompareExchange(ref part, p.AddOrUpdate(hash, value, update), p) != p)
+                Ref.Swap(ref part, hash, value, update, (x, h, k, u) => x.AddOrUpdate(h, k, u));
+        }
+
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partion</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, int partHashMask = PARTITION_HASH_MASK)
+        {
+            ref var part = ref parts[hash & partHashMask];
+            var p = part;
+            if (Interlocked.CompareExchange(ref part, p.AddOrKeep(hash, key, value), p) != p)
+                RefAddOrKeepPart(ref part, hash, key, value);
+        }
+
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partion</summary>
+        [MethodImpl((MethodImplOptions) 256)]
+        public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] parts, K key, V value, 
+            int partHashMask = PARTITION_HASH_MASK) =>
+            parts.AddOrKeep(key.GetHashCode(), key, value, partHashMask);
+
+        private static void RefAddOrKeepPart<K, V>(ref ImHashMap<K, V> part, int hash, K key, V value) =>
+            Ref.Swap(ref part, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v));
+
+        /// <summary>Updates the map with the new value if the hash is found otherwise returns the same unchanged map.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static void Update<V>(this ImMap<V>[] parts, int hash, V value, 
+            int partHashMask = PARTITION_HASH_MASK) 
+        {
+            ref var part = ref parts[hash & partHashMask];
+            var p = part;
+            if (Interlocked.CompareExchange(ref part, p.Update(hash, value), p) != p)
+                RefUpdatePart(ref part, hash, value);
+        }
+
+        private static void RefUpdatePart<V>(ref ImMap<V> part, int hash, V value) =>
+            Ref.Swap(ref part, hash, value, (x, h, v) => x.Update(h, v));
+
+        /// <summary>Enumerates all the partitions map entries in the hash order.
+        /// `parents` parameter allow to reuse the stack memory used for traversal between multiple enumerates.
+        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent `Enumerate` calls</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static IEnumerable<ImHashMapEntry<K, V>> Enumerate<K, V>(this ImHashMap<K, V>[] parts, 
+        ImHashMap.Stack<ImHashMap<K, V>> parents = null)
+        {
+            if (parents == null)
+                parents = new ImHashMap.Stack<ImHashMap<K, V>>();
+            foreach (var map in parts) 
+            {
+                if (map == ImHashMap<K, V>.Empty)
+                    continue;
+                foreach (var entry in map.Enumerate(parents))
                     yield return entry;
             }
         }
 
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up.
-        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
-        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
-        /// </summary>
-        public static S Fold<K, S>(this ImMap<KValue<K>> map,
-            S state, Func<ImMapEntry<KValue<K>>, S, S> reduce, ImMapTree<KValue<K>>[] parentsStack = null) =>
-                map.Fold(state, reduce, (entry, s, r) =>
-                {
-                    if (entry.Value.Value is ImMapEntry<KValue<K>>[] conflicts)
-                        for (var i = 0; i < conflicts.Length; i++)
-                            s = r(conflicts[i], s);
-                    else
-                        s = r(entry, s);
-                    return s;
-                },
-                parentsStack);
-
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up.
-        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
-        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
-        /// </summary>
-        public static S Visit<K, S>(this ImMap<KValue<K>> map,
-            S state, Action<ImMapEntry<KValue<K>>, S> effect, ImMapTree<KValue<K>>[] parentsStack = null) =>
-            map.Fold(state, effect, (entry, s, eff) =>
+        /// <summary> 
+        /// Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
+        /// The `parents` parameter allows to reuse the stack memory used for traversal between multiple enumerates.
+        /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent `Enumerate` calls</summary>
+        public static S Fold<V, S>(this ImMap<V>[] parts, S state, Func<ImMapEntry<V>, S, S> reduce, 
+            ImHashMap.Stack<ImMap<V>> parents = null)
+        {
+            if (parents == null)
+                parents = new ImHashMap.Stack<ImMap<V>>();
+            foreach (var map in parts) 
             {
-                if (entry.Value.Value is ImMapEntry<KValue<K>>[] conflicts)
-                    for (var i = 0; i < conflicts.Length; i++)
-                        eff(conflicts[i], s);
-                else
-                    eff(entry, s);
-                return s;
-            },
-            parentsStack);
-
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up.
-        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
-        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
-        /// </summary>
-        public static void Visit<K>(this ImMap<KValue<K>> map,
-            Action<ImMapEntry<KValue<K>>> effect, ImMapTree<KValue<K>>[] parentsStack = null) =>
-            map.Fold(false, effect, (entry, s, eff) =>
-            {
-                if (entry.Value.Value is ImMapEntry<KValue<K>>[] conflicts)
-                    for (var i = 0; i < conflicts.Length; i++)
-                        eff(conflicts[i]);
-                else
-                    eff(entry);
-                return false;
-            },
-            parentsStack);
-    }
-
-    /// <summary>
-    /// The array of ImMap slots where the key first bits are used for FAST slot location
-    /// and the slot is the reference to ImMap that can be swapped with its updated value
-    /// </summary>
-    public static class ImMapSlots
-    {
-        /// Default number of slots
-        public const int SLOT_COUNT_POWER_OF_TWO = 32;
-
-        /// The default mask to partition the key to the target slot
-        public const int KEY_MASK_TO_FIND_SLOT = SLOT_COUNT_POWER_OF_TWO - 1;
-
-        /// Creates the array with the empty slots
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V>[] CreateWithEmpty<V>(int slotCountPowerOfTwo = SLOT_COUNT_POWER_OF_TWO)
-        {
-            var slots = new ImMap<V>[slotCountPowerOfTwo];
-            for (var i = 0; i < slots.Length; ++i)
-                slots[i] = ImMap<V>.Empty;
-            return slots;
-        }
-
-        /// Returns a new tree with added or updated value for specified key.
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<V>(this ImMap<V>[] slots, int key, V value, int keyMaskToFindSlot = KEY_MASK_TO_FIND_SLOT)
-        {
-            ref var slot = ref slots[key & keyMaskToFindSlot];
-            var copy = slot;
-            if (Interlocked.CompareExchange(ref slot, copy.AddOrUpdate(key, value), copy) != copy)
-                RefAddOrUpdateSlot(ref slot, key, value);
-        }
-
-        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
-        public static void RefAddOrUpdateSlot<V>(ref ImMap<V> slot, int key, V value) =>
-            Ref.Swap(ref slot, key, value, (x, k, v) => x.AddOrUpdate(k, v));
-
-        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrKeep<V>(this ImMap<V>[] slots, int key, V value, int keyMaskToFindSlot = KEY_MASK_TO_FIND_SLOT)
-        {
-            ref var slot = ref slots[key & keyMaskToFindSlot];
-            var copy = slot;
-            if (Interlocked.CompareExchange(ref slot, copy.AddOrKeep(key, value), copy) != copy)
-                RefAddOrKeepSlot(ref slot, key, value);
-        }
-
-        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
-        public static void RefAddOrKeepSlot<V>(ref ImMap<V> slot, int key, V value) =>
-            Ref.Swap(ref slot, key, value, (s, k, v) => s.AddOrKeep(k, v));
-
-        /// Adds a default value entry for the specified key or keeps the existing map if the key is already in the map.
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrKeep<V>(this ImMap<V>[] slots, int key, int keyMaskToFindSlot = KEY_MASK_TO_FIND_SLOT)
-        {
-            ref var slot = ref slots[key & keyMaskToFindSlot];
-            var copy = slot;
-            if (Interlocked.CompareExchange(ref slot, copy.AddOrKeep(key), copy) != copy)
-                RefAddOrKeepSlot(ref slot, key);
-        }
-
-        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
-        public static void RefAddOrKeepSlot<V>(ref ImMap<V> slot, int key) =>
-            Ref.Swap(ref slot, key, (s, k) => s.AddOrKeep(k));
-
-        /// <summary> Folds all map nodes without the order </summary>
-        public static S Fold<V, S>(this ImMap<V>[] slots, S state, Func<ImMapEntry<V>, S, S> reduce)
-        {
-            var parentStack = ArrayTools.Empty<ImMapTree<V>>();
-            for (var i = 0; i < slots.Length; ++i)
-            {
-                var map = slots[i];
                 if (map == ImMap<V>.Empty)
                     continue;
-
-                if (map is ImMapEntry<V> leaf)
-                    state = reduce(leaf, state);
-                else if (map is ImMapBranch<V> branch)
-                {
-                    state = reduce(branch.Entry, state);
-                    state = reduce(branch.RightEntry, state);
-                }
-                else if (map is ImMapTree<V> tree)
-                {
-                    if (tree.TreeHeight == 2)
-                    {
-                        state = reduce((ImMapEntry<V>)tree.Left, state);
-                        state = reduce(tree.Entry, state);
-                        state = reduce((ImMapEntry<V>)tree.Right, state);
-                    }
-                    else
-                    {
-                        if (parentStack.Length < tree.TreeHeight - 2)
-                            parentStack = new ImMapTree<V>[tree.TreeHeight - 2];
-                        var parentIndex = -1;
-                        while (true)
-                        {
-                            if ((tree = map as ImMapTree<V>) != null)
-                            {
-                                if (tree.TreeHeight == 2)
-                                {
-                                    state = reduce((ImMapEntry<V>)tree.Left, state);
-                                    state = reduce(tree.Entry, state);
-                                    state = reduce((ImMapEntry<V>)tree.Right, state);
-                                    if (parentIndex == -1)
-                                        break;
-                                    tree = parentStack[parentIndex--];
-                                    state = reduce(tree.Entry, state);
-                                    map = tree.Right;
-                                }
-                                else
-                                {
-                                    parentStack[++parentIndex] = tree;
-                                    map = tree.Left;
-                                }
-                            }
-                            else if ((branch = map as ImMapBranch<V>) != null)
-                            {
-                                state = reduce(branch.Entry, state);
-                                state = reduce(branch.RightEntry, state);
-                                if (parentIndex == -1)
-                                    break;
-                                tree = parentStack[parentIndex--];
-                                state = reduce(tree.Entry, state);
-                                map = tree.Right;
-                            }
-                            else
-                            {
-                                state = reduce((ImMapEntry<V>)map, state);
-                                if (parentIndex == -1)
-                                    break;
-                                tree = parentStack[parentIndex--];
-                                state = reduce(tree.Entry, state);
-                                map = tree.Right;
-                            }
-                        }
-                    }
-                }
+                state = map.Fold(state, reduce, parents);
             }
-
-            return state;
-        }
-    }
-
-    /// <summary>Wraps the stored data with "fixed" reference semantics - when added to the tree it did not change or reconstructed in memory</summary>
-    public class ImHashMapEntry<K, V>
-    {
-        /// Empty thingy
-        public static readonly ImHashMapEntry<K, V> Empty = new ImHashMapEntry<K, V>();
-
-        /// Key hash
-        public readonly int Hash;
-
-        ///  The key
-        public readonly K Key;
-
-        /// The value - may be mutated implementing the Ref CAS semantics if needed
-        public V Value;
-
-        private ImHashMapEntry() { }
-
-        /// Constructs the data
-        public ImHashMapEntry(int hash, K key, V value)
-        {
-            Hash = hash;
-            Key = key;
-            Value = value;
-        }
-
-        /// Constructs the data with the default value
-        public ImHashMapEntry(int hash, K key)
-        {
-            Hash = hash;
-            Key = key;
-        }
-
-        /// <summary>Outputs the brief tree info - mostly for debugging purposes</summary>
-        public override string ToString() => Key + ": " + Value;
-    }
-
-    /// Stores ALL the data in `Conflicts` array, the fields except the `hash` are just fillers.
-    /// This way we preserve the once created `ImHashMapData` so that client can hold the reference to it and update the Value if needed.
-    public sealed class ImHashMapConflicts<K, V> : ImHashMapEntry<K, V>
-    {
-        /// Conflicted data
-        public readonly ImHashMapEntry<K, V>[] Conflicts;
-
-        /// <inheritdoc />
-        public ImHashMapConflicts(int hash, params ImHashMapEntry<K, V>[] conflicts) : base(hash, default, default) =>
-            Conflicts = conflicts;
-    }
-
-    /// Immutable http://en.wikipedia.org/wiki/AVL_tree 
-    /// where node key is the hash code of <typeparamref name="K"/>
-    public sealed class ImHashMap<K, V>
-    {
-        /// Empty map to start with.
-        public static readonly ImHashMap<K, V> Empty = new ImHashMap<K, V>();
-
-        /// <summary>Calculated key hash.</summary>
-        public int Hash
-        {
-            [MethodImpl((MethodImplOptions)256)]
-            get => Entry.Hash;
-        }
-
-        /// <summary>Key of type K that should support <see cref="object.Equals(object)"/> and <see cref="object.GetHashCode"/>.</summary>
-        public K Key
-        {
-            [MethodImpl((MethodImplOptions)256)]
-            get => Entry.Key;
-        }
-
-        /// <summary>Value of any type V.</summary>
-        public V Value
-        {
-            [MethodImpl((MethodImplOptions)256)]
-            get => Entry.Value;
-        }
-
-        /// <summary>In case of <see cref="Hash"/> conflicts for different keys contains conflicted keys with their values.</summary>
-        public ImHashMapEntry<K, V>[] Conflicts
-        {
-            [MethodImpl((MethodImplOptions)256)]
-            get => (Entry as ImHashMapConflicts<K, V>)?.Conflicts;
-        }
-
-        /// <summary>Left sub-tree/branch, or empty.</summary>
-        public ImHashMap<K, V> Left;
-
-        /// <summary>Right sub-tree/branch, or empty.</summary>
-        public ImHashMap<K, V> Right;
-
-        /// <summary>Height of longest sub-tree/branch plus 1. It is 0 for empty tree, and 1 for single node tree.</summary>
-        public int Height;
-
-        /// <summary>Returns true if tree is empty.</summary>
-        public bool IsEmpty => Height == 0;
-
-        /// <summary>The entry which is allocated once and can be used as a "fixed" reference to the Key and Value</summary>
-        public readonly ImHashMapEntry<K, V> Entry;
-
-        internal ImHashMap() => Entry = ImHashMapEntry<K, V>.Empty;
-
-        /// Creates  leaf node
-        public ImHashMap(int hash, K key, V value)
-        {
-            Entry = new ImHashMapEntry<K, V>(hash, key, value);
-            Left = Empty;
-            Right = Empty;
-            Height = 1;
-        }
-
-        /// Creates a leaf node with default value
-        public ImHashMap(int hash, K key)
-        {
-            Entry = new ImHashMapEntry<K, V>(hash, key);
-            Left = Empty;
-            Right = Empty;
-            Height = 1;
-        }
-
-        /// Creates a leaf node
-        public ImHashMap(ImHashMapEntry<K, V> entry)
-        {
-            Entry = entry;
-            Left = Empty;
-            Right = Empty;
-            Height = 1;
-        }
-
-        /// Creates the tree and calculates the height for you
-        public ImHashMap(ImHashMapEntry<K, V> entry, ImHashMap<K, V> left, ImHashMap<K, V> right)
-        {
-            Entry = entry;
-            Left = left;
-            Right = right;
-            Height = 1 + (left.Height > right.Height ? left.Height : right.Height);
-        }
-
-        /// Creates the tree with the known height
-        public ImHashMap(ImHashMapEntry<K, V> entry, ImHashMap<K, V> left, ImHashMap<K, V> right, int height)
-        {
-            Entry = entry;
-            Left = left;
-            Right = right;
-            Height = height;
-        }
-
-        /// <summary>Outputs the brief tree info - mostly for debugging purposes</summary>
-        public override string ToString() => Height == 0 ? "empty"
-            : "(" + Entry
-            + ") -> (" + (Left.Height == 0 ? "empty" : Left.Entry + " of height " + Left.Height)
-            + ", " + (Right.Height == 0 ? "empty" : Right.Entry + " of height " + Right.Height)
-            + ")";
-
-        /// <summary>Uses the user provided hash and adds and updates the tree with passed key-value. Returns a new tree.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(int hash, K key, V value) =>
-            Height == 0 ? new ImHashMap<K, V>(hash, key, value)
-            : hash == Hash ? UpdateValueOrAddOrUpdateConflict(hash, key, value)
-            : AddOrUpdateLeftOrRight(hash, key, value);
-
-        /// Adds and updates the tree with passed key-value. Returns a new tree.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value) =>
-            AddOrUpdate(key.GetHashCode(), key, value);
-
-        private ImHashMap<K, V> UpdateValueOrAddOrUpdateConflict(int hash, K key, V value)
-        {
-            var conflictsData = Entry as ImHashMapConflicts<K, V>;
-            return conflictsData == null && (ReferenceEquals(key, Key) || key.Equals(Key))
-                ? new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key, value), Left, Right, Height)
-                : AddOrUpdateConflict(conflictsData, hash, key, value);
-        }
-
-        internal enum DoAddOrUpdateConflicts { AddOrUpdate, AddOrKeep, Update }
-
-        private ImHashMap<K, V> AddOrUpdateConflict(ImHashMapConflicts<K, V> conflictsData, int hash, K key, V value,
-            Update<K, V> update = null, DoAddOrUpdateConflicts doWhat = DoAddOrUpdateConflicts.AddOrUpdate)
-        {
-            if (conflictsData == null)
-                return doWhat == DoAddOrUpdateConflicts.Update
-                    ? this
-                    : new ImHashMap<K, V>(
-                        new ImHashMapConflicts<K, V>(hash, Entry, new ImHashMapEntry<K, V>(hash, key, value)),
-                        Left, Right, Height);
-
-            var conflicts = conflictsData.Conflicts;
-            var conflictCount = conflicts.Length;
-            var conflictIndex = conflictCount - 1;
-            while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Key))
-                --conflictIndex;
-
-            ImHashMapEntry<K, V>[] newConflicts;
-            if (conflictIndex != -1)
-            {
-                if (doWhat == DoAddOrUpdateConflicts.AddOrKeep)
-                    return this;
-
-                // update the existing conflicted value
-                newConflicts = new ImHashMapEntry<K, V>[conflictCount];
-                Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                var newValue = update == null ? value : update(key, conflicts[conflictIndex].Value, value);
-                newConflicts[conflictIndex] = new ImHashMapEntry<K, V>(hash, key, newValue);
-            }
-            else
-            {
-                if (doWhat == DoAddOrUpdateConflicts.Update)
-                    return this;
-
-                // add the new conflicting value
-                newConflicts = new ImHashMapEntry<K, V>[conflictCount + 1];
-                Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-                newConflicts[conflictCount] = new ImHashMapEntry<K, V>(hash, key, value);
-            }
-
-            return new ImHashMap<K, V>(new ImHashMapConflicts<K, V>(hash, newConflicts), Left, Right, Height);
-        }
-
-        private ImHashMap<K, V> AddOrUpdateLeftOrRight(int hash, K key, V value)
-        {
-            if (hash < Hash)
-            {
-                if (Left.Height == 0)
-                    return new ImHashMap<K, V>(Entry, new ImHashMap<K, V>(hash, key, value), Right, 2);
-
-                if (Left.Hash == hash)
-                    return new ImHashMap<K, V>(Entry, Left.UpdateValueOrAddOrUpdateConflict(hash, key, value), Right, Height);
-
-                if (Right.Height == 0)
-                {
-                    if (hash < Left.Hash)
-                        return new ImHashMap<K, V>(Left.Entry,
-                            new ImHashMap<K, V>(hash, key, value), new ImHashMap<K, V>(Entry), 2);
-
-                    return new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key, value),
-                        new ImHashMap<K, V>(Left.Entry), new ImHashMap<K, V>(Entry), 2);
-                }
-
-                var left = Left.AddOrUpdateLeftOrRight(hash, key, value);
-                return left.Height > Right.Height + 1
-                    ? BalanceNewLeftTree(left)
-                    : new ImHashMap<K, V>(Entry, left, Right);
-            }
-            else
-            {
-                if (Right.Height == 0)
-                    return new ImHashMap<K, V>(Entry, Left, new ImHashMap<K, V>(hash, key, value), 2);
-
-                if (Right.Hash == hash)
-                    return new ImHashMap<K, V>(Entry, Left, Right.UpdateValueOrAddOrUpdateConflict(hash, key, value), Height);
-
-                if (Left.Height == 0)
-                {
-                    if (hash < Right.Hash)
-                        return new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key, value),
-                            new ImHashMap<K, V>(Entry), new ImHashMap<K, V>(Right.Entry), 2);
-
-                    return new ImHashMap<K, V>(Right.Entry,
-                        new ImHashMap<K, V>(Entry), new ImHashMap<K, V>(hash, key, value), 2);
-                }
-
-                var right = Right.AddOrUpdateLeftOrRight(hash, key, value);
-                return right.Height > Left.Height + 1
-                    ? BalanceNewRightTree(right)
-                    : new ImHashMap<K, V>(Entry, Left, right);
-            }
-        }
-
-        private ImHashMap<K, V> BalanceNewLeftTree(ImHashMap<K, V> newLeftTree)
-        {
-            var leftLeft = newLeftTree.Left;
-            var leftLeftHeight = leftLeft.Height;
-
-            var leftRight = newLeftTree.Right;
-            var leftRightHeight = leftRight.Height;
-
-            if (leftRightHeight > leftLeftHeight)
-            {
-                newLeftTree.Right = leftRight.Left;
-                newLeftTree.Height = leftLeftHeight + 1;
-                return new ImHashMap<K, V>(leftRight.Entry,
-                    newLeftTree,
-                    new ImHashMap<K, V>(Entry, leftRight.Right, Right, Right.Height + 1),
-                    leftLeftHeight + 2);
-
-                //return new ImHashMap<K, V>(leftRight.Entry,
-                //    new ImHashMap<K, V>(newLeftTree.Entry, leftLeft, leftRight.Left),
-                //    new ImHashMap<K, V>(Entry, leftRight.Right, Right));
-            }
-
-            newLeftTree.Right = new ImHashMap<K, V>(Entry, leftRight, Right, leftRightHeight + 1);
-            newLeftTree.Height = leftRightHeight + 2;
-            return newLeftTree;
-
-            //return new ImHashMap<K, V>(newLeftTree.Entry,
-            //    leftLeft, new ImHashMap<K, V>(Entry, leftRight, Right));
-        }
-
-        // Note that Left is by 2 less deep than `newRightTree` - means that at `newRightTree.Left/Right` is at least of Left height or deeper
-        private ImHashMap<K, V> BalanceNewRightTree(ImHashMap<K, V> newRightTree)
-        {
-            var rightLeft = newRightTree.Left;
-            var rightLeftHeight = rightLeft.Height;
-
-            var rightRight = newRightTree.Right;
-            var rightRightHeight = rightRight.Height;
-
-            if (rightLeftHeight > rightRightHeight) // 1 greater - not 2 greater because it would be too unbalanced
-            {
-                newRightTree.Left = rightLeft.Right;
-                // the height now should be defined by rr - because left now is shorter by 1
-                newRightTree.Height = rightRightHeight + 1;
-                // the whole height consequentially can be defined by `newRightTree` (rr+1) because left is consist of short Left and -2 rl.Left
-                return new ImHashMap<K, V>(rightLeft.Entry,
-                    // Left should be >= rightLeft.Left because it maybe rightLeft.Right which defines rl height
-                    new ImHashMap<K, V>(Entry, Left, rightLeft.Left, height: Left.Height + 1),
-                    newRightTree, rightRightHeight + 2);
-
-                //return new ImHashMap<K, V>(rightLeft.Entry,
-                //    new ImHashMap<K, V>(Entry, Left, rightLeft.Left),
-                //    new ImHashMap<K, V>(newRightTree.Entry, rightLeft.Right, rightRight));
-            }
-
-            // we may decide on the height because the Left smaller by 2
-            newRightTree.Left = new ImHashMap<K, V>(Entry, Left, rightLeft, rightLeftHeight + 1);
-            // if rr was > rl by 1 than new rl+1 should be equal height to rr now, if rr was == rl than new rl wins anyway
-            newRightTree.Height = rightLeftHeight + 2;
-            return newRightTree;
-
-            //return new ImHashMap<K, V>(newRightTree.Entry, new ImHashMap<K, V>(Entry, Left, rightLeft), rightRight);
-        }
-
-        /// Uses the user provided hash and adds and updates the tree with passed key-value and the update function for the existing value. Returns a new tree.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(int hash, K key, V value, Update<K, V> update) =>
-            Height == 0 ? new ImHashMap<K, V>(hash, key, value)
-            : hash == Hash ? UpdateValueOrAddOrUpdateConflict(hash, key, value, update)
-            : AddOrUpdateLeftOrRightWithUpdate(hash, key, value, update);
-
-        private ImHashMap<K, V> UpdateValueOrAddOrUpdateConflict(int hash, K key, V value, Update<K, V> update)
-        {
-            var conflictsData = Entry as ImHashMapConflicts<K, V>;
-            return conflictsData == null && (ReferenceEquals(Key, key) || Key.Equals(key))
-                ? new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key, update(key, Value, value)), Left, Right, Height)
-                : AddOrUpdateConflict(conflictsData, hash, key, value, update);
-        }
-
-        private ImHashMap<K, V> AddOrUpdateLeftOrRightWithUpdate(int hash, K key, V value, Update<K, V> update)
-        {
-            if (hash < Hash)
-            {
-                if (Left.Height == 0)
-                    return new ImHashMap<K, V>(Entry, new ImHashMap<K, V>(hash, key, value), Right, 2);
-
-                if (Left.Hash == hash)
-                    return new ImHashMap<K, V>(Entry, Left.UpdateValueOrAddOrUpdateConflict(hash, key, value, update), Right, Height);
-
-                if (Right.Height == 0)
-                {
-                    if (hash < Left.Hash)
-                        return new ImHashMap<K, V>(Left.Entry, new ImHashMap<K, V>(hash, key, value), new ImHashMap<K, V>(Entry), 2);
-
-                    return new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key, value),
-                        new ImHashMap<K, V>(Left.Entry), new ImHashMap<K, V>(Entry), 2);
-                }
-
-                var left = Left.AddOrUpdateLeftOrRightWithUpdate(hash, key, value, update);
-                return left.Height > Right.Height + 1
-                    ? BalanceNewLeftTree(left)
-                    : new ImHashMap<K, V>(Entry, left, Right);
-            }
-            else
-            {
-                if (Right.Height == 0)
-                    return new ImHashMap<K, V>(Entry, Left, new ImHashMap<K, V>(hash, key, value), 2);
-
-                if (Right.Hash == hash)
-                    return new ImHashMap<K, V>(Entry, Left, Right.UpdateValueOrAddOrUpdateConflict(hash, key, value, update), Height);
-
-                if (Left.Height == 0)
-                {
-                    if (hash < Right.Hash)
-                        return new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key, value),
-                            new ImHashMap<K, V>(Entry), new ImHashMap<K, V>(Right.Entry), 2);
-
-                    return new ImHashMap<K, V>(Right.Entry,
-                        new ImHashMap<K, V>(Entry), new ImHashMap<K, V>(hash, key, value), 2);
-                }
-
-                var right = Right.AddOrUpdateLeftOrRightWithUpdate(hash, key, value, update);
-                return right.Height > Left.Height + 1
-                    ? BalanceNewRightTree(right)
-                    : new ImHashMap<K, V>(Entry, Left, right);
-            }
-        }
-
-        /// Returns a new tree with added or updated key-value. Uses the provided <paramref name="update"/> for updating the existing value.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<K, V> update) =>
-            AddOrUpdate(key.GetHashCode(), key, value, update);
-
-        /// Returns a new tree with added or updated key-value. Uses the provided <paramref name="update"/> for updating the existing value.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrUpdate(K key, V value, Update<V> update) =>
-            AddOrUpdate(key.GetHashCode(), key, value, update.IgnoreKey);
-
-        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrKeep(int hash, K key, V value) =>
-            Height == 0 ? new ImHashMap<K, V>(hash, key, value)
-            : hash == Hash ? KeepValueOrAddConflict(hash, key, value)
-            : AddOrKeepLeftOrRight(hash, key, value);
-
-        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrKeep(K key, V value) =>
-            AddOrKeep(key.GetHashCode(), key, value);
-
-        private ImHashMap<K, V> KeepValueOrAddConflict(int hash, K key, V value)
-        {
-            var conflictsData = Entry as ImHashMapConflicts<K, V>;
-            return conflictsData == null && (ReferenceEquals(Key, key) || Key.Equals(key)) ? this
-                : AddOrUpdateConflict(conflictsData, hash, key, value, null, DoAddOrUpdateConflicts.AddOrKeep);
-        }
-        private ImHashMap<K, V> AddOrKeepLeftOrRight(int hash, K key, V value)
-        {
-            if (hash < Hash)
-            {
-                if (Left.Height == 0)
-                    return new ImHashMap<K, V>(Entry, new ImHashMap<K, V>(hash, key, value), Right, 2);
-
-                if (Left.Hash == hash)
-                {
-                    var leftWithNewConflict = Left.KeepValueOrAddConflict(hash, key, value);
-                    return ReferenceEquals(leftWithNewConflict, Left) ? this
-                        : new ImHashMap<K, V>(Entry, leftWithNewConflict, Right, Height);
-                }
-
-                if (Right.Height == 0)
-                {
-                    if (hash < Left.Hash)
-                        return new ImHashMap<K, V>(Left.Entry,
-                            new ImHashMap<K, V>(hash, key, value), new ImHashMap<K, V>(Entry), 2);
-
-                    return new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key, value),
-                        new ImHashMap<K, V>(Left.Entry), new ImHashMap<K, V>(Entry), 2);
-                }
-
-                var left = Left.AddOrKeepLeftOrRight(hash, key, value);
-                if (ReferenceEquals(left, Left))
-                    return this;
-
-                return left.Height > Right.Height + 1
-                    ? BalanceNewLeftTree(left)
-                    : new ImHashMap<K, V>(Entry, left, Right);
-            }
-            else
-            {
-                if (Right.Height == 0)
-                    return new ImHashMap<K, V>(Entry, Left, new ImHashMap<K, V>(hash, key, value), 2);
-
-                if (Right.Hash == hash)
-                {
-                    var rightWithNewConflict = Right.KeepValueOrAddConflict(hash, key, value);
-                    return ReferenceEquals(rightWithNewConflict, Right) ? this
-                        : new ImHashMap<K, V>(Entry, Left, rightWithNewConflict, Height);
-                }
-
-                if (Left.Height == 0)
-                {
-                    if (hash < Right.Hash)
-                        return new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key, value),
-                            new ImHashMap<K, V>(Entry), new ImHashMap<K, V>(Right.Entry), 2);
-
-                    return new ImHashMap<K, V>(Right.Entry,
-                        new ImHashMap<K, V>(Entry), new ImHashMap<K, V>(hash, key, value), 2);
-                }
-
-                var right = Right.AddOrKeepLeftOrRight(hash, key, value);
-                if (ReferenceEquals(right, Right))
-                    return this;
-
-                return right.Height > Left.Height + 1
-                    ? BalanceNewRightTree(right)
-                    : new ImHashMap<K, V>(Entry, Left, right);
-            }
-        }
-
-        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrKeep(int hash, K key) =>
-            Height == 0 ? new ImHashMap<K, V>(hash, key)
-            : hash == Hash ? KeepValueOrAddConflict(hash, key)
-            : AddOrKeepLeftOrRight(hash, key);
-
-        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> AddOrKeep(K key) =>
-            AddOrKeep(key.GetHashCode(), key);
-
-        private ImHashMap<K, V> KeepValueOrAddConflict(int hash, K key)
-        {
-            var conflictsData = Entry as ImHashMapConflicts<K, V>;
-            return conflictsData == null && (ReferenceEquals(Key, key) || Key.Equals(key))
-                ? this : AddOrKeepConflict(conflictsData, hash, key);
-        }
-
-        private ImHashMap<K, V> AddOrKeepConflict(ImHashMapConflicts<K, V> conflictsData, int hash, K key)
-        {
-            if (conflictsData == null)
-                return new ImHashMap<K, V>(
-                    new ImHashMapConflicts<K, V>(hash, Entry, new ImHashMapEntry<K, V>(hash, key)),
-                    Left, Right, Height);
-
-            var conflicts = conflictsData.Conflicts;
-            var conflictCount = conflicts.Length;
-            var conflictIndex = conflictCount - 1;
-            while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Key))
-                --conflictIndex;
-
-            if (conflictIndex != -1)
-                return this;
-
-            // add the new conflicting value
-            var newConflicts = new ImHashMapEntry<K, V>[conflictCount + 1];
-            Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-            newConflicts[conflictCount] = new ImHashMapEntry<K, V>(hash, key);
-
-            return new ImHashMap<K, V>(new ImHashMapConflicts<K, V>(hash, newConflicts), Left, Right, Height);
-        }
-
-        private ImHashMap<K, V> AddOrKeepLeftOrRight(int hash, K key)
-        {
-            if (hash < Hash)
-            {
-                if (Left.Height == 0)
-                    return new ImHashMap<K, V>(Entry, new ImHashMap<K, V>(hash, key), Right, 2);
-
-                if (Left.Hash == hash)
-                {
-                    var leftWithNewConflict = Left.KeepValueOrAddConflict(hash, key);
-                    return ReferenceEquals(leftWithNewConflict, Left) ? this
-                        : new ImHashMap<K, V>(Entry, leftWithNewConflict, Right, Height);
-                }
-
-                if (Right.Height == 0)
-                {
-                    if (hash < Left.Hash)
-                        return new ImHashMap<K, V>(Left.Entry,
-                            new ImHashMap<K, V>(hash, key), new ImHashMap<K, V>(Entry), 2);
-
-                    return new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key),
-                        new ImHashMap<K, V>(Left.Entry), new ImHashMap<K, V>(Entry), 2);
-                }
-
-                var left = Left.AddOrKeepLeftOrRight(hash, key);
-                if (ReferenceEquals(left, Left))
-                    return this;
-
-                return left.Height > Right.Height + 1
-                    ? BalanceNewLeftTree(left)
-                    : new ImHashMap<K, V>(Entry, left, Right);
-            }
-            else
-            {
-                if (Right.Height == 0)
-                    return new ImHashMap<K, V>(Entry, Left, new ImHashMap<K, V>(hash, key), 2);
-
-                if (Right.Hash == hash)
-                {
-                    var rightWithNewConflict = Right.KeepValueOrAddConflict(hash, key);
-                    return ReferenceEquals(rightWithNewConflict, Right) ? this
-                        : new ImHashMap<K, V>(Entry, Left, rightWithNewConflict, Height);
-                }
-
-                if (Left.Height == 0)
-                {
-                    if (hash < Right.Hash)
-                        return new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key),
-                            new ImHashMap<K, V>(Entry), new ImHashMap<K, V>(Right.Entry), 2);
-
-                    return new ImHashMap<K, V>(Right.Entry,
-                        new ImHashMap<K, V>(Entry), new ImHashMap<K, V>(hash, key), 2);
-                }
-
-                var right = Right.AddOrKeepLeftOrRight(hash, key);
-                if (ReferenceEquals(right, Right))
-                    return this;
-
-                return right.Height > Left.Height + 1
-                    ? BalanceNewRightTree(right)
-                    : new ImHashMap<K, V>(Entry, Left, right);
-            }
-        }
-
-        /// Updates the map with the new value if key is found, otherwise returns the same unchanged map.
-        public ImHashMap<K, V> Update(int hash, K key, V value, Update<K, V> update = null)
-        {
-            if (Height == 0)
-                return this;
-
-            // No need to balance cause we not adding or removing nodes
-            if (hash < Hash)
-            {
-                var left = Left.Update(hash, key, value, update);
-                return ReferenceEquals(left, Left) ? this : new ImHashMap<K, V>(Entry, left, Right, Height);
-            }
-
-            if (hash > Hash)
-            {
-                var right = Right.Update(hash, key, value, update);
-                return ReferenceEquals(right, Right) ? this : new ImHashMap<K, V>(Entry, Left, right, Height);
-            }
-
-            var conflictsData = Entry as ImHashMapConflicts<K, V>;
-            if (conflictsData == null && (ReferenceEquals(Key, key) || Key.Equals(key)))
-                return new ImHashMap<K, V>(
-                    new ImHashMapEntry<K, V>(hash, key, update == null ? value : update(key, Value, value)),
-                    Left, Right, Height);
-
-            return AddOrUpdateConflict(conflictsData, hash, key, value, update, DoAddOrUpdateConflicts.Update);
-        }
-
-        /// Updates the map with the new value if key is found, otherwise returns the same unchanged map.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> Update(K key, V value) =>
-            Update(key.GetHashCode(), key, value);
-
-        /// Updates the map with the new value if key is found, otherwise returns the same unchanged map.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> Update(K key, V value, Update<V> update) =>
-            Update(key.GetHashCode(), key, value, update.IgnoreKey);
-
-        /// Updates the map with the Default (null for reference types) value if key is found, otherwise returns the same unchanged map.
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> UpdateToDefault(int hash, K key)
-        {
-            if (Height == 0)
-                return this;
-
-            // No need to balance cause we not adding or removing nodes
-            if (hash < Hash)
-            {
-                var left = Left.UpdateToDefault(hash, key);
-                return left == Left ? this : new ImHashMap<K, V>(Entry, left, Right, Height);
-            }
-
-            if (hash > Hash)
-            {
-                var right = Right.UpdateToDefault(hash, key);
-                return right == Right ? this : new ImHashMap<K, V>(Entry, Left, right, Height);
-            }
-
-            var conflictsData = Entry as ImHashMapConflicts<K, V>;
-            if (conflictsData == null && (ReferenceEquals(Key, key) || Key.Equals(key)))
-                return new ImHashMap<K, V>(new ImHashMapEntry<K, V>(hash, key), Left, Right, Height);
-
-            return UpdateConflictToDefault(conflictsData, hash, key);
-        }
-
-        private ImHashMap<K, V> UpdateConflictToDefault(ImHashMapConflicts<K, V> conflictsData, int hash, K key)
-        {
-            if (conflictsData == null)
-                return this;
-
-            var conflicts = conflictsData.Conflicts;
-            var conflictCount = conflicts.Length;
-            var conflictIndex = conflictCount - 1;
-            while (conflictIndex != -1 && !key.Equals(conflicts[conflictIndex].Key))
-                --conflictIndex;
-
-            if (conflictIndex == -1)
-                return this;
-
-            // update the existing conflicted value
-            var newConflicts = new ImHashMapEntry<K, V>[conflictCount];
-            Array.Copy(conflicts, 0, newConflicts, 0, conflictCount);
-            newConflicts[conflictIndex] = new ImHashMapEntry<K, V>(hash, key);
-            return new ImHashMap<K, V>(new ImHashMapConflicts<K, V>(hash, newConflicts), Left, Right, Height);
-        }
-
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up.
-        /// </summary>
-        public IEnumerable<ImHashMapEntry<K, V>> Enumerate()
-        {
-            if (Height != 0)
-            {
-                var parents = new ImHashMap<K, V>[Height];
-                var node = this;
-                var parentCount = -1;
-                while (node.Height != 0 || parentCount != -1)
-                {
-                    if (node.Height != 0)
-                    {
-                        parents[++parentCount] = node;
-                        node = node.Left;
-                    }
-                    else
-                    {
-                        node = parents[parentCount--];
-                        if (node.Entry is ImHashMapConflicts<K, V> conflictsData)
-                        {
-                            var conflicts = conflictsData.Conflicts;
-                            for (var i = 0; i < conflicts.Length; i++)
-                                yield return conflicts[i];
-                        }
-                        else
-                        {
-                            yield return node.Entry;
-                        }
-
-                        node = node.Right;
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up.
-        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
-        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
-        /// </summary>
-        public S Fold<S>(S state, Func<ImHashMapEntry<K, V>, S, S> reduce, ImHashMap<K, V>[] parentsStack = null)
-        {
-            if (Height == 1 && Entry is ImHashMapConflicts<K, V> == false)
-                return reduce(Entry, state);
-
-            if (Height != 0)
-            {
-                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
-                var node = this;
-                var parentCount = -1;
-                while (node.Height != 0 || parentCount != -1)
-                {
-                    if (node.Height != 0)
-                    {
-                        parentsStack[++parentCount] = node;
-                        node = node.Left;
-                    }
-                    else
-                    {
-                        node = parentsStack[parentCount--];
-
-                        if (!(node.Entry is ImHashMapConflicts<K, V> conflicts))
-                            state = reduce(node.Entry, state);
-                        else
-                        {
-                            var conflict = conflicts.Conflicts;
-                            for (var i = 0; i < conflict.Length; i++)
-                                state = reduce(conflict[i], state);
-                        }
-
-                        node = node.Right;
-                    }
-                }
-            }
-
-            return state;
-        }
-
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up.
-        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
-        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
-        /// </summary>
-        public S Fold<S>(S state, Func<ImHashMapEntry<K, V>, int, S, S> reduce, ImHashMap<K, V>[] parentsStack = null)
-        {
-            if (Height == 1 && Entry is ImHashMapConflicts<K, V> == false)
-                return reduce(Entry, 0, state);
-
-            if (Height != 0)
-            {
-                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
-                var index = 0;
-                var node = this;
-                var parentCount = -1;
-                while (node.Height != 0 || parentCount != -1)
-                {
-                    if (node.Height != 0)
-                    {
-                        parentsStack[++parentCount] = node;
-                        node = node.Left;
-                    }
-                    else
-                    {
-                        node = parentsStack[parentCount--];
-
-                        if (!(node.Entry is ImHashMapConflicts<K, V> conflicts))
-                            state = reduce(node.Entry, index++, state);
-                        else
-                        {
-                            var conflictData = conflicts.Conflicts;
-                            for (var i = 0; i < conflictData.Length; i++)
-                                state = reduce(conflictData[i], index++, state);
-                        }
-
-                        node = node.Right;
-                    }
-                }
-            }
-
-            return state;
-        }
-
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up.
-        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
-        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
-        /// </summary>
-        public S Visit<S>(S state, Action<ImHashMapEntry<K, V>, S> effect, ImHashMap<K, V>[] parentsStack = null)
-        {
-            if (Height == 1 && Entry is ImHashMapConflicts<K, V> == false)
-            {
-                effect(Entry, state);
-            }
-            else if (Height != 0)
-            {
-                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
-                var node = this;
-                var parentCount = -1;
-                while (node.Height != 0 || parentCount != -1)
-                {
-                    if (node.Height != 0)
-                    {
-                        parentsStack[++parentCount] = node;
-                        node = node.Left;
-                    }
-                    else
-                    {
-                        node = parentsStack[parentCount--];
-
-                        if (!(node.Entry is ImHashMapConflicts<K, V> conflicts))
-                            effect(node.Entry, state);
-                        else
-                        {
-                            var conflict = conflicts.Conflicts;
-                            for (var i = 0; i < conflict.Length; i++)
-                                effect(conflict[i], state);
-                        }
-
-                        node = node.Right;
-                    }
-                }
-            }
-
-            return state;
-        }
-
-        /// <summary>
-        /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
-        /// The only difference is using fixed size array instead of stack for speed-up.
-        /// Note: By passing <paramref name="parentsStack"/> you may reuse the stack array between different method calls,
-        /// but it should be at least <see cref="ImHashMap{K,V}.Height"/> length. The contents of array are not important.
-        /// </summary>
-        public void Visit(Action<ImHashMapEntry<K, V>> effect, ImHashMap<K, V>[] parentsStack = null)
-        {
-            if (Height == 1 && Entry is ImHashMapConflicts<K, V> == false)
-                effect(Entry);
-            else if (Height != 0)
-            {
-                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
-                var node = this;
-                var parentCount = -1;
-                while (node.Height != 0 || parentCount != -1)
-                {
-                    if (node.Height != 0)
-                    {
-                        parentsStack[++parentCount] = node;
-                        node = node.Left;
-                    }
-                    else
-                    {
-                        node = parentsStack[parentCount--];
-
-                        if (!(node.Entry is ImHashMapConflicts<K, V> conflicts))
-                            effect(node.Entry);
-                        else
-                        {
-                            var conflict = conflicts.Conflicts;
-                            for (var i = 0; i < conflict.Length; i++)
-                                effect(conflict[i]);
-                        }
-
-                        node = node.Right;
-                    }
-                }
-            }
-        }
-
-        /// <summary> Finds the first entry matching the condition, returns `null` if not found </summary>
-        public ImHashMapEntry<K, V> FindFirstOrDefault(Func<ImHashMapEntry<K, V>, bool> condition, ImHashMap<K, V>[] parentsStack = null)
-        {
-            if (Height == 1 && Entry is ImHashMapConflicts<K, V> == false)
-            {
-                if (condition(Entry))
-                    return Entry;
-            }
-            else if (Height != 0)
-            {
-                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
-                var node = this;
-                var parentCount = -1;
-                while (node.Height != 0 || parentCount != -1)
-                {
-                    if (node.Height != 0)
-                    {
-                        parentsStack[++parentCount] = node;
-                        node = node.Left;
-                    }
-                    else
-                    {
-                        node = parentsStack[parentCount--];
-
-                        if (!(node.Entry is ImHashMapConflicts<K, V> conflicts))
-                        {
-                            if (condition(node.Entry))
-                                return node.Entry;
-                        }
-                        else
-                        {
-                            var conflictedEntries = conflicts.Conflicts;
-                            for (var i = 0; i < conflictedEntries.Length; i++)
-                                if (condition(conflictedEntries[i]))
-                                    return conflictedEntries[i];
-                        }
-
-                        node = node.Right;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        /// Removes or updates value for specified key, or does nothing if the key is not found (returns the unchanged map)
-        /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
-        public ImHashMap<K, V> Remove(int hash, K key) =>
-            RemoveImpl(hash, key);
-
-        /// Removes or updates value for specified key, or does nothing if the key is not found (returns the unchanged map)
-        /// Based on Eric Lippert http://blogs.msdn.com/b/ericlippert/archive/2008/01/21/immutability-in-c-part-nine-academic-plus-my-avl-tree-implementation.aspx
-        [MethodImpl((MethodImplOptions)256)]
-        public ImHashMap<K, V> Remove(K key) =>
-            RemoveImpl(key.GetHashCode(), key);
-
-        private ImHashMap<K, V> RemoveImpl(int hash, K key, bool ignoreKey = false)
-        {
-            if (Height == 0)
-                return this;
-
-            ImHashMap<K, V> result;
-            if (hash == Hash) // found node
-            {
-                if (ignoreKey || Equals(Key, key))
-                {
-                    if (Height == 1) // remove node
-                        return Empty;
-
-                    if (Right.IsEmpty)
-                        result = Left;
-                    else if (Left.IsEmpty)
-                        result = Right;
-                    else
-                    {
-                        // we have two children, so remove the next highest node and replace this node with it.
-                        var next = Right;
-                        while (!next.Left.IsEmpty)
-                            next = next.Left;
-                        result = new ImHashMap<K, V>(next.Entry, Left, Right.RemoveImpl(next.Hash, default, ignoreKey: true));
-                    }
-                }
-                else if (Entry is ImHashMapConflicts<K, V> conflictsData)
-                    return TryRemoveConflicted(conflictsData, hash, key);
-                else
-                    return this; // if key is not matching and no conflicts to lookup - just return
-            }
-            else
-                result = hash < Hash
-                    ? Balance(Entry, Left.RemoveImpl(hash, key, ignoreKey), Right)
-                    : Balance(Entry, Left, Right.RemoveImpl(hash, key, ignoreKey));
-
-            return result;
-        }
-
-        /// <summary> Searches for the key in the conflicts and returns true if found </summary>
-        public bool ContainsConflictedData(K key)
-        {
-            if (Conflicts != null)
-            {
-                var conflicts = Conflicts;
-                for (var i = 0; i < conflicts.Length; ++i)
-                    if (key.Equals(conflicts[i].Key))
-                        return true;
-            }
-            return false;
-        }
-
-        /// <summary> Searches for the key in the node conflicts </summary>
-        public ImHashMapEntry<K, V> GetConflictedEntryOrDefault(K key)
-        {
-            if (Conflicts != null)
-            {
-                var conflicts = Conflicts;
-                for (var i = 0; i < conflicts.Length; ++i)
-                    if (key.Equals(conflicts[i].Key))
-                        return conflicts[i];
-            }
-            return null;
-        }
-
-        /// Searches for the key in the node conflicts
-        public V GetConflictedValueOrDefault(K key, V defaultValue)
-        {
-            if (Conflicts != null)
-            {
-                var conflicts = Conflicts;
-                for (var i = 0; i < conflicts.Length; ++i)
-                    if (key.Equals(conflicts[i].Key))
-                        return conflicts[i].Value;
-            }
-            return defaultValue;
-        }
-
-        /// Searches for the key in the node conflicts
-        public bool TryFindConflictedValue(K key, out V value)
-        {
-            if (Conflicts != null)
-            {
-                var conflicts = Conflicts;
-                for (var i = 0; i < conflicts.Length; ++i)
-                    if (Equals(conflicts[i].Key, key))
-                    {
-                        value = conflicts[i].Value;
-                        return true;
-                    }
-            }
-            value = default;
-            return false;
-        }
-
-        // todo: implement in terms of BalanceNewLeftTree | BalanceNewRightTree
-        private static ImHashMap<K, V> Balance(ImHashMapEntry<K, V> entry, ImHashMap<K, V> left, ImHashMap<K, V> right)
-        {
-            var delta = left.Height - right.Height;
-            if (delta > 1) // left is longer by 2, rotate left
-            {
-                var leftLeft = left.Left;
-                var leftRight = left.Right;
-                if (leftRight.Height > leftLeft.Height)
-                {
-                    // double rotation:
-                    //      5     =>     5     =>     4
-                    //   2     6      4     6      2     5
-                    // 1   4        2   3        1   3     6
-                    //    3        1
-                    return new ImHashMap<K, V>(leftRight.Entry,
-                        new ImHashMap<K, V>(left.Entry, leftLeft, leftRight.Left),
-                        new ImHashMap<K, V>(entry, leftRight.Right, right));
-                }
-
-                // one rotation:
-                //      5     =>     2
-                //   2     6      1     5
-                // 1   4              4   6
-                return new ImHashMap<K, V>(left.Entry,
-                    leftLeft, new ImHashMap<K, V>(entry, leftRight, right));
-            }
-
-            if (delta < -1)
-            {
-                var rightLeft = right.Left;
-                var rightRight = right.Right;
-                return rightLeft.Height > rightRight.Height
-                    ? new ImHashMap<K, V>(rightLeft.Entry,
-                        new ImHashMap<K, V>(entry, left, rightLeft.Left),
-                        new ImHashMap<K, V>(right.Entry, rightLeft.Right, rightRight))
-                    : new ImHashMap<K, V>(right.Entry, new ImHashMap<K, V>(entry, left, rightLeft), rightRight);
-            }
-
-            return new ImHashMap<K, V>(entry, left, right);
-        }
-
-        private ImHashMap<K, V> TryRemoveConflicted(ImHashMapConflicts<K, V> conflictsData, int hash, K key)
-        {
-            var conflicts = conflictsData.Conflicts;
-            var index = conflicts.Length - 1;
-            while (index != -1 && !conflicts[index].Key.Equals(key)) --index;
-            if (index == -1) // key is not found in conflicts - just return
-                return this;
-
-            // we removing the one from the 2 items, so we can reference the remaining item directly from the map node 
-            if (conflicts.Length == 2)
-                return new ImHashMap<K, V>(index == 0 ? conflicts[1] : conflicts[0], Left, Right, Height);
-
-            // copy all except the `index`ed data into shrinked conflicts
-            var shrinkedConflicts = new ImHashMapEntry<K, V>[conflicts.Length - 1];
-            var newIndex = 0;
-            for (var i = 0; i < conflicts.Length; ++i)
-                if (i != index)
-                    shrinkedConflicts[newIndex++] = conflicts[i];
-            return new ImHashMap<K, V>(new ImHashMapConflicts<K, V>(hash, shrinkedConflicts), Left, Right, Height);
-        }
-    }
-
-    /// ImHashMap methods for faster performance
-    public static class ImHashMap
-    {
-        internal static V IgnoreKey<K, V>(this Update<V> update, K _, V oldValue, V newValue) => update(oldValue, newValue);
-
-        /// <summary> Looks for key in a tree and returns `true` if found. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool Contains<K, V>(this ImHashMap<K, V> map, int hash, K key)
-        {
-            while (map.Height != 0 && map.Hash != hash)
-                map = hash < map.Hash ? map.Left : map.Right;
-            return map.Height != 0 && (key.Equals(map.Key) || map.ContainsConflictedData(key));
-        }
-
-        /// <summary> Looks for key in a tree and returns `true` if found. </summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool Contains<K, V>(this ImHashMap<K, V> map, K key) =>
-            map.Height != 0 && map.Contains(key.GetHashCode(), key);
-
-        /// Looks for key in a tree and returns the Data object if found or `null` otherwise.
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
-        {
-            while (map.Height != 0 && map.Hash != hash)
-                map = hash < map.Hash ? map.Left : map.Right;
-
-            return map.Height == 0 ? null :
-                key.Equals(map.Key) ? map.Entry :
-                map.GetConflictedEntryOrDefault(key);
-        }
-
-        /// <summary> Looks for key in a tree and returns the Data object if found or `null` otherwise. </summary> 
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, K key)
-        {
-            if (map.Height == 0)
-                return null;
-
-            var hash = key.GetHashCode();
-
-            while (map.Hash != hash)
-            {
-                map = hash < map.Hash ? map.Left : map.Right;
-                if (map.Height == 0)
-                    return null;
-            }
-
-            return key.Equals(map.Key) ? map.Entry : map.GetConflictedEntryOrDefault(key);
-        }
-
-        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, K key, V defaultValue = default)
-        {
-            if (map.Height == 0)
-                return defaultValue;
-
-            var hash = key.GetHashCode();
-
-            while (map.Hash != hash)
-            {
-                map = hash < map.Hash ? map.Left : map.Right;
-                if (map.Height == 0)
-                    return defaultValue;
-            }
-
-            return key.Equals(map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
-        }
-
-        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key, V defaultValue = default)
-        {
-            if (map.Height == 0)
-                return defaultValue;
-
-            while (map.Hash != hash)
-            {
-                map = hash < map.Hash ? map.Left : map.Right;
-                if (map.Height == 0)
-                    return defaultValue;
-            }
-
-            return key.Equals(map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
-        }
-
-        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, Type key, V defaultValue = default)
-        {
-            if (map.Height == 0)
-                return defaultValue;
-
-            var hash = RuntimeHelpers.GetHashCode(key);
-            while (hash != map.Hash)
-            {
-                map = hash < map.Hash ? map.Left : map.Right;
-                if (map.Height == 0)
-                    return defaultValue;
-            }
-
-            // we don't need to check `Height != 0` again cause in that case `key` will be `null` and `ReferenceEquals` will fail
-            return ReferenceEquals(key, map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
-        }
-
-        /// Looks for key in a tree and returns the key value if found, or <paramref name="defaultValue"/> otherwise.
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefault<V>(this ImHashMap<Type, V> map, int hash, Type key, V defaultValue = default)
-        {
-            if (map.Height == 0)
-                return defaultValue;
-
-            while (hash != map.Hash)
-            {
-                map = hash < map.Hash ? map.Left : map.Right;
-                if (map.Height == 0)
-                    return defaultValue;
-            }
-
-            // we don't need to check `Height != 0` again cause in that case `key` will be `null` and `ReferenceEquals` will fail
-            return ReferenceEquals(key, map.Key) ? map.Value : map.GetConflictedValueOrDefault(key, defaultValue);
-        }
-
-        /// Returns true if key is found and sets the value.
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<K, V>(this ImHashMap<K, V> map, K key, out V value)
-        {
-            if (map.Height != 0)
-            {
-                var hash = key.GetHashCode();
-
-                while (hash != map.Hash && map.Height != 0)
-                    map = hash < map.Hash ? map.Left : map.Right;
-
-                if (map.Height != 0)
-                {
-                    if (key.Equals(map.Key))
-                    {
-                        value = map.Value;
-                        return true;
-                    }
-
-                    return map.TryFindConflictedValue(key, out value);
-                }
-            }
-
-            value = default;
-            return false;
-        }
-
-        /// Returns true if key is found and sets the value.
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<K, V>(this ImHashMap<K, V> map, int hash, K key, out V value)
-        {
-            if (map.Height != 0)
-            {
-                while (hash != map.Hash && map.Height != 0)
-                    map = hash < map.Hash ? map.Left : map.Right;
-
-                if (map.Height != 0)
-                {
-                    if (key.Equals(map.Key))
-                    {
-                        value = map.Value;
-                        return true;
-                    }
-
-                    return map.TryFindConflictedValue(key, out value);
-                }
-            }
-
-            value = default;
-            return false;
-        }
-
-        /// Returns true if key is found and the result value.
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<V>(this ImHashMap<Type, V> map, Type key, out V value)
-        {
-            if (map.Height != 0)
-            {
-                var hash = RuntimeHelpers.GetHashCode(key);
-                while (hash != map.Hash && map.Height != 0)
-                    map = hash < map.Hash ? map.Left : map.Right;
-
-                if (map.Height != 0)
-                {
-                    // assign to `var data = ...`
-                    if (ReferenceEquals(key, map.Key))
-                    {
-                        value = map.Value;
-                        return true;
-                    }
-
-                    return map.TryFindConflictedValue(key, out value);
-                }
-            }
-
-            value = default;
-            return false;
-        }
-
-        /// Returns true if hash and key are found and the result value, or the false otherwise
-        [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFind<V>(this ImHashMap<Type, V> map, int hash, Type key, out V value)
-        {
-            if (map.Height != 0)
-            {
-                while (hash != map.Hash && map.Height != 0)
-                    map = hash < map.Hash ? map.Left : map.Right;
-
-                if (map.Height != 0)
-                {
-                    if (ReferenceEquals(key, map.Key))
-                    {
-                        value = map.Value;
-                        return true;
-                    }
-
-                    return map.TryFindConflictedValue(key, out value);
-                }
-            }
-
-            value = default;
-            return false;
-        }
-
-        /// <summary>Uses `RuntimeHelpers.GetHashCode()`</summary>
-        public static ImHashMap<Type, V> AddOrUpdate<V>(this ImHashMap<Type, V> map, Type key, V value) =>
-            map.AddOrUpdate(RuntimeHelpers.GetHashCode(key), key, value);
-    }
-
-    /// The array of ImHashMap slots where the key first bits are used for FAST slot location
-    /// and the slot is the reference to ImHashMap that can be swapped with its updated value
-    public static class ImHashMapSlots
-    {
-        /// Default number of slots
-        public const int SLOT_COUNT_POWER_OF_TWO = 32;
-
-        /// The default mask to partition the key to the target slot
-        public const int HASH_MASK_TO_FIND_SLOT = SLOT_COUNT_POWER_OF_TWO - 1;
-
-        /// Creates the array with the empty slots
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V>[] CreateWithEmpty<K, V>(int slotCountPowerOfTwo = SLOT_COUNT_POWER_OF_TWO)
-        {
-            var slots = new ImHashMap<K, V>[slotCountPowerOfTwo];
-            for (var i = 0; i < slots.Length; ++i)
-                slots[i] = ImHashMap<K, V>.Empty;
-            return slots;
-        }
-
-        /// Returns a new tree with added or updated value for specified key.
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] slots, int hash, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT)
-        {
-            ref var slot = ref slots[hash & hashMaskToFindSlot];
-            var copy = slot;
-            if (Interlocked.CompareExchange(ref slot, copy.AddOrUpdate(hash, key, value), copy) != copy)
-                RefAddOrUpdateSlot(ref slot, hash, key, value);
-        }
-
-        /// Returns a new tree with added or updated value for specified key.
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] slots, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT) =>
-            slots.AddOrUpdate(key.GetHashCode(), key, value, hashMaskToFindSlot);
-
-        /// Updates the ref to the slot with the new version - retry if the someone changed the slot in between
-        public static void RefAddOrUpdateSlot<K, V>(ref ImHashMap<K, V> slot, int hash, K key, V value) =>
-            Ref.Swap(ref slot, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v));
-
-        /// Updates the value with help of `updateValue` function
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] slots, int hash, K key, V value, Update<K, V> update, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT)
-        {
-            ref var slot = ref slots[hash & hashMaskToFindSlot];
-            var copy = slot;
-            if (Interlocked.CompareExchange(ref slot, copy.AddOrUpdate(hash, key, value, update), copy) != copy)
-                RefAddOrUpdateSlot(ref slot, hash, key, value, update);
-        }
-
-        /// Updates the value with help of `updateValue` function
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] slots, K key, V value, Update<K, V> updateValue, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT) =>
-            slots.AddOrUpdate(key.GetHashCode(), key, value, updateValue, hashMaskToFindSlot);
-
-        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
-        public static void RefAddOrUpdateSlot<K, V>(ref ImHashMap<K, V> slot, int hash, K key, V value, Update<K, V> update) =>
-            Ref.Swap(ref slot, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v, update));
-
-        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] slots, int hash, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT)
-        {
-            ref var slot = ref slots[hash & hashMaskToFindSlot];
-            var copy = slot;
-            if (Interlocked.CompareExchange(ref slot, copy.AddOrKeep(hash, key, value), copy) != copy)
-                RefAddOrKeepSlot(ref slot, hash, key, value);
-        }
-
-        /// Adds a new value for the specified key or keeps the existing map if the key is already in the map.
-        [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] slots, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT) =>
-            slots.AddOrKeep(key.GetHashCode(), key, value, hashMaskToFindSlot);
-
-        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
-        public static void RefAddOrKeepSlot<K, V>(ref ImHashMap<K, V> slot, int hash, K key, V value) =>
-            Ref.Swap(ref slot, hash, key, value, (s, h, k, v) => s.AddOrKeep(h, k, v));
-
-        /// Updates the specified slot or does not change it
-        [MethodImpl((MethodImplOptions)256)]
-        public static void Update<K, V>(this ImHashMap<K, V>[] slots, int hash, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT)
-        {
-            ref var slot = ref slots[hash & hashMaskToFindSlot];
-            var copy = slot;
-            if (Interlocked.CompareExchange(ref slot, copy.Update(hash, key, value), copy) != copy)
-                RefUpdateSlot(ref slot, hash, key, value);
-        }
-
-        /// Updates the specified slot or does not change it
-        [MethodImpl((MethodImplOptions)256)]
-        public static void Update<K, V>(this ImHashMap<K, V>[] slots, K key, V value, int hashMaskToFindSlot = HASH_MASK_TO_FIND_SLOT) =>
-            slots.Update(key.GetHashCode(), key, value, hashMaskToFindSlot);
-
-        /// Update the ref to the slot with the new version - retry if the someone changed the slot in between
-        public static void RefUpdateSlot<K, V>(ref ImHashMap<K, V> slot, int hash, K key, V value) =>
-            Ref.Swap(ref slot, key, value, (s, k, v) => s.Update(k, v));
-
-        /// Returns all map tree nodes without the order
-        public static S Fold<K, V, S>(this ImHashMap<K, V>[] slots, S state, Func<ImHashMapEntry<K, V>, S, S> reduce)
-        {
-            var parentStack = ArrayTools.Empty<ImHashMap<K, V>>();
-            for (var s = 0; s < slots.Length; s++)
-            {
-                var map = slots[s];
-                var height = map.Height;
-                if (height != 0)
-                {
-                    if (height > 1 && parentStack.Length < height)
-                        parentStack = new ImHashMap<K, V>[height];
-                    state = map.Fold(state, reduce, parentStack);
-                }
-            }
-
             return state;
         }
     }

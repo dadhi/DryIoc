@@ -1111,6 +1111,26 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 |        MsDI | 113.2 us | 2.66 us | 7.42 us |  1.00 |    0.00 | 16.1133 | 0.1221 |     - |  74.23 KB |
 |      DryIoc | 115.0 us | 2.87 us | 8.18 us |  1.02 |    0.10 | 14.4043 | 1.2207 |     - |  66.76 KB |
 | DryIoc_MsDI | 141.3 us | 3.51 us | 9.96 us |  1.26 |    0.12 | 19.0430 | 1.7090 |     - |  87.85 KB |
+
+## V5 + ImTools V3
+
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18363
+Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=5.0.200
+  [Host]     : .NET Core 3.1.12 (CoreCLR 4.700.21.6504, CoreFX 4.700.21.6905), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.12 (CoreCLR 4.700.21.6504, CoreFX 4.700.21.6905), X64 RyuJIT
+
+
+|              Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+|-------------------- |-------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|-------:|----------:|
+|                MsDI |     99.60 us |   1.880 us |   2.012 us |   1.00 |    0.00 |  11.4746 |  2.8076 |      - |  70.54 KB |
+|              DryIoc |    103.15 us |   1.769 us |   1.655 us |   1.03 |    0.03 |  10.2539 |  0.7324 |      - |  62.95 KB |
+|  DryIoc_MsDIAdapter |    128.59 us |   2.566 us |   2.853 us |   1.29 |    0.04 |  13.6719 |  1.2207 |      - |  84.21 KB |
+|               Grace | 17,297.74 us | 336.184 us | 492.774 us | 174.61 |    6.18 |  93.7500 | 31.2500 |      - |  729.5 KB |
+|   Grace_MsDIAdapter | 19,746.27 us | 257.440 us | 240.810 us | 197.80 |    3.07 | 125.0000 | 62.5000 |      - | 893.23 KB |
+|   Lamar_MsDIAdapter |  6,154.49 us |  99.811 us |  83.346 us |  61.56 |    1.82 | 101.5625 | 31.2500 |      - | 656.43 KB |
+|             Autofac |    609.34 us |   8.014 us |   6.692 us |   6.09 |    0.15 |  50.7813 | 25.3906 | 1.9531 | 315.88 KB |
+| Autofac_MsDIAdapter |    599.20 us |   6.511 us |   5.771 us |   5.99 |    0.15 |  54.6875 | 27.3438 | 1.9531 | 339.42 KB |
 */
             [Benchmark(Baseline = true)]
             public object MsDI() => Measure(PrepareMsDi());
@@ -1119,7 +1139,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             public object DryIoc() => Measure(PrepareDryIoc());
 
             [Benchmark]
-            public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
+            public object DryIoc_MsDIAdapter() => Measure(PrepareDryIocMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark
             //[Benchmark] 
@@ -1129,16 +1149,16 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
             public object Grace() => Measure(PrepareGrace());
 
             [Benchmark]
-            public object Grace_MsDI() => Measure(PrepareGraceMsDi());
+            public object Grace_MsDIAdapter() => Measure(PrepareGraceMsDi());
 
             [Benchmark]
-            public object Lamar_MsDI() => Measure(PrepareLamarMsDi());
+            public object Lamar_MsDIAdapter() => Measure(PrepareLamarMsDi());
 
             [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
             [Benchmark]
-            public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
+            public object Autofac_MsDIAdapter() => Measure(PrepareAutofacMsDi());
         }
 
         [MemoryDiagnoser]
@@ -1432,6 +1452,25 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
 | DryIoc_MsDIAdapter | 2.168 us | 0.0130 us | 0.0109 us |  0.63 | 0.6485 | 0.0076 |     - |   2.98 KB |
 |              Grace | 1.665 us | 0.0081 us | 0.0076 us |  0.49 | 0.6886 |      - |     - |   3.17 KB |
 |  Grace_MsDIAdapter | 2.258 us | 0.0108 us | 0.0096 us |  0.66 | 0.7401 | 0.0076 |     - |   3.41 KB |
+
+BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18363
+Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=5.0.200
+  [Host]     : .NET Core 3.1.12 (CoreCLR 4.700.21.6504, CoreFX 4.700.21.6905), X64 RyuJIT
+  DefaultJob : .NET Core 3.1.12 (CoreCLR 4.700.21.6504, CoreFX 4.700.21.6905), X64 RyuJIT
+
+### DryIoc v5 + ImTools v3
+
+|              Method |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|-------------------- |----------:|----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|                MsDI |  3.675 us | 0.0730 us | 0.1070 us |  3.699 us |  1.00 |    0.00 |  0.7095 | 0.0114 |     - |   4.35 KB |
+|              DryIoc |  1.359 us | 0.0147 us | 0.0138 us |  1.354 us |  0.37 |    0.01 |  0.4768 | 0.0057 |     - |   2.93 KB |
+|  DryIoc_MsDIAdapter |  2.051 us | 0.0408 us | 0.0437 us |  2.048 us |  0.56 |    0.02 |  0.4807 | 0.0038 |     - |   2.95 KB |
+|               Grace |  1.751 us | 0.0339 us | 0.0377 us |  1.748 us |  0.47 |    0.02 |  0.5150 | 0.0076 |     - |   3.17 KB |
+|   Grace_MsDIAdapter |  2.395 us | 0.0578 us | 0.0594 us |  2.402 us |  0.65 |    0.03 |  0.5569 |      - |     - |   3.41 KB |
+|   Lamar_MsDIAdapter |  6.802 us | 0.0675 us | 0.0563 us |  6.800 us |  1.85 |    0.06 |  1.5335 | 0.7629 |     - |   9.44 KB |
+|             Autofac | 50.699 us | 0.9995 us | 2.3947 us | 49.903 us | 14.13 |    0.81 |  7.7515 | 0.6104 |     - |  47.84 KB |
+| Autofac_MsDIAdapter | 60.233 us | 1.1734 us | 1.2050 us | 60.089 us | 16.38 |    0.46 | 10.7422 | 0.8545 |     - |  66.26 KB |
 
 */
             private IServiceProvider _msDi;

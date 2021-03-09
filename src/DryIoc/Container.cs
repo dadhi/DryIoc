@@ -289,10 +289,9 @@ namespace DryIoc
                 return service;
 
             var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
-            var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
-            if (cacheEntry != null)
+            var entry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
+            if (entry != null)
             {
-                ref var entry = ref cacheEntry.Value;
                 if (entry.Value is FactoryDelegate cachedDelegate)
                     return cachedDelegate(this);
 
@@ -733,8 +732,8 @@ namespace DryIoc
              // reset the cache if any
             var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
             if (cacheEntry != null)
-                cacheEntry.Value.Value = null;
-            }
+                cacheEntry.Value = null;
+        }
 
 #endregion
 
@@ -897,10 +896,10 @@ namespace DryIoc
                 {
                     foreach (var e in serviceFactories.Enumerate())
                     {
-                        if (e.Value.Value is Factory f)
+                        if (e.Value is Factory f)
                         {
                             if ((serviceKey == null || serviceKey == DefaultKey.Value) && 
-                                serviceType.IsAssignableVariantGenericTypeFrom(e.Value.Key) &&
+                                serviceType.IsAssignableVariantGenericTypeFrom(e.Key) &&
                                 request.MatchFactoryConditionAndMetadata(f))
                             {
                                 entry = f;
@@ -909,9 +908,9 @@ namespace DryIoc
                         }
                         else
                         {
-                            foreach (var kf in ((FactoriesEntry)e.Value.Value).Factories.Enumerate())
+                            foreach (var kf in ((FactoriesEntry)e.Value).Factories.Enumerate())
                                 if (kf.Key.Equals(serviceKey) && 
-                                    serviceType.IsAssignableVariantGenericTypeFrom(e.Value.Key) &&
+                                    serviceType.IsAssignableVariantGenericTypeFrom(e.Key) &&
                                     request.MatchFactoryConditionAndMetadata(kf.Value))
                                 {
                                     entry = kf.Value;
@@ -936,8 +935,12 @@ namespace DryIoc
 
             var factories = entry == null ? null
                 : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
-                : entry.To<FactoriesEntry>().Factories
-                       .Visit(new List<KV<object, Factory>>(2), (x, list) => list.Add(KV.Of(x.Key, x.Value))).ToArray(); // todo: optimize - we may not need ToArray here
+                : entry.To<FactoriesEntry>().Factories.Fold(new List<KV<object, Factory>>(2),
+                    (x, list) =>
+                    {
+                        list.Add(KV.Of(x.Key, x.Value));
+                        return list;
+                    }).ToArray(); // todo: optimize - we may not need ToArray here
  
             if (!factories.IsNullOrEmpty()) // check for the additional (not the fallback) factories, because we have the standard factories
             {
@@ -1054,7 +1057,12 @@ namespace DryIoc
             }
             else if (entry is FactoriesEntry e)
             {
-                factories = e.Factories.Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray();
+                factories = e.Factories.Fold(new List<KV<object, Factory>>(2),
+                    (x, l) =>
+                    {
+                        l.Add(KV.Of(x.Key, x.Value));
+                        return l;
+                    }).ToArray();
             }
             else
             {
@@ -1071,9 +1079,9 @@ namespace DryIoc
                     {
                         foreach (var sf in serviceFactories.Enumerate())
                         {
-                            if (sf.Value.Value is Factory f)
+                            if (sf.Value is Factory f)
                             {
-                                if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Value.Key) &&
+                                if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Key) &&
                                     request.MatchFactoryConditionAndMetadata(f))
                                 {
                                     factories = KV.Of<object, Factory>(DefaultKey.Value, f).One();
@@ -1082,8 +1090,8 @@ namespace DryIoc
                             }
                             else
                             {
-                                foreach (var kf in ((FactoriesEntry)sf.Value.Value).Factories.Enumerate())
-                                    if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Value.Key) &&
+                                foreach (var kf in ((FactoriesEntry)sf.Value).Factories.Enumerate())
+                                    if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Key) &&
                                         request.MatchFactoryConditionAndMetadata(kf.Value))
                                     {
                                         factories = KV.Of(kf.Key, kf.Value).One();
@@ -1224,7 +1232,12 @@ namespace DryIoc
                 ? Empty<KV<object, Factory>>()
                 : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Value, (Factory)entry) }
                 // todo: optimize
-                : entry.To<FactoriesEntry>().Factories.Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray();
+                : entry.To<FactoriesEntry>().Factories.Fold(new List<KV<object, Factory>>(),
+                    (x, l) =>
+                    {
+                        l.Add(KV.Of(x.Key, x.Value));
+                        return l;
+                    }).ToArray();
 
         internal static Factory[] MergeSortedByLatestOrderOrRegistration(Factory[] source, params Factory[] added)
         {
@@ -1724,10 +1737,10 @@ namespace DryIoc
             public static readonly Registry Default = new Registry(WrappersSupport.Wrappers);
 
             // Factories:
-            public readonly ImMap<ImMap.KValue<Type>> Services;
+            public readonly ImHashMap<Type, object> Services;
             // todo: @perf make it Factory or Factory[]
-            public readonly ImMap<ImMap.KValue<Type>> Decorators; // value is Factory[] 
-            public readonly ImMap<ImMap.KValue<Type>> Wrappers;   // value is Factory
+            public readonly ImHashMap<Type, object> Decorators; // value is Factory[] 
+            public readonly ImHashMap<Type, object> Wrappers;   // value is Factory
 
             internal const int CACHE_SLOT_COUNT = 16;
             internal const int CACHE_SLOT_COUNT_MASK = CACHE_SLOT_COUNT - 1;
@@ -1738,10 +1751,10 @@ namespace DryIoc
                 public Compiling(Expression expression) => Expression = expression;
             }
 
-            public ImMap<ImMap.KValue<Type>>[] DefaultFactoryCache;
+            public ImHashMap<Type, object>[] DefaultFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
-            public ImMapEntry<ImMap.KValue<Type>> GetCachedDefaultFactoryOrDefault(int serviceTypeHash, Type serviceType)
+            public ImHashMapEntry<Type, object> GetCachedDefaultFactoryOrDefault(int serviceTypeHash, Type serviceType)
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = DefaultFactoryCache;
@@ -1755,11 +1768,11 @@ namespace DryIoc
                     return;
 
                 if (DefaultFactoryCache == null)
-                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImMap<ImMap.KValue<Type>>[CACHE_SLOT_COUNT], null);
+                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
 
                 ref var map = ref DefaultFactoryCache[serviceTypeHash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
-                    Interlocked.CompareExchange(ref map, ImMap<ImMap.KValue<Type>>.Empty, null);
+                    Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
 
                 var m = map;
                 if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(serviceTypeHash, serviceType, factory), m) != m)
@@ -1781,7 +1794,7 @@ namespace DryIoc
 
             // Where key is `KV.Of(ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
             // and value is `KeyedFactoryCacheEntries`
-            public ImMap<ImMap.KValue<Type>>[] KeyedFactoryCache;
+            public ImHashMap<Type, object>[] KeyedFactoryCache;
 
             [MethodImpl((MethodImplOptions)256)]
             public bool GetCachedKeyedFactoryOrDefault(int serviceTypeHash, Type serviceType, object key, out KeyedFactoryCacheEntry result)
@@ -1792,7 +1805,7 @@ namespace DryIoc
                 {
                     var entry = cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
                     if (entry != null)
-                        for (var x = (KeyedFactoryCacheEntry)entry.Value.Value; x != null && result == null; x = x.Rest)
+                        for (var x = (KeyedFactoryCacheEntry)entry.Value; x != null && result == null; x = x.Rest)
                             if (ReferenceEquals(x.Key, key))
                                 result = x;
                             else if (x.Key.Equals(key))
@@ -1809,16 +1822,16 @@ namespace DryIoc
                     return;
 
                 if (KeyedFactoryCache == null)
-                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImMap<ImMap.KValue<Type>>[CACHE_SLOT_COUNT], null);
+                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
 
                 ref var map = ref KeyedFactoryCache[serviceTypeHash & CACHE_SLOT_COUNT_MASK];
                 if (map == null)
-                    Interlocked.CompareExchange(ref map, ImMap<ImMap.KValue<Type>>.Empty, null);
+                    Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
 
                 var entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
                 if (entry == null)
                 {
-                    entry = new ImMapEntry<ImMap.KValue<Type>>(serviceTypeHash, new ImMap.KValue<Type>(serviceType, null));
+                    entry = new ImHashMapEntry<Type, object>(serviceTypeHash, serviceType);
                     var oldMap = map;
                     var newMap = oldMap.AddOrKeepEntry(entry);
                     if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
@@ -1830,9 +1843,9 @@ namespace DryIoc
                         entry = Ref.SwapAndGetNewValue(ref map, entry, (x, en) => x.AddOrKeepEntry(en)).GetEntryOrDefault(serviceTypeHash, serviceType);
                 }
 
-                var e = entry.Value.Value;
-                if (Interlocked.CompareExchange(ref entry.Value.Value, SetOrAddKeyedCacheFactory(e, key, factory), e) != e)
-                    Ref.Swap(ref entry.Value.Value, key, factory, SetOrAddKeyedCacheFactory);
+                var e = entry.Value;
+                if (Interlocked.CompareExchange(ref entry.Value, SetOrAddKeyedCacheFactory(e, key, factory), e) != e)
+                    Ref.Swap(ref entry.Value, key, factory, SetOrAddKeyedCacheFactory);
             }
 
             private object SetOrAddKeyedCacheFactory(object x, object k, object f)
@@ -1941,18 +1954,18 @@ namespace DryIoc
 
             internal readonly IsRegistryChangePermitted IsChangePermitted;
 
-            private Registry(ImMap<ImMap.KValue<Type>> wrapperFactories = null)
-                : this(ImMap<ImMap.KValue<Type>>.Empty, ImMap<ImMap.KValue<Type>>.Empty, wrapperFactories ?? ImMap<ImMap.KValue<Type>>.Empty,
+            private Registry(ImHashMap<Type, object> wrapperFactories = null)
+                : this(ImHashMap<Type, object>.Empty, ImHashMap<Type, object>.Empty, wrapperFactories ?? ImHashMap<Type, object>.Empty,
                     null, null, null, // caches are initialized to `null` to quickly check that they 
                     IsRegistryChangePermitted.Permitted)
             { }
 
             private Registry(
-                ImMap<ImMap.KValue<Type>> services,
-                ImMap<ImMap.KValue<Type>> decorators,
-                ImMap<ImMap.KValue<Type>> wrappers,
-                ImMap<ImMap.KValue<Type>>[]  defaultFactoryCache,
-                ImMap<ImMap.KValue<Type>>[]  keyedFactoryCache,
+                ImHashMap<Type, object> services,
+                ImHashMap<Type, object> decorators,
+                ImHashMap<Type, object> wrappers,
+                ImHashMap<Type, object>[]  defaultFactoryCache,
+                ImHashMap<Type, object>[]  keyedFactoryCache,
                 ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
                 IsRegistryChangePermitted isChangePermitted)
             {
@@ -1968,19 +1981,19 @@ namespace DryIoc
             public Registry WithoutCache() =>
                 new Registry(Services, Decorators, Wrappers, null, null, null, IsChangePermitted);
 
-            internal Registry WithServices(ImMap<ImMap.KValue<Type>> services) =>
+            internal Registry WithServices(ImHashMap<Type, object> services) =>
                 services == Services ? this :
                 new Registry(services, Decorators, Wrappers,
                     // Using Copy is fine when you have only the registrations because the caches will be null and no actual copy will be done.
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
                     IsChangePermitted);
 
-            private Registry WithDecorators(ImMap<ImMap.KValue<Type>> decorators) =>
+            private Registry WithDecorators(ImHashMap<Type, object> decorators) =>
                 decorators == Decorators ? this :
                 new Registry(Services, decorators, Wrappers, 
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
 
-            private Registry WithWrappers(ImMap<ImMap.KValue<Type>> wrappers) =>
+            private Registry WithWrappers(ImHashMap<Type, object> wrappers) =>
                 wrappers == Wrappers ? this :
                 new Registry(Services, Decorators, wrappers, 
                     DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
@@ -1989,34 +2002,34 @@ namespace DryIoc
             {
                 foreach (var entry in Services.Enumerate())
                 {
-                    if (entry.Value.Value is Factory factory)
-                        yield return new ServiceRegistrationInfo(factory, entry.Value.Key, null);
+                    if (entry.Value is Factory factory)
+                        yield return new ServiceRegistrationInfo(factory, entry.Key, null);
                     else
                     {
-                        var factories = ((FactoriesEntry)entry.Value.Value).Factories;
+                        var factories = ((FactoriesEntry)entry.Value).Factories;
                         foreach (var f in factories.Enumerate())
-                            yield return new ServiceRegistrationInfo(f.Value, entry.Value.Key, f.Key);
+                            yield return new ServiceRegistrationInfo(f.Value, entry.Key, f.Key);
                     }
                 }
             }
 
-            // todo: use instead of GetServiceRegistrations above
+            // todo: @perf use instead of GetServiceRegistrations above
             // optimized for allocations
             public IEnumerable<R> GetServiceRegistrations<R>(Func<Type, object, Factory, R> match) where R : class
             {
                 R result = null;
                 foreach (var entry in Services.Enumerate())
                 {
-                    if (entry.Value.Value is Factory factory)
+                    if (entry.Value is Factory factory)
                     {
-                        if ((result = match(entry.Value.Key, null, factory)) != null)
+                        if ((result = match(entry.Key, null, factory)) != null)
                             yield return result;
                     }
                     else
                     {
-                        var factories = ((FactoriesEntry)entry.Value.Value).Factories;
+                        var factories = ((FactoriesEntry)entry.Value).Factories;
                         foreach (var f in factories.Enumerate())
-                            if ((result = match(entry.Value.Key, f.Key, f.Value)) != null)
+                            if ((result = match(entry.Key, f.Key, f.Value)) != null)
                                 yield return result;
                     }
                 }
@@ -2082,7 +2095,7 @@ namespace DryIoc
 
                         var factories = ((FactoriesEntry)entry).Factories;
                         if (serviceKey == null) // get all the factories
-                            return factories.Visit(new List<Factory>(), (x, l) => l.Add(x.Value)).ToArray();
+                            return factories.Fold(new List<Factory>(), (x, l) => { l.Add(x.Value); return l; }).ToArray(); // todo: @perf call ToArray directly
 
                         return factories.GetValueOrDefault(serviceKey)?.One();
                     }
@@ -2144,7 +2157,7 @@ namespace DryIoc
 
                         var factories = ((FactoriesEntry)entry).Factories;
                         if (serviceKey == null)
-                            return condition == null || factories.FindFirstOrDefault(f => condition(f.Value)) != null;
+                            return condition == null || factories.Enumerate().FirstOrDefault(f => condition(f.Value)) != null;
 
                         factory = factories.GetValueOrDefault(serviceKey);
                         return factory != null && (condition == null || condition(factory));
@@ -2249,11 +2262,14 @@ namespace DryIoc
                     if (oldEntry is Factory oldFactory)
                         newRegistry.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
                     else if (oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
-                        oldFactoriesEntry.Factories.Visit(new{ newRegistry, serviceTypeHash, serviceType }, (x, s) =>
-                        {
-                            if (x.Key is DefaultKey)
-                                s.newRegistry.DropFactoryCache(x.Value, s.serviceTypeHash, s.serviceType);
-                        });
+                        oldFactoriesEntry.Factories.Fold(
+                            new{ newRegistry, serviceTypeHash, serviceType }, 
+                            (x, s) =>
+                            {
+                                if (x.Key is DefaultKey)
+                                    s.newRegistry.DropFactoryCache(x.Value, s.serviceTypeHash, s.serviceType);
+                                return s;
+                            });
                 }
 
                 return newRegistry;
@@ -2378,7 +2394,7 @@ namespace DryIoc
             private Registry UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
             {
                 object removed = null; // Factory or FactoriesEntry or Factory[]
-                ImMap<ImMap.KValue<Type>> services;
+                ImHashMap<Type, object> services;
                 var hash = RuntimeHelpers.GetHashCode(serviceType);
                 if (serviceKey == null && condition == null) // simplest case with simplest handling
                     services = Services.Update(hash, serviceType, null, (_, entry, _null) =>
@@ -2418,7 +2434,7 @@ namespace DryIoc
                             remainingFactories = oldFactories;
                             var factory = oldFactories.GetValueOrDefault(serviceKey);
                             if (factory != null)
-                                remainingFactories = oldFactories.Height > 1
+                                remainingFactories = oldFactories.Count() > 1
                                     ? oldFactories.UpdateToDefault(serviceKey.GetHashCode(), serviceKey)
                                     : ImHashMap<object, Factory>.Empty;
                         }
@@ -2430,11 +2446,11 @@ namespace DryIoc
                             return null;
                         }
 
-                        // todo: huh - no perf here?
+                        // todo: @perf huh - no perf here?
                         removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(f => f.Value).ToArray();
 
-                        if (remainingFactories.Height == 1 && DefaultKey.Value.Equals(remainingFactories.Key))
-                            return remainingFactories.Value; // replace entry with single remaining default factory
+                        if (remainingFactories is ImHashMapEntry<object, Factory> e && DefaultKey.Value.Equals(e.Key))
+                            return e.Value; // replace entry with single remaining default factory
 
                         // update last default key if current default key was removed
                         var newDefaultKey = factoriesEntry.LastDefaultKey;
@@ -2469,12 +2485,12 @@ namespace DryIoc
                         var d = DefaultFactoryCache;
                         if (d != null)
                             Ref.Swap(ref d[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
-                                (x, h, t) => (x ?? ImMap<ImMap.KValue<Type>>.Empty).UpdateToDefault(h, t));
+                                (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).UpdateToDefault(h, t));
 
                         var k = KeyedFactoryCache;
                         if (k != null)
                             Ref.Swap(ref k[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
-                                (x, h, t) => (x ?? ImMap<ImMap.KValue<Type>>.Empty).UpdateToDefault(h, t));
+                                (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).UpdateToDefault(h, t));
                     }
                     else
                     {
@@ -4490,11 +4506,11 @@ namespace DryIoc
         internal static int CollectionWrapperID { get; private set; }
 
         /// <summary>Registered wrappers by their concrete or generic definition service type.</summary>
-        public static readonly ImMap<ImMap.KValue<Type>> Wrappers = BuildSupportedWrappers();
+        public static readonly ImHashMap<Type, object> Wrappers = BuildSupportedWrappers();
 
-        private static ImMap<ImMap.KValue<Type>> BuildSupportedWrappers()
+        private static ImHashMap<Type, object> BuildSupportedWrappers()
         {
-            var wrappers = ImMap<ImMap.KValue<Type>>.Empty;
+            var wrappers = ImHashMap<Type, object>.Empty;
 
             var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
             CollectionWrapperID = arrayExpr.FactoryID;
@@ -4547,7 +4563,7 @@ namespace DryIoc
             return wrappers;
         }
 
-        private static ImMap<ImMap.KValue<Type>> AddContainerInterfaces(this ImMap<ImMap.KValue<Type>> wrappers)
+        private static ImHashMap<Type, object> AddContainerInterfaces(this ImHashMap<Type, object> wrappers)
         {
             var resolverContextExpr = new ExpressionFactory(
                 ResolverContext.GetRootOrSelfExpr, 
@@ -10697,7 +10713,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 //     });
 
                 _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
-                    (x, genFacKey, closedGenFac) => x.AddOrUpdate(genFacKey, closedGenFac, (oldFac, _) => closedGenericFactory = oldFac));
+                    (x, genFacKey, closedGenFac) => x.AddOrUpdate(genFacKey, closedGenFac, (k, oldFac, _) => closedGenericFactory = oldFac));
 
                 return closedGenericFactory;
             }
@@ -11574,7 +11590,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
         private static void SafelyDisposeOrderedDisposables(ImMap<IDisposable> disposables)
         {
-            disposables.Visit(d => {
+            disposables.Fold(false, (d, _) => {
                 try
                 {
                     // Ignoring disposing exception, as it is not important to proceed the disposal of other items
@@ -11587,6 +11603,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 catch (Exception)
                 {
                 }
+                return false;
             });
         }
 

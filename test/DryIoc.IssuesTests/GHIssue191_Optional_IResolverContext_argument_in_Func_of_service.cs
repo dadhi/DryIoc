@@ -109,7 +109,7 @@ namespace DryIoc.IssuesTests
                     var scopeEntry = _scopes.GetEntryOrDefault(address);
                     if (scopeEntry == null)
                     {
-                        Ref.Swap(ref _scopes, address, (x, a) => x.AddOrKeep(a));
+                        Ref.Swap(ref _scopes, address, (x, a) => x.AddOrKeepEntry(new ImHashMapEntry<string, IResolverContext>(a.GetHashCode(), a)));
                         scopeEntry = _scopes.GetEntryOrDefault(address);
                     }
 
@@ -189,7 +189,7 @@ namespace DryIoc.IssuesTests
                 var scopeEntry = _scopes.GetEntryOrDefault(address);
                 if (scopeEntry == null)
                 {
-                    Ref.Swap(ref _scopes, address, (x, a) => x.AddOrKeep(a));
+                    Ref.Swap(ref _scopes, address, (x, a) => x.AddOrKeepEntry(new ImHashMapEntry<string, IResolverContext>(a.GetHashCode(), a)));
                     scopeEntry = _scopes.GetEntryOrDefault(address);
                 }
 
@@ -206,7 +206,7 @@ namespace DryIoc.IssuesTests
                 var scopeEntry = _scopes.GetEntryOrDefault(address);
                 if (scopeEntry == null)
                 {
-                    Ref.Swap(ref _scopes, address, (x, a) => x.AddOrKeep(a));
+                    Ref.Swap(ref _scopes, address, (x, a) => x.AddOrKeepEntry(new ImHashMapEntry<string, IResolverContext>(a.GetHashCode(), a)));
                     scopeEntry = _scopes.GetEntryOrDefault(address);
                 }
 
@@ -218,7 +218,7 @@ namespace DryIoc.IssuesTests
             }
 
             // Closes all scopes - Note: alternatively we may add scope tracking in parent and rely on parent scope disposal
-            public void Dispose() => _scopes.Visit(entry => entry.Value?.Dispose());
+            public void Dispose() => _scopes.Fold(false, (entry, _) => { entry.Value?.Dispose(); return false; });
         }
 
         [Test]
