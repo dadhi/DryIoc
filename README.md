@@ -34,8 +34,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 - [Extensions and Companions](Extensions.md)
 - [Documentation][WikiHome]
 - [Contribution guide](CONTRIBUTING.md)
-- Check the old issues on [BitBucket](https://bitbucket.org/dadhi/dryioc)
-- Two original parts of DryIoc are now separate projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)
+- Two original parts of the DryIoc are now the separate projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)
 
 ## Benchmarks
 
@@ -172,8 +171,8 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
 * Service lifetime control via *Reuse* and lifetime scoping:
     * Nested disposable scopes with optional names 
     * Optional ambient scope context
-    * Reuse types: `Transient`, `Singleton`, `Scoped` in multiple flavors (including scoping to the specific service ancestor in the object graph)
-    * Option to `useParentReuse` and to `useDecorateeReuse` for decorators
+    * Reuse types: `Transient`, `Singleton`, `Scoped` in multiple flavors including the scoping to the specific service ancestor in the object graph
+    * Option to `useParentReuse` and to `useDecorateeReuse` (for decorators)
     * Option to `preventDisposal` and `weaklyReferenced`
 * Open-generics support including type constraints, variance, complex nesting and recurring definitions.
 * Constructor parameters injection and optional property and field injection.
@@ -183,7 +182,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
     * Nested with the relative order control
     * Generic and non-generic
     * With the Reuse possibly different from the decorated service
-    * Decorators of wrapped service
+    * Decorators of the Wrappers
 * [Wrappers](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Wrappers.md):
     * Service collections: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and  `I(ReadOnly)Collection|List<T>`
     * Single service wrappers: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>` or `Tuple<TMetadata, T>`, `KeyValuePair<TKey, T>`

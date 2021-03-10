@@ -9,20 +9,21 @@
 
 ## Overview
 
-What happens when you call `container.Resolve<X>();` for the same service `X` multiple times in a sequence assuming that the `X` is not a singleton*:
+What happens when you call the `container.Resolve<X>()` for the service `X` multiple times in a sequence assuming that the `X` is not a singleton*:
 
-1. The first call will **discover and construct the expression tree** of `X` object graph, **interpret** the expression to get the service, and if succeeded will **cache the expression** in resolution cache.
-2. The second call will find cached expression, will **compile** it to delegate, then it will **replace the cached expression with the delegate** and will invoke the delegate to get the service.
+1. The first call will **discover and construct the expression tree** of `X` object graph, will **interpret** the expression to get the service, and if succeeded will **cache the expression** in the resolution cache, and will return the interpreted service.
+2. The second call will find the cached expression, will **compile** it to the delegate, then it will **replace the cached expression with the delegate** and will invoke the delegate to get the service.
 3. The third call will find the cached delegate and invoke it.
 
-singleton* - those are always interpreted (cannot be changed via rules) and injected in object graph as `ConstantExpression` unless wrapped in Func or Lazy wrappers (which create singleton when consumer demand). 
-This is because they need to be created once and one-time interpretation is faster than compilation+invocation.
+singleton* - those are always interpreted (this cannot be changed via rules) and injected in the object graph as a `ConstantExpression` unless wrapped in `Func` or `Lazy` wrappers (which create the singleton on demand). 
+The reason for that is the singletons are created once and the one-time interpretation is faster than the compilation+invocation.
 
 
 ## Relative Performance
 
+- Delegate invocation is the fastest
 - Expression interpretation is 10x times slower than the delegate invocation
-- Delegate compilation is 100x slower than interpretation.
+- Delegate compilation is 100x slower than the interpretation.
 
 That's mean you need **once** to spend 100x more time than interpretation to get 10x boost, 
 and DryIoc by default is not paying this price.
@@ -30,7 +31,7 @@ and DryIoc by default is not paying this price.
 
 ## Rules.WithUseInterpretation
 
-The compilation (essentially `System.Reflection.Emit`) is not supported by all targets, e.g. Xamarin iOS. In this case, you may specify to always use interpretation via 
+The compilation (essentially `System.Reflection.Emit`) is not supported by all targets, e.g. by the Xamarin iOS. In this case you may specify to always use the interpretation via the rule: 
 
 ```cs
 var c = new Container(rules => rules.WithUseInterpretation());
