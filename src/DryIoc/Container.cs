@@ -935,12 +935,7 @@ namespace DryIoc
 
             var factories = entry == null ? null
                 : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
-                : entry.To<FactoriesEntry>().Factories.Fold(new List<KV<object, Factory>>(2),
-                    (x, list) =>
-                    {
-                        list.Add(KV.Of(x.Key, x.Value));
-                        return list;
-                    }).ToArray(); // todo: optimize - we may not need ToArray here
+                : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value));
  
             if (!factories.IsNullOrEmpty()) // check for the additional (not the fallback) factories, because we have the standard factories
             {
@@ -1057,12 +1052,7 @@ namespace DryIoc
             }
             else if (entry is FactoriesEntry e)
             {
-                factories = e.Factories.Fold(new List<KV<object, Factory>>(2),
-                    (x, l) =>
-                    {
-                        l.Add(KV.Of(x.Key, x.Value));
-                        return l;
-                    }).ToArray();
+                factories = e.Factories.ToArray(x => KV.Of(x.Key, x.Value));
             }
             else
             {
@@ -1231,13 +1221,7 @@ namespace DryIoc
             entry == null
                 ? Empty<KV<object, Factory>>()
                 : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Value, (Factory)entry) }
-                // todo: optimize
-                : entry.To<FactoriesEntry>().Factories.Fold(new List<KV<object, Factory>>(),
-                    (x, l) =>
-                    {
-                        l.Add(KV.Of(x.Key, x.Value));
-                        return l;
-                    }).ToArray();
+                : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value));
 
         internal static Factory[] MergeSortedByLatestOrderOrRegistration(Factory[] source, params Factory[] added)
         {
@@ -2095,7 +2079,7 @@ namespace DryIoc
 
                         var factories = ((FactoriesEntry)entry).Factories;
                         if (serviceKey == null) // get all the factories
-                            return factories.Fold(new List<Factory>(), (x, l) => { l.Add(x.Value); return l; }).ToArray(); // todo: @perf call ToArray directly
+                            return factories.ToArray(x => x.Value);
 
                         return factories.GetValueOrDefault(serviceKey)?.One();
                     }
@@ -2207,7 +2191,7 @@ namespace DryIoc
                                     // and using them in a new factory entry
                                     var keyedFactories = facEntryToReplace.Factories.Fold(
                                         ImHashMap<object, Factory>.Empty,
-                                        (x, map) => x.Key is DefaultKey == false ? map.AddOrUpdate(x.Key, x.Value) : map);
+                                        (x, _, map) => x.Key is DefaultKey == false ? map.AddOrUpdate(x.Key, x.Value) : map);
                                     if (!keyedFactories.IsEmpty)
                                         newEntry = new FactoriesEntry(DefaultKey.Value,
                                             keyedFactories.AddOrUpdate(DefaultKey.Value, factory));
@@ -2262,13 +2246,12 @@ namespace DryIoc
                     if (oldEntry is Factory oldFactory)
                         newRegistry.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
                     else if (oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
-                        oldFactoriesEntry.Factories.Fold(
+                        oldFactoriesEntry.Factories.Each(
                             new{ newRegistry, serviceTypeHash, serviceType }, 
-                            (x, s) =>
+                            (x, _, s) =>
                             {
                                 if (x.Key is DefaultKey)
                                     s.newRegistry.DropFactoryCache(x.Value, s.serviceTypeHash, s.serviceType);
-                                return s;
                             });
                 }
 
@@ -2424,7 +2407,7 @@ namespace DryIoc
                         {
                             // keep factories for which condition is true
                             remainingFactories = oldFactories.Fold(remainingFactories,
-                                (oldFac, remainingFacs) => condition != null && !condition(oldFac.Value)
+                                (oldFac, _, remainingFacs) => condition != null && !condition(oldFac.Value)
                                     ? remainingFacs.AddOrUpdate(oldFac.Key, oldFac.Value)
                                     : remainingFacs);
                         }
@@ -11590,7 +11573,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
         private static void SafelyDisposeOrderedDisposables(ImMap<IDisposable> disposables)
         {
-            disposables.Fold(false, (d, _) => {
+            disposables.Each((d, _) => {
                 try
                 {
                     // Ignoring disposing exception, as it is not important to proceed the disposal of other items
@@ -11603,7 +11586,6 @@ private ParameterServiceInfo(ParameterInfo p)
                 catch (Exception)
                 {
                 }
-                return false;
             });
         }
 
