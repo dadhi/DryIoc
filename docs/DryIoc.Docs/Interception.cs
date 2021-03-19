@@ -6,6 +6,7 @@
 
 - [Interception](#interception)
   - [Decorator with Castle DynamicProxy](#decorator-with-castle-dynamicproxy)
+    - [Async Interceptor with Castle.DynamicProxy](#async-interceptor-with-castledynamicproxy)
   - [Decorator with LinFu DynamicProxy](#decorator-with-linfu-dynamicproxy)
 
 
@@ -18,7 +19,9 @@ with help of [Castle DynamicProxy](http://www.castleproject.org/projects/dynamic
 
 Let's define an extension method for intercepting interfaces and classes:
 
-```cs md*/
+md*/
+//md{ usings ...
+//md```cs
 
 using DryIoc;
 using ImTools;
@@ -31,6 +34,11 @@ using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
+
+//md```
+//md}
+//md```cs
 
 public static class DryIocInterception
 {
@@ -106,6 +114,91 @@ public class Register_and_use_interceptor
         Assert.AreEqual("Invoking method: Greet", logger.LogLines[0]);
     }
 }/*md
+```
+
+### Async Interceptor with Castle.DynamicProxy
+
+The __Castle.Core.AsyncInterceptor__ package provides the `IAsyncInterceptor` and `AsyncDeterminationInterceptor` class 
+which we may use to implement the interception of `async` methods.
+
+```cs md*/
+
+    public class AsyncInterceptor<T> : AsyncDeterminationInterceptor where T : IAsyncInterceptor
+    {
+        public AsyncInterceptor(T asyncInterceptor) : base(asyncInterceptor) { }
+    }
+
+    public static class DryIocInterceptionAsync
+    {
+        public static void InterceptAsync<TService, TInterceptor>(this IRegistrator registrator, object serviceKey = null)
+            where TInterceptor : class, IAsyncInterceptor
+        {
+            registrator.Register<AsyncInterceptor<TInterceptor>>();
+            registrator.Intercept<TService, AsyncInterceptor<TInterceptor>>(serviceKey);
+        }
+    }
+
+/*md
+```
+
+And the usage example:
+
+```cs md*/
+
+public class Register_and_use_async_interceptor 
+{
+    public interface IFoo
+    {
+        Task<string> HeyAsync(string name);
+    }
+
+    public class Foo : IFoo
+    {
+        public async Task<string> HeyAsync(string name)
+        {
+            await Task.Delay(50);
+            return $"Hey {name} async!";
+        }
+    }
+
+    public class SomeAsyncInterceptor : ProcessingAsyncInterceptor<string>
+    {
+        public List<string> Interseptions = new List<string>();
+
+        protected override string StartingInvocation(IInvocation invocation)
+        {
+            var method = invocation.GetConcreteMethod().Name;
+            var arg = invocation.Arguments[0];
+            return $"intercept BEFORE async method call of `{method}` with argument `{arg}`; ";
+        }
+
+        protected override void CompletedInvocation(IInvocation invocation, string state)
+        {
+            var method = invocation.GetConcreteMethod().Name;
+            var res = invocation.ReturnValue;
+            Interseptions.Add(state + "intercept AFTER async method call of `{methodName}` with the result `{res}`;");
+        }
+    }
+
+    [Test]
+    public async Task Example()
+    {
+        var container = new Container();
+
+        container.Register<IFoo, Foo>();
+        container.Register<SomeAsyncInterceptor>(Reuse.Singleton);
+        container.InterceptAsync<IFoo, SomeAsyncInterceptor>();
+
+        var foo = container.Resolve<IFoo>();
+
+        var result = await foo.HeyAsync("NyanCat");
+
+        var interceptor = container.Resolve<SomeAsyncInterceptor>();
+        Assert.AreEqual(1, interceptor.Interseptions.Count);
+    }
+}
+
+/*md
 ```
 
 
