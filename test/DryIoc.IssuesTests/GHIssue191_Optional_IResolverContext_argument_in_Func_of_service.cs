@@ -218,7 +218,7 @@ namespace DryIoc.IssuesTests
             }
 
             // Closes all scopes - Note: alternatively we may add scope tracking in parent and rely on parent scope disposal
-            public void Dispose() => _scopes.Each((entry, _) => entry.Value?.Dispose());
+            public void Dispose() => _scopes.ForEach((entry, _) => entry.Value?.Dispose());
         }
 
         [Test]

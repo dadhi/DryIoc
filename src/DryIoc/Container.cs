@@ -2246,7 +2246,7 @@ namespace DryIoc
                     if (oldEntry is Factory oldFactory)
                         newRegistry.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
                     else if (oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
-                        oldFactoriesEntry.Factories.Each(
+                        oldFactoriesEntry.Factories.ForEach(
                             new{ newRegistry, serviceTypeHash, serviceType }, 
                             (x, _, s) =>
                             {
@@ -11331,34 +11331,16 @@ private ParameterServiceInfo(ParameterInfo p)
             var itemRef = new ImMapEntry<object>(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var oldMap = map;
-            var newMap = oldMap.AddOrKeepEntry(itemRef);
-            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
+            var oldRefOrNewMap = oldMap.AddOrGetEntry(itemRef);
+            if (oldRefOrNewMap is ImMapEntry<object> oldRef && oldMap != ImMap<object>.Empty)
+                return oldRef.Value != NoItem ? oldRef.Value : WaitForItemIsSet(oldRef);
+            if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
             {
-                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = newMap.GetSurePresentEntry(id);
+                oldRefOrNewMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+                var otherItemRef = oldRefOrNewMap.GetSurePresentEntry(id);
                 if (otherItemRef != itemRef)
                     return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
             }
-            else if (newMap == oldMap)
-            {
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
-            }
-
-            // todo: @api @perf designing the better ImMap API returning the present item without GetSurePresentEntry call
-            // var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
-            // var oldMap = map;
-            // var oldRefOrNewMap = oldMap.GetOrAddEntry(id, itemRef);
-            // if (oldRefOrNewMap is ImMapEntry<object> oldRef && oldMap != ImMap<object>.Empty)
-            //     return oldRef.Value != Scope.NoItem ? oldRef.Value : Scope.WaitForItemIsSet(oldRef);
-            
-            // if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
-            // {
-            //     oldRefOrNewMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-            //     var otherItemRef = oldRefOrNewMap.GetSurePresentEntry(id);
-            //     if (otherItemRef != itemRef)
-            //         return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            // }
 
             object result = null;
             itemRef.Value = result = createValue(r);
@@ -11573,7 +11555,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
         private static void SafelyDisposeOrderedDisposables(ImMap<IDisposable> disposables)
         {
-            disposables.Each((d, _) => {
+            disposables.ForEach((d, _) => {
                 try
                 {
                     // Ignoring disposing exception, as it is not important to proceed the disposal of other items
