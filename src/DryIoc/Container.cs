@@ -11332,7 +11332,7 @@ private ParameterServiceInfo(ParameterInfo p)
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var oldMap = map;
             var oldRefOrNewMap = oldMap.AddOrGetEntry(itemRef);
-            if (oldRefOrNewMap is ImMapEntry<object> oldRef && oldMap != ImMap<object>.Empty)
+            if (oldRefOrNewMap is ImMapEntry<object> oldRef && oldRef != itemRef)
                 return oldRef.Value != NoItem ? oldRef.Value : WaitForItemIsSet(oldRef);
             if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
             {
