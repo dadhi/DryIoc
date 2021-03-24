@@ -2924,7 +2924,7 @@ namespace DryIoc.ImTools
     }
 
     /// <summary>The base and the holder class for the map tree leafs and branches, also defines the Empty tree.
-    /// The map implementation is based on the "modified" 2-3-4 tree.</summary>
+    /// The map implementation is based on the "modified" 2-3 tree.</summary>
     public class ImHashMap<K, V>
     {
         /// <summary>Hide the base constructor to prevent the multiple Empty trees creation</summary>
@@ -4031,7 +4031,7 @@ namespace DryIoc.ImTools
     }
 
     /// <summary>The base and the holder class for the map tree leafs and branches, also defines the Empty tree.
-    /// The map implementation is based on the "modified" 2-3-4 tree.</summary>
+    /// The map implementation is based on the "modified" 2-3 tree.</summary>
     public class ImMap<V>
     {
         /// <summary>Hide the base constructor to prevent the multiple Empty trees creation</summary>
@@ -5119,20 +5119,9 @@ namespace DryIoc.ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> Entry<K, V>(K key, V value) => new ImHashMapEntry<K, V>(key.GetHashCode(), key, value);
 
-        /// <summary>Creates the map out of the entries in the final shape without wasting the memory</summary>
+        /// <summary>Creates the entry to help with inference</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> Create<K, V>(ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1) => 
-            e0.Hash < e1.Hash ? new ImHashMap<K, V>.Leaf2(e0, e1) : new ImHashMap<K, V>.Leaf2(e0, e1);
-
-        /// <summary>Creates the map out of the entries in the final shape without wasting the memory</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> Create<K, V>(ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2) => 
-            new ImHashMap<K, V>.Leaf2Plus1(e2, (ImHashMap<K, V>.Leaf2)Create(e0, e1));
-
-        /// <summary>Creates the map out of the entries in the final shape without wasting the memory</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> Create<K, V>(ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3) => 
-            new ImHashMap<K, V>.Leaf2Plus1Plus1(e3, new ImHashMap<K, V>.Leaf2Plus1(e2, (ImHashMap<K, V>.Leaf2)Create(e0, e1)));
+        public static ImHashMap<K, V> Entry<K, V>(int hash, K key, V value) => new ImHashMapEntry<K, V>(hash, key, value);
 
         private sealed class GoRightInBranch3<K, V> 
         {
@@ -6167,17 +6156,9 @@ namespace DryIoc.ImTools
     /// <summary>The map methods</summary>
     public static class ImMap
     {
-        /// <summary>Creates the map out of the entries in the final shape without wasting the memory</summary>
-        public static ImMap<V> Create<V>(ImMapEntry<V> e0, ImMapEntry<V> e1) => 
-            e0.Hash < e1.Hash ? new ImMap<V>.Leaf2(e0, e1) : new ImMap<V>.Leaf2(e0, e1);
-
-        /// <summary>Creates the map out of the entries in the final shape without wasting the memory</summary>
-        public static ImMap<V> Create<V>(ImMapEntry<V> e0, ImMapEntry<V> e1, ImMapEntry<V> e2) => 
-            new ImMap<V>.Leaf2Plus1(e2, (ImMap<V>.Leaf2)Create(e0, e1));
-
-        /// <summary>Creates the map out of the entries in the final shape without wasting the memory</summary>
-        public static ImMap<V> Create<V>(ImMapEntry<V> e0, ImMapEntry<V> e1, ImMapEntry<V> e2, ImMapEntry<V> e3) => 
-            new ImMap<V>.Leaf2Plus1Plus1(e3, new ImMap<V>.Leaf2Plus1(e2, (ImMap<V>.Leaf2)Create(e0, e1)));
+        /// <summary>Creates the entry to help with inference</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImMap<V> Entry<V>(int hash, V value) => new ImMapEntry<V>(hash, value);
 
         private sealed class GoRightInBranch3<V> 
         {
