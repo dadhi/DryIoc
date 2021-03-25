@@ -5117,11 +5117,11 @@ namespace DryIoc.ImTools
     {
         /// <summary>Creates the entry to help with inference</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> Entry<K, V>(K key, V value) => new ImHashMapEntry<K, V>(key.GetHashCode(), key, value);
+        public static ImHashMapEntry<K, V> Entry<K, V>(K key, V value) => new ImHashMapEntry<K, V>(key.GetHashCode(), key, value);
 
         /// <summary>Creates the entry to help with inference</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> Entry<K, V>(int hash, K key, V value) => new ImHashMapEntry<K, V>(hash, key, value);
+        public static ImHashMapEntry<K, V> Entry<K, V>(int hash, K key, V value) => new ImHashMapEntry<K, V>(hash, key, value);
 
         private sealed class GoRightInBranch3<K, V> 
         {
@@ -6158,7 +6158,7 @@ namespace DryIoc.ImTools
     {
         /// <summary>Creates the entry to help with inference</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> Entry<V>(int hash, V value) => new ImMapEntry<V>(hash, value);
+        public static ImMapEntry<V> Entry<V>(int hash, V value) => new ImMapEntry<V>(hash, value);
 
         private sealed class GoRightInBranch3<V> 
         {

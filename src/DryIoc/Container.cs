@@ -10532,33 +10532,18 @@ private ParameterServiceInfo(ParameterInfo p)
                     Caching = openFactory.Caching
                 };
 
-                // todo: @perf attempt 2 to remove closedGenericFactory from the closure
-                // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
-                // var entry = _generatedFactories.SwapAndGetNewValue(generatedFactoryKey, closedGenericFactory,
-                //     (x, genFacKey, closedGenFac) => x.GetOrAddEntry(Entry.Of(genFacKey, default(ReflectionFactory)));
-                // if (entry.Value != null)
-                //     closedGenericFactory = entry.Value
-                // else
-                //     entry.Value = closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup)
-                //     {
-                //         GeneratorFactoryID = openFactory.FactoryID,
-                //         Caching = openFactory.Caching
-                //     };
-
-                // todo: @perf attempt 1 to remove closedGenericFactory from the closure
-                // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
-                // _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
-                //     (x, genFacKey, closedGenFac) => 
-                //     {
-                //         var currFac = x.GetValueOrDefault(genFacKey);
-                //         if (currFac == null)
-                //             return x.AddOrUpdate(genFacKey, closedGenFac); // todo: @api should be the AddUnsafe instead
-                //         closedGenericFactory = currFac;
-                //         return x;
-                //     });
-
                 _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
-                    (x, genFacKey, closedGenFac) => x.AddOrUpdate(genFacKey, closedGenFac, (k, oldFac, _) => closedGenericFactory = oldFac));
+                    (x, genFacKey, closedGenFac) => 
+                    {
+                        var newEntry = ImHashMap.Entry(genFacKey, closedGenFac);
+                        var oldEntryOrNewMap = x.AddOrGetEntry(newEntry);
+                        if (oldEntryOrNewMap is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
+                        {
+                            closedGenericFactory = oldEntry.Value;
+                            return x;
+                        }
+                        return oldEntryOrNewMap;
+                    });
 
                 return closedGenericFactory;
             }
