@@ -1131,6 +1131,20 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |   Lamar_MsDIAdapter |  6,154.49 us |  99.811 us |  83.346 us |  61.56 |    1.82 | 101.5625 | 31.2500 |      - | 656.43 KB |
 |             Autofac |    609.34 us |   8.014 us |   6.692 us |   6.09 |    0.15 |  50.7813 | 25.3906 | 1.9531 | 315.88 KB |
 | Autofac_MsDIAdapter |    599.20 us |   6.511 us |   5.771 us |   5.99 |    0.15 |  54.6875 | 27.3438 | 1.9531 | 339.42 KB |
+
+#V5 + FECv3 + ImToolsv3
+
+|              Method |        Mean |     Error |    StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+|-------------------- |------------:|----------:|----------:|-------:|--------:|---------:|--------:|-------:|----------:|
+|                MsDI |    139.2 us |   2.74 us |   3.47 us |   1.00 |    0.00 |  11.4746 |  2.6855 |      - |  70.55 KB |
+|              DryIoc |    134.9 us |   1.82 us |   1.70 us |   0.98 |    0.02 |  10.0098 |  0.7324 |      - |  61.84 KB |
+|  DryIoc_MsDIAdapter |    170.9 us |   2.54 us |   2.25 us |   1.24 |    0.04 |  13.1836 |  1.2207 |      - |  80.84 KB |
+|               Grace | 25,575.2 us | 444.52 us | 394.06 us | 185.23 |    5.56 |  93.7500 | 31.2500 |      - | 729.54 KB |
+|   Grace_MsDIAdapter | 30,124.8 us | 420.66 us | 393.49 us | 217.89 |    7.17 | 125.0000 | 62.5000 |      - | 893.17 KB |
+|   Lamar_MsDIAdapter | 12,497.3 us | 249.21 us | 686.38 us |  87.91 |    4.85 |        - |       - |      - | 707.34 KB |
+|             Autofac |    923.6 us |  12.14 us |  11.35 us |   6.68 |    0.16 |  50.7813 | 25.3906 | 1.9531 | 315.93 KB |
+| Autofac_MsDIAdapter |    891.9 us |  14.95 us |  13.98 us |   6.45 |    0.17 |  54.6875 | 27.3438 | 2.9297 | 339.43 KB |
+
 */
             [Benchmark(Baseline = true)]
             public object MsDI() => Measure(PrepareMsDi());
