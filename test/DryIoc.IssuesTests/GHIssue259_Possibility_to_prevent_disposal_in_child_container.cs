@@ -6,29 +6,28 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class GHIssue259_Possibility_to_prevent_disposal_in_child_container
     {
-        [Test][Explicit("todo: @fixme")]
+        [Test]
         public void Test1()
         {
             var container = new Container();
             container.Register<MyService>(Reuse.Singleton);
 
-            var someService1 = container.Resolve<MyService>();
-            MyService someService2 = null;
+            var service1 = container.Resolve<MyService>();
+            MyService service2 = null;
 
-            using (var childContainer = container.With(
-                container.Rules,
-                container.ScopeContext,
-                RegistrySharing.CloneAndDropCache,
-                container.SingletonScope.Clone()))
+            using (var childContainer = container.WithoutSingletonsAndCache().CreateChild())
             {
-                someService2 = childContainer.Resolve<MyService>();
+                service2 = childContainer.Resolve<MyService>(); // expecting it to be a new singleton, right?
             }
 
-            Assert.IsTrue(someService2.IsDisposed);
-            Assert.IsFalse(someService1.IsDisposed);
+            Assert.IsTrue(service2.IsDisposed);
+            Assert.IsFalse(service1.IsDisposed);
 
-            var someService3 = container.Resolve<MyService>();
-            Assert.IsFalse(someService3.IsDisposed);
+            var service3 = container.Resolve<MyService>();
+            Assert.AreSame(service1, service3);
+
+            container.Dispose();
+            Assert.IsTrue(service1.IsDisposed);
         }
 
         public class MyService : IDisposable
