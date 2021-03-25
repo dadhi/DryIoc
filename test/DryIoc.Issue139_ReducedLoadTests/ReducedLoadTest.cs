@@ -36,7 +36,7 @@ namespace LoadTest
                 var expr = scope.Resolve<LambdaExpression>(typeof(EmailController));
                 Assert.IsNotNull(expr);
 
-                var code = expr.ToCodeString(new StringBuilder(100000), 2, true, Abbreviate).ToString();
+                var code = expr.ToCSharpString(new StringBuilder(100000), 2, true, Abbreviate).ToString();
                 var nestedLambdas = code.Count(c => c == '$');
 
                 // the number when split by `dependencyCount >= 256`
@@ -64,11 +64,11 @@ namespace LoadTest
                 var expr = scope.Resolve<LambdaExpression>(typeof(EmailController));
                 Assert.IsNotNull(expr);
 
-                var code = expr.ToCodeString(new StringBuilder(100000), 2, true, Abbreviate).ToString();
+                var code = expr.ToCSharpString(new StringBuilder(100000), 2, true, Abbreviate).ToString();
                 var nestedLambdas = code.Count(c => c == '$');
                 Assert.AreEqual(2, nestedLambdas);
 
-                StringAssert.Contains("\"Resolve\"", code);
+                StringAssert.Contains(".Resolve", code);
             }
         }
 
