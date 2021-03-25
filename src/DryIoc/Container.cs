@@ -304,14 +304,13 @@ namespace DryIoc
                 var rules = Rules;
                 while (entry.Value is Expression expr)
                 {
-                    if (rules.UseInterpretation && 
-                        Interpreter.TryInterpretAndUnwrapContainerException(this, expr, false, out var result))
+                    if (rules.UseInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var result))
                         return result;
 
                     // set to Compiling to notify other threads to use the interpretation until the service is compiled
                     if (Interlocked.CompareExchange(ref entry.Value, new Registry.Compiling(expr), expr) == expr)
                     {
-                        var compiledFactory = expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
+                        var compiledFactory = expr.CompileToFactoryDelegate(rules.UseInterpretation);
                         entry.Value = compiledFactory; // todo: @unclear should we instead cache only after invoking the factory delegate
                         return compiledFactory(this);
                     }
@@ -319,9 +318,9 @@ namespace DryIoc
 
                 if (entry.Value is Registry.Compiling compiling)
                 {
-                    if (Interpreter.TryInterpretAndUnwrapContainerException(this, compiling.Expression, false, out var result)) 
+                    if (Interpreter.TryInterpretAndUnwrapContainerException(this, compiling.Expression, out var result)) 
                         return result;
-                    return compiling.Expression.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation)(this);
+                    return compiling.Expression.CompileToFactoryDelegate(rules.UseInterpretation)(this);
                 }
             }
 
@@ -376,10 +375,10 @@ namespace DryIoc
                     _registry.Value.TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
 
                 // 1) First try to interpret
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, rules.UseFastExpressionCompiler, out var instance))
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
                     return instance;
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
+                factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
             }
 
             if (factory.Caching != FactoryCaching.DoNotCache)
@@ -486,12 +485,11 @@ namespace DryIoc
                     _registry.Value.TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, expr);
 
                 // 1) First try to interpret
-                var useFec = Rules.UseFastExpressionCompiler;
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, useFec, out var instance))
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
                     return instance;
 
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegate(useFec, Rules.UseInterpretation);
+                factoryDelegate = expr.CompileToFactoryDelegate(Rules.UseInterpretation);
             }
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
@@ -507,14 +505,13 @@ namespace DryIoc
         {
             while (cacheEntry.Factory is Expression expr)
             {
-                if (rules.UseInterpretation &&
-                    Interpreter.TryInterpretAndUnwrapContainerException(r, expr, false, out result))
+                if (rules.UseInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(r, expr, out result))
                     return true;
 
                 // set to Compiling to notify other threads to use the interpretation until the service is compiled
                 if (Interlocked.CompareExchange(ref cacheEntry.Factory, new Registry.Compiling(expr), expr) == expr)
                 {
-                    var factoryDelegate = expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation);
+                    var factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
                     // todo: @unclear should we instead cache only after invoking the factory delegate
                     cacheEntry.Factory = factoryDelegate;
                     result = factoryDelegate(r);
@@ -524,8 +521,8 @@ namespace DryIoc
 
             if (cacheEntry.Factory is Registry.Compiling compiling)
             {
-                if (!Interpreter.TryInterpretAndUnwrapContainerException(r, compiling.Expression, false, out result))
-                    result = compiling.Expression.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation)(r);
+                if (!Interpreter.TryInterpretAndUnwrapContainerException(r, compiling.Expression, out result))
+                    result = compiling.Expression.CompileToFactoryDelegate(rules.UseInterpretation)(r);
                 return true;
             }
 
@@ -2590,12 +2587,11 @@ namespace DryIoc
         // private const int POOLED_ARGS_COUNT = 6;
 
         /// <summary>Calls `TryInterpret` inside try-catch and unwraps/re-throws `ContainerException` from the reflection `TargetInvocationException`</summary>
-        public static bool TryInterpretAndUnwrapContainerException(
-            IResolverContext r, Expression expr, bool useFec, out object result)
+        public static bool TryInterpretAndUnwrapContainerException(IResolverContext r, Expression expr, out object result)
         {
             try
             {
-                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null, useFec, out result
+                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null, out result
                     //, new object[POOLED_ARGS_COUNT][] // todo: @perf use the pool for the args
                 );
             }
@@ -2628,7 +2624,7 @@ namespace DryIoc
 
         /// <summary>Interprets passed expression.</summary>
         public static bool TryInterpret(IResolverContext r, Expression expr,
-            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result)
+            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, out object result)
         {
             result = null;
             switch (expr.NodeType)
@@ -2654,7 +2650,7 @@ namespace DryIoc
                             var argExpr = newExpr.GetArgument(i);
                             if (argExpr is ConstantExpression ac)
                                 args[i] = ac.Value;
-                            else if (!TryInterpret(r, argExpr, paramExprs, paramValues, parentArgs, useFec, out args[i]))
+                            else if (!TryInterpret(r, argExpr, paramExprs, paramValues, parentArgs, out args[i]))
                                 return false;
                         }
 
@@ -2663,7 +2659,7 @@ namespace DryIoc
                     }
                 case ExprType.Call:
                     {
-                        return TryInterpretMethodCall(r, expr, paramExprs, paramValues, parentArgs, useFec, ref result);
+                        return TryInterpretMethodCall(r, expr, paramExprs, paramValues, parentArgs, ref result);
                     }
                 case ExprType.Convert:
                     {
@@ -2672,7 +2668,7 @@ namespace DryIoc
                         var operandExpr = convertExpr.Operand;
                         if (operandExpr is MethodCallExpression m)
                         {
-                            if (!TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, useFec, ref instance))
+                            if (!TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, ref instance))
                                 return false;
                         }
                         else if (operandExpr is InvocationExpression invokeExpr &&
@@ -2684,12 +2680,12 @@ namespace DryIoc
                                 result = facDel(r);
                             else if (rArg == ResolverContext.RootOrSelfExpr)
                                 result = facDel(r.Root ?? r);
-                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, useFec, out var resolver))
+                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, out var resolver))
                                 result = facDel((IResolverContext)resolver);
                             else return false;
                             return true;
                         }
-                        else if (!TryInterpret(r, operandExpr, paramExprs, paramValues, parentArgs, useFec, out instance))
+                        else if (!TryInterpret(r, operandExpr, paramExprs, paramValues, parentArgs, out instance))
                             return false;
 
                         // skip conversion for null and for directly assignable type
@@ -2706,7 +2702,7 @@ namespace DryIoc
                         var memberExpr = (MemberExpression)expr;
                         var instanceExpr = memberExpr.Expression;
                         object instance = null;
-                        if (instanceExpr != null && !TryInterpret(r, instanceExpr, paramExprs, paramValues, parentArgs, useFec, out instance))
+                        if (instanceExpr != null && !TryInterpret(r, instanceExpr, paramExprs, paramValues, parentArgs, out instance))
                             return false;
 
                         if (memberExpr.Member is FieldInfo field)
@@ -2726,14 +2722,14 @@ namespace DryIoc
                 case ExprType.MemberInit:
                     {
                         var memberInit = (MemberInitExpression)expr;
-                        if (!TryInterpret(r, memberInit.NewExpression, paramExprs, paramValues, parentArgs, useFec, out var instance))
+                        if (!TryInterpret(r, memberInit.NewExpression, paramExprs, paramValues, parentArgs, out var instance))
                             return false;
 
                         var count = memberInit.ArgumentCount; 
                         for (var i = 0; i < count; i++)
                         {
                             var binding = (MemberAssignment)memberInit.GetArgument(i);
-                            if (!TryInterpret(r, binding.Expression, paramExprs, paramValues, parentArgs, useFec, out var memberValue))
+                            if (!TryInterpret(r, binding.Expression, paramExprs, paramValues, parentArgs, out var memberValue))
                                 return false;
 
                             var field = binding.Member as FieldInfo;
@@ -2755,7 +2751,7 @@ namespace DryIoc
                             var arg = newArray.GetArgument(i);
                             if (arg is ConstantExpression ca)
                                 items[i] = ca.Value;
-                            else if (!TryInterpret(r, arg, paramExprs, paramValues, parentArgs, useFec, out items[i]))
+                            else if (!TryInterpret(r, arg, paramExprs, paramValues, parentArgs, out items[i]))
                                 return false;
                         }
 
@@ -2773,7 +2769,7 @@ namespace DryIoc
                                 result = facDel(r);
                             else if (rArg == ResolverContext.RootOrSelfExpr)
                                 result = facDel(r.Root ?? r);
-                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, useFec, out var resolver))
+                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, out var resolver))
                                 result = facDel((IResolverContext)resolver);
                             else return false;
                             return true;
@@ -2782,9 +2778,9 @@ namespace DryIoc
                         // The Invocation of Func is used for splitting the big object graphs
                         // so we can ignore this split and go directly to the body
                         if (delegateExpr.Type == typeof(Func<object>) && delegateExpr is LambdaExpression f)
-                            return TryInterpret(r, f.Body, paramExprs, paramValues, parentArgs, useFec, out result);
+                            return TryInterpret(r, f.Body, paramExprs, paramValues, parentArgs, out result);
 
-                        if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, useFec, out var delegateObj))
+                        if (!TryInterpret(r, delegateExpr, paramExprs, paramValues, parentArgs, out var delegateObj))
                             return false;
 
                         var lambda = (Delegate)delegateObj;
@@ -2799,7 +2795,7 @@ namespace DryIoc
                                 var arg = invokeExpr.GetArgument(i);
                                 if (arg is ConstantExpression ca)
                                     args[i] = ca.Value;
-                                else if (!TryInterpret(r, arg, paramExprs, paramValues, parentArgs, useFec, out args[i]))
+                                else if (!TryInterpret(r, arg, paramExprs, paramValues, parentArgs, out args[i]))
                                     return false;
                             }
                             result = lambda.GetMethodInfo().Invoke(lambda.Target, args);
@@ -2848,14 +2844,14 @@ namespace DryIoc
                         return false;
                     }
                 case ExprType.Lambda:
-                    return TryInterpretNestedLambda(r, (LambdaExpression)expr, paramExprs, paramValues, parentArgs, useFec, ref result);
+                    return TryInterpretNestedLambda(r, (LambdaExpression)expr, paramExprs, paramValues, parentArgs, ref result);
                 default:
                     return false;
             }
         }
 
         private static bool TryInterpretNestedLambda(IResolverContext r, LambdaExpression lambdaExpr,
-            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
+            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, ref object result)
         {
             var returnType = lambdaExpr.ReturnType;
             if (paramExprs != null)
@@ -2867,13 +2863,13 @@ namespace DryIoc
             {
                 if (returnType != typeof(void))
                 {
-                    result = new Func<object>(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
+                    result = new Func<object>(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs));
                     if (returnType != typeof(object))
                         result = _convertFuncMethod.MakeGenericMethod(returnType).Invoke(null, new[] { result });
                 }
                 else
                 {
-                    result = new Action(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs, useFec));
+                    result = new Action(() => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, null, null, parentArgs));
                 }
             }
             else if (paramCount == 1)
@@ -2881,13 +2877,13 @@ namespace DryIoc
                 var paramExpr = lambdaExpr.GetParameter(0);
                 if (returnType != typeof(void))
                 {
-                    result = new Func<object, object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, arg, parentArgs, useFec));
+                    result = new Func<object, object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, arg, parentArgs));
                     if (paramExpr.Type != typeof(object) || returnType != typeof(object))
                         result = _convertOneArgFuncMethod.MakeGenericMethod(paramExpr.Type, returnType).Invoke(null, new[] { result });
                 }
                 else
                 {
-                    result = new Action<object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, arg, parentArgs, useFec));
+                    result = new Action<object>(arg => TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, arg, parentArgs));
                     if (paramExpr.Type != typeof(object))
                         result = _convertOneArgActionMethod.MakeGenericMethod(paramExpr.Type).Invoke(null, new[] { result });
                 }
@@ -2899,7 +2895,7 @@ namespace DryIoc
                 if (returnType != typeof(void))
                 {
                     result = new Func<object, object, object>((arg0, arg1) => 
-                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, new[] { arg0, arg1 }, parentArgs, useFec));
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, new[] { arg0, arg1 }, parentArgs));
 
                     if (paramExpr0.Type != typeof(object) || paramExpr1.Type != typeof(object) || returnType != typeof(object))
                         result = _convertTwoArgFuncMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, returnType).Invoke(null, new[] { result });
@@ -2907,7 +2903,7 @@ namespace DryIoc
                 else
                 {
                     result = new Action<object, object>((arg0, arg1) =>
-                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, new[] { arg0, arg1 }, parentArgs, useFec));
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, new[] { arg0, arg1 }, parentArgs));
 
                     if (paramExpr0.Type != typeof(object) || paramExpr1.Type != typeof(object))
                         result = _convertTwoArgActionMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type).Invoke(null, new[] { result });
@@ -2918,14 +2914,14 @@ namespace DryIoc
                 if (returnType != typeof(void))
                 {
                     result = new Func<object[], object>(args => 
-                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, args, parentArgs, useFec));
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, args, parentArgs));
                     result = _convertThreeArgFuncMethod.MakeGenericMethod(GetParamsAndReturnType(lambdaExpr, returnType))
                         .Invoke(null, new[] { result });
                 }
                 else
                 {
                     result = new Action<object[]>(args => 
-                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, args, parentArgs, useFec));
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, args, parentArgs));
                     result = _convertThreeArgActionMethod.MakeGenericMethod(GetParamTypes(lambdaExpr))
                         .Invoke(null, new[] { result });
                 }
@@ -2958,11 +2954,11 @@ namespace DryIoc
         }
 
         private static object TryInterpretNestedLambdaBodyAndUnwrapException(IResolverContext r,
-            Expression bodyExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
+            Expression bodyExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
             try
             {
-                if (!TryInterpret(r, bodyExpr, paramExprs, paramValues, parentArgs, useFec, out var lambdaResult))
+                if (!TryInterpret(r, bodyExpr, paramExprs, paramValues, parentArgs, out var lambdaResult))
                     Throw.It(Error.UnableToInterpretTheNestedLambda, bodyExpr);
                 return lambdaResult;
             }
@@ -3000,7 +2996,7 @@ namespace DryIoc
         private static readonly MethodInfo _convertFourArgActionMethod = typeof(Interpreter).GetTypeInfo().GetDeclaredMethod(nameof(ConvertFourArgAction));
 
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
-            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, ref object result)
+            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, ref object result)
         {
             if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
             {
@@ -3016,25 +3012,25 @@ namespace DryIoc
             {
                 if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateNoDisposalIndexMethod)
                 {
-                    result = InterpretGetScopedViaFactoryDelegateNoDisposalIndex(r, callExpr, paramExprs, paramValues, parentArgs, useFec);
+                    result = InterpretGetScopedViaFactoryDelegateNoDisposalIndex(r, callExpr, paramExprs, paramValues, parentArgs);
                     return true;
                 }
 
                 if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod)
                 {
-                    result = InterpretGetScopedViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs, useFec);
+                    result = InterpretGetScopedViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs);
                     return true;
                 }
 
                 if (method == CurrentScopeReuse.GetNameScopedViaFactoryDelegateMethod)
                 {
-                    result = InterpretGetNameScopedViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs, useFec);
+                    result = InterpretGetNameScopedViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs);
                     return true;
                 }
 
                 if (method == CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateMethod)
                 {
-                    result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs, useFec);
+                    result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs);
                     return true;
                 }
 
@@ -3042,7 +3038,7 @@ namespace DryIoc
                 var rArg = callExpr.GetArgument(0);
                 if (!ReferenceEquals(rArg, FactoryDelegateCompiler.ResolverContextParamExpr))
                 {
-                    if (!TryInterpret(resolver, rArg, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                    if (!TryInterpret(resolver, rArg, paramExprs, paramValues, parentArgs, out var resolverObj))
                         return false;
                     resolver = (IResolverContext)resolverObj;
                 }
@@ -3050,7 +3046,7 @@ namespace DryIoc
                 if (method == CurrentScopeReuse.TrackScopedOrSingletonMethod)
                 {
                     var args = (TwoArgumentsMethodCallExpression)callExpr;
-                    if (!TryInterpret(resolver, args.Argument1, paramExprs, paramValues, parentArgs, useFec, out var service))
+                    if (!TryInterpret(resolver, args.Argument1, paramExprs, paramValues, parentArgs, out var service))
                         return false;
                     result = CurrentScopeReuse.TrackScopedOrSingleton(resolver, service);
                     return true;
@@ -3064,7 +3060,7 @@ namespace DryIoc
                         result = null; // result is null in this case
                     else
                     {
-                        if (!TryInterpret(resolver, args.Argument2, paramExprs, paramValues, parentArgs, useFec, out var service))
+                        if (!TryInterpret(resolver, args.Argument2, paramExprs, paramValues, parentArgs, out var service))
                             return false;
                         result = service is IDisposable d ? scope.TrackDisposableWithoutDisposalOrder(d) : service;
                     }
@@ -3080,7 +3076,7 @@ namespace DryIoc
                         result = null; // result is null in this case
                     else
                     {
-                        if (!TryInterpret(resolver, args.Argument3, paramExprs, paramValues, parentArgs, useFec, out var service))
+                        if (!TryInterpret(resolver, args.Argument3, paramExprs, paramValues, parentArgs, out var service))
                             return false;
                         result = service is IDisposable d ? scope.TrackDisposableWithoutDisposalOrder(d) : service;
                     }
@@ -3098,12 +3094,12 @@ namespace DryIoc
                     var factoryId = (int) ConstValue(args.Argument0);
                     if (!r.SingletonScope.TryGet(out result, factoryId))
                     {
-                        result = r.SingletonScope.TryGetOrAddWithoutClosure(factoryId, r, ((LambdaExpression)args.Argument1).Body, useFec,
-                            (rc, e, uf) =>
+                        result = r.SingletonScope.TryGetOrAddWithoutClosure(factoryId, r, ((LambdaExpression)args.Argument1).Body,
+                            (rc, e) =>
                             {
-                                if (TryInterpret(rc, e, paramExprs, paramValues, parentArgs, uf, out var value))
+                                if (TryInterpret(rc, e, paramExprs, paramValues, parentArgs, out var value))
                                     return value;
-                                return e.CompileToFactoryDelegate(uf, ((IContainer)rc).Rules.UseInterpretation)(rc);
+                                return e.CompileToFactoryDelegate(((IContainer)rc).Rules.UseInterpretation)(rc);
                             },
                             (int)ConstValue(args.Argument3));
                     }
@@ -3115,7 +3111,7 @@ namespace DryIoc
                 {
                     var args = (InstanceTwoArgumentsMethodCallExpression)callExpr;
                     r = r.Root ?? r;
-                    if (!TryInterpret(r, args.Argument0, paramExprs, paramValues, parentArgs, useFec, out var service))
+                    if (!TryInterpret(r, args.Argument0, paramExprs, paramValues, parentArgs, out var service))
                         return false;
                     if (service is IDisposable d) 
                     {
@@ -3133,7 +3129,7 @@ namespace DryIoc
                 var resolver = r;
                 if (!ReferenceEquals(callExpr.Object, FactoryDelegateCompiler.ResolverContextParamExpr))
                 {
-                    if (!TryInterpret(resolver, callExpr.Object, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                    if (!TryInterpret(resolver, callExpr.Object, paramExprs, paramValues, parentArgs, out var resolverObj))
                         return false;
                     resolver = (IResolverContext)resolverObj;
                 }
@@ -3148,7 +3144,7 @@ namespace DryIoc
                 if (method == Resolver.ResolveMethod)
                 {
                     InterpretResolveMethod(resolver, (InstanceSixArgumentsMethodCallExpression)callExpr, 
-                        paramExprs, paramValues, parentArgs, useFec, out result);
+                        paramExprs, paramValues, parentArgs, out result);
                     return true;
                 }
 
@@ -3156,9 +3152,9 @@ namespace DryIoc
                 {
                     var fiveArgs = (InstanceFiveArgumentsMethodCallExpression)callExpr;
                     object serviceKey = null, preResolveParent = null, resolveArgs = null;
-                    if (!TryInterpret(resolver, fiveArgs.Argument1, paramExprs, paramValues, parentArgs, useFec, out serviceKey) ||
-                        !TryInterpret(resolver, fiveArgs.Argument3, paramExprs, paramValues, parentArgs, useFec, out preResolveParent) ||
-                        !TryInterpret(resolver, fiveArgs.Argument4, paramExprs, paramValues, parentArgs, useFec, out resolveArgs))
+                    if (!TryInterpret(resolver, fiveArgs.Argument1, paramExprs, paramValues, parentArgs, out serviceKey) ||
+                        !TryInterpret(resolver, fiveArgs.Argument3, paramExprs, paramValues, parentArgs, out preResolveParent) ||
+                        !TryInterpret(resolver, fiveArgs.Argument4, paramExprs, paramValues, parentArgs, out resolveArgs))
                         return false;
 
                     result = resolver.ResolveMany(
@@ -3175,7 +3171,7 @@ namespace DryIoc
             {
                 if (callObjectExpr is ConstantExpression oc)
                     instance = oc.Value;
-                else if (!TryInterpret(r, callObjectExpr, paramExprs, paramValues, parentArgs, useFec, out instance)) 
+                else if (!TryInterpret(r, callObjectExpr, paramExprs, paramValues, parentArgs, out instance)) 
                     return false;
             }
 
@@ -3190,7 +3186,7 @@ namespace DryIoc
                     var argExpr = callExpr.GetArgument(i);
                     if (argExpr is ConstantExpression ac)
                         args[i] = ac.Value;
-                    else if (!TryInterpret(r, argExpr, paramExprs, paramValues, parentArgs, useFec, out args[i]))
+                    else if (!TryInterpret(r, argExpr, paramExprs, paramValues, parentArgs, out args[i]))
                         return false;
                 }
                 result = method.Invoke(instance, args);
@@ -3200,11 +3196,11 @@ namespace DryIoc
         }
 
         internal static void InterpretResolveMethod(IResolverContext resolver, InstanceSixArgumentsMethodCallExpression args,
-            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec, out object result)
+            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, out object result)
         {
-            TryInterpret(resolver, args.Argument1, paramExprs, paramValues, parentArgs, useFec, out var serviceKey);
-            TryInterpret(resolver, args.Argument4, paramExprs, paramValues, parentArgs, useFec, out var preResolveParent);
-            TryInterpret(resolver, args.Argument5, paramExprs, paramValues, parentArgs, useFec, out var resolveArgs);
+            TryInterpret(resolver, args.Argument1, paramExprs, paramValues, parentArgs, out var serviceKey);
+            TryInterpret(resolver, args.Argument4, paramExprs, paramValues, parentArgs, out var preResolveParent);
+            TryInterpret(resolver, args.Argument5, paramExprs, paramValues, parentArgs, out var resolveArgs);
 
             result = resolver.Resolve((Type)
                 ((ConstantExpression) args.Argument0).Value,
@@ -3216,13 +3212,13 @@ namespace DryIoc
         }
 
         private static object InterpretGetScopedViaFactoryDelegateNoDisposalIndex(IResolverContext r,
-            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
+            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
             var fewArgExpr = (FourArgumentsMethodCallExpression)callExpr;
             var resolverArg = fewArgExpr.Argument0;
             if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
             {
-                if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, out var resolverObj))
                     return false;
                 r = (IResolverContext)resolverObj;
             }
@@ -3265,8 +3261,8 @@ namespace DryIoc
             object result = null;
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
+            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
+                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
             itemRef.Value = result;
 
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
@@ -3275,14 +3271,14 @@ namespace DryIoc
         }
 
         private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r, 
-            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
+            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
             var args = (FiveArgumentsMethodCallExpression)callExpr;
             var resolverArg = args.Argument0;
 
             if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
             {
-                if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, out var resolverObj))
                     return false;
                 r = (IResolverContext)resolverObj;
             }
@@ -3325,8 +3321,8 @@ namespace DryIoc
             object result = null;
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
+            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
+                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
             itemRef.Value = result;
 
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
@@ -3344,12 +3340,12 @@ namespace DryIoc
 
         // todo: @perf create the overload without disposal index so we could use FiveArgumentsMethodCall expression from the FEC, because it is now have a 6 arguments and I see impractical to create a SixArgumentsMethodCall
         private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r, 
-            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
+            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
             var args = (SixArgumentsMethodCallExpression)callExpr;
             if (!ReferenceEquals(args.Argument0, FactoryDelegateCompiler.ResolverContextParamExpr))
             {
-                if (!TryInterpret(r, args.Argument0, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                if (!TryInterpret(r, args.Argument0, paramExprs, paramValues, parentArgs, out var resolverObj))
                     return false;
                 r = (IResolverContext)resolverObj;
             }
@@ -3388,8 +3384,8 @@ namespace DryIoc
             object result = null;
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
+            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
+                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
             itemRef.Value = result;
 
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
@@ -3405,13 +3401,13 @@ namespace DryIoc
         }
 
         private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, 
-            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
+            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
             var fewArgExpr = (FourArgumentsMethodCallExpression)callExpr;
             var resolverArg = fewArgExpr.Argument0;
             if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
             {
-                if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, useFec, out var resolverObj))
+                if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, out var resolverObj))
                     return false;
                 r = (IResolverContext)resolverObj;
             }
@@ -3449,8 +3445,8 @@ namespace DryIoc
             object result = null;
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, useFec, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(useFec, ((IContainer)r).Rules.UseInterpretation)(r);
+            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
+                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
             itemRef.Value = result;
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
             {
@@ -3534,14 +3530,13 @@ namespace DryIoc
 
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
-        public static FactoryDelegate CompileToFactoryDelegate(
-            this Expression expression, bool useFastExpressionCompiler, bool preferInterpretation)
+        public static FactoryDelegate CompileToFactoryDelegate(this Expression expression, bool preferInterpretation)
         {
             expression = expression.NormalizeExpression();
             if (expression is ConstantExpression constExpr)
                 return constExpr.Value.ToFactoryDelegate;
 
-            if (!preferInterpretation && useFastExpressionCompiler)
+            if (!preferInterpretation)
             {
                 var factoryDelegate = (FactoryDelegate)(FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompileBoundToFirstClosureParam(
                     typeof(FactoryDelegate), expression, FactoryDelegateParamExprs, 
@@ -3552,10 +3547,8 @@ namespace DryIoc
                     return factoryDelegate;
             }
 
-            // fallback for platforms when FastExpressionCompiler is not supported,
-            // or just in case when some expression is not supported (did not found one yet)
+            // fallback for platforms when FastExpressionCompiler is not able to compile the expression
             var lambda = Lambda<FactoryDelegate>(expression, ResolverContextParamExpr, typeof(object)).ToLambdaExpression();
-
             if (preferInterpretation)
             {
 #if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
@@ -3569,10 +3562,9 @@ namespace DryIoc
         }
 
         /// <summary>Compiles lambda expression to actual `FactoryDelegate` wrapper.</summary>
-        public static object CompileToFactoryDelegate(this Expression expression, 
-            Type factoryDelegateType, Type resultType,  bool useFastExpressionCompiler, bool preferInterpretation)
+        public static object CompileToFactoryDelegate(this Expression expression, Type factoryDelegateType, Type resultType, bool preferInterpretation)
         {
-            if (!preferInterpretation && useFastExpressionCompiler)
+            if (!preferInterpretation)
             {
                 var factoryDelegate = (FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompileBoundToFirstClosureParam(
                     factoryDelegateType, expression, FactoryDelegateParamExprs,
@@ -3583,9 +3575,9 @@ namespace DryIoc
                     return factoryDelegate;
             }
 
-            // fallback for platforms when FastExpressionCompiler is not supported,
-            // or just in case when some expression is not supported (did not found one yet)
-            return Lambda(factoryDelegateType, expression, ResolverContextParamExpr, resultType).ToLambdaExpression()
+            // fallback for platforms where FastExpressionCompiler does not support the expression
+            return Lambda(factoryDelegateType, expression, ResolverContextParamExpr, resultType)
+                .ToLambdaExpression()
                 .Compile(
 #if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
                     preferInterpretation
@@ -4660,10 +4652,10 @@ namespace DryIoc
 
             var rules = container.Rules;
             if (wrapperType == typeof(FactoryDelegate))
-                return Constant(expr.CompileToFactoryDelegate(rules.UseFastExpressionCompiler, rules.UseInterpretation));
+                return Constant(expr.CompileToFactoryDelegate(rules.UseInterpretation));
 
             return Constant(
-                expr.CompileToFactoryDelegate(wrapperType, serviceType, rules.UseFastExpressionCompiler, rules.UseInterpretation),
+                expr.CompileToFactoryDelegate(wrapperType, serviceType, rules.UseInterpretation),
                 wrapperType);
         }
 
@@ -5479,14 +5471,6 @@ namespace DryIoc
         public Rules WithFuncAndLazyWithoutRegistration() =>
             WithSettings(_settings | Settings.FuncAndLazyWithoutRegistration);
 
-        /// Commands to use FastExpressionCompiler - set by default.
-        public bool UseFastExpressionCompiler =>
-            (_settings & Settings.UseFastExpressionCompilerIfPlatformSupported) != 0;
-
-        /// Fallbacks to system `Expression.Compile()`
-        public Rules WithoutFastExpressionCompiler() =>
-            WithSettings(_settings & ~Settings.UseFastExpressionCompilerIfPlatformSupported);
-
         /// Subject-subject
         public bool UseInterpretationForTheFirstResolution =>
             (_settings & Settings.UseInterpretationForTheFirstResolution) != 0;
@@ -5624,7 +5608,7 @@ namespace DryIoc
             AutoConcreteTypeResolution = 1 << 14, // informational flag // todo: @clarify consider for the obsoleting
             SelectLastRegisteredFactory = 1 << 15,// informational flag
             UsedForExpressionGeneration = 1 << 16,
-            UseFastExpressionCompilerIfPlatformSupported = 1 << 17,
+            // UseFastExpressionCompilerIfPlatformSupported = 1 << 17, // the default in V5 without opt-out because of complexity, but the System.Compile(preferInterpretation?) is still used as a fallback  
             UseInterpretationForTheFirstResolution = 1 << 18,
             UseInterpretation = 1 << 19,
             UseDecorateeReuseForDecorators = 1 << 20,
@@ -5640,7 +5624,6 @@ namespace DryIoc
             | Settings.ImplicitCheckForReuseMatchingScope
             | Settings.VariantGenericTypesInResolvedCollection
             | Settings.EagerCachingSingletonForFasterAccess
-            | Settings.UseFastExpressionCompilerIfPlatformSupported
             | Settings.UseInterpretationForTheFirstResolution;
 
         private Settings _settings;
@@ -9583,21 +9566,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 if (depCount >= rules.DependencyCountInLambdaToSplitBigObjectGraph)
                 {
                     request.DecreaseTrackedDependencyCountForParents(depCount);
-
-                    if (rules.UseFastExpressionCompiler)
-                    {
-                        serviceExpr = Convert(Invoke(
-                            Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>(), typeof(object)), Empty<Expression>()), serviceExpr.Type);
-                    }
-                    else
-                    {
-                        // cache expression if possible to minimize the double work for the generated Resolve call
-                        if (cacheExpression)
-                            ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse, 
-                                depCount, cacheEntry);
-
-                        return Resolver.CreateResolutionExpression(request);
-                    }
+                    serviceExpr = Convert(Invoke(Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>(), typeof(object)), Empty<Expression>()), serviceExpr.Type);
                 }
             }
 
@@ -9659,8 +9628,8 @@ private ParameterServiceInfo(ParameterInfo p)
 
                 if (singleton == Scope.NoItem)
                 {
-                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, container.Rules.UseFastExpressionCompiler, out singleton))
-                        singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseFastExpressionCompiler, container.Rules.UseInterpretation)(container);
+                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, out singleton))
+                        singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseInterpretation)(container);
 
                     if (Setup.WeaklyReferenced)
                         singleton = new WeakReference(singleton);
@@ -9703,8 +9672,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// Creates factory delegate from service expression and returns it.
         public virtual FactoryDelegate GetDelegateOrDefault(Request request) =>
-            GetExpressionOrDefault(request)
-                ?.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler, request.Rules.UseInterpretation);
+            GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseInterpretation);
 
         internal virtual bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
@@ -11053,9 +11021,8 @@ private ParameterServiceInfo(ParameterInfo p)
         object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0);
 
         /// Creates, stores, and returns created item
-        object TryGetOrAddWithoutClosure(int id,
-            IResolverContext resolveContext, Expression expr, bool useFec,
-            Func<IResolverContext, Expression, bool, object> createValue, int disposalOrder = 0);
+        object TryGetOrAddWithoutClosure(int id, IResolverContext resolveContext, Expression expr,
+            Func<IResolverContext, Expression, object> createValue, int disposalOrder = 0);
 
         /// <summary>Tracked item will be disposed with the scope. 
         /// Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
@@ -11217,9 +11184,8 @@ private ParameterServiceInfo(ParameterInfo p)
         }
 
         /// <inheritdoc />
-        public object TryGetOrAddWithoutClosure(int id,
-            IResolverContext resolveContext, Expression expr, bool useFec,
-            Func<IResolverContext, Expression, bool, object> createValue, int disposalOrder = 0)
+        public object TryGetOrAddWithoutClosure(int id, IResolverContext resolveContext, 
+            Expression expr, Func<IResolverContext, Expression, object> createValue, int disposalOrder = 0)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
@@ -11242,7 +11208,7 @@ private ParameterServiceInfo(ParameterInfo p)
             }
 
             object result = null;
-            itemRef.Value = result = createValue(resolveContext, expr, useFec);
+            itemRef.Value = result = createValue(resolveContext, expr);
 
             if (result is IDisposable disp && !ReferenceEquals(disp, this))
                 if (disposalOrder == 0)

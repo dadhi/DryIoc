@@ -17,14 +17,8 @@ namespace PerformanceTests
         public static IContainer PrepareDryIoc() => 
             PrepareDryIoc(new Container());
 
-        public static IContainer PrepareDryIocWithoutFEC() => 
-            PrepareDryIoc(new Container(Rules.Default.WithoutFastExpressionCompiler()));
-
         public static IContainer PrepareDryIoc_WebRequestScoped() =>
             PrepareDryIoc_WebRequestScoped(new Container());
-
-        public static IContainer PrepareDryIoc_WebRequestScoped_WithoutFEC() =>
-            PrepareDryIoc_WebRequestScoped(new Container(Rules.Default.WithoutFastExpressionCompiler()));
 
         public static IContainer PrepareDryIocInterpretationOnly() => 
             PrepareDryIoc(new Container(Rules.Default.WithUseInterpretation()));
@@ -1505,9 +1499,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             {
                 Measure(_msDi = PrepareMsDi());
                 Measure(_dryIoc = PrepareDryIoc());
-                Measure(_dryIocWithoutFEC = PrepareDryIocWithoutFEC());
                 Measure_WebRequestScoped(_dryIocWebRequestScoped = PrepareDryIoc_WebRequestScoped());
-                Measure_WebRequestScoped(_dryIocWebRequestScopedWithoutFEC = PrepareDryIoc_WebRequestScoped_WithoutFEC());
                 Measure(_dryIocInterpretationOnly = PrepareDryIocInterpretationOnly());
                 Measure(_dryIocMsDi = PrepareDryIocMsDi());
                 Measure(_grace = PrepareGrace());
@@ -1523,17 +1515,11 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             //[Benchmark]
             public object DryIoc_WebRequestScoped() => Measure_WebRequestScoped(_dryIocWebRequestScoped);
 
-            //[Benchmark]
-            public object DryIoc_WebRequestScoped_WithoutFEC() => Measure_WebRequestScoped(_dryIocWebRequestScopedWithoutFEC);
-
             [Benchmark]
             public object DryIoc() => Measure(_dryIoc);
 
             [Benchmark]
             public object DryIoc_MsDIAdapter() => Measure(_dryIocMsDi);
-
-            //[Benchmark]
-            public object DryIoc_WithoutFEC() => Measure(_dryIocWithoutFEC);
 
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);

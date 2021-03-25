@@ -163,58 +163,6 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        [Test]
-        public void Decorator_should_be_correctly_resolved_withoutFEC()
-        {
-            var c = new Container(rules => rules.WithoutFastExpressionCompiler());
-
-            c.Register<Controller, Controller>(Reuse.InWebRequest);
-            c.Register<Controller2, Controller2>(Reuse.InWebRequest);
-            c.RegisterMany(
-                new List<Type> {typeof(Repo), typeof(AService), typeof(BService)},
-                Reuse.Singleton,
-                serviceTypeCondition: s => s.IsInterface
-            );
-
-            c.Register<IRepository, RepoDecorator>(setup: Setup.Decorator,
-                ifAlreadyRegistered: IfAlreadyRegistered.Throw);
-
-
-            using (var scope = c.OpenScope(Reuse.WebRequestScopeName))
-            {
-                var a = scope.Resolve<Controller>();
-                Assert.AreEqual("REPO_DECORATOR__A_Controller", a.Identify());
-                a = scope.Resolve<Controller>();
-                Assert.AreEqual("REPO_DECORATOR__A_Controller", a.Identify());
-                a = scope.Resolve<Controller>();
-                Assert.AreEqual("REPO_DECORATOR__A_Controller", a.Identify());
-
-                var b = scope.Resolve<Controller2>();
-                Assert.AreEqual("REPO_DECORATOR__B_Controller2", b.Identify());
-                b = scope.Resolve<Controller2>();
-                Assert.AreEqual("REPO_DECORATOR__B_Controller2", b.Identify());
-                b = scope.Resolve<Controller2>();
-                Assert.AreEqual("REPO_DECORATOR__B_Controller2", b.Identify());
-            }
-
-            using (var scope = c.OpenScope(Reuse.WebRequestScopeName))
-            {
-                var a = scope.Resolve<Controller>();
-                Assert.AreEqual("REPO_DECORATOR__A_Controller", a.Identify());
-                a = scope.Resolve<Controller>();
-                Assert.AreEqual("REPO_DECORATOR__A_Controller", a.Identify());
-                a = scope.Resolve<Controller>();
-                Assert.AreEqual("REPO_DECORATOR__A_Controller", a.Identify());
-
-                var b = scope.Resolve<Controller2>();
-                Assert.AreEqual("REPO_DECORATOR__B_Controller2", b.Identify());
-                b = scope.Resolve<Controller2>();
-                Assert.AreEqual("REPO_DECORATOR__B_Controller2", b.Identify());
-                b = scope.Resolve<Controller2>();
-                Assert.AreEqual("REPO_DECORATOR__B_Controller2", b.Identify());
-            }
-        }
-
         public interface IRepository
         {
             string Identify();
