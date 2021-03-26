@@ -2584,16 +2584,12 @@ namespace DryIoc
     /// <summary>Interpreter of expression - where possible uses knowledge of DryIoc internals to avoid reflection</summary>
     public static class Interpreter
     {
-        // private const int POOLED_ARGS_COUNT = 6;
-
         /// <summary>Calls `TryInterpret` inside try-catch and unwraps/re-throws `ContainerException` from the reflection `TargetInvocationException`</summary>
         public static bool TryInterpretAndUnwrapContainerException(IResolverContext r, Expression expr, out object result)
         {
             try
             {
-                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null, out result
-                    //, new object[POOLED_ARGS_COUNT][] // todo: @perf use the pool for the args
-                );
+                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null, out result);
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
@@ -2789,7 +2785,7 @@ namespace DryIoc
                             result = lambda.GetMethodInfo().Invoke(lambda.Target, ArrayTools.Empty<object>());
                         else // it does not make sense to avoid array allocating for the single argument because we still need to pass array to the Invoke call
                         {
-                            var args = new object[argCount]; // // todo: @perf args pooling?
+                            var args = new object[argCount];
                             for (var i = 0; i < args.Length; ++i)
                             {
                                 var arg = invokeExpr.GetArgument(i);
