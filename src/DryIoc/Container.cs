@@ -5612,7 +5612,7 @@ namespace DryIoc
 
         /// <summary>Sets <see cref="FactorySelector"/></summary>
         public Rules WithFactorySelector(FactorySelectorRule rule) =>
-            new Rules(_settings | (rule == SelectLastRegisteredFactory ? Settings.SelectLastRegisteredFactory : default(Settings)),
+            new Rules(rule == SelectLastRegisteredFactory ? (_settings | Settings.SelectLastRegisteredFactory) : (_settings & ~Settings.SelectLastRegisteredFactory),
                 rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -6252,7 +6252,7 @@ namespace DryIoc
         }
 
         private Rules Clone(bool cloneMade) =>
-            new Rules(_settings, FactorySelector, DefaultReuse, cloneMade ? _made.Copy() : _made, 
+            new Rules(_settings, FactorySelector, DefaultReuse, cloneMade ? _made.Clone() : _made, 
                 DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter, DynamicRegistrationProviders, 
                 _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -6269,6 +6269,7 @@ namespace DryIoc
         [Flags]
         private enum Settings
         {
+            Empty = 0,
             ThrowIfDependencyHasShorterReuseLifespan = 1 << 1,
             ThrowOnRegisteringDisposableTransient = 1 << 2,
             TrackingDisposableTransients = 1 << 3,
@@ -6904,8 +6905,7 @@ namespace DryIoc
             _details = details;
         }
 
-        internal Made Copy() =>
-            new Made(FactoryMethod, Parameters, PropertiesAndFields, FactoryMethodKnownResultType, _details);
+        internal Made Clone() => new Made(FactoryMethod, Parameters, PropertiesAndFields, FactoryMethodKnownResultType, _details);
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
             System.Linq.Expressions.Expression wholeServiceExpr, ParameterInfo[] paramInfos,
