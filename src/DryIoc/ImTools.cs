@@ -1874,7 +1874,7 @@ namespace ImTools
             {
                 var condition0 = condition(source[0]);
                 var condition1 = condition(source[1]);
-                return condition0 && condition1 ? new[] { source[0], source[1] }
+                return condition0 && condition1 ? source
                     : condition0 ? new[] { source[0] }
                     : condition1 ? new[] { source[1] }
                     : Empty<T>();
@@ -1913,7 +1913,7 @@ namespace ImTools
             {
                 var condition0 = condition(state, source[0]);
                 var condition1 = condition(state, source[1]);
-                return condition0 && condition1 ? new[] { source[0], source[1] }
+                return condition0 && condition1 ? source
                     : condition0 ? new[] { source[0] }
                     : condition1 ? new[] { source[1] }
                     : Empty<T>();
