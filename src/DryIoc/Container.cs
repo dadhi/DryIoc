@@ -2693,7 +2693,7 @@ namespace DryIoc
                         }
 
                         // todo: huh - no perf here?
-                        removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(f => f.Value).ToArray();
+                        removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(x => x.Value).ToArray();
 
                         if (remainingFactories.Height == 1 && DefaultKey.Value.Equals(remainingFactories.Key))
                             return remainingFactories.Value; // replace entry with single remaining default factory
