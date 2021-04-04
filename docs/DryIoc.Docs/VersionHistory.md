@@ -1,6 +1,11 @@
 Version History
 ---------------
 
+## v4.7.5 Bug-fix release / 2021-04-04
+
+- #390 NullReferenceException on Unregister
+- fixed the potential issue with the switching back from the SelectLastFactoryRule to the default rule
+
 ## v4.7.4 Bug-fix release / 2021-02-26
 
 - #376 DryIoc.Interpreter seems to mess up the exception call stack
