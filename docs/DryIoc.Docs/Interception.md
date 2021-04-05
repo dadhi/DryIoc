@@ -41,10 +41,10 @@ public static class DryIocInterception
         var serviceType = typeof(TService);
 
         Type proxyType;
-        if (serviceType.IsInterface())
+        if (serviceType.IsInterface)
             proxyType = _proxyBuilder.CreateInterfaceProxyTypeWithTargetInterface(
                 serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
-        else if (serviceType.IsClass())
+        else if (serviceType.IsClass)
             proxyType = _proxyBuilder.CreateClassProxyTypeWithTarget(
                 serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
         else
@@ -126,7 +126,7 @@ public static class DryIocInterceptionLinFu
         where TInvokeWrapper : class, IInvokeWrapper
     {
         var serviceType = typeof(TService);
-        if (!serviceType.IsAbstract())
+        if (!serviceType.IsAbstract)
             throw new ArgumentException($"Non-abstract {serviceType} are not a supported.");
 
         var createProxyMethod = _createProxyMethod.MakeGenericMethod(serviceType);

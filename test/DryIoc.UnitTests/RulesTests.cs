@@ -18,7 +18,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(Bla<>), made: Made.Of(
-                t => t.GetConstructorOrNull(typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()[0]))));
+                t => t.GetConstructorOrNull(typeof(Func<>).MakeGenericType(t.GetGenericArguments()[0]))));
 
             container.Register(typeof(SomeService), typeof(SomeService));
 
@@ -31,7 +31,7 @@ namespace DryIoc.UnitTests
         public void I_should_be_able_to_add_rule_to_resolve_not_registered_service()
         {
             var container = new Container(Rules.Default.WithUnknownServiceResolvers(request =>
-                !request.ServiceType.IsValueType() && !request.ServiceType.IsAbstract()
+                !request.ServiceType.IsValueType && !request.ServiceType.IsAbstract
                     ? new ReflectionFactory(request.ServiceType)
                     : null));
 
@@ -44,7 +44,7 @@ namespace DryIoc.UnitTests
         public void I_can_remove_rule_to_resolve_not_registered_service()
         {
             Rules.UnknownServiceResolver unknownServiceResolver = request =>
-                !request.ServiceType.IsValueType() && !request.ServiceType.IsAbstract()
+                !request.ServiceType.IsValueType && !request.ServiceType.IsAbstract
                     ? new ReflectionFactory(request.ServiceType)
                     : null;
 

@@ -1611,12 +1611,7 @@ namespace DryIoc.ImTools
         }
 
         /// <summary>Returns new array consisting from all items from source array then all items from added array.
-        /// If source is null or empty, then added array will be returned.
-        /// If added is null or empty, then source will be returned.</summary>
-        /// <typeparam name="T">Array item type.</typeparam>
-        /// <param name="source">Array with leading items.</param>
-        /// <param name="added">Array with following items.</param>
-        /// <returns>New array with items of source and added arrays.</returns>
+        /// If source is null or empty, then added array will be returned. If added is null or empty, then source will be returned.</summary>
         public static T[] Append<T>(this T[] source, params T[] added)
         {
             if (added == null || added.Length == 0)
@@ -1633,23 +1628,13 @@ namespace DryIoc.ImTools
             return result;
         }
 
-        /// <summary>Performant concat of enumerables in case of arrays.
-        /// But performance will degrade if you use Concat().Where().</summary>
-        /// <typeparam name="T">Type of item.</typeparam>
-        /// <param name="source">goes first.</param>
-        /// <param name="other">appended to source.</param>
-        /// <returns>empty array or concat of source and other.</returns>
+        /// <summary>Performant concat of enumerables in case of arrays. But performance will degrade if you use Concat().Where().</summary>
         public static T[] Append<T>(this IEnumerable<T> source, IEnumerable<T> other) =>
             source.ToArrayOrSelf().Append(other.ToArrayOrSelf());
 
         /// <summary>Returns new array with <paramref name="value"/> appended, 
         /// or <paramref name="value"/> at <paramref name="index"/>, if specified.
         /// If source array could be null or empty, then single value item array will be created despite any index.</summary>
-        /// <typeparam name="T">Array item type.</typeparam>
-        /// <param name="source">Array to append value to.</param>
-        /// <param name="value"> value to append.</param>
-        /// <param name="index">(optional) Index of value to update.</param>
-        /// <returns>New array with appended or updated value.</returns>
         public static T[] AppendOrUpdate<T>(this T[] source, T value, int index = -1)
         {
             if (source == null || source.Length == 0)
@@ -1664,10 +1649,6 @@ namespace DryIoc.ImTools
 
         /// <summary>Calls predicate on each item in <paramref name="source"/> array until predicate returns true,
         /// then method will return this item index, or if predicate returns false for each item, method will return -1.</summary>
-        /// <typeparam name="T">Type of array items.</typeparam>
-        /// <param name="source">Source array: if null or empty, then method will return -1.</param>
-        /// <param name="predicate">Delegate to evaluate on each array item until delegate returns true.</param>
-        /// <returns>Index of item for which predicate returns true, or -1 otherwise.</returns>
         public static int IndexOf<T>(this T[] source, Func<T, bool> predicate)
         {
             if (source != null && source.Length != 0)
@@ -1677,7 +1658,7 @@ namespace DryIoc.ImTools
             return -1;
         }
 
-        /// Minimizes the allocations for closure in predicate lambda with the provided <paramref name="state"/>
+        /// <summary>Minimizes the allocations for closure in predicate lambda with the provided <paramref name="state"/></summary>
         public static int IndexOf<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
         {
             if (source != null && source.Length != 0)
@@ -1688,10 +1669,6 @@ namespace DryIoc.ImTools
         }
 
         /// <summary>Looks up for item in source array equal to provided value, and returns its index, or -1 if not found.</summary>
-        /// <typeparam name="T">Type of array items.</typeparam>
-        /// <param name="source">Source array: if null or empty, then method will return -1.</param>
-        /// <param name="value"> value to look up.</param>
-        /// <returns>Index of item equal to value, or -1 item is not found.</returns>
         public static int IndexOf<T>(this T[] source, T value)
         {
             if (source != null && source.Length != 0)
@@ -1717,9 +1694,6 @@ namespace DryIoc.ImTools
 
         /// <summary>Produces new array without item at specified <paramref name="index"/>. 
         /// Will return <paramref name="source"/> array if index is out of bounds, or source is null/empty.</summary>
-        /// <typeparam name="T">Type of array item.</typeparam>
-        /// <param name="source">Input array.</param> <param name="index">Index if item to remove.</param>
-        /// <returns>New array with removed item at index, or input source array if index is not in array.</returns>
         public static T[] RemoveAt<T>(this T[] source, int index)
         {
             if (source == null || source.Length == 0 || index < 0 || index >= source.Length)
@@ -1735,17 +1709,10 @@ namespace DryIoc.ImTools
         }
 
         /// <summary>Looks for item in array using equality comparison, and returns new array with found item remove, or original array if not item found.</summary>
-        /// <typeparam name="T">Type of array item.</typeparam>
-        /// <param name="source">Input array.</param> <param name="value"> value to find and remove.</param>
-        /// <returns>New array with value removed or original array if value is not found.</returns>
         public static T[] Remove<T>(this T[] source, T value) =>
             source.RemoveAt(source.IndexOf(value));
 
         /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
-        /// <typeparam name="T">item type</typeparam>
-        /// <param name="source">items collection to search</param>
-        /// <param name="predicate">condition to evaluate for each item.</param>
-        /// <returns>First item matching condition or default value.</returns>
         public static T FindFirst<T>(this T[] source, Func<T, bool> predicate)
         {
             if (source != null && source.Length != 0)
@@ -1759,7 +1726,7 @@ namespace DryIoc.ImTools
             return default(T);
         }
 
-        /// Version of FindFirst with the fixed state used by predicate to prevent allocations by predicate lambda closure
+        /// <summary>Version of FindFirst with the fixed state used by predicate to prevent allocations by predicate lambda closure</summary>
         public static T FindFirst<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
         {
             if (source != null && source.Length != 0)
@@ -1774,10 +1741,6 @@ namespace DryIoc.ImTools
         }
 
         /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
-        /// <typeparam name="T">item type</typeparam>
-        /// <param name="source">items collection to search</param>
-        /// <param name="predicate">condition to evaluate for each item.</param>
-        /// <returns>First item matching condition or default value.</returns>
         public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate) =>
             source is T[] sourceArr ? sourceArr.FindFirst(predicate) : source.FirstOrDefault(predicate);
 
@@ -1868,7 +1831,7 @@ namespace DryIoc.ImTools
             return appendedResults;
         }
 
-        private static R[] AppendTo<T, S, R>(T[] source, S state, int sourcePos, int count, Func<S, T, R> map, R[] results = null)
+        private static R[] AppendTo<S, T, R>(T[] source, S state, int sourcePos, int count, Func<S, T, R> map, R[] results = null)
         {
             if (results == null || results.Length == 0)
             {
@@ -1899,12 +1862,39 @@ namespace DryIoc.ImTools
             return appendedResults;
         }
 
+        private static R[] AppendTo<A, B, T, R>(T[] source, A a, B b, int sourcePos, int count, Func<A, B, T, R> map, R[] results = null)
+        {
+            if (results == null || results.Length == 0)
+            {
+                var newResults = new R[count];
+                if (count == 1)
+                    newResults[0] = map(a, b, source[sourcePos]);
+                else
+                    for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                        newResults[i] = map(a, b, source[j]);
+                return newResults;
+            }
+
+            var oldResultsCount = results.Length;
+            var appendedResults = new R[oldResultsCount + count];
+            if (oldResultsCount == 1)
+                appendedResults[0] = results[0];
+            else
+                Array.Copy(results, 0, appendedResults, 0, oldResultsCount);
+
+            if (count == 1)
+                appendedResults[oldResultsCount] = map(a, b, source[sourcePos]);
+            else
+            {
+                for (int i = oldResultsCount, j = sourcePos; i < appendedResults.Length; ++i, ++j)
+                    appendedResults[i] = map(a, b, source[j]);
+            }
+
+            return appendedResults;
+        }
+
         /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
         /// It returns source array and does Not create new one if all items match the condition.</summary>
-        /// <typeparam name="T">Type of source items.</typeparam>
-        /// <param name="source">If null, the null will be returned.</param>
-        /// <param name="condition">Condition to keep items.</param>
-        /// <returns>New array if some items are filter out. Empty array if all items are filtered out. Original array otherwise.</returns>
         public static T[] Match<T>(this T[] source, Func<T, bool> condition)
         {
             if (source == null || source.Length == 0)
@@ -1915,12 +1905,9 @@ namespace DryIoc.ImTools
 
             if (source.Length == 2)
             {
-                var condition0 = condition(source[0]);
-                var condition1 = condition(source[1]);
-                return condition0 && condition1 ? new[] { source[0], source[1] }
-                    : condition0 ? new[] { source[0] }
-                    : condition1 ? new[] { source[1] }
-                    : Empty<T>();
+                var c0 = condition(source[0]);
+                var c1 = condition(source[1]);
+                return c0 && c1 ? new[] { source[0], source[1] } : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
             }
 
             var matchStart = 0;
@@ -1943,8 +1930,9 @@ namespace DryIoc.ImTools
             return matches ?? (matchStart != 0 ? Empty<T>() : source);
         }
 
-        /// Match with the additional state to use in <paramref name="condition"/> to minimize the allocations in <paramref name="condition"/> lambda closure 
-        public static T[] Match<T, S>(this T[] source, S state, Func<S, T, bool> condition)
+        /// <summary>Match with the additional state to use in <paramref name="condition"/> to minimize the allocations 
+        /// in <paramref name="condition"/> lambda closure</summary> 
+        public static T[] Match<S, T>(this T[] source, S state, Func<S, T, bool> condition)
         {
             if (source == null || source.Length == 0)
                 return source;
@@ -1954,12 +1942,9 @@ namespace DryIoc.ImTools
 
             if (source.Length == 2)
             {
-                var condition0 = condition(state, source[0]);
-                var condition1 = condition(state, source[1]);
-                return condition0 && condition1 ? new[] { source[0], source[1] }
-                    : condition0 ? new[] { source[0] }
-                    : condition1 ? new[] { source[1] }
-                    : Empty<T>();
+                var c0 = condition(state, source[0]);
+                var c1 = condition(state, source[1]);
+                return c0 && c1 ? new[] { source[0], source[1] } : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
             }
 
             var matchStart = 0;
@@ -1982,12 +1967,45 @@ namespace DryIoc.ImTools
             return matches ?? (matchStart != 0 ? Empty<T>() : source);
         }
 
+        /// <summary>Match with the additional state to use in <paramref name="condition"/> to minimize the allocations 
+        /// in <paramref name="condition"/> lambda closure</summary> 
+        public static T[] Match<A, B, T>(this T[] source, A a, B b, Func<A, B, T, bool> condition)
+        {
+            if (source == null || source.Length == 0)
+                return source;
+
+            if (source.Length == 1)
+                return condition(a, b, source[0]) ? source : Empty<T>();
+
+            if (source.Length == 2)
+            {
+                var c0 = condition(a, b, source[0]);
+                var c1 = condition(a, b, source[1]);
+                return c0 && c1 ? new[] { source[0], source[1] } : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
+            }
+
+            var matchStart = 0;
+            T[] matches = null;
+            var matchFound = false;
+            var i = 0;
+            for (; i < source.Length; ++i)
+                if (!(matchFound = condition(a, b, source[i])))
+                {
+                    // for accumulated matched items
+                    if (i != 0 && i > matchStart)
+                        matches = AppendTo(source, matchStart, i - matchStart, matches);
+                    matchStart = i + 1; // guess the next match start will be after the non-matched item
+                }
+
+            // when last match was found but not all items are matched (hence matchStart != 0)
+            if (matchFound && matchStart != 0)
+                return AppendTo(source, matchStart, i - matchStart, matches);
+
+            return matches ?? (matchStart != 0 ? Empty<T>() : source);
+        }
+
         /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
         /// It returns source array and does Not create new one if all items match the condition.</summary>
-        /// <typeparam name="T">Type of source items.</typeparam> <typeparam name="R">Type of result items.</typeparam>
-        /// <param name="source">If null, the null will be returned.</param>
-        /// <param name="condition">Condition to keep items.</param> <param name="map">Converter from source to result item.</param>
-        /// <returns>New array of result items.</returns>
         public static R[] Match<T, R>(this T[] source, Func<T, bool> condition, Func<T, R> map)
         {
             if (source == null)
@@ -2004,12 +2022,9 @@ namespace DryIoc.ImTools
 
             if (source.Length == 2)
             {
-                var condition0 = condition(source[0]);
-                var condition1 = condition(source[1]);
-                return condition0 && condition1 ? new[] { map(source[0]), map(source[1]) }
-                    : condition0 ? new[] { map(source[0]) }
-                    : condition1 ? new[] { map(source[1]) }
-                    : Empty<R>();
+                var c0 = condition(source[0]);
+                var c1 = condition(source[1]);
+                return c0 && c1 ? new[] { map(source[0]), map(source[1]) } : c0 ? new[] { map(source[0]) } : c1 ? new[] { map(source[1]) } : Empty<R>();
             }
 
             var matchStart = 0;
@@ -2033,12 +2048,12 @@ namespace DryIoc.ImTools
             return matches ?? (matchStart == 0 ? AppendTo(source, 0, source.Length, map) : Empty<R>());
         }
 
-        /// Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> to minimize the allocations in <paramref name="condition"/> lambda closure 
-        public static R[] Match<T, S, R>(this T[] source, S state, Func<S, T, bool> condition, Func<S, T, R> map)
+        /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
+        /// to minimize the allocations in <paramref name="condition"/> lambda closure </summary>
+        public static R[] Match<S, T, R>(this T[] source, S state, Func<S, T, bool> condition, Func<S, T, R> map)
         {
             if (source == null)
                 return null;
-
             if (source.Length == 0)
                 return Empty<R>();
 
@@ -2077,6 +2092,52 @@ namespace DryIoc.ImTools
                 return AppendTo(source, state, matchStart, i - matchStart, map, matches);
 
             return matches ?? (matchStart == 0 ? AppendTo(source, state, 0, source.Length, map) : Empty<R>());
+        }
+
+        /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
+        /// to minimize the allocations in <paramref name="condition"/> lambda closure </summary>
+        public static R[] Match<A, B, T, R>(this T[] source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map)
+        {
+            if (source == null)
+                return null;
+            if (source.Length == 0)
+                return Empty<R>();
+
+            if (source.Length == 1)
+            {
+                var item = source[0];
+                return condition(a, b, item) ? new[] { map(a, b, item) } : Empty<R>();
+            }
+
+            if (source.Length == 2)
+            {
+                var condition0 = condition(a, b, source[0]);
+                var condition1 = condition(a, b, source[1]);
+                return condition0 && condition1 ? new[] { map(a, b, source[0]), map(a, b, source[1]) }
+                    : condition0 ? new[] { map(a, b, source[0]) }
+                    : condition1 ? new[] { map(a, b, source[1]) }
+                    : Empty<R>();
+            }
+
+            var matchStart = 0;
+            R[] matches = null;
+            var matchFound = false;
+
+            var i = 0;
+            for (; i < source.Length; ++i)
+                if (!(matchFound = condition(a, b, source[i])))
+                {
+                    // for accumulated matched items
+                    if (i != 0 && i > matchStart)
+                        matches = AppendTo(source, a, b, matchStart, i - matchStart, map, matches);
+                    matchStart = i + 1; // guess the next match start will be after the non-matched item
+                }
+
+            // when last match was found but not all items are matched (hence matchStart != 0)
+            if (matchFound && matchStart != 0)
+                return AppendTo(source, a, b, matchStart, i - matchStart, map, matches);
+
+            return matches ?? (matchStart == 0 ? AppendTo(source, a, b, 0, source.Length, map) : Empty<R>());
         }
 
         /// <summary>Maps all items from source to result array.</summary>
@@ -2126,8 +2187,7 @@ namespace DryIoc.ImTools
             return results;
         }
 
-        /// <summary>Maps all items from source to result collection. 
-        /// If possible uses fast array Map otherwise Enumerable.Select.</summary>
+        /// <summary>Maps all items from source to result collection. If possible uses fast array Map otherwise Enumerable.Select.</summary>
         /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>
         /// <param name="source">Source items</param> <param name="map">Function to convert item from source to result.</param>
         /// <returns>Converted items</returns>

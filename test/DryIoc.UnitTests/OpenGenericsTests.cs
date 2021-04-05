@@ -297,7 +297,7 @@ namespace DryIoc.UnitTests
         public void Registering_generic_but_not_closed_implementation_should_Throw()
         {
             var container = new Container();
-            var genericButNotClosedType = typeof(Closed<>).GetBaseType();
+            var genericButNotClosedType = typeof(Closed<>).BaseType;
 
             Assert.Throws<ContainerException>(() =>
                 container.Register(genericButNotClosedType));
@@ -309,7 +309,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             Assert.Throws<ContainerException>(() =>
-                container.Register(typeof(Closed<>).GetBaseType(), typeof(Closed<>)));
+                container.Register(typeof(Closed<>).BaseType, typeof(Closed<>)));
         }
 
         [Test] 

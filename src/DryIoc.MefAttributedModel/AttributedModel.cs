@@ -374,7 +374,7 @@ namespace DryIoc.MefAttributedModel
 
             // Export does not make sense for static or abstract type
             // because the instance of such type can't be created (resolved).
-            if (!type.IsStatic() && !type.IsAbstract())
+            if (!type.IsStatic() && !type.IsAbstract)
             {
                 var typeAttributes = GetAllExportAttributes(type);
                 if (IsExportDefined(typeAttributes, shouldRegisterWithoutExport))
@@ -522,7 +522,7 @@ namespace DryIoc.MefAttributedModel
             };
         }
 
-        private static bool CanBeExported(Type type) => type.IsClass() && !type.IsCompilerGenerated();
+        private static bool CanBeExported(Type type) => type.IsClass && !type.IsCompilerGenerated();
 
         private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute) => 
             new ReuseInfo { ReuseType = attribute.CreationPolicy == CreationPolicy.NonShared ? ReuseType.Transient : ReuseType.Singleton };
@@ -961,12 +961,12 @@ namespace DryIoc.MefAttributedModel
         {
             var attributes = type.GetAttributes();
 
-            for (var baseType = type.GetBaseType();
+            for (var baseType = type.BaseType;
                 baseType != typeof(object) && baseType != null;
-                baseType = baseType.GetBaseType())
+                baseType = baseType.BaseType)
                 attributes = attributes.Append(GetInheritedExportAttributes(baseType));
 
-            var interfaces = type.GetImplementedInterfaces();
+            var interfaces = type.GetInterfaces();
             if (interfaces.Length != 0)
                 for (var i = 0; i < interfaces.Length; i++)
                     attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
@@ -1214,7 +1214,7 @@ namespace DryIoc.MefAttributedModel
                 return code.AppendType((Type)x);
 
             var type = x.GetType();
-            if (type.IsEnum())
+            if (type.IsEnum)
                 return code.AppendEnum(type, x);
 
             if (ifNotRecognized != null)

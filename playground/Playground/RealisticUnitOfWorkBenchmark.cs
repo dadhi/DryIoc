@@ -1153,19 +1153,19 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             //[Benchmark] 
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace_MsDIAdapter() => Measure(PrepareGraceMsDi());
 
-            [Benchmark]
+            // [Benchmark]
             public object Lamar_MsDIAdapter() => Measure(PrepareLamarMsDi());
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac_MsDIAdapter() => Measure(PrepareAutofacMsDi());
         }
 

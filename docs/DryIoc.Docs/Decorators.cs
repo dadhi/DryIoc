@@ -673,7 +673,7 @@ class Reusing_the_scoped_service_from_the_parent_scope
                req =>
                {
                    var wrapperType = req.ServiceType;
-                   var serviceType = wrapperType.GetGenericParamsAndArgs()[0];
+                   var serviceType = wrapperType.GetGenericArguments()[0];
                    var factory = req.Container.ResolveFactory(req.Push(serviceType));
                    return Expression.New(wrapperType.SingleConstructor(), Expression.Constant(factory.FactoryID));
                },

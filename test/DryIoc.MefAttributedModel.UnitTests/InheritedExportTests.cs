@@ -60,7 +60,7 @@ namespace DryIoc.MefAttributedModel.UnitTests
         [Test]
         public void API_TEST_Can_discover_attribute_from_implemented_interface_OR_inherited_class()
         {
-            Assert.IsTrue(typeof(ForExport).GetImplementedInterfaces().Any(type => type.GetAttributes(typeof(InheritedExportAttribute)).Any()));
+            Assert.IsTrue(typeof(ForExport).GetInterfaces().Any(type => type.GetAttributes(typeof(InheritedExportAttribute)).Any()));
             Assert.IsTrue(typeof(ForExportBaseImpl).GetAttributes(typeof(InheritedExportAttribute), true).Any());
         }
     }

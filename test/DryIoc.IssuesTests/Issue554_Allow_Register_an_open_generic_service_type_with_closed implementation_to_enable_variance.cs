@@ -23,7 +23,7 @@ namespace DryIoc.IssuesTests
             var c = new Container();
 
             c.RegisterMany(typeof(FakeRepo).GetAssembly().GetImplementationTypes(
-                t => t.GetImplementedInterfaces().IndexOf(_ => _.GetGenericDefinitionOrNull() == typeof(IQuery<,>)) != -1),
+                t => t.GetInterfaces().IndexOf(_ => _.GetGenericDefinitionOrNull() == typeof(IQuery<,>)) != -1),
                 t => typeof(IQuery<,>).One());
 
             var q = c.Resolve<IQuery<string, object>>(); // resolve reverse type of what implemented by FakeRepo
