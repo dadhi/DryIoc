@@ -61,6 +61,7 @@ namespace DryIoc.FastExpressionCompiler
     using System.Threading;
     using System.Text;
     using System.Runtime.CompilerServices;
+    using System.Diagnostics;
     using static System.Environment;
 
     /// <summary>The options for the compiler</summary>
@@ -518,7 +519,7 @@ namespace DryIoc.FastExpressionCompiler
 
         private struct BlockInfo
         {
-            public object VarExprs;     // ParameterExpression  | IReadOnlyList<PE>
+            public object VarExprs;   // ParameterExpression  | IReadOnlyList<PE>
             public int[]  VarIndexes;
         }
 
@@ -529,6 +530,15 @@ namespace DryIoc.FastExpressionCompiler
             UserProvided         = 1 << 1,
             HasClosure           = 1 << 2,
             ShouldBeStaticMethod = 1 << 3
+        }
+
+        internal enum LabelState : byte { Undefined = 0, Defined = 1, Marked = 2 }
+
+        internal struct LabelInfo 
+        {
+            public LabelTarget Target; // label target is the link between the goto and the label.
+            public Label Label;
+            public LabelState State;
         }
 
         /// Track the info required to build a closure object + some context information not directly related to closure.
@@ -544,8 +554,8 @@ namespace DryIoc.FastExpressionCompiler
             /// Tracks the stack of blocks where are we in emit phase
             private LiveCountArray<BlockInfo> _blockStack;
 
-            /// Dictionary for the used Labels in IL
-            private KeyValuePair<LabelTarget, Label?>[] _labels;
+            /// Map of the links between Labels and Goto's
+            private LiveCountArray<LabelInfo> _labels;
 
             public ClosureStatus Status;
 
@@ -579,7 +589,7 @@ namespace DryIoc.FastExpressionCompiler
                 LastEmitIsAddress = false;
                 CurrentTryCatchFinallyIndex = -1;
                 _tryCatchFinallyInfos = null;
-                _labels = null; // todo: @perf Use LiveCountArray instead
+                _labels     = new LiveCountArray<LabelInfo>(Tools.Empty<LabelInfo>());
                 _blockStack = new LiveCountArray<BlockInfo>(Tools.Empty<BlockInfo>());
             }
 
@@ -654,34 +664,54 @@ namespace DryIoc.FastExpressionCompiler
                 }
             }
 
-            public void AddLabel(LabelTarget labelTarget)
-            {
-                if (labelTarget != null &&
-                    GetLabelIndex(labelTarget) == -1)
-                    _labels = _labels.WithLast(new KeyValuePair<LabelTarget, Label?>(labelTarget, null));
-            }
-
-            public Label GetOrCreateLabel(LabelTarget labelTarget, ILGenerator il) =>
-                GetOrCreateLabel(GetLabelIndex(labelTarget), il);
-
-            public Label GetOrCreateLabel(int index, ILGenerator il)
-            {
-                var labelPair = _labels[index];
-                var label = labelPair.Value;
-                if (!label.HasValue)
-                    _labels[index] = new KeyValuePair<LabelTarget, Label?>(labelPair.Key, label = il.DefineLabel());
-                return label.Value;
-            }
-
             public int GetLabelIndex(LabelTarget labelTarget)
             {
-                if (_labels != null)
-                    for (var i = 0; i < _labels.Length; ++i)
-                        if (_labels[i].Key == labelTarget)
-                            return i;
+                var count = _labels.Count;
+                var items = _labels.Items;
+                for (var i = 0; i < count; ++i)
+                    if (items[i].Target == labelTarget)
+                        return i;
                 return -1;
             }
 
+            public void AddLabel(LabelTarget labelTarget)
+            {
+                if (GetLabelIndex(labelTarget) == -1)
+                {
+                    ref var label = ref _labels.PushSlot();
+                    label.Target = labelTarget;
+                }
+            }
+
+            public ref LabelInfo GetLabel(int index) => ref _labels.Items[index]; 
+
+            public Label GetDefinedLabel(int index, ILGenerator il)
+            {
+                ref var label = ref _labels.Items[index];
+                if (label.State == LabelState.Undefined)
+                {
+                    label.State = LabelState.Defined;
+                    label.Label = il.DefineLabel();
+                }
+                return label.Label;
+            }
+
+            public void TryMarkDefinedLabel(int index, ILGenerator il)
+            {
+                ref var label = ref _labels.Items[index];
+                if (label.State == LabelState.Undefined)
+                {
+                    label.State = LabelState.Marked;
+                    il.MarkLabel(label.Label = il.DefineLabel());
+
+                }
+                else if (label.State == LabelState.Defined)
+                {
+                    label.State = LabelState.Marked;
+                    il.MarkLabel(label.Label);
+                }
+            } 
+                
             public void AddTryCatchFinallyInfo()
             {
                 ++CurrentTryCatchFinallyIndex;
@@ -1362,21 +1392,18 @@ namespace DryIoc.FastExpressionCompiler
 
                     case ExpressionType.Label:
                         var labelExpr = (LabelExpression)expr;
-                        var defaultValueExpr = labelExpr.DefaultValue;
                         closure.AddLabel(labelExpr.Target);
-                        if (defaultValueExpr == null)
+                        if (labelExpr.DefaultValue == null)
                             return true;
-                        expr = defaultValueExpr;
+                        expr = labelExpr.DefaultValue;
                         continue;
 
                     case ExpressionType.Goto:
                         var gotoExpr = (GotoExpression)expr;
                         if (gotoExpr.Kind == GotoExpressionKind.Return)
                             closure.MarkAsContainsReturnGotoExpression();
-
                         if (gotoExpr.Value == null)
                             return true;
-
                         expr = gotoExpr.Value;
                         continue;
 
@@ -1746,7 +1773,7 @@ namespace DryIoc.FastExpressionCompiler
 
                         case ExpressionType.ArrayIndex:
                             var arrIndexExpr = (BinaryExpression)expr;
-                            return TryEmit(arrIndexExpr.Left,  paramExprs, il, ref closure, setup, parent) 
+                            return TryEmit(arrIndexExpr.Left,  paramExprs, il, ref closure, setup, parent | ParentFlags.IndexAccess) 
                                 && TryEmit(arrIndexExpr.Right, paramExprs, il, ref closure, setup, parent | ParentFlags.IndexAccess) // #265
                                 && TryEmitArrayIndex(expr.Type, il, parent, ref closure);
 
@@ -1754,10 +1781,7 @@ namespace DryIoc.FastExpressionCompiler
                             if (!TryEmit(((UnaryExpression)expr).Operand, paramExprs, il, ref closure, setup, parent))
                                 return false;
                             if ((parent & ParentFlags.IgnoreResult) == 0)
-                            {
                                 il.Emit(OpCodes.Ldlen);
-                                il.Emit(OpCodes.Conv_I4);
-                            }
                             return true;
 
                         case ExpressionType.Constant:
@@ -1844,7 +1868,7 @@ namespace DryIoc.FastExpressionCompiler
                         case ExpressionType.PreIncrementAssign:
                         case ExpressionType.PostDecrementAssign:
                         case ExpressionType.PreDecrementAssign:
-                            return TryEmitIncDecAssign((UnaryExpression)expr, paramExprs, il, ref closure, setup, parent);
+                            return TryEmitIncDecAssign((UnaryExpression)expr, expr.NodeType, paramExprs, il, ref closure, setup, parent);
 
                         case ExpressionType.AddAssign: 
                         case ExpressionType.AddAssignChecked:
@@ -1905,15 +1929,28 @@ namespace DryIoc.FastExpressionCompiler
                                         continue;
                                     
                                     // This is basically the return pattern (see #237), so we don't care for the rest of expressions
+                                    // Note (#300) the sentence above is slightly wrong because that may be a goto to this specific label, so we still need to print the label
                                     if (stExpr is GotoExpression gt && gt.Kind == GotoExpressionKind.Return &&
-                                        statementExprs[i + 1] is LabelExpression label && label.Target == gt.Target &&
-                                        gt.Value != null)
+                                        statementExprs[i + 1] is LabelExpression label && label.Target == gt.Target)
                                     {
                                         // we are generating the return value and ensuring here that it is not popped-out
-                                        if (!TryEmit(gt.Value, paramExprs, il, ref closure, setup, parent & ~ParentFlags.IgnoreResult))
+                                        if (gt.Value != null)
+                                        {
+                                            if (!TryEmit(gt.Value, paramExprs, il, ref closure, setup, parent & ~ParentFlags.IgnoreResult))
+                                                return false;
+                                            il.Emit(OpCodes.Ret);
+                                        }
+
+                                        // We still need the label here (#300) if we jump from the other goto here
+                                        closure.TryMarkDefinedLabel(closure.GetLabelIndex(label.Target), il);
+
+                                        // todo: @check do we need to emit the default value if it is `default(T)` or not `null`,
+                                        // because it is likely to be emit by Return (GotoExpression.Value)
+                                        if (label.DefaultValue != null && 
+                                            !TryEmit(label.DefaultValue, paramExprs, il, ref closure, setup, parent & ~ParentFlags.IgnoreResult))
                                             return false;
 
-                                        // todo: @hack (related to #237) if `IgnoreResult` set, that means the external/calling code won't planning on returning and
+                                        // @hack (related to #237) if `IgnoreResult` set, that means the external/calling code won't planning on returning and
                                         // emitting the double `OpCodes.Ret` (usually for not the last statement in block), so we can safely emit our own `Ret` here.
                                         // And vice-versa, if `IgnoreResult` not set then the external code planning to emit `Ret` (the last block statement), 
                                         // so we should avoid it on our side.
@@ -1956,7 +1993,7 @@ namespace DryIoc.FastExpressionCompiler
                             return true;
 
                         case ExpressionType.Index:
-                            return TryEmitIndex((IndexExpression)expr, paramExprs, il, ref closure, setup, parent);
+                            return TryEmitIndex((IndexExpression)expr, paramExprs, il, ref closure, setup, parent | ParentFlags.IndexAccess);
 
                         case ExpressionType.Goto:
                             return TryEmitGoto((GotoExpression)expr, paramExprs, il, ref closure, setup, parent);
@@ -2031,7 +2068,7 @@ namespace DryIoc.FastExpressionCompiler
                 il.MarkLabel(loopBodyLabel);
 
                 if (loopExpr.ContinueLabel != null)
-                    il.MarkLabel(closure.GetOrCreateLabel(loopExpr.ContinueLabel, il));
+                    closure.TryMarkDefinedLabel(closure.GetLabelIndex(loopExpr.ContinueLabel), il);
 
                 if (!TryEmit(loopExpr.Body, paramExprs, il, ref closure, setup, parent))
                     return false;
@@ -2040,7 +2077,7 @@ namespace DryIoc.FastExpressionCompiler
                 il.Emit(OpCodes.Br, loopBodyLabel);
 
                 if (loopExpr.BreakLabel != null)
-                    il.MarkLabel(closure.GetOrCreateLabel(loopExpr.BreakLabel, il));
+                    closure.TryMarkDefinedLabel(closure.GetLabelIndex(loopExpr.BreakLabel), il);
 
                 return true;
             }
@@ -2105,15 +2142,12 @@ namespace DryIoc.FastExpressionCompiler
                 if (index == -1)
                     return false; // should be found in first collecting constants round
 
-                if (closure.IsTryReturnLabel(index))
-                    return true; // label will be emitted by TryEmitTryCatchFinallyBlock
+                if (closure.IsTryReturnLabel(index)) 
+                    return true; // label will be emitted by the TryEmitTryCatchFinallyBlock
 
                 // define a new label or use the label provided by the preceding GoTo expression
-                // todo: @fixme Ensure that for each defined label it is placed once only - there's should not be two `labelFoo:`
-                il.MarkLabel(closure.GetOrCreateLabel(index, il));
+                closure.TryMarkDefinedLabel(index, il);
 
-                // todo: @check do we need to emit the default value if it is `default(T)` or not `null`,
-                // because it is likely to be emit by Return (GotoExpression.Value)
                 return expr.DefaultValue == null || TryEmit(expr.DefaultValue, paramExprs, il, ref closure, setup, parent);
             }
 
@@ -2130,7 +2164,7 @@ namespace DryIoc.FastExpressionCompiler
                 {
                     if ((closure.Status & ClosureStatus.ToBeCollected) == 0)
                         return false; // if no collection cycle then the labels may be not collected
-                    throw new InvalidOperationException("Cannot jump, no labels found");
+                    throw new InvalidOperationException($"Cannot jump, no labels found for the target `{expr.Target}`");
                 }
 
                 if (expr.Value != null &&
@@ -2142,7 +2176,7 @@ namespace DryIoc.FastExpressionCompiler
                     case GotoExpressionKind.Break:
                     case GotoExpressionKind.Continue:
                         // use label defined by Label expression or define its own to use by subsequent Label
-                        il.Emit(OpCodes.Br, closure.GetOrCreateLabel(index, il));
+                        il.Emit(OpCodes.Br, closure.GetDefinedLabel(index, il));
                         return true;
 
                     case GotoExpressionKind.Goto:
@@ -2150,24 +2184,21 @@ namespace DryIoc.FastExpressionCompiler
                             goto case GotoExpressionKind.Return;
 
                         // use label defined by Label expression or define its own to use by subsequent Label
-                        il.Emit(OpCodes.Br, closure.GetOrCreateLabel(index, il));
+                        il.Emit(OpCodes.Br, closure.GetDefinedLabel(index, il));
                         return true;
 
                     case GotoExpressionKind.Return:
 
-                        // check that we are inside the Try-Catch-Finally block
+                        // Can't emit a Return inside a Try/Catch, so leave it to TryEmitTryCatchFinallyBlock
+                        // to emit the Leave instruction, return label and return result
                         if ((parent & ParentFlags.TryCatch) != 0)
-                        {
-                            // Can't emit a Return inside a Try/Catch, so leave it to TryEmitTryCatchFinallyBlock
-                            // to emit the Leave instruction, return label and return result
                             closure.MarkReturnLabelIndex(index);
-                        }
-                        else
+                        else // use label defined by Label expression or define its own to use by subsequent Label
                         {
-                            // use label defined by Label expression or define its own to use by subsequent Label
-                            il.Emit(OpCodes.Ret, closure.GetOrCreateLabel(index, il));
+                            // todo: @unclear in case Goto.Value is null, we may need to check the default value in the target LabelExpression 
+                            // and then do Br to the Label (where the DefaultValue is loaded on stack) instead of just Ret.
+                            il.Emit(OpCodes.Ret); // see #301 (#300) that we will get an invalid program if forget an additional return value on stack
                         }
-
                         return true;
 
                     default:
@@ -2399,7 +2430,7 @@ namespace DryIoc.FastExpressionCompiler
                         else 
                         {
                             if (!isArgByRef && (parent & ParentFlags.Call) != 0 ||
-                                (parent & (ParentFlags.MemberAccess | ParentFlags.Coalesce)) != 0)
+                                (parent & (ParentFlags.MemberAccess | ParentFlags.Coalesce | ParentFlags.IndexAccess)) != 0)
                             il.Emit(OpCodes.Ldind_Ref);
                         }
                     }
@@ -3424,117 +3455,98 @@ namespace DryIoc.FastExpressionCompiler
             }
 
 #if LIGHT_EXPRESSION
-            private static bool TryEmitIncDecAssign(UnaryExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitIncDecAssign(UnaryExpression expr, ExpressionType nodeType, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure, 
                 CompilerFlags setup, ParentFlags parent)
             {
-                var paramExprCount = paramExprs.ParameterCount;
 #else
-            private static bool TryEmitIncDecAssign(UnaryExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitIncDecAssign(UnaryExpression expr, ExpressionType nodeType, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
                 CompilerFlags setup, ParentFlags parent)
             {
-                var paramExprCount = paramExprs.Count;
 #endif
                 var operandExpr = expr.Operand;
-                
-                MemberExpression memberAccess;
-                var useLocalVar = false;
-                int localVarIndex, paramIndex = -1;
+                var resultVar = il.GetNextLocalVarIndex(expr.Type); // todo: @perf here is the opportunity to reuse the variable because is only needed in the local scope 
 
-                var isParameterOrVariable = operandExpr.NodeType == ExpressionType.Parameter;
-                var usesResult = (parent & ParentFlags.IgnoreResult) == 0;
-                if (isParameterOrVariable)
+                if (operandExpr is ParameterExpression p)
                 {
-                    localVarIndex = closure.GetDefinedLocalVarOrDefault((ParameterExpression)operandExpr);
+#if LIGHT_EXPRESSION
+                    var paramExprCount = paramExprs.ParameterCount;
+#else
+                    var paramExprCount = paramExprs.Count;
+#endif
+                    var paramIndex = -1;
+                    var localVarIndex = closure.GetDefinedLocalVarOrDefault(p);
                     if (localVarIndex != -1)
-                    {
                         EmitLoadLocalVariable(il, localVarIndex);
-                        useLocalVar = true;
-                    }
                     else
                     {
                         paramIndex = paramExprCount - 1;
-                        while (paramIndex != -1 && !ReferenceEquals(paramExprs.GetParameter(paramIndex), operandExpr))
+                        while (paramIndex != -1 && !ReferenceEquals(paramExprs.GetParameter(paramIndex), p))
                             --paramIndex;
                         if (paramIndex == -1)
                             return false;
-                        il.Emit(OpCodes.Ldarg, paramIndex + 1);
+                        if ((closure.Status & ClosureStatus.ShouldBeStaticMethod) == 0)
+                            ++paramIndex;
+                        il.Emit(OpCodes.Ldarg, paramIndex);
+                        if (p.IsByRef)
+                            EmitValueTypeDereference(il, p.Type);
                     }
 
-                    memberAccess = null;
+                    if (nodeType == ExpressionType.PostIncrementAssign || nodeType == ExpressionType.PostDecrementAssign)
+                        EmitStoreAndLoadLocalVariable(il, resultVar); // save the non-incremented value for the later further use
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    il.Emit(nodeType == ExpressionType.PostIncrementAssign || nodeType == ExpressionType.PreIncrementAssign ? OpCodes.Add : OpCodes.Sub);
+                    if (nodeType == ExpressionType.PreIncrementAssign || nodeType == ExpressionType.PreDecrementAssign)
+                        EmitStoreAndLoadLocalVariable(il, resultVar); // save the non-incremented value for the later further use
 
+                    if (localVarIndex != -1)
+                        EmitStoreLocalVariable(il, localVarIndex); // store incremented value into the local value;
+                    else if (p.IsByRef)
+                    {
+                        var incrementedVar = il.GetNextLocalVarIndex(expr.Type);
+                        EmitStoreLocalVariable(il, incrementedVar);
+                        EmitLoadArg(il, paramIndex);
+                        EmitLoadLocalVariable(il, incrementedVar);
+                        EmitStoreByRefValueType(il, expr.Type);
+                    }
+                    else
+                        il.Emit(OpCodes.Starg_S, paramIndex);
                 }
-                else if (operandExpr.NodeType == ExpressionType.MemberAccess)
+                else if (operandExpr is MemberExpression m)
                 {
-                    memberAccess = (MemberExpression)operandExpr;
-
-                    if (!TryEmitMemberAccess(memberAccess, paramExprs, il, ref closure, setup, parent | ParentFlags.DupMemberOwner))
+                    if (!TryEmitMemberAccess(m, paramExprs, il, ref closure, setup, parent | ParentFlags.DupMemberOwner))
                         return false;
 
-                    useLocalVar = memberAccess.Expression != null && (usesResult || memberAccess.Member is PropertyInfo);
-                    localVarIndex = useLocalVar ? il.GetNextLocalVarIndex(operandExpr.Type) : -1;
+                    if (nodeType == ExpressionType.PostIncrementAssign || nodeType == ExpressionType.PostDecrementAssign)
+                        EmitStoreAndLoadLocalVariable(il, resultVar); // save the non-incremented value for the later further use
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    il.Emit(nodeType == ExpressionType.PostIncrementAssign || nodeType == ExpressionType.PreIncrementAssign ? OpCodes.Add : OpCodes.Sub);
+                    if (nodeType == ExpressionType.PreIncrementAssign || nodeType == ExpressionType.PreDecrementAssign)
+                        EmitStoreAndLoadLocalVariable(il, resultVar); // save the non-incremented value for the later further use
+
+                    if (!EmitMemberAssign(il, m.Member))
+                        return false;
+                }
+                else if (operandExpr is IndexExpression i)
+                {
+                    if (!TryEmitIndex(i, paramExprs, il, ref closure, setup, parent | ParentFlags.IndexAccess))
+                        return false;
+
+                    if (nodeType == ExpressionType.PostIncrementAssign || nodeType == ExpressionType.PostDecrementAssign)
+                        EmitStoreAndLoadLocalVariable(il, resultVar); // save the non-incremented value for the later further use
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    il.Emit(nodeType == ExpressionType.PostIncrementAssign || nodeType == ExpressionType.PreIncrementAssign ? OpCodes.Add : OpCodes.Sub);
+                    if (nodeType == ExpressionType.PreIncrementAssign || nodeType == ExpressionType.PreDecrementAssign)
+                        EmitStoreAndLoadLocalVariable(il, resultVar); // save the non-incremented value for the later further use
+
+                    if (!TryEmitIndexAssign(i, i.Object?.Type, expr.Type, il))
+                        return false;
                 }
                 else
-                    return false;
+                    return false; // not_supported_expression
 
-                switch (expr.NodeType)
-                {
-                    case ExpressionType.PreIncrementAssign:
-                        il.Emit(OpCodes.Ldc_I4_1);
-                        il.Emit(OpCodes.Add);
-                        StoreIncDecValue(il, usesResult, isParameterOrVariable, localVarIndex);
-                        break;
-
-                    case ExpressionType.PostIncrementAssign:
-                        StoreIncDecValue(il, usesResult, isParameterOrVariable, localVarIndex);
-                        il.Emit(OpCodes.Ldc_I4_1);
-                        il.Emit(OpCodes.Add);
-                        break;
-
-                    case ExpressionType.PreDecrementAssign:
-                        il.Emit(OpCodes.Ldc_I4_1);
-                        il.Emit(OpCodes.Sub);
-                        StoreIncDecValue(il, usesResult, isParameterOrVariable, localVarIndex);
-                        break;
-
-                    case ExpressionType.PostDecrementAssign:
-                        StoreIncDecValue(il, usesResult, isParameterOrVariable, localVarIndex);
-                        il.Emit(OpCodes.Ldc_I4_1);
-                        il.Emit(OpCodes.Sub);
-                        break;
-                }
-
-                if (isParameterOrVariable && paramIndex != -1)
-                    il.Emit(OpCodes.Starg_S, paramIndex + 1);
-                else if (isParameterOrVariable || useLocalVar && !usesResult) 
-                    EmitStoreLocalVariable(il, localVarIndex);
-
-                if (isParameterOrVariable)
-                    return true;
-
-                if (useLocalVar && !usesResult)
-                    EmitLoadLocalVariable(il, localVarIndex);
-
-                if (!EmitMemberAssign(il, memberAccess.Member))
-                    return false;
-
-                if (useLocalVar && usesResult)
-                    EmitLoadLocalVariable(il, localVarIndex);
-
+                if ((parent & ParentFlags.IgnoreResult) == 0)
+                    EmitLoadLocalVariable(il, resultVar); // todo: @perf here is the opportunity to reuse the variable because is only needed in the local scope
                 return true;
-            }
-
-            private static void StoreIncDecValue(ILGenerator il, bool usesResult, bool isVar, int localVarIndex)
-            {
-                if (!usesResult)
-                    return;
-
-                if (isVar || localVarIndex == -1)
-                    il.Emit(OpCodes.Dup);
-                else
-                {
-                    EmitStoreLocalVariable(il, localVarIndex);
-                    EmitLoadLocalVariable(il, localVarIndex);
-                }
             }
 
 #if LIGHT_EXPRESSION
@@ -3645,7 +3657,7 @@ namespace DryIoc.FastExpressionCompiler
                                 il.Emit(OpCodes.Dup); // duplicate value to assign and return
 
                             if (leftParamExpr.IsByRef)
-                                EmitByRefStore(il, leftParamExpr.Type);
+                                EmitStoreByRefValueType(il, leftParamExpr.Type);
                             else
                                 il.Emit(OpCodes.Starg_S, paramIndex);
 
@@ -3806,7 +3818,8 @@ namespace DryIoc.FastExpressionCompiler
                 }
             }
 
-            private static void EmitByRefStore(ILGenerator il, Type type)
+            // todo: @fix check that it is applied only for the ValueType
+            private static void EmitStoreByRefValueType(ILGenerator il, Type type)
             {
                 if (type == typeof(int) || type == typeof(uint))
                     il.Emit(OpCodes.Stind_I4);
@@ -4794,7 +4807,13 @@ namespace DryIoc.FastExpressionCompiler
                 var labelIfFalse = il.DefineLabel();
                 if (testExpr.NodeType == ExpressionType.Equal    && useBrFalseOrTrue == 0 ||
                     testExpr.NodeType == ExpressionType.NotEqual && useBrFalseOrTrue == 1)
+                {
+                    // todo: @perf incomplete:
+                    // try to recognize the pattern like in #301(300) `if (b == null) { goto return_label; }` 
+                    // and instead of generating two branches e.g. Brtrue to else branch and Br or Ret to the end of the body,
+                    // let's generate a single one e.g. Brfalse to return.
                     il.Emit(OpCodes.Brtrue, labelIfFalse);
+                }
                 else
                     il.Emit(OpCodes.Brfalse, labelIfFalse);
 
@@ -4939,7 +4958,7 @@ namespace DryIoc.FastExpressionCompiler
             {
                 if (location == 0)
                     il.Emit(OpCodes.Stloc_0);
-                else if (location == 1) // todo: @perf make this a first branch because often the 0 location is occupied by stored closure array field
+                else if (location == 1)
                     il.Emit(OpCodes.Stloc_1);
                 else if (location == 2)
                     il.Emit(OpCodes.Stloc_2);
@@ -4949,6 +4968,40 @@ namespace DryIoc.FastExpressionCompiler
                     il.Emit(OpCodes.Stloc_S, (byte)location);
                 else
                     il.Emit(OpCodes.Stloc, location);
+            }
+
+            private static void EmitStoreAndLoadLocalVariable(ILGenerator il, int location)
+            {
+                if (location == 0)
+                {
+                    il.Emit(OpCodes.Stloc_0);
+                    il.Emit(OpCodes.Ldloc_0);
+                }
+                else if (location == 1)
+                {
+                    il.Emit(OpCodes.Stloc_1);
+                    il.Emit(OpCodes.Ldloc_1);
+                }
+                else if (location == 2)
+                {
+                    il.Emit(OpCodes.Stloc_2);
+                    il.Emit(OpCodes.Ldloc_2);
+                }
+                else if (location == 3)
+                {
+                    il.Emit(OpCodes.Stloc_3);
+                    il.Emit(OpCodes.Ldloc_3);
+                }
+                else if (location < 256)
+                {
+                    il.Emit(OpCodes.Stloc_S, (byte)location);
+                    il.Emit(OpCodes.Ldloc_S, (byte)location);
+                }
+                else
+                {
+                    il.Emit(OpCodes.Stloc, location);
+                    il.Emit(OpCodes.Ldloc, location);
+                }
             }
 
             private static int EmitStoreLocalVariableAndLoadItsAddress(ILGenerator il, Type type)
@@ -4986,6 +5039,20 @@ namespace DryIoc.FastExpressionCompiler
                 }
 
                 return varIndex;
+            }
+
+            private static void EmitLoadArg(ILGenerator il, int paramIndex)
+            {
+                if (paramIndex == 0)
+                    il.Emit(OpCodes.Ldarg_0);
+                else if (paramIndex == 1)
+                    il.Emit(OpCodes.Ldarg_1);
+                else if (paramIndex == 2)
+                    il.Emit(OpCodes.Ldarg_2);
+                else if (paramIndex == 3)
+                    il.Emit(OpCodes.Ldarg_3);
+                else
+                    il.Emit(OpCodes.Ldarg_S, (byte)paramIndex);
             }
         }
     }
@@ -5127,21 +5194,6 @@ namespace DryIoc.FastExpressionCompiler
         }
 
         public static T[] Empty<T>() => EmptyArray<T>.Value;
-
-        public static T[] WithLast<T>(this T[] source, T value)
-        {
-            if (source == null || source.Length == 0)
-                return new[] { value };
-            if (source.Length == 1)
-                return new[] { source[0], value };
-            if (source.Length == 2)
-                return new[] { source[0], source[1], value };
-            var sourceLength = source.Length;
-            var result = new T[sourceLength + 1];
-            Array.Copy(source, 0, result, 0, sourceLength);
-            result[sourceLength] = value;
-            return result;
-        }
 
         public static Type[] GetParamTypes(IReadOnlyList<PE> paramExprs)
         {
@@ -5702,7 +5754,7 @@ namespace DryIoc.FastExpressionCompiler
                 case ExpressionType.Lambda:
                 {
                     var x = (LambdaExpression)e;
-                    sb.Append("Lambda( // $"); // bookmark for the lambdas - $ means the cost of the lambda, specifically nested lambda
+                    sb.Append("Lambda( //$"); // bookmark for the lambdas - $ means the cost of the lambda, specifically nested lambda
                     sb.NewLineIdent(lineIdent).AppendTypeof(x.Type, stripNamespace, printType).Append(',');
                     sb.NewLineIdentExpr(x.Body, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces).Append(',');
                     sb.NewLineIdentArgumentExprs(x.Parameters, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces);
@@ -5850,9 +5902,9 @@ namespace DryIoc.FastExpressionCompiler
                     var x = (BinaryExpression)e;
                     sb.Append("Coalesce(");
                     sb.NewLineIdentExpr(x.Left,  paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces).Append(',');
-                    sb.NewLineIdentExpr(x.Right, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces).Append(',');
+                    sb.NewLineIdentExpr(x.Right, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces);
                     if (x.Conversion != null)
-                        sb.NewLineIdentExpr(x.Conversion, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces);
+                        sb.Append(',').NewLineIdentExpr(x.Conversion, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces);
                     return sb.Append(')');
                 }
                 case ExpressionType.ListInit:
@@ -6073,9 +6125,9 @@ namespace DryIoc.FastExpressionCompiler
                     var x = (LambdaExpression)e;
                     // The result should be something like this (taken from the #237)
                     //
-                    // `(DeserializerDlg<Word>)(ref ReadOnlySequence<Byte> input, Word value, out Int64 bytesRead) => {...})`
+                    // `(DeserializerDlg<Word>)((ref ReadOnlySequence<Byte> input, Word value, out Int64 bytesRead) => {...})`
                     // 
-                    sb.Append('(').Append(e.Type.ToCode(stripNamespace, printType)).Append(")(");
+                    sb.Append('(').Append(e.Type.ToCode(stripNamespace, printType)).Append(")((");
                     var count = x.Parameters.Count;
                     if (count > 0)
                     {
@@ -6113,7 +6165,7 @@ namespace DryIoc.FastExpressionCompiler
 
                         sb.NewLine(lineIdent, identSpaces).Append("})");
                     }
-                    return sb;
+                    return sb.Append(')');
                 }
                 case ExpressionType.Invoke:
                 {
@@ -6212,7 +6264,7 @@ namespace DryIoc.FastExpressionCompiler
                     var x = (TryExpression)e;
                     sb.Append("try");
                     sb.NewLine(lineIdent, identSpaces).Append('{');
-                    sb.NewLineIdentCs(x.Body, lineIdent, stripNamespace, printType, identSpaces);
+                    sb.NewLineIdentCs(x.Body, lineIdent, stripNamespace, printType, identSpaces).AddSemicolonIfFits();
                     sb.NewLine(lineIdent, identSpaces).Append('}');
 
                     var handlers = x.Handlers;
@@ -6236,7 +6288,7 @@ namespace DryIoc.FastExpressionCompiler
                                 sb.NewLine(lineIdent, identSpaces).Append(')');
                             }
                             sb.NewLine(lineIdent, identSpaces).Append('{');
-                            sb.NewLineIdentCs(h.Body, lineIdent, stripNamespace, printType, identSpaces);
+                            sb.NewLineIdentCs(h.Body, lineIdent, stripNamespace, printType, identSpaces).AddSemicolonIfFits();
                             sb.NewLine(lineIdent, identSpaces).Append('}');
                         }
                     }
@@ -6474,6 +6526,14 @@ namespace DryIoc.FastExpressionCompiler
             }
         }
 
+        private static StringBuilder AddSemicolonIfFits(this StringBuilder sb)
+        {
+            var lastChar = sb[sb.Length - 1];
+            if (lastChar != ';' && lastChar != '}')
+                return sb.Append(";");
+            return sb;
+        }
+
         private static string GetCSharpName(this MemberInfo m)
         {
             var name = m.Name;
@@ -6492,9 +6552,8 @@ namespace DryIoc.FastExpressionCompiler
 
         private const string NotSupportedExpression = "// NOT_SUPPORTED_EXPRESSION: ";
 
-        internal static  StringBuilder ToCSharpString(this LabelTarget lt, StringBuilder sb) =>
-            (lt.Name != null ? sb.Append(lt.Name) : sb.Append(lt.Type.ToCode(true, null)))
-                .Append("__").Append(lt.GetHashCode()); // append the hash because often the label names in the block and sub-blocks are selected to be the same
+        internal static  StringBuilder ToCSharpString(this LabelTarget target, StringBuilder sb) =>
+            sb.AppendName(target.Name, target.Type, target);
 
         private static StringBuilder ToCSharpString(this IReadOnlyList<MemberBinding> bindings, StringBuilder sb,
             int lineIdent = 0, bool stripNamespace = false, Func<Type, string, string> printType = null, int identSpaces = 4) 
@@ -6564,16 +6623,22 @@ namespace DryIoc.FastExpressionCompiler
                 var expr = exprs[i];
 
                 // this is basically the return pattern (see #237) so we don't care for the rest of the expressions
+                // Note (#300) the sentence above is slightly wrong because that may be a goto to this specific label, so we still need to print the label
                 if (expr is GotoExpression gt && gt.Kind == GotoExpressionKind.Return &&
                     exprs[i + 1] is LabelExpression label && label.Target == gt.Target)
                 {
                     sb.NewLineIdent(lineIdent);
                     if (gt.Value == null)
-                        return b.Type == typeof(void) ? sb : sb.Append("return;");
+                        sb.Append("return;");
+                    else 
+                        gt.Value.ToCSharpString(sb.Append("return "), lineIdent, stripNamespace, printType, identSpaces).Append(";");
 
-                    sb.Append("return ");
-                    return gt.Value.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces)
-                        .Append(";");
+                    sb.NewLineIdent(lineIdent);
+                    label.Target.ToCSharpString(sb).Append(':');
+                    if (label.DefaultValue == null) 
+                        return sb.AppendLine(); // no return because we may have other expressions after label
+                    sb.NewLineIdent(lineIdent);
+                    return label.DefaultValue.ToCSharpString(sb.Append("return "), lineIdent, stripNamespace, printType, identSpaces).Append(";");
                 }
 
                 if (expr is BlockExpression bl)
