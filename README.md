@@ -28,12 +28,11 @@ DryIoc is fast, small, full-featured IoC Container for .NET
     - __DryIoc__ (source code) [![NuGet Badge](https://buildstats.info/nuget/DryIoc)](https://www.nuget.org/packages/DryIoc)
     - __DryIoc.Internal__ (source code with public types made internal) [![NuGet Badge](https://buildstats.info/nuget/DryIoc.Internal)](https://www.nuget.org/packages/DryIoc.Internal)
 
-- [Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.7.4) :: [Previous Versions](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/VersionHistory.md)
+- [Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.7.5) :: [Previous Versions](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/VersionHistory.md)
 - [Extensions and Companions](Extensions.md)
 - [Documentation][WikiHome]
 - [Contribution guide](CONTRIBUTING.md)
-- Check the old issues on [BitBucket](https://bitbucket.org/dadhi/dryioc)
-- Two original parts of DryIoc are now separate projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)
+- Two original parts of the DryIoc are now the separate projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)
 
 ## Benchmarks
 
@@ -173,8 +172,8 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
 * Service lifetime control via *Reuse* and lifetime scoping:
     * Nested disposable scopes with optional names 
     * Optional ambient scope context
-    * Reuse types: `Transient`, `Singleton`, `Scoped` in multiple flavors (including scoping to the specific service ancestor in the object graph)
-    * Option to `useParentReuse` and to `useDecorateeReuse` for decorators
+    * Reuse types: `Transient`, `Singleton`, `Scoped` in multiple flavors including the scoping to the specific service ancestor in the object graph
+    * Option to `useParentReuse` and to `useDecorateeReuse` (for decorators)
     * Option to `preventDisposal` and `weaklyReferenced`
 * Open-generics support including type constraints, variance, complex nesting and recurring definitions.
 * Constructor parameters injection and optional property and field injection.
@@ -184,7 +183,7 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
     * Nested with the relative order control
     * Generic and non-generic
     * With the Reuse possibly different from the decorated service
-    * Decorators of wrapped service
+    * Decorators of the Wrappers
 * [Wrappers](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Wrappers.md):
     * Service collections: `T[]`, `IEnumerable<T>`, `LazyEnumerable<T>`, and  `I(ReadOnly)Collection|List<T>`
     * Single service wrappers: `Lazy<T>`, `Func<T>`, `Meta<TMetadata, T>` or `Tuple<TMetadata, T>`, `KeyValuePair<TKey, T>`

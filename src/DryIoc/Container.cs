@@ -832,7 +832,7 @@ namespace DryIoc
             str = request.Container
                 .GetAllServiceFactories(request.ServiceType, bothClosedAndOpenGenerics: true)
                 .Aggregate(str, (s, x) => s
-                    .Append(x.Value.Reuse?.CanApply(request) ?? true ? "  " : "  without matching scope ")
+                    .Append((x.Value.Reuse?.CanApply(request) ?? true) ? "  " : "  without matching scope ")
                     .Print(x));
 
             if (str.Length != 0)
@@ -923,7 +923,8 @@ namespace DryIoc
 
             var factories = entry == null ? null
                 : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
-                : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value));
+                : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value))
+			           .Match(x => x.Value != null); // filter out the Unregistered factories (see #390)
  
             if (!factories.IsNullOrEmpty()) // check for the additional (not the fallback) factories, because we have the standard factories
             {
@@ -1208,8 +1209,9 @@ namespace DryIoc
         private static IEnumerable<KV<object, Factory>> GetRegistryEntryKeyFactoryPairs(object entry) =>
             entry == null
                 ? Empty<KV<object, Factory>>()
-                : entry is Factory ? new[] { new KV<object, Factory>(DefaultKey.Value, (Factory)entry) }
-                : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value));
+                : entry is Factory f ? new[] { new KV<object, Factory>(DefaultKey.Value, f) }
+                : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value))
+				       .Match(x => x.Value != null); // filter out the Unregistered factories
 
         internal static Factory[] MergeSortedByLatestOrderOrRegistration(Factory[] source, params Factory[] added)
         {
@@ -2412,7 +2414,7 @@ namespace DryIoc
                         }
 
                         // todo: @perf huh - no perf here?
-                        removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(f => f.Value).ToArray();
+                        removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(x => x.Value).ToArray();
 
                         if (remainingFactories is ImHashMapEntry<object, Factory> e && DefaultKey.Value.Equals(e.Key))
                             return e.Value; // replace entry with single remaining default factory
@@ -2430,19 +2432,23 @@ namespace DryIoc
 
                 var registry = WithServices(services);
 
-                var removedFactory = removed as Factory;
-                if (removedFactory != null)
-                    registry.DropFactoryCache(removedFactory, hash, serviceType, serviceKey);
+                if (removed is Factory f)
+                    registry.DropFactoryCache(f, hash, serviceType, serviceKey);
+                else if (removed is Factory[] fs)
+                    foreach (var rf in fs)
+                        registry.DropFactoryCache(rf, hash, serviceType, serviceKey);
                 else
-                    (removed as Factory[] ??
-                     ((FactoriesEntry)removed).Factories.Enumerate().Select(f => f.Value).ToArray())
-                        .ForEach(x => registry.DropFactoryCache(x, hash, serviceType, serviceKey));
+                    foreach (var e in ((FactoriesEntry)removed).Factories.Enumerate())
+                        registry.DropFactoryCache(e.Value, hash, serviceType, serviceKey);
 
                 return registry;
             }
 
             internal void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null)
             {
+                if (factory == null)
+                    return; // filter out Unregistered factory (see #390)
+
                 if (DefaultFactoryCache != null || KeyedFactoryCache != null)
                 {
                     if (factory.FactoryGenerator == null)
@@ -4908,7 +4914,7 @@ namespace DryIoc
 
         /// <summary>Sets <see cref="FactorySelector"/></summary>
         public Rules WithFactorySelector(FactorySelectorRule rule) =>
-            new Rules(_settings | (rule == SelectLastRegisteredFactory ? Settings.SelectLastRegisteredFactory : default(Settings)),
+            new Rules(rule == SelectLastRegisteredFactory ? (_settings | Settings.SelectLastRegisteredFactory) : (_settings & ~Settings.SelectLastRegisteredFactory),
                 rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -5537,7 +5543,7 @@ namespace DryIoc
         }
 
         private Rules Clone(bool cloneMade) =>
-            new Rules(_settings, FactorySelector, DefaultReuse, cloneMade ? _made.Copy() : _made, 
+            new Rules(_settings, FactorySelector, DefaultReuse, cloneMade ? _made.Clone() : _made, 
                 DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter, DynamicRegistrationProviders, 
                 _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -5554,6 +5560,7 @@ namespace DryIoc
         [Flags]
         private enum Settings
         {
+            Empty = 0,
             ThrowIfDependencyHasShorterReuseLifespan = 1 << 1,
             ThrowOnRegisteringDisposableTransient = 1 << 2,
             TrackingDisposableTransients = 1 << 3,
@@ -6211,7 +6218,7 @@ namespace DryIoc
             _details = details;
         }
 
-        internal Made Copy() =>
+        internal Made Clone() =>
             new Made(FactoryMethod, Parameters, PropertiesAndFields, FactoryMethodKnownResultType, _details);
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,

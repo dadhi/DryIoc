@@ -1,4 +1,3 @@
-**Not updated yet for V4**
 
 # Unregister and Resolution Cache
 

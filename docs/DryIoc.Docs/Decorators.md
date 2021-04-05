@@ -49,9 +49,9 @@ aka __Initializer__.
 ## General use-case
 
 We start by defining the `IHandler` which we will decorate adding the logging capabilities:
+<details><summary><strong>usings ...</strong></summary>
 
-```cs 
-<details><summary><strong>usings...</strong></summary>
+```cs
 
 using System;
 using System.Collections.Generic;

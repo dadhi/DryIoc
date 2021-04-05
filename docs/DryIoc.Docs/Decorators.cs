@@ -50,9 +50,10 @@ aka __Initializer__.
 ## General use-case
 
 We start by defining the `IHandler` which we will decorate adding the logging capabilities:
+md*/
+//md{ usings ...
+//md```cs
 
-```cs md*/
-//md{ usings...
 using System;
 using System.Collections.Generic;
 using System.Linq;

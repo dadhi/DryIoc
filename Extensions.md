@@ -41,7 +41,7 @@
 
 ## Companions in this repository
 
-Companion packages do not depend on DryIoc package.
+Companion packages different from the Extensions because they do not depend on the DryIoc package.
 
 ### DryIocAttributes
 
