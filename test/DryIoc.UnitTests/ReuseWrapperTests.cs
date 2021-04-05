@@ -65,7 +65,7 @@ namespace DryIoc.UnitTests
             Assert.That(serviceWeakRef.IsAlive, Is.False);
         }
 
-        [Test]
+        [Explicit]
         public void Can_store_as_WeakReference_in_current_scope()
         {
             var container = new Container();
