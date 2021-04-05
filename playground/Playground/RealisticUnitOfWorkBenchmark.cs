@@ -1126,7 +1126,8 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |             Autofac |    609.34 us |   8.014 us |   6.692 us |   6.09 |    0.15 |  50.7813 | 25.3906 | 1.9531 | 315.88 KB |
 | Autofac_MsDIAdapter |    599.20 us |   6.511 us |   5.771 us |   5.99 |    0.15 |  54.6875 | 27.3438 | 1.9531 | 339.42 KB |
 
-#V5 + FECv3 + ImToolsv3
+
+## V5 + FECv3 + ImToolsv3
 
 |              Method |        Mean |     Error |    StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
 |-------------------- |------------:|----------:|----------:|-------:|--------:|---------:|--------:|-------:|----------:|
@@ -1138,6 +1139,29 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |   Lamar_MsDIAdapter | 12,497.3 us | 249.21 us | 686.38 us |  87.91 |    4.85 |        - |       - |      - | 707.34 KB |
 |             Autofac |    923.6 us |  12.14 us |  11.35 us |   6.68 |    0.16 |  50.7813 | 25.3906 | 1.9531 | 315.93 KB |
 | Autofac_MsDIAdapter |    891.9 us |  14.95 us |  13.98 us |   6.45 |    0.17 |  54.6875 | 27.3438 | 2.9297 | 339.43 KB |
+
+
+|             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|               MsDI |  95.89 us | 2.040 us | 3.519 us |  1.00 |    0.00 | 11.4746 | 2.9297 |     - |  70.54 KB |
+|             DryIoc |  93.34 us | 1.187 us | 1.110 us |  0.95 |    0.04 | 10.0098 | 0.8545 |     - |  61.83 KB |
+| DryIoc_MsDIAdapter | 119.50 us | 2.363 us | 3.883 us |  1.25 |    0.06 | 13.1836 | 1.2207 |     - |  80.83 KB |
+
+## Optimizing LastSelectedFactory rule
+
+|             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|               MsDI |  96.35 us | 1.894 us | 3.216 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.53 KB |
+|             DryIoc |  93.41 us | 0.872 us | 0.816 us |  0.98 |    0.04 | 10.0098 | 0.8545 |     - |  61.83 KB |
+| DryIoc_MsDIAdapter | 109.70 us | 0.623 us | 0.486 us |  1.16 |    0.05 | 12.8174 | 1.2207 |     - |  78.79 KB |
+
+## Optimizing NewExpression with up to 7 arguments
+
+|             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|               MsDI |  97.32 us | 1.849 us | 2.055 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.54 KB |
+|             DryIoc |  94.23 us | 0.352 us | 0.329 us |  0.97 |    0.02 | 10.0098 | 0.8545 |     - |  61.71 KB |
+| DryIoc_MsDIAdapter | 113.64 us | 0.919 us | 0.859 us |  1.17 |    0.03 | 12.8174 | 1.2207 |     - |  78.58 KB |
 
 */
             [Benchmark(Baseline = true)]

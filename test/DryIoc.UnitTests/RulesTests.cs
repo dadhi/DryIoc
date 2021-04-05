@@ -229,7 +229,9 @@ namespace DryIoc.UnitTests
         public void You_can_specify_rules_to_disable_registration_based_on_reuse_type()
         {
             var container = new Container(Rules.Default.WithFactorySelector(
-                (request, factories) => factories.FirstOrDefault(f => f.Key.Equals(request.ServiceKey) && !(f.Value.Reuse is SingletonReuse)).Value));
+                (request, f, factories) => 
+                    f != null ? (request.ServiceKey == null && !(f.Reuse is SingletonReuse) ? f : null)
+                    : factories.FirstOrDefault(x => x.Key.Equals(request.ServiceKey) && !(x.Value.Reuse is SingletonReuse)).Value));
 
             container.Register<IService, Service>(Reuse.Singleton);
             var service = container.Resolve(typeof(IService), IfUnresolved.ReturnDefault);

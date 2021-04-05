@@ -5,7 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "TestRunner .NET Core",
+            "name": "Playground Benchmarks",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build_benchmark",
+            "program": "${workspaceFolder}/playground/Playground/bin/Debug/netcoreapp3.1/Playground.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/playground/Playground",
+            "stopAtEntry": false,
+            "console": "internalConsole"
+        },
+        {
+            "name": "TestRunner",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build_testrunner",

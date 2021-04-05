@@ -1029,13 +1029,12 @@ namespace DryIoc
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             KV<object, Factory>[] factories;
-            if (entry is Factory singleDefaultFactory)
+            if (entry is Factory singleDefaultFactory) // todo: @perf optimize for the SelectLastRegisteredFactory
             {
-                if (!Rules.HasDynamicRegistrationProvider(
-                    DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
-                    return request.MatchFactoryConditionAndMetadata(singleDefaultFactory)
-                        ? Rules.FactorySelector(request, DefaultKey.Value.Pair<object, Factory>(singleDefaultFactory).One())
-                        : null;
+                if (!Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
+                    return !request.MatchFactoryConditionAndMetadata(singleDefaultFactory) ? null
+                        : Rules.IsSelectLastRegisteredFactory ? singleDefaultFactory 
+                        : Rules.FactorySelector(request, singleDefaultFactory, null);
 
                 factories = new[] {new KV<object, Factory>(DefaultKey.Value, singleDefaultFactory)};
             }
@@ -1104,20 +1103,20 @@ namespace DryIoc
             // optimize for the case with the single factory
             if (factories.Length == 1)
                 return request.MatchFactoryConditionAndMetadata(factories[0])
-                    ? Rules.FactorySelector(request, factories[0].Key.Pair(factories[0].Value).One())
+                    ? Rules.FactorySelector(request, factories[0].Value, null)
                     : null;
 
             // Sort in registration order
             if (factories.Length > 1)
                 Array.Sort(factories, _lastFactoryIDWinsComparer);
 
-            var matchedFactories = factories.Match(request.MatchFactoryConditionAndMetadata);
+            var matchedFactories = factories.Match(x => request.MatchFactoryConditionAndMetadata(x));
 
             if (matchedFactories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
             {
                 // Check for the matching scopes. Only for more than one factory, 
                 // for the single factory the check will be down the road (BBIssue #175)
-                matchedFactories = matchedFactories.Match(request.MatchFactoryReuse);
+                matchedFactories = matchedFactories.Match(x => request.MatchFactoryReuse(x));
                 // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition (BBIssue #382)
                 if (matchedFactories.Length == 1 && !request.IsResolutionCall)
                     matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
@@ -1131,7 +1130,9 @@ namespace DryIoc
             if (matchedFactories.Length == 0)
                 return null;
 
-            var selectedFactory = Rules.FactorySelector(request, matchedFactories.Map(x => x.Key.Pair(x.Value)));
+            var selectedFactory = matchedFactories.Length == 1
+                ? Rules.FactorySelector(request, matchedFactories[0].Value, null) 
+                : Rules.FactorySelector(request, null, matchedFactories);
             if (selectedFactory == null)
                 return null;
 
@@ -1211,7 +1212,7 @@ namespace DryIoc
                 ? Empty<KV<object, Factory>>()
                 : entry is Factory f ? new[] { new KV<object, Factory>(DefaultKey.Value, f) }
                 : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value))
-				       .Match(x => x.Value != null); // filter out the Unregistered factories
+                       .Match(x => x.Value != null); // filter out the Unregistered factories
 
         internal static Factory[] MergeSortedByLatestOrderOrRegistration(Factory[] source, params Factory[] added)
         {
@@ -4789,7 +4790,7 @@ namespace DryIoc
         private static Rules WithMicrosoftDependencyInjectionRules(Rules rules)
         {
             rules = rules.Clone(cloneMade: true);
-            rules._settings |= Settings.TrackingDisposableTransients;
+            rules._settings |= Settings.TrackingDisposableTransients | Settings.SelectLastRegisteredFactory;
             rules._settings &= ~Settings.ThrowOnRegisteringDisposableTransient;
             rules._settings &= ~Settings.VariantGenericTypesInResolvedCollection;
             rules._factorySelector = SelectLastRegisteredFactory;
@@ -4901,11 +4902,10 @@ namespace DryIoc
                     DependencyResolutionCallExprs, ItemToExpressionConverter,
                     DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, serviceKey);
 
-        /// <summary>Defines single factory selector delegate.</summary>
-        /// <param name="request">Provides service request leading to factory selection.</param>
-        /// <param name="factories">Registered factories with corresponding key to select from.</param>
-        /// <returns>Single selected factory, or null if unable to select.</returns>
-        public delegate Factory FactorySelectorRule(Request request, KeyValuePair<object, Factory>[] factories);
+        /// <summary>Defines single factory selector delegate. 
+        /// The only one of the passed parameters `singleDefaultFactory` or `orManyDefaultAndKeyedFactories` is not `null`</summary>
+        /// <returns>Single selected factory or null if unable to select.</returns>
+        public delegate Factory FactorySelectorRule(Request request, Factory singleDefaultFactory, KV<object, Factory>[] orManyDefaultAndKeyedFactories);
 
         /// <summary>Rules to select single matched factory default and keyed registered factory/factories.
         /// Selectors applied in specified array order, until first returns not null <see cref="Factory"/>.
@@ -4921,40 +4921,50 @@ namespace DryIoc
 
         /// <summary>Select last registered factory from the multiple default.</summary>
         public static FactorySelectorRule SelectLastRegisteredFactory() => SelectLastRegisteredFactory;
-        private static Factory SelectLastRegisteredFactory(Request request, KeyValuePair<object, Factory>[] factories)
+        private static Factory SelectLastRegisteredFactory(Request request, Factory singleDefaultFactory, KV<object, Factory>[] orManyDefaultAndKeyedFactories)
         {
             var serviceKey = request.ServiceKey;
-            for (var i = factories.Length - 1; i >= 0; --i)
+            if (singleDefaultFactory != null)
+                return serviceKey == null ? singleDefaultFactory : null;
+
+            for (var i = orManyDefaultAndKeyedFactories.Length - 1; i >= 0; --i)
             {
-                var factory = factories[i];
+                var factory = orManyDefaultAndKeyedFactories[i];
                 if (factory.Key.Equals(serviceKey))
                     return factory.Value;
             }
             return null;
         }
 
+        /// <summary>A commonly used rule, the flag is for optimization</summary>
+        public bool IsSelectLastRegisteredFactory => (_settings & Settings.SelectLastRegisteredFactory) != 0;
+
         /// <summary>Tries to select a single factory based on the minimal reuse life-span ignoring the Transients</summary>
-        public static FactorySelectorRule SelectFactoryWithTheMinReuseLifespan() => SelectFactoryWithTheMinReuseLifespan;
+        public static FactorySelectorRule SelectFactoryWithTheMinReuseLifespan() => SelectLastRegisteredFactory;
 
         /// <summary>Tries either SelectFactoryWithTheMinReuseLifespan or SelectLastRegisteredFactory</summary>
-        public static FactorySelectorRule SelectFactoryWithTheMinReuseLifespanOrLastRegistered() => (request, factories) =>
-            SelectFactoryWithTheMinReuseLifespan(request, factories) ?? 
-            SelectLastRegisteredFactory(request, factories);
+        public static FactorySelectorRule SelectFactoryWithTheMinReuseLifespanOrLastRegistered() => (request, factory, factories) =>
+            SelectFactoryWithTheMinReuseLifespan(request, factory, factories) ?? 
+            SelectLastRegisteredFactory(request, factory, factories);
 
         /// <summary>Prefer specified service key (if found) over default key.
         /// Help to override default registrations in Open Scope scenarios:
         /// I may register service with key and resolve it as default in current scope.</summary>
         public static FactorySelectorRule SelectKeyedOverDefaultFactory(object serviceKey) =>
-            (r, fs) => fs.FindFirst(serviceKey, (key, f) => f.Key.Equals(key)).Value ??
-                       fs.FindFirst(f => f.Key.Equals(null)).Value;
+            (r, f, fs) => f ??
+                          fs.FindFirst(serviceKey, (key, f) => f.Key.Equals(key)).Value ??
+                          fs.FindFirst(f => f.Key.Equals(null)).Value;
 
-        private static Factory SelectFactoryWithTheMinReuseLifespan(Request request, KeyValuePair<object, Factory>[] factories)
+        private static Factory SelectFactoryWithTheMinReuseLifespan(Request request, Factory singleDefaultFactory, KV<object, Factory>[] orManyDefaultAndKeyedFactories)
         {
+            if (singleDefaultFactory != null)
+                return singleDefaultFactory;
+
             var minLifespan       = int.MaxValue;
             var multipleFactories = false;
             Factory minLifespanFactory = null;
 
-            foreach (var factory in factories)
+            foreach (var factory in orManyDefaultAndKeyedFactories)
             {
                 var reuse = factory.Value.Reuse;
                 var lifespan = reuse == null || reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
@@ -8061,12 +8071,14 @@ private ParameterServiceInfo(ParameterInfo p)
     {
         public static bool MatchFactoryConditionAndMetadata(this Request request, Factory factory)
         {
-            if (!factory.CheckCondition(request))
+            var setup = factory.Setup;
+            if (setup.Condition != null && !setup.Condition(request))
                 return false;
 
-            var metadataKey = request.MetadataKey;
-            var metadata = request.Metadata;
-            return (metadataKey == null && metadata == null) || factory.Setup.MatchesMetadata(metadataKey, metadata);
+            var details     = request._serviceInfo.Details;
+            var metadataKey = details.MetadataKey;
+            var metadata    = details.Metadata;
+            return metadataKey == null && metadata == null || setup.MatchesMetadata(metadataKey, metadata);
         }
 
         public static bool MatchFactoryConditionAndMetadata(this Request r, KV<object, Factory> f) => 
@@ -8207,7 +8219,7 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Persisted request conditions</summary>
         public RequestFlags Flags;
 
-        // todo: should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
+        // todo: @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
         /// mutable, so that the ServiceKey or IfUnresolved can be changed in place.
         internal IServiceInfo _serviceInfo;
 
@@ -8833,7 +8845,7 @@ private ParameterServiceInfo(ParameterInfo p)
             DependencyDepth = dependencyDepth;
             DependencyCount = dependencyCount;
             RequestStack = stack;
-            _serviceInfo = serviceInfo;
+            _serviceInfo = serviceInfo; // todo: @perf consider to unpack the serviceInfo and save the Details and ServiceType separately
             _actualServiceType = serviceInfo.GetActualServiceType();
             Flags = flags;
 
@@ -8891,12 +8903,9 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             if (metadataKey == null)
                 return Equals(metadata, Metadata);
-
-            object metaValue;
-            var metaDict = Metadata as IDictionary<string, object>;
-            return metaDict != null
-                && metaDict.TryGetValue(metadataKey, out metaValue)
-                && Equals(metadata, metaValue);
+            return Metadata is IDictionary<string, object> metaDict
+                && metaDict.TryGetValue(metadataKey, out var metaValue)
+                && Equals(metaValue, metadata);
         }
 
         /// <summary>Indicates that injected expression should be:
@@ -9326,7 +9335,11 @@ private ParameterServiceInfo(ParameterInfo p)
         }
 
         /// <summary>Checks that condition is met for request or there is no condition setup.</summary>
-        public bool CheckCondition(Request request) => (Setup.Condition == null || Setup.Condition(request));
+        public bool CheckCondition(Request request)
+        {
+            var condition = Setup.Condition;
+            return condition == null || condition(request);
+        }
 
         /// <summary>Shortcut for <see cref="DryIoc.Setup.FactoryType"/>.</summary>
         public FactoryType FactoryType => Setup.FactoryType;
@@ -10081,7 +10094,7 @@ private ParameterServiceInfo(ParameterInfo p)
             }
 
             Expression a0 = null, a1 = null, a2 = null, a3 = null, a4 = null, a5 = null, a6 = null;
-            var paramExprs = parameters.Length > 5 ? new Expression[parameters.Length] : null;
+            var paramExprs = parameters.Length > 7 ? new Expression[parameters.Length] : null;
             var paramSelector = rules.TryGetParameterSelector(Made)(request);
 
             var inputArgs = request.InputArgExprs;
@@ -10096,20 +10109,16 @@ private ParameterServiceInfo(ParameterInfo p)
                     {
                         if (paramExprs != null)
                             paramExprs[i] = inputArgExpr;
-                        else if (i == 0)
-                            a0 = inputArgExpr;
-                        else if (i == 1)
-                            a1 = inputArgExpr;
-                        else if (i == 2)
-                            a2 = inputArgExpr;
-                        else if (i == 3)
-                            a3 = inputArgExpr;
-                        else if (i == 4)
-                            a4 = inputArgExpr;
-                        else if (i == 5)
-                            a5 = inputArgExpr;
-                        else
-                            a6 = inputArgExpr;
+                        else switch (i)
+                        {
+                            case 0: a0 = inputArgExpr; break;
+                            case 1: a1 = inputArgExpr; break;
+                            case 2: a2 = inputArgExpr; break;
+                            case 3: a3 = inputArgExpr; break;
+                            case 4: a4 = inputArgExpr; break;
+                            case 5: a5 = inputArgExpr; break;
+                            case 6: a6 = inputArgExpr; break;
+                        }
                         continue;
                     }
                 }
@@ -10122,20 +10131,16 @@ private ParameterServiceInfo(ParameterInfo p)
                 {
                     if (paramExprs != null)
                         paramExprs[i] = usedOrCustomValExpr;
-                    else if (i == 0)
-                        a0 = usedOrCustomValExpr;
-                    else if (i == 1)
-                        a1 = usedOrCustomValExpr;
-                    else if (i == 2)
-                        a2 = usedOrCustomValExpr;
-                    else if (i == 3)
-                        a3 = usedOrCustomValExpr;
-                    else if (i == 4)
-                        a4 = usedOrCustomValExpr;
-                    else if (i == 5)
-                        a5 = usedOrCustomValExpr;
-                    else
-                        a6 = usedOrCustomValExpr;
+                    else switch (i)
+                    {
+                        case 0: a0 = usedOrCustomValExpr; break;
+                        case 1: a1 = usedOrCustomValExpr; break;
+                        case 2: a2 = usedOrCustomValExpr; break;
+                        case 3: a3 = usedOrCustomValExpr; break;
+                        case 4: a4 = usedOrCustomValExpr; break;
+                        case 5: a5 = usedOrCustomValExpr; break;
+                        case 6: a6 = usedOrCustomValExpr; break;
+                    }
                     continue;
                 }
 
@@ -10157,20 +10162,16 @@ private ParameterServiceInfo(ParameterInfo p)
 
                 if (paramExprs != null)
                     paramExprs[i] = injectedExpr;
-                else if (i == 0)
-                    a0 = injectedExpr;
-                else if (i == 1)
-                    a1 = injectedExpr;
-                else if (i == 2)
-                    a2 = injectedExpr;
-                else if (i == 3)
-                    a3 = injectedExpr;
-                else if (i == 4)
-                    a4 = injectedExpr;
-                else if (i == 5)
-                    a5 = injectedExpr;
-                else
-                    a6 = injectedExpr;
+                else switch (i)
+                {
+                    case 0: a0 = injectedExpr; break;
+                    case 1: a1 = injectedExpr; break;
+                    case 2: a2 = injectedExpr; break;
+                    case 3: a3 = injectedExpr; break;
+                    case 4: a4 = injectedExpr; break;
+                    case 5: a5 = injectedExpr; break;
+                    case 6: a6 = injectedExpr; break;
+                }
             }
 
             if (rules.UsedForValidation) 
@@ -12041,7 +12042,7 @@ private ParameterServiceInfo(ParameterInfo p)
         /// both closed and open-generic registrations.</param>
         /// <returns>Enumerable of found pairs.</returns>
         /// <remarks>Returned Key item should not be null - it should be <see cref="DefaultKey.Value"/>.</remarks>
-        KV<object, Factory>[] GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics = false);
+        KV<object, Factory>[] GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics = false); // todo: @perf replace KV with ImHashMapEntry to avoid conversion cost
 
         /// <summary>Searches for registered wrapper factory and returns it, or null if not found.</summary>
         /// <param name="serviceType">Service type to look for.</param> <returns>Found wrapper factory or null.</returns>
