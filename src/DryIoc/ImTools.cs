@@ -1907,7 +1907,7 @@ namespace DryIoc.ImTools
             {
                 var c0 = condition(source[0]);
                 var c1 = condition(source[1]);
-                return c0 && c1 ? new[] { source[0], source[1] } : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
+                return c0 && c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
             }
 
             var matchStart = 0;
@@ -1915,7 +1915,7 @@ namespace DryIoc.ImTools
             var matchFound = false;
             var i = 0;
             for (; i < source.Length; ++i)
-                if (!(matchFound = condition(source[i])))
+                if (!(matchFound = condition(source[i]))) // todo: @unclear check what will happen if the `matchFound` is set back to false
                 {
                     // for accumulated matched items
                     if (i != 0 && i > matchStart)
@@ -1944,7 +1944,7 @@ namespace DryIoc.ImTools
             {
                 var c0 = condition(state, source[0]);
                 var c1 = condition(state, source[1]);
-                return c0 && c1 ? new[] { source[0], source[1] } : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
+                return c0 && c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
             }
 
             var matchStart = 0;
@@ -1981,7 +1981,7 @@ namespace DryIoc.ImTools
             {
                 var c0 = condition(a, b, source[0]);
                 var c1 = condition(a, b, source[1]);
-                return c0 && c1 ? new[] { source[0], source[1] } : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
+                return c0 && c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
             }
 
             var matchStart = 0;
