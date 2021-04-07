@@ -845,9 +845,11 @@ namespace DryIoc
 
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
         {
+            var details = request._serviceInfo.Details;
+            var serviceKey          = details.ServiceKey;
+            var requiredServiceType = details.RequiredServiceType;
+
             Type serviceType;
-            var serviceKey = request.ServiceKey;
-            var requiredServiceType = request.RequiredServiceType;
             if (requiredServiceType != null && requiredServiceType.IsOpenGeneric())
                 serviceType = requiredServiceType;
             else
@@ -5000,7 +5002,7 @@ namespace DryIoc
         public bool HasDynamicRegistrationProvider(DynamicRegistrationFlags withFlags, 
             DynamicRegistrationFlags withoutFlags = DynamicRegistrationFlags.NoFlags)
         {
-            var allFlags   = _dynamicRegistrationFlags;
+            var allFlags = _dynamicRegistrationFlags;
             if (allFlags == null || allFlags.Length == 0)
                 return false;
 
@@ -12042,7 +12044,7 @@ private ParameterServiceInfo(ParameterInfo p)
         /// both closed and open-generic registrations.</param>
         /// <returns>Enumerable of found pairs.</returns>
         /// <remarks>Returned Key item should not be null - it should be <see cref="DefaultKey.Value"/>.</remarks>
-        KV<object, Factory>[] GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics = false); // todo: @perf replace KV with ImHashMapEntry to avoid conversion cost
+        KV<object, Factory>[] GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics = false); // todo: @perf try replace KV with ImHashMapEntry to avoid conversion cost
 
         /// <summary>Searches for registered wrapper factory and returns it, or null if not found.</summary>
         /// <param name="serviceType">Service type to look for.</param> <returns>Found wrapper factory or null.</returns>
