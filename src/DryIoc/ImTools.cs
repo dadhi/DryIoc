@@ -1597,34 +1597,42 @@ namespace DryIoc.ImTools
         public static IList<T> ToListOrSelf<T>(this IEnumerable<T> source) =>
             source == null ? Empty<T>() : source as IList<T> ?? source.ToList();
 
-        /// <summary>
-        /// Array copy
-        /// </summary>
+        /// <summary>Array copy</summary>
         public static T[] Copy<T>(this T[] items)
         {
-            if (items == null)
-                return null;
-            var copy = new T[items.Length];
-            for (var i = 0; i < copy.Length; i++)
-                copy[i] = items[i];
+            if (items == null || items.Length == 0)
+                return items;
+            var count = items.Length;
+            var copy = new T[count];
+            if (count < 6)
+                for (var i = 0; i < count; ++i)
+                    copy[i] = items[i];
+            else
+                Array.Copy(items, copy, count);
             return copy;
         }
 
-        /// <summary>Returns new array consisting from all items from source array then all items from added array.
-        /// If source is null or empty, then added array will be returned. If added is null or empty, then source will be returned.</summary>
+        /// <summary>Returns the new array consisting from all items from source array then the all items from added array.
+        /// If source is null or empty then the added array will be returned. If added is null or empty then the source will be returned.</summary>
         public static T[] Append<T>(this T[] source, params T[] added)
         {
             if (added == null || added.Length == 0)
                 return source;
             if (source == null || source.Length == 0)
                 return added;
-
-            var result = new T[source.Length + added.Length];
-            Array.Copy(source, 0, result, 0, source.Length);
-            if (added.Length == 1)
-                result[source.Length] = added[0];
+            var sourceCount = source.Length;
+            var addedCount  = added.Length;
+            var result = new T[sourceCount + addedCount];
+            if (sourceCount < 6)
+                for (var i = 0; i < sourceCount; ++i)
+                    result[i] = source[i];
             else
-                Array.Copy(added, 0, result, source.Length, added.Length);
+                Array.Copy(source, 0, result, 0, sourceCount);
+            if (addedCount < 6)
+                for (var i = 0; i < addedCount; ++i)
+                    result[sourceCount + i] = added[i];
+            else
+                Array.Copy(added, 0, result, sourceCount, addedCount);
             return result;
         }
 
@@ -1639,11 +1647,59 @@ namespace DryIoc.ImTools
         {
             if (source == null || source.Length == 0)
                 return new[] { value };
-            var sourceLength = source.Length;
-            index = index < 0 ? sourceLength : index;
-            var result = new T[index < sourceLength ? sourceLength : sourceLength + 1];
-            Array.Copy(source, result, sourceLength);
+            var sourceCount = source.Length;
+            index = index < 0 ? sourceCount : index;
+            var result = new T[index < sourceCount ? sourceCount : sourceCount + 1];
+            Array.Copy(source, result, sourceCount);
             result[index] = value;
+            return result;
+        }
+
+        /// <summary>Returns the new array consisting from all items from source array then the all items from added array.
+        /// Assumes that both arrays are non-empty to avoid the checks.</summary>
+        public static T[] AppendNonEmpty<T>(this T[] source, params T[] added)
+        {
+            var sourceCount = source.Length;
+            var addedCount  = added.Length;
+            var result = new T[sourceCount + addedCount];
+            if (sourceCount < 6)
+                for (var i = 0; i < sourceCount; ++i)
+                    result[i] = source[i];
+            else
+                Array.Copy(source, 0, result, 0, sourceCount);
+            if (addedCount < 6)
+                for (var i = 0; i < addedCount; ++i)
+                    result[sourceCount + i] = added[i];
+            else
+                Array.Copy(added, 0, result, sourceCount, addedCount);
+            return result;
+        }
+
+        /// <summary>Returns new array with <paramref name="value"/> appended. Assumes that `source` is not empty to avoid the checks.</summary>
+        public static T[] AppendToNonEmpty<T>(this T[] source, T value)
+        {
+            var count = source.Length;
+            var result = new T[count + 1];
+            if (count < 6)
+                for (var i = 0; i < count; ++i)
+                    result[i] = source[i];
+            else
+                Array.Copy(source, 0, result, 0, count);
+            result[count] = value;
+            return result;
+        }
+
+        /// <summary>Returns new array with <paramref name="value"/> prepended. Assumes that `source` is not empty to avoid the checks.</summary>
+        public static T[] PrependToNonEmpty<T>(this T[] source, T value)
+        {
+            var count = source.Length;
+            var result = new T[count + 1];
+            if (count < 6)
+                for (var i = 0; i < count; ++i)
+                    result[i + 1] = source[i];
+            else
+                Array.Copy(source, 0, result, 1, count);
+            result[0] = value;
             return result;
         }
 
@@ -5731,6 +5787,11 @@ namespace DryIoc.ImTools
             map == ImHashMap<K, V>.Empty ? ArrayTools.Empty<S>() : 
                 map.ForEach(St.Rent(new S[map.Count()], selector), (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
 
+        /// <summary>Converts map to an array with the minimum allocations</summary>
+        public static ImHashMapEntry<K, V>[] ToArray<K, V>(this ImHashMap<K, V> map) =>
+            map == ImHashMap<K, V>.Empty ? ArrayTools.Empty<ImHashMapEntry<K, V>>() : 
+                map.ForEach(new ImHashMapEntry<K, V>[map.Count()], (e, i, a) => a[i] = e);
+
         /// <summary>Converts the map to the dictionary</summary>
         public static Dictionary<K, V> ToDictionary<K, V>(this ImHashMap<K, V> map) =>
             map == ImHashMap<K, V>.Empty ? new Dictionary<K, V>(0) :
@@ -6700,6 +6761,10 @@ namespace DryIoc.ImTools
             map == ImMap<V>.Empty ? ArrayTools.Empty<S>() :
                 map.ForEach(St.Rent(new S[map.Count()], selector), (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
 
+        /// <summary>Converts the map to an array with the minimum allocations</summary>
+        public static ImMapEntry<V>[] ToArray<K, V>(this ImMap<V> map) =>
+            map == ImMap<V>.Empty ? ArrayTools.Empty<ImMapEntry<V>>() : map.ForEach(new ImMapEntry<V>[map.Count()], (e, i, a) => a[i] = e);
+
         /// <summary>Converts the map to the dictionary</summary>
         public static Dictionary<int, V> ToDictionary<V>(this ImMap<V> map) =>
             map == ImMap<V>.Empty ? new Dictionary<int, V>(0) :
@@ -6872,21 +6937,20 @@ namespace DryIoc.ImTools
             return p != null ? p.GetValueOrDefault(hash, key) : default(V);
         }
 
+        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals` for equality,
+        ///  returns found value or the default value if not found</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, int partHashMask = PARTITION_HASH_MASK) where K : class
+        {
+            var p = parts[hash & partHashMask];
+            return p != null ? p.GetValueOrDefaultByReferenceEquals(hash, key) : default(V);
+        }
+
         /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.Equals` for equality, 
         /// returns the default `V` if hash, key are not found.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static V GetValueOrDefault<K, V>(this ImHashMap<K, V>[] parts, K key, int partHashMask = PARTITION_HASH_MASK) =>
             parts.GetValueOrDefault(key.GetHashCode(), key, partHashMask);
-
-        /// <summary>Lookup for the value by the key using the hash and checking the key with the `object.ReferenceEquals` for equality, 
-        /// returns the default `V` if hash, key are not found.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, 
-            int partHashMask = PARTITION_HASH_MASK) where K : class
-        {
-            var p = parts[hash & partHashMask];
-            return p != null ? p.GetValueOrDefaultByReferenceEquals(hash, key) : default(V);
-        }
 
         /// <summary>Lookup for the value by the key using the hash code and checking the key with the `object.Equals` for equality,
         /// returns the `true` and the found value or the `false`</summary>
@@ -6922,14 +6986,12 @@ namespace DryIoc.ImTools
         /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.ReferenceEquals` for equality, 
         /// returns the default `V` if hash, key are not found.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, K key, 
-            int partHashMask = PARTITION_HASH_MASK) where K : class => 
+        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, K key, int partHashMask = PARTITION_HASH_MASK) where K : class => 
             parts.GetValueOrDefaultByReferenceEquals(key.GetHashCode(), key, partHashMask);
 
         /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, 
-            int partHashMask = PARTITION_HASH_MASK)
+        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, int partHashMask = PARTITION_HASH_MASK)
         {
             ref var part = ref parts[hash & partHashMask];
             var p = part;
@@ -6939,8 +7001,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
         [MethodImpl((MethodImplOptions) 256)]
-        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, K key, V value, 
-            int partHashMask = PARTITION_HASH_MASK) =>
+        public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, K key, V value, int partHashMask = PARTITION_HASH_MASK) =>
             parts.AddOrUpdate(key.GetHashCode(), key, value, partHashMask);
 
         private static void RefAddOrUpdatePart<K, V>(ref ImHashMap<K, V> part, int hash, K key, V value) =>
