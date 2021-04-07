@@ -4429,7 +4429,7 @@ namespace DryIoc
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType).Map(requiredItemType, 
-                    (it, x) => new ServiceRegistrationInfo(x.Value, it, new OpenGenericTypeKey(requiredItemType.GetGenericDefinitionOrNull(), x.Key)));
+                    (rt, x) => new ServiceRegistrationInfo(x.Value, rt, new OpenGenericTypeKey(rt.GetGenericDefinitionOrNull(), x.Key)));
                 items = items.Append(openGenericItems);
             }
 
@@ -4465,7 +4465,7 @@ namespace DryIoc
             var metadataKey = request.MetadataKey;
             var metadata = request.Metadata;
             if (metadataKey != null || metadata != null)
-                items = items.Match(metadataKey.Pair(metadata), (m, x) => x.Factory.Setup.MatchesMetadata(m.Key, m.Value));
+                items = items.Match(metadataKey, metadata, (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
 
             var itemExprs = Empty<Expression>();
             if (!items.IsNullOrEmpty())
