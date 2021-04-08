@@ -334,7 +334,7 @@ namespace DryIoc
             if (ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var usedInstance))
                 return usedInstance;
 
-            // todo: @perf should we add `serviceTypeHash` to Request?
+            // todo: @perf Should we in the first place create the request here, or later in CreateExpression because it may be faster for the root service without dependency or with the delegate factory? 
             var request = Request.Create(this, serviceType, ifUnresolved: ifUnresolved);
             var factory = ((IContainer)this).ResolveFactory(request); // HACK: may mutate request, but it should be safe
 
@@ -347,7 +347,7 @@ namespace DryIoc
             if (factory == null)
                 return null;
 
-            var rules = Rules;
+            var rules = Rules; // todo: @perf inline
             FactoryDelegate factoryDelegate;
 
             if (!rules.UseInterpretationForTheFirstResolution)
@@ -613,7 +613,7 @@ namespace DryIoc
                 items = items.Match(parent.FactoryID, (id, x) => x.Factory.FactoryID != id);
                 if (openGenericItems != null)
                     openGenericItems = openGenericItems.Match(parent.FactoryID, 
-                        (id, x) => x.Factory.FactoryGenerator?.GeneratedFactories.ToArray(x => x).FindFirst(id, (i, f) => f.Value.FactoryID == id) == null);
+                        (id, x) => x.Factory.FactoryGenerator?.GeneratedFactories.ToArray().FindFirst(id, (i, f) => f.Value.FactoryID == id) == null);
                 if (variantGenericItems != null)
                     variantGenericItems = variantGenericItems.Match(parent.FactoryID, (id, x) => x.Factory.FactoryID != id);
             }
@@ -868,7 +868,7 @@ namespace DryIoc
             }
 
             if (Rules.FactorySelector != null && serviceKey == null)
-                return GetRuleSelectedServiceFactoryOrDefault(request, serviceType);
+                return GetRuleSelectedServiceFactoryOrDefault(request, details, serviceType);
 
             var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
@@ -890,7 +890,7 @@ namespace DryIoc
                         {
                             if ((serviceKey == null || serviceKey == DefaultKey.Value) && 
                                 serviceType.IsAssignableVariantGenericTypeFrom(e.Key) &&
-                                request.MatchFactoryConditionAndMetadata(f))
+                                request.MatchFactoryConditionAndMetadata(details, f))
                             {
                                 entry = f;
                                 break;
@@ -901,7 +901,7 @@ namespace DryIoc
                             foreach (var kf in ((FactoriesEntry)e.Value).Factories.Enumerate())
                                 if (kf.Key.Equals(serviceKey) && 
                                     serviceType.IsAssignableVariantGenericTypeFrom(e.Key) &&
-                                    request.MatchFactoryConditionAndMetadata(kf.Value))
+                                    request.MatchFactoryConditionAndMetadata(details, kf.Value))
                                 {
                                     entry = kf.Value;
                                     break;
@@ -912,21 +912,22 @@ namespace DryIoc
             }
 
             // Most common case when we have a single default factory and no dynamic rules to always apply
-            if (entry is Factory singleDefaultFactory && !Rules.HasDynamicRegistrationProvider(
-                DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)) 
+            if (entry is Factory defaultFactory &&
+                (Rules.DynamicRegistrationProviders == null ||
+                !Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))) 
             {
-                if (serviceKey != null && serviceKey != DefaultKey.Value || 
-                    !singleDefaultFactory.CheckCondition(request) ||
-                    (request.MetadataKey != null || request.Metadata != null) && 
-                    !singleDefaultFactory.Setup.MatchesMetadata(request.MetadataKey, request.Metadata))
+                var setup = defaultFactory.Setup;
+                if (serviceKey != null && serviceKey != DefaultKey.Value ||
+                    setup.Condition != null && !setup.Condition(request) ||
+                    (details.MetadataKey != null || details.Metadata != null) && !setup.MatchesMetadata(details.MetadataKey, details.Metadata))
                     return null;
-                return singleDefaultFactory;
+                return defaultFactory;
             }
 
             var factories = entry == null ? null
                 : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
                 : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value))
-			           .Match(x => x.Value != null); // filter out the Unregistered factories (see #390)
+                       .Match(x => x.Value != null); // filter out the Unregistered factories (see #390)
  
             if (!factories.IsNullOrEmpty()) // check for the additional (not the fallback) factories, because we have the standard factories
             {
@@ -1025,20 +1026,24 @@ namespace DryIoc
             return null;
         }
 
-        private Factory GetRuleSelectedServiceFactoryOrDefault(Request request, Type serviceType)
+        private Factory GetRuleSelectedServiceFactoryOrDefault(Request request, ServiceDetails details, Type serviceType)
         {
             var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             KV<object, Factory>[] factories;
-            if (entry is Factory singleDefaultFactory) // todo: @perf optimize for the SelectLastRegisteredFactory
+            if (entry is Factory defaultFactory) // todo: @perf optimize for the SelectLastRegisteredFactory
             {
-                if (!Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
-                    return !request.MatchFactoryConditionAndMetadata(singleDefaultFactory) ? null
-                        : Rules.IsSelectLastRegisteredFactory ? singleDefaultFactory 
-                        : Rules.FactorySelector(request, singleDefaultFactory, null);
+                var setup = defaultFactory.Setup;
+                if (Rules.DynamicRegistrationProviders == null ||
+                   !Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
+                    return setup.Condition != null && !setup.Condition(request) 
+                        || (details.MetadataKey != null || details.Metadata != null) && !setup.MatchesMetadata(details.MetadataKey, details.Metadata)
+                        ? null
+                        : Rules.IsSelectLastRegisteredFactory ? defaultFactory 
+                        : Rules.FactorySelector(request, defaultFactory, null);
 
-                factories = new[] {new KV<object, Factory>(DefaultKey.Value, singleDefaultFactory)};
+                factories = new[] {new KV<object, Factory>(DefaultKey.Value, defaultFactory)};
             }
             else if (entry is FactoriesEntry e)
             {
@@ -1062,7 +1067,7 @@ namespace DryIoc
                             if (sf.Value is Factory f)
                             {
                                 if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Key) &&
-                                    request.MatchFactoryConditionAndMetadata(f))
+                                    request.MatchFactoryConditionAndMetadata(details, f))
                                 {
                                     factories = KV.Of<object, Factory>(DefaultKey.Value, f).One();
                                     break;
@@ -1072,7 +1077,7 @@ namespace DryIoc
                             {
                                 foreach (var kf in ((FactoriesEntry)sf.Value).Factories.Enumerate())
                                     if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Key) &&
-                                        request.MatchFactoryConditionAndMetadata(kf.Value))
+                                        request.MatchFactoryConditionAndMetadata(details, kf.Value))
                                     {
                                         factories = KV.Of(kf.Key, kf.Value).One();
                                         break;
@@ -1563,7 +1568,7 @@ namespace DryIoc
             KV<object, Factory>[] registeredFactories, bool bothClosedAndOpenGenerics, FactoryType factoryType, Type serviceType, object serviceKey = null)
         {
             var dynamicServices = Rules.DynamicRegistrationProviders;
-            var dynamicFlags    = Rules._dynamicRegistrationFlags;
+            var dynamicFlags    = Rules.DynamicRegistrationFlags;
             var resultFactories = registeredFactories;
 
             // Assign unique continuous keys across all of dynamic providers,
@@ -1666,7 +1671,7 @@ namespace DryIoc
                 (first?.Value.FactoryID ?? 0) - (next?.Value.FactoryID ?? 0);
         }
 
-        private Factory GetWrapperFactoryOrDefault(Request request)
+        private Factory GetWrapperFactoryOrDefault(Request request) // todo: @perf the candidate for inlining and simplification
         {
             // wrapper ignores the service key, and propagate the service key to wrapped service
             var serviceType = request.GetActualServiceType();
@@ -4838,7 +4843,7 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, dependencyCount < 1 ? 1 : dependencyCount,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Disables the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/> limitation.</summary>
         public Rules WithoutDependencyCountInLambdaToSplitBigObjectGraph() =>
@@ -4891,7 +4896,7 @@ namespace DryIoc
                         made.PropertiesAndFields ?? _made.PropertiesAndFields),
                 DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Service key to be used instead on `null` in registration.</summary>
         public object DefaultRegistrationServiceKey { get; }
@@ -4902,7 +4907,7 @@ namespace DryIoc
                 new Rules(_settings, FactorySelector, DefaultReuse,
                     _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                     DependencyResolutionCallExprs, ItemToExpressionConverter,
-                    DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, serviceKey);
+                    DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, serviceKey);
 
         /// <summary>Defines single factory selector delegate. 
         /// The only one of the passed parameters `singleDefaultFactory` or `orManyDefaultAndKeyedFactories` is not `null`</summary>
@@ -4919,7 +4924,7 @@ namespace DryIoc
             new Rules(rule == SelectLastRegisteredFactory ? (_settings | Settings.SelectLastRegisteredFactory) : (_settings & ~Settings.SelectLastRegisteredFactory),
                 rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Select last registered factory from the multiple default.</summary>
         public static FactorySelectorRule SelectLastRegisteredFactory() => SelectLastRegisteredFactory;
@@ -4993,16 +4998,16 @@ namespace DryIoc
         /// <summary>Providers for resolving multiple not-registered services. Null by default.</summary>
         public DynamicRegistrationProvider[] DynamicRegistrationProviders { get; private set; }
 
-        /// <summary>The flags per dynamic registration provider</summary>
-        public DynamicRegistrationFlags[] _dynamicRegistrationFlags { get; private set; }
-        private static DynamicRegistrationFlags _defaultDynamicRegistrationFlags = 
-            DynamicRegistrationFlags.Service | DynamicRegistrationFlags.Decorator;
+        /// <summary>The flags per dynamic registration provider, match the respective `DynamicRegistrationProviders`</summary>
+        public DynamicRegistrationFlags[] DynamicRegistrationFlags { get; private set; }
+        private static DynamicRegistrationFlags _defaultDynamicRegistrationFlags =
+            DryIoc.DynamicRegistrationFlags.Service | DryIoc.DynamicRegistrationFlags.Decorator;
 
         /// <summary>Get the specific providers with the specified flags and without the flags or return `null` if nothing found</summary>
         public bool HasDynamicRegistrationProvider(DynamicRegistrationFlags withFlags, 
-            DynamicRegistrationFlags withoutFlags = DynamicRegistrationFlags.NoFlags)
+            DynamicRegistrationFlags withoutFlags = DryIoc.DynamicRegistrationFlags.NoFlags)
         {
-            var allFlags = _dynamicRegistrationFlags;
+            var allFlags = DynamicRegistrationFlags;
             if (allFlags == null || allFlags.Length == 0)
                 return false;
 
@@ -5019,7 +5024,7 @@ namespace DryIoc
             var newRules = Clone(cloneMade: false);
             newRules._settings |= Settings.UseDynamicRegistrationsAsFallbackOnly;
             newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(provider);
-            newRules._dynamicRegistrationFlags = _dynamicRegistrationFlags.Append(flags);
+            newRules.DynamicRegistrationFlags = DynamicRegistrationFlags.Append(flags);
             return newRules;
         }
 
@@ -5030,7 +5035,7 @@ namespace DryIoc
         /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
         /// The rules applied only when no normal registrations found!</summary>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
-            WithDynamicRegistrations(_defaultDynamicRegistrationFlags | DynamicRegistrationFlags.AsFallback, rules);
+            WithDynamicRegistrations(_defaultDynamicRegistrationFlags | DryIoc.DynamicRegistrationFlags.AsFallback, rules);
 
         /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
         /// The rules applied only when no normal registrations found!</summary>
@@ -5039,22 +5044,22 @@ namespace DryIoc
             var newRules = Clone(cloneMade: false);
             newRules._settings |= Settings.UseDynamicRegistrationsAsFallbackOnly;
             newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(rules);
-            newRules._dynamicRegistrationFlags = WithDynamicRegistrationProviderFlags(rules?.Length ?? 0, flags);
+            newRules.DynamicRegistrationFlags = WithDynamicRegistrationProviderFlags(rules?.Length ?? 0, flags);
             return newRules;
         }
 
         private DynamicRegistrationFlags[] WithDynamicRegistrationProviderFlags(int count, DynamicRegistrationFlags flags)
         {
             if (count == 0)
-                return _dynamicRegistrationFlags;
+                return DynamicRegistrationFlags;
 
             if (count == 1)
-                return _dynamicRegistrationFlags.Append(flags);
+                return DynamicRegistrationFlags.Append(flags);
 
             var newFlags = new DynamicRegistrationFlags[count];
             for (var i = 0; i < newFlags.Length; i++)
                 newFlags[i] = flags;
-            return _dynamicRegistrationFlags.Append(newFlags);
+            return DynamicRegistrationFlags.Append(newFlags);
         }
 
         // todo: @obsolete
@@ -5073,7 +5078,7 @@ namespace DryIoc
         public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
-                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, DynamicRegistrationFlags, 
                 UnknownServiceResolvers.Append(rules), DefaultRegistrationServiceKey);
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
@@ -5082,7 +5087,7 @@ namespace DryIoc
         public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
-                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, DynamicRegistrationFlags, 
                 UnknownServiceResolvers.Remove(rule), DefaultRegistrationServiceKey);
 
         /// <summary>Sugar on top of <see cref="WithUnknownServiceResolvers"/> to simplify setting the diagnostic action.
@@ -5159,7 +5164,7 @@ namespace DryIoc
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
             new Rules(_settings | Settings.AutoConcreteTypeResolution, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
-                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags,
+                ItemToExpressionConverter, DynamicRegistrationProviders, DynamicRegistrationFlags,
                 UnknownServiceResolvers.Append(AutoResolveConcreteTypeRule(condition)), DefaultRegistrationServiceKey);
 
         /// <summary>Creates dynamic fallback registrations for the requested service type
@@ -5244,7 +5249,7 @@ namespace DryIoc
             reuse == DefaultReuse ? this : 
             new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
-                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags,
+                ItemToExpressionConverter, DynamicRegistrationProviders, DynamicRegistrationFlags,
                 UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Given item object and its type should return item "pure" expression presentation,
@@ -5262,7 +5267,7 @@ namespace DryIoc
         public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault) =>
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, 
-                itemToExpressionOrDefault, DynamicRegistrationProviders, _dynamicRegistrationFlags,
+                itemToExpressionOrDefault, DynamicRegistrationProviders, DynamicRegistrationFlags,
                 UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithoutThrowIfDependencyHasShorterReuseLifespan"/>.</summary>
@@ -5344,7 +5349,7 @@ namespace DryIoc
             new Rules(GetSettingsForExpressionGeneration(allowRuntimeState), FactorySelector, DefaultReuse,
                 _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty), ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary>Indicates that rules are used for the validation, e.g. the rules created in `Validate` method</summary>
         public bool UsedForValidation => (_settings & Settings.UsedForValidation) != 0;
@@ -5359,7 +5364,7 @@ namespace DryIoc
         public Rules ForValidate() =>
             new Rules(GetSettingsForValidation(), 
                 FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, int.MaxValue, null, 
-                ItemToExpressionConverter, DynamicRegistrationProviders, _dynamicRegistrationFlags, 
+                ItemToExpressionConverter, DynamicRegistrationProviders, DynamicRegistrationFlags, 
                 UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="ImplicitCheckForReuseMatchingScope"/></summary>
@@ -5415,7 +5420,7 @@ namespace DryIoc
             rule == DefaultIfAlreadyRegistered ? this :
             new Rules(_settings, FactorySelector, DefaultReuse,
                 _made, rule, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
         public bool ThrowIfRuntimeStateRequired =>
@@ -5549,7 +5554,7 @@ namespace DryIoc
             DependencyResolutionCallExprs = dependencyResolutionCallExprs;
             ItemToExpressionConverter = itemToExpressionConverter;
             DynamicRegistrationProviders = dynamicRegistrationProviders;
-            _dynamicRegistrationFlags = dynamicRegistrationProvidersFlags;
+            DynamicRegistrationFlags = dynamicRegistrationProvidersFlags;
             UnknownServiceResolvers = unknownServiceResolvers;
             DefaultRegistrationServiceKey = defaultRegistrationServiceKey;
         }
@@ -5558,7 +5563,7 @@ namespace DryIoc
             new Rules(_settings, FactorySelector, DefaultReuse, cloneMade ? _made.Clone() : _made, 
                 DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter, DynamicRegistrationProviders, 
-                _dynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+                DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
 
         private Rules WithSettings(Settings newSettings)
         {
@@ -5689,7 +5694,7 @@ namespace DryIoc
         /// <returns>Constructor or null if not found.</returns>
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) => request =>
         {
-            var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+            var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request); // todo: @perf replace ThrowIfNull with Throw.It
 
             var flags = BindingFlags.Public | BindingFlags.Instance;
             if (includeNonPublic)
@@ -5700,7 +5705,7 @@ namespace DryIoc
 
             var firstCtor = ctors[0];
             if (ctors.Length == 1)
-                return new FactoryMethod(firstCtor);
+                return new FactoryMethod(firstCtor); // todo: @perf do we need to wrap a single constructor in the FactoryMethod
 
             var secondCtor = ctors[1];
 
@@ -8071,20 +8076,23 @@ private ParameterServiceInfo(ParameterInfo p)
     /// Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations
     internal static class RequestTools
     {
-        public static bool MatchFactoryConditionAndMetadata(this Request request, Factory factory)
+        public static bool MatchFactoryConditionAndMetadata(this Request request, ServiceDetails details, Factory factory)
         {
             var setup = factory.Setup;
             if (setup.Condition != null && !setup.Condition(request))
                 return false;
-
-            var details     = request._serviceInfo.Details;
-            var metadataKey = details.MetadataKey;
-            var metadata    = details.Metadata;
-            return metadataKey == null && metadata == null || setup.MatchesMetadata(metadataKey, metadata);
+            return details.MetadataKey == null && details.Metadata == null || setup.MatchesMetadata(details.MetadataKey, details.Metadata);
         }
 
-        public static bool MatchFactoryConditionAndMetadata(this Request r, KV<object, Factory> f) => 
-            r.MatchFactoryConditionAndMetadata(f.Value);
+        public static bool MatchFactoryConditionAndMetadata(this Request request, KV<object, Factory> f)
+        {
+            var setup = f.Value.Setup;
+            if (setup.Condition != null && !setup.Condition(request))
+                return false;
+            var details = request._serviceInfo.Details;
+            return details.MetadataKey == null && details.Metadata == null || setup.MatchesMetadata(details.MetadataKey, details.Metadata);
+        }
+
         public static bool MatchFactoryReuse(this Request r, Factory f) => f.Reuse?.CanApply(r) ?? true;
         public static bool MatchFactoryReuse(this Request r, KV<object, Factory> f) => r.MatchFactoryReuse(f.Value);
 
@@ -9433,7 +9441,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 !Made.IsConditional;
 
             // First, lookup in the expression cache
-            var reuse = request.Reuse;
+            var reuse = request.Reuse; // todo: @perf move higher
             ImMapEntry<Container.Registry.ExpressionCacheSlot> cacheEntry = null;
             if (cacheExpression)
             {
@@ -9454,7 +9462,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
             // Next, lookup for the already created service in the singleton scope
             Expression serviceExpr;
-            if (request.Reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess)
+            if (request.Reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess) // todo @perf use the `reuse` and `rules` variables
             {
                 // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
                 var id = request.FactoryType == FactoryType.Decorator
