@@ -49,12 +49,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<InternalClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
-
             var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<InternalClient>());
+                container.Register<InternalClient>(made: FactoryMethod.ConstructorWithResolvableArguments));
 
-            StringAssert.StartsWith("code: Error.UnableToSelectCtor", ex.Message);
+            Assert.AreSame(Error.NameOf(Error.UnableToSelectSinglePublicConstructorFromNone), ex.ErrorName);
         }
 
         [Test]
@@ -162,9 +160,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<BaseA>());
 
-            Assert.AreEqual(
-                Error.NameOf(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection),
-                Error.NameOf(ex.Error));
+            Assert.AreEqual(Error.NameOf(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection), ex.ErrorName);
         }
 
         [Test]

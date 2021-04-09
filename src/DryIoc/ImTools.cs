@@ -2525,8 +2525,8 @@ namespace DryIoc.ImTools
         /// <inheritdoc />
         public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer) =>
             s.Append("(").To(b => Key == null ? b : printer(b, Key))
-                .Append(", ").To(b => Value == null ? b : printer(b, Value))
-                .Append(')');
+             .Append(", ").To(b => Value == null ? b : printer(b, Value))
+             .Append(')');
 
         /// <summary>Creates nice string view.</summary><returns>String representation.</returns>
         public override string ToString() =>
@@ -2537,8 +2537,8 @@ namespace DryIoc.ImTools
         {
             var other = obj as KV<K, V>;
             return other != null
-                   && (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key))
-                   && (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
+                && (ReferenceEquals(other.Key, Key)     || Equals(other.Key, Key))
+                && (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
         }
 
         /// <summary>Combines key and value hash code</summary>

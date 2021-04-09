@@ -1163,6 +1163,14 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |             DryIoc |  94.23 us | 0.352 us | 0.329 us |  0.97 |    0.02 | 10.0098 | 0.8545 |     - |  61.71 KB |
 | DryIoc_MsDIAdapter | 113.64 us | 0.919 us | 0.859 us |  1.17 |    0.03 | 12.8174 | 1.2207 |     - |  78.58 KB |
 
+## Optimizing ConstructorWithResolvableArguments
+
+|             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|               MsDI |  96.08 us | 1.901 us | 3.476 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.54 KB |
+|             DryIoc |  94.83 us | 1.801 us | 1.769 us |  0.99 |    0.05 | 10.0098 | 0.8545 |     - |  61.71 KB |
+| DryIoc_MsDIAdapter | 104.94 us | 1.936 us | 1.716 us |  1.10 |    0.06 | 12.3291 | 1.0986 |     - |  75.81 KB |
+
 */
             [Benchmark(Baseline = true)]
             public object MsDI() => Measure(PrepareMsDi());
