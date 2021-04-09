@@ -8615,7 +8615,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 // check for disposable transient
                 if (!setup.PreventDisposal &&
                     (setup.TrackDisposableTransient || !setup.AllowDisposableTransient && Rules.TrackingDisposableTransients) &&
-                    typeof(IDisposable).IsAssignableFrom((factory.ImplementationType ?? _actualServiceType)))
+                    typeof(IDisposable).IsAssignableFrom(factory.ImplementationType ?? _actualServiceType))
                 {
                     if (firstParentNonTransientReuseOrNull != null)
                     {
@@ -10503,6 +10503,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 _generatedFactories = Ref.Of(ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
         }
 
+        // todo: @perf optimize this thingy for made == null or Made.Default
         private void SetKnownImplementationType(Type implType, Made made)
         {
             var knownImplType = implType;
@@ -10535,14 +10536,13 @@ private ParameterServiceInfo(ParameterInfo p)
             {
                 if (!factoryMethodResultType.IsAssignableTo(implType) &&
                     !factoryMethodResultType.HasConversionOperatorTo(implType))
-                    Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType,
-                        implType, factoryMethodResultType);
+                    Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType, implType, factoryMethodResultType);
             }
 
             var openGenericImplType = knownImplType ?? implType;
             if (openGenericImplType == typeof(object) || // for open-generic T implementation
                 openGenericImplType != null &&           // for open-generic X<T> implementation
-                (openGenericImplType.IsGenericTypeDefinition || openGenericImplType.IsGenericParameter) ||
+                (openGenericImplType.IsGenericTypeDefinition || openGenericImplType.IsGenericParameter) || 
                 made.IsConditionalImplementation)
             {
                 _factoryGenerator = new ClosedGenericFactoryGenerator(this);
@@ -12681,8 +12681,7 @@ private ParameterServiceInfo(ParameterInfo p)
             if (!openGenericType.IsOpenGeneric())
                 return false;
 
-            var matchedParams = new Type[genericParameters.Length];
-            Array.Copy(genericParameters, 0, matchedParams, 0, genericParameters.Length);
+            var matchedParams = genericParameters.Copy();
 
             ClearGenericParametersReferencedInConstraints(matchedParams);
             ClearMatchesFoundInGenericParameters(matchedParams, openGenericType.GetGenericArguments());
