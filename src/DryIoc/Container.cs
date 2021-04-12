@@ -12010,14 +12010,23 @@ namespace DryIoc
             return result;
         }
 
+        internal const uint WaitForItemIsSetTimeout = 5000;
+
         internal static object WaitForItemIsSet(ImMapEntry<object> itemRef)
         {
+            var tickCount = (uint)Environment.TickCount;
+            var tickStart = tickCount;
 #if SUPPORTS_SPIN_WAIT
             Debug.WriteLine("SpinWaiting!!! ");
 
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
+            {
                 spinWait.SpinOnce();
+                if (tickCount - tickStart > WaitForItemIsSetTimeout)
+                    Throw.It(Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForItemIsSetTimeout);
+                tickCount = (uint)Environment.TickCount;
+            }
 
             Debug.WriteLine("SpinWaiting!!! Done");
 #else
@@ -12025,7 +12034,12 @@ namespace DryIoc
 
             lock (itemRef) 
                 while (itemRef.Value == NoItem)
+                {
                     Monitor.Wait(itemRef);
+                    if (tickCount - tickStart > WaitForItemIsSetTimeout)
+                        Throw.It(Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForItemIsSetTimeout);
+                    tickCount = (uint)Environment.TickCount;
+                }
 
             Debug.WriteLine("Lock waiting!!! Done");
 #endif
@@ -13486,8 +13500,14 @@ namespace DryIoc
                 "Validate found the errors, please check the ContainerException.CollectedExceptions for details."),
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine +
-                "{0}")
-            ;
+                "{0}"),
+            WaitForScopedServiceIsCreatedTimeoutExpired = Of(
+                "We have waited for the creation of the scoped service by 'other party' for the {0} ticks without the success." + NewLine +
+                "It means that either the 'other party' is the parallel thread wich is started! but unable to create the service for the the provided amount of time." + NewLine +
+                "Or more likely we have the undetected recursive dependency and the 'other party' is the same thread." + NewLine +
+                "Another reason may be that the previous scoped service resolution is failed with the exception and the exception was CATCHED " + NewLine +
+                "but you are trying to proceed resolving the failed service again." + NewLine + 
+                "That's why for all these reasons we have a timeout to prevent the hanging due the infinite waiting.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 

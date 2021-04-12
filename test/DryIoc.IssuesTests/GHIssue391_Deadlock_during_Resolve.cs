@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
             return 1;
         }
 
-        [Test][Ignore("fixme")]
+        [Test]
         public void Test1()
         {
             var container = new Container(rules => rules
@@ -33,14 +33,14 @@ namespace DryIoc.IssuesTests
             // the missing dependency
             // container.Register<ID, D>(Reuse.Singleton);
 
+            // A -> B -> C -> D(missing)
+            //   \----->
+
             Assert.Throws<ContainerException>(() => container.Resolve<IA>());
 
-            // the second code deadlocks instead of throwing
-            Assert.Throws<ContainerException>(() => container.Resolve<IA>());
+            var ex = Assert.Throws<ContainerException>(() => container.Resolve<IA>());
+            Assert.AreSame(Error.NameOf(Error.WaitForScopedServiceIsCreatedTimeoutExpired), ex.ErrorName);
         }
-
-        // A -> B -> C -> D(missing)
-        //   \----->
 
         public interface IA {}
         public interface IB {}
