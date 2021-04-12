@@ -12038,8 +12038,8 @@ namespace DryIoc
                 while (itemRef.Value == NoItem)
                 {
                     Monitor.Wait(itemRef);
-                    if (tickCount - tickStart > WaitForItemIsSetTimeout)
-                        Throw.It(Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForItemIsSetTimeout);
+                    if (tickCount - tickStart > WaitForScopedServiceIsCreatedTimeoutTicks)
+                        Throw.It(Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForScopedServiceIsCreatedTimeoutTicks);
                     tickCount = (uint)Environment.TickCount;
                 }
 
