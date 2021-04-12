@@ -13501,13 +13501,13 @@ namespace DryIoc
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine +
                 "{0}"),
-            WaitForScopedServiceIsCreatedTimeoutExpired = Of(
-                "We have waited for the creation of the scoped service by 'other party' for the {0} ticks without the success." + NewLine +
-                "It means that either the 'other party' is the parallel thread wich is started! but unable to create the service for the the provided amount of time." + NewLine +
-                "Or more likely we have the undetected recursive dependency and the 'other party' is the same thread." + NewLine +
-                "Another reason may be that the previous scoped service resolution is failed with the exception and the exception was CATCHED " + NewLine +
-                "but you are trying to proceed resolving the failed service again." + NewLine + 
-                "That's why for all these reasons we have a timeout to prevent the hanging due the infinite waiting.");
+WaitForScopedServiceIsCreatedTimeoutExpired = Of(
+    "We have waited for the creation of the scoped service by 'other party' for the {0} ticks without the success." + NewLine +
+    "It means that either the 'other party' is the parallel thread wрich has started! but unable to finish the creation of the service in the provided amount of time." + NewLine +
+    "Or more likely we have the undetected recursive dependency and the 'other party' is the same thread." + NewLine +
+    "Another reason may be that the previous scoped service resolution is failed with the exception and the exception was CATCHED " + NewLine +
+    "but you are proceeding to resolve the failed service again." + NewLine + 
+    "That's why for all these reasons we have a timeout to prevent the hanging due to the infinite waiting.");
 
 #pragma warning restore 1591 // "Missing XML-comment"
 
