@@ -491,6 +491,24 @@ namespace DryIoc.UnitTests
             }
         }
 
+        [Test]
+        public void For_Func_returned_type_with_lazy_dependency_Func_parameters_are_correctly_passed()
+        {
+            var c = new Container();
+
+            c.Register<A>();
+            c.RegisterDelegate<F>(() => new F("notUsed"));
+            c.Register<L>();
+            c.Register<Y>();
+
+            var lFunc = c.Resolve<Func<A, Y, L>>();
+            var l = lFunc(new A(), new Y(new A()));
+
+            var f = l.F;
+
+            Assert.IsNotNull(f, "Expected F will be created via Lazy<> evaluation.");
+        }
+
         #region CUT
 
         class SS

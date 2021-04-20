@@ -3181,7 +3181,7 @@ namespace DryIoc
                                     for (var i = 0; i < multipleParams.Count; i++)
                                         if (expr == multipleParams[i])
                                         {
-                                            result = ((object[]) paramValues)[i];
+                                            result = ((object[]) p.ParamValues)[i];
                                             return true;
                                         }
                             }
