@@ -118,10 +118,7 @@ class FacadeExample
     public class Client
     {
         public IService Service { get; }
-        public Client(IService service)
-        {
-            Service = service;
-        }
+        public Client(IService service) => Service = service;
     }
 
     [Test]public void Facade_for_tests()

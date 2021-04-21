@@ -1,6 +1,11 @@
 Version History
 ---------------
 
+## v4.7.6 Bug-fix release / 2021-04-21
+
+- fixed: #391 Deadlock during Resolve
+- fixed: #394 For_Func_returned_type_with_lazy_dependency_Func_parameters_are_correctly_passed
+
 ## v4.7.5 Bug-fix release / 2021-04-04
 
 - #390 NullReferenceException on Unregister
