@@ -11143,13 +11143,24 @@ private ParameterServiceInfo(ParameterInfo p)
             return result;
         }
 
+        /// <summary>The amount of time to wait for the other party to create the scoped (or singleton) service. 
+        /// The default value of 5000 ticks rougly corresponds to the 5 seconds.</summary>
+        public static uint WaitForScopedServiceIsCreatedTimeoutTicks = 5000;
+
         internal static object WaitForItemIsSet(ImMapEntry<object> itemRef)
         {
-            Debug.WriteLine("SpinWaiting!!! ...");
+            var tickCount = (uint)Environment.TickCount;
+            var tickStart = tickCount;
+            Debug.WriteLine("SpinWaiting!!! ");
 
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
+            {
                 spinWait.SpinOnce();
+                if (tickCount - tickStart > WaitForScopedServiceIsCreatedTimeoutTicks)
+                    Throw.It(Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForScopedServiceIsCreatedTimeoutTicks);
+                tickCount = (uint)Environment.TickCount;
+            }
 
             Debug.WriteLine("SpinWaiting!!! is Done");
             return itemRef.Value;
@@ -12415,6 +12426,14 @@ private ParameterServiceInfo(ParameterInfo p)
             ValidateFoundErrors = Of(
                 "Validate found the errors, please check the ContainerException.CollectedExceptions for details."),
             UnableToInterpretTheNestedLambda = Of(
+                "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
+            WaitForScopedServiceIsCreatedTimeoutExpired = Of(
+                "DryIoc has waited for the creation of the scoped (or singleton) service by 'other party' for the {0} ticks without the completion. " + NewLine +
+                "It means that either the 'other party' is the parallel thread which has started (!) but unable to finish the creation of the service in the provided amount of time. " + NewLine +
+                "Or more likely the 'other party' is the same thread and there is an undetected recursive dependency or " + NewLine +
+                "the scoped service creation is failed with the exception and the exception was catched (!) but you are trying to resolve the failed service again. " + NewLine + 
+                "For all those reasons DryIoc has a timeout to prevent the infinite waiting. " + NewLine +
+                $"You may change the default timeout via `Scope.{nameof(Scope.WaitForScopedServiceIsCreatedTimeoutTicks)}=NewValue`"),
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             ServiceTypeIsNull = Of("Registered service type is null");
 

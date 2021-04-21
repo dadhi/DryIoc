@@ -20,6 +20,7 @@
   - [Decorator as Interceptor with Castle DynamicProxy](#decorator-as-interceptor-with-castle-dynamicproxy)
   - [Doing the interesting things with decorators](#doing-the-interesting-things-with-decorators)
     - [Reusing the scoped service from the parent scope](#reusing-the-scoped-service-from-the-parent-scope)
+    - [Using the Decorator directly for the complex initialization](#using-the-decorator-directly-for-the-complex-initialization)
 
 
 [FactoryMethod]:SelectConstructorOrFactoryMethod.md#factory-method-instead-of-constructor
@@ -716,6 +717,81 @@ class Reusing_the_scoped_service_from_the_parent_scope
             if (s.TryGet(out var res, id))
                 return (T)res;
         return fd(r);
+    }
+} 
+```
+
+### Using the Decorator directly for the complex initialization
+
+When you have a complex initialization scenario at your hands where `RegisterInitializer` behavior does not fit, 
+you may remember that `RegisterInitializer` is just a Decorator in disguise. So we may use it directly.
+
+Especially, because the features of DryIoc are greatly composable - you can decorate wrapped services, 
+inject the additional services (either into the decorator constructor or into the method or into both!), etc., etc.
+
+Let's imagine that we need a transient `DbContext` which should be consumed lazily, 
+but requires a one-time initialization logic (say a database migration) based on the config provided. 
+
+Btw, this is the real case from the Gitter discussion with the user.
+
+```cs 
+class Using_the_Decorator_directly_for_the_complex_initialization
+{
+    [Test]
+    public void Example()
+    {
+        var c = new Container();
+
+        var config = new Config();
+        c.RegisterInstance(config);
+
+        c.Register<DbContext>();
+        c.Register<InitDbContext>(Reuse.Singleton, serviceKey: "initializer"); // serviceKey is optional, here it basically hides the service unless you know its key
+        c.Register<DbContext>(setup: Setup.Decorator,
+            made: Made.Of(_ => ServiceInfo.Of<InitDbContext>(serviceKey: "initializer"),
+            f => f.Init(Arg.Of<DbContext>())));
+
+        var ctx0 = c.Resolve<Lazy<DbContext>>();
+        var ctx1 = c.Resolve<Lazy<DbContext>>();
+
+        var initializer = c.Resolve<InitDbContext>("initializer");
+
+        Assert.IsFalse(initializer.Initialized);
+
+        Assert.IsTrue(ctx0.Value.Migrated);
+        Assert.IsTrue(initializer.Initialized); 
+
+        Assert.AreNotSame(ctx0.Value, ctx1.Value);
+    }
+
+    // DI infrastructure, but it does not need any knowledge of DryIoc - it may perfectly work and be tested without DryIoc.
+    class InitDbContext
+    {
+        Config _config;
+        public bool Initialized;
+        public InitDbContext(Config config) { _config = config; }
+        public DbContext Init(DbContext ctx)
+        {
+            if (!Initialized)
+            {
+                if (_config.ShouldMigrateDatabase())
+                    ctx.MigrateDatabase();
+                Initialized = true;
+            }
+            return ctx;
+        }
+    }
+
+    // Application services
+    class DbContext
+    {
+        public bool Migrated;
+        public void MigrateDatabase() { Migrated = true; }
+    }
+
+    class Config
+    {
+        public bool ShouldMigrateDatabase() => true;
     }
 } 
 ```

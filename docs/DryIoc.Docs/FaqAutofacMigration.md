@@ -292,7 +292,7 @@ Here the docs describing [Autofac Modules feature](http://docs.autofac.org/en/la
 
 They major responsibility of Module to be the unit of configuration and registration. Actually the Module plays the role of [Facade](https://en.wikipedia.org/wiki/Facade_pattern) to hide some related registrations behind.
 
-Here is the how defining and using the module looks like in Autofac:
+Here is the example of module definition and usage in Autofac:
 ```cs
     // Here is the AModule
     public class AutofacModule : Module
