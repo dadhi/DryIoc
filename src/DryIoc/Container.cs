@@ -12434,7 +12434,6 @@ private ParameterServiceInfo(ParameterInfo p)
                 "the scoped service creation is failed with the exception and the exception was catched (!) but you are trying to resolve the failed service again. " + NewLine + 
                 "For all those reasons DryIoc has a timeout to prevent the infinite waiting. " + NewLine +
                 $"You may change the default timeout via `Scope.{nameof(Scope.WaitForScopedServiceIsCreatedTimeoutTicks)}=NewValue`"),
-                "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             ServiceTypeIsNull = Of("Registered service type is null");
 
 #pragma warning restore 1591 // "Missing XML-comment"
