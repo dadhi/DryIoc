@@ -40,7 +40,7 @@ DryIoc Decorators support:
 - Nesting decorators and specifying custom nesting order.
 - Open-generic decorators with support of: generic variance, constraints, generic factory methods in generic classes.
 - Decorator may have its own Reuse different from decorated service. There is an additional option for decorators to `useDecorateeReuse`.
-- Decorator may decorate service wrapped in `Func`, `Lazy` and the rest of [Wrappers](Wrappers). Nesting is supported as well.
+- Decorator may decorate service wrapped in `Func`, `Lazy` and the rest of [Wrappers](Wrappers.md). Nesting is supported as well.
 - Decorator registered with a [FactoryMethod] may be used to add functionality around decorated service creation, 
 aka __Initializer__.
 - Combining decorator reuse and factory method registration, decorator may provide additional action on service dispose, aka __Disposer__.
@@ -467,7 +467,7 @@ class Decoratee_reuse
 
 ## Decorator of Wrapped Service
 
-Decorator may be applied to the [wrapped](Wrappers) service in order to provide laziness, create decorated service on demand, proxy-ing, etc.
+Decorator may be applied to the [wrapped](Wrappers.md) service in order to provide laziness, create decorated service on demand, proxy-ing, etc.
 ```cs md*/
 class ACall
 {
@@ -641,10 +641,10 @@ Here `DecorateFooWithGreet` is a static method just for the demonstration.
 It also may be a non-static and include additional dependencies to be injected by Container, 
 check the [FactoryMethod] for more details.
 
-DryIoc has a dedicated [`RegisterInitializer`](RegisterResolve#registerinitializer) method,
+DryIoc has a dedicated [`RegisterInitializer`](RegisterResolve.md#registerinitializer) method,
 which is a decorator in disguise.
 
-Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisposer`](RegisterResolve#registerdisposer).
+Moreover, to complement the `RegisterInitializer` there is also a [`RegisterDisposer`](RegisterResolve.md#registerdisposer).
 
 
 ## Decorator as Interceptor with Castle DynamicProxy
