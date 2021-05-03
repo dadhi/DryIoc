@@ -64,10 +64,10 @@ namespace DryIoc.AzureFunctions
             });
 
             // Funny, but we can actually Replace the Azure Functions ServiceProvider
-            hostBuilder.Services.Replace(ServiceDescriptor.Singleton(typeof(IJobActivator),   typeof(ScopedJobActivator)));
-            hostBuilder.Services.Replace(ServiceDescriptor.Singleton(typeof(IJobActivatorEx), typeof(ScopedJobActivator)));
+            hostBuilder.Services.Replace(ServiceDescriptor.Singleton(typeof(IJobActivator),   typeof(DryIocJobActivator)));
+            hostBuilder.Services.Replace(ServiceDescriptor.Singleton(typeof(IJobActivatorEx), typeof(DryIocJobActivator)));
 
-            hostBuilder.Services.AddScoped<ScopedResolverContext>();
+            hostBuilder.Services.AddScoped<DryIocScopedResolverContext>();
 
             return hostBuilder;
         }
@@ -80,27 +80,27 @@ namespace DryIoc.AzureFunctions
             internal FunctionName(string name) => Name = name;
         }
 
-        internal sealed class ScopedResolverContext : IDisposable
+        internal sealed class DryIocScopedResolverContext : IDisposable
         {
             public readonly IResolverContext Scope;
-            public ScopedResolverContext(IContainer container) => 
+            public DryIocScopedResolverContext(IContainer container) => 
                 Scope = container.OpenScope(); // todo: @clarify do we need the named scope here?
             public void Dispose() => Scope.Dispose();
         }
 
-        internal sealed class ScopedJobActivator : IJobActivator, IJobActivatorEx
+        internal sealed class DryIocJobActivator : IJobActivator, IJobActivatorEx
         {
             private readonly IServiceProvider _serviceProvider;
-            public ScopedJobActivator(IServiceProvider serviceProvider) => _serviceProvider = serviceProvider;
+            public DryIocJobActivator(IServiceProvider serviceProvider) => _serviceProvider = serviceProvider;
 
             public T CreateInstance<T>() =>
-                _serviceProvider.GetRequiredService<ScopedResolverContext>().Scope.Resolve<T>();
+                _serviceProvider.GetRequiredService<DryIocScopedResolverContext>().Scope.Resolve<T>();
 
             public T CreateInstance<T>(IFunctionInstanceEx functionInstance)
             {
                 var functionServices = functionInstance.InstanceServices;
-                var scope = (functionServices.GetService<ScopedResolverContext>() 
-                        ?? _serviceProvider.GetRequiredService<ScopedResolverContext>()).Scope;
+                var scope = (functionServices.GetService<DryIocScopedResolverContext>() 
+                        ?? _serviceProvider.GetRequiredService<DryIocScopedResolverContext>()).Scope;
 
                 var loggerFactory = functionServices.GetService<ILoggerFactory>();
                 if (loggerFactory != null)
