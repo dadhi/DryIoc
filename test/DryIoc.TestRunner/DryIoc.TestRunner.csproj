@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj" />
+    <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj" />
   </ItemGroup>
 
 </Project>

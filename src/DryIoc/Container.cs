@@ -6193,8 +6193,7 @@ namespace DryIoc
             { }
         }
 
-#region Implementation
-
+        // todo: @perf split the Made classes per data passed to the constructors.
         internal Made(
             FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
             Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImplementation = false, 
@@ -6219,12 +6218,14 @@ namespace DryIoc
             _details = details;
         }
 
+        // todo: @perf split the Made classes per data passed to the constructors.
         internal Made(FactoryMethod factoryMethod, Type factoryReturnType)
         {
             FactoryMethod = factoryMethod.ToFunc<Request, FactoryMethod>;
             FactoryMethodKnownResultType = factoryReturnType;
         }
 
+        // todo: @perf split the Made classes per data passed to the constructors.
         private Made(
             FactoryMethodSelector factoryMethod, ParameterSelector parameters, PropertiesAndFieldsSelector propertiesAndFields,
             Type factoryMethodKnownResultType, MadeDetails details)
@@ -6418,8 +6419,6 @@ namespace DryIoc
             return Throw.For<object>(Error.UnexpectedExpressionInsteadOfConstantInMadeOf,
                 argExpr, wholeServiceExpr);
         }
-
-#endregion
     }
 
     /// <summary>Class for defining parameters/properties/fields service info in <see cref="Made"/> expressions.
@@ -6926,6 +6925,18 @@ namespace DryIoc
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
+        public static void RegisterDelegate(
+            this IRegistrator r, Type serviceType, Type depType, Func<object, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            // RegisterDelegateFunc<Func<object, object>>(r, serviceType,
+            //     dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType),
+            //     reuse, setup, ifAlreadyRegistered, serviceKey);
+            r.Register(new ReflectionFactory(serviceType, reuse, new Made(new FactoryMethod(
+                typeof(Func<object, object>).GetMethod(InvokeMethodName),
+                Constant((Func<object, object>)(dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType)))), 
+                serviceType), setup), serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+
+        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2>(
             this IRegistrator r, Type serviceType, Func<TDep1, TDep2, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
@@ -6973,8 +6984,8 @@ namespace DryIoc
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
             TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey) =>
             r.Register(new ReflectionFactory(serviceType, reuse, 
-                new Made(new FactoryMethod(typeof(TFunc).GetMethod(InvokeMethodName), Constant(factory)), serviceType), 
-                setup), serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+                new Made(new FactoryMethod(typeof(TFunc).GetMethod(InvokeMethodName), Constant(factory)), serviceType), setup), 
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// Minimizes the number of allocations when converting from Func to named delegate
         public static object ToFactoryDelegate<TService>(this Func<IResolverContext, TService> f, IResolverContext r) => f(r);
@@ -13500,5 +13511,15 @@ namespace DryIoc.Messages
         /// <summary>Sends the message with empty response to resolved Single handler</summary>
         public Task Send<M>(M message, CancellationToken cancellationToken) where M : IMessage<EmptyResponse> =>
             _resolver.Resolve<IMessageHandler<M, EmptyResponse>>().Handle(message, cancellationToken);
+    }
+}
+
+namespace DryIoc.Testing
+{
+    /// <summary>Common abstraction to run the tests</summary>
+    public interface ITest
+    {
+        /// <summary>Should return the number of running tests</summary>
+        int Run();
     }
 }

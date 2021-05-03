@@ -2,14 +2,23 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+
 using NUnit.Framework;
+
+using DryIoc.Testing;
 using DryIoc.ImTools;
 
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class DecoratorTests
+    public class DecoratorTests : ITest
     {
+        public int Run()
+        {
+            Delegate_decorator_with_the_runtime_service_types_RegisterDelegate();
+            return 1;
+        }
+
         [Test]
         public void Should_resolve_decorator()
         {
@@ -377,6 +386,21 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IOperation, SomeOperation>(Reuse.Singleton);
             container.RegisterDelegate<IOperation, IOperation>(op => new MeasureExecutionTimeOperationDecorator(op), 
+                setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            var operation = container.Resolve<IOperation>();
+
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
+            Assert.AreSame(operation, container.Resolve<IOperation>());
+        }
+
+        [Test, Ignore("todo: @fixme")]
+        public void Delegate_decorator_with_the_runtime_service_types_RegisterDelegate()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.RegisterDelegate(typeof(IOperation), typeof(IOperation),
+                op => new MeasureExecutionTimeOperationDecorator((IOperation)op), 
                 setup: Setup.DecoratorWith(useDecorateeReuse: true));
 
             var operation = container.Resolve<IOperation>();

@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
+      <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
   </ItemGroup>
-
 </Project>

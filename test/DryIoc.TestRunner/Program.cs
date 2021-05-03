@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Threading.Tasks;
 using DryIoc.IssuesTests;
+using DryIoc.Testing;
 
 namespace DryIoc.UnitTests
 {
@@ -10,6 +11,8 @@ namespace DryIoc.UnitTests
         public static void Main()
         {
             RunAllTests();
+
+            // new DryIoc.UnitTests.DecoratorTests().Run();
 
             //new GHIssue380_ExportFactory_throws_Container_disposed_exception().Run();
         }
