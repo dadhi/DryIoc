@@ -5916,6 +5916,8 @@ namespace DryIoc
             FactoryServiceInfo = factoryServiceInfo;
         }
 
+        // todo: @perf split the FactoryMethod based on the constructor
+        // todo: @perf use the object instead of Constant to minimize the allocations
         internal FactoryMethod(MemberInfo constructorOrMethodOrMember, Expression factoryExpression)
         {
             ConstructorOrMethodOrMember = constructorOrMethodOrMember;
