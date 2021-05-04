@@ -5634,19 +5634,19 @@ namespace DryIoc
         /// <summary>Just creates a thingy from the constructor</summary>
         public FactoryMethod(MemberInfo memberInfo) => ConstructorOrMethodOrMember = memberInfo;
 
+        internal sealed class WithFactoryExpression : FactoryMethod
+        {
+            public override Expression FactoryExpression { get; }
+            internal WithFactoryExpression(MemberInfo constructorOrMethodOrMember, Expression factoryExpression) : base(constructorOrMethodOrMember) =>
+                FactoryExpression = factoryExpression;
+        }
+
         internal sealed class Full : FactoryMethod
         {
             public override ServiceInfo FactoryServiceInfo { get; }
-            public override Expression FactoryExpression { get; }
             internal override Expression[] ResolvedParameterExpressions { get; }
             internal Full(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo) : base(constructorOrMethodOrMember) =>
                 FactoryServiceInfo = factoryServiceInfo;
-
-            // todo: @perf split the FactoryMethod based on the constructor
-            // todo: @perf use the object instead of Constant to minimize the allocations
-            internal Full(MemberInfo constructorOrMethodOrMember, Expression factoryExpression) : base(constructorOrMethodOrMember) =>
-                FactoryExpression = factoryExpression;
-
             internal Full(ConstructorInfo ctor, Expression[] resolvedParameterExpressions) : base(ctor) =>
                 ResolvedParameterExpressions = resolvedParameterExpressions;
         }
@@ -5677,7 +5677,7 @@ namespace DryIoc
             methodOrMember.ThrowIfNull(Error.PassedCtorOrMemberIsNull);
             if (methodOrMember.IsStatic())
                 Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, methodOrMember, factoryInstance);
-            return new Full(methodOrMember, Constant(factoryInstance));
+            return new WithFactoryExpression(methodOrMember, Constant(factoryInstance));
         }
 
         /// <summary>Discovers the static factory method or member by name in <typeparamref name="TFactory"/>.
@@ -6927,7 +6927,7 @@ namespace DryIoc
             // RegisterDelegateFunc<Func<object, object>>(r, serviceType,
             //     dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType),
             //     reuse, setup, ifAlreadyRegistered, serviceKey);
-            r.Register(new ReflectionFactory(serviceType, reuse, new Made(new FactoryMethod.Full(
+            r.Register(new ReflectionFactory(serviceType, reuse, new Made(new FactoryMethod.WithFactoryExpression(
                 typeof(Func<object, object>).GetMethod(InvokeMethodName),
                 Constant((Func<object, object>)(dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType)))), 
                 serviceType), setup), serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
@@ -6980,7 +6980,7 @@ namespace DryIoc
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
             TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey) =>
             r.Register(new ReflectionFactory(serviceType, reuse, 
-                new Made(new FactoryMethod.Full(typeof(TFunc).GetMethod(InvokeMethodName), Constant(factory)), serviceType), setup), 
+                new Made(new FactoryMethod.WithFactoryExpression(typeof(TFunc).GetMethod(InvokeMethodName), Constant(factory)), serviceType), setup), 
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// Minimizes the number of allocations when converting from Func to named delegate
@@ -10788,7 +10788,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
             var factoryInstance = factoryMethod.FactoryExpression;
             return factoryInstance != null 
-                ? new FactoryMethod.Full(factoryMember, factoryInstance) 
+                ? new FactoryMethod.WithFactoryExpression(factoryMember, factoryInstance) 
                 : new FactoryMethod.Full(factoryMember, factoryInfo);
         }
 
