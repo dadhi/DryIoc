@@ -9322,11 +9322,11 @@ private ParameterServiceInfo(ParameterInfo p)
         Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false);
     }
 
-    /// Instructs how to deal with factory result expression: 
-    public enum FactoryCaching
-    {   /// Is up to DryIoc to decide,
+    /// <summary>Instructs how to deal with factory result expression</summary>
+    public enum FactoryCaching : byte
+    {   /// Up to DryIoc to decide
         Default = 0,
-        /// Prevents DryIoc to set `DoNotCache`.
+        /// Prevents DryIoc to set `DoNotCache`
         PleaseDontSetDoNotCache,
         /// If set, the expression won't be cached 
         DoNotCache
@@ -9350,15 +9350,21 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Unique factory id generated from static seed.</summary>
         public int FactoryID { get; internal set; }
 
+        // todo: @perf optimize the memory for no reuse
         /// <summary>Reuse policy for created services.</summary>
         public virtual IReuse Reuse => _reuse;
 
+        // todo: @perf optimize the memory for no setup
         /// <summary>Setup may contain different/non-default factory settings.</summary>
         public virtual Setup Setup
         {
             get => _setup;
             internal set { _setup = value ?? Setup.Default; }
         }
+
+        internal static int _lastFactoryID;
+        private IReuse _reuse;
+        private Setup _setup;
 
         /// <summary>Checks that condition is met for request or there is no condition setup.</summary>
         public bool CheckCondition(Request request)
@@ -9389,7 +9395,8 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>The factory inserts the runtime-state into result expression, e.g. delegate or pre-created instance.</summary>
         public virtual bool HasRuntimeState => false;
 
-        /// Indicates how to deal with the result expression
+        // todo: @perf optimize the memory for the default caching
+        /// <summary>Indicates how to deal with the result expression</summary>
         public FactoryCaching Caching { get; set; }
 
         /// Instructs to skip caching the factory unless it really wants to do so via `PleaseDontSetDoNotCache`
@@ -9721,14 +9728,6 @@ private ParameterServiceInfo(ParameterInfo p)
 
             return s.Append("}").ToString();
         }
-
-#region Implementation
-
-        internal static int _lastFactoryID;
-        private IReuse _reuse;
-        private Setup _setup;
-
-#endregion
     }
 
     /// <summary>Declares delegate to get single factory method or constructor for resolved request.</summary>
