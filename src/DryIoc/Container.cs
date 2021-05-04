@@ -5618,19 +5618,38 @@ namespace DryIoc
     }
 
     /// <summary>Wraps constructor or factory method optionally with factory instance to create service.</summary>
-    public sealed class FactoryMethod
+    public class FactoryMethod
     {
         /// <summary>Constructor or method to use for service creation.</summary>
         public readonly MemberInfo ConstructorOrMethodOrMember;
-
         /// <summary>Identifies factory service if factory method is instance member.</summary>
-        public readonly ServiceInfo FactoryServiceInfo;
+        public virtual ServiceInfo FactoryServiceInfo => null;
 
         /// Alternatively you may just provide an expression for factory
-        public readonly Expression FactoryExpression;
+        public virtual Expression FactoryExpression => null;
 
         ///<summary> Contains resolved parameter expressions found when looking for most resolvable constructor</summary> 
-        internal readonly Expression[] ResolvedParameterExpressions;
+        internal virtual Expression[] ResolvedParameterExpressions => null;
+
+        /// <summary>Just creates a thingy from the constructor</summary>
+        public FactoryMethod(MemberInfo memberInfo) => ConstructorOrMethodOrMember = memberInfo;
+
+        internal sealed class Full : FactoryMethod
+        {
+            public override ServiceInfo FactoryServiceInfo { get; }
+            public override Expression FactoryExpression { get; }
+            internal override Expression[] ResolvedParameterExpressions { get; }
+            internal Full(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo) : base(constructorOrMethodOrMember) =>
+                FactoryServiceInfo = factoryServiceInfo;
+
+            // todo: @perf split the FactoryMethod based on the constructor
+            // todo: @perf use the object instead of Constant to minimize the allocations
+            internal Full(MemberInfo constructorOrMethodOrMember, Expression factoryExpression) : base(constructorOrMethodOrMember) =>
+                FactoryExpression = factoryExpression;
+
+            internal Full(ConstructorInfo ctor, Expression[] resolvedParameterExpressions) : base(ctor) =>
+                ResolvedParameterExpressions = resolvedParameterExpressions;
+        }
 
         /// <summary>Wraps method and factory instance.
         /// Where <paramref name="ctorOrMethodOrMember"/> is constructor, static or instance method, property or field.</summary>
@@ -5642,14 +5661,12 @@ namespace DryIoc
             {
                 if (factoryInfo == null)
                     Throw.It(Error.PassedMemberIsNotStaticButInstanceFactoryIsNull, ctorOrMethodOrMember);
-            }
-            else
-            {
-                if (factoryInfo != null)
-                    Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, ctorOrMethodOrMember, factoryInfo);
+                return new Full(ctorOrMethodOrMember, factoryInfo);
             }
 
-            return new FactoryMethod(ctorOrMethodOrMember, factoryInfo);
+            if (factoryInfo != null)
+                Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, ctorOrMethodOrMember, factoryInfo);
+            return new FactoryMethod(ctorOrMethodOrMember);
         }
 
         /// <summary>Wraps method and factory instance.
@@ -5660,7 +5677,7 @@ namespace DryIoc
             methodOrMember.ThrowIfNull(Error.PassedCtorOrMemberIsNull);
             if (methodOrMember.IsStatic())
                 Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, methodOrMember, factoryInstance);
-            return new FactoryMethod(methodOrMember, Constant(factoryInstance));
+            return new Full(methodOrMember, Constant(factoryInstance));
         }
 
         /// <summary>Discovers the static factory method or member by name in <typeparamref name="TFactory"/>.
@@ -5890,7 +5907,7 @@ namespace DryIoc
                 return Throw.For<FactoryMethod>(throwIfCtorNotFound, 
                     Error.UnableToFindCtorWithAllResolvableArgs, request.InputArgExprs, request);
 
-            return new FactoryMethod(resolvedCtor, resolvedCtorParamExprs);
+            return new Full(resolvedCtor, resolvedCtorParamExprs);
         };
 
         /// <summary>Easy way to specify default constructor to be used for resolution.</summary>
@@ -5906,29 +5923,6 @@ namespace DryIoc
         /// <summary>Searches for constructor (including non public ones) with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
         /// Works both for resolving service and for Func{TArgs..., TService}</summary>
         public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublic = Constructor(mostResolvable: true, includeNonPublic: true);
-
-        /// <summary>Just creates a thingy from the constructor</summary>
-        public FactoryMethod(ConstructorInfo constructor) => ConstructorOrMethodOrMember = constructor;
-
-        internal FactoryMethod(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo = null)
-        {
-            ConstructorOrMethodOrMember = constructorOrMethodOrMember;
-            FactoryServiceInfo = factoryServiceInfo;
-        }
-
-        // todo: @perf split the FactoryMethod based on the constructor
-        // todo: @perf use the object instead of Constant to minimize the allocations
-        internal FactoryMethod(MemberInfo constructorOrMethodOrMember, Expression factoryExpression)
-        {
-            ConstructorOrMethodOrMember = constructorOrMethodOrMember;
-            FactoryExpression = factoryExpression;
-        }
-
-        internal FactoryMethod(ConstructorInfo ctor, Expression[] resolvedParameterExpressions)
-        {
-            ConstructorOrMethodOrMember = ctor;
-            ResolvedParameterExpressions = resolvedParameterExpressions;
-        }
     }
 
     /// <summary>Rules how to: <list type="bullet">
@@ -6933,7 +6927,7 @@ namespace DryIoc
             // RegisterDelegateFunc<Func<object, object>>(r, serviceType,
             //     dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType),
             //     reuse, setup, ifAlreadyRegistered, serviceKey);
-            r.Register(new ReflectionFactory(serviceType, reuse, new Made(new FactoryMethod(
+            r.Register(new ReflectionFactory(serviceType, reuse, new Made(new FactoryMethod.Full(
                 typeof(Func<object, object>).GetMethod(InvokeMethodName),
                 Constant((Func<object, object>)(dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType)))), 
                 serviceType), setup), serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
@@ -6986,7 +6980,7 @@ namespace DryIoc
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
             TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey) =>
             r.Register(new ReflectionFactory(serviceType, reuse, 
-                new Made(new FactoryMethod(typeof(TFunc).GetMethod(InvokeMethodName), Constant(factory)), serviceType), setup), 
+                new Made(new FactoryMethod.Full(typeof(TFunc).GetMethod(InvokeMethodName), Constant(factory)), serviceType), setup), 
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// Minimizes the number of allocations when converting from Func to named delegate
@@ -10794,8 +10788,8 @@ private ParameterServiceInfo(ParameterInfo p)
 
             var factoryInstance = factoryMethod.FactoryExpression;
             return factoryInstance != null 
-                ? new FactoryMethod(factoryMember, factoryInstance) 
-                : new FactoryMethod(factoryMember, factoryInfo);
+                ? new FactoryMethod.Full(factoryMember, factoryInstance) 
+                : new FactoryMethod.Full(factoryMember, factoryInfo);
         }
 
 #endregion
