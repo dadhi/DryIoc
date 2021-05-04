@@ -2189,6 +2189,7 @@ namespace DryIoc
                                 }
                             }
                             break;
+
                         case IfAlreadyRegistered.AppendNewImplementation:
                             var oldImplFacsEntry = oldEntry as FactoriesEntry;
                             if (oldImplFacsEntry != null && oldImplFacsEntry.LastDefaultKey == null)
@@ -5641,13 +5642,17 @@ namespace DryIoc
                 FactoryExpression = factoryExpression;
         }
 
-        internal sealed class Full : FactoryMethod
+        internal sealed class WithFactoryServiceInfo : FactoryMethod
         {
             public override ServiceInfo FactoryServiceInfo { get; }
-            internal override Expression[] ResolvedParameterExpressions { get; }
-            internal Full(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo) : base(constructorOrMethodOrMember) =>
+            internal WithFactoryServiceInfo(MemberInfo constructorOrMethodOrMember, ServiceInfo factoryServiceInfo) : base(constructorOrMethodOrMember) =>
                 FactoryServiceInfo = factoryServiceInfo;
-            internal Full(ConstructorInfo ctor, Expression[] resolvedParameterExpressions) : base(ctor) =>
+        }
+
+        internal sealed class WithResolvedParameterExpressions : FactoryMethod
+        {
+            internal override Expression[] ResolvedParameterExpressions { get; }
+            internal WithResolvedParameterExpressions(ConstructorInfo ctor, Expression[] resolvedParameterExpressions) : base(ctor) =>
                 ResolvedParameterExpressions = resolvedParameterExpressions;
         }
 
@@ -5661,7 +5666,7 @@ namespace DryIoc
             {
                 if (factoryInfo == null)
                     Throw.It(Error.PassedMemberIsNotStaticButInstanceFactoryIsNull, ctorOrMethodOrMember);
-                return new Full(ctorOrMethodOrMember, factoryInfo);
+                return new WithFactoryServiceInfo(ctorOrMethodOrMember, factoryInfo);
             }
 
             if (factoryInfo != null)
@@ -5904,10 +5909,9 @@ namespace DryIoc
             }
 
             if (resolvedCtor == null)
-                return Throw.For<FactoryMethod>(throwIfCtorNotFound, 
-                    Error.UnableToFindCtorWithAllResolvableArgs, request.InputArgExprs, request);
+                return Throw.For<FactoryMethod>(throwIfCtorNotFound, Error.UnableToFindCtorWithAllResolvableArgs, request.InputArgExprs, request);
 
-            return new Full(resolvedCtor, resolvedCtorParamExprs);
+            return new WithResolvedParameterExpressions(resolvedCtor, resolvedCtorParamExprs);
         };
 
         /// <summary>Easy way to specify default constructor to be used for resolution.</summary>
@@ -10789,7 +10793,7 @@ private ParameterServiceInfo(ParameterInfo p)
             var factoryInstance = factoryMethod.FactoryExpression;
             return factoryInstance != null 
                 ? new FactoryMethod.WithFactoryExpression(factoryMember, factoryInstance) 
-                : new FactoryMethod.Full(factoryMember, factoryInfo);
+                : new FactoryMethod.WithFactoryServiceInfo(factoryMember, factoryInfo);
         }
 
 #endregion

@@ -1155,7 +1155,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |             DryIoc |  93.41 us | 0.872 us | 0.816 us |  0.98 |    0.04 | 10.0098 | 0.8545 |     - |  61.83 KB |
 | DryIoc_MsDIAdapter | 109.70 us | 0.623 us | 0.486 us |  1.16 |    0.05 | 12.8174 | 1.2207 |     - |  78.79 KB |
 
-## Optimizing NewExpression with up to 7 arguments
+### Optimizing NewExpression with up to 7 arguments
 
 |             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
@@ -1163,13 +1163,21 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |             DryIoc |  94.23 us | 0.352 us | 0.329 us |  0.97 |    0.02 | 10.0098 | 0.8545 |     - |  61.71 KB |
 | DryIoc_MsDIAdapter | 113.64 us | 0.919 us | 0.859 us |  1.17 |    0.03 | 12.8174 | 1.2207 |     - |  78.58 KB |
 
-## Optimizing ConstructorWithResolvableArguments
+### Optimizing ConstructorWithResolvableArguments
 
 |             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
 |               MsDI |  96.08 us | 1.901 us | 3.476 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.54 KB |
 |             DryIoc |  94.83 us | 1.801 us | 1.769 us |  0.99 |    0.05 | 10.0098 | 0.8545 |     - |  61.71 KB |
 | DryIoc_MsDIAdapter | 104.94 us | 1.936 us | 1.716 us |  1.10 |    0.06 | 12.3291 | 1.0986 |     - |  75.81 KB |
+
+### FactoryMethod class splitting
+
+|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|               MsDI | 92.81 us | 1.828 us | 3.389 us |  1.00 |    0.00 | 11.4746 | 2.9297 |     - |  70.54 KB |
+|             DryIoc | 86.70 us | 1.722 us | 2.050 us |  0.94 |    0.05 | 10.0098 | 0.8545 |     - |  61.61 KB |
+| DryIoc_MsDIAdapter | 96.46 us | 1.887 us | 2.173 us |  1.05 |    0.05 | 12.3291 | 1.0986 |     - |  75.81 KB |
 
 */
             [Benchmark(Baseline = true)]
