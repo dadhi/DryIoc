@@ -58,8 +58,8 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Adjusts the rules to provide the full MEF compatibility.</summary>
         public static Rules WithMefRules(this Rules rules)
         {
-            var importMadeOf = rules.FactoryMethod == null ? _defaultImportMadeOf :
-                Made.Of(request => GetImportingConstructor(request, rules.FactoryMethod),
+            var importMadeOf = rules.FactoryMethodOrSelector == null ? _defaultImportMadeOf :
+                Made.Of(request => GetImportingConstructor(request, rules.FactoryMethodOrSelector),
                     GetImportedParameter, _getImportedPropertiesAndFields);
 
             return rules.With(importMadeOf)
@@ -548,7 +548,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static FactoryMethod GetImportingConstructor(DryIoc.Request request, FactoryMethodSelector fallbackSelector = null)
+        private static FactoryMethod GetImportingConstructor(DryIoc.Request request, object fallbackMethodOrSelector = null)
         {
             var implType = request.ImplementationType;
             var ctors = implType.PublicAndInternalConstructors().ToArrayOrSelf();
@@ -563,11 +563,11 @@ namespace DryIoc.MefAttributedModel
             if (ctor == null)
             {
                 // next try to fallback defined constructor, it may be defined as ConstructorWithResolvableArguments
-                if (fallbackSelector != null)
+                if (fallbackMethodOrSelector != null)
                 {
-                    var fallbackCtor = fallbackSelector(request);
-                    if (fallbackCtor != null)
-                        return fallbackCtor;
+                    var fallbackMethod = fallbackMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)fallbackMethodOrSelector)(request);
+                    if (fallbackMethod != null)
+                        return fallbackMethod;
                 }
 
                 // at the end try default constructor
@@ -1390,7 +1390,7 @@ namespace DryIoc.MefAttributedModel
             IEnumerable<Attribute> metaAttrs = ImplementationType.GetAttributes();
             if (made != null && made.FactoryMethodKnownResultType != null)
             {
-                var member = made.FactoryMethod(request: null).ConstructorOrMethodOrMember;
+                var member = (made.FactoryMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)made.FactoryMethodOrSelector)(null))?.ConstructorOrMethodOrMember;
                 if (member != null)
                     metaAttrs = metaAttrs.Concat(member.GetAttributes());
             }

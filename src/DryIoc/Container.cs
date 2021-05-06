@@ -3129,8 +3129,8 @@ namespace DryIoc
 
                 if (method == Resolver.ResolveFastMethod)
                 {
-                    var twoArgs = (InstanceTwoArgumentsMethodCallExpression)callExpr;
-                    result = resolver.Resolve((Type)ConstValue(twoArgs.Argument0), (IfUnresolved)ConstValue(twoArgs.Argument1));
+                    var args = (InstanceTwoArgumentsMethodCallExpression)callExpr;
+                    result = resolver.Resolve((Type)ConstValue(args.Argument0), (IfUnresolved)(ConstValue(args.Argument1)));
                     return true;
                 }
 
@@ -3207,8 +3207,8 @@ namespace DryIoc
         private static object InterpretGetScopedViaFactoryDelegateNoDisposalIndex(IResolverContext r,
             MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
-            var fewArgExpr = (FourArgumentsMethodCallExpression)callExpr;
-            var resolverArg = fewArgExpr.Argument0;
+            var args = (FourArgumentsMethodCallExpression)callExpr;
+            var resolverArg = args.Argument0;
             if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
             {
                 if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, out var resolverObj))
@@ -3219,12 +3219,11 @@ namespace DryIoc
             var scope = (Scope)r.CurrentScope;
             if (scope == null)
             {
-                var throwIfNoScopeArg = fewArgExpr.Argument1;
+                var throwIfNoScopeArg = args.Argument1;
                 return (bool)((ConstantExpression)throwIfNoScopeArg).Value ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
             }
 
-            var factoryIdArg = fewArgExpr.Argument2;
-            var id = (int)((ConstantExpression)factoryIdArg).Value;
+            var id = (int)((ConstantExpression)args.Argument2).Value;
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
@@ -3249,7 +3248,7 @@ namespace DryIoc
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            var lambda = fewArgExpr.Argument3;
+            var lambda = args.Argument3;
 
             object result = null;
             if (lambda is ConstantExpression lambdaConstExpr)
@@ -3283,8 +3282,7 @@ namespace DryIoc
                 return (bool)((ConstantExpression)throwIfNoScopeArg).Value ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
             }
 
-            var factoryIdArg = args.Argument2;
-            var id = (int)((ConstantExpression)factoryIdArg).Value;
+            var id = (int)((ConstantExpression)args.Argument2).Value;
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
@@ -3396,8 +3394,8 @@ namespace DryIoc
         private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, 
             MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
-            var fewArgExpr = (FourArgumentsMethodCallExpression)callExpr;
-            var resolverArg = fewArgExpr.Argument0;
+            var args = (FourArgumentsMethodCallExpression)callExpr;
+            var resolverArg = args.Argument0;
             if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
             {
                 if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, out var resolverObj))
@@ -3407,8 +3405,7 @@ namespace DryIoc
 
             var scope = (Scope)(r.CurrentScope ?? r.SingletonScope);
 
-            var factoryIdArg = fewArgExpr.Argument1;
-            var id = (int)((ConstantExpression)factoryIdArg).Value;
+            var id = (int)((ConstantExpression)args.Argument1).Value;
 
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
@@ -3434,7 +3431,7 @@ namespace DryIoc
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            var lambda = fewArgExpr.Argument2;
+            var lambda = args.Argument2;
             object result = null;
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
@@ -3443,7 +3440,7 @@ namespace DryIoc
             itemRef.Value = result;
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
             {
-                var disposalOrderArg = fewArgExpr.Argument3;
+                var disposalOrderArg = args.Argument3;
                 var disposalOrder = (int)((ConstantExpression)disposalOrderArg).Value;
                 if (disposalOrder == 0)
                     scope.AddUnorderedDisposable(disp);
@@ -3820,9 +3817,11 @@ namespace DryIoc
         /// ]]></code></example>
         public static IContainer WithDependencies(this IContainer container,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            container.With(rules => rules.With(Made.Of(
-                parameters: rules.Parameters.OverrideWith(parameters),
-                propertiesAndFields: rules.PropertiesAndFields.OverrideWith(propertiesAndFields)),
+            container.With(rules => rules.With(Made.Create(
+                rules.FactoryMethodOrSelector,
+                rules.Parameters.OverrideWith(parameters),
+                rules.PropertiesAndFields.OverrideWith(propertiesAndFields),
+                isConditionalImplementation: rules._made.IsConditionalImplementation),
                 overrideRegistrationMade: true));
 
         /// <summary>Result of GenerateResolutionExpressions methods</summary>
@@ -4801,7 +4800,7 @@ namespace DryIoc
             rules._settings &= ~Settings.ThrowOnRegisteringDisposableTransient;
             rules._settings &= ~Settings.VariantGenericTypesInResolvedCollection;
             rules._factorySelector = SelectLastRegisteredFactory;
-            rules._made._factoryMethod = DryIoc.FactoryMethod.ConstructorWithResolvableArguments;
+            rules._made.FactoryMethodOrSelector = DryIoc.FactoryMethod.ConstructorWithResolvableArguments;
             return rules;
         }
 
@@ -4849,8 +4848,8 @@ namespace DryIoc
         public Rules WithoutDependencyCountInLambdaToSplitBigObjectGraph() =>
             WithDependencyCountInLambdaToSplitBigObjectGraph(int.MaxValue);
 
-        /// <summary>Shorthand to <see cref="Made.FactoryMethod"/></summary>
-        public FactoryMethodSelector FactoryMethod => _made.FactoryMethod;
+        /// <summary>Shorthand to <see cref="Made.FactoryMethodOrSelector"/></summary>
+        public object FactoryMethodOrSelector => _made.FactoryMethodOrSelector;
 
         /// <summary>Shorthand to <see cref="Made.Parameters"/></summary>
         public ParameterSelector Parameters => _made.Parameters;
@@ -4890,10 +4889,11 @@ namespace DryIoc
                 FactorySelector, DefaultReuse,
                 _made == Made.Default
                     ? made
-                    : Made.Of(
-                        made.FactoryMethod ?? _made.FactoryMethod,
-                        made.Parameters ?? _made.Parameters,
-                        made.PropertiesAndFields ?? _made.PropertiesAndFields),
+                    : Made.Create( // todo: @bug @unclear should we replace it with override?
+                        made.FactoryMethodOrSelector     ?? _made.FactoryMethodOrSelector,
+                        made.Parameters                  ?? _made.Parameters,
+                        made.PropertiesAndFields         ?? _made.PropertiesAndFields,
+                        made.IsConditionalImplementation || _made.IsConditionalImplementation),
                 DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter,
                 DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -5572,7 +5572,7 @@ namespace DryIoc
             return newRules;
         }
 
-        private Made _made;
+        internal Made _made;
 
         [Flags]
         private enum Settings
@@ -5930,21 +5930,65 @@ namespace DryIoc
     }
 
     /// <summary>Rules how to: <list type="bullet">
-    /// <item>Select constructor for creating service with <see cref="FactoryMethod"/>.</item>
+    /// <item>Select constructor for creating service with <see cref="FactoryMethodOrSelector"/>.</item>
     /// <item>Specify how to resolve constructor parameters with <see cref="Parameters"/>.</item>
     /// <item>Specify what properties/fields to resolve and how with <see cref="PropertiesAndFields"/>.</item>
     /// </list></summary>
     public class Made
     {
-        /// <summary>Returns delegate to select constructor based on provided request.</summary>
-        public FactoryMethodSelector FactoryMethod { get => _factoryMethod; private set => _factoryMethod = value; }
-        internal FactoryMethodSelector _factoryMethod;
+        /// <summary>The factory method or its selector based on the request.</summary>
+        public object FactoryMethodOrSelector { get; internal set; }
 
         /// <summary>Return type of strongly-typed factory method expression.</summary>
-        public Type FactoryMethodKnownResultType { get; private set; }
+        public Type FactoryMethodKnownResultType { get; }
+
+        /// <summary>Specifies how constructor parameters should be resolved:
+        /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
+        public virtual ParameterSelector Parameters => null;
+
+        /// <summary>Specifies what <see cref="ServiceInfo"/> should be used when resolving property or field.</summary>
+        public virtual PropertiesAndFieldsSelector PropertiesAndFields => null;
+
+        internal virtual MadeDetails _details => MadeDetails.NoConditionals;
+
+        internal sealed class WithDetails : Made
+        {
+            public override ParameterSelector Parameters { get; }
+            public override PropertiesAndFieldsSelector PropertiesAndFields { get; }
+            internal override MadeDetails _details { get; }
+            public WithDetails(object factoryMethodOrSelector, Type factoryMethodKnownResultType, 
+                ParameterSelector parameters, PropertiesAndFieldsSelector propertiesAndFields, MadeDetails details) : 
+                base(factoryMethodOrSelector, factoryMethodKnownResultType)
+            {
+                _details = details;
+                Parameters = parameters;
+                PropertiesAndFields = propertiesAndFields;
+            }
+
+            internal WithDetails(object factoryMethodOrSelector, Type factoryMethodKnownResultType = null,
+                ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
+                bool hasCustomValue = false, bool isConditionalImplementation = false, bool implMemberDependsOnRequest = false) : 
+                base(factoryMethodOrSelector, factoryMethodKnownResultType)
+            {
+                var details = default(MadeDetails);
+
+                if (parameters != null || propertiesAndFields != null)
+                    details |= MadeDetails.ImplMemberDependsOnRequest;
+                if (hasCustomValue)
+                    details |= MadeDetails.HasCustomDependencyValue;
+                if (isConditionalImplementation)
+                    details |= MadeDetails.ImplTypeDependsOnRequest;
+                if (implMemberDependsOnRequest)
+                    details |= MadeDetails.ImplMemberDependsOnRequest;
+
+                _details = details;
+                Parameters = parameters;
+                PropertiesAndFields = propertiesAndFields;
+            }
+        }
 
         [Flags]
-        private enum MadeDetails
+        internal enum MadeDetails : byte
         {
             NoConditionals = 0,
             ImplTypeDependsOnRequest = 1 << 1, // todo: @unclear I am not sure why I am using shift to 1 as first and then shift to 3
@@ -5952,13 +5996,11 @@ namespace DryIoc
             HasCustomDependencyValue = 1 << 4
         }
 
-        private readonly MadeDetails _details;
-
         /// Has any conditional flags
         public bool IsConditional => _details != MadeDetails.NoConditionals; 
 
-        /// True is made has properties or parameters with custom value.
-        /// That's mean the whole made become context based which affects caching.
+        /// <summary>True if made has properties or parameters with custom value.
+        /// That's mean the whole made become context based which affects caching.</summary>
         public bool HasCustomDependencyValue => (_details & MadeDetails.HasCustomDependencyValue) != 0;
 
         /// <summary>Indicates that the implementation type depends on request.</summary>
@@ -5967,13 +6009,6 @@ namespace DryIoc
         /// Indicates that the member depends on request
         public bool IsImplMemberDependsOnRequest => (_details & MadeDetails.ImplMemberDependsOnRequest) != 0;
 
-        /// <summary>Specifies how constructor parameters should be resolved:
-        /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
-        public ParameterSelector Parameters { get; private set; }
-
-        /// <summary>Specifies what <see cref="ServiceInfo"/> should be used when resolving property or field.</summary>
-        public PropertiesAndFieldsSelector PropertiesAndFields { get; private set; }
-
         /// <summary>Outputs whatever is possible (known) for Made</summary>
         public override string ToString()
         {
@@ -5981,12 +6016,12 @@ namespace DryIoc
                 return "Made.Default";
 
             var s = "{";
-            if (FactoryMethod != null)
+            if (FactoryMethodOrSelector != null)
             {
                 s += (s == "{" ? "" : ", ") + "FactoryMethod=";
-                if (FactoryMethod == DryIoc.FactoryMethod.ConstructorWithResolvableArguments)
+                if (ReferenceEquals(FactoryMethodOrSelector, DryIoc.FactoryMethod.ConstructorWithResolvableArguments))
                     s += nameof(DryIoc.FactoryMethod.ConstructorWithResolvableArguments);
-                else if (FactoryMethod == DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic)
+                else if (ReferenceEquals(FactoryMethodOrSelector, DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic))
                     s += nameof(DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
                 else
                     s += "<custom>";
@@ -6004,40 +6039,45 @@ namespace DryIoc
         }
 
         /// <summary>Container will use some sensible defaults for service creation.</summary>
-        public static readonly Made Default = new Made();
+        public static readonly Made Default = new Made(null);
 
-        /// <summary>Creates rules with only <see cref="FactoryMethod"/> specified.</summary>
+        /// <summary>Creates rules with only <see cref="FactoryMethodOrSelector"/> specified.</summary>
         public static implicit operator Made(FactoryMethodSelector factoryMethod) => new Made(factoryMethod);
 
         /// <summary>Creates rules with only <see cref="Parameters"/> specified.</summary>
-        public static implicit operator Made(ParameterSelector parameters) => new Made(null, parameters);
+        public static implicit operator Made(ParameterSelector parameters) => new WithDetails(null, null, parameters);
 
         /// <summary>Creates rules with only <see cref="PropertiesAndFields"/> specified.</summary>
-        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields) => new Made(null, null, propertiesAndFields);
+        public static implicit operator Made(PropertiesAndFieldsSelector propertiesAndFields) => new WithDetails(null, null, null, propertiesAndFields);
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
-        public static Made Of(FactoryMethodSelector factoryMethod = null,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            bool isConditionalImplementation = false) =>
-            factoryMethod == null && parameters == null && propertiesAndFields == null && !isConditionalImplementation ? Default :
-            new Made(factoryMethod, parameters, propertiesAndFields, isConditionalImplementation: isConditionalImplementation);
+        public static Made Of(FactoryMethodSelector factoryMethodSelector = null,
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null, bool isConditionalImplementation = false) =>
+            Create(factoryMethodSelector, parameters, propertiesAndFields, isConditionalImplementation);
+
+        internal static Made Create(object factoryMethodOrSelector,
+            ParameterSelector parameters, PropertiesAndFieldsSelector propertiesAndFields, bool isConditionalImplementation)
+        {
+            bool withDetails = parameters != null || propertiesAndFields != null || isConditionalImplementation;
+            return factoryMethodOrSelector == null && !withDetails ? Default
+                : !withDetails ? new Made(factoryMethodOrSelector)
+                : new WithDetails(factoryMethodOrSelector, null, parameters, propertiesAndFields, isConditionalImplementation: isConditionalImplementation);
+        }
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
-        /// <param name="factoryMethod">Known factory method.</param>
-        /// <param name="parameters">(optional)</param> <param name="propertiesAndFields">(optional)</param>
-        /// <returns>New injection rules.</returns>
         public static Made Of(FactoryMethod factoryMethod,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null)
         {
-            var methodReturnType = factoryMethod.ThrowIfNull()
-                .ConstructorOrMethodOrMember.GetReturnTypeOrDefault();
+            var methodReturnType = factoryMethod.ThrowIfNull().ConstructorOrMethodOrMember.GetReturnTypeOrDefault();
 
             // Normalizes open-generic type to open-generic definition,
             // because for base classes and return types it may not be the case (they may be partially closed).
             if (methodReturnType != null && methodReturnType.IsOpenGeneric())
                 methodReturnType = methodReturnType.GetGenericTypeDefinition();
 
-            return new Made(factoryMethod.ToFunc<Request, FactoryMethod>, parameters, propertiesAndFields, methodReturnType);
+            return parameters == null && propertiesAndFields == null
+                ? new Made(factoryMethod, methodReturnType)
+                : new WithDetails(factoryMethod, methodReturnType, parameters, propertiesAndFields);
         }
 
         /// <summary>Creates factory method specification</summary>
@@ -6046,23 +6086,21 @@ namespace DryIoc
             Of(DryIoc.FactoryMethod.Of(factoryMethodOrMember, factoryInfo), parameters, propertiesAndFields);
 
         /// <summary>Creates factory specification with implementation type, conditionally depending on request.</summary>
-        public static Made Of(Func<Request, Type> getImplType,
-            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getImplType(r).SingleConstructor()),
-                parameters, propertiesAndFields, isConditionalImplementation: true);
+        public static Made Of(Func<Request, Type> getImplType, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
+            Of(r => DryIoc.FactoryMethod.Of(getImplType(r).SingleConstructor()), parameters, propertiesAndFields, isConditionalImplementation: true);
 
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/> is method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, ServiceInfo factoryInfo = null,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo),
+            new WithDetails((FactoryMethodSelector)(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo)), null,
                 parameters, propertiesAndFields, implMemberDependsOnRequest: true);
 
         /// <summary>Creates factory specification with method or member selector based on request.
         /// Where <paramref name="getMethodOrMember"/>Method, or constructor, or member selector.</summary>
         public static Made Of(Func<Request, MemberInfo> getMethodOrMember, Func<Request, ServiceInfo> factoryInfo,
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            new Made(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r)),
+            new WithDetails((FactoryMethodSelector)(r => DryIoc.FactoryMethod.Of(getMethodOrMember(r), factoryInfo(r))), null,
                 parameters, propertiesAndFields, implMemberDependsOnRequest: true);
 
         /// <summary>Defines how to select constructor from implementation type.
@@ -6170,75 +6208,65 @@ namespace DryIoc
 
             var hasCustomValue = false;
 
-            var parameterSelector = parameters.IsNullOrEmpty() ? null
-                : ComposeParameterSelectorFromArgs(ref hasCustomValue,
-                    serviceReturningExpr, parameters, argExprs, argValues);
+            var parameterSelector = parameters.IsNullOrEmpty() ? null : 
+                ComposeParameterSelectorFromArgs(ref hasCustomValue, serviceReturningExpr, parameters, argExprs, argValues);
 
-            var propertiesAndFieldsSelector =
-                memberBindingExprs == null || memberBindingExprs.Count == 0 ? null
-                : ComposePropertiesAndFieldsSelector(ref hasCustomValue,
-                    serviceReturningExpr, memberBindingExprs, argValues);
+            var propertiesAndFieldsSelector = memberBindingExprs == null || memberBindingExprs.Count == 0 ? null : 
+                ComposePropertiesAndFieldsSelector(ref hasCustomValue, serviceReturningExpr, memberBindingExprs, argValues);
 
-            return new TypedMade<TService>(getFactoryMethodSelector(ctorOrMethodOrMember),
+            return new WithDetails<TService>(getFactoryMethodSelector(ctorOrMethodOrMember),
                 parameterSelector, propertiesAndFieldsSelector, hasCustomValue);
         }
 
         /// <summary>Typed version of <see cref="Made"/> specified with statically typed expression tree.</summary>
-        public sealed class TypedMade<TService> : Made
+        public class TypedMade<TService> : Made
         {
-            internal TypedMade(FactoryMethodSelector factoryMethod = null,
+            internal TypedMade(FactoryMethodSelector factoryMethod) : base(factoryMethod, typeof(TService)) { }
+        }
+
+        internal sealed class WithDetails<TService> : TypedMade<TService>
+        {
+            public override ParameterSelector Parameters { get; }
+            public override PropertiesAndFieldsSelector PropertiesAndFields { get; }
+            internal override MadeDetails _details { get; }
+            public WithDetails(FactoryMethodSelector factoryMethod,
                 ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-                bool hasCustomValue = false)
-                : base(factoryMethod, parameters, propertiesAndFields, typeof(TService), hasCustomValue)
-            { }
+                bool hasCustomValue = false, bool isConditionalImplementation = false, bool implMemberDependsOnRequest = false) : 
+                base(factoryMethod) 
+            {
+                var details = default(MadeDetails);
+
+                if (parameters != null || propertiesAndFields != null)
+                    details |= MadeDetails.ImplMemberDependsOnRequest;
+                if (hasCustomValue)
+                    details |= MadeDetails.HasCustomDependencyValue;
+                if (isConditionalImplementation)
+                    details |= MadeDetails.ImplTypeDependsOnRequest;
+                if (implMemberDependsOnRequest)
+                    details |= MadeDetails.ImplMemberDependsOnRequest;
+
+                _details = details;
+                Parameters = parameters;
+                PropertiesAndFields = propertiesAndFields;
+            }
         }
 
-        // todo: @perf split the Made classes per data passed to the constructors.
-        internal Made(
-            FactoryMethodSelector factoryMethod = null, ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-            Type factoryMethodKnownResultType = null, bool hasCustomValue = false, bool isConditionalImplementation = false, 
-            bool implMemberDependsOnRequest = false)
+        internal Made(object factoryMethodOrSelector, Type factoryReturnType = null)
         {
-            FactoryMethod       = factoryMethod;
-            Parameters          = parameters;
-            PropertiesAndFields = propertiesAndFields;
-            FactoryMethodKnownResultType = factoryMethodKnownResultType;
-
-            var details = default(MadeDetails);
-
-            if (parameters != null || propertiesAndFields != null)
-                details |= MadeDetails.ImplMemberDependsOnRequest;
-
-            if (hasCustomValue)
-                details |= MadeDetails.HasCustomDependencyValue;
-            if (isConditionalImplementation)
-                details |= MadeDetails.ImplTypeDependsOnRequest;
-            if (implMemberDependsOnRequest)
-                details |= MadeDetails.ImplMemberDependsOnRequest;
-            _details = details;
-        }
-
-        // todo: @perf split the Made classes per data passed to the constructors.
-        internal Made(FactoryMethod factoryMethod, Type factoryReturnType)
-        {
-            FactoryMethod = factoryMethod.ToFunc<Request, FactoryMethod>;
+            FactoryMethodOrSelector      = factoryMethodOrSelector;
             FactoryMethodKnownResultType = factoryReturnType;
         }
 
-        // todo: @perf split the Made classes per data passed to the constructors.
-        private Made(
-            FactoryMethodSelector factoryMethod, ParameterSelector parameters, PropertiesAndFieldsSelector propertiesAndFields,
-            Type factoryMethodKnownResultType, MadeDetails details)
+        internal Made(FactoryMethod factoryMethod, Type factoryReturnType)
         {
-            FactoryMethod = factoryMethod;
-            Parameters = parameters;
-            PropertiesAndFields = propertiesAndFields;
-            FactoryMethodKnownResultType = factoryMethodKnownResultType;
-            _details = details;
+            FactoryMethodOrSelector      = factoryMethod;
+            FactoryMethodKnownResultType = factoryReturnType;
         }
 
-        internal Made Clone() =>
-            new Made(FactoryMethod, Parameters, PropertiesAndFields, FactoryMethodKnownResultType, _details);
+        internal Made Clone() => // it does not return Default made as-is because the cloned result supposed to be mutated
+            _details == default 
+                ? new Made       (FactoryMethodOrSelector, FactoryMethodKnownResultType)
+                : new WithDetails(FactoryMethodOrSelector, FactoryMethodKnownResultType, Parameters, PropertiesAndFields, _details);
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
             System.Linq.Expressions.Expression wholeServiceExpr, ParameterInfo[] paramInfos,
@@ -9165,15 +9193,12 @@ private ParameterServiceInfo(ParameterInfo p)
             /// <inheritdoc />
             public override FactoryType FactoryType => FactoryType.Service;
 
-            /// <summary>Evaluates metadata if it specified as Func of object, and replaces Func with its result!.
-            /// Otherwise just returns metadata object.</summary>
+            /// <summary>Evaluates metadata if it specified as Func of object, and replaces Func with its result, otherwise just returns metadata object.</summary>
             /// <remarks>Invocation of Func metadata is Not thread-safe. Please take care of that inside the Func.</remarks>
             public override object Metadata =>
-                _metadataOrFuncOfMetadata is Func<object> metaFactory
-                    ? (_metadataOrFuncOfMetadata = metaFactory())
-                    : _metadataOrFuncOfMetadata;
+                _metadataOrFuncOfMetadata is Func<object> metaFactory ? (_metadataOrFuncOfMetadata = metaFactory()) : _metadataOrFuncOfMetadata;
 
-            /// All settings are set to defaults.
+            /// All settings are set to the default.
             public ServiceSetup() { }
 
             /// Specify all the individual settings.
@@ -9751,8 +9776,8 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// <summary>Combines source selector with other. Other is used as fallback when source returns null.</summary>
         public static ParameterSelector OverrideWith(this ParameterSelector source, ParameterSelector other) =>
-            source == null || source == Of ? other ?? Of
-            : other == null || other == Of ? source
+            source  == null || source == Of ? other ?? Of
+            : other == null || other  == Of ? source
             : req => paramInfo => other(req)?.Invoke(paramInfo) ?? source(req)?.Invoke(paramInfo);
 
         /// <summary>Obsolete: please use <see cref="OverrideWith"/></summary>
@@ -10054,10 +10079,10 @@ private ParameterServiceInfo(ParameterInfo p)
             var ctor = _knownPublicCtorOrCtors as ConstructorInfo;
             if (ctor == null)
             {
-                var factoryMethodSelector = Made.FactoryMethod ?? rules.FactoryMethod;
+                var factoryMethodSelector = Made.FactoryMethodOrSelector ?? rules.FactoryMethodOrSelector;
                 if (factoryMethodSelector != null)
                 {
-                    factoryMethod = factoryMethodSelector.Invoke(request);
+                    factoryMethod = factoryMethodSelector as FactoryMethod ?? ((FactoryMethodSelector)factoryMethodSelector)(request);
                     if (factoryMethod == null)
                     {
                         if (request.IfUnresolved != IfUnresolved.ReturnDefault)
@@ -10320,7 +10345,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 var serviceType = paramRequest.ServiceType;
                 if (request.Container.TryGetUsedInstance(RuntimeHelpers.GetHashCode(serviceType), serviceType, out var instance))
                     return Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
-                        Constant(serviceType, typeof(Type)), Constant(paramRequest.IfUnresolved));
+                        Constant(serviceType), Constant(paramRequest.IfUnresolved));
             }
 
             return null;
@@ -10335,8 +10360,8 @@ private ParameterServiceInfo(ParameterInfo p)
                 return true;
 
             var implType = ImplementationType;
-            var factoryMethod = Made.FactoryMethod ?? rules.FactoryMethod;
-            if (factoryMethod == null || factoryMethod == FactoryMethod.ConstructorWithResolvableArguments) // optimizing for one of the common cases with the ConstructorWithResolvableArguments
+            var factoryMethod = Made.FactoryMethodOrSelector ?? rules.FactoryMethodOrSelector;
+            if (factoryMethod == null || ReferenceEquals(factoryMethod, FactoryMethod.ConstructorWithResolvableArguments)) // optimizing for one of the common cases with the ConstructorWithResolvableArguments
             {
                 var ctors = implType.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
                 var ctorCount = ctors.Length;
@@ -10444,11 +10469,11 @@ private ParameterServiceInfo(ParameterInfo p)
                     return null;
 
                 var made = openFactory.Made;
-                if (made.FactoryMethod != null)
+                if (made.FactoryMethodOrSelector != null)
                 {
                     // resolve request with factory to specify the implementation type may be required by FactoryMethod or GetClosed...
                     request = request.WithResolvedFactory(openFactory, ifErrorReturnDefault, ifErrorReturnDefault, copyRequest: true);
-                    var factoryMethod = made.FactoryMethod(request);
+                    var factoryMethod = made.FactoryMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)made.FactoryMethodOrSelector)(request);
                     if (factoryMethod == null)
                         return ifErrorReturnDefault ? null : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
 
@@ -10523,7 +10548,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 implType == typeof(object) || // required as currently object represents the open-generic type argument T registrations
                 implType.IsAbstract)
             {
-                if (made.FactoryMethod == null)
+                if (made.FactoryMethodOrSelector == null)
                 {
                     if (implType == null)
                         Throw.It(Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
@@ -10863,8 +10888,7 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             // unpacks the weak-reference
             if (Setup.WeaklyReferenced)
-                return Call(
-                    typeof(ThrowInGeneratedCode).GetMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
+                return Call(typeof(ThrowInGeneratedCode).GetMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
                     Property(Constant(Instance, typeof(WeakReference)), typeof(WeakReference).Property(nameof(WeakReference.Target))));
 
             // otherwise just return a constant
@@ -11556,8 +11580,7 @@ private ParameterServiceInfo(ParameterInfo p)
                     request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID);
 
                 Expression factoryDelegateExpr;
-                if (serviceFactoryExpr is InvocationExpression ie &&
-                    ie.Expression is ConstantExpression registeredDelegateExpr &&
+                if (serviceFactoryExpr is InvocationExpression ie && ie.Expression is ConstantExpression registeredDelegateExpr &&
                     registeredDelegateExpr.Type == typeof(FactoryDelegate))
                 {
                     factoryDelegateExpr = registeredDelegateExpr;
