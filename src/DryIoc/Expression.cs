@@ -907,7 +907,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
         public static ListInitExpression ListInit(NewExpression newExpression, IEnumerable<ElementInit> initializers) =>
             new ListInitExpression(newExpression, initializers.AsReadOnlyList());
-
+        // todo: @perf optimize for the small amount of initializers the same as NewArrayInit
         public static ListInitExpression ListInit(NewExpression newExpression, params ElementInit[] initializers) =>
             new ListInitExpression(newExpression, initializers);
 
@@ -1308,10 +1308,13 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             new WithFinallyTryExpression(body, null, @finally);
 
         public static CatchBlock Catch(ParameterExpression variable, Expression body) =>
-            new CatchBlock(variable, body, null, variable.Type);
+            new CatchBlock(variable.Type, variable, body, null);
 
         public static CatchBlock Catch(Type test, Expression body) =>
-            new CatchBlock(null, body, null, test);
+            new CatchBlock(test, null, body, null);
+
+        public static CatchBlock MakeCatchBlock(Type test, ParameterExpression variable, Expression body, Expression filter) =>
+            new CatchBlock(test, variable, body, filter);
 
         /// <summary>Creates a UnaryExpression that represents a throwing of an exception.</summary>
         public static UnaryExpression Throw(Expression value) => new ThrowUnaryExpression(value);
@@ -3149,10 +3152,8 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public sealed class TypedBlockExpression : BlockExpression
     {
         public override Type Type { get; }
-        internal TypedBlockExpression(Type type, IReadOnlyList<Expression> expressions) : base(expressions) =>
-            Type = type;
+        internal TypedBlockExpression(Type type, IReadOnlyList<Expression> expressions) : base(expressions) => Type = type;
     }
-
 
     public class ManyVariablesBlockExpression : BlockExpression
     {
@@ -3249,19 +3250,18 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             Finally = @finally;
     }
 
-    // todo: @perf convert to class and minimize the memory for the general cases
-    public struct CatchBlock
+    public sealed class CatchBlock
     {
+        public readonly Type Test;
         public readonly ParameterExpression Variable;
         public readonly Expression Body;
         public readonly Expression Filter;
-        public readonly Type Test;
-        internal CatchBlock(ParameterExpression variable, Expression body, Expression filter, Type test)
+        internal CatchBlock(Type test, ParameterExpression variable, Expression body, Expression filter)
         {
+            Test     = test;
             Variable = variable;
-            Body = body;
-            Filter = filter;
-            Test = test;
+            Body     = body;
+            Filter   = filter;
         }
     }
 
@@ -3348,6 +3348,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class ValueGotoExpression : GotoExpression
     {
+        public override Type Type => Target.Type; // non-void when the Value expression is provided
         public override Expression Value { get; }
         internal ValueGotoExpression(LabelTarget target, Expression value) : base(target) =>
             Value = value;
