@@ -1187,6 +1187,14 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |             DryIoc | 81.88 us | 1.628 us | 2.485 us |  1.09 |    0.03 |  9.8877 | 0.8545 |     - |   61.1 KB |
 | DryIoc_MsDIAdapter | 99.76 us | 2.597 us | 7.239 us |  1.31 |    0.09 | 12.3291 | 1.0986 |     - |  75.81 KB |
 
+### Unbox the Constant
+
+|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|               MsDI | 75.80 us | 1.512 us | 2.264 us |  1.00 |    0.00 | 11.4746 | 2.9297 |     - |  70.55 KB |
+|             DryIoc | 76.77 us | 0.411 us | 0.364 us |  1.02 |    0.03 |  9.6436 | 0.8545 |     - |  59.65 KB |
+| DryIoc_MsDIAdapter | 87.58 us | 1.708 us | 2.097 us |  1.15 |    0.04 | 12.0850 | 1.0986 |     - |  74.07 KB |
+
 */
             [Benchmark(Baseline = true)]
             public object MsDI() => Measure(PrepareMsDi());
@@ -1194,7 +1202,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             [Benchmark]
             public object DryIoc() => Measure(PrepareDryIoc());
 
-            // [Benchmark]
+            [Benchmark]
             public object DryIoc_MsDIAdapter() => Measure(PrepareDryIocMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark
@@ -1572,7 +1580,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace() => Measure(_grace);
 
             // [Benchmark]

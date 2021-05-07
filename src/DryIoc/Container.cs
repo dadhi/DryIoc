@@ -1487,7 +1487,7 @@ namespace DryIoc
                 return itemType == null ? Constant(item) : Constant(item, itemType);
 
             if (item == null)
-                return itemType == null || itemType == typeof(object) ? Constant(null) : Constant(null, itemType);
+                return itemType == null || itemType == typeof(object) ? NullConstant : Constant(null, itemType);
 
             var convertible = item as IConvertibleToExpression;
             if (convertible != null)
@@ -2562,7 +2562,7 @@ namespace DryIoc
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
-            New(_ctor, Constant(RequiredServiceType, typeof(Type)), fallbackConverter(ServiceKey));
+            New(_ctor, ConstantOf<Type>(RequiredServiceType), fallbackConverter(ServiceKey));
 
         private static readonly ConstructorInfo _ctor = typeof(OpenGenericTypeKey).GetConstructors()[0];
     }
@@ -3048,7 +3048,7 @@ namespace DryIoc
                 if (method == CurrentScopeReuse.TrackScopedMethod)
                 {
                     var args = (ThreeArgumentsMethodCallExpression)callExpr;
-                    var scope = resolver.GetCurrentScope((bool)((ConstantExpression)args.Argument1).Value);
+                    var scope = resolver.GetCurrentScope((bool)ConstValue(args.Argument1));
                     if (scope == null)
                         result = null; // result is null in this case
                     else
@@ -3084,7 +3084,7 @@ namespace DryIoc
                     var args = (InstanceFourArgumentsMethodCallExpression)callExpr;
                     r = r.Root ?? r;
                     // check if scoped dependency is already in scope, then just return it
-                    var factoryId = (int) ConstValue(args.Argument0);
+                    var factoryId = TryGetIntConstantValue(args.Argument0);
                     if (!r.SingletonScope.TryGet(out result, factoryId))
                     {
                         result = r.SingletonScope.TryGetOrAddWithoutClosure(factoryId, r, ((LambdaExpression)args.Argument1).Body,
@@ -3094,7 +3094,7 @@ namespace DryIoc
                                     return value;
                                 return e.CompileToFactoryDelegate(((IContainer)rc).Rules.UseInterpretation)(rc);
                             },
-                            (int)ConstValue(args.Argument3));
+                            TryGetIntConstantValue(args.Argument3));
                     }
 
                     return true;
@@ -3108,7 +3108,7 @@ namespace DryIoc
                         return false;
                     if (service is IDisposable d) 
                     {
-                        var disposalOrder = (int)ConstValue(args.Argument1);
+                        var disposalOrder = TryGetIntConstantValue(args.Argument1);
                         result = disposalOrder == 0
                             ? r.SingletonScope.TrackDisposableWithoutDisposalOrder(d)
                             : r.SingletonScope.TrackDisposable(service, disposalOrder);
@@ -3130,29 +3130,30 @@ namespace DryIoc
                 if (method == Resolver.ResolveFastMethod)
                 {
                     var args = (InstanceTwoArgumentsMethodCallExpression)callExpr;
-                    result = resolver.Resolve((Type)ConstValue(args.Argument0), (IfUnresolved)(ConstValue(args.Argument1)));
+                    result = resolver.Resolve((Type)ConstValue(args.Argument0), (IfUnresolved)ConstValue(args.Argument1));
                     return true;
                 }
 
                 if (method == Resolver.ResolveMethod)
                 {
-                    InterpretResolveMethod(resolver, (InstanceSixArgumentsMethodCallExpression)callExpr, 
-                        paramExprs, paramValues, parentArgs, out result);
+                    var args = (InstanceSixArgumentsMethodCallExpression)callExpr;
+                    TryInterpret(resolver, args.Argument1, paramExprs, paramValues, parentArgs, out var serviceKey);
+                    TryInterpret(resolver, args.Argument4, paramExprs, paramValues, parentArgs, out var preResolveParent);
+                    TryInterpret(resolver, args.Argument5, paramExprs, paramValues, parentArgs, out var resolveArgs);
+                    result = resolver.Resolve(
+                        (Type)ConstValue(args.Argument0), serviceKey, (IfUnresolved)ConstValue(args.Argument2),
+                        (Type)ConstValue(args.Argument3), (Request)preResolveParent, (object[])resolveArgs);
                     return true;
                 }
 
                 if (method == Resolver.ResolveManyMethod)
                 {
                     var fiveArgs = (InstanceFiveArgumentsMethodCallExpression)callExpr;
-                    object serviceKey = null, preResolveParent = null, resolveArgs = null;
-                    if (!TryInterpret(resolver, fiveArgs.Argument1, paramExprs, paramValues, parentArgs, out serviceKey) ||
-                        !TryInterpret(resolver, fiveArgs.Argument3, paramExprs, paramValues, parentArgs, out preResolveParent) ||
-                        !TryInterpret(resolver, fiveArgs.Argument4, paramExprs, paramValues, parentArgs, out resolveArgs))
-                        return false;
-
+                    TryInterpret(resolver, fiveArgs.Argument1, paramExprs, paramValues, parentArgs, out var serviceKey);
+                    TryInterpret(resolver, fiveArgs.Argument3, paramExprs, paramValues, parentArgs, out var preResolveParent);
+                    TryInterpret(resolver, fiveArgs.Argument4, paramExprs, paramValues, parentArgs, out var resolveArgs);
                     result = resolver.ResolveMany(
-                        (Type)ConstValue(fiveArgs.Argument0), serviceKey, (Type)ConstValue(fiveArgs.Argument2),
-                        (Request)preResolveParent, (object[])resolveArgs);
+                        (Type)ConstValue(fiveArgs.Argument0), serviceKey, (Type)ConstValue(fiveArgs.Argument2), (Request)preResolveParent, (object[])resolveArgs);
                     return true;
                 }
             }
@@ -3188,22 +3189,6 @@ namespace DryIoc
             return true;
         }
 
-        internal static void InterpretResolveMethod(IResolverContext resolver, InstanceSixArgumentsMethodCallExpression args,
-            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, out object result)
-        {
-            TryInterpret(resolver, args.Argument1, paramExprs, paramValues, parentArgs, out var serviceKey);
-            TryInterpret(resolver, args.Argument4, paramExprs, paramValues, parentArgs, out var preResolveParent);
-            TryInterpret(resolver, args.Argument5, paramExprs, paramValues, parentArgs, out var resolveArgs);
-
-            result = resolver.Resolve((Type)
-                ((ConstantExpression) args.Argument0).Value,
-                serviceKey,
-                (IfUnresolved) ((ConstantExpression) args.Argument2).Value,
-                (Type) ((ConstantExpression)args.Argument3).Value,
-                (Request) preResolveParent,
-                (object[]) resolveArgs);
-        }
-
         private static object InterpretGetScopedViaFactoryDelegateNoDisposalIndex(IResolverContext r,
             MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
@@ -3218,12 +3203,9 @@ namespace DryIoc
 
             var scope = (Scope)r.CurrentScope;
             if (scope == null)
-            {
-                var throwIfNoScopeArg = args.Argument1;
-                return (bool)((ConstantExpression)throwIfNoScopeArg).Value ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
-            }
+                return (bool)ConstValue(args.Argument1) ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
 
-            var id = (int)((ConstantExpression)args.Argument2).Value;
+            var id = TryGetIntConstantValue(args.Argument2);
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
@@ -3277,12 +3259,9 @@ namespace DryIoc
 
             var scope = (Scope)r.CurrentScope;
             if (scope == null)
-            {
-                var throwIfNoScopeArg = args.Argument1;
-                return (bool)((ConstantExpression)throwIfNoScopeArg).Value ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
-            }
+                return (bool)ConstValue(args.Argument1) ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
 
-            var id = (int)((ConstantExpression)args.Argument2).Value;
+            var id = TryGetIntConstantValue(args.Argument2);
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
@@ -3318,8 +3297,7 @@ namespace DryIoc
 
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
             {
-                var disposalOrderArg = args.Argument4;
-                var disposalOrder = (int)((ConstantExpression)disposalOrderArg).Value;
+                var disposalOrder = TryGetIntConstantValue(args.Argument4);
                 if (disposalOrder == 0)
                     scope.AddUnorderedDisposable(disp);
                 else
@@ -3341,7 +3319,7 @@ namespace DryIoc
                 r = (IResolverContext)resolverObj;
             }
 
-            var scope = (Scope)r.GetNamedScope(((ConstantExpression)args.Argument1).Value, (bool)((ConstantExpression)args.Argument2).Value);
+            var scope = (Scope)r.GetNamedScope(ConstValue(args.Argument1), (bool)ConstValue(args.Argument2));
             if (scope == null)
                 return null; // result is null in this case
 
@@ -3349,7 +3327,8 @@ namespace DryIoc
                 Throw.It(Error.ScopeIsDisposed, scope.ToString());
 
             // check if scoped dependency is already in scope, then just return it
-            var id = (int)((ConstantExpression)args.Argument3).Value;
+            var id = TryGetIntConstantValue(args.Argument3);
+
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
@@ -3381,7 +3360,7 @@ namespace DryIoc
 
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
             {
-                var disposalOrder = (int)((ConstantExpression)args.Argument5).Value; //@perf no need for this if we have a overload without disposal index
+                var disposalOrder = TryGetIntConstantValue(args.Argument5); //todo: @perf no need for this if we have a overload without disposal index
                 if (disposalOrder == 0)
                     scope.AddUnorderedDisposable(disp);
                 else
@@ -3405,7 +3384,7 @@ namespace DryIoc
 
             var scope = (Scope)(r.CurrentScope ?? r.SingletonScope);
 
-            var id = (int)((ConstantExpression)args.Argument1).Value;
+            var id = TryGetIntConstantValue(args.Argument1);
 
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
@@ -3440,8 +3419,7 @@ namespace DryIoc
             itemRef.Value = result;
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
             {
-                var disposalOrderArg = args.Argument3;
-                var disposalOrder = (int)((ConstantExpression)disposalOrderArg).Value;
+                var disposalOrder = TryGetIntConstantValue(args.Argument3);
                 if (disposalOrder == 0)
                     scope.AddUnorderedDisposable(disp);
                 else
@@ -3508,7 +3486,7 @@ namespace DryIoc
             }
 
             if (expr.Type != typeof(void) && expr.Type.IsValueType)
-                return Convert(expr, typeof(object));
+                return Convert<object>(expr);
 
             return expr;
         }
@@ -3578,6 +3556,21 @@ namespace DryIoc
     /// <summary>Container extended features.</summary>
     public static class ContainerTools
     {
+        internal static readonly ConstantExpression NullTypeConstant = ConstantNull<Type>();
+        [MethodImpl((MethodImplOptions)256)]
+        internal static ConstantExpression ToConstant(this Type type) =>
+            type == null ? NullTypeConstant : ConstantOf<Type>(type);
+
+        internal static readonly ConstantExpression IfUnresolvedThrowConstant = Constant(IfUnresolved.Throw);
+        internal static readonly ConstantExpression IfUnresolvedReturnDefaultConstant = Constant(IfUnresolved.ReturnDefault);
+        internal static readonly ConstantExpression IfUnresolvedReturnDefaultIfNotRegisteredConstant = Constant(IfUnresolved.ReturnDefaultIfNotRegistered);
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal static ConstantExpression ToConstant(this IfUnresolved ifUnresolved) =>
+            ifUnresolved == IfUnresolved.Throw ? IfUnresolvedThrowConstant :
+            ifUnresolved == IfUnresolved.ReturnDefault ? IfUnresolvedThrowConstant :
+            IfUnresolvedReturnDefaultIfNotRegisteredConstant;
+
         /// <summary>The default key for services registered into container created by <see cref="CreateFacade"/></summary>
         public const string FacadeKey = "@facade";
 
@@ -3980,7 +3973,7 @@ namespace DryIoc
             var decoratedFactoryID = r.DecoratedFactoryID;
 
             var serviceTypeExpr = Constant(serviceType);
-            var factoryIdExpr = Constant(factoryID);
+            var factoryIdExpr = Constant(factoryID); // todo: @perf remove boxing
             var implTypeExpr = Constant(implementationType);
             var reuseExpr = r.Reuse == null ? Constant(null, typeof(IReuse))
                 : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
@@ -3993,8 +3986,8 @@ namespace DryIoc
 
             var requiredServiceTypeExpr = Constant(requiredServiceType);
             var serviceKeyExpr = container.GetConstantExpression(serviceKey, typeof(object));
-            var factoryTypeExpr = Constant(factoryType);
-            var flagsExpr = Constant(flags);
+            var factoryTypeExpr = Constant(factoryType); // todo: @perf all types to the singleton constants
+            var flagsExpr = Constant(flags);// todo: @perf remove boxing
 
             if (ifUnresolved == IfUnresolved.Throw &&
                 metadataKey == null && metadata == null && decoratedFactoryID == 0)
@@ -4002,7 +3995,7 @@ namespace DryIoc
                     serviceTypeExpr, requiredServiceTypeExpr, serviceKeyExpr,
                     factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr, flagsExpr);
 
-            var ifUnresolvedExpr = Constant(ifUnresolved);
+            var ifUnresolvedExpr = ifUnresolved.ToConstant();
             var decoratedFactoryIDExpr = Constant(decoratedFactoryID);
 
             if (metadataKey == null && metadata == null)
@@ -4073,7 +4066,7 @@ namespace DryIoc
 
         /// <summary>Converts to expression</summary>
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
-            Call(_ofMethod, Constant(RegistrationOrder));
+            Call(_ofMethod, Constant(RegistrationOrder)); // todo: @perf remove boxing
 
         /// <summary>Returns next default key with increased <see cref="RegistrationOrder"/>.</summary>
         public DefaultKey Next() => Of(RegistrationOrder + 1);
@@ -4108,7 +4101,7 @@ namespace DryIoc
 
         /// <summary>Converts to expression</summary>
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
-            Call(_ofMethod, Constant(RegistrationOrder));
+            Call(_ofMethod, Constant(RegistrationOrder));// todo: @perf remove boxing
 
         /// <summary>Returns next dynamic key with increased <see cref="RegistrationOrder"/>.</summary> 
         public DefaultDynamicKey Next() => Of(RegistrationOrder + 1);
@@ -4602,7 +4595,7 @@ namespace DryIoc
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)
                 return null;
-            return Constant(expr.WrapInFactoryExpression().ToLambdaExpression(), typeof(System.Linq.Expressions.LambdaExpression));
+            return ConstantOf<System.Linq.Expressions.LambdaExpression>(expr.WrapInFactoryExpression().ToLambdaExpression());
         }
 
         private static Expression GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(Request request)
@@ -4611,7 +4604,7 @@ namespace DryIoc
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)
                 return null;
-            return Constant(expr.WrapInFactoryExpression(), typeof(FastExpressionCompiler.LightExpression.LambdaExpression));
+            return ConstantOf<FastExpressionCompiler.LightExpression.LambdaExpression>(expr.WrapInFactoryExpression());
         }
 
         private static Expression GetFactoryDelegateExpressionOrDefault(Request request)
@@ -4633,9 +4626,7 @@ namespace DryIoc
             if (wrapperType == typeof(FactoryDelegate))
                 return Constant(expr.CompileToFactoryDelegate(rules.UseInterpretation));
 
-            return Constant(
-                expr.CompileToFactoryDelegate(wrapperType, serviceType, rules.UseInterpretation),
-                wrapperType);
+            return Constant(expr.CompileToFactoryDelegate(wrapperType, serviceType, rules.UseInterpretation), wrapperType);
         }
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request)
@@ -6961,7 +6952,7 @@ namespace DryIoc
             //     reuse, setup, ifAlreadyRegistered, serviceKey);
             r.Register(new ReflectionFactory(serviceType, reuse, new Made(new FactoryMethod.WithFactoryExpression(
                 typeof(Func<object, object>).GetMethod(InvokeMethodName),
-                Constant((Func<object, object>)(dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType)))), 
+                ConstantOf((Func<object, object>)(dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType)))), 
                 serviceType), setup), serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -7012,7 +7003,7 @@ namespace DryIoc
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
             TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey) =>
             r.Register(new ReflectionFactory(serviceType, reuse, 
-                new Made(new FactoryMethod.WithFactoryExpression(typeof(TFunc).GetMethod(InvokeMethodName), Constant(factory)), serviceType), setup), 
+                new Made(new FactoryMethod.WithFactoryExpression(typeof(TFunc).GetMethod(InvokeMethodName), Constant(factory))), setup), // todo: @perf optimize Made to be the FactoryMethod in the simple case 
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// Minimizes the number of allocations when converting from Func to named delegate
@@ -7464,10 +7455,6 @@ namespace DryIoc
         internal static readonly ConstructorInfo ResolutionScopeNameCtor = 
             typeof(ResolutionScopeName).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)[0];
 
-        private static readonly ConstantExpression _ifUnresolvedThrowExpr = Constant(IfUnresolved.Throw);
-        private static readonly ConstantExpression _nullTypeExpr          = Constant(null, typeof(Type));
-        private static readonly ConstantExpression _nullExpr              = Constant(null, typeof(object));
-
         internal static Expression CreateResolutionExpression(Request request, 
             bool openResolutionScope = false, bool asResolutionCall = false)
         {
@@ -7478,27 +7465,15 @@ namespace DryIoc
             var container = request.Container;
             var serviceType = request.ServiceType;
 
-            var serviceTypeExpr = Constant(serviceType, typeof(Type));
-
+            var serviceTypeExpr = ConstantOf<Type>(serviceType);
             var details = request._serviceInfo.Details;
-
-            var ifUnresolvedExpr = details.IfUnresolved == IfUnresolved.Throw 
-                ? _ifUnresolvedThrowExpr 
-                : Constant(details.IfUnresolved, typeof(IfUnresolved));
-
-            var requiredServiceTypeExpr = details.RequiredServiceType == null 
-                ? _nullTypeExpr
-                : Constant(details.RequiredServiceType, typeof(Type));
-            
-            var serviceKeyExpr = details.ServiceKey == null 
-                ? _nullExpr
-                : container.GetConstantExpression(details.ServiceKey, typeof(object));
+            var ifUnresolvedExpr = details.IfUnresolved.ToConstant();
+            var requiredServiceTypeExpr = details.RequiredServiceType.ToConstant(); 
+            var serviceKeyExpr = details.ServiceKey == null ? NullConstant : container.GetConstantExpression(details.ServiceKey, typeof(object));
 
             Expression resolverExpr;
             if (!openResolutionScope)
-            {
                 resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
-            }
             else
             {
                 // Generates the code below. That means the service opening the scope is scoped to this scope.
@@ -7506,12 +7481,9 @@ namespace DryIoc
                 // r => r.OpenScope(new ResolutionScopeName(serviceType, serviceKey), trackInParent: true)
                 //       .Resolve(serviceType, serviceKey)
                 //
-                var actualServiceTypeExpr = Constant(request.GetActualServiceType(), typeof(Type));
-                var scopeNameExpr = Expression.New(ResolutionScopeNameCtor, actualServiceTypeExpr, serviceKeyExpr);
+                var scopeNameExpr = Expression.New(ResolutionScopeNameCtor, ConstantOf<Type>(request.GetActualServiceType()), serviceKeyExpr);
                 var trackInParent = Constant(true);
-
-                resolverExpr = Call(ResolverContext.OpenScopeMethod,
-                    FactoryDelegateCompiler.ResolverContextParamExpr, scopeNameExpr, trackInParent);
+                resolverExpr = Call(ResolverContext.OpenScopeMethod, FactoryDelegateCompiler.ResolverContextParamExpr, scopeNameExpr, trackInParent);
             }
 
             var parentFlags = default(RequestFlags);
@@ -8345,7 +8317,7 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Returns expression for func arguments.</summary>
         public Expression GetInputArgsExpr() =>
             InputArgExprs == null ? Constant(null, typeof(object[]))
-            : (Expression)NewArrayInit(typeof(object), InputArgExprs.Map(x => x.Type.IsValueType ? Convert(x, typeof(object)) : x));
+            : (Expression)NewArrayInit(typeof(object), InputArgExprs.Map(x => x.Type.IsValueType ? Convert<object>(x) : x));
 
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
         public bool TracksTransientDisposable => (Flags & RequestFlags.TracksTransientDisposable) != 0;
@@ -9544,9 +9516,9 @@ private ParameterServiceInfo(ParameterInfo p)
 
                         if (Setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
                             serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
-                                Property(Convert(serviceExpr, typeof(WeakReference)), ThrowInGeneratedCode.WeakReferenceValueProperty));
+                                Property(Convert<WeakReference>(serviceExpr), ThrowInGeneratedCode.WeakReferenceValueProperty));
                         else if (Setup.PreventDisposal)
-                            serviceExpr = Field(Convert(serviceExpr, typeof(HiddenDisposable)), HiddenDisposable.ValueField);
+                            serviceExpr = Field(Convert<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
 
                         return serviceExpr;
                     }
@@ -9682,9 +9654,9 @@ private ParameterServiceInfo(ParameterInfo p)
 
             if (Setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
                 serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
-                    Property(Convert(serviceExpr, typeof(WeakReference)), ThrowInGeneratedCode.WeakReferenceValueProperty));
+                    Property(Convert<WeakReference>(serviceExpr), ThrowInGeneratedCode.WeakReferenceValueProperty));
             else if (Setup.PreventDisposal)
-                serviceExpr = Field(Convert(serviceExpr, typeof(HiddenDisposable)), HiddenDisposable.ValueField);
+                serviceExpr = Field(Convert<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
 
             return serviceExpr;
         }
@@ -10345,7 +10317,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 var serviceType = paramRequest.ServiceType;
                 if (request.Container.TryGetUsedInstance(RuntimeHelpers.GetHashCode(serviceType), serviceType, out var instance))
                     return Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
-                        Constant(serviceType), Constant(paramRequest.IfUnresolved));
+                        ConstantOf(serviceType), paramRequest.IfUnresolved.ToConstant());
             }
 
             return null;
@@ -10889,7 +10861,7 @@ private ParameterServiceInfo(ParameterInfo p)
             // unpacks the weak-reference
             if (Setup.WeaklyReferenced)
                 return Call(typeof(ThrowInGeneratedCode).GetMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
-                    Property(Constant(Instance, typeof(WeakReference)), typeof(WeakReference).Property(nameof(WeakReference.Target))));
+                    Property(ConstantOf((WeakReference)Instance), typeof(WeakReference).Property(nameof(WeakReference.Target))));
 
             // otherwise just return a constant
             var instanceExpr = request.Container.GetConstantExpression(Instance);
@@ -11504,11 +11476,13 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             // this is required because we cannot use ValueType for the object
             if (serviceFactoryExpr.Type.IsValueType)
-                serviceFactoryExpr = Convert(serviceFactoryExpr, typeof(object));
+                serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
+
+            var disposalOrder = request.Factory.Setup.DisposalOrder;
 
             if (request.TracksTransientDisposable)
-                return Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
-                    serviceFactoryExpr, Constant(request.Factory.Setup.DisposalOrder));
+                return Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod, 
+                    serviceFactoryExpr, Constant(disposalOrder));
 
             var factoryId = request.FactoryType == FactoryType.Decorator
                 ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
@@ -11519,7 +11493,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
 
             return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
-                Constant(factoryId), lambdaExpr, FactoryDelegateCompiler.ResolverContextParamExpr, Constant(request.Factory.Setup.DisposalOrder));
+                Constant(factoryId), lambdaExpr, FactoryDelegateCompiler.ResolverContextParamExpr, Constant(disposalOrder));
         }
 
         private static readonly Lazy<Expression> _singletonReuseExpr = Lazy.Of<Expression>(() =>
@@ -11558,7 +11532,7 @@ private ParameterServiceInfo(ParameterInfo p)
             
             // this is required because we cannot use ValueType for the object
             if (serviceFactoryExpr.Type.IsValueType)
-                serviceFactoryExpr = Convert(serviceFactoryExpr, typeof(object));
+                serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
 
             var resolverContextParamExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
 
@@ -13140,7 +13114,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
         public static Expression GetDefaultValueExpression(this Type type) =>
-            !type.IsValueType ? Constant(null, type) : (Expression)Call(GetDefaultMethod.MakeGenericMethod(type), Empty<Expression>());
+            !type.IsValueType ? ContainerTools.NullTypeConstant : (Expression)Call(GetDefaultMethod.MakeGenericMethod(type), Empty<Expression>());
     }
 
     /// <summary>Provides pretty printing/debug view for number of types.</summary>

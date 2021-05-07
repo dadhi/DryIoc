@@ -147,16 +147,15 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                     : new TypedParameterExpression(type, name)
             };
 
-        public static readonly ConstantExpression NullConstant = new TypedConstantExpression<object>(null);
-        public static readonly ConstantExpression FalseConstant = new TypedConstantExpression<bool>(false);
-        public static readonly ConstantExpression TrueConstant = new TypedConstantExpression<bool>(true);
-        public static readonly ConstantExpression ZeroConstant = new TypedConstantExpression<int>(0);
-        public static readonly ConstantExpression OneConstant = new TypedConstantExpression<int>(1);
-        public static readonly ConstantExpression MinusOneConstant = new TypedConstantExpression<int>(-1);
+        public static readonly ConstantExpression NullConstant     = new NullConstantExpression<object>();
+        public static readonly ConstantExpression FalseConstant    = new ValueConstantExpression<bool>(false);
+        public static readonly ConstantExpression TrueConstant     = new ValueConstantExpression<bool>(true);
+        public static readonly ConstantExpression ZeroConstant     = new IntConstantExpression(0);
+        public static readonly ConstantExpression OneConstant      = new IntConstantExpression(1);
+        public static readonly ConstantExpression MinusOneConstant = new IntConstantExpression(-1);
 
         /// <summary>Avoids the boxing for all (two) bool values</summary>
-        public static ConstantExpression Constant(bool value) =>
-            value ? TrueConstant : FalseConstant;
+        public static ConstantExpression Constant(bool value) => value ? TrueConstant : FalseConstant;
 
         public static ConstantExpression Constant(object value)
         {
@@ -171,29 +170,40 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                     n == 0  ? ZeroConstant : 
                     n == 1  ? OneConstant : 
                     n == -1 ? MinusOneConstant : 
-                    new TypedConstantExpression<int>(n);
+                    new IntConstantExpression(n);
 
-            return new ConstantExpression(value);
+            return new ValueConstantExpression(value);
         }
 
-        // todo: @perf benchmark thw switch on the LightExprVsExpr_Create_ComplexExpr
         public static ConstantExpression Constant(object value, Type type) 
         {
             if (value == null)
             {
                 if (type == typeof(object))
                     return NullConstant;
-                return new TypedConstantExpression(null, type);
+                return new TypedNullConstantExpression(type);
             }
 
             if (type == typeof(bool))
                 return (bool)value ? TrueConstant : FalseConstant;
 
             if (type == value.GetType())
-                return new ConstantExpression(value);
+                return new ValueConstantExpression(value);
 
-            return new TypedConstantExpression(value, type);
+            return new TypedValueConstantExpression(value, type);
         }
+
+        [MethodImpl((MethodImplOptions)256)]
+        public static ConstantExpression ConstantNull<T>() => new NullConstantExpression<T>();
+
+        [MethodImpl((MethodImplOptions)256)]
+        public static ConstantExpression Constant(int value) => new IntConstantExpression(value);
+
+        [MethodImpl((MethodImplOptions)256)]
+        public static ConstantExpression ConstantOf<T>(T value) => new ValueConstantExpression<T>(value);
+
+        [MethodImpl((MethodImplOptions)256)]
+        public static int TryGetIntConstantValue(Expression e) => ((IntConstantExpression)e).IntValue;
 
         public static NewExpression New(Type type)
         {
@@ -383,7 +393,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                 Assign(instanceVar, instance),
                 Condition(
                     Equal(instanceVar, Constant(null, instance.Type)),
-                    Constant(null),
+                    NullConstant,
                     Call(instanceVar, method, arguments),
                     method.ReturnType));
         }
@@ -475,6 +485,9 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         /// <summary>Creates a UnaryExpression that represents a type conversion operation.</summary>
         public static UnaryExpression Convert(Expression expression, Type type) => 
             new ConvertUnaryExpression(expression, type);
+
+        public static UnaryExpression Convert<T>(Expression expression) => 
+            new TypedConvertUnaryExpression<T>(expression);
 
         /// <summary>Creates a UnaryExpression that represents a conversion operation for which the implementing method is specified.</summary>
         public static UnaryExpression Convert(Expression expression, Type type, MethodInfo method) =>
@@ -1913,8 +1926,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     {
         public override ExpressionType NodeType => ExpressionType.Convert;
         public override Type Type { get; }
-        public ConvertUnaryExpression(Expression operand, Type type) : base(operand) =>
-            Type = type;
+        public ConvertUnaryExpression(Expression operand, Type type) : base(operand) => Type = type;
+    }
+
+    public sealed class TypedConvertUnaryExpression<T> : UnaryExpression
+    {
+        public override ExpressionType NodeType => ExpressionType.Convert;
+        public override Type Type => typeof(T);
+        public TypedConvertUnaryExpression(Expression operand) : base(operand) {}
     }
 
     public sealed class ConvertWithMethodUnaryExpression : TypedUnaryExpression
@@ -2288,12 +2307,11 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         internal TypedParameterExpression(string name) : base(name) {}
     }
 
-    public class ConstantExpression : Expression
+    ///<summary>The base constant type</summary>
+    public abstract class ConstantExpression : Expression
     {
         public sealed override ExpressionType NodeType => ExpressionType.Constant;
-        public override Type Type => Value.GetType();
-        public readonly object Value; // todo: @perf convert to the property so I can delegate it to non-boxing version
-        internal ConstantExpression(object value) => Value = value;
+        public abstract object Value { get; }
 #if SUPPORTS_VISITOR
         protected internal override Expression Accept(ExpressionVisitor visitor) => visitor.VisitConstant(this);
 #endif
@@ -2303,25 +2321,46 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override string ToString() => $"Constant({Value}, typeof({Type.ToCode()}))";
     }
 
-    // todo: @perf @incomplete
-    // public sealed class ConstantValueExpression<T> : ConstantExpression where T : struct
-    // {
-    //     public override Type Type => typeof(T)
-    //     public readonly T ValueValue;
-
-    //     internal ConstantValueExpression(T value) => ValueValue = value;
-    // }
-
-    public sealed class TypedConstantExpression : ConstantExpression
+    public sealed class TypedNullConstantExpression : ConstantExpression
     {
         public override Type Type { get; }
-        internal TypedConstantExpression(object value, Type type) : base(value) => Type = type;
+        public override object Value => null;
+        internal TypedNullConstantExpression(Type type) => Type = type;
     }
 
-    public sealed class TypedConstantExpression<T> : ConstantExpression
+    public sealed class NullConstantExpression<T> : ConstantExpression
+    {
+        public override object Value => null;
+        public override Type Type => typeof(T);
+    }
+
+    public sealed class ValueConstantExpression : ConstantExpression
+    {
+        public override Type Type => Value.GetType();
+        public override object Value { get; }
+        internal ValueConstantExpression(object value) => Value = value;
+    }
+
+    public sealed class ValueConstantExpression<T> : ConstantExpression
     {
         public override Type Type => typeof(T);
-        internal TypedConstantExpression(object value) : base(value) { }
+        public override object Value { get; }
+        internal ValueConstantExpression(object value) => Value = value;
+    }
+
+    public sealed class TypedValueConstantExpression : ConstantExpression
+    {
+        public override Type Type { get; }
+        public override object Value { get; }
+        internal TypedValueConstantExpression(object value, Type type) { Value = value; Type = type; }
+    }
+
+    public sealed class IntConstantExpression : ConstantExpression
+    {
+        public override Type Type => typeof(int);
+        public override object Value => IntValue;
+        public readonly int IntValue;
+        internal IntConstantExpression(int value) => IntValue = value;
     }
 
     public class NewExpression : Expression, IArgumentProvider

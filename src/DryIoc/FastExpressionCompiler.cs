@@ -43,7 +43,7 @@ THE SOFTWARE.
 #endif
 #if LIGHT_EXPRESSION
 using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
-using PE =   DryIoc.FastExpressionCompiler.LightExpression.ParameterExpression;
+using PE   = DryIoc.FastExpressionCompiler.LightExpression.ParameterExpression;
 namespace    DryIoc.FastExpressionCompiler.LightExpression
 #else
 using static System.Linq.Expressions.Expression;
@@ -1075,6 +1075,10 @@ namespace DryIoc.FastExpressionCompiler
                 switch (expr.NodeType)
                 {
                     case ExpressionType.Constant:
+#if LIGHT_EXPRESSION
+                        if (expr is IntConstantExpression n)
+                            return true;
+#endif
                         var constantExpr = (ConstantExpression)expr;
                         var value = constantExpr.Value;
                         if (value != null)
@@ -1796,10 +1800,16 @@ namespace DryIoc.FastExpressionCompiler
                             return true;
 
                         case ExpressionType.Constant:
-                            var constExpr = (ConstantExpression)expr;
                             if ((parent & ParentFlags.IgnoreResult) != 0)
                                 return true;
-
+#if LIGHT_EXPRESSION
+                            if (expr is IntConstantExpression n)
+                            {
+                                EmitLoadConstantInt(il, n.IntValue);
+                                return true;
+                            }
+#endif
+                            var constExpr = (ConstantExpression)expr;
                             if (constExpr.Value == null)
                             {
                                 if (constExpr.Type.IsValueType)
