@@ -197,7 +197,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static ConstantExpression ConstantNull<T>() => new NullConstantExpression<T>();
 
         [MethodImpl((MethodImplOptions)256)]
-        public static ConstantExpression Constant(int value) => new IntConstantExpression(value);
+        public static ConstantExpression ConstantInt(int value) => new IntConstantExpression(value);
 
         [MethodImpl((MethodImplOptions)256)]
         public static ConstantExpression ConstantOf<T>(T value) => new ValueConstantExpression<T>(value);

@@ -11482,7 +11482,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
             if (request.TracksTransientDisposable)
                 return Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod, 
-                    serviceFactoryExpr, Constant(disposalOrder));
+                    serviceFactoryExpr, ConstantInt(disposalOrder));
 
             var factoryId = request.FactoryType == FactoryType.Decorator
                 ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
@@ -11493,7 +11493,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
 
             return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
-                Constant(factoryId), lambdaExpr, FactoryDelegateCompiler.ResolverContextParamExpr, Constant(disposalOrder));
+                ConstantInt(factoryId), lambdaExpr, FactoryDelegateCompiler.ResolverContextParamExpr, ConstantInt(disposalOrder));
         }
 
         private static readonly Lazy<Expression> _singletonReuseExpr = Lazy.Of<Expression>(() =>
@@ -11550,7 +11550,7 @@ private ParameterServiceInfo(ParameterInfo p)
             }
             else
             {
-                var idExpr = Constant(request.FactoryType == FactoryType.Decorator ?
+                var idExpr = ConstantInt(request.FactoryType == FactoryType.Decorator ?
                     request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID);
 
                 Expression factoryDelegateExpr;
@@ -11568,27 +11568,27 @@ private ParameterServiceInfo(ParameterInfo p)
                         request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
                 }
 
-                var disposalIndex = request.Factory.Setup.DisposalOrder;
+                var disposalOrder = request.Factory.Setup.DisposalOrder;
 
                 if (ScopedOrSingleton)
                     return Call(GetScopedOrSingletonViaFactoryDelegateMethod,
-                        resolverContextParamExpr, idExpr, factoryDelegateExpr, Constant(disposalIndex));
+                        resolverContextParamExpr, idExpr, factoryDelegateExpr, ConstantInt(disposalOrder));
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
 
                 if (Name == null)
                 {
-                    if (disposalIndex == 0)
+                    if (disposalOrder == 0)
                         return Call(GetScopedViaFactoryDelegateNoDisposalIndexMethod,
                             resolverContextParamExpr, ifNoScopeThrowExpr, idExpr, factoryDelegateExpr);
 
                     return Call(GetScopedViaFactoryDelegateMethod, 
-                        resolverContextParamExpr, ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, Constant(disposalIndex));
+                        resolverContextParamExpr, ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, ConstantInt(disposalOrder));
                 }
 
                 return Call(GetNameScopedViaFactoryDelegateMethod, resolverContextParamExpr,
                     request.Container.GetConstantExpression(Name, typeof(object)),
-                    ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, Constant(disposalIndex));
+                    ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, ConstantInt(disposalOrder));
             }
         }
 
