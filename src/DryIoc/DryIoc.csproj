@@ -5,7 +5,7 @@
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.7.6</VersionPrefix>
+        <VersionPrefix>4.7.7</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -17,6 +17,11 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v4.7.7 Bug-fix release
+
+- fixed: #399 Func dependency on Singleton resolved under scope breaks after disposing scope when WithFuncAndLazyWithoutRegistration()
+
+
 ## v4.7.6 Bug-fix release
 
 - fixed: #391 Deadlock during Resolve

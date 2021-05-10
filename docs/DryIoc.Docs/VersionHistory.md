@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.7.7 Bug-fix release / 2021-05-10
+
+- fixed: #399 Func dependency on Singleton resolved under scope breaks after disposing scope when WithFuncAndLazyWithoutRegistration()
+
 ## v4.7.6 Bug-fix release / 2021-04-21
 
 - fixed: #391 Deadlock during Resolve

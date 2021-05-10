@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.7.6</version>
+        <version>4.7.7</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,6 +14,11 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v4.7.7 Bug-fix release
+
+- fixed: #399 Func dependency on Singleton resolved under scope breaks after disposing scope when WithFuncAndLazyWithoutRegistration()
+
+
 ## v4.7.6 Bug-fix release
 
 - fixed: #391 Deadlock during Resolve
