@@ -4825,7 +4825,6 @@ namespace DryIoc
              request.Reuse is CurrentScopeReuse == false &&
              request.DirectParent.IsSingletonOrDependencyOfSingleton &&
             !request.OpensResolutionScope && 
-            !request.IsDirectlyWrappedInFunc() &&
             request.Rules.ThrowIfDependencyHasShorterReuseLifespan
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
