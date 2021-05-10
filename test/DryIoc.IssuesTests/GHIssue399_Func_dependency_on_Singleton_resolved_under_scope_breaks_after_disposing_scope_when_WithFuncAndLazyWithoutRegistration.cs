@@ -15,7 +15,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test1()
         {
-            using var container = new Container(rules => rules.WithFuncAndLazyWithoutRegistration());
+            var container = new Container(rules => rules.WithFuncAndLazyWithoutRegistration());
 
             container.Register<DepFactory>(Reuse.Singleton);
             container.Register<Dep>(Reuse.Transient);
@@ -29,6 +29,8 @@ namespace DryIoc.IssuesTests
 
             var dep = factory.Create();
             Assert.IsNotNull(dep);
+
+            container.Dispose();
         }
 
         class DepFactory
