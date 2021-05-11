@@ -9993,6 +9993,12 @@ private ParameterServiceInfo(ParameterInfo p)
     /// creates expression for each reflected dependency, and composes result service expression.</summary>
     public sealed class ReflectionFactory : Factory
     {
+        private Type _implementationType; // non-readonly to be set by lazy type provider
+        private readonly Func<Type> _implementationTypeProvider;
+        private readonly Made _made;
+        private ClosedGenericFactoryGenerator _factoryGenerator;
+        internal object _knownPublicCtorOrCtors;
+
         /// <summary>Non-abstract service implementation type. May be open generic.</summary>
         public override Type ImplementationType
         {
@@ -10407,14 +10413,6 @@ private ParameterServiceInfo(ParameterInfo p)
             return true;
         }
 
-#region Implementation
-
-        private Type _implementationType; // non-readonly to be set by lazy type provider
-        private readonly Func<Type> _implementationTypeProvider;
-        private readonly Made _made;
-        private ClosedGenericFactoryGenerator _factoryGenerator;
-        internal object _knownPublicCtorOrCtors;
-
         private sealed class ClosedGenericFactoryGenerator : IConcreteFactoryGenerator
         {
             public ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => _generatedFactories.Value;
@@ -10790,8 +10788,6 @@ private ParameterServiceInfo(ParameterInfo p)
                 ? new FactoryMethod.WithFactoryExpression(factoryMember, factoryInstance) 
                 : new FactoryMethod.WithFactoryServiceInfo(factoryMember, factoryInfo);
         }
-
-#endregion
     }
 
     /// <summary>Creates service expression using client provided expression factory delegate.</summary>
