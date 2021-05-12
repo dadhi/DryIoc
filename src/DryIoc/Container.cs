@@ -614,7 +614,7 @@ namespace DryIoc
                 items = items.Match(parent.FactoryID, (id, x) => x.Factory.FactoryID != id);
                 if (openGenericItems != null)
                     openGenericItems = openGenericItems.Match(parent.FactoryID, 
-                        (id, x) => x.Factory.FactoryGenerator?.GeneratedFactories.ToArray().FindFirst(id, (i, f) => f.Value.FactoryID == id) == null);
+                        (id, x) => x.Factory.GeneratedFactories?.ToArray().FindFirst(id, (i, f) => f.Value.FactoryID == id) == null);
                 if (variantGenericItems != null)
                     variantGenericItems = variantGenericItems.Match(parent.FactoryID, (id, x) => x.Factory.FactoryID != id);
             }
@@ -815,8 +815,8 @@ namespace DryIoc
                         factory = unknownServiceResolvers[i](request)?.DoNotCache();
             }
 
-            if (factory?.FactoryGenerator != null)
-                factory = factory.FactoryGenerator.GetGeneratedFactory(request);
+            if (factory?.GeneratedFactories != null)
+                factory = factory.GetGeneratedFactoryOrDefault(request);
 
             if (factory == null)
                 TryThrowUnableToResolve(request);
@@ -1343,11 +1343,11 @@ namespace DryIoc
                         .Match(appliedDecoratorIDs, 
                             (appliedDecIds, d) =>
                             {
-                                var factoryGenerator = d.FactoryGenerator;
-                                if (factoryGenerator == null)
+                                var generatedFactories = d.GeneratedFactories;
+                                if (generatedFactories == null)
                                     return appliedDecIds.IndexOf(d.FactoryID) == -1;
 
-                                foreach (var entry in factoryGenerator.GeneratedFactories.Enumerate())
+                                foreach (var entry in generatedFactories.Enumerate())
                                     if (appliedDecIds.IndexOf(entry.Value.FactoryID) != -1)
                                         return false;
 
@@ -1359,7 +1359,7 @@ namespace DryIoc
                 if (!genericDecorators.IsNullOrEmpty())
                 {
                     genericDecorators = genericDecorators
-                        .Map(request, (r, d) => d.FactoryGenerator == null ? d : d.FactoryGenerator.GetGeneratedFactory(r, ifErrorReturnDefault: true))
+                        .Map(request, (r, d) => d.GeneratedFactories == null ? d : d.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true))
                         .Match(d => d != null);
                     decorators = Container.MergeSortedByLatestOrderOrRegistration(decorators, genericDecorators);
                 }
@@ -1680,8 +1680,8 @@ namespace DryIoc
                 serviceType = typeof(IEnumerable<>).MakeGenericType(itemType);
 
             var factory = ((IContainer)this).GetWrapperFactoryOrDefault(serviceType);
-            if (factory?.FactoryGenerator != null)
-                factory = factory.FactoryGenerator.GetGeneratedFactory(request);
+            if (factory?.GeneratedFactories != null)
+                factory = factory.GetGeneratedFactoryOrDefault(request);
 
             if (factory == null)
                 return null;
@@ -2459,7 +2459,7 @@ namespace DryIoc
 
                 if (DefaultFactoryCache != null || KeyedFactoryCache != null)
                 {
-                    if (factory.FactoryGenerator == null)
+                    if (factory.GeneratedFactories == null)
                     {
                         var d = DefaultFactoryCache;
                         if (d != null)
@@ -4452,7 +4452,7 @@ namespace DryIoc
                 items = items.Match(parent.FactoryID, (pID, x) => x.Factory.FactoryID != pID);
                 if (requiredItemType.IsGenericType)
                     items = items.Match(parent.FactoryID, 
-                        (pID, x) => x.Factory.FactoryGenerator?.GeneratedFactories.Enumerate().FindFirst(f => f.Value.FactoryID == pID) == null);
+                        (pID, x) => x.Factory.GeneratedFactories?.Enumerate().FindFirst(f => f.Value.FactoryID == pID) == null);
             }
 
             // Return collection of single matched item if key is specified.
@@ -8114,9 +8114,11 @@ private ParameterServiceInfo(ParameterInfo p)
 
         public static bool MatchFactoryReuse(this Request r, Factory f) => f.Reuse?.CanApply(r) ?? true;
         public static bool MatchFactoryReuse(this Request r, KV<object, Factory> f) => r.MatchFactoryReuse(f.Value);
-
-        public static bool MatchGeneratedFactory(this Request r, KV<object, Factory> f) =>
-            f.Value.FactoryGenerator == null || f.Value.FactoryGenerator.GetGeneratedFactory(r, ifErrorReturnDefault: true) != null;
+        public static bool MatchGeneratedFactory(this Request r, KV<object, Factory> f)
+        {
+            var fac = f.Value;
+            return fac.GeneratedFactories == null || fac.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true) != null;
+        }
     }
 
     internal sealed class RequestStack
@@ -8139,7 +8141,6 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             if (index < Items.Length)
                 return ref Items[index];
-
             Items = Expand(Items, index);
             return ref Items[index];
         }
@@ -9297,18 +9298,6 @@ private ParameterServiceInfo(ParameterInfo p)
         }
     }
 
-    /// <summary>Facility for creating concrete factories from some template/prototype. Example:
-    /// creating closed-generic type reflection factory from registered open-generic prototype factory.</summary>
-    public interface IConcreteFactoryGenerator
-    {
-        // todo: @perf @v5 make it a ImHashMap<object, object> to use the implementationType as a key for no or default service key
-        /// <summary>Generated factories so far, identified by the service type and key pair.</summary>
-        ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories { get; }
-
-        /// <summary>Returns factory per request. May track already generated factories and return one without regenerating.</summary>
-        Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false);
-    }
-
     /// <summary>Flags to describe how to deal with factory result expression</summary>
     [Flags]
     public enum FactoryFlags : byte
@@ -9379,10 +9368,6 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Allow inheritors to define lazy implementation type</summary>
         public virtual bool CanAccessImplementationType => true;
 
-        /// <summary>Indicates that Factory is factory provider and
-        /// consumer should call <see cref="IConcreteFactoryGenerator.GetGeneratedFactory"/> to get concrete factory.</summary>
-        public virtual IConcreteFactoryGenerator FactoryGenerator => null;
-
         /// <summary>Registration order.</summary>
         public virtual int RegistrationOrder => FactoryID;
 
@@ -9409,14 +9394,22 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Factory expression should be the resolution call</summary>
         public bool AsResolutionCall => (Flags & FactoryFlags.AsResolutionCall) != 0 || Setup.AsResolutionCall;
 
+        ///<summary>Closed generic factories</summary> 
+        public virtual ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => null;
+
+        ///<summary>Open-generic parent factory</summary> 
+        public virtual ReflectionFactory GeneratorFactory => null;
+
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
-        /// <param name="reuse">(optional)</param> <param name="setup">(optional)</param>
         protected Factory(IReuse reuse = null, Setup setup = null)
         {
             FactoryID = GetNextID();
             _reuse = reuse;
             _setup = setup ?? Setup.Default;
         }
+
+        /// <summary>Returns the closed-generic generated factory or `null`</summary>
+        public virtual Factory GetGeneratedFactoryOrDefault(Request request, bool ifErrorReturnDefault = false) => null;
 
         /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
         /// If <paramref name="request"/> has <see cref="Request.InputArgExprs"/> specified, they could be used in expression.</summary>
@@ -10000,7 +9993,15 @@ private ParameterServiceInfo(ParameterInfo p)
     {
         internal object _implementationTypeOrProviderOrPubCtorOrCtors; // Type or the Func<Type> for the lazy factory initialization
         private readonly Made _made;
-        private ClosedGenericFactoryGenerator _factoryGenerator;
+        private object _generatedFactoriesOrGeneratorFactory; // ImHashMap<KV<Type, object>, ReflectionFactory> or Factory
+
+        ///<inheritdoc />
+        public override ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => 
+            _generatedFactoriesOrGeneratorFactory as ImHashMap<KV<Type, object>, ReflectionFactory>;
+
+        ///<inheritdoc />
+        public override ReflectionFactory GeneratorFactory => 
+            _generatedFactoriesOrGeneratorFactory as ReflectionFactory;
 
         /// <summary>Non-abstract service implementation type. May be open generic.</summary>
         public override Type ImplementationType
@@ -10021,17 +10022,11 @@ private ParameterServiceInfo(ParameterInfo p)
         public override bool CanAccessImplementationType =>
             _implementationTypeOrProviderOrPubCtorOrCtors is Func<Type> == false || _implementationTypeOrProviderOrPubCtorOrCtors == null;
 
-        /// <summary>Provides closed-generic factory for registered open-generic variant.</summary>
-        public override IConcreteFactoryGenerator FactoryGenerator => _factoryGenerator;
-
         /// <summary>Injection rules set for Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
         public override Made Made => _made;
 
-        /// <summary>FactoryID of generator (open-generic) factory.</summary>
-        public int GeneratorFactoryID { get; private set; }
-
         /// <summary>Will contain factory ID of generator's factory for generated factory.</summary>
-        public override int RegistrationOrder => GeneratorFactoryID != 0 ? GeneratorFactoryID : FactoryID;
+        public override int RegistrationOrder => GeneratorFactory?.FactoryID ?? FactoryID;
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
         /// <param name="implementationType">(optional) Optional if Made.FactoryMethod is present Non-abstract close or open generic type.</param>
@@ -10420,101 +10415,88 @@ private ParameterServiceInfo(ParameterInfo p)
             return true;
         }
 
-        private sealed class ClosedGenericFactoryGenerator : IConcreteFactoryGenerator
+        // todo: @perf optimize request.Details access and reflection here
+        /// <inheritdoc />
+        public override Factory GetGeneratedFactoryOrDefault(Request request, bool ifErrorReturnDefault = false)
         {
-            public ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => _generatedFactories.Value;
+            var implType = ImplementationType;
+            var serviceType = request.GetActualServiceType();
 
-            public ClosedGenericFactoryGenerator(ReflectionFactory openGenericFactory)
+            var closedTypeArgs = implType == null || implType == serviceType.GetGenericDefinitionOrNull()
+                ? serviceType.GetGenericArguments()
+                : implType.IsGenericParameter ? serviceType.One()
+                : GetClosedTypeArgsOrNullForOpenGenericType(implType, serviceType, request, ifErrorReturnDefault);
+
+            if (closedTypeArgs == null)
+                return null;
+
+            var made = Made;
+            if (made.FactoryMethodOrSelector != null)
             {
-                _openGenericFactory = openGenericFactory;
-            }
+                // resolve request with factory to specify the implementation type may be required by FactoryMethod or GetClosed...
+                request = request.WithResolvedFactory(this, ifErrorReturnDefault, ifErrorReturnDefault, copyRequest: true);
+                var factoryMethod = made.FactoryMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)made.FactoryMethodOrSelector)(request);
+                if (factoryMethod == null)
+                    return ifErrorReturnDefault ? null : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
 
-            // todo: @perf optimize request.Details access and reflection here
-            public Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false)
-            {
-                var openFactory = _openGenericFactory;
-                var implType = (Type)openFactory.ImplementationType;
-                var serviceType = request.GetActualServiceType();
+                var checkMatchingType = implType != null && implType.IsGenericParameter;
+                var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request, checkMatchingType);
 
-                var closedTypeArgs = implType == null || implType == serviceType.GetGenericDefinitionOrNull()
-                  ? serviceType.GetGenericArguments()
-                  : implType.IsGenericParameter ? serviceType.One()
-                  : GetClosedTypeArgsOrNullForOpenGenericType(implType, serviceType, request, ifErrorReturnDefault);
-
-                if (closedTypeArgs == null)
+                // may be null only for `IfUnresolved.ReturnDefault` or if the check for matching type is failed
+                if (closedFactoryMethod == null)
                     return null;
 
-                var made = openFactory.Made;
-                if (made.FactoryMethodOrSelector != null)
-                {
-                    // resolve request with factory to specify the implementation type may be required by FactoryMethod or GetClosed...
-                    request = request.WithResolvedFactory(openFactory, ifErrorReturnDefault, ifErrorReturnDefault, copyRequest: true);
-                    var factoryMethod = made.FactoryMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)made.FactoryMethodOrSelector)(request);
-                    if (factoryMethod == null)
-                        return ifErrorReturnDefault ? null : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
-
-                    var checkMatchingType = implType != null && implType.IsGenericParameter;
-                    var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request, checkMatchingType);
-
-                    // may be null only for `IfUnresolved.ReturnDefault` or if the check for matching type is failed
-                    if (closedFactoryMethod == null)
-                        return null;
-
-                    made = Made.Of(closedFactoryMethod, made.Parameters, made.PropertiesAndFields);
-                }
-
-                if (implType != null)
-                {
-                    implType = implType.IsGenericParameter
-                        ? closedTypeArgs[0]
-                        : Throw.IfThrows<ArgumentException, Type>(() => implType.MakeGenericType(closedTypeArgs), 
-                            !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
-                            Error.NoMatchedGenericParamConstraints, implType, request);
-                    if (implType == null)
-                        return null;
-                }
-
-                var knownImplOrServiceType = implType ?? made.FactoryMethodKnownResultType ?? serviceType;
-                var serviceKey = request.ServiceKey;
-                serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey ?? DefaultKey.Value;
-                var generatedFactoryKey = KV.Of(knownImplOrServiceType, serviceKey);
-
-                var generatedFactories = _generatedFactories.Value;
-                if (!generatedFactories.IsEmpty)
-                {
-                    var generatedFactory = generatedFactories.GetValueOrDefault(generatedFactoryKey);
-                    if (generatedFactory != null)
-                        return generatedFactory;
-                }
-
-                var closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup)
-                {
-                    GeneratorFactoryID = openFactory.FactoryID,
-                    Flags = openFactory.Flags
-                };
-
-                _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
-                    (x, genFacKey, closedGenFac) => 
-                    {
-                        var newEntry = ImHashMap.Entry(genFacKey, closedGenFac);
-                        var oldEntryOrNewMap = x.AddOrGetEntry(newEntry);
-                        if (oldEntryOrNewMap is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
-                        {
-                            closedGenericFactory = oldEntry.Value;
-                            return x;
-                        }
-                        return oldEntryOrNewMap;
-                    });
-
-                return closedGenericFactory;
+                made = Made.Of(closedFactoryMethod, made.Parameters, made.PropertiesAndFields);
             }
 
-            private readonly ReflectionFactory _openGenericFactory;
-            private readonly Ref<ImHashMap<KV<Type, object>, ReflectionFactory>>
-                _generatedFactories = Ref.Of(ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
+            if (implType != null)
+            {
+                implType = implType.IsGenericParameter
+                    ? closedTypeArgs[0]
+                    : Throw.IfThrows<ArgumentException, Type>(() => implType.MakeGenericType(closedTypeArgs), 
+                        !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
+                        Error.NoMatchedGenericParamConstraints, implType, request);
+                if (implType == null)
+                    return null;
+            }
+
+            var knownImplOrServiceType = implType ?? made.FactoryMethodKnownResultType ?? serviceType;
+            var serviceKey = request.ServiceKey;
+            serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey ?? DefaultKey.Value;
+            var generatedFactoryKey = KV.Of(knownImplOrServiceType, serviceKey);
+
+            var generatedFactories = (ImHashMap<KV<Type, object>, ReflectionFactory>)_generatedFactoriesOrGeneratorFactory;
+            if (!generatedFactories.IsEmpty)
+            {
+                var generatedFactory = generatedFactories.GetValueOrDefault(generatedFactoryKey);
+                if (generatedFactory != null)
+                    return generatedFactory;
+            }
+
+            var closedGenericFactory = new ReflectionFactory(implType, Reuse, made, Setup)
+            {
+                _generatedFactoriesOrGeneratorFactory = this, Flags = Flags
+            };
+
+            Ref.Swap(ref _generatedFactoriesOrGeneratorFactory, generatedFactoryKey, closedGenericFactory,
+                (x, genFacKey, closedGenFac) => 
+                {
+
+                    var newEntry = ImHashMap.Entry(genFacKey, closedGenFac);
+                    var oldEntryOrNewMap = ((ImHashMap<KV<Type, object>, ReflectionFactory>)x).AddOrGetEntry(newEntry);
+                    if (oldEntryOrNewMap is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
+                    {
+                        closedGenericFactory = oldEntry.Value;
+                        return x;
+                    }
+                    return oldEntryOrNewMap;
+                });
+
+            return closedGenericFactory;
         }
 
         // todo: @perf optimize this thingy for made == null or Made.Default
+        // todo: @perf inline for implType
         private void SetKnownImplementationType(Type implType, Made made)
         {
             var knownImplType = implType;
@@ -10556,7 +10538,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 (openGenericImplType.IsGenericTypeDefinition || openGenericImplType.IsGenericParameter) || 
                 made.IsConditionalImplementation)
             {
-                _factoryGenerator = new ClosedGenericFactoryGenerator(this);
+                _generatedFactoriesOrGeneratorFactory = ImHashMap<KV<Type, object>, ReflectionFactory>.Empty;
             }
 
             _implementationTypeOrProviderOrPubCtorOrCtors = knownImplType;
