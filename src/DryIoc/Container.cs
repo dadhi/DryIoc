@@ -6710,9 +6710,13 @@ namespace DryIoc
             {
                 if (serviceType.IsInterface)
                 {
-                    foreach (var iface in type.GetInterfaces())
+                    var array = type.GetInterfaces();
+                    for (var i = 0; i < array.Length; i++)
+                    {
+                        var iface = array[i];
                         if (iface == serviceType)
                             return true;
+                    }
                 }
                 else
                 {
@@ -9993,8 +9997,7 @@ private ParameterServiceInfo(ParameterInfo p)
     /// creates expression for each reflected dependency, and composes result service expression.</summary>
     public sealed class ReflectionFactory : Factory
     {
-        private Type _implementationType; // non-readonly to be set by lazy type provider
-        private readonly Func<Type> _implementationTypeProvider;
+        private object _implementationTypeOrProvider; // Type or the Func<Type> for the lazy factory initialization
         private readonly Made _made;
         private ClosedGenericFactoryGenerator _factoryGenerator;
         internal object _knownPublicCtorOrCtors;
@@ -10004,15 +10007,15 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             get
             {
-                if (_implementationType == null && _implementationTypeProvider != null)
-                    SetKnownImplementationType(_implementationTypeProvider(), Made);
-                return _implementationType;
+                if (_implementationTypeOrProvider is Func<Type> typeProvider)
+                    SetKnownImplementationType(typeProvider(), Made);
+                return (Type)_implementationTypeOrProvider;
             }
         }
 
         /// <summary>False for lazy implementation type, to prevent its early materialization.</summary>
         public override bool CanAccessImplementationType =>
-            _implementationType != null || _implementationTypeProvider == null;
+            _implementationTypeOrProvider is Type || _implementationTypeOrProvider == null;
 
         /// <summary>Provides closed-generic factory for registered open-generic variant.</summary>
         public override IConcreteFactoryGenerator FactoryGenerator => _factoryGenerator;
@@ -10043,7 +10046,7 @@ private ParameterServiceInfo(ParameterInfo p)
             : base(reuse, setup)
         {
             _made = made ?? Made.Default;
-            _implementationTypeProvider = implementationTypeProvider.ThrowIfNull();
+            _implementationTypeOrProvider = implementationTypeProvider.ThrowIfNull();
         }
 
         /// <summary>Creates service expression.</summary>
@@ -10426,7 +10429,7 @@ private ParameterServiceInfo(ParameterInfo p)
             public Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false)
             {
                 var openFactory = _openGenericFactory;
-                var implType = openFactory._implementationType;
+                var implType = (Type)openFactory._implementationTypeOrProvider;
                 var serviceType = request.GetActualServiceType();
 
                 var closedTypeArgs = implType == null || implType == serviceType.GetGenericDefinitionOrNull()
@@ -10512,7 +10515,7 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             var knownImplType = implType;
 
-            var factoryMethodResultType = Made.FactoryMethodKnownResultType;
+            var factoryMethodResultType = made.FactoryMethodKnownResultType;
             if (implType == null ||
                 implType == typeof(object) || // required as currently object represents the open-generic type argument T registrations
                 implType.IsAbstract)
@@ -10552,7 +10555,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 _factoryGenerator = new ClosedGenericFactoryGenerator(this);
             }
 
-            _implementationType = knownImplType;
+            _implementationTypeOrProvider = knownImplType;
         }
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
