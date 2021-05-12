@@ -366,13 +366,13 @@ namespace DryIoc
                 if (expr is ConstantExpression constExpr)
                 {
                     var value = constExpr.Value;
-                    if (factory.Caching != FactoryCaching.DoNotCache)
+                    if (factory.CanCache)
                         _registry.Value.TryCacheDefaultFactory<FactoryDelegate>(serviceTypeHash, serviceType, value.ToFactoryDelegate);
                     return value;
                 }
 
                 // Important to cache expression first before tying to interpret, so that parallel resolutions may already use it.
-                if (factory.Caching != FactoryCaching.DoNotCache)
+                if (factory.CanCache)
                     _registry.Value.TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
 
                 // 1) First try to interpret
@@ -382,7 +382,7 @@ namespace DryIoc
                 factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
             }
 
-            if (factory.Caching != FactoryCaching.DoNotCache)
+            if (factory.CanCache)
                 _registry.Value.TryCacheDefaultFactory(serviceTypeHash, serviceType, factoryDelegate);
 
             return factoryDelegate(this);
@@ -443,7 +443,7 @@ namespace DryIoc
                 return null;
 
             // Prevents caching if factory says Don't
-            if (factory.Caching == FactoryCaching.DoNotCache)
+            if (!factory.CanCache)
                 cacheKey = null;
 
             // Request service key may be changed when resolving the factory,
@@ -983,7 +983,7 @@ namespace DryIoc
                 {
                     // Add asResolutionCall or change the serviceKey to prevent the caching of expression as default (BBIssue: #382)
                     if (!request.IsResolutionCall)
-                        singleMatchedFactory.Value.Setup = singleMatchedFactory.Value.Setup.WithAsResolutionCall();
+                        singleMatchedFactory.Value.WithAsResolutionCall();
                     else
                         request.ChangeServiceKey(singleMatchedFactory.Key);
                     return singleMatchedFactory.Value; // we are done
@@ -1127,7 +1127,7 @@ namespace DryIoc
                 matchedFactories = matchedFactories.Match(x => request.MatchFactoryReuse(x));
                 // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition (BBIssue #382)
                 if (matchedFactories.Length == 1 && !request.IsResolutionCall)
-                    matchedFactories[0].Value.Setup = matchedFactories[0].Value.Setup.WithAsResolutionCall();
+                    matchedFactories[0].Value.WithAsResolutionCall();
             }
 
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
@@ -8945,19 +8945,6 @@ private ParameterServiceInfo(ParameterInfo p)
         internal static readonly Setup AsResolutionCallSetup = 
             new ServiceSetup { _settings = Settings.AsResolutionCall };
 
-        internal Setup WithAsResolutionCall()
-        {
-            if (AsResolutionCall)
-                return this;
-
-            if (this == Default)
-                return AsResolutionCallSetup;
-
-            var setupClone = (Setup)MemberwiseClone();
-            setupClone._settings |= Settings.AsResolutionCall;
-            return setupClone;
-        }
-
         /// <summary>Works as `AsResolutionCall` but only with `Rules.UsedForExpressionGeneration`</summary>
         public bool AsResolutionCallForExpressionGeneration => (_settings & Settings.AsResolutionCallForExpressionGeneration) != 0;
 
@@ -9055,7 +9042,7 @@ private ParameterServiceInfo(ParameterInfo p)
             AsResolutionCallForExpressionGeneration = 1 << 10
         }
 
-        private Settings _settings; // note: mutable because of setting the AsResolutionCall
+        private Settings _settings;
 
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
@@ -9322,14 +9309,18 @@ private ParameterServiceInfo(ParameterInfo p)
         Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false);
     }
 
-    /// <summary>Instructs how to deal with factory result expression</summary>
-    public enum FactoryCaching : byte
-    {   /// Up to DryIoc to decide
+    /// <summary>Flags to describe how to deal with factory result expression</summary>
+    [Flags]
+    public enum FactoryFlags : byte
+    {
+        /// <summary>Up to DryIoc to decide</summary>
         Default = 0,
-        /// Prevents DryIoc to set `DoNotCache`
-        PleaseDontSetDoNotCache,
-        /// If set, the expression won't be cached 
-        DoNotCache
+        /// <summary>Prevents DryIoc to set `DoNotCache`</summary>
+        PleaseDontSetDoNotCache = 1,
+        /// <summary>If set, the expression won't be cached</summary> 
+        DoNotCache = 1 << 1,
+        /// <summary>If set then as resolution cache, it is for the internal use complementing the Setup.IsResolutionCall</summary>
+        AsResolutionCall = 1 << 2
     }
 
     /// <summary>Base class for different ways to instantiate service:
@@ -9360,6 +9351,12 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             get => _setup;
             internal set { _setup = value ?? Setup.Default; }
+        }
+
+        internal void WithAsResolutionCall()
+        {
+            if (!Setup.AsResolutionCall)
+                Flags |= FactoryFlags.AsResolutionCall;
         }
 
         internal static int _lastFactoryID;
@@ -9395,17 +9392,22 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>The factory inserts the runtime-state into result expression, e.g. delegate or pre-created instance.</summary>
         public virtual bool HasRuntimeState => false;
 
-        // todo: @perf optimize the memory for the default caching
         /// <summary>Indicates how to deal with the result expression</summary>
-        public FactoryCaching Caching { get; set; }
+        public FactoryFlags Flags { get; set; }
 
-        /// Instructs to skip caching the factory unless it really wants to do so via `PleaseDontSetDoNotCache`
+        /// <summary>Can cache the result expression</summary>
+        public bool CanCache => (Flags & FactoryFlags.DoNotCache) == 0;
+
+        /// <summary>Instructs to skip caching the factory unless it really wants to do so via `PleaseDontSetDoNotCache`</summary>
         public Factory DoNotCache()
         {
-            if (Caching != FactoryCaching.PleaseDontSetDoNotCache)
-                Caching = FactoryCaching.DoNotCache;
+            if ((Flags & FactoryFlags.PleaseDontSetDoNotCache) == 0)
+                Flags |= FactoryFlags.DoNotCache;
             return this;
         }
+
+        /// <summary>Factory expression should be the resolution call</summary>
+        public bool AsResolutionCall => (Flags & FactoryFlags.AsResolutionCall) != 0 || Setup.AsResolutionCall;
 
         /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
         /// <param name="reuse">(optional)</param> <param name="setup">(optional)</param>
@@ -9439,27 +9441,26 @@ private ParameterServiceInfo(ParameterInfo p)
 
             var setup = Setup;
             var rules = container.Rules;
-
+            var asResolutionCall = AsResolutionCall;
             var getAsRsolutionCall = 
                 (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 
                 && !request.OpensResolutionScope
                 && (setup.OpenResolutionScope ||
                     !request.IsResolutionCall 
-                        && (setup.AsResolutionCall || (setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration))
+                        && (asResolutionCall || (setup.AsResolutionCallForExpressionGeneration && rules.UsedForExpressionGeneration))
                         && request.GetActualServiceType() != typeof(void));
 
             if (getAsRsolutionCall)
-                return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope, setup.AsResolutionCall);
+                return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope, asResolutionCall);
 
             var reuse = request.Reuse;
-            var cacheExpression = 
-                Caching != FactoryCaching.DoNotCache &&
+            var cacheExpression = CanCache &&
                 FactoryType == FactoryType.Service &&
                 !request.IsResolutionRoot &&
                 !request.IsDirectlyWrappedInFunc() &&
                 !request.IsWrappedInFuncWithArgs() &&
                 !(reuse.Name is IScopeName) &&
-                !setup.AsResolutionCall && // see #295
+                !asResolutionCall && // see #295
                 !setup.UseParentReuse &&
                 setup.Condition == null &&
                 !Made.IsConditional;
@@ -9723,7 +9724,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
             if (Setup.OpenResolutionScope)
                 s.Append(", OpensResolutionScope");
-            else if (Setup.AsResolutionCall)
+            else if (AsResolutionCall)
                 s.Append(", AsResolutionCall");
 
             return s.Append("}").ToString();
@@ -10489,7 +10490,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 var closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup)
                 {
                     GeneratorFactoryID = openFactory.FactoryID,
-                    Caching = openFactory.Caching
+                    Flags = openFactory.Flags
                 };
 
                 _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
@@ -10877,8 +10878,8 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             if (// preventing recursion
                 (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 && !request.IsResolutionCall && 
-                 (Setup.AsResolutionCall || Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
-                return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), Setup.OpenResolutionScope, Setup.AsResolutionCall);
+                 (AsResolutionCall || Setup.AsResolutionCallForExpressionGeneration && request.Rules.UsedForExpressionGeneration))
+                return Resolver.CreateResolutionExpression(request.WithResolvedFactory(this), Setup.OpenResolutionScope, AsResolutionCall);
 
             // First look for decorators if it is not already a decorator
             var serviceType = request.ServiceType;
