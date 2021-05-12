@@ -5705,7 +5705,7 @@ namespace DryIoc
         /// <returns>Constructor or null if not found.</returns>
         public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) => request =>
         {
-            var ctors = ((ReflectionFactory)request.Factory)._knownPublicCtorOrCtors as ConstructorInfo[];
+            var ctors = ((ReflectionFactory)request.Factory)._implementationTypeOrProviderOrPubCtorOrCtors as ConstructorInfo[];
             if (ctors == null)
             {
                 var implType = request.ImplementationType;
@@ -9997,25 +9997,28 @@ private ParameterServiceInfo(ParameterInfo p)
     /// creates expression for each reflected dependency, and composes result service expression.</summary>
     public sealed class ReflectionFactory : Factory
     {
-        private object _implementationTypeOrProvider; // Type or the Func<Type> for the lazy factory initialization
+        internal object _implementationTypeOrProviderOrPubCtorOrCtors; // Type or the Func<Type> for the lazy factory initialization
         private readonly Made _made;
         private ClosedGenericFactoryGenerator _factoryGenerator;
-        internal object _knownPublicCtorOrCtors;
 
         /// <summary>Non-abstract service implementation type. May be open generic.</summary>
         public override Type ImplementationType
         {
             get
             {
-                if (_implementationTypeOrProvider is Func<Type> typeProvider)
+                if (_implementationTypeOrProviderOrPubCtorOrCtors is ConstructorInfo c)
+                    return c.DeclaringType;
+                if (_implementationTypeOrProviderOrPubCtorOrCtors is ConstructorInfo[] cs)
+                    return cs[0].DeclaringType;
+                if (_implementationTypeOrProviderOrPubCtorOrCtors is Func<Type> typeProvider)
                     SetKnownImplementationType(typeProvider(), Made);
-                return (Type)_implementationTypeOrProvider;
+                return (Type)_implementationTypeOrProviderOrPubCtorOrCtors;
             }
         }
 
         /// <summary>False for lazy implementation type, to prevent its early materialization.</summary>
         public override bool CanAccessImplementationType =>
-            _implementationTypeOrProvider is Type || _implementationTypeOrProvider == null;
+            _implementationTypeOrProviderOrPubCtorOrCtors is Func<Type> == false || _implementationTypeOrProviderOrPubCtorOrCtors == null;
 
         /// <summary>Provides closed-generic factory for registered open-generic variant.</summary>
         public override IConcreteFactoryGenerator FactoryGenerator => _factoryGenerator;
@@ -10046,7 +10049,7 @@ private ParameterServiceInfo(ParameterInfo p)
             : base(reuse, setup)
         {
             _made = made ?? Made.Default;
-            _implementationTypeOrProvider = implementationTypeProvider.ThrowIfNull();
+            _implementationTypeOrProviderOrPubCtorOrCtors = implementationTypeProvider.ThrowIfNull();
         }
 
         /// <summary>Creates service expression.</summary>
@@ -10056,7 +10059,7 @@ private ParameterServiceInfo(ParameterInfo p)
             var rules = container.Rules;
 
             FactoryMethod factoryMethod = null;
-            var ctor = _knownPublicCtorOrCtors as ConstructorInfo;
+            var ctor = _implementationTypeOrProviderOrPubCtorOrCtors as ConstructorInfo;
             if (ctor == null)
             {
                 var factoryMethodSelector = Made.FactoryMethodOrSelector ?? rules.FactoryMethodOrSelector;
@@ -10346,13 +10349,13 @@ private ParameterServiceInfo(ParameterInfo p)
                 var ctors = implType.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
                 var ctorCount = ctors.Length;
                 if (ctorCount == 1)
-                    _knownPublicCtorOrCtors = ctors[0];
+                    _implementationTypeOrProviderOrPubCtorOrCtors = ctors[0];
                 else if (ctorCount == 0)
                     return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromNone, implType);
                 else if (factoryMethod == null)
                     return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromMultiple, implType, ctors);
                 else
-                    _knownPublicCtorOrCtors = ctors; // store the constructors to prevent calling the GetConstructors(...) again for ConstructorWithResolvableArguments
+                    _implementationTypeOrProviderOrPubCtorOrCtors = ctors; // store the constructors to prevent calling the GetConstructors(...) again for ConstructorWithResolvableArguments
             }
 
             if (isStaticallyChecked || implType == null)
@@ -10429,7 +10432,7 @@ private ParameterServiceInfo(ParameterInfo p)
             public Factory GetGeneratedFactory(Request request, bool ifErrorReturnDefault = false)
             {
                 var openFactory = _openGenericFactory;
-                var implType = (Type)openFactory._implementationTypeOrProvider;
+                var implType = (Type)openFactory.ImplementationType;
                 var serviceType = request.GetActualServiceType();
 
                 var closedTypeArgs = implType == null || implType == serviceType.GetGenericDefinitionOrNull()
@@ -10555,7 +10558,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 _factoryGenerator = new ClosedGenericFactoryGenerator(this);
             }
 
-            _implementationTypeOrProvider = knownImplType;
+            _implementationTypeOrProviderOrPubCtorOrCtors = knownImplType;
         }
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
