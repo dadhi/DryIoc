@@ -11015,20 +11015,20 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// <summary>Creates the specialized factory from the provided arguments</summary>
         public static DelegateFactory Of(FactoryDelegate factoryDelegate,
-            IReuse reuse = null, Setup setup = null, Type knownImplementationType = null)
+            IReuse reuse = null, Setup setup = null)
         {
             if (setup == null)
                 setup = Setup.Default;
-            return setup == Setup.Default && knownImplementationType == null
+            return setup == Setup.Default
                 ? reuse == null ? new DelegateFactory(factoryDelegate)
                 : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(factoryDelegate)
-                : reuse == DryIoc.Reuse.Scoped    ? new WithScopedReuse(factoryDelegate)
+                : reuse == DryIoc.Reuse.Scoped    ? new WithScopedReuse   (factoryDelegate)
+                : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(factoryDelegate)
                 : new WithReuse(factoryDelegate, reuse)
-                : new WithAllDetails(factoryDelegate, reuse, setup, knownImplementationType);
+                : new WithAllDetails(factoryDelegate, reuse, setup);
         }
 
-        // todo: @perf make the alternative with the `Func<IResolverContext, object>` to avoid the conversion to FactoryDelegat
-        /// <summary>Creates factory.</summary>
+        /// <summary>Creates the factory.</summary>
         public DelegateFactory(FactoryDelegate factoryDelegate) => _factoryDelegate = factoryDelegate.ThrowIfNull();
 
         internal sealed class WithSingletonReuse : DelegateFactory
@@ -11043,6 +11043,12 @@ private ParameterServiceInfo(ParameterInfo p)
             public WithScopedReuse(FactoryDelegate factoryDelegate) : base(factoryDelegate) {}
         }
 
+        internal sealed class WithTransientReuse : DelegateFactory
+        {
+            public override IReuse Reuse => DryIoc.Reuse.Transient;
+            public WithTransientReuse(FactoryDelegate factoryDelegate) : base(factoryDelegate) {}
+        }
+
         internal sealed class WithReuse : DelegateFactory
         {
             public override IReuse Reuse { get; }
@@ -11053,12 +11059,10 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             public override IReuse Reuse { get; }
             public override Setup Setup { get; }
-            public override Type ImplementationType { get; }
-            public WithAllDetails(FactoryDelegate factoryDelegate, IReuse reuse, Setup setup, Type knownImplementationType) : base(factoryDelegate)
+            public WithAllDetails(FactoryDelegate factoryDelegate, IReuse reuse, Setup setup) : base(factoryDelegate)
             {
                 Reuse = reuse;
                 Setup = setup.WithAsResolutionCallForGeneratedExpression();
-                ImplementationType = knownImplementationType;
             }
         }
 
