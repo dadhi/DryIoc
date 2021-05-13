@@ -94,8 +94,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container(rules => rules
                 .WithUnknownServiceResolvers(request => 
-                    new DelegateFactory(resolver => 
-                        request.ServiceType == typeof(string) ? request.Is(() => "x") : null)));
+                    DelegateFactory.Of(resolver => request.ServiceType == typeof(string) ? request.Is(() => "x") : null)));
 
             var service = container.Resolve<string>();
 

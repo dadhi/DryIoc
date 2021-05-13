@@ -177,7 +177,7 @@ public class Moq_example_with_test_container
 
                     var mockType = typeof(Mock<>).MakeGenericType(serviceType);
 
-                    var mockFactory = new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton);
+                    var mockFactory = DelegateFactory.Of(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton);
 
                     return new[] { new DynamicRegistration(mockFactory, IfAlreadyRegistered.Keep) };
                 }

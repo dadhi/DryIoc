@@ -675,7 +675,7 @@ class ResolveMany_does_not_work_WithUnknownResolvers
         parent.Register<IService, Service2>();
 
         var child = new Container(Rules.Default.WithUnknownServiceResolvers(req =>
-            new DelegateFactory(_ => parent.Resolve(req.ServiceType))));
+            DelegateFactory.Of(_ => parent.Resolve(req.ServiceType))));
 
         // does not work
         var actual = child.ResolveMany<IService>();
@@ -693,7 +693,7 @@ class ResolveMany_does_not_work_WithUnknownResolvers
         Rules.DynamicRegistrationProvider dynamicRegistration = (serviceType, serviceKey) => 
             new[] 
             {
-                new DynamicRegistration(new DelegateFactory(_ => parent.Resolve(serviceType, 
+                new DynamicRegistration(DelegateFactory.Of(_ => parent.Resolve(serviceType, 
                     serviceKey is DefaultDynamicKey dk ? DefaultKey.Of(dk.RegistrationOrder) : null))) 
             };
         

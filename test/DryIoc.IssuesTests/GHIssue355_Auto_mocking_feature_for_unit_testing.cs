@@ -84,7 +84,7 @@ namespace DryIoc.IssuesTests
                             return new[]
                             {
                                 new DynamicRegistration(
-                                    new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton, Setup.Default, serviceType),
+                                    DelegateFactory.Of(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton, Setup.Default, serviceType),
                                     IfAlreadyRegistered.Keep),
                             };
                         }
@@ -171,7 +171,7 @@ namespace DryIoc.IssuesTests
 
                         var mockType = typeof(Mock<>).MakeGenericType(serviceType);
 
-                        var mockFactory = new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton);
+                        var mockFactory = DelegateFactory.Of(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton);
 
                         return new[] { new DynamicRegistration(mockFactory, IfAlreadyRegistered.Keep) };
                     }
@@ -233,7 +233,7 @@ namespace DryIoc.IssuesTests
                             return new[]
                             {
                                 new DynamicRegistration(
-                                    new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton, null, serviceType),
+                                    DelegateFactory.Of(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton, null, serviceType),
                                     IfAlreadyRegistered.Keep),
                             };
                         }

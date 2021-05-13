@@ -137,8 +137,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules
                 .WithConcreteTypeDynamicRegistrations()
-                .WithUnknownServiceResolvers(r => r.ServiceType == typeof(Xx) ?
-                    new DelegateFactory(_ => new Xx(null)) : null));
+                .WithUnknownServiceResolvers(r => r.ServiceType == typeof(Xx) ? DelegateFactory.Of(_ => new Xx(null)) : null));
 
             var xx = container.Resolve<Xx>();
 

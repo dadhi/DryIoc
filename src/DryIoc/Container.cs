@@ -6928,7 +6928,7 @@ namespace DryIoc
             Func<IResolverContext, TService> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
-            registrator.Register(new DelegateFactory(factoryDelegate.ToFactoryDelegate, reuse, setup),
+            registrator.Register(DelegateFactory.Of(factoryDelegate.ToFactoryDelegate, reuse, setup),
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers delegate to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -7041,8 +7041,7 @@ namespace DryIoc
             FactoryDelegate checkedDelegate = r => factoryDelegate(r)
                 .ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
 
-            var factory = new DelegateFactory(checkedDelegate, reuse, setup);
-
+            var factory = DelegateFactory.Of(checkedDelegate, reuse, setup);
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
         }
 
@@ -7051,10 +7050,10 @@ namespace DryIoc
         /// that already check compatibility between delegate result and the service type
         /// </summary>
         public static void RegisterDelegate(this IRegistrator registrator,
-            bool isChecked, Type serviceType, Func<IResolverContext, object> factoryDelegate,
+            bool isChecked, Type serviceType, Func<IServiceProvider, object> factoryDelegate,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
-            registrator.Register(new DelegateFactory(factoryDelegate.ToFactoryDelegate, reuse, setup), 
+            registrator.Register(DelegateFactory.Of(factoryDelegate.ToFactoryDelegate, reuse, setup), 
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
 
@@ -11007,28 +11006,60 @@ private ParameterServiceInfo(ParameterInfo p)
 
     /// <summary>This factory is the thin wrapper for user provided delegate
     /// and where possible it uses delegate directly: without converting it to expression.</summary>
-    public sealed class DelegateFactory : Factory
+    public class DelegateFactory : Factory
     {
-        /// <inheritdoc/>
-        public override IReuse Reuse { get; } // todo: @perf split
-        /// <inheritdoc/>
-        public override Setup Setup { get; } // todo: @perf split
-
-        /// <summary>Non-abstract closed implementation type.</summary>
-        public override Type ImplementationType { get; }
-
         /// <inheritdoc />
         public override bool HasRuntimeState => true;
+        /// <inheritdoc />
+        public override Setup Setup => DryIoc.Setup.AsResolutionCallForGeneratedExpressionSetup;
 
-        /// <summary>Creates factory.</summary>
-        public DelegateFactory(FactoryDelegate factoryDelegate,
-           IReuse reuse = null, Setup setup = null, Type knownImplementationType = null)
+        /// <summary>Creates the specialized factory from the provided arguments</summary>
+        public static DelegateFactory Of(FactoryDelegate factoryDelegate,
+            IReuse reuse = null, Setup setup = null, Type knownImplementationType = null)
         {
-            Reuse = reuse;
-            Setup = (setup ?? DryIoc.Setup.Default).WithAsResolutionCallForGeneratedExpression();
+            if (setup == null)
+                setup = Setup.Default;
+            return setup == Setup.Default && knownImplementationType == null
+                ? reuse == null ? new DelegateFactory(factoryDelegate)
+                : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(factoryDelegate)
+                : reuse == DryIoc.Reuse.Scoped    ? new WithScopedReuse(factoryDelegate)
+                : new WithReuse(factoryDelegate, reuse)
+                : new WithAllDetails(factoryDelegate, reuse, setup, knownImplementationType);
+        }
 
-            _factoryDelegate = factoryDelegate.ThrowIfNull();
-            ImplementationType = knownImplementationType;
+        // todo: @perf make the alternative with the `Func<IResolverContext, object>` to avoid the conversion to FactoryDelegat
+        /// <summary>Creates factory.</summary>
+        public DelegateFactory(FactoryDelegate factoryDelegate) => _factoryDelegate = factoryDelegate.ThrowIfNull();
+
+        internal sealed class WithSingletonReuse : DelegateFactory
+        {
+            public override IReuse Reuse => DryIoc.Reuse.Singleton;
+            public WithSingletonReuse(FactoryDelegate factoryDelegate) : base(factoryDelegate) {}
+        }
+
+        internal sealed class WithScopedReuse : DelegateFactory
+        {
+            public override IReuse Reuse => DryIoc.Reuse.Scoped;
+            public WithScopedReuse(FactoryDelegate factoryDelegate) : base(factoryDelegate) {}
+        }
+
+        internal sealed class WithReuse : DelegateFactory
+        {
+            public override IReuse Reuse { get; }
+            public WithReuse(FactoryDelegate factoryDelegate, IReuse reuse) : base(factoryDelegate) => Reuse = reuse;
+        }
+
+        internal sealed class WithAllDetails : DelegateFactory
+        {
+            public override IReuse Reuse { get; }
+            public override Setup Setup { get; }
+            public override Type ImplementationType { get; }
+            public WithAllDetails(FactoryDelegate factoryDelegate, IReuse reuse, Setup setup, Type knownImplementationType) : base(factoryDelegate)
+            {
+                Reuse = reuse;
+                Setup = setup.WithAsResolutionCallForGeneratedExpression();
+                ImplementationType = knownImplementationType;
+            }
         }
 
         /// <summary>Create expression by wrapping call to stored delegate with provided request.</summary>
