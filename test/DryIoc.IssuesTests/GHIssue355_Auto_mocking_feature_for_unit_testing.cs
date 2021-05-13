@@ -177,7 +177,7 @@ namespace DryIoc.IssuesTests
                     }
 
                     // concrete types
-                    var concreteTypeFactory = new ReflectionFactory(serviceType, Reuse.Singleton,
+                    var concreteTypeFactory = ReflectionFactory.Of(serviceType, Reuse.Singleton,
                         FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
 
                     return new[] { new DynamicRegistration(concreteTypeFactory) };

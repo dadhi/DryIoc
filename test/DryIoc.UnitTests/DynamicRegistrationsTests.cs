@@ -232,7 +232,7 @@ namespace DryIoc.UnitTests
             var container = new Container()
                 .WithAutoFallbackDynamicRegistrations(
                     (t, k) => new[] { typeof(D) },
-                    type => new ReflectionFactory(type, setup: Setup.Decorator));
+                    type => type.ToFactory(setup: Setup.Decorator));
 
             container.Register<X>();
 
@@ -247,7 +247,7 @@ namespace DryIoc.UnitTests
             var container = new Container()
                 .WithAutoFallbackDynamicRegistrations(
                     (t, k) => new[] { typeof(D) },
-                    type => new ReflectionFactory(type, setup: Setup.Decorator));
+                    type => type.ToFactory(setup: Setup.Decorator));
 
             container.Register<X, A>();
 

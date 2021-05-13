@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using DryIoc.FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
@@ -127,8 +126,6 @@ namespace DryIoc.IssuesTests
         }
     }
 
-    #region Registration Helper Code
-
     internal static class ContainerExtension
     {
         /// <summary>
@@ -145,17 +142,6 @@ namespace DryIoc.IssuesTests
 
     internal class CustomDelegateWrapper<TDelegate> : Factory where TDelegate : System.Delegate
     {
-        #region Constructors
-
-        public CustomDelegateWrapper(IReuse reuse = null, Setup setup = null)
-            : base(reuse, setup)
-        {
-        }
-
-        #endregion
-
-        #region Public Methods
-
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var originalFactoryType = GetOriginalFactoryType();
@@ -168,10 +154,6 @@ namespace DryIoc.IssuesTests
 
             return convertedFactoryExpression;
         }
-
-        #endregion
-
-        #region Non-Public Methods
 
         private static Type GetOriginalFactoryType()
         {
@@ -223,9 +205,5 @@ namespace DryIoc.IssuesTests
                         "Factory delegates with more than 8 parameters are not supported.");
             }
         }
-
-        #endregion
     }
-
-    #endregion
 }

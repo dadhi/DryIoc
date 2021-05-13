@@ -1,11 +1,18 @@
+using DryIoc.Testing;
 using NUnit.Framework;
 using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func
+    public class Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

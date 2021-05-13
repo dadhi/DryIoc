@@ -32,7 +32,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(Rules.Default.WithUnknownServiceResolvers(request =>
                 !request.ServiceType.IsValueType && !request.ServiceType.IsAbstract
-                    ? new ReflectionFactory(request.ServiceType)
+                    ? request.ServiceType.ToFactory()
                     : null));
 
             var service = container.Resolve<NotRegisteredService>();
@@ -45,7 +45,7 @@ namespace DryIoc.UnitTests
         {
             Rules.UnknownServiceResolver unknownServiceResolver = request =>
                 !request.ServiceType.IsValueType && !request.ServiceType.IsAbstract
-                    ? new ReflectionFactory(request.ServiceType)
+                    ? request.ServiceType.ToFactory()
                     : null;
 
             IContainer container = new Container(Rules.Default.WithUnknownServiceResolvers(unknownServiceResolver));

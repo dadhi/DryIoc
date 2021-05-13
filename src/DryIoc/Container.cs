@@ -983,7 +983,7 @@ namespace DryIoc
                 {
                     // Add asResolutionCall or change the serviceKey to prevent the caching of expression as default (BBIssue: #382)
                     if (!request.IsResolutionCall)
-                        singleMatchedFactory.Value.WithAsResolutionCall();
+                        singleMatchedFactory.Value.SetAsResolutionCall();
                     else
                         request.ChangeServiceKey(singleMatchedFactory.Key);
                     return singleMatchedFactory.Value; // we are done
@@ -1127,7 +1127,7 @@ namespace DryIoc
                 matchedFactories = matchedFactories.Match(x => request.MatchFactoryReuse(x));
                 // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition (BBIssue #382)
                 if (matchedFactories.Length == 1 && !request.IsResolutionCall)
-                    matchedFactories[0].Value.WithAsResolutionCall();
+                    matchedFactories[0].Value.SetAsResolutionCall();
             }
 
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
@@ -3474,7 +3474,7 @@ namespace DryIoc
         /// Optimization: singleton array with the parameter expression of IResolverContext
         public static readonly OneParameterLambdaExpression FactoryDelegateParamExprs = new OneParameterLambdaExpression(null, null, ResolverContextParamExpr);
 
-        /// Strips the unnecessary or adds the necessary cast to expression return result
+        /// <summary>Strips the unnecessary or adds the necessary cast to expression return result</summary>
         public static Expression NormalizeExpression(this Expression expr)
         {
             // System.Linq.Expressions.ExpressionType is used by FEC as well 
@@ -3494,6 +3494,10 @@ namespace DryIoc
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         public static Expression<FactoryDelegate> WrapInFactoryExpression(this Expression expression) =>
             Lambda<FactoryDelegate>(expression.NormalizeExpression(), ResolverContextParamExpr, typeof(object));
+
+        /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
+        public static Expression<FactoryDelegate> WrapInFactoryExpressionWithoutNormalization(this Expression expression) =>
+            Lambda<FactoryDelegate>(expression, ResolverContextParamExpr, typeof(object));
 
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
@@ -3755,7 +3759,7 @@ namespace DryIoc
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IReuse reuse, params Type[] implTypes) =>
-            container.WithAutoFallbackDynamicRegistrations((_, __) => implTypes, implType => new ReflectionFactory(implType, reuse));
+            container.WithAutoFallbackDynamicRegistrations((_, __) => implTypes, implType => ReflectionFactory.Of(implType, reuse));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
@@ -3763,7 +3767,7 @@ namespace DryIoc
             IReuse reuse, Setup setup, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations(
                 (ignoredServiceType, ignoredServiceKey) => implTypes,
-                implType => new ReflectionFactory(implType, reuse, setup: setup));
+                implType => ReflectionFactory.Of(implType, reuse, setup: setup));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
@@ -4769,7 +4773,7 @@ namespace DryIoc
         /// <summary>No flags - to use in `GetDynamicRegistrationProvidersOrDefault`</summary>
         NoFlags       = 0,
         /// <summary>Use as AsFallback only</summary>
-        AsFallback = 1,
+        AsFallback    = 1,
         /// <summary>Provider may have the services provided</summary>
         Service       = 1 << 1,
         /// <summary>Provider may have the decorators provided</summary>
@@ -5103,7 +5107,7 @@ namespace DryIoc
                 if (openGenericServiceType != null && WrappersSupport.Wrappers.GetValueOrDefault(openGenericServiceType) != null)
                     return null;
 
-                var factory = new ReflectionFactory(concreteType,
+                var factory = ReflectionFactory.Of(concreteType,
                     made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
 
                 // to enable fallback to other rules if unresolved try to resolve expression first and return null
@@ -5137,7 +5141,7 @@ namespace DryIoc
                 ReflectionFactory factory = null;
 
                 // the condition checks that factory is resolvable
-                factory = new ReflectionFactory(implType, reuse,
+                factory = ReflectionFactory.Of(implType, reuse,
                     DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic,
                     Setup.With(condition: req => factory?.GetExpressionOrDefault(req.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null));
 
@@ -6500,7 +6504,7 @@ namespace DryIoc
         public static void Register(this IRegistrator registrator, Type serviceType, Type implementationType,
             IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
-            registrator.Register(new ReflectionFactory(implementationType, reuse, made, setup),
+            registrator.Register(ReflectionFactory.Of(implementationType, reuse, made, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, false);
 
         /// <summary>Registers service of <paramref name="serviceAndMayBeImplementationType"/>.
@@ -6508,7 +6512,7 @@ namespace DryIoc
         public static void Register(this IRegistrator registrator, Type serviceAndMayBeImplementationType,
             IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
-            registrator.Register(new ReflectionFactory(serviceAndMayBeImplementationType, reuse, made, setup),
+            registrator.Register(ReflectionFactory.Of(serviceAndMayBeImplementationType, reuse, made, setup),
                 serviceAndMayBeImplementationType, serviceKey, ifAlreadyRegistered, false);
 
         /// <summary>Registers service of <typeparamref name="TService"/> type
@@ -6517,7 +6521,7 @@ namespace DryIoc
             IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null)
             where TImplementation : TService =>
-            registrator.Register(new ReflectionFactory(typeof(TImplementation), reuse, made, setup),
+            registrator.Register(ReflectionFactory.Of(typeof(TImplementation), reuse, made, setup),
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers implementation type <typeparamref name="TImplementation"/> with itself as service type.</summary>
@@ -6530,7 +6534,7 @@ namespace DryIoc
         public static void Register<TService, TMadeResult>(this IRegistrator registrator,
             Made.TypedMade<TMadeResult> made, IReuse reuse = null, Setup setup = null,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) where TMadeResult : TService =>
-            registrator.Register(new ReflectionFactory(default(Type), reuse, made, setup),
+            registrator.Register(ReflectionFactory.Of(default(Type), reuse, made, setup),
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers service returned by Made expression.</summary>
@@ -6781,11 +6785,12 @@ namespace DryIoc
             type.ImplementsServiceType(typeof(TService));
 
         /// <summary>Wraps the implementation type in factory.</summary>
-        public static Factory ToFactory(this Type implType) => new ReflectionFactory(implType);
+        public static ReflectionFactory ToFactory(this Type implType) => 
+            new ReflectionFactory(implType);
 
         /// <summary>Wraps the implementation type in factory plus allow to provide factory parameters.</summary>
-        public static Factory ToFactory(this Type implType, IReuse reuse, Made made = null, Setup setup = null) =>
-            new ReflectionFactory(implType, reuse, made, setup);
+        public static ReflectionFactory ToFactory(this Type implType, IReuse reuse = null, Made made = null, Setup setup = null) =>
+            ReflectionFactory.Of(implType, reuse, made, setup);
 
         /// <summary>
         /// Batch registering the implementations with possibly many service types,
@@ -7006,7 +7011,7 @@ namespace DryIoc
         private const string InvokeMethodName = "Invoke";
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
             TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey) =>
-            r.Register(new ReflectionFactory(serviceType, reuse, 
+            r.Register(ReflectionFactory.Of(serviceType, reuse, 
                 new Made(new FactoryMethod.WithFactoryExpression(typeof(TFunc).GetMethod(InvokeMethodName), Constant(factory))), setup), // todo: @perf optimize Made to be the FactoryMethod in the simple case 
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
@@ -9329,29 +9334,31 @@ private ParameterServiceInfo(ParameterInfo p)
         public static int GetNextID() => Interlocked.Increment(ref _lastFactoryID);
 
         /// <summary>Unique factory id generated from static seed.</summary>
-        public int FactoryID { get; internal set; }
+        public int FactoryID { get; internal set; } = GetNextID();
 
-        // todo: @perf optimize the memory for no reuse
-        /// <summary>Reuse policy for created services.</summary>
-        public virtual IReuse Reuse => _reuse;
+        /// <summary>Reuse policy for created services. The default is `null` which means the absense of the resue or Transient</summary>
+        public virtual IReuse Reuse => null;
 
-        // todo: @perf optimize the memory for no setup
         /// <summary>Setup may contain different/non-default factory settings.</summary>
-        public virtual Setup Setup
+        public virtual Setup Setup => Setup.Default;
+
+        /// <summary>Indicates how to deal with the result expression</summary>
+        public FactoryFlags Flags { get; set; }
+
+        /// <summary>Can cache the result expression</summary>
+        public bool CanCache => (Flags & FactoryFlags.DoNotCache) == 0;
+
+        /// <summary>Instructs to skip caching the factory unless it really wants to do so via `PleaseDontSetDoNotCache`</summary>
+        public Factory DoNotCache()
         {
-            get => _setup;
-            internal set { _setup = value ?? Setup.Default; }
+            if ((Flags & FactoryFlags.PleaseDontSetDoNotCache) == 0)
+                Flags |= FactoryFlags.DoNotCache;
+            return this;
         }
 
-        internal void WithAsResolutionCall()
-        {
-            if (!Setup.AsResolutionCall)
-                Flags |= FactoryFlags.AsResolutionCall;
-        }
+        internal void SetAsResolutionCall() => Flags |= FactoryFlags.AsResolutionCall;
 
         internal static int _lastFactoryID;
-        private IReuse _reuse;
-        private Setup _setup;
 
         /// <summary>Checks that condition is met for request or there is no condition setup.</summary>
         public bool CheckCondition(Request request)
@@ -9378,20 +9385,6 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>The factory inserts the runtime-state into result expression, e.g. delegate or pre-created instance.</summary>
         public virtual bool HasRuntimeState => false;
 
-        /// <summary>Indicates how to deal with the result expression</summary>
-        public FactoryFlags Flags { get; set; }
-
-        /// <summary>Can cache the result expression</summary>
-        public bool CanCache => (Flags & FactoryFlags.DoNotCache) == 0;
-
-        /// <summary>Instructs to skip caching the factory unless it really wants to do so via `PleaseDontSetDoNotCache`</summary>
-        public Factory DoNotCache()
-        {
-            if ((Flags & FactoryFlags.PleaseDontSetDoNotCache) == 0)
-                Flags |= FactoryFlags.DoNotCache;
-            return this;
-        }
-
         /// <summary>Factory expression should be the resolution call</summary>
         public bool AsResolutionCall => (Flags & FactoryFlags.AsResolutionCall) != 0 || Setup.AsResolutionCall;
 
@@ -9400,14 +9393,6 @@ private ParameterServiceInfo(ParameterInfo p)
 
         ///<summary>Open-generic parent factory</summary> 
         public virtual ReflectionFactory GeneratorFactory => null;
-
-        /// <summary>Initializes reuse and setup. Sets the <see cref="FactoryID"/></summary>
-        protected Factory(IReuse reuse = null, Setup setup = null)
-        {
-            FactoryID = GetNextID();
-            _reuse = reuse;
-            _setup = setup ?? Setup.Default;
-        }
 
         /// <summary>Returns the closed-generic generated factory or `null`</summary>
         public virtual Factory GetGeneratedFactoryOrDefault(Request request, bool ifErrorReturnDefault = false) => null;
@@ -9990,11 +9975,11 @@ private ParameterServiceInfo(ParameterInfo p)
 
     /// <summary>Reflects on <see cref="ImplementationType"/> constructor parameters and members,
     /// creates expression for each reflected dependency, and composes result service expression.</summary>
-    public sealed class ReflectionFactory : Factory
+    public class ReflectionFactory : Factory
     {
         internal object _implementationTypeOrProviderOrPubCtorOrCtors; // Type or the Func<Type> for the lazy factory initialization
-        private readonly Made _made;
-        private object _generatedFactoriesOrGeneratorFactory; // ImHashMap<KV<Type, object>, ReflectionFactory> or Factory
+        // todo @perf split to the separate class for the open-generic factory
+        internal object _generatedFactoriesOrGeneratorFactory; // ImHashMap<KV<Type, object>, ReflectionFactory> or Factory
 
         ///<inheritdoc />
         public override ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => 
@@ -10009,44 +9994,201 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             get
             {
-                if (_implementationTypeOrProviderOrPubCtorOrCtors is ConstructorInfo c)
+                var x = _implementationTypeOrProviderOrPubCtorOrCtors;
+                if (x is Type t)
+                    return t;
+                if (x is ConstructorInfo c)
                     return c.DeclaringType;
-                if (_implementationTypeOrProviderOrPubCtorOrCtors is ConstructorInfo[] cs)
+                if (x is ConstructorInfo[] cs)
                     return cs[0].DeclaringType;
-                if (_implementationTypeOrProviderOrPubCtorOrCtors is Func<Type> typeProvider)
-                    SetKnownImplementationType(typeProvider(), Made);
-                return (Type)_implementationTypeOrProviderOrPubCtorOrCtors;
+                if (x == null)
+                    return null;
+                return ValidateAndSetImplementationType(((Func<Type>)x)(), Made);
             }
         }
 
+        private static Type ThrowIfInvalidImplementationType(Type type)
+        {
+            if (type == null)
+                Throw.It(Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
+            if (type == typeof(object))
+                Throw.It(Error.RegisteringObjectTypeAsImplementationIsNotSupported);
+            if (type.IsAbstract)
+                Throw.It(Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, type);
+            return type;
+        }
+
+        // todo: @perf move out of constructor to be statically called before factory creation or when it needed
+        private Type ValidateAndSetImplementationType(Type implType, Made made)
+        {
+            var knownImplType = implType;
+
+            var factoryMethodResultType = made.FactoryMethodKnownResultType;
+            if (implType == null ||
+                implType == typeof(object) || // required as currently object represents the open-generic type argument T registrations
+                implType.IsAbstract)
+            {
+                if (made.FactoryMethodOrSelector == null)
+                    ThrowIfInvalidImplementationType(implType);
+
+                knownImplType = null; // Ensure that we do not have abstract implementation type
+
+                // Using non-abstract factory method result type is safe for conditions and diagnostics
+                if (factoryMethodResultType != null &&
+                    factoryMethodResultType != typeof(object) &&
+                    !factoryMethodResultType.IsAbstract)
+                    knownImplType = factoryMethodResultType;
+            }
+            else if (factoryMethodResultType != null && factoryMethodResultType != implType)
+            {
+                if (!implType.IsAssignableFrom(factoryMethodResultType) && !factoryMethodResultType.HasConversionOperatorTo(implType))
+                    Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType, implType, factoryMethodResultType);
+            }
+
+            _implementationTypeOrProviderOrPubCtorOrCtors = knownImplType;
+
+            knownImplType = knownImplType ?? implType;
+            if (knownImplType == typeof(object) || // for open-generic T implementation
+                knownImplType != null && (knownImplType.IsGenericTypeDefinition || knownImplType.IsGenericParameter) || 
+                made.IsConditionalImplementation)
+                _generatedFactoriesOrGeneratorFactory = ImHashMap<KV<Type, object>, ReflectionFactory>.Empty;
+
+            return knownImplType;
+        }
+
         /// <summary>False for lazy implementation type, to prevent its early materialization.</summary>
-        public override bool CanAccessImplementationType =>
-            _implementationTypeOrProviderOrPubCtorOrCtors is Func<Type> == false || _implementationTypeOrProviderOrPubCtorOrCtors == null;
+        public override bool CanAccessImplementationType
+        {
+            get
+            {
+                // todo: @unclear should we also check for the `FactoryMethodKnownResultType`
+                var x = _implementationTypeOrProviderOrPubCtorOrCtors;
+                return x is Func<Type> == false // not a lazy type provider
+                    || x == null; // or the type provided by the factory method
+            }
+        }
 
         /// <summary>Injection rules set for Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
-        public override Made Made => _made;
+        public override Made Made => Made.Default;
 
         /// <summary>Will contain factory ID of generator's factory for generated factory.</summary>
         public override int RegistrationOrder => GeneratorFactory?.FactoryID ?? FactoryID;
 
-        /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
-        /// <param name="implementationType">(optional) Optional if Made.FactoryMethod is present Non-abstract close or open generic type.</param>
-        /// <param name="reuse">(optional)</param> <param name="made">(optional)</param> <param name="setup">(optional)</param>
-        public ReflectionFactory(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
-            : base(reuse, setup)
+        /// <summary>Creates the factory based on arguments</summary>
+        public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
         {
-            _made = made ?? Made.Default;
-            SetKnownImplementationType(implementationType, _made);
+            if (made == null)
+                made = Made.Default;
+            if (setup == null)
+                setup = Setup.Default;
+            return made == Made.Default && setup == Setup.Default
+                ? reuse == null ? new ReflectionFactory(implementationType)
+                : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(implementationType)
+                : reuse == DryIoc.Reuse.Scoped ? new WithScopedReuse(implementationType)
+                : new WithReuse(implementationType, reuse)
+                : setup == Setup.Default ? new WithReuseAndMade(implementationType, reuse, made)
+                : new WithAllDetails(implementationType, reuse, made, setup);
         }
 
-        /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
-        /// <param name="implementationTypeProvider">Provider of non-abstract closed or open-generic type.</param>
-        /// <param name="reuse">(optional)</param> <param name="made">(optional)</param> <param name="setup">(optional)</param>
-        public ReflectionFactory(Func<Type> implementationTypeProvider, IReuse reuse = null, Made made = null, Setup setup = null)
-            : base(reuse, setup)
+        /// <summary>Creates the factory based on arguments</summary>
+        public static ReflectionFactory Of(Func<Type> implementationTypeProvider, IReuse reuse = null, Made made = null, Setup setup = null)
         {
-            _made = made ?? Made.Default;
+            if (made == null)
+                made = Made.Default;
+            if (setup == null)
+                setup = Setup.Default;
+            return made == Made.Default && setup == Setup.Default
+                ? reuse == null ? new ReflectionFactory(implementationTypeProvider)
+                : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(implementationTypeProvider)
+                : reuse == DryIoc.Reuse.Scoped ? new WithScopedReuse(implementationTypeProvider)
+                : new WithReuse(implementationTypeProvider, reuse)
+                : setup == Setup.Default ? new WithReuseAndMade(implementationTypeProvider, reuse, made)
+                : new WithAllDetails(implementationTypeProvider, reuse, made, setup);
+        }
+
+        /// <summary>Base constructor without setting the implementation type or type provider</summary>
+        protected ReflectionFactory() {}
+
+        /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
+        public ReflectionFactory(Type implementationType)
+        {
+            _implementationTypeOrProviderOrPubCtorOrCtors = ThrowIfInvalidImplementationType(implementationType);
+            if (implementationType.IsGenericTypeDefinition || implementationType.IsGenericParameter)
+                _generatedFactoriesOrGeneratorFactory = ImHashMap<KV<Type, object>, ReflectionFactory>.Empty;
+        }
+
+        // todo: @perf use for the creating of the closed-generic factory
+        // internal protected ReflectionFactory(Type implementationType, ReflectionFactory generatorFactory)
+        // {
+        //     ThrowIfInvalidImplementationType(implementationType);
+        //     _implementationTypeOrProviderOrPubCtorOrCtors = implementationType;
+        //     _generatedFactoriesOrGeneratorFactory = generatorFactory;
+        // }
+
+        /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
+        public ReflectionFactory(Func<Type> implementationTypeProvider) =>
             _implementationTypeOrProviderOrPubCtorOrCtors = implementationTypeProvider.ThrowIfNull();
+
+        internal sealed class WithSingletonReuse : ReflectionFactory
+        {
+            public override IReuse Reuse => DryIoc.Reuse.Singleton;
+            public WithSingletonReuse(Type implementationType) : base(implementationType) {}
+            public WithSingletonReuse(Func<Type> implementationTypeProvider) : base(implementationTypeProvider) {}
+        }
+
+        internal sealed class WithScopedReuse : ReflectionFactory
+        {
+            public override IReuse Reuse => DryIoc.Reuse.Scoped;
+            public WithScopedReuse(Type implementationType) : base(implementationType) {}
+            public WithScopedReuse(Func<Type> implementationTypeProvider) : base(implementationTypeProvider) {}
+        }
+
+        internal sealed class WithReuse : ReflectionFactory
+        {
+            public override IReuse Reuse { get; }
+            public WithReuse(Type implementationType, IReuse reuse) : base(implementationType) => Reuse = reuse;
+            public WithReuse(Func<Type> implementationTypeProvider, IReuse reuse) : base(implementationTypeProvider) => Reuse = reuse;
+        }
+
+        internal sealed class WithReuseAndMade : ReflectionFactory 
+        {
+            public override IReuse Reuse { get; }
+            public override Made Made { get; }
+            public WithReuseAndMade(Type implementationType, IReuse reuse, Made made)
+            {
+                Reuse = reuse;
+                Made  = made;
+                ValidateAndSetImplementationType(implementationType, made);
+            }
+
+            public WithReuseAndMade(Func<Type> implementationTypeProvider, IReuse reuse, Made made)
+            {
+                _implementationTypeOrProviderOrPubCtorOrCtors = implementationTypeProvider.ThrowIfNull();
+                Reuse = reuse;
+                Made  = made;
+            }
+        }
+
+        internal sealed class WithAllDetails : ReflectionFactory 
+        {
+            public override IReuse Reuse { get; }
+            public override Made Made { get; }
+            public override Setup Setup { get; }
+            public WithAllDetails(Type implementationType, IReuse reuse, Made made, Setup setup)
+            {
+                Reuse = reuse;
+                Made  = made;
+                Setup = setup;
+                ValidateAndSetImplementationType(implementationType, made);
+            }
+
+            public WithAllDetails(Func<Type> implementationTypeProvider, IReuse reuse, Made made, Setup setup)
+            {
+                _implementationTypeOrProviderOrPubCtorOrCtors = implementationTypeProvider.ThrowIfNull();
+                Reuse = reuse;
+                Made  = made;
+                Setup = setup;
+            }
         }
 
         /// <summary>Creates service expression.</summary>
@@ -10346,13 +10488,19 @@ private ParameterServiceInfo(ParameterInfo p)
                 var ctors = implType.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
                 var ctorCount = ctors.Length;
                 if (ctorCount == 1)
+                {
+                    // todo: @perf do we need it for the open-generic because we still want to create the closed-generic type and then ask for its constructors again
                     _implementationTypeOrProviderOrPubCtorOrCtors = ctors[0];
+                }
                 else if (ctorCount == 0)
                     return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromNone, implType);
                 else if (factoryMethod == null)
                     return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromMultiple, implType, ctors);
                 else
+                {
+                    // todo: @perf do we need it for the open-generic because we still want to create the closed-generic type and then ask for its constructors again
                     _implementationTypeOrProviderOrPubCtorOrCtors = ctors; // store the constructors to prevent calling the GetConstructors(...) again for ConstructorWithResolvableArguments
+                }
             }
 
             if (isStaticallyChecked || implType == null)
@@ -10474,10 +10622,9 @@ private ParameterServiceInfo(ParameterInfo p)
                     return generatedFactory;
             }
 
-            var closedGenericFactory = new ReflectionFactory(implType, Reuse, made, Setup)
-            {
-                _generatedFactoriesOrGeneratorFactory = this, Flags = Flags
-            };
+            var closedGenericFactory = Of(implType, Reuse, made, Setup);
+            closedGenericFactory._generatedFactoriesOrGeneratorFactory = this;
+            closedGenericFactory.Flags = Flags;
 
             Ref.Swap(ref _generatedFactoriesOrGeneratorFactory, generatedFactoryKey, closedGenericFactory,
                 (x, genFacKey, closedGenFac) => 
@@ -10494,55 +10641,6 @@ private ParameterServiceInfo(ParameterInfo p)
                 });
 
             return closedGenericFactory;
-        }
-
-        // todo: @perf optimize this thingy for made == null or Made.Default
-        // todo: @perf inline for implType
-        private void SetKnownImplementationType(Type implType, Made made)
-        {
-            var knownImplType = implType;
-
-            var factoryMethodResultType = made.FactoryMethodKnownResultType;
-            if (implType == null ||
-                implType == typeof(object) || // required as currently object represents the open-generic type argument T registrations
-                implType.IsAbstract)
-            {
-                if (made.FactoryMethodOrSelector == null)
-                {
-                    if (implType == null)
-                        Throw.It(Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
-                    if (implType == typeof(object))
-                        Throw.It(Error.RegisteringObjectTypeAsImplementationIsNotSupported);
-                    if (implType.IsAbstract)
-                        Throw.It(Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, implType);
-                }
-
-                knownImplType = null; // Ensure that we do not have abstract implementation type
-
-                // Using non-abstract factory method result type is safe for conditions and diagnostics
-                if (factoryMethodResultType != null &&
-                    factoryMethodResultType != typeof(object) &&
-                    !factoryMethodResultType.IsAbstract)
-                    knownImplType = factoryMethodResultType;
-            }
-            else if (factoryMethodResultType != null
-                  && factoryMethodResultType != implType)
-            {
-                if (!factoryMethodResultType.IsAssignableTo(implType) &&
-                    !factoryMethodResultType.HasConversionOperatorTo(implType))
-                    Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType, implType, factoryMethodResultType);
-            }
-
-            var openGenericImplType = knownImplType ?? implType;
-            if (openGenericImplType == typeof(object) || // for open-generic T implementation
-                openGenericImplType != null &&           // for open-generic X<T> implementation
-                (openGenericImplType.IsGenericTypeDefinition || openGenericImplType.IsGenericParameter) || 
-                made.IsConditionalImplementation)
-            {
-                _generatedFactoriesOrGeneratorFactory = ImHashMap<KV<Type, object>, ReflectionFactory>.Empty;
-            }
-
-            _implementationTypeOrProviderOrPubCtorOrCtors = knownImplType;
         }
 
         private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
@@ -10783,26 +10881,33 @@ private ParameterServiceInfo(ParameterInfo p)
     /// <summary>Creates service expression using client provided expression factory delegate.</summary>
     public sealed class ExpressionFactory : Factory
     {
+        /// <inheritdoc/>
+        public override IReuse Reuse { get; } // todo: @perf split
+        /// <inheritdoc/>
+        public override Setup Setup { get; } // todo: @perf split
+        private readonly Func<Request, Expression> _getServiceExpression;
+
         /// <summary>Wraps provided delegate into factory.</summary>
-        /// <param name="getServiceExpression">Delegate that will be used internally to create service expression.</param>
-        /// <param name="reuse">(optional) Reuse.</param> <param name="setup">(optional) Setup.</param>
         public ExpressionFactory(Func<Request, Expression> getServiceExpression, IReuse reuse = null, Setup setup = null)
-            : base(reuse, setup)
         {
             _getServiceExpression = getServiceExpression.ThrowIfNull();
+            Reuse = reuse;
+            Setup = setup ?? Setup.Default;
         }
 
         /// <summary>Creates service expression using wrapped delegate.</summary>
-        /// <param name="request">Request to resolve.</param> <returns>Expression returned by stored delegate.</returns>
-        public override Expression CreateExpressionOrDefault(Request request) =>
-            _getServiceExpression(request);
+        public override Expression CreateExpressionOrDefault(Request request) => _getServiceExpression(request);
 
-        private readonly Func<Request, Expression> _getServiceExpression;
     }
 
-    /// Wraps the instance in registry
+    /// <summary>Wraps the instance in registry</summary>
     public sealed class RegisteredInstanceFactory : Factory
     {
+        /// <inheritdoc/>
+        public override IReuse Reuse { get; } // todo: @perf split
+        /// <inheritdoc/>
+        public override Setup Setup { get; } // todo: @perf split
+
         /// <summary>The registered pre-created object instance</summary>
         public readonly object Instance;
 
@@ -10827,9 +10932,9 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// <summary>Creates factory.</summary>
         public RegisteredInstanceFactory(object instance, IReuse reuse = null, Setup setup = null)
-           : base(reuse ?? DryIoc.Reuse.Singleton,
-               (setup ?? DryIoc.Setup.Default).WithAsResolutionCallForGeneratedExpression())
         {
+            Reuse = reuse;
+            Setup = (setup ?? DryIoc.Setup.Default).WithAsResolutionCallForGeneratedExpression();
             if (instance != null) // it may be `null` as well
             {
                 ImplementationType = instance.GetType();
@@ -10904,6 +11009,11 @@ private ParameterServiceInfo(ParameterInfo p)
     /// and where possible it uses delegate directly: without converting it to expression.</summary>
     public sealed class DelegateFactory : Factory
     {
+        /// <inheritdoc/>
+        public override IReuse Reuse { get; } // todo: @perf split
+        /// <inheritdoc/>
+        public override Setup Setup { get; } // todo: @perf split
+
         /// <summary>Non-abstract closed implementation type.</summary>
         public override Type ImplementationType { get; }
 
@@ -10913,8 +11023,10 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Creates factory.</summary>
         public DelegateFactory(FactoryDelegate factoryDelegate,
            IReuse reuse = null, Setup setup = null, Type knownImplementationType = null)
-           : base(reuse, (setup ?? Setup.Default).WithAsResolutionCallForGeneratedExpression())
         {
+            Reuse = reuse;
+            Setup = (setup ?? DryIoc.Setup.Default).WithAsResolutionCallForGeneratedExpression();
+
             _factoryDelegate = factoryDelegate.ThrowIfNull();
             ImplementationType = knownImplementationType;
         }

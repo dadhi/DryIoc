@@ -52,7 +52,7 @@ class NSubstitute_example
             var serviceType = request.ServiceType;
             if (!serviceType.IsAbstract) // Mock interface or abstract class only.
                 return null; 
-            return new ReflectionFactory(made: Made.Of(() => Substitute.For(new[] { serviceType }, null)));
+            return ReflectionFactory.Of(made: Made.Of(() => Substitute.For(new[] { serviceType }, null)));
         }));
 
     [Test]
@@ -92,8 +92,7 @@ class NSubstitute_example_with_singleton_mocks
             if (!serviceType.IsAbstract) // Mock interface or abstract class only.
                 return null;
             return _mockFactories.GetOrAdd(serviceType,
-                type => new ReflectionFactory(reuse: reuse,
-                    made: Made.Of(() => Substitute.For(new[] { type }, null))));
+                type => ReflectionFactory.Of(reuse: reuse, made: Made.Of(() => Substitute.For(new[] { type }, null))));
         }));
 
 
@@ -180,8 +179,7 @@ public class Moq_example_with_test_container
                 }
 
                 // concrete types
-                var concreteTypeFactory = new ReflectionFactory(serviceType, Reuse.Singleton,
-                    FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
+                var concreteTypeFactory = serviceType.ToFactory(Reuse.Singleton, FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
 
                 return new[] { new DynamicRegistration(concreteTypeFactory) };
             }, 

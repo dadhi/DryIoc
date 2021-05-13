@@ -1332,12 +1332,12 @@ namespace DryIoc.MefAttributedModel
         public ReflectionFactory CreateFactory(Func<string, Type> typeProvider = null)
         {
             if (!IsLazy)
-                return new ReflectionFactory(ImplementationType, GetReuse(), GetMade(), GetSetup());
+                return ReflectionFactory.Of(ImplementationType, GetReuse(), GetMade(), GetSetup());
 
             typeProvider = typeProvider.ThrowIfNull();
             var made = GetMade(typeProvider);
             var setup = GetSetup(made);
-            return new ReflectionFactory(() => typeProvider(ImplementationTypeFullName), GetReuse(), made, setup);
+            return ReflectionFactory.Of(() => typeProvider(ImplementationTypeFullName), GetReuse(), made, setup);
         }
 
         // todo: fix multi-threading

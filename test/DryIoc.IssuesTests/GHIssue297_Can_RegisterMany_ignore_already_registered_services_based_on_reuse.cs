@@ -39,7 +39,7 @@ namespace DryIoc.IssuesTests
                     .GetRegisterManyImplementedServiceTypes(nonPublicServiceTypes: true)
                     .Where(st => !c.IsRegistered(st, condition: factory => factory.Reuse == Reuse.Scoped))
                     .ToArray(),
-                t => new ReflectionFactory(t, Reuse.Transient),
+                t => ReflectionFactory.Of(t, Reuse.Transient),
                 ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             Assert.IsTrue(c.IsRegistered<A>(condition: f => f.Reuse == Reuse.Scoped));
