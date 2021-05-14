@@ -6559,10 +6559,23 @@ namespace DryIoc
         {
             registrator.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: isChecked);
+            registrator.TrackInstance(instance, setup);
+        }
 
-            // done after registration to pass all the registration validation checks
+        /// <summary>Tracks the disposable instance in the singleton scope</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static void TrackInstance(this IRegistrator registrator, object instance)
+        {
+            if (instance is IDisposable d)
+                ((IResolverContext)registrator).SingletonScope.TrackDisposableWithoutDisposalOrder(d);
+        }
+
+        /// <summary>Tracks the disposable instance in the singleton scope</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static void TrackInstance(this IRegistrator registrator, object instance, Setup setup)
+        {
             if (instance is IDisposable d && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
-                (registrator as IResolverContext)?.SingletonScope.TrackDisposableWithoutDisposalOrder(d);
+                ((IResolverContext)registrator).SingletonScope.TrackDisposableWithoutDisposalOrder(d);
         }
 
          /// <summary>

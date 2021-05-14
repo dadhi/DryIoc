@@ -305,11 +305,14 @@ public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this I
             else if (descriptor.ImplementationFactory != null)
             {
                 container.Register(DelegateFactory.Of(descriptor.ImplementationFactory.ToFactoryDelegate, descriptor.Lifetime.ToReuse()), 
-                    descriptor.ServiceType, null, null, isStaticallyChecked: true); // todo: @unclear can we really assume the `isStaticallyChecked: true`
+                    descriptor.ServiceType, null, null, isStaticallyChecked: true);
             }
             else
             {
-                container.RegisterInstance(true, descriptor.ServiceType, descriptor.ImplementationInstance);
+                var instance = descriptor.ImplementationInstance;
+                container.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton),
+                    descriptor.ServiceType, null, null, isStaticallyChecked: true);
+                container.TrackInstance(instance);
             }
         }
     }
