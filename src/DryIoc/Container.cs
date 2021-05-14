@@ -698,7 +698,7 @@ namespace DryIoc
             propertiesAndFields = propertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.Auto;
 
             var request = Request.Create(this, instanceType)
-                .WithResolvedFactory(RegisteredInstanceFactory.Of(instance, Reuse.Transient), 
+                .WithResolvedFactory(InstanceFactory.Of(instance, Reuse.Transient), 
                     skipRecursiveDependencyCheck: true, skipCaptiveDependencyCheck: true);
 
             foreach (var serviceInfo in propertiesAndFields(request))
@@ -6557,7 +6557,7 @@ namespace DryIoc
         public static void RegisterInstance(this IRegistrator registrator, bool isChecked, Type serviceType, object instance, 
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
         {
-            registrator.Register(RegisteredInstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup),
+            registrator.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
 
             // done after registration to pass all the registration validation checks
@@ -6610,7 +6610,7 @@ namespace DryIoc
             if (serviceTypes.Length == 0)
                 Throw.It(Error.NoServicesWereRegisteredByRegisterMany, implType.One());
             
-            var factory = RegisteredInstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup);
+            var factory = InstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup);
             foreach (var serviceType in serviceTypes)
                 registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
@@ -6648,7 +6648,7 @@ namespace DryIoc
             if (serviceTypes.IsNullOrEmpty())
                 Throw.It(Error.NoServicesWereRegisteredByRegisterMany, instance);
 
-            var factory = RegisteredInstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup);
+            var factory = InstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup);
 
             foreach (var serviceType in serviceTypes)
             {
@@ -10907,7 +10907,7 @@ private ParameterServiceInfo(ParameterInfo p)
     }
 
     /// <summary>Wraps the instance in registry</summary>
-    public class RegisteredInstanceFactory : Factory
+    public class InstanceFactory : Factory
     {
         /// <summary>The registered pre-created object instance</summary>
         public readonly object Instance;
@@ -10923,19 +10923,19 @@ private ParameterServiceInfo(ParameterInfo p)
         public override bool HasRuntimeState => true;
 
         /// <summary>Creates the memory-optimized factory from the supplied arguments</summary>
-        public static RegisteredInstanceFactory Of(object instance, IReuse reuse = null, Setup setup = null)
+        public static InstanceFactory Of(object instance, IReuse reuse = null, Setup setup = null)
         {
             if (setup == null)
                 setup = Setup.Default;
             return setup == Setup.Default && reuse == DryIoc.Reuse.Singleton 
-                ? new RegisteredInstanceFactory(instance)
+                ? new InstanceFactory(instance)
                 : new WithAllDetails(instance, reuse, setup);
         }
 
         /// <summary>Creates the factory.</summary>
-        public RegisteredInstanceFactory(object instance) => Instance = instance;
+        public InstanceFactory(object instance) => Instance = instance;
 
-        internal sealed class WithAllDetails : RegisteredInstanceFactory
+        internal sealed class WithAllDetails : InstanceFactory
         {
             public override IReuse Reuse { get; }
             public override Setup Setup { get; }
