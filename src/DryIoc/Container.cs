@@ -3766,8 +3766,7 @@ namespace DryIoc
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IReuse reuse, Setup setup, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations(
-                (ignoredServiceType, ignoredServiceKey) => implTypes,
-                implType => ReflectionFactory.Of(implType, reuse, setup: setup));
+                (ignoredServiceType, ignoredServiceKey) => implTypes, implType => ReflectionFactory.Of(implType, reuse, setup));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
@@ -5108,7 +5107,7 @@ namespace DryIoc
                     return null;
 
                 var factory = ReflectionFactory.Of(concreteType,
-                    made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
+                    DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
 
                 // to enable fallback to other rules if unresolved try to resolve expression first and return null
                 return factory.GetExpressionOrDefault(request.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null ? factory : null;
@@ -6499,6 +6498,11 @@ namespace DryIoc
         public static void Register(this IRegistrator registrator, Type serviceType, Factory factory,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, false);
+
+        /// <summary>Registers service <paramref name="serviceType"/> with corresponding <paramref name="implementationType"/>.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static void Register(this IRegistrator registrator, Type serviceType, Type implementationType, IReuse reuse) =>
+            registrator.Register(ReflectionFactory.Of(implementationType, reuse), serviceType, null, null, false);
 
         /// <summary>Registers service <paramref name="serviceType"/> with corresponding <paramref name="implementationType"/>.</summary>
         public static void Register(this IRegistrator registrator, Type serviceType, Type implementationType,
@@ -10000,9 +10004,7 @@ private ParameterServiceInfo(ParameterInfo p)
                     return c.DeclaringType;
                 if (x is ConstructorInfo[] cs)
                     return cs[0].DeclaringType;
-                if (x == null)
-                    return null;
-                return ValidateAndSetImplementationType(((Func<Type>)x)(), Made);
+                return null;
             }
         }
 
@@ -10055,17 +10057,8 @@ private ParameterServiceInfo(ParameterInfo p)
             return knownImplType;
         }
 
-        /// <summary>False for lazy implementation type, to prevent its early materialization.</summary>
-        public override bool CanAccessImplementationType
-        {
-            get
-            {
-                // todo: @unclear should we also check for the `FactoryMethodKnownResultType`
-                var x = _implementationTypeOrProviderOrPubCtorOrCtors;
-                return x is Func<Type> == false // not a lazy type provider
-                    || x == null; // or the type provided by the factory method
-            }
-        }
+        /// <summary>Is `true` for `null` or some implementation type, but is `false` below in `WithAllDetails` for the type provider</summary>
+        public override bool CanAccessImplementationType => true;
 
         /// <summary>Injection rules set for Constructor/FactoryMethod, Parameters, Properties and Fields.</summary>
         public override Made Made => Made.Default;
@@ -10073,39 +10066,48 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Will contain factory ID of generator's factory for generated factory.</summary>
         public override int RegistrationOrder => GeneratorFactory?.FactoryID ?? FactoryID;
 
-        /// <summary>Creates the factory based on arguments</summary>
-        public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
-        {
-            if (made == null)
-                made = Made.Default;
-            if (setup == null)
-                setup = Setup.Default;
-            return made == Made.Default && setup == Setup.Default
-                ? reuse == null ? new ReflectionFactory(implementationType)
-                : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(implementationType)
-                : reuse == DryIoc.Reuse.Scoped ? new WithScopedReuse(implementationType)
-                : new WithReuse(implementationType, reuse)
-                : setup == Setup.Default ? new WithReuseAndMade(implementationType, reuse, made)
-                : new WithAllDetails(implementationType, reuse, made, setup);
-        }
+        /// <summary>Creates the memory-optimized factory based on arguments</summary>
+        public static ReflectionFactory Of(Type implementationType) => 
+            new ReflectionFactory(implementationType);
+
+        /// <summary>Creates the memory-optimized factory based on arguments</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ReflectionFactory Of(Type implementationType, IReuse reuse) =>
+            reuse == null ? new ReflectionFactory(implementationType)
+            : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(implementationType)
+            : reuse == DryIoc.Reuse.Scoped    ? new WithScopedReuse   (implementationType)
+            : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(implementationType)
+            : new WithReuse(implementationType, reuse);
+
+        /// <summary>Creates the memory-optimized factory based on arguments</summary>
+        public static ReflectionFactory Of(Type implementationType, Made made) =>
+            new WithAllDetails(implementationType, null, made ?? Made.Default, Setup.Default);
+
+        /// <summary>Creates the memory-optimized factory based on arguments</summary>
+        public static ReflectionFactory Of(Type implementationType, IReuse reuse, Made made) => 
+            made == null || made == Made.Default 
+                ? Of(implementationType, reuse)
+                : new WithAllDetails(implementationType, reuse, made ?? Made.Default, Setup.Default);
+
+        /// <summary>Creates the memory-optimized factory based on arguments</summary>
+        public static ReflectionFactory Of(Type implementationType, Setup setup) => 
+            new WithAllDetails(implementationType, null, Made.Default, setup ?? Setup.Default);
+
+        /// <summary>Creates the memory-optimized factory based on arguments</summary>
+        public static ReflectionFactory Of(Type implementationType, IReuse reuse, Setup setup) =>
+            new WithAllDetails(implementationType, reuse, Made.Default, setup ?? Setup.Default);
+
+        /// <summary>Creates the memory-optimized factory based on arguments</summary>
+        public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null) =>
+            (made == null || made == Made.Default) && (setup == null || setup == Setup.Default)
+                ? Of(implementationType, reuse)
+                : new WithAllDetails(implementationType, reuse, made ?? Made.Default, setup ?? Setup.Default);
 
         /// <summary>Creates the factory based on arguments</summary>
-        public static ReflectionFactory Of(Func<Type> implementationTypeProvider, IReuse reuse = null, Made made = null, Setup setup = null)
-        {
-            if (made == null)
-                made = Made.Default;
-            if (setup == null)
-                setup = Setup.Default;
-            return made == Made.Default && setup == Setup.Default
-                ? reuse == null ? new ReflectionFactory(implementationTypeProvider)
-                : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(implementationTypeProvider)
-                : reuse == DryIoc.Reuse.Scoped ? new WithScopedReuse(implementationTypeProvider)
-                : new WithReuse(implementationTypeProvider, reuse)
-                : setup == Setup.Default ? new WithReuseAndMade(implementationTypeProvider, reuse, made)
-                : new WithAllDetails(implementationTypeProvider, reuse, made, setup);
-        }
+        public static ReflectionFactory Of(Func<Type> implementationTypeProvider, IReuse reuse = null, Made made = null, Setup setup = null) =>
+            new WithAllDetails(implementationTypeProvider, reuse, made ?? Made.Default, setup ?? Setup.Default);
 
-        /// <summary>Base constructor without setting the implementation type or type provider</summary>
+        /// <summary>Required for the `WithAllDetails` factory below</summary>
         protected ReflectionFactory() {}
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
@@ -10132,48 +10134,59 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             public override IReuse Reuse => DryIoc.Reuse.Singleton;
             public WithSingletonReuse(Type implementationType) : base(implementationType) {}
-            public WithSingletonReuse(Func<Type> implementationTypeProvider) : base(implementationTypeProvider) {}
+        }
+
+        internal sealed class WithTransientReuse : ReflectionFactory
+        {
+            public override IReuse Reuse => DryIoc.Reuse.Transient;
+            public WithTransientReuse(Type implementationType) : base(implementationType) {}
         }
 
         internal sealed class WithScopedReuse : ReflectionFactory
         {
             public override IReuse Reuse => DryIoc.Reuse.Scoped;
             public WithScopedReuse(Type implementationType) : base(implementationType) {}
-            public WithScopedReuse(Func<Type> implementationTypeProvider) : base(implementationTypeProvider) {}
         }
 
         internal sealed class WithReuse : ReflectionFactory
         {
             public override IReuse Reuse { get; }
             public WithReuse(Type implementationType, IReuse reuse) : base(implementationType) => Reuse = reuse;
-            public WithReuse(Func<Type> implementationTypeProvider, IReuse reuse) : base(implementationTypeProvider) => Reuse = reuse;
-        }
-
-        internal sealed class WithReuseAndMade : ReflectionFactory 
-        {
-            public override IReuse Reuse { get; }
-            public override Made Made { get; }
-            public WithReuseAndMade(Type implementationType, IReuse reuse, Made made)
-            {
-                Reuse = reuse;
-                Made  = made;
-                ValidateAndSetImplementationType(implementationType, made);
-            }
-
-            public WithReuseAndMade(Func<Type> implementationTypeProvider, IReuse reuse, Made made)
-            {
-                _implementationTypeOrProviderOrPubCtorOrCtors = implementationTypeProvider.ThrowIfNull();
-                Reuse = reuse;
-                Made  = made;
-            }
         }
 
         internal sealed class WithAllDetails : ReflectionFactory 
         {
+            public override bool CanAccessImplementationType
+            {
+                get
+                {
+                    var x = _implementationTypeOrProviderOrPubCtorOrCtors;
+                    return x is Func<Type> == false // not a lazy type provider
+                        || x == null; // or the type provided by the factory method
+                }
+            }
+
+            public override Type ImplementationType
+            {
+                get
+                {
+                    var x = _implementationTypeOrProviderOrPubCtorOrCtors;
+                    if (x is Type t)
+                        return t;
+                    if (x is ConstructorInfo c)
+                        return c.DeclaringType;
+                    if (x is ConstructorInfo[] cs)
+                        return cs[0].DeclaringType;
+                    if (x == null)
+                        return null;
+                    return ValidateAndSetImplementationType(((Func<Type>)x)(), Made);
+                }
+            }
+
             public override IReuse Reuse { get; }
             public override Made Made { get; }
             public override Setup Setup { get; }
-            public WithAllDetails(Type implementationType, IReuse reuse, Made made, Setup setup)
+            public WithAllDetails(Type implementationType, IReuse reuse, Made made, Setup setup) : base()
             {
                 Reuse = reuse;
                 Made  = made;
@@ -10181,7 +10194,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 ValidateAndSetImplementationType(implementationType, made);
             }
 
-            public WithAllDetails(Func<Type> implementationTypeProvider, IReuse reuse, Made made, Setup setup)
+            public WithAllDetails(Func<Type> implementationTypeProvider, IReuse reuse, Made made, Setup setup) : base()
             {
                 _implementationTypeOrProviderOrPubCtorOrCtors = implementationTypeProvider.ThrowIfNull();
                 Reuse = reuse;
