@@ -6558,7 +6558,7 @@ namespace DryIoc
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
         {
             registrator.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup),
-                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: isChecked);
 
             // done after registration to pass all the registration validation checks
             if (instance is IDisposable d && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
@@ -10923,14 +10923,23 @@ private ParameterServiceInfo(ParameterInfo p)
         public override bool HasRuntimeState => true;
 
         /// <summary>Creates the memory-optimized factory from the supplied arguments</summary>
-        public static InstanceFactory Of(object instance, IReuse reuse = null, Setup setup = null)
-        {
-            if (setup == null)
-                setup = Setup.Default;
-            return setup == Setup.Default && reuse == DryIoc.Reuse.Singleton 
+        public static InstanceFactory Of(object instance) => new InstanceFactory(instance);
+
+        /// <summary>Creates the memory-optimized factory from the supplied arguments</summary>
+        public static InstanceFactory Of(object instance, IReuse reuse) =>
+            reuse == DryIoc.Reuse.Singleton
                 ? new InstanceFactory(instance)
-                : new WithAllDetails(instance, reuse, setup);
-        }
+                : new WithAllDetails(instance, reuse, Setup.Default);
+
+        /// <summary>Creates the memory-optimized factory from the supplied arguments</summary>
+        public static InstanceFactory Of(object instance, Setup setup) =>
+            new WithAllDetails(instance, null, setup ?? Setup.Default);
+
+        /// <summary>Creates the memory-optimized factory from the supplied arguments</summary>
+        public static InstanceFactory Of(object instance, IReuse reuse, Setup setup) =>
+            reuse == DryIoc.Reuse.Singleton && (setup == null || setup == Setup.Default) 
+                ? new InstanceFactory(instance)
+                : new WithAllDetails(instance, reuse, setup ?? Setup.Default);
 
         /// <summary>Creates the factory.</summary>
         public InstanceFactory(object instance) => Instance = instance;
@@ -11022,10 +11031,10 @@ private ParameterServiceInfo(ParameterInfo p)
 
             return Setup.WeaklyReferenced 
                 ? (FactoryDelegate)UnpackWeakRefFactory 
-                : InstanceFactory;
+                : IdentityFactory;
         }
 
-        private object InstanceFactory(IResolverContext _) => Instance;
+        private object IdentityFactory(IResolverContext _) => Instance;
         private object UnpackWeakRefFactory(IResolverContext _) => (Instance as WeakReference)?.Target.WeakRefReuseWrapperGCed();
     }
 
