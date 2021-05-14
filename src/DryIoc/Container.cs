@@ -10065,6 +10065,7 @@ private ParameterServiceInfo(ParameterInfo p)
             : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(implementationType)
             : reuse == DryIoc.Reuse.Scoped    ? new WithScopedReuse   (implementationType)
             : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(implementationType)
+            : reuse == DryIoc.Reuse.ScopedOrSingleton ? new WithScopedOrSingletonReuse(implementationType)
             : new WithReuse(implementationType, reuse);
 
         /// <summary>Creates the memory-optimized factory based on arguments</summary>
@@ -10128,6 +10129,12 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             public override IReuse Reuse => DryIoc.Reuse.Transient;
             public WithTransientReuse(Type implementationType) : base(implementationType) {}
+        }
+
+        internal sealed class WithScopedOrSingletonReuse : ReflectionFactory
+        {
+            public override IReuse Reuse => DryIoc.Reuse.ScopedOrSingleton;
+            public WithScopedOrSingletonReuse(Type implementationType) : base(implementationType) {}
         }
 
         internal sealed class WithScopedReuse : ReflectionFactory
@@ -10897,7 +10904,6 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// <summary>Creates service expression using wrapped delegate.</summary>
         public override Expression CreateExpressionOrDefault(Request request) => _getServiceExpression(request);
-
     }
 
     /// <summary>Wraps the instance in registry</summary>
@@ -11044,6 +11050,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(factoryDelegate)
                 : reuse == DryIoc.Reuse.Scoped    ? new WithScopedReuse   (factoryDelegate)
                 : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(factoryDelegate)
+                : reuse == DryIoc.Reuse.ScopedOrSingleton ? new WithScopedOrSingletonReuse(factoryDelegate)
                 : new WithReuse(factoryDelegate, reuse);
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
@@ -11077,6 +11084,12 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             public override IReuse Reuse => DryIoc.Reuse.Transient;
             public WithTransientReuse(FactoryDelegate factoryDelegate) : base(factoryDelegate) {}
+        }
+
+        internal sealed class WithScopedOrSingletonReuse : DelegateFactory
+        {
+            public override IReuse Reuse => DryIoc.Reuse.ScopedOrSingleton;
+            public WithScopedOrSingletonReuse(FactoryDelegate factoryDelegate) : base(factoryDelegate) {}
         }
 
         internal sealed class WithReuse : DelegateFactory

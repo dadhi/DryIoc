@@ -1195,13 +1195,13 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |             DryIoc | 76.77 us | 0.411 us | 0.364 us |  1.02 |    0.03 |  9.6436 | 0.8545 |     - |  59.65 KB |
 | DryIoc_MsDIAdapter | 87.58 us | 1.708 us | 2.097 us |  1.15 |    0.04 | 12.0850 | 1.0986 |     - |  74.07 KB |
 
-### Optimizing ReflectionFactory and DelegateFactory
+### Optimizing ReflectionFactory, DelegateFactory and RegisteredInstanceFactory
 
 |             Method |     Mean |    Error |   StdDev |   Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------------- |---------:|---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI | 78.84 us | 1.566 us | 3.091 us | 78.09 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.53 KB |
-|             DryIoc | 88.75 us | 1.967 us | 5.768 us | 86.14 us |  1.14 |    0.08 |  9.2773 | 0.7324 |     - |  57.27 KB |
-| DryIoc_MsDIAdapter | 94.42 us | 2.211 us | 2.069 us | 93.51 us |  1.15 |    0.05 | 11.7188 | 0.9766 |     - |  71.99 KB |
+|               MsDI | 70.37 us | 0.951 us | 0.889 us | 70.46 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.54 KB |
+|             DryIoc | 91.31 us | 1.891 us | 5.456 us | 91.83 us |  1.26 |    0.14 |  9.2773 | 0.7324 |     - |  57.07 KB |
+| DryIoc_MsDIAdapter | 90.71 us | 1.809 us | 3.022 us | 89.28 us |  1.29 |    0.06 | 11.5967 | 1.0986 |     - |  71.74 KB |
 
 */
             [Benchmark(Baseline = true)]
