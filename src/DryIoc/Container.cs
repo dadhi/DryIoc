@@ -7049,18 +7049,6 @@ namespace DryIoc
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
         }
 
-        /// <summary>
-        /// A special performant version mostly for integration with other libraries,
-        /// that already check compatibility between delegate result and the service type
-        /// </summary>
-        public static void RegisterDelegate(this IRegistrator registrator,
-            bool isChecked, Type serviceType, Func<IServiceProvider, object> factoryDelegate,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
-            object serviceKey = null) =>
-            registrator.Register(DelegateFactory.Of(factoryDelegate.ToFactoryDelegate, reuse, setup), 
-                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-
-
         // [Obsolete("Replaced with RegisterDelegate{MyService, Dep1...Dep2, MyService}((service, d1, d2) => new MyServiceDecorator(service, d1, d2), setup: Setup.DecoratorWith(useDecorateeReuse: true, condition: optional))")]
         ///<summary>Obsolete("Replaced with RegisterDelegate{MyService, Dep1...Dep2, MyService}((service, d1, d2) => new MyServiceDecorator(service, d1, d2), setup: Setup.DecoratorWith(useDecorateeReuse: true, condition: optional))")</summary>
         public static void RegisterDelegateDecorator<TService>(this IRegistrator registrator,
@@ -11044,20 +11032,31 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <inheritdoc />
         public override Setup Setup => DryIoc.Setup.AsResolutionCallForGeneratedExpressionSetup;
 
-        /// <summary>Creates the specialized factory from the provided arguments</summary>
-        public static DelegateFactory Of(FactoryDelegate factoryDelegate,
-            IReuse reuse = null, Setup setup = null)
-        {
-            if (setup == null)
-                setup = Setup.Default;
-            return setup == Setup.Default
-                ? reuse == null ? new DelegateFactory(factoryDelegate)
+        /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static DelegateFactory Of(FactoryDelegate factoryDelegate) =>
+            new DelegateFactory(factoryDelegate);
+
+        /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static DelegateFactory Of(FactoryDelegate factoryDelegate, IReuse reuse) =>
+            reuse == null ? new DelegateFactory(factoryDelegate)
                 : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(factoryDelegate)
                 : reuse == DryIoc.Reuse.Scoped    ? new WithScopedReuse   (factoryDelegate)
                 : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(factoryDelegate)
-                : new WithReuse(factoryDelegate, reuse)
-                : new WithAllDetails(factoryDelegate, reuse, setup);
-        }
+                : new WithReuse(factoryDelegate, reuse);
+
+        /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
+        public static DelegateFactory Of(FactoryDelegate factoryDelegate, Setup setup) =>
+            setup == null || setup == Setup.Default
+                ? new DelegateFactory(factoryDelegate)
+                : new WithAllDetails(factoryDelegate, null, setup ?? Setup.Default);
+
+        /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
+        public static DelegateFactory Of(FactoryDelegate factoryDelegate, IReuse reuse, Setup setup) =>
+            setup == null || setup == Setup.Default
+                ? Of(factoryDelegate, reuse)
+                : new WithAllDetails(factoryDelegate, reuse, setup ?? Setup.Default);
 
         /// <summary>Creates the factory.</summary>
         public DelegateFactory(FactoryDelegate factoryDelegate) => _factoryDelegate = factoryDelegate.ThrowIfNull();
@@ -12155,6 +12154,8 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
 
+        // todo: @perf optimize the Register for the most common case of FactoryType.Service, no serviceKey, default IfAlreadyRegistered
+        // todo: @perf maybe introduce the separate minimal (most common) version in the IRegistrator interface
         /// <summary>Registers factory in registry with specified service type and key for lookup.
         /// Returns true if factory was added to registry, false otherwise. False may be in case of <see cref="IfAlreadyRegistered.Keep"/>
         /// setting and already existing factory</summary>

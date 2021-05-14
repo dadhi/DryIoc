@@ -24,6 +24,7 @@ THE SOFTWARE.
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;  // for MethodImplAttribute
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DryIoc.Microsoft.DependencyInjection
@@ -286,30 +287,25 @@ public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this I
                         container.RegisterDescriptor(descriptor);
         }
 
-        /// <summary>Uses passed descriptor to register service in container: 
-        /// maps DI Lifetime to DryIoc Reuse,
-        /// and DI registration type to corresponding DryIoc Register, RegisterDelegate or RegisterInstance.</summary>
-        /// <param name="container">The container.</param>
-        /// <param name="descriptor">Service descriptor.</param>
+        /// <summary>Converts the MS.DI ServiceLifetime into the corresponding `DryIoc.IReuse`</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static IReuse ToReuse(this ServiceLifetime lifetime) =>
+            lifetime == ServiceLifetime.Singleton ? Reuse.Singleton : 
+            lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton : // check that we have Reuse.ScopedOrSingleton here instead of Reuse.Scoped
+            Reuse.Transient;
+
+        /// <summary>Unpacks the service descriptor to register the service in DryIoc container</summary>
         public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor)
         {
             if (descriptor.ImplementationType != null)
             {
-                var reuse = descriptor.Lifetime == ServiceLifetime.Singleton ? Reuse.Singleton
-                    : descriptor.Lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton
-                    : Reuse.Transient;
-
-                container.Register(descriptor.ServiceType, descriptor.ImplementationType, reuse);
+                container.Register(ReflectionFactory.Of(descriptor.ImplementationType, descriptor.Lifetime.ToReuse()), 
+                    descriptor.ServiceType, null, null, isStaticallyChecked: true);
             }
             else if (descriptor.ImplementationFactory != null)
             {
-                var reuse = descriptor.Lifetime == ServiceLifetime.Singleton ? Reuse.Singleton
-                    : descriptor.Lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton
-                    : Reuse.Transient;
-
-                container.RegisterDelegate(true, descriptor.ServiceType,
-                    descriptor.ImplementationFactory,
-                    reuse);
+                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory.ToFactoryDelegate, descriptor.Lifetime.ToReuse()), 
+                    descriptor.ServiceType, null, null, isStaticallyChecked: true); // todo: @unclear can we really assume the `isStaticallyChecked: true`
             }
             else
             {
