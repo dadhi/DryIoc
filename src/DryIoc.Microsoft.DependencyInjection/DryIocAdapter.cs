@@ -300,7 +300,7 @@ public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this I
             if (descriptor.ImplementationType != null)
             {
                 container.Register(ReflectionFactory.Of(descriptor.ImplementationType, descriptor.Lifetime.ToReuse()), 
-                    descriptor.ServiceType, null, null, isStaticallyChecked: true);
+                    descriptor.ServiceType, null, null, isStaticallyChecked: false);
             }
             else if (descriptor.ImplementationFactory != null)
             {
