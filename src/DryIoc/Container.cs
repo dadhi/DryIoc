@@ -367,13 +367,13 @@ namespace DryIoc
                 {
                     var value = constExpr.Value;
                     if (factory.CanCache)
-                        _registry.Value.TryCacheDefaultFactory<FactoryDelegate>(serviceTypeHash, serviceType, value.ToFactoryDelegate);
+                        TryCacheDefaultFactory<FactoryDelegate>(serviceTypeHash, serviceType, value.ToFactoryDelegate);
                     return value;
                 }
 
                 // Important to cache expression first before tying to interpret, so that parallel resolutions may already use it.
                 if (factory.CanCache)
-                    _registry.Value.TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
+                    TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
 
                 // 1) First try to interpret
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
@@ -383,7 +383,7 @@ namespace DryIoc
             }
 
             if (factory.CanCache)
-                _registry.Value.TryCacheDefaultFactory(serviceTypeHash, serviceType, factoryDelegate);
+                TryCacheDefaultFactory(serviceTypeHash, serviceType, factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -1699,15 +1699,29 @@ namespace DryIoc
 
         private int _disposed;
         private StackTrace _disposeStackTrace;
-
         internal readonly Ref<Registry> _registry;
-
         private readonly IScope _singletonScope;
         private readonly IScope _ownCurrentScope;
         private readonly IScopeContext _scopeContext;
         private readonly IResolverContext _parent;
 
-        internal sealed class Registry
+        internal void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
+        {
+            // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
+            var registry = _registry.Value;
+            if (registry.Services.IsEmpty)
+                return;
+
+            var withCache = registry as Registry.WithCache;
+            if (withCache == null)
+            {
+                _registry.Swap(r => r.WithDefaultFactoryCache()); // todo: @perf optimize
+                withCache = (Registry.WithCache)_registry.Value;
+            }
+            withCache.TryCacheDefaultFactory(serviceTypeHash, serviceType, factory);
+        }
+
+        internal class Registry
         {
             public static readonly Registry Empty = new Registry();
             public static readonly Registry Default = new Registry(WrappersSupport.Wrappers);
@@ -1727,7 +1741,7 @@ namespace DryIoc
                 public Compiling(Expression expression) => Expression = expression;
             }
 
-            public ImHashMap<Type, object>[] DefaultFactoryCache;
+            public virtual ImHashMap<Type, object>[] DefaultFactoryCache => null;
 
             [MethodImpl((MethodImplOptions)256)]
             public ImHashMapEntry<Type, object> GetCachedDefaultFactoryOrDefault(int serviceTypeHash, Type serviceType)
@@ -1735,24 +1749,6 @@ namespace DryIoc
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = DefaultFactoryCache;
                 return cache == null ? null : cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
-            }
-
-            public void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
-            {
-                // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
-                if (Services.IsEmpty)
-                    return;
-
-                if (DefaultFactoryCache == null)
-                    Interlocked.CompareExchange(ref DefaultFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
-
-                ref var map = ref DefaultFactoryCache[serviceTypeHash & CACHE_SLOT_COUNT_MASK];
-                if (map == null)
-                    Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
-
-                var m = map;
-                if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(serviceTypeHash, serviceType, factory), m) != m)
-                    Ref.Swap(ref map, serviceTypeHash, serviceType, factory, (x, h, t, f) => x.AddOrUpdate(h, t, f));
             }
 
             internal sealed class KeyedFactoryCacheEntry
@@ -1932,7 +1928,6 @@ namespace DryIoc
 
             private Registry(ImHashMap<Type, object> wrapperFactories = null)
                 : this(ImHashMap<Type, object>.Empty, ImHashMap<Type, object>.Empty, wrapperFactories ?? ImHashMap<Type, object>.Empty,
-                    null, null, null, // caches are initialized to `null` to quickly check that they 
                     IsRegistryChangePermitted.Permitted)
             { }
 
@@ -1940,39 +1935,122 @@ namespace DryIoc
                 ImHashMap<Type, object> services,
                 ImHashMap<Type, object> decorators,
                 ImHashMap<Type, object> wrappers,
-                ImHashMap<Type, object>[]  defaultFactoryCache,
-                ImHashMap<Type, object>[]  keyedFactoryCache,
-                ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
                 IsRegistryChangePermitted isChangePermitted)
             {
                 Services   = services;
                 Decorators = decorators;
                 Wrappers   = wrappers;
-                DefaultFactoryCache = defaultFactoryCache;
-                KeyedFactoryCache = keyedFactoryCache;
-                FactoryExpressionCache = factoryExpressionCache;
                 IsChangePermitted = isChangePermitted;
             }
 
-            public Registry WithoutCache() =>
-                new Registry(Services, Decorators, Wrappers, null, null, null, IsChangePermitted);
+            internal sealed class WithCache : Registry
+            {
+                public override ImHashMap<Type, object>[] DefaultFactoryCache => _defaultFactoryCache;
+                private ImHashMap<Type, object>[] _defaultFactoryCache;
+                internal WithCache(
+                    ImHashMap<Type, object> services,
+                    ImHashMap<Type, object> decorators,
+                    ImHashMap<Type, object> wrappers,
+                    ImHashMap<Type, object>[]  defaultFactoryCache,
+                    ImHashMap<Type, object>[]  keyedFactoryCache,
+                    ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
+                    IsRegistryChangePermitted isChangePermitted) : 
+                    base(services, decorators, wrappers, isChangePermitted)
+                {
+                    _defaultFactoryCache   = defaultFactoryCache;
+                    KeyedFactoryCache      = keyedFactoryCache;
+                    FactoryExpressionCache = factoryExpressionCache;
+                }
 
-            internal Registry WithServices(ImHashMap<Type, object> services) =>
-                services == Services ? this :
-                new Registry(services, Decorators, Wrappers,
-                    // Using Copy is fine when you have only the registrations because the caches will be null and no actual copy will be done.
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
-                    IsChangePermitted);
+                public override Registry WithoutCache() =>
+                    new Registry(Services, Decorators, Wrappers, IsChangePermitted);
 
-            private Registry WithDecorators(ImHashMap<Type, object> decorators) =>
-                decorators == Decorators ? this :
-                new Registry(Services, decorators, Wrappers, 
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
+                internal override Registry WithServices(ImHashMap<Type, object> services) =>
+                    services == Services ? this :
+                    new WithCache(services, Decorators, Wrappers, 
+                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
 
-            private Registry WithWrappers(ImHashMap<Type, object> wrappers) =>
-                wrappers == Wrappers ? this :
-                new Registry(Services, Decorators, wrappers, 
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
+                internal override Registry WithDecorators(ImHashMap<Type, object> decorators) =>
+                    decorators == Decorators ? this :
+                    new WithCache(Services, decorators, Wrappers, 
+                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
+
+                internal override Registry WithWrappers(ImHashMap<Type, object> wrappers) =>
+                    wrappers == Wrappers ? this :
+                    new WithCache(Services, Decorators, wrappers, 
+                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
+
+                public override Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
+                    new Registry(Services, Decorators, Wrappers, isChangePermitted);
+
+                public void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
+                {
+                    if (_defaultFactoryCache == null)
+                        Interlocked.CompareExchange(ref _defaultFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
+
+                    ref var map = ref DefaultFactoryCache[serviceTypeHash & CACHE_SLOT_COUNT_MASK];
+                    if (map == null)
+                        Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
+
+                    var m = map;
+                    if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(serviceTypeHash, serviceType, factory), m) != m)
+                        Ref.Swap(ref map, serviceTypeHash, serviceType, factory, (x, h, t, f) => x.AddOrUpdate(h, t, f));
+                }
+
+                internal override void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null)
+                {
+                    if (factory == null)
+                        return; // filter out Unregistered factory (see #390)
+
+                    if (DefaultFactoryCache != null || KeyedFactoryCache != null)
+                    {
+                        if (factory.GeneratedFactories == null)
+                        {
+                            var d = DefaultFactoryCache;
+                            if (d != null)
+                                Ref.Swap(ref d[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
+                                    (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).UpdateToDefault(h, t));
+
+                            var k = KeyedFactoryCache;
+                            if (k != null)
+                                Ref.Swap(ref k[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
+                                    (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).UpdateToDefault(h, t));
+                        }
+                        else
+                        {
+                            // We cannot remove generated factories, because they are keyed by implementation type and we may remove wrong factory
+                            // a safe alternative is dropping the whole cache
+                            _defaultFactoryCache = null;
+                            KeyedFactoryCache = null;
+                        }
+                    }
+
+                    if (FactoryExpressionCache != null)
+                    {
+                        var exprCache = FactoryExpressionCache;
+                        if (exprCache != null)
+                        {
+                            var factoryId = factory.FactoryID;
+                            Ref.Swap(ref exprCache[factoryId & CACHE_SLOT_COUNT_MASK],
+                                factoryId, (x, i) => (x ?? ImMap<ExpressionCacheSlot>.Empty).UpdateToDefault(i));
+                        }
+                    }
+                }
+            }
+
+            public virtual Registry WithoutCache() => this;
+
+            public Registry WithDefaultFactoryCache() =>
+                new Registry.WithCache(Services, Decorators, Wrappers, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, null, IsChangePermitted);
+
+            internal virtual Registry WithServices(ImHashMap<Type, object> services) =>
+                services == Services ? this : new Registry(services, Decorators, Wrappers, IsChangePermitted);
+
+            internal virtual Registry WithDecorators(ImHashMap<Type, object> decorators) =>
+                decorators == Decorators ? this : new Registry(Services, decorators, Wrappers, IsChangePermitted);
+
+            internal virtual Registry WithWrappers(ImHashMap<Type, object> wrappers) =>
+                wrappers == Wrappers ? this : new Registry(Services, Decorators, wrappers, IsChangePermitted);
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
             {
@@ -2229,9 +2307,7 @@ namespace DryIoc
                 if (newEntry == oldEntry)
                     return this;
 
-                var newServices = services.AddOrUpdate(serviceTypeHash, serviceType, newEntry);
-                var newRegistry = new Registry(newServices, Decorators, Wrappers,
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
+                var newRegistry = WithServices(services.AddOrUpdate(serviceTypeHash, serviceType, newEntry));
 
                 if (oldEntry != null)
                 {
@@ -2297,10 +2373,7 @@ namespace DryIoc
                 if (newEntry == null)
                     newEntry = FactoriesEntry.Empty.With(factory, serviceKey);
 
-                var newServices = services.AddOrUpdate(serviceTypeHash, serviceType, newEntry);
-                var newRegistry = new Registry(newServices, Decorators, Wrappers,
-                    DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(),
-                    IsChangePermitted);
+                var newRegistry = WithServices(services.AddOrUpdate(serviceTypeHash, serviceType, newEntry));
 
                 if (oldEntry != null && ifAlreadyRegistered == IfAlreadyRegistered.Replace &&
                     oldEntry is FactoriesEntry updatedOldFactories &&
@@ -2452,48 +2525,10 @@ namespace DryIoc
                 return registry;
             }
 
-            internal void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null)
-            {
-                if (factory == null)
-                    return; // filter out Unregistered factory (see #390)
+            internal virtual void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null) {}
 
-                if (DefaultFactoryCache != null || KeyedFactoryCache != null)
-                {
-                    if (factory.GeneratedFactories == null)
-                    {
-                        var d = DefaultFactoryCache;
-                        if (d != null)
-                            Ref.Swap(ref d[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
-                                (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).UpdateToDefault(h, t));
-
-                        var k = KeyedFactoryCache;
-                        if (k != null)
-                            Ref.Swap(ref k[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
-                                (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).UpdateToDefault(h, t));
-                    }
-                    else
-                    {
-                        // We cannot remove generated factories, because they are keyed by implementation type and we may remove wrong factory
-                        // a safe alternative is dropping the whole cache
-                        DefaultFactoryCache = null;
-                        KeyedFactoryCache = null;
-                    }
-                }
-
-                if (FactoryExpressionCache != null)
-                {
-                    var exprCache = FactoryExpressionCache;
-                    if (exprCache != null)
-                    {
-                        var factoryId = factory.FactoryID;
-                        Ref.Swap(ref exprCache[factoryId & CACHE_SLOT_COUNT_MASK],
-                            factoryId, (x, i) => (x ?? ImMap<ExpressionCacheSlot>.Empty).UpdateToDefault(i));
-                    }
-                }
-            }
-
-            public Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
-                new Registry(Services, Decorators, Wrappers, DefaultFactoryCache, KeyedFactoryCache, FactoryExpressionCache, isChangePermitted);
+            public virtual Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
+                new Registry(Services, Decorators, Wrappers, isChangePermitted);
         }
 
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
