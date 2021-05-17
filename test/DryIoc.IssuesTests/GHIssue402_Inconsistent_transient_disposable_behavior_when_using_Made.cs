@@ -10,6 +10,7 @@ namespace DryIoc.IssuesTests
         public int Run()
         {
             Test1();
+            Test2();
             return 1;
         }
 
@@ -21,6 +22,29 @@ namespace DryIoc.IssuesTests
             container.Register<IService, Service>(
                 setup: Setup.With(trackDisposableTransient: true), 
                 made: Made.Of(() => new Service(Arg.Of<Func<object, ILogger>>(), Arg.Of<Service1>(), Arg.Of<Service2>(), Arg.Of<Service3>())));
+
+            var logger = new ListLogger { Messages = new List<string>() };
+            container.RegisterInstance<ILogger>(logger);
+            
+            container.Register<Service1>();
+            container.Register<Service2>();
+            container.Register<Service3>();
+
+
+            using (var scope = container.OpenScope())
+            {
+                var s = scope.Resolve<IService>();
+            }
+
+            Assert.AreEqual("disposed", logger.Messages[0]);
+        }
+
+        [Test]
+        public void Test2()
+        {
+            var container = new Container();
+
+            container.Register<IService, Service>(setup: Setup.With(trackDisposableTransient: true));
 
             var logger = new ListLogger { Messages = new List<string>() };
             container.RegisterInstance<ILogger>(logger);

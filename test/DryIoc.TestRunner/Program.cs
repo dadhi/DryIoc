@@ -13,6 +13,7 @@ namespace DryIoc.UnitTests
     
             // new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration().Run();
             //new GHIssue380_ExportFactory_throws_Container_disposed_exception().Run();
+            // new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made().Run();
         }
 
         public static void RunAllTests()
@@ -44,7 +45,8 @@ namespace DryIoc.UnitTests
             var tests = new ITest[] {
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
-                new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration()
+                new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration(),
+                new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made(),
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added
