@@ -2,7 +2,6 @@ using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 using DryIoc.ImTools;
-using DryIoc.Testing;
 
 namespace DryIoc.UnitTests
 {

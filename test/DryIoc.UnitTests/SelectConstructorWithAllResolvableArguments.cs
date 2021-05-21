@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class SelectConstructorWithAllResolvableArgumentTests
+    public class SelectConstructorWithAllResolvableArgumentTests : ITest
     {
+        public int Run()
+        {
+            Can_specify_to_use_default_ctor_and_throw_correct_error_if_no_impl_type();
+            return 1;
+        }
+
         [Test]
         public void Container_is_providing_method_for_that_Test_default_constructor()
         {
@@ -190,7 +196,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void AutoConstructoSelection_will_throw_for_not_defined_impl_type()
+        public void AutoConstructorSelection_will_throw_for_not_defined_impl_type()
         {
             var container = new Container();
 

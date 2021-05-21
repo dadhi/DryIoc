@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
+        <!-- <TargetFramework>net5</TargetFramework> -->
         <TargetFramework>netcoreapp3.1</TargetFramework>
         <Description>Benchmarks, sandbox for experiments.</Description>
         <NoWarn>1701;1702;AD0001;NU1608</NoWarn>
@@ -16,7 +17,7 @@
     <ItemGroup>
         <PackageReference Include="Autofac" Version="6.1.0" />
         <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="7.1.0" />
-        <PackageReference Include="BenchmarkDotNet" Version="0.12.0" />
+        <PackageReference Include="BenchmarkDotNet" Version="0.13.0" />
         <PackageReference Include="Grace" Version="7.2.0" />
         <PackageReference Include="Grace.DependencyInjection.Extensions" Version="7.1.0" />
         <PackageReference Include="LightInject" Version="6.4.0" />

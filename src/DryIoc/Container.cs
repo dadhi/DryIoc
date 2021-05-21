@@ -477,13 +477,13 @@ namespace DryIoc
                 {
                     var value = constExpr.Value;
                     if (cacheKey != null)
-                        _registry.Value.TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, (FactoryDelegate)value.ToFactoryDelegate);
+                        TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, (FactoryDelegate)value.ToFactoryDelegate);
                     return value;
                 }
 
                 // Important to cache expression first before tying to interpret, so that parallel resolutions may already use it
                 if (cacheKey != null)
-                    _registry.Value.TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, expr);
+                    TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, expr);
 
                 // 1) First try to interpret
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
@@ -496,7 +496,7 @@ namespace DryIoc
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
             // Additionally disable caching when no services registered, not to cache an empty collection wrapper or alike.
             if (cacheKey != null)
-                _registry.Value.TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, factoryDelegate);
+                TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, factoryDelegate);
 
             return factoryDelegate(this);
         }
@@ -792,13 +792,8 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<Registry.ExpressionCacheSlot> slot) => 
+        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<ExpressionCacheSlot> slot) => 
             _registry.Value.GetCachedFactoryExpression(factoryId, reuse, out slot);
-
-        [MethodImpl((MethodImplOptions) 256)]
-        internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount,
-            ImMapEntry<Registry.ExpressionCacheSlot> slot) =>
-            _registry.Value.CacheFactoryExpression(factoryId, expr, reuse, dependencyCount, slot);
 
         Factory IContainer.ResolveFactory(Request request)
         {
@@ -1482,8 +1477,7 @@ namespace DryIoc
         /// <summary>Converts known item into literal expression or wraps it in a constant expression.</summary>
         public Expression GetConstantExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
-            // Check for UsedForExpressionGeneration, and if not set just short-circuit to Expression.Constant
-            if (!throwIfStateRequired && !Rules.ThrowIfRuntimeStateRequired && !Rules.UsedForExpressionGeneration)
+            if (!throwIfStateRequired && Rules.ConstantExpressionIsFine)
                 return itemType == null ? Constant(item) : Constant(item, itemType);
 
             if (item == null)
@@ -1721,6 +1715,45 @@ namespace DryIoc
             withCache.TryCacheDefaultFactory(serviceTypeHash, serviceType, factory);
         }
 
+        internal void TryCacheKeyedFactory(int serviceTypeHash, Type serviceType, object key, object factory)
+        {
+            // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
+            var registry = _registry.Value;
+            if (registry.Services.IsEmpty)
+                return;
+
+            var withCache = registry as Registry.WithCache;
+            if (withCache == null)
+            {
+                _registry.Swap(r => r.WithKeyedFactoryCache()); // todo: @perf optimize
+                withCache = (Registry.WithCache)_registry.Value;
+            }
+            withCache.TryCacheKeyedFactory(serviceTypeHash, serviceType, key, factory);
+        }
+
+        // The cases to store
+        // | Singleton of (ConstantExpression e)
+        // | Transient of (Expression e, int dependencyCount)
+        // | Scoped    of (Expression e)
+        // | ScopedTo  of (Expression e, object name)
+        internal struct ExpressionCacheSlot
+        {
+            public Expression Expr;
+            public object ScopeNameOrDependencyCount; // null - singleton | NoNameForScoped - scoped | TransientDependencyCount - transient | scope name
+            public static readonly object NoNameForScoped = new object();
+        }
+
+        internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<ExpressionCacheSlot> entry = null)
+        {
+            var withCache = _registry.Value as Registry.WithCache;
+            if (withCache == null)
+            {
+                _registry.Swap(r => r.WithFactoryExpressionCache()); // todo: @perf optimize
+                withCache = (Registry.WithCache)_registry.Value;
+            }
+            withCache.CacheFactoryExpression(factoryId, expr, reuse, dependencyCount, entry);
+        }
+
         internal class Registry
         {
             public static readonly Registry Empty = new Registry();
@@ -1728,20 +1761,28 @@ namespace DryIoc
 
             // Factories:
             public readonly ImHashMap<Type, object> Services;
-            // todo: @perf make it Factory or Factory[]
-            public readonly ImHashMap<Type, object> Decorators; // value is Factory[] 
-            public readonly ImHashMap<Type, object> Wrappers;   // value is Factory
+            public readonly ImHashMap<Type, object> Wrappers;   // value is Factory // todo: @perf we may use the static predefined Wrappers and optimize away the instance one 
+            public virtual ImHashMap<Type, object> Decorators => ImHashMap<Type, object>.Empty; // value is Factory[]  // todo: @perf make it Factory or Factory[]
 
             internal const int CACHE_SLOT_COUNT = 16;
             internal const int CACHE_SLOT_COUNT_MASK = CACHE_SLOT_COUNT - 1;
+
+            public virtual ImHashMap<Type, object>[] DefaultFactoryCache => null;
+
+            // Where key is `KV.Of(ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
+            // and value is `KeyedFactoryCacheEntries`
+            public virtual ImHashMap<Type, object>[] KeyedFactoryCache => null;
+
+            ///<summary>The int key is the `FactoryID`</summary>
+            public virtual ImMap<ExpressionCacheSlot>[] FactoryExpressionCache => null;
+
+            internal virtual IsRegistryChangePermitted IsChangePermitted => default;
 
             public sealed class Compiling
             {
                 public readonly Expression Expression;
                 public Compiling(Expression expression) => Expression = expression;
             }
-
-            public virtual ImHashMap<Type, object>[] DefaultFactoryCache => null;
 
             [MethodImpl((MethodImplOptions)256)]
             public ImHashMapEntry<Type, object> GetCachedDefaultFactoryOrDefault(int serviceTypeHash, Type serviceType)
@@ -1764,10 +1805,6 @@ namespace DryIoc
                 }
             }
 
-            // Where key is `KV.Of(ServiceKey | ScopeName | RequiredServiceType | KV.Of(ServiceKey, ScopeName | RequiredServiceType) | ...)`
-            // and value is `KeyedFactoryCacheEntries`
-            public ImHashMap<Type, object>[] KeyedFactoryCache;
-
             [MethodImpl((MethodImplOptions)256)]
             public bool GetCachedKeyedFactoryOrDefault(int serviceTypeHash, Type serviceType, object key, out KeyedFactoryCacheEntry result)
             {
@@ -1787,39 +1824,6 @@ namespace DryIoc
                 return result != null;
             }
 
-            public void TryCacheKeyedFactory(int serviceTypeHash, Type serviceType, object key, object factory)
-            {
-                // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
-                if (Services.IsEmpty)
-                    return;
-
-                if (KeyedFactoryCache == null)
-                    Interlocked.CompareExchange(ref KeyedFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
-
-                ref var map = ref KeyedFactoryCache[serviceTypeHash & CACHE_SLOT_COUNT_MASK];
-                if (map == null)
-                    Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
-
-                var entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
-                if (entry == null)
-                {
-                    entry = new ImHashMapEntry<Type, object>(serviceTypeHash, serviceType);
-                    var oldMap = map;
-                    var newMap = oldMap.AddOrKeepEntry(entry);
-                    if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
-                    {
-                        if (newMap == oldMap)
-                            entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
-                    }
-                    else 
-                        entry = Ref.SwapAndGetNewValue(ref map, entry, (x, en) => x.AddOrKeepEntry(en)).GetEntryOrDefault(serviceTypeHash, serviceType);
-                }
-
-                var e = entry.Value;
-                if (Interlocked.CompareExchange(ref entry.Value, SetOrAddKeyedCacheFactory(e, key, factory), e) != e)
-                    Ref.Swap(ref entry.Value, key, factory, SetOrAddKeyedCacheFactory);
-            }
-
             private object SetOrAddKeyedCacheFactory(object x, object k, object f)
             {
                 for (var entry = (KeyedFactoryCacheEntry)x; entry != null; entry = entry.Rest)
@@ -1834,29 +1838,13 @@ namespace DryIoc
                 return new KeyedFactoryCacheEntry((KeyedFactoryCacheEntry)x, k, f);
             }
 
-            // The cases to store
-            // | Singleton of (ConstantExpression e)
-            // | Transient of (Expression e, int dependencyCount)
-            // | Scoped    of (Expression e)
-            // | ScopedTo  of (Expression e, object name)
-            internal struct ExpressionCacheSlot
-            {
-                public Expression Expr;
-                public object ScopeNameOrDependencyCount; // null - singleton | NoNameForScoped - scoped | TransientDependencyCount - transient | scope name
-                public static readonly object NoNameForScoped = new object();
-            }
-
             internal class TransientDependencyCount
             {
                 public int Value;
                 public TransientDependencyCount(int value) => Value = value;
             }
 
-            ///<summary>The int key is the `FactoryID`</summary>
-            public ImMap<ExpressionCacheSlot>[] FactoryExpressionCache;
-
-            internal Expression GetCachedFactoryExpression(int factoryId, 
-                IReuse reuse, out ImMapEntry<Registry.ExpressionCacheSlot> entry)
+            internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<ExpressionCacheSlot> entry)
             {
                 entry = FactoryExpressionCache?[factoryId & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(factoryId);
                 if (entry == null) 
@@ -1877,7 +1865,7 @@ namespace DryIoc
                 if (reuse is CurrentScopeReuse scoped)
                 {
                     if (scoped.Name == null)
-                        return scopeNameOrDependencyCount == Registry.ExpressionCacheSlot.NoNameForScoped ? expr : null;
+                        return scopeNameOrDependencyCount == ExpressionCacheSlot.NoNameForScoped ? expr : null;
 
                     if (ReferenceEquals(scoped.Name, scopeNameOrDependencyCount) || scoped.Name.Equals(scopeNameOrDependencyCount))
                         return expr;
@@ -1886,109 +1874,97 @@ namespace DryIoc
                 return null;
             }
 
-            internal void CacheFactoryExpression(int factoryId, 
-                Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<ExpressionCacheSlot> entry)
+            private Registry(ImHashMap<Type, object> wrapperFactories = null) : 
+                this(ImHashMap<Type, object>.Empty, wrapperFactories ?? ImHashMap<Type, object>.Empty) {}
+
+            private Registry(ImHashMap<Type, object> services, ImHashMap<Type, object> wrappers)
             {
-                if (entry == null)
-                {
-                    if (FactoryExpressionCache == null)
-                        Interlocked.CompareExchange(ref FactoryExpressionCache,
-                            new ImMap<ExpressionCacheSlot>[CACHE_SLOT_COUNT], null);
-
-                    ref var map = ref FactoryExpressionCache[factoryId & CACHE_SLOT_COUNT_MASK];
-                    if (map == null)
-                        Interlocked.CompareExchange(ref map, ImMap<ExpressionCacheSlot>.Empty, null);
-
-                    entry = map.GetEntryOrDefault(factoryId);
-                    if (entry == null)
-                    {
-                        entry = new ImMapEntry<ExpressionCacheSlot>(factoryId);
-                        var oldMap = map;
-                        var newMap = oldMap.AddOrKeepEntry(entry);
-                        if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
-                        {
-                            if (newMap == oldMap) 
-                                entry = map.GetEntryOrDefault(factoryId);
-                        }
-                        else 
-                            entry = Ref.SwapAndGetNewValue(ref map, entry, (x, e) => x.AddOrKeepEntry(e))
-                                .GetEntryOrDefault(factoryId);
-                    }
-                }
-
-                entry.Value.Expr = expr;
-
-                if (reuse == Reuse.Transient)
-                    entry.Value.ScopeNameOrDependencyCount = new TransientDependencyCount(dependencyCount);
-                else if (reuse is CurrentScopeReuse scoped)
-                    entry.Value.ScopeNameOrDependencyCount = scoped.Name ?? ExpressionCacheSlot.NoNameForScoped;
+                Services = services;
+                Wrappers = wrappers;
             }
 
-            internal readonly IsRegistryChangePermitted IsChangePermitted;
-
-            private Registry(ImHashMap<Type, object> wrapperFactories = null)
-                : this(ImHashMap<Type, object>.Empty, ImHashMap<Type, object>.Empty, wrapperFactories ?? ImHashMap<Type, object>.Empty,
-                    IsRegistryChangePermitted.Permitted)
-            { }
-
-            private Registry(
-                ImHashMap<Type, object> services,
-                ImHashMap<Type, object> decorators,
-                ImHashMap<Type, object> wrappers,
-                IsRegistryChangePermitted isChangePermitted)
+            internal sealed class RegistryWithDecorators : Registry
             {
-                Services   = services;
-                Decorators = decorators;
-                Wrappers   = wrappers;
-                IsChangePermitted = isChangePermitted;
+                public override ImHashMap<Type, object> Decorators => _decorators; // value is Factory[]  // todo: @perf make it Factory or Factory[]
+                readonly ImHashMap<Type, object> _decorators;
+                public RegistryWithDecorators(ImHashMap<Type, object> services, ImHashMap<Type, object> wrappers, ImHashMap<Type, object> decorators) : 
+                    base(services, wrappers) => _decorators = decorators;
+
+                public override Registry WithDefaultFactoryCache() =>
+                    new Registry.WithCacheAndDecorators(Services, Wrappers, _decorators, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, null, default);
+
+                public override Registry WithKeyedFactoryCache() =>
+                    new Registry.WithCacheAndDecorators(Services, Wrappers, _decorators, null, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, default);
+
+                public override Registry WithFactoryExpressionCache() =>
+                    new Registry.WithCacheAndDecorators(Services, Wrappers, _decorators, null, null, new ImMap<ExpressionCacheSlot>[CACHE_SLOT_COUNT], IsChangePermitted);
+
+                internal override Registry WithServices(ImHashMap<Type, object> services) =>
+                    services == Services ? this : new RegistryWithDecorators(services, Wrappers, _decorators);
+
+                internal override Registry WithWrappers(ImHashMap<Type, object> wrappers) =>
+                    wrappers == Wrappers ? this : new RegistryWithDecorators(Services, wrappers, _decorators);
+
+                internal override Registry WithDecorators(ImHashMap<Type, object> decorators) =>
+                    decorators == _decorators ? this : new RegistryWithDecorators(Services, Wrappers, decorators);
+
+                public override Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
+                    new WithCacheAndDecorators(Services, Wrappers, _decorators, null, null, null, isChangePermitted);
             }
 
-            internal sealed class WithCache : Registry
+            internal class WithCache : Registry
             {
-                public override ImHashMap<Type, object>[] DefaultFactoryCache => _defaultFactoryCache;
-                private ImHashMap<Type, object>[] _defaultFactoryCache;
+                public sealed override ImHashMap<Type, object>[] DefaultFactoryCache => _defaultFactoryCache;
+                protected ImHashMap<Type, object>[] _defaultFactoryCache;
+                public sealed override ImHashMap<Type, object>[] KeyedFactoryCache => _keyedFactoryCache;
+                protected ImHashMap<Type, object>[] _keyedFactoryCache;
+                public sealed override ImMap<ExpressionCacheSlot>[] FactoryExpressionCache => _factoryExpressionCache;
+                protected ImMap<ExpressionCacheSlot>[] _factoryExpressionCache;
+                internal sealed override IsRegistryChangePermitted IsChangePermitted => _isChangePermitted;
+                protected IsRegistryChangePermitted _isChangePermitted;
+
                 internal WithCache(
                     ImHashMap<Type, object> services,
-                    ImHashMap<Type, object> decorators,
                     ImHashMap<Type, object> wrappers,
                     ImHashMap<Type, object>[]  defaultFactoryCache,
                     ImHashMap<Type, object>[]  keyedFactoryCache,
                     ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
                     IsRegistryChangePermitted isChangePermitted) : 
-                    base(services, decorators, wrappers, isChangePermitted)
+                    base(services, wrappers)
                 {
-                    _defaultFactoryCache   = defaultFactoryCache;
-                    KeyedFactoryCache      = keyedFactoryCache;
-                    FactoryExpressionCache = factoryExpressionCache;
+                    _defaultFactoryCache    = defaultFactoryCache;
+                    _keyedFactoryCache      = keyedFactoryCache;
+                    _factoryExpressionCache = factoryExpressionCache;
+                    _isChangePermitted      = isChangePermitted;
                 }
 
-                public override Registry WithoutCache() =>
-                    new Registry(Services, Decorators, Wrappers, IsChangePermitted);
+                public override Registry WithoutCache() => 
+                    _isChangePermitted == default 
+                        ? new Registry(Services, Wrappers) 
+                        : new WithCache(Services, Wrappers, null, null, null, _isChangePermitted);
 
                 internal override Registry WithServices(ImHashMap<Type, object> services) =>
                     services == Services ? this :
-                    new WithCache(services, Decorators, Wrappers, 
-                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
-
-                internal override Registry WithDecorators(ImHashMap<Type, object> decorators) =>
-                    decorators == Decorators ? this :
-                    new WithCache(Services, decorators, Wrappers, 
-                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
+                    new WithCache(services, Wrappers, _defaultFactoryCache?.CopyNonEmpty(), _keyedFactoryCache?.CopyNonEmpty(), _factoryExpressionCache?.CopyNonEmpty(), _isChangePermitted);
 
                 internal override Registry WithWrappers(ImHashMap<Type, object> wrappers) =>
                     wrappers == Wrappers ? this :
-                    new WithCache(Services, Decorators, wrappers, 
-                        DefaultFactoryCache.Copy(), KeyedFactoryCache.Copy(), FactoryExpressionCache.Copy(), IsChangePermitted);
+                    new WithCache(Services, wrappers, _defaultFactoryCache?.CopyNonEmpty(), _keyedFactoryCache?.CopyNonEmpty(), _factoryExpressionCache?.CopyNonEmpty(), _isChangePermitted);
+
+                internal override Registry WithDecorators(ImHashMap<Type, object> decorators) =>
+                    new WithCacheAndDecorators(Services, Wrappers, decorators, 
+                        _defaultFactoryCache?.CopyNonEmpty(), _keyedFactoryCache?.CopyNonEmpty(), _factoryExpressionCache?.CopyNonEmpty(), _isChangePermitted);
 
                 public override Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
-                    new Registry(Services, Decorators, Wrappers, isChangePermitted);
+                    isChangePermitted == _isChangePermitted ? this :
+                    new WithCache(Services, Wrappers, _defaultFactoryCache, _keyedFactoryCache, _factoryExpressionCache, isChangePermitted);
 
                 public void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
                 {
                     if (_defaultFactoryCache == null)
                         Interlocked.CompareExchange(ref _defaultFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
 
-                    ref var map = ref DefaultFactoryCache[serviceTypeHash & CACHE_SLOT_COUNT_MASK];
+                    ref var map = ref _defaultFactoryCache[serviceTypeHash & CACHE_SLOT_COUNT_MASK];
                     if (map == null)
                         Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
 
@@ -1997,21 +1973,86 @@ namespace DryIoc
                         Ref.Swap(ref map, serviceTypeHash, serviceType, factory, (x, h, t, f) => x.AddOrUpdate(h, t, f));
                 }
 
+                public void TryCacheKeyedFactory(int serviceTypeHash, Type serviceType, object key, object factory)
+                {
+                    if (_keyedFactoryCache == null)
+                        Interlocked.CompareExchange(ref _keyedFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
+
+                    ref var map = ref _keyedFactoryCache[serviceTypeHash & CACHE_SLOT_COUNT_MASK];
+                    if (map == null)
+                        Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
+
+                    var entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
+                    if (entry == null)
+                    {
+                        entry = new ImHashMapEntry<Type, object>(serviceTypeHash, serviceType);
+                        var oldMap = map;
+                        var newMap = oldMap.AddOrKeepEntry(entry);
+                        if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
+                        {
+                            if (newMap == oldMap)
+                                entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
+                        }
+                        else 
+                            entry = Ref.SwapAndGetNewValue(ref map, entry, (x, en) => x.AddOrKeepEntry(en)).GetEntryOrDefault(serviceTypeHash, serviceType);
+                    }
+
+                    var e = entry.Value;
+                    if (Interlocked.CompareExchange(ref entry.Value, SetOrAddKeyedCacheFactory(e, key, factory), e) != e)
+                        Ref.Swap(ref entry.Value, key, factory, SetOrAddKeyedCacheFactory);
+                }
+
+                internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<ExpressionCacheSlot> entry)
+                {
+                    if (entry == null)
+                    {
+                        if (_factoryExpressionCache == null)
+                            Interlocked.CompareExchange(ref _factoryExpressionCache, new ImMap<ExpressionCacheSlot>[CACHE_SLOT_COUNT], null);
+
+                        ref var map = ref _factoryExpressionCache[factoryId & CACHE_SLOT_COUNT_MASK];
+                        if (map == null)
+                            Interlocked.CompareExchange(ref map, ImMap<ExpressionCacheSlot>.Empty, null);
+
+                        entry = map.GetEntryOrDefault(factoryId);
+                        if (entry == null)
+                        {
+                            entry = new ImMapEntry<ExpressionCacheSlot>(factoryId);
+                            var oldMap = map;
+                            var newMap = oldMap.AddOrKeepEntry(entry);
+                            if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
+                            {
+                                if (newMap == oldMap) 
+                                    entry = map.GetEntryOrDefault(factoryId);
+                            }
+                            else 
+                                entry = Ref.SwapAndGetNewValue(ref map, entry, (x, e) => x.AddOrKeepEntry(e))
+                                    .GetEntryOrDefault(factoryId);
+                        }
+                    }
+
+                    entry.Value.Expr = expr;
+
+                    if (reuse == Reuse.Transient)
+                        entry.Value.ScopeNameOrDependencyCount = new TransientDependencyCount(dependencyCount);
+                    else if (reuse is CurrentScopeReuse scoped)
+                        entry.Value.ScopeNameOrDependencyCount = scoped.Name ?? ExpressionCacheSlot.NoNameForScoped;
+                }
+
                 internal override void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null)
                 {
                     if (factory == null)
                         return; // filter out Unregistered factory (see #390)
 
-                    if (DefaultFactoryCache != null || KeyedFactoryCache != null)
+                    if (_defaultFactoryCache != null || _keyedFactoryCache != null)
                     {
                         if (factory.GeneratedFactories == null)
                         {
-                            var d = DefaultFactoryCache;
+                            var d = _defaultFactoryCache;
                             if (d != null)
                                 Ref.Swap(ref d[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
                                     (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).UpdateToDefault(h, t));
 
-                            var k = KeyedFactoryCache;
+                            var k = _keyedFactoryCache;
                             if (k != null)
                                 Ref.Swap(ref k[hash & CACHE_SLOT_COUNT_MASK], hash, serviceType,
                                     (x, h, t) => (x ?? ImHashMap<Type, object>.Empty).UpdateToDefault(h, t));
@@ -2021,13 +2062,13 @@ namespace DryIoc
                             // We cannot remove generated factories, because they are keyed by implementation type and we may remove wrong factory
                             // a safe alternative is dropping the whole cache
                             _defaultFactoryCache = null;
-                            KeyedFactoryCache = null;
+                            _keyedFactoryCache   = null;
                         }
                     }
 
-                    if (FactoryExpressionCache != null)
+                    if (_factoryExpressionCache != null)
                     {
-                        var exprCache = FactoryExpressionCache;
+                        var exprCache = _factoryExpressionCache;
                         if (exprCache != null)
                         {
                             var factoryId = factory.FactoryID;
@@ -2038,19 +2079,69 @@ namespace DryIoc
                 }
             }
 
+            internal sealed class WithCacheAndDecorators : WithCache
+            {
+                public override ImHashMap<Type, object> Decorators => _decorators; // value is Factory[]  // todo: @perf make it Factory or Factory[]
+                readonly ImHashMap<Type, object> _decorators;
+                internal WithCacheAndDecorators(
+                    ImHashMap<Type, object> services, 
+                    ImHashMap<Type, object> wrappers,
+                    ImHashMap<Type, object> decorators,
+                    ImHashMap<Type, object>[] defaultFactoryCache, 
+                    ImHashMap<Type, object>[] keyedFactoryCache, 
+                    ImMap<ExpressionCacheSlot>[] factoryExpressionCache, 
+                    IsRegistryChangePermitted isChangePermitted) :  
+                    base(services, wrappers, defaultFactoryCache, keyedFactoryCache, factoryExpressionCache, isChangePermitted) =>
+                    _decorators = decorators;
+
+                public override Registry WithoutCache() => 
+                    _isChangePermitted == default 
+                        ? new RegistryWithDecorators(Services, Wrappers, _decorators) 
+                        : new WithCacheAndDecorators(Services, Wrappers, _decorators, null, null, null, _isChangePermitted);
+
+                internal override Registry WithServices(ImHashMap<Type, object> services) =>
+                    services == Services ? this :
+                    new WithCacheAndDecorators(services, Wrappers, _decorators,
+                        _defaultFactoryCache?.CopyNonEmpty(), _keyedFactoryCache?.CopyNonEmpty(), _factoryExpressionCache?.CopyNonEmpty(), _isChangePermitted);
+
+                internal override Registry WithWrappers(ImHashMap<Type, object> wrappers) =>
+                    wrappers == Wrappers ? this :
+                    new WithCacheAndDecorators(Services, wrappers, _decorators,
+                        _defaultFactoryCache?.CopyNonEmpty(), _keyedFactoryCache?.CopyNonEmpty(), _factoryExpressionCache?.CopyNonEmpty(), _isChangePermitted);
+
+                internal override Registry WithDecorators(ImHashMap<Type, object> decorators) =>
+                    decorators == _decorators ? this :
+                    new WithCacheAndDecorators(Services, Wrappers, decorators, 
+                        _defaultFactoryCache?.CopyNonEmpty(), _keyedFactoryCache?.CopyNonEmpty(), _factoryExpressionCache?.CopyNonEmpty(), _isChangePermitted);
+
+                public override Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
+                    isChangePermitted == _isChangePermitted ? this :
+                    new WithCacheAndDecorators(Services, Wrappers, _decorators, 
+                        _defaultFactoryCache, _keyedFactoryCache, _factoryExpressionCache, isChangePermitted);
+            }
+
             public virtual Registry WithoutCache() => this;
 
-            public Registry WithDefaultFactoryCache() =>
-                new Registry.WithCache(Services, Decorators, Wrappers, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, null, IsChangePermitted);
+            public virtual Registry WithDefaultFactoryCache() =>
+                new Registry.WithCache(Services, Wrappers, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, null, default);
+
+            public virtual Registry WithKeyedFactoryCache() =>
+                new Registry.WithCache(Services, Wrappers, null, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, default);
+
+            public virtual Registry WithFactoryExpressionCache() =>
+                new Registry.WithCache(Services, Wrappers, null, null, new ImMap<ExpressionCacheSlot>[CACHE_SLOT_COUNT], IsChangePermitted);
 
             internal virtual Registry WithServices(ImHashMap<Type, object> services) =>
-                services == Services ? this : new Registry(services, Decorators, Wrappers, IsChangePermitted);
-
-            internal virtual Registry WithDecorators(ImHashMap<Type, object> decorators) =>
-                decorators == Decorators ? this : new Registry(Services, decorators, Wrappers, IsChangePermitted);
+                services == Services ? this : new Registry(services, Wrappers);
 
             internal virtual Registry WithWrappers(ImHashMap<Type, object> wrappers) =>
-                wrappers == Wrappers ? this : new Registry(Services, Decorators, wrappers, IsChangePermitted);
+                wrappers == Wrappers ? this : new Registry(Services, wrappers);
+
+            internal virtual Registry WithDecorators(ImHashMap<Type, object> decorators) =>
+                new RegistryWithDecorators(Services, Wrappers, decorators);
+
+            public virtual Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
+                new WithCache(Services, Wrappers, null, null, null, isChangePermitted);
 
             public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
             {
@@ -2526,9 +2617,6 @@ namespace DryIoc
             }
 
             internal virtual void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null) {}
-
-            public virtual Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
-                new Registry(Services, Decorators, Wrappers, isChangePermitted);
         }
 
         private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
@@ -2699,20 +2787,6 @@ namespace DryIoc
                             if (!TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, ref instance))
                                 return false;
                         }
-                        else if (operandExpr is InvocationExpression invokeExpr &&
-                             invokeExpr.Expression is ConstantExpression cd && cd.Value is FactoryDelegate facDel)
-                        {
-                            // The majority of cases the delegate will be a well known `FactoryDelegate` - so calling it directly
-                            var rArg = invokeExpr.GetArgument(0);
-                            if (rArg == FactoryDelegateCompiler.ResolverContextParamExpr)
-                                result = facDel(r);
-                            else if (rArg == ResolverContext.RootOrSelfExpr)
-                                result = facDel(r.Root ?? r);
-                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, out var resolver))
-                                result = facDel((IResolverContext)resolver);
-                            else return false;
-                            return true;
-                        }
                         else if (!TryInterpret(r, operandExpr, paramExprs, paramValues, parentArgs, out instance))
                             return false;
 
@@ -2792,7 +2866,7 @@ namespace DryIoc
                         var delegateExpr = invokeExpr.Expression;
                         if (delegateExpr is ConstantExpression dc && dc.Value is FactoryDelegate facDel) 
                         {
-                            var rArg = ((OneArgumentInvocationExpression)invokeExpr).Argument;
+                            var rArg = invokeExpr.GetArgument(0);
                             if (rArg == FactoryDelegateCompiler.ResolverContextParamExpr)
                                 result = facDel(r);
                             else if (rArg == ResolverContext.RootOrSelfExpr)
@@ -3026,9 +3100,21 @@ namespace DryIoc
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, ref object result)
         {
-            if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
+            if (expr is CurrentScopeReuse.GetScopedViaFactoryDelegatexpression s)
             {
-                result = r.Root ?? r;
+                result = InterpretGetScopedViaFactoryDelegate(r, s, paramExprs, paramValues, parentArgs);
+                return true;
+            }
+
+            if (expr is CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression ss)
+            {
+                result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, ss, paramExprs, paramValues, parentArgs);
+                return true;
+            }
+
+            if (expr is CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression ssd)
+            {
+                result = InterpretGetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(r, ssd, paramExprs, paramValues, parentArgs);
                 return true;
             }
 
@@ -3038,27 +3124,15 @@ namespace DryIoc
 
             if (methodDeclaringType == typeof(CurrentScopeReuse))
             {
-                if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateNoDisposalIndexMethod)
+                if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateWithDisposalOrderMethod)
                 {
-                    result = InterpretGetScopedViaFactoryDelegateNoDisposalIndex(r, callExpr, paramExprs, paramValues, parentArgs);
-                    return true;
-                }
-
-                if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateMethod)
-                {
-                    result = InterpretGetScopedViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs);
+                    result = InterpretGetScopedViaFactoryDelegateWithDisposalOrder(r, callExpr, paramExprs, paramValues, parentArgs);
                     return true;
                 }
 
                 if (method == CurrentScopeReuse.GetNameScopedViaFactoryDelegateMethod)
                 {
                     result = InterpretGetNameScopedViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs);
-                    return true;
-                }
-
-                if (method == CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateMethod)
-                {
-                    result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs);
                     return true;
                 }
 
@@ -3090,7 +3164,7 @@ namespace DryIoc
                     {
                         if (!TryInterpret(resolver, args.Argument2, paramExprs, paramValues, parentArgs, out var service))
                             return false;
-                        result = service is IDisposable d ? scope.TrackDisposableWithoutDisposalOrder(d) : service;
+                        result = service is IDisposable d ? scope.TrackDisposable(d) : service;
                     }
 
                     return true;
@@ -3106,7 +3180,7 @@ namespace DryIoc
                     {
                         if (!TryInterpret(resolver, args.Argument3, paramExprs, paramValues, parentArgs, out var service))
                             return false;
-                        result = service is IDisposable d ? scope.TrackDisposableWithoutDisposalOrder(d) : service;
+                        result = service is IDisposable d ? scope.TrackDisposable(d) : service;
                     }
 
                     return true;
@@ -3115,6 +3189,25 @@ namespace DryIoc
             else if (methodDeclaringType == typeof(IScope))
             {
                 if (method == Scope.GetOrAddViaFactoryDelegateMethod)
+                {
+                    var args = (InstanceThreeArgumentsMethodCallExpression)callExpr;
+                    r = r.Root ?? r;
+                    // check if scoped dependency is already in scope, then just return it
+                    var factoryId = TryGetIntConstantValue(args.Argument0);
+                    if (!r.SingletonScope.TryGet(out result, factoryId))
+                    {
+                        result = r.SingletonScope.TryGetOrAddWithoutClosure(factoryId, r, ((LambdaExpression)args.Argument1).Body,
+                            (rc, e) =>
+                            {
+                                if (TryInterpret(rc, e, paramExprs, paramValues, parentArgs, out var value))
+                                    return value;
+                                return e.CompileToFactoryDelegate(((IContainer)rc).Rules.UseInterpretation)(rc);
+                            });
+                    }
+                    return true;
+                }
+
+                if (method == Scope.GetOrAddViaFactoryDelegateWithDisposalOrderMethod)
                 {
                     var args = (InstanceFourArgumentsMethodCallExpression)callExpr;
                     r = r.Root ?? r;
@@ -3131,7 +3224,6 @@ namespace DryIoc
                             },
                             TryGetIntConstantValue(args.Argument3));
                     }
-
                     return true;
                 }
 
@@ -3145,8 +3237,8 @@ namespace DryIoc
                     {
                         var disposalOrder = TryGetIntConstantValue(args.Argument1);
                         result = disposalOrder == 0
-                            ? r.SingletonScope.TrackDisposableWithoutDisposalOrder(d)
-                            : r.SingletonScope.TrackDisposable(service, disposalOrder);
+                            ? r.SingletonScope.TrackDisposable(d)
+                            : r.SingletonScope.TrackDisposableWithOrder(service, disposalOrder);
                     }
                     
                     return true;
@@ -3192,7 +3284,13 @@ namespace DryIoc
                     return true;
                 }
             }
-            
+
+            if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
+            {
+                result = r.Root ?? r;
+                return true;
+            }
+
             // fallback to reflection invocation
             object instance = null;
             var callObjectExpr = callExpr.Object;
@@ -3224,23 +3322,15 @@ namespace DryIoc
             return true;
         }
 
-        private static object InterpretGetScopedViaFactoryDelegateNoDisposalIndex(IResolverContext r,
-            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
+        private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r,
+            CurrentScopeReuse.GetScopedViaFactoryDelegatexpression e, 
+            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
-            var args = (FourArgumentsMethodCallExpression)callExpr;
-            var resolverArg = args.Argument0;
-            if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
-            {
-                if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, out var resolverObj))
-                    return false;
-                r = (IResolverContext)resolverObj;
-            }
-
             var scope = (Scope)r.CurrentScope;
             if (scope == null)
-                return (bool)ConstValue(args.Argument1) ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
+                return e.ThrowIfNoScope ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
 
-            var id = TryGetIntConstantValue(args.Argument2);
+            var id = e.FactoryId;
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
@@ -3265,7 +3355,7 @@ namespace DryIoc
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            var lambda = args.Argument3;
+            var lambda = e.CreateValueExpr;
 
             object result = null;
             if (lambda is ConstantExpression lambdaConstExpr)
@@ -3279,7 +3369,7 @@ namespace DryIoc
             return result;
         }
 
-        private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r, 
+        private static object InterpretGetScopedViaFactoryDelegateWithDisposalOrder(IResolverContext r, 
             MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
             var args = (FiveArgumentsMethodCallExpression)callExpr;
@@ -3406,20 +3496,12 @@ namespace DryIoc
         }
 
         private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r, 
-            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
+            CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression e, 
+            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
-            var args = (FourArgumentsMethodCallExpression)callExpr;
-            var resolverArg = args.Argument0;
-            if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
-            {
-                if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, out var resolverObj))
-                    return false;
-                r = (IResolverContext)resolverObj;
-            }
-
             var scope = (Scope)(r.CurrentScope ?? r.SingletonScope);
 
-            var id = TryGetIntConstantValue(args.Argument1);
+            var id = e.FactoryId;
 
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
@@ -3445,7 +3527,52 @@ namespace DryIoc
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            var lambda = args.Argument2;
+            var lambda = e.CreateValueExpr;
+            object result = null;
+            if (lambda is ConstantExpression lambdaConstExpr)
+                result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
+            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
+                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
+            itemRef.Value = result;
+            if (result is IDisposable disp && !ReferenceEquals(disp, scope))
+                scope.AddUnorderedDisposable(disp);
+
+            return result;
+        }
+
+        private static object InterpretGetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(IResolverContext r, 
+            CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression e, 
+            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
+        {
+            var scope = (Scope)(r.CurrentScope ?? r.SingletonScope);
+
+            var id = e.FactoryId;
+
+            ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
+            var itemRef = map.GetEntryOrDefault(id);
+            if (itemRef != null && itemRef.Value != Scope.NoItem)
+                return itemRef.Value;
+
+            if (scope.IsDisposed)
+                Throw.It(Error.ScopeIsDisposed, scope.ToString());
+
+            itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            var oldMap = map;
+            var newMap = oldMap.AddOrKeepEntry(itemRef);
+            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
+            {
+                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+                var otherItemRef = newMap.GetSurePresentEntry(id);
+                if (otherItemRef != itemRef)
+                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+            }
+            else if (newMap == oldMap)
+            {
+                var otherItemRef = newMap.GetSurePresentEntry(id);
+                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+            }
+
+            var lambda = e.CreateValueExpr;
             object result = null;
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
@@ -3454,7 +3581,7 @@ namespace DryIoc
             itemRef.Value = result;
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
             {
-                var disposalOrder = TryGetIntConstantValue(args.Argument3);
+                var disposalOrder = e.DisposalOrder;
                 if (disposalOrder == 0)
                     scope.AddUnorderedDisposable(disp);
                 else
@@ -3528,11 +3655,11 @@ namespace DryIoc
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         public static Expression<FactoryDelegate> WrapInFactoryExpression(this Expression expression) =>
-            Lambda<FactoryDelegate>(expression.NormalizeExpression(), ResolverContextParamExpr, typeof(object));
+            new FactoryDelegateExpression(expression.NormalizeExpression());
 
         /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
         public static Expression<FactoryDelegate> WrapInFactoryExpressionWithoutNormalization(this Expression expression) =>
-            Lambda<FactoryDelegate>(expression, ResolverContextParamExpr, typeof(object));
+            new FactoryDelegateExpression(expression);
 
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
@@ -3554,7 +3681,7 @@ namespace DryIoc
             }
 
             // fallback for platforms when FastExpressionCompiler is not able to compile the expression
-            var lambda = Lambda<FactoryDelegate>(expression, ResolverContextParamExpr, typeof(object)).ToLambdaExpression();
+            var lambda = new FactoryDelegateExpression(expression).ToLambdaExpression();
             if (preferInterpretation)
             {
 #if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
@@ -3590,6 +3717,15 @@ namespace DryIoc
 #endif
                 );
         }
+    }
+
+    internal sealed class FactoryDelegateExpression : Expression<FactoryDelegate>
+    {
+        public override Type ReturnType => typeof(object);
+        public override int ParameterCount => 1;
+        public override IReadOnlyList<ParameterExpression> Parameters => new[] { FactoryDelegateCompiler.ResolverContextParamExpr };
+        public override ParameterExpression GetParameter(int index) => FactoryDelegateCompiler.ResolverContextParamExpr;
+        public FactoryDelegateExpression(Expression body) : base(body) {}
     }
 
     /// <summary>Container extended features.</summary>
@@ -3801,7 +3937,7 @@ namespace DryIoc
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IReuse reuse, Setup setup, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations(
-                (ignoredServiceType, ignoredServiceKey) => implTypes, implType => ReflectionFactory.Of(implType, reuse, setup));
+                (ignoredServiceType, ignoredServiceKey) => implTypes, implType => ReflectionFactory.Of(implType, reuse, setup: setup));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
@@ -4284,7 +4420,7 @@ namespace DryIoc
                 var parentScope = r.CurrentScope;
                 var newOwnScope = new Scope(parentScope, name);
                 if (trackInParent)
-                    (parentScope ?? r.SingletonScope).TrackDisposableWithoutDisposalOrder(newOwnScope);
+                    (parentScope ?? r.SingletonScope).TrackDisposable(newOwnScope);
                 return r.WithCurrentScope(newOwnScope);
             }
 
@@ -4293,7 +4429,7 @@ namespace DryIoc
                 : r.ScopeContext.SetCurrent(parent => new Scope(parent, name));
 
             if (trackInParent)
-                (newContextScope.Parent ?? r.SingletonScope).TrackDisposableWithoutDisposalOrder(newContextScope);
+                (newContextScope.Parent ?? r.SingletonScope).TrackDisposable(newContextScope);
             return r.WithCurrentScope(null);
         }
 
@@ -4308,7 +4444,7 @@ namespace DryIoc
         // todo: @perf no need to check for IDisposable in TrackDisposable
         /// <summary>A bit if sugar to track disposable in the current scope or in the singleton scope as a fallback</summary>
         public static T TrackDisposable<T>(this IResolverContext r, T instance) where T : IDisposable =>
-            (T)(r.CurrentScope ?? r.SingletonScope).TrackDisposableWithoutDisposalOrder(instance);
+            (T)(r.CurrentScope ?? r.SingletonScope).TrackDisposable(instance);
     }
 
     /// <summary>The result delegate generated by DryIoc for service creation.</summary>
@@ -4905,7 +5041,7 @@ namespace DryIoc
             FactoryMethodSelector factoryMethod = null,
             ParameterSelector parameters = null,
             PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            With(Made.Of(factoryMethod, parameters, propertiesAndFields));
+            With(Made.Create(factoryMethod, parameters, propertiesAndFields, false));
 
         /// <summary>Returns new instance of the rules with specified <see cref="Made"/>.</summary>
         /// <param name="made">New Made.Of rules.</param>
@@ -5142,7 +5278,7 @@ namespace DryIoc
                     return null;
 
                 var factory = ReflectionFactory.Of(concreteType,
-                    DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
+                    made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
 
                 // to enable fallback to other rules if unresolved try to resolve expression first and return null
                 return factory.GetExpressionOrDefault(request.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null ? factory : null;
@@ -5227,7 +5363,7 @@ namespace DryIoc
                         {
                             if (factory == null)
                                 factories.Swap(fs => (implFactory = fs.GetValueOrDefault(implTypeHash, implType)) != null ? fs 
-                                    : fs.AddOrUpdate(implTypeHash, implType, implFactory = new ReflectionFactory(implType)));
+                                    : fs.AddOrUpdate(implTypeHash, implType, implFactory = ReflectionFactory.Of(implType)));
                             else
                                 factories.Swap(fs => (implFactory = fs.GetValueOrDefault(implTypeHash, implType)) != null ? fs
                                     : fs.AddOrUpdate(implTypeHash, implType, implFactory = factory.Invoke(implType).ThrowIfNull()));
@@ -5453,6 +5589,10 @@ namespace DryIoc
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
         public bool ThrowIfRuntimeStateRequired =>
             (_settings & Settings.ThrowIfRuntimeStateRequired) != 0;
+
+        /// <summary>The thing.</summary>
+        public bool ConstantExpressionIsFine =>
+            (_settings & (Settings.ThrowIfRuntimeStateRequired | Settings.UsedForExpressionGeneration)) == 0;
 
         /// <summary>Specifies to throw an exception in attempt to resolve service which require runtime state for resolution.
         /// Runtime state may be introduced by RegisterDelegate, RegisterInstance, or registering with non-primitive service key, or metadata.</summary>
@@ -5968,7 +6108,7 @@ namespace DryIoc
         public object FactoryMethodOrSelector { get; internal set; }
 
         /// <summary>Return type of strongly-typed factory method expression.</summary>
-        public Type FactoryMethodKnownResultType { get; }
+        public virtual Type FactoryMethodKnownResultType => null;
 
         /// <summary>Specifies how constructor parameters should be resolved:
         /// parameter service key and type, throw or return default value if parameter is unresolved.</summary>
@@ -5979,7 +6119,16 @@ namespace DryIoc
 
         internal virtual MadeDetails _details => MadeDetails.NoConditionals;
 
-        internal sealed class WithDetails : Made
+        internal class WithFactoryMethodKnownResultType : Made
+        {
+            public override Type FactoryMethodKnownResultType { get; }
+            internal WithFactoryMethodKnownResultType(object factoryMethodOrSelector, Type factoryReturnType) 
+                : base(factoryMethodOrSelector) => FactoryMethodKnownResultType = factoryReturnType;
+            internal WithFactoryMethodKnownResultType(FactoryMethod factoryMethod, Type factoryReturnType) 
+                : base(factoryMethod) => FactoryMethodKnownResultType = factoryReturnType;
+        }
+
+        internal sealed class WithDetails : WithFactoryMethodKnownResultType
         {
             public override ParameterSelector Parameters { get; }
             public override PropertiesAndFieldsSelector PropertiesAndFields { get; }
@@ -6087,7 +6236,8 @@ namespace DryIoc
             ParameterSelector parameters, PropertiesAndFieldsSelector propertiesAndFields, bool isConditionalImplementation)
         {
             bool withDetails = parameters != null || propertiesAndFields != null || isConditionalImplementation;
-            return factoryMethodOrSelector == null && !withDetails ? Default
+            return factoryMethodOrSelector == null && !withDetails 
+                ? Default
                 : !withDetails ? new Made(factoryMethodOrSelector)
                 : new WithDetails(factoryMethodOrSelector, null, parameters, propertiesAndFields, isConditionalImplementation: isConditionalImplementation);
         }
@@ -6104,7 +6254,7 @@ namespace DryIoc
                 methodReturnType = methodReturnType.GetGenericTypeDefinition();
 
             return parameters == null && propertiesAndFields == null
-                ? new Made(factoryMethod, methodReturnType)
+                ? new WithFactoryMethodKnownResultType(factoryMethod, methodReturnType)
                 : new WithDetails(factoryMethod, methodReturnType, parameters, propertiesAndFields);
         }
 
@@ -6134,10 +6284,11 @@ namespace DryIoc
         /// <summary>Defines how to select constructor from implementation type.
         /// Where <paramref name="getConstructor"/> is delegate taking implementation type as input 
         /// and returning selected constructor info.</summary>
-        public static Made Of(Func<Type, ConstructorInfo> getConstructor, ParameterSelector parameters = null,
-            PropertiesAndFieldsSelector propertiesAndFields = null) =>
-            Of(r => DryIoc.FactoryMethod.Of(getConstructor(r.ImplementationType).ThrowIfNull(Error.GotNullConstructorFromFactoryMethod, r)),
-                parameters, propertiesAndFields);
+        public static Made Of(Func<Type, ConstructorInfo> getConstructor, 
+            ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null) => 
+            Create((FactoryMethodSelector)(
+                r => DryIoc.FactoryMethod.Of(getConstructor(r.ImplementationType).ThrowIfNull(Error.GotNullConstructorFromFactoryMethod, r))), 
+                parameters, propertiesAndFields, false);
 
         /// <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
         /// <typeparam name="TService">Type with constructor or static method.</typeparam>
@@ -6169,7 +6320,7 @@ namespace DryIoc
                 serviceReturningExpr, argValues);
         }
 
-        /// Composes Made.Of expression with known factory instance and expression to get a service
+        /// <summary>Composes Made.Of expression with known factory instance and expression to get a service</summary>
         public static TypedMade<TService> Of<TFactory, TService>(
             TFactory factoryInstance,
             System.Linq.Expressions.Expression<Func<TFactory, TService>> serviceReturningExpr,
@@ -6242,6 +6393,8 @@ namespace DryIoc
             var propertiesAndFieldsSelector = memberBindingExprs == null || memberBindingExprs.Count == 0 ? null : 
                 ComposePropertiesAndFieldsSelector(ref hasCustomValue, serviceReturningExpr, memberBindingExprs, argValues);
 
+            if (!hasCustomValue && parameterSelector == null && propertiesAndFieldsSelector == null)
+                return new TypedMade<TService>(getFactoryMethodSelector(ctorOrMethodOrMember));
             return new WithDetails<TService>(getFactoryMethodSelector(ctorOrMethodOrMember),
                 parameterSelector, propertiesAndFieldsSelector, hasCustomValue);
         }
@@ -6249,7 +6402,9 @@ namespace DryIoc
         /// <summary>Typed version of <see cref="Made"/> specified with statically typed expression tree.</summary>
         public class TypedMade<TService> : Made
         {
-            internal TypedMade(FactoryMethodSelector factoryMethod) : base(factoryMethod, typeof(TService)) { }
+            /// <inheritdoc />
+            public override Type FactoryMethodKnownResultType => typeof(TService);
+            internal TypedMade(FactoryMethodSelector factoryMethodSelector) : base(factoryMethodSelector) { }
         }
 
         internal sealed class WithDetails<TService> : TypedMade<TService>
@@ -6258,9 +6413,7 @@ namespace DryIoc
             public override PropertiesAndFieldsSelector PropertiesAndFields { get; }
             internal override MadeDetails _details { get; }
             public WithDetails(FactoryMethodSelector factoryMethod,
-                ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null,
-                bool hasCustomValue = false, bool isConditionalImplementation = false, bool implMemberDependsOnRequest = false) : 
-                base(factoryMethod) 
+                ParameterSelector parameters, PropertiesAndFieldsSelector propertiesAndFields, bool hasCustomValue) : base(factoryMethod) 
             {
                 var details = default(MadeDetails);
 
@@ -6268,10 +6421,6 @@ namespace DryIoc
                     details |= MadeDetails.ImplMemberDependsOnRequest;
                 if (hasCustomValue)
                     details |= MadeDetails.HasCustomDependencyValue;
-                if (isConditionalImplementation)
-                    details |= MadeDetails.ImplTypeDependsOnRequest;
-                if (implMemberDependsOnRequest)
-                    details |= MadeDetails.ImplMemberDependsOnRequest;
 
                 _details = details;
                 Parameters = parameters;
@@ -6279,22 +6428,18 @@ namespace DryIoc
             }
         }
 
-        internal Made(object factoryMethodOrSelector, Type factoryReturnType = null)
-        {
-            FactoryMethodOrSelector      = factoryMethodOrSelector;
-            FactoryMethodKnownResultType = factoryReturnType;
-        }
+        internal Made(object factoryMethodOrSelector = null) => FactoryMethodOrSelector = factoryMethodOrSelector;
 
-        internal Made(FactoryMethod factoryMethod, Type factoryReturnType)
-        {
-            FactoryMethodOrSelector      = factoryMethod;
-            FactoryMethodKnownResultType = factoryReturnType;
-        }
+        internal Made(FactoryMethod factoryMethod) => FactoryMethodOrSelector = factoryMethod;
 
-        internal Made Clone() => // it does not return Default made as-is because the cloned result supposed to be mutated
-            _details == default 
-                ? new Made       (FactoryMethodOrSelector, FactoryMethodKnownResultType)
-                : new WithDetails(FactoryMethodOrSelector, FactoryMethodKnownResultType, Parameters, PropertiesAndFields, _details);
+        // it does not return Default made as-is because the cloned result supposed to be mutated
+        internal Made Clone()
+        {
+            var t = FactoryMethodKnownResultType;
+            return _details == default
+                ? t == null ? new Made(FactoryMethodOrSelector) : new WithFactoryMethodKnownResultType(FactoryMethodOrSelector, t)
+                : new WithDetails(FactoryMethodOrSelector, t, Parameters, PropertiesAndFields, _details);
+        }
 
         private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
             System.Linq.Expressions.Expression wholeServiceExpr, ParameterInfo[] paramInfos,
@@ -6602,7 +6747,7 @@ namespace DryIoc
         public static void TrackInstance(this IRegistrator registrator, object instance)
         {
             if (instance is IDisposable d)
-                ((IResolverContext)registrator).SingletonScope.TrackDisposableWithoutDisposalOrder(d);
+                ((IResolverContext)registrator).SingletonScope.TrackDisposable(d);
         }
 
         /// <summary>Tracks the disposable instance in the singleton scope</summary>
@@ -6610,7 +6755,7 @@ namespace DryIoc
         public static void TrackInstance(this IRegistrator registrator, object instance, Setup setup)
         {
             if (instance is IDisposable d && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
-                ((IResolverContext)registrator).SingletonScope.TrackDisposableWithoutDisposalOrder(d);
+                ((IResolverContext)registrator).SingletonScope.TrackDisposable(d);
         }
 
          /// <summary>
@@ -6664,7 +6809,7 @@ namespace DryIoc
 
             if (instance is IDisposable d && 
                 (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
-                (registrator as IResolverContext)?.SingletonScope.TrackDisposableWithoutDisposalOrder(d);
+                (registrator as IResolverContext)?.SingletonScope.TrackDisposable(d);
         }
 
         /// <summary>
@@ -6706,7 +6851,7 @@ namespace DryIoc
 
             if (instance is IDisposable d && 
                 (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
-                (registrator as IResolverContext)?.SingletonScope.TrackDisposableWithoutDisposalOrder(d);
+                (registrator as IResolverContext)?.SingletonScope.TrackDisposable(d);
         }
 
         /// <summary>List of types excluded by default from RegisterMany convention.</summary>
@@ -6838,7 +6983,7 @@ namespace DryIoc
 
         /// <summary>Wraps the implementation type in factory.</summary>
         public static ReflectionFactory ToFactory(this Type implType) => 
-            new ReflectionFactory(implType);
+            ReflectionFactory.Of(implType);
 
         /// <summary>Wraps the implementation type in factory plus allow to provide factory parameters.</summary>
         public static ReflectionFactory ToFactory(this Type implType, IReuse reuse = null, Made made = null, Setup setup = null) =>
@@ -7591,10 +7736,10 @@ namespace DryIoc
     }
 
     /// <summary>Controls the registry change</summary>
-    public enum IsRegistryChangePermitted
+    public enum IsRegistryChangePermitted : byte
     { 
         /// <summary>Change is permitted - the default setting</summary>
-        Permitted,
+        Permitted = 0,
         /// <summary>Throws the error for the new registration</summary>
         Error,
         /// <summary>Ignores the next registration</summary>
@@ -9484,7 +9629,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 !Made.IsConditional;
 
             // First, lookup in the expression cache
-            ImMapEntry<Container.Registry.ExpressionCacheSlot> cacheEntry = null;
+            ImMapEntry<Container.ExpressionCacheSlot> cacheEntry = null;
             if (cacheExpression)
             {
                 var cachedExpr = ((Container)container).GetCachedFactoryExpression(request.FactoryID, reuse, out cacheEntry);
@@ -9579,7 +9724,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 if (depCount >= rules.DependencyCountInLambdaToSplitBigObjectGraph)
                 {
                     request.DecreaseTrackedDependencyCountForParents(depCount);
-                    serviceExpr = Convert(Invoke(Lambda(typeof(Func<object>), serviceExpr, Empty<ParameterExpression>(), typeof(object)), Empty<Expression>()), serviceExpr.Type);
+                    serviceExpr = Invoke(serviceExpr.Type, Lambda<Func<object>>(serviceExpr, Empty<ParameterExpression>(), typeof(object)), Empty<Expression>());
                 }
             }
 
@@ -10017,16 +10162,6 @@ private ParameterServiceInfo(ParameterInfo p)
     public class ReflectionFactory : Factory
     {
         internal object _implementationTypeOrProviderOrPubCtorOrCtors; // Type or the Func<Type> for the lazy factory initialization
-        // todo @perf split to the separate class for the open-generic factory
-        internal object _generatedFactoriesOrGeneratorFactory; // ImHashMap<KV<Type, object>, ReflectionFactory> or Factory
-
-        ///<inheritdoc />
-        public override ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => 
-            _generatedFactoriesOrGeneratorFactory as ImHashMap<KV<Type, object>, ReflectionFactory>;
-
-        ///<inheritdoc />
-        public override ReflectionFactory GeneratorFactory => 
-            _generatedFactoriesOrGeneratorFactory as ReflectionFactory;
 
         /// <summary>Non-abstract service implementation type. May be open generic.</summary>
         public override Type ImplementationType
@@ -10044,7 +10179,7 @@ private ParameterServiceInfo(ParameterInfo p)
             }
         }
 
-        private static Type ThrowIfInvalidImplementationType(Type type)
+        private static Type ValidateImplementationType(Type type)
         {
             if (type == null)
                 Throw.It(Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
@@ -10055,9 +10190,11 @@ private ParameterServiceInfo(ParameterInfo p)
             return type;
         }
 
-        // todo: @perf move out of constructor to be statically called before factory creation or when it needed
-        private Type ValidateAndSetImplementationType(Type implType, Made made)
+        private static Type ValidateImplementationType(Type implType, Made made)
         {
+            if (made == Made.Default)
+                return ValidateImplementationType(implType);
+
             var knownImplType = implType;
 
             var factoryMethodResultType = made.FactoryMethodKnownResultType;
@@ -10066,7 +10203,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 implType.IsAbstract)
             {
                 if (made.FactoryMethodOrSelector == null)
-                    ThrowIfInvalidImplementationType(implType);
+                    ValidateImplementationType(implType);
 
                 knownImplType = null; // Ensure that we do not have abstract implementation type
 
@@ -10082,16 +10219,16 @@ private ParameterServiceInfo(ParameterInfo p)
                     Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType, implType, factoryMethodResultType);
             }
 
-            _implementationTypeOrProviderOrPubCtorOrCtors = knownImplType;
-
-            knownImplType = knownImplType ?? implType;
-            if (knownImplType == typeof(object) || // for open-generic T implementation
-                knownImplType != null && (knownImplType.IsGenericTypeDefinition || knownImplType.IsGenericParameter) || 
-                made.IsConditionalImplementation)
-                _generatedFactoriesOrGeneratorFactory = ImHashMap<KV<Type, object>, ReflectionFactory>.Empty;
-
             return knownImplType;
         }
+
+        [MethodImpl((MethodImplOptions)256)]
+        private static bool IsFactoryGenerator(Type t) => 
+            t.IsGenericTypeDefinition || t.IsGenericParameter;
+
+        [MethodImpl((MethodImplOptions)256)]
+        private static bool IsFactoryGenerator(Type t, Made m) =>
+            t == typeof(object) || t?.IsGenericTypeDefinition == true || t?.IsGenericParameter == true || m.IsConditionalImplementation;
 
         /// <summary>Is `true` for `null` or some implementation type, but is `false` below in `WithAllDetails` for the type provider</summary>
         public override bool CanAccessImplementationType => true;
@@ -10103,12 +10240,26 @@ private ParameterServiceInfo(ParameterInfo p)
         public override int RegistrationOrder => GeneratorFactory?.FactoryID ?? FactoryID;
 
         /// <summary>Creates the memory-optimized factory based on arguments</summary>
-        public static ReflectionFactory Of(Type implementationType) => 
-            new ReflectionFactory(implementationType);
+        public static ReflectionFactory Of(Type implementationType)
+        {
+            ValidateImplementationType(implementationType);
+            if (IsFactoryGenerator(implementationType))
+                return new WithAllDetails(implementationType, null, Made.Default, Setup.Default, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
+            return new ReflectionFactory(implementationType);
+        }
 
         /// <summary>Creates the memory-optimized factory based on arguments</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ReflectionFactory Of(Type implementationType, IReuse reuse) =>
+        public static ReflectionFactory Of(Type implementationType, IReuse reuse)
+        {
+            ValidateImplementationType(implementationType);
+            if (IsFactoryGenerator(implementationType))
+                return new WithAllDetails(implementationType, reuse, Made.Default, Setup.Default, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
+            return OfReuse(implementationType, reuse);
+        }
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal static ReflectionFactory OfReuse(Type implementationType, IReuse reuse) =>
             reuse == null ? new ReflectionFactory(implementationType)
             : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(implementationType)
             : reuse == DryIoc.Reuse.Scoped    ? new WithScopedReuse   (implementationType)
@@ -10117,55 +10268,27 @@ private ParameterServiceInfo(ParameterInfo p)
             : new WithReuse(implementationType, reuse);
 
         /// <summary>Creates the memory-optimized factory based on arguments</summary>
-        public static ReflectionFactory Of(Type implementationType, Made made) =>
-            new WithAllDetails(implementationType, null, made ?? Made.Default, Setup.Default);
-
-        /// <summary>Creates the memory-optimized factory based on arguments</summary>
-        public static ReflectionFactory Of(Type implementationType, IReuse reuse, Made made) => 
-            made == null || made == Made.Default 
-                ? Of(implementationType, reuse)
-                : new WithAllDetails(implementationType, reuse, made ?? Made.Default, Setup.Default);
-
-        /// <summary>Creates the memory-optimized factory based on arguments</summary>
-        public static ReflectionFactory Of(Type implementationType, Setup setup) => 
-            new WithAllDetails(implementationType, null, Made.Default, setup ?? Setup.Default);
-
-        /// <summary>Creates the memory-optimized factory based on arguments</summary>
-        public static ReflectionFactory Of(Type implementationType, IReuse reuse, Setup setup) =>
-            new WithAllDetails(implementationType, reuse, Made.Default, setup ?? Setup.Default);
-
-        /// <summary>Creates the memory-optimized factory based on arguments</summary>
-        public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null) =>
-            (made == null || made == Made.Default) && (setup == null || setup == Setup.Default)
-                ? Of(implementationType, reuse)
-                : new WithAllDetails(implementationType, reuse, made ?? Made.Default, setup ?? Setup.Default);
+        public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null) 
+        {
+            if (made == null)  made  = Made.Default;
+            if (setup == null) setup = Setup.Default;
+            var validatedImplType = ValidateImplementationType(implementationType, made);
+            if (IsFactoryGenerator(validatedImplType ?? implementationType, made))
+                return new WithAllDetails(validatedImplType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
+            return made == Made.Default && setup == Setup.Default
+                ? OfReuse(validatedImplType, reuse)
+                : new WithAllDetails(validatedImplType, reuse, made, setup);
+        }
 
         /// <summary>Creates the factory based on arguments</summary>
         public static ReflectionFactory Of(Func<Type> implementationTypeProvider, IReuse reuse = null, Made made = null, Setup setup = null) =>
-            new WithAllDetails(implementationTypeProvider, reuse, made ?? Made.Default, setup ?? Setup.Default);
+            new WithTypeProvider(implementationTypeProvider, reuse, made ?? Made.Default, setup ?? Setup.Default);
 
         /// <summary>Required for the `WithAllDetails` factory below</summary>
         protected ReflectionFactory() {}
 
         /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
-        public ReflectionFactory(Type implementationType)
-        {
-            _implementationTypeOrProviderOrPubCtorOrCtors = ThrowIfInvalidImplementationType(implementationType);
-            if (implementationType.IsGenericTypeDefinition || implementationType.IsGenericParameter)
-                _generatedFactoriesOrGeneratorFactory = ImHashMap<KV<Type, object>, ReflectionFactory>.Empty;
-        }
-
-        // todo: @perf use for the creating of the closed-generic factory
-        // internal protected ReflectionFactory(Type implementationType, ReflectionFactory generatorFactory)
-        // {
-        //     ThrowIfInvalidImplementationType(implementationType);
-        //     _implementationTypeOrProviderOrPubCtorOrCtors = implementationType;
-        //     _generatedFactoriesOrGeneratorFactory = generatorFactory;
-        // }
-
-        /// <summary>Creates factory providing implementation type, optional reuse and setup.</summary>
-        public ReflectionFactory(Func<Type> implementationTypeProvider) =>
-            _implementationTypeOrProviderOrPubCtorOrCtors = implementationTypeProvider.ThrowIfNull();
+        protected ReflectionFactory(Type implementationType) => _implementationTypeOrProviderOrPubCtorOrCtors = implementationType;
 
         internal sealed class WithSingletonReuse : ReflectionFactory
         {
@@ -10197,53 +10320,172 @@ private ParameterServiceInfo(ParameterInfo p)
             public WithReuse(Type implementationType, IReuse reuse) : base(implementationType) => Reuse = reuse;
         }
 
-        internal sealed class WithAllDetails : ReflectionFactory 
+        internal class WithAllDetails : ReflectionFactory 
         {
-            public override bool CanAccessImplementationType
-            {
-                get
-                {
-                    var x = _implementationTypeOrProviderOrPubCtorOrCtors;
-                    return x is Func<Type> == false // not a lazy type provider
-                        || x == null; // or the type provided by the factory method
-                }
-            }
-
-            public override Type ImplementationType
-            {
-                get
-                {
-                    var x = _implementationTypeOrProviderOrPubCtorOrCtors;
-                    if (x is Type t)
-                        return t;
-                    if (x is ConstructorInfo c)
-                        return c.DeclaringType;
-                    if (x is ConstructorInfo[] cs)
-                        return cs[0].DeclaringType;
-                    if (x == null)
-                        return null;
-                    return ValidateAndSetImplementationType(((Func<Type>)x)(), Made);
-                }
-            }
+            internal object _generatedFactoriesOrFactoryGenerator; // ImHashMap<KV<Type, object>, ReflectionFactory> or Factory
+            ///<inheritdoc />
+            public override ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => 
+                _generatedFactoriesOrFactoryGenerator as ImHashMap<KV<Type, object>, ReflectionFactory>;
+            ///<inheritdoc />
+            public override ReflectionFactory GeneratorFactory => 
+                _generatedFactoriesOrFactoryGenerator as ReflectionFactory;
 
             public override IReuse Reuse { get; }
             public override Made Made { get; }
             public override Setup Setup { get; }
-            public WithAllDetails(Type implementationType, IReuse reuse, Made made, Setup setup) : base()
+            public WithAllDetails(object implementationType, IReuse reuse, Made made, Setup setup,
+                ImHashMap<KV<Type, object>, ReflectionFactory> generatedFactories = null) : base()
             {
+                _implementationTypeOrProviderOrPubCtorOrCtors = implementationType;
                 Reuse = reuse;
                 Made  = made;
                 Setup = setup;
-                ValidateAndSetImplementationType(implementationType, made);
+                _generatedFactoriesOrFactoryGenerator = generatedFactories;
             }
 
-            public WithAllDetails(Func<Type> implementationTypeProvider, IReuse reuse, Made made, Setup setup) : base()
+            internal WithAllDetails(Type implementationType, IReuse reuse, Made made, Setup setup,
+                ReflectionFactory factoryGenerator) : base()
             {
-                _implementationTypeOrProviderOrPubCtorOrCtors = implementationTypeProvider.ThrowIfNull();
+                _implementationTypeOrProviderOrPubCtorOrCtors = implementationType;
                 Reuse = reuse;
                 Made  = made;
                 Setup = setup;
+                _generatedFactoriesOrFactoryGenerator = factoryGenerator;
             }
+
+            // todo: @perf optimize request.Details access and reflection here
+            /// <inheritdoc />
+            public override Factory GetGeneratedFactoryOrDefault(Request request, bool ifErrorReturnDefault = false)
+            {
+                var implType = ImplementationType;
+                var serviceType = request.GetActualServiceType();
+
+                var closedTypeArgs = implType == null || implType == serviceType.GetGenericDefinitionOrNull()
+                    ? serviceType.GetGenericArguments()
+                    : implType.IsGenericParameter ? serviceType.One()
+                    : GetClosedTypeArgsOrNullForOpenGenericType(implType, serviceType, request, ifErrorReturnDefault);
+
+                if (closedTypeArgs == null)
+                    return null;
+
+                var made = Made;
+                if (made.FactoryMethodOrSelector != null)
+                {
+                    // resolve request with factory to specify the implementation type may be required by FactoryMethod or GetClosed...
+                    request = request.WithResolvedFactory(this, ifErrorReturnDefault, ifErrorReturnDefault, copyRequest: true);
+                    var factoryMethod = made.FactoryMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)made.FactoryMethodOrSelector)(request);
+                    if (factoryMethod == null)
+                        return ifErrorReturnDefault ? null : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
+
+                    var checkMatchingType = implType != null && implType.IsGenericParameter;
+                    var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request, checkMatchingType);
+
+                    // may be null only for `IfUnresolved.ReturnDefault` or if the check for matching type is failed
+                    if (closedFactoryMethod == null)
+                        return null;
+
+                    made = Made.Of(closedFactoryMethod, made.Parameters, made.PropertiesAndFields);
+                }
+
+                if (implType != null)
+                {
+                    implType = implType.IsGenericParameter
+                        ? closedTypeArgs[0]
+                        : Throw.IfThrows<ArgumentException, Type>(() => implType.MakeGenericType(closedTypeArgs), 
+                            !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
+                            Error.NoMatchedGenericParamConstraints, implType, request);
+                    if (implType == null)
+                        return null;
+                }
+
+                var knownImplOrServiceType = implType ?? made.FactoryMethodKnownResultType ?? serviceType;
+                var serviceKey = request.ServiceKey;
+                serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey ?? DefaultKey.Value;
+                var generatedFactoryKey = KV.Of(knownImplOrServiceType, serviceKey);
+
+                var generatedFactories = GeneratedFactories;
+                if (!generatedFactories.IsEmpty)
+                {
+                    var generatedFactory = generatedFactories.GetValueOrDefault(generatedFactoryKey);
+                    if (generatedFactory != null)
+                        return generatedFactory;
+                }
+
+                ReflectionFactory closedGenericFactory = new WithAllDetails(implType, Reuse, made, Setup, this);
+                closedGenericFactory.Flags = Flags;
+
+                Ref.Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryKey, closedGenericFactory,
+                    (x, genFacKey, closedGenFac) => 
+                    {
+
+                        var newEntry = ImHashMap.Entry(genFacKey, closedGenFac);
+                        var oldEntryOrNewMap = ((ImHashMap<KV<Type, object>, ReflectionFactory>)x).AddOrGetEntry(newEntry);
+                        if (oldEntryOrNewMap is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
+                        {
+                            closedGenericFactory = oldEntry.Value;
+                            return x;
+                        }
+                        return oldEntryOrNewMap;
+                    });
+
+                return closedGenericFactory;
+            }
+
+            private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
+                Type openImplType, Type closedServiceType, Request request, bool ifErrorReturnDefault)
+            {
+                var serviceTypeArgs = closedServiceType.GetGenericArguments();
+                var serviceTypeGenericDef = closedServiceType.GetGenericTypeDefinition();
+
+                var implTypeParams = openImplType.GetGenericArguments();
+                var implTypeArgs = new Type[implTypeParams.Length];
+
+                var implementedTypes = openImplType.GetImplementedTypes();
+
+                var matchFound = false;
+                for (var i = 0; !matchFound && i < implementedTypes.Length; ++i)
+                {
+                    var implementedType = implementedTypes[i];
+                    if (implementedType.IsOpenGeneric() && implementedType.GetGenericDefinitionOrNull() == serviceTypeGenericDef)
+                        matchFound = MatchServiceWithImplementedTypeParams(
+                            implTypeArgs, implTypeParams, implementedType.GetGenericArguments(), serviceTypeArgs);
+                }
+
+                if (!matchFound)
+                    return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
+                        : Throw.For<Type[]>(Error.NoMatchedImplementedTypesWithServiceType,
+                            openImplType, implementedTypes, request);
+
+                MatchOpenGenericConstraints(implTypeParams, implTypeArgs);
+
+                var notMatchedIndex = Array.IndexOf(implTypeArgs, null);
+                if (notMatchedIndex != -1)
+                    return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
+                        : Throw.For<Type[]>(Error.NotFoundOpenGenericImplTypeArgInService,
+                            openImplType, implTypeParams[notMatchedIndex], request);
+
+                return implTypeArgs;
+            }
+
+        }
+
+        internal sealed class WithTypeProvider : WithAllDetails 
+        {
+            public override bool CanAccessImplementationType => false;
+            public override Type ImplementationType 
+            {
+                get 
+                {
+                    var m = Made;
+                    var implType = ((Func<Type>)_implementationTypeOrProviderOrPubCtorOrCtors)();
+                    var validatedImplType = ValidateImplementationType(implType, m);
+                    if (IsFactoryGenerator(validatedImplType ?? implType, m))
+                        _generatedFactoriesOrFactoryGenerator = ImHashMap<KV<Type, object>, ReflectionFactory>.Empty;
+                    return validatedImplType;
+                }
+            } 
+            public WithTypeProvider(Func<Type> implementationTypeProvider, IReuse reuse, Made made, Setup setup) 
+                : base(implementationTypeProvider.ThrowIfNull(), reuse, made, setup) {}
         }
 
         /// <summary>Creates service expression.</summary>
@@ -10619,121 +10861,6 @@ private ParameterServiceInfo(ParameterInfo p)
             return true;
         }
 
-        // todo: @perf optimize request.Details access and reflection here
-        /// <inheritdoc />
-        public override Factory GetGeneratedFactoryOrDefault(Request request, bool ifErrorReturnDefault = false)
-        {
-            var implType = ImplementationType;
-            var serviceType = request.GetActualServiceType();
-
-            var closedTypeArgs = implType == null || implType == serviceType.GetGenericDefinitionOrNull()
-                ? serviceType.GetGenericArguments()
-                : implType.IsGenericParameter ? serviceType.One()
-                : GetClosedTypeArgsOrNullForOpenGenericType(implType, serviceType, request, ifErrorReturnDefault);
-
-            if (closedTypeArgs == null)
-                return null;
-
-            var made = Made;
-            if (made.FactoryMethodOrSelector != null)
-            {
-                // resolve request with factory to specify the implementation type may be required by FactoryMethod or GetClosed...
-                request = request.WithResolvedFactory(this, ifErrorReturnDefault, ifErrorReturnDefault, copyRequest: true);
-                var factoryMethod = made.FactoryMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)made.FactoryMethodOrSelector)(request);
-                if (factoryMethod == null)
-                    return ifErrorReturnDefault ? null : Throw.For<Factory>(Error.GotNullFactoryWhenResolvingService, request);
-
-                var checkMatchingType = implType != null && implType.IsGenericParameter;
-                var closedFactoryMethod = GetClosedFactoryMethodOrDefault(factoryMethod, closedTypeArgs, request, checkMatchingType);
-
-                // may be null only for `IfUnresolved.ReturnDefault` or if the check for matching type is failed
-                if (closedFactoryMethod == null)
-                    return null;
-
-                made = Made.Of(closedFactoryMethod, made.Parameters, made.PropertiesAndFields);
-            }
-
-            if (implType != null)
-            {
-                implType = implType.IsGenericParameter
-                    ? closedTypeArgs[0]
-                    : Throw.IfThrows<ArgumentException, Type>(() => implType.MakeGenericType(closedTypeArgs), 
-                        !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
-                        Error.NoMatchedGenericParamConstraints, implType, request);
-                if (implType == null)
-                    return null;
-            }
-
-            var knownImplOrServiceType = implType ?? made.FactoryMethodKnownResultType ?? serviceType;
-            var serviceKey = request.ServiceKey;
-            serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey ?? DefaultKey.Value;
-            var generatedFactoryKey = KV.Of(knownImplOrServiceType, serviceKey);
-
-            var generatedFactories = (ImHashMap<KV<Type, object>, ReflectionFactory>)_generatedFactoriesOrGeneratorFactory;
-            if (!generatedFactories.IsEmpty)
-            {
-                var generatedFactory = generatedFactories.GetValueOrDefault(generatedFactoryKey);
-                if (generatedFactory != null)
-                    return generatedFactory;
-            }
-
-            var closedGenericFactory = Of(implType, Reuse, made, Setup);
-            closedGenericFactory._generatedFactoriesOrGeneratorFactory = this;
-            closedGenericFactory.Flags = Flags;
-
-            Ref.Swap(ref _generatedFactoriesOrGeneratorFactory, generatedFactoryKey, closedGenericFactory,
-                (x, genFacKey, closedGenFac) => 
-                {
-
-                    var newEntry = ImHashMap.Entry(genFacKey, closedGenFac);
-                    var oldEntryOrNewMap = ((ImHashMap<KV<Type, object>, ReflectionFactory>)x).AddOrGetEntry(newEntry);
-                    if (oldEntryOrNewMap is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
-                    {
-                        closedGenericFactory = oldEntry.Value;
-                        return x;
-                    }
-                    return oldEntryOrNewMap;
-                });
-
-            return closedGenericFactory;
-        }
-
-        private static Type[] GetClosedTypeArgsOrNullForOpenGenericType(
-            Type openImplType, Type closedServiceType, Request request, bool ifErrorReturnDefault)
-        {
-            var serviceTypeArgs = closedServiceType.GetGenericArguments();
-            var serviceTypeGenericDef = closedServiceType.GetGenericTypeDefinition();
-
-            var implTypeParams = openImplType.GetGenericArguments();
-            var implTypeArgs = new Type[implTypeParams.Length];
-
-            var implementedTypes = openImplType.GetImplementedTypes();
-
-            var matchFound = false;
-            for (var i = 0; !matchFound && i < implementedTypes.Length; ++i)
-            {
-                var implementedType = implementedTypes[i];
-                if (implementedType.IsOpenGeneric() && implementedType.GetGenericDefinitionOrNull() == serviceTypeGenericDef)
-                    matchFound = MatchServiceWithImplementedTypeParams(
-                        implTypeArgs, implTypeParams, implementedType.GetGenericArguments(), serviceTypeArgs);
-            }
-
-            if (!matchFound)
-                return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
-                    : Throw.For<Type[]>(Error.NoMatchedImplementedTypesWithServiceType,
-                        openImplType, implementedTypes, request);
-
-            MatchOpenGenericConstraints(implTypeParams, implTypeArgs);
-
-            var notMatchedIndex = Array.IndexOf(implTypeArgs, null);
-            if (notMatchedIndex != -1)
-                return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
-                    : Throw.For<Type[]>(Error.NotFoundOpenGenericImplTypeArgInService,
-                        openImplType, implTypeParams[notMatchedIndex], request);
-
-            return implTypeArgs;
-        }
-
         private static void MatchOpenGenericConstraints(Type[] implTypeParams, Type[] implTypeArgs)
         {
             for (var i = 0; i < implTypeParams.Length; i++)
@@ -11094,11 +11221,11 @@ private ParameterServiceInfo(ParameterInfo p)
         public override bool HasRuntimeState => true;
         /// <inheritdoc />
         public override Setup Setup => DryIoc.Setup.AsResolutionCallForGeneratedExpressionSetup;
+        private readonly FactoryDelegate _factoryDelegate;
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static DelegateFactory Of(FactoryDelegate factoryDelegate) =>
-            new DelegateFactory(factoryDelegate);
+        public static DelegateFactory Of(FactoryDelegate factoryDelegate) => new DelegateFactory(factoryDelegate);
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -11170,9 +11297,11 @@ private ParameterServiceInfo(ParameterInfo p)
         public override Expression CreateExpressionOrDefault(Request request)
         {
             // GetConstant here is needed to check the runtime state rule
-            var delegateExpr = request.Container.GetConstantExpression(_factoryDelegate);
+            var delegateExpr = request.Container.GetConstantExpression(_factoryDelegate); // todo: @perf avoid the call and go directly to InvokeFactoryDelegateExpression for the common case
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
-            return Convert(Invoke(delegateExpr, resolverExpr), request.GetActualServiceType());
+            if (resolverExpr == FactoryDelegateCompiler.ResolverContextParamExpr)
+                return new InvokeFactoryDelegateExpression(request.GetActualServiceType(), delegateExpr); // todo: @perf use the delegate directly instead of wrapping it into the Constant
+            return Invoke(request.GetActualServiceType(), delegateExpr, resolverExpr);
         }
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
@@ -11192,8 +11321,15 @@ private ParameterServiceInfo(ParameterInfo p)
             // Otherwise just use delegate as-is
             return _factoryDelegate;
         }
+    }
 
-        private readonly FactoryDelegate _factoryDelegate;
+    internal sealed class InvokeFactoryDelegateExpression : InvocationExpression
+    {
+        public override Type Type { get; }
+        public sealed override int ArgumentCount => 1;
+        public sealed override IReadOnlyList<Expression> Arguments => new[] { FactoryDelegateCompiler.ResolverContextParamExpr };
+        public sealed override Expression GetArgument(int index) => FactoryDelegateCompiler.ResolverContextParamExpr;
+        internal InvokeFactoryDelegateExpression(Type type, Expression expression) : base(expression) => Type = type;
     }
 
     internal sealed class FactoryPlaceholder : Factory
@@ -11228,7 +11364,10 @@ private ParameterServiceInfo(ParameterInfo p)
         bool TryGet(out object item, int id);
 
         /// Create the value via `FactoryDelegate` passing the `IResolverContext`
-        object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0);
+        object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r);
+
+        /// Create the value via `FactoryDelegate` passing the `IResolverContext`
+        object GetOrAddViaFactoryDelegateWithDisposalOrder(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder);
 
         /// Creates, stores, and returns created item
         object TryGetOrAddWithoutClosure(int id, IResolverContext resolveContext, Expression expr,
@@ -11236,10 +11375,10 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// <summary>Tracked item will be disposed with the scope. 
         /// Smaller <paramref name="disposalOrder"/> will be disposed first.</summary>
-        object TrackDisposable(object item, int disposalOrder = 0);
+        object TrackDisposableWithOrder(object item, int disposalOrder);
 
         /// <summary>Tracked item will be disposed with the scope.</summary> 
-        T TrackDisposableWithoutDisposalOrder<T>(T disposable) where T : IDisposable;
+        T TrackDisposable<T>(T disposable) where T : IDisposable;
 
         ///<summary>Sets or adds the service item directly to the scope services</summary>
         void SetOrAdd(int id, object item);
@@ -11337,7 +11476,17 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
-        public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
+        public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r)
+        {
+            var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
+            return itemRef != null
+                ? itemRef.Value != NoItem ? itemRef.Value : WaitForItemIsSet(itemRef)
+                : TryGetOrAddViaFactoryDelegate(id, createValue, r);
+        }
+
+        /// <inheritdoc />
+        [MethodImpl((MethodImplOptions)256)]
+        public object GetOrAddViaFactoryDelegateWithDisposalOrder(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
         {
             var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
             return itemRef != null
@@ -11347,6 +11496,9 @@ private ParameterServiceInfo(ParameterInfo p)
 
         internal static readonly MethodInfo GetOrAddViaFactoryDelegateMethod = 
             typeof(IScope).GetMethod(nameof(IScope.GetOrAddViaFactoryDelegate));
+
+        internal static readonly MethodInfo GetOrAddViaFactoryDelegateWithDisposalOrderMethod = 
+            typeof(IScope).GetMethod(nameof(IScope.GetOrAddViaFactoryDelegateWithDisposalOrder));
 
         internal object TryGetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
@@ -11490,7 +11642,7 @@ private ParameterServiceInfo(ParameterInfo p)
         // todo: @perf consider adding the overload without `disposalOrder`
         // todo: @perf we always know that item is IDisposable because it is being checked upper in stack, so we may remove the check here 
         /// <summary>Can be used to manually add service for disposal</summary>
-        public object TrackDisposable(object item, int disposalOrder = 0)
+        public object TrackDisposableWithOrder(object item, int disposalOrder)
         {
             if (item is IDisposable disp && !ReferenceEquals(disp, this))
                 if (disposalOrder == 0)
@@ -11501,10 +11653,10 @@ private ParameterServiceInfo(ParameterInfo p)
         }
 
         internal static readonly MethodInfo TrackDisposableMethod =
-            typeof(IScope).GetMethod(nameof(IScope.TrackDisposable));
+            typeof(IScope).GetMethod(nameof(IScope.TrackDisposableWithOrder));
 
         /// <summary>Tracked item will be disposed with the scope.</summary> 
-        public T TrackDisposableWithoutDisposalOrder<T>(T disposable) where T : IDisposable 
+        public T TrackDisposable<T>(T disposable) where T : IDisposable 
         {
             if (!ReferenceEquals(disposable, this)) 
             {
@@ -11719,12 +11871,16 @@ private ParameterServiceInfo(ParameterInfo p)
             var factoryId = request.FactoryType == FactoryType.Decorator
                 ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
 
-            var lambdaExpr = Lambda<FactoryDelegate>(serviceFactoryExpr, FactoryDelegateCompiler.ResolverContextParamExpr, typeof(object));
+            var lambdaExpr = new FactoryDelegateExpression(serviceFactoryExpr);
 
             if (request.DependencyCount > 0)
                 request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
 
-            return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
+            if (disposalOrder == 0)
+                return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
+                    ConstantInt(factoryId), lambdaExpr, FactoryDelegateCompiler.ResolverContextParamExpr);
+
+            return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateWithDisposalOrderMethod,
                 ConstantInt(factoryId), lambdaExpr, FactoryDelegateCompiler.ResolverContextParamExpr, ConstantInt(disposalOrder));
         }
 
@@ -11766,24 +11922,21 @@ private ParameterServiceInfo(ParameterInfo p)
             if (serviceFactoryExpr.Type.IsValueType)
                 serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
 
-            var resolverContextParamExpr = FactoryDelegateCompiler.ResolverContextParamExpr;
-
             if (request.TracksTransientDisposable)
             {
                 if (ScopedOrSingleton)
-                    return Call(TrackScopedOrSingletonMethod, resolverContextParamExpr, serviceFactoryExpr);
+                    return Call(TrackScopedOrSingletonMethod, FactoryDelegateCompiler.ResolverContextParamExpr, serviceFactoryExpr);
 
                 var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
                 if (Name == null)
-                    return Call(TrackScopedMethod, resolverContextParamExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
+                    return Call(TrackScopedMethod, FactoryDelegateCompiler.ResolverContextParamExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
 
                 var nameExpr = request.Container.GetConstantExpression(Name, typeof(object));
-                return Call(TrackNameScopedMethod, resolverContextParamExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
+                return Call(TrackNameScopedMethod, FactoryDelegateCompiler.ResolverContextParamExpr, nameExpr, ifNoScopeThrowExpr, serviceFactoryExpr);
             }
             else
             {
-                var idExpr = ConstantInt(request.FactoryType == FactoryType.Decorator ?
-                    request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID);
+                var factoryId = request.FactoryType == FactoryType.Decorator ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
 
                 Expression factoryDelegateExpr;
                 if (serviceFactoryExpr is InvocationExpression ie && ie.Expression is ConstantExpression registeredDelegateExpr &&
@@ -11793,7 +11946,7 @@ private ParameterServiceInfo(ParameterInfo p)
                 }
                 else
                 {
-                    factoryDelegateExpr = Lambda<FactoryDelegate>(serviceFactoryExpr, FactoryDelegateCompiler.ResolverContextParamExpr, typeof(object));
+                    factoryDelegateExpr = new FactoryDelegateExpression(serviceFactoryExpr);
 
                     // decrease the dependency count when wrapping into lambda
                     if (request.DependencyCount > 0)
@@ -11803,24 +11956,25 @@ private ParameterServiceInfo(ParameterInfo p)
                 var disposalOrder = request.Factory.Setup.DisposalOrder;
 
                 if (ScopedOrSingleton)
-                    return Call(GetScopedOrSingletonViaFactoryDelegateMethod,
-                        resolverContextParamExpr, idExpr, factoryDelegateExpr, ConstantInt(disposalOrder));
+                {
+                    if (disposalOrder == 0)
+                        return new GetScopedOrSingletonViaFactoryDelegateExpression(factoryId, factoryDelegateExpr);
+                    return new GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(factoryId, factoryDelegateExpr, disposalOrder);
+                }
 
-                var ifNoScopeThrowExpr = Constant(request.IfUnresolved == IfUnresolved.Throw);
+                var ifNoScopeThrow = request.IfUnresolved == IfUnresolved.Throw;
 
                 if (Name == null)
                 {
                     if (disposalOrder == 0)
-                        return Call(GetScopedViaFactoryDelegateNoDisposalIndexMethod,
-                            resolverContextParamExpr, ifNoScopeThrowExpr, idExpr, factoryDelegateExpr);
-
-                    return Call(GetScopedViaFactoryDelegateMethod, 
-                        resolverContextParamExpr, ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, ConstantInt(disposalOrder));
+                        return new GetScopedViaFactoryDelegatexpression(ifNoScopeThrow, factoryId, factoryDelegateExpr);
+                    return Call(GetScopedViaFactoryDelegateWithDisposalOrderMethod, 
+                        FactoryDelegateCompiler.ResolverContextParamExpr, Constant(ifNoScopeThrow), ConstantInt(factoryId), factoryDelegateExpr, ConstantInt(disposalOrder));
                 }
 
-                return Call(GetNameScopedViaFactoryDelegateMethod, resolverContextParamExpr,
+                return Call(GetNameScopedViaFactoryDelegateMethod, FactoryDelegateCompiler.ResolverContextParamExpr,
                     request.Container.GetConstantExpression(Name, typeof(object)),
-                    ifNoScopeThrowExpr, idExpr, factoryDelegateExpr, ConstantInt(disposalOrder));
+                    Constant(ifNoScopeThrow), ConstantInt(factoryId), factoryDelegateExpr, ConstantInt(disposalOrder));
             }
         }
 
@@ -11862,55 +12016,130 @@ private ParameterServiceInfo(ParameterInfo p)
         public readonly bool ScopedOrSingleton;
 
         /// Subject
-        public static object GetScopedOrSingletonViaFactoryDelegate(IResolverContext r,
-            int id, FactoryDelegate createValue, int disposalIndex) =>
-            (r.CurrentScope ?? r.SingletonScope).GetOrAddViaFactoryDelegate(id, createValue, r, disposalIndex);
+        public static object GetScopedOrSingletonViaFactoryDelegate(IResolverContext r, int id, FactoryDelegate createValue) =>
+            (r.CurrentScope ?? r.SingletonScope).GetOrAddViaFactoryDelegate(id, createValue, r);
 
         internal static readonly MethodInfo GetScopedOrSingletonViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedOrSingletonViaFactoryDelegate));
 
+        /// Subject
+        public static object GetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(IResolverContext r,
+            int id, FactoryDelegate createValue, int disposalOrder) =>
+            (r.CurrentScope ?? r.SingletonScope).GetOrAddViaFactoryDelegateWithDisposalOrder(id, createValue, r, disposalOrder);
+
+        internal static readonly MethodInfo GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderMethod =
+            typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedOrSingletonViaFactoryDelegateWithDisposalOrder));
+
+        internal sealed class GetScopedOrSingletonViaFactoryDelegateExpression : MethodCallExpression
+        {
+            public override MethodInfo Method => GetScopedOrSingletonViaFactoryDelegateMethod;
+            public readonly int FactoryId;
+            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
+            public readonly Expression CreateValueExpr;
+            public override int ArgumentCount => 3;
+            public override IReadOnlyList<Expression> Arguments => 
+                new[] { FactoryDelegateCompiler.ResolverContextParamExpr, FactoryIdExpr, CreateValueExpr };
+            public override Expression GetArgument(int i) => 
+                i == 0 ? FactoryDelegateCompiler.ResolverContextParamExpr : 
+                i == 1 ? FactoryIdExpr : 
+                         CreateValueExpr;
+            internal GetScopedOrSingletonViaFactoryDelegateExpression(int factoryId, Expression createValueExpr)
+            {
+                FactoryId       = factoryId;
+                CreateValueExpr = createValueExpr;
+            }
+        }
+
+        internal sealed class GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression : MethodCallExpression
+        {
+            public override MethodInfo Method => GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderMethod;
+            public readonly int FactoryId;
+            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
+            public readonly int DisposalOrder;
+            public ConstantExpression DisposalOrderExpr => ConstantInt(DisposalOrder);
+            public readonly Expression CreateValueExpr;
+            public override int ArgumentCount => 4;
+            public override IReadOnlyList<Expression> Arguments => 
+                new[] { FactoryDelegateCompiler.ResolverContextParamExpr, FactoryIdExpr, CreateValueExpr, DisposalOrderExpr };
+            public override Expression GetArgument(int i) => 
+                i == 0 ? FactoryDelegateCompiler.ResolverContextParamExpr : 
+                i == 1 ? FactoryIdExpr : 
+                i == 2 ? CreateValueExpr :
+                         DisposalOrderExpr;
+            internal GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(int factoryId, Expression createValueExpr, int disposalOrder)
+            {
+                FactoryId       = factoryId;
+                CreateValueExpr = createValueExpr;
+                DisposalOrder   = disposalOrder;
+            }
+        }
+
+        // todo: @duplicate of TrackInstance
         /// <summary>Tracks the Unordered disposal in the current scope or in the singleton as fallback</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static object TrackScopedOrSingleton(IResolverContext r, object item) =>
-            item is IDisposable d ? (r.CurrentScope ?? r.SingletonScope).TrackDisposableWithoutDisposalOrder(d) : item;
+            item is IDisposable d ? (r.CurrentScope ?? r.SingletonScope).TrackDisposable(d) : item;
 
         internal static readonly MethodInfo TrackScopedOrSingletonMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(TrackScopedOrSingleton));
 
         /// Subject
-        public static object GetScopedViaFactoryDelegateNoDisposalIndex(IResolverContext r,
-            bool throwIfNoScope, int id, FactoryDelegate createValue) =>
+        public static object GetScopedViaFactoryDelegate(IResolverContext r, bool throwIfNoScope, int id, FactoryDelegate createValue) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r);
-
-        internal static readonly MethodInfo GetScopedViaFactoryDelegateNoDisposalIndexMethod =
-            typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedViaFactoryDelegateNoDisposalIndex));
-
-        /// Subject
-        public static object GetScopedViaFactoryDelegate(IResolverContext r,
-            bool throwIfNoScope, int id, FactoryDelegate createValue, int disposalIndex) =>
-            r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r, disposalIndex);
 
         internal static readonly MethodInfo GetScopedViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedViaFactoryDelegate));
 
+        internal sealed class GetScopedViaFactoryDelegatexpression : MethodCallExpression
+        {
+            public override MethodInfo Method => GetScopedViaFactoryDelegateMethod;
+            public readonly bool ThrowIfNoScope;
+            public ConstantExpression ThrowIfNoScopeExpr => Constant(ThrowIfNoScope);
+            public readonly int FactoryId;
+            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
+            public readonly Expression CreateValueExpr;
+            public override int ArgumentCount => 4;
+            public override IReadOnlyList<Expression> Arguments => 
+                new[] { FactoryDelegateCompiler.ResolverContextParamExpr, ThrowIfNoScopeExpr, FactoryIdExpr, CreateValueExpr };
+            public override Expression GetArgument(int i) => 
+                i == 0 ? FactoryDelegateCompiler.ResolverContextParamExpr : 
+                i == 1 ? ThrowIfNoScopeExpr : 
+                i == 2 ? FactoryIdExpr : 
+                         CreateValueExpr;
+            internal GetScopedViaFactoryDelegatexpression(bool throwIfNoScope, int factoryId, Expression createValueExpr)
+            {
+                ThrowIfNoScope  = throwIfNoScope;
+                FactoryId       = factoryId;
+                CreateValueExpr = createValueExpr;
+            }
+        }
+
+        /// Subject
+        public static object GetScopedViaFactoryDelegateWithDisposalOrder(IResolverContext r,
+            bool throwIfNoScope, int id, FactoryDelegate createValue, int disposalOrder) =>
+            r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegateWithDisposalOrder(id, createValue, r, disposalOrder);
+
+        internal static readonly MethodInfo GetScopedViaFactoryDelegateWithDisposalOrderMethod =
+            typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedViaFactoryDelegateWithDisposalOrder));
+
         /// Subject
         public static object GetNameScopedViaFactoryDelegate(IResolverContext r,
-            object scopeName, bool throwIfNoScope, int id, FactoryDelegate createValue, int disposalIndex) =>
-            r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r, disposalIndex);
+            object scopeName, bool throwIfNoScope, int id, FactoryDelegate createValue, int disposalOrder) =>
+            r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAddViaFactoryDelegateWithDisposalOrder(id, createValue, r, disposalOrder);
 
         internal static readonly MethodInfo GetNameScopedViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(GetNameScopedViaFactoryDelegate));
 
         /// Subject
         public static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
-            item is IDisposable d ? r.GetCurrentScope(throwIfNoScope)?.TrackDisposableWithoutDisposalOrder(d) : item;
+            item is IDisposable d ? r.GetCurrentScope(throwIfNoScope)?.TrackDisposable(d) : item;
 
         internal static readonly MethodInfo TrackScopedMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(TrackScoped));
 
         /// Subject
         public static object TrackNameScoped(IResolverContext r, object scopeName, bool throwIfNoScope, object item) =>
-            item is IDisposable d ? r.GetNamedScope(scopeName, throwIfNoScope)?.TrackDisposableWithoutDisposalOrder(d) : item;
+            item is IDisposable d ? r.GetNamedScope(scopeName, throwIfNoScope)?.TrackDisposable(d) : item;
 
         internal static readonly MethodInfo TrackNameScopedMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(TrackNameScoped));
@@ -13744,7 +13973,7 @@ namespace DryIoc.Messages
     }
 }
 
-namespace DryIoc.Testing
+namespace DryIoc
 {
     /// <summary>Common abstraction to run the tests</summary>
     public interface ITest

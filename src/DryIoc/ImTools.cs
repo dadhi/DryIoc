@@ -1612,6 +1612,19 @@ namespace DryIoc.ImTools
             return copy;
         }
 
+        /// <summary>Array copy</summary>
+        public static T[] CopyNonEmpty<T>(this T[] items)
+        {
+            var count = items.Length;
+            var copy = new T[count];
+            if (count < 6)
+                for (var i = 0; i < count; ++i)
+                    copy[i] = items[i];
+            else
+                Array.Copy(items, copy, count);
+            return copy;
+        }
+
         /// <summary>Returns the new array consisting from all items from source array then the all items from added array.
         /// If source is null or empty then the added array will be returned. If added is null or empty then the source will be returned.</summary>
         public static T[] Append<T>(this T[] source, params T[] added)

@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel.Composition;
 using NUnit.Framework;
 using DryIoc.MefAttributedModel;
-using DryIoc.Testing;
 
 namespace DryIoc.IssuesTests
 {

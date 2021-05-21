@@ -2,10 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-
 using NUnit.Framework;
-
-using DryIoc.Testing;
 using DryIoc.ImTools;
 
 namespace DryIoc.UnitTests

@@ -1140,69 +1140,20 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |             Autofac |    923.6 us |  12.14 us |  11.35 us |   6.68 |    0.16 |  50.7813 | 25.3906 | 1.9531 | 315.93 KB |
 | Autofac_MsDIAdapter |    891.9 us |  14.95 us |  13.98 us |   6.45 |    0.17 |  54.6875 | 27.3438 | 2.9297 | 339.43 KB |
 
+## Optimizing the memory consumption
 
-|             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI |  95.89 us | 2.040 us | 3.519 us |  1.00 |    0.00 | 11.4746 | 2.9297 |     - |  70.54 KB |
-|             DryIoc |  93.34 us | 1.187 us | 1.110 us |  0.95 |    0.04 | 10.0098 | 0.8545 |     - |  61.83 KB |
-| DryIoc_MsDIAdapter | 119.50 us | 2.363 us | 3.883 us |  1.25 |    0.06 | 13.1836 | 1.2207 |     - |  80.83 KB |
+BenchmarkDotNet=v0.13.0, OS=Windows 10.0.19042.985 (20H2/October2020Update)
+Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET SDK=5.0.202
+  [Host]     : .NET 5.0.5 (5.0.521.16609), X64 RyuJIT
+  DefaultJob : .NET 5.0.5 (5.0.521.16609), X64 RyuJIT
 
-## Optimizing LastSelectedFactory rule
-
-|             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI |  96.35 us | 1.894 us | 3.216 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.53 KB |
-|             DryIoc |  93.41 us | 0.872 us | 0.816 us |  0.98 |    0.04 | 10.0098 | 0.8545 |     - |  61.83 KB |
-| DryIoc_MsDIAdapter | 109.70 us | 0.623 us | 0.486 us |  1.16 |    0.05 | 12.8174 | 1.2207 |     - |  78.79 KB |
-
-### Optimizing NewExpression with up to 7 arguments
-
-|             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI |  97.32 us | 1.849 us | 2.055 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.54 KB |
-|             DryIoc |  94.23 us | 0.352 us | 0.329 us |  0.97 |    0.02 | 10.0098 | 0.8545 |     - |  61.71 KB |
-| DryIoc_MsDIAdapter | 113.64 us | 0.919 us | 0.859 us |  1.17 |    0.03 | 12.8174 | 1.2207 |     - |  78.58 KB |
-
-### Optimizing ConstructorWithResolvableArguments
-
-|             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI |  96.08 us | 1.901 us | 3.476 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.54 KB |
-|             DryIoc |  94.83 us | 1.801 us | 1.769 us |  0.99 |    0.05 | 10.0098 | 0.8545 |     - |  61.71 KB |
-| DryIoc_MsDIAdapter | 104.94 us | 1.936 us | 1.716 us |  1.10 |    0.06 | 12.3291 | 1.0986 |     - |  75.81 KB |
-
-### FactoryMethod class splitting
 
 |             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI | 92.81 us | 1.828 us | 3.389 us |  1.00 |    0.00 | 11.4746 | 2.9297 |     - |  70.54 KB |
-|             DryIoc | 86.70 us | 1.722 us | 2.050 us |  0.94 |    0.05 | 10.0098 | 0.8545 |     - |  61.61 KB |
-| DryIoc_MsDIAdapter | 96.46 us | 1.887 us | 2.173 us |  1.05 |    0.05 | 12.3291 | 1.0986 |     - |  75.81 KB |
-
-### Made splitting and optimization
-
-|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI | 74.04 us | 0.930 us | 0.825 us |  1.00 |    0.00 | 11.4746 | 2.9297 |     - |  70.54 KB |
-|             DryIoc | 81.88 us | 1.628 us | 2.485 us |  1.09 |    0.03 |  9.8877 | 0.8545 |     - |   61.1 KB |
-| DryIoc_MsDIAdapter | 99.76 us | 2.597 us | 7.239 us |  1.31 |    0.09 | 12.3291 | 1.0986 |     - |  75.81 KB |
-
-### Unbox the Constant
-
-|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI | 75.80 us | 1.512 us | 2.264 us |  1.00 |    0.00 | 11.4746 | 2.9297 |     - |  70.55 KB |
-|             DryIoc | 76.77 us | 0.411 us | 0.364 us |  1.02 |    0.03 |  9.6436 | 0.8545 |     - |  59.65 KB |
-| DryIoc_MsDIAdapter | 87.58 us | 1.708 us | 2.097 us |  1.15 |    0.04 | 12.0850 | 1.0986 |     - |  74.07 KB |
-
-### Optimizing ReflectionFactory, DelegateFactory and RegisteredInstanceFactory
-
-|             Method |     Mean |    Error |   StdDev |   Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI | 75.53 us | 0.847 us | 0.751 us | 75.51 us |  1.00 |    0.00 | 11.4746 | 2.9297 |     - |  70.54 KB |
-|             DryIoc | 82.67 us | 2.013 us | 5.937 us | 78.47 us |  1.11 |    0.09 |  9.2773 | 0.7324 |     - |  57.07 KB |
-| DryIoc_MsDIAdapter | 91.26 us | 2.137 us | 3.629 us | 91.07 us |  1.22 |    0.07 | 11.5967 | 0.9766 |     - |   71.5 KB |
-
+|               MsDI | 95.52 us | 1.741 us | 1.935 us |  1.00 |    0.00 | 11.7188 | 2.9297 |     - |     73 KB |
+|             DryIoc | 85.42 us | 1.010 us | 0.843 us |  0.89 |    0.02 |  8.4229 | 0.6104 |     - |     52 KB |
+| DryIoc_MsDIAdapter | 96.94 us | 1.933 us | 3.122 us |  1.01 |    0.04 | 10.6201 | 0.7324 |     - |     65 KB |
 */
             [Benchmark(Baseline = true)]
             public object MsDI() => Measure(PrepareMsDi());
@@ -1214,7 +1165,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             public object DryIoc_MsDIAdapter() => Measure(PrepareDryIocMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark
-            //[Benchmark] 
+            //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
             // [Benchmark]

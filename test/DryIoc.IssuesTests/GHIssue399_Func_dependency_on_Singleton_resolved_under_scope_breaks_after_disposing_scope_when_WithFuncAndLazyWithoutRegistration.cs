@@ -1,6 +1,5 @@
 using System;
 using NUnit.Framework;
-using DryIoc.Testing;
 
 namespace DryIoc.IssuesTests
 {

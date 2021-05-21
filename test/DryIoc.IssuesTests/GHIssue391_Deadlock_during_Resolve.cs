@@ -1,6 +1,4 @@
 using NUnit.Framework;
-using System.Threading.Tasks;
-using DryIoc.Testing;
 
 namespace DryIoc.IssuesTests
 {

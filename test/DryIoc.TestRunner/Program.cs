@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using DryIoc.IssuesTests;
-using DryIoc.Testing;
 
 namespace DryIoc.UnitTests
 {
@@ -13,6 +11,7 @@ namespace DryIoc.UnitTests
             RunAllTests();
     
             // new ContainerTests().Run();
+            // new SelectConstructorWithAllResolvableArgumentTests().Run();
             // new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func().Run();
             // new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration().Run();
             // new DryIoc.UnitTests.DecoratorTests().Run();
@@ -42,11 +41,13 @@ namespace DryIoc.UnitTests
             var sw = Stopwatch.StartNew();
 
             Console.WriteLine();
-            Console.WriteLine("NETCOREAPP2.1: Running UnitTests and IssueTests...");
+            Console.WriteLine("Running UnitTests and IssueTests (.NET Core) ...");
             Console.WriteLine();
 
-            var tests = new ITest[] {
+            var tests = new ITest[] 
+            {
                 new ContainerTests(),
+                new SelectConstructorWithAllResolvableArgumentTests(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
