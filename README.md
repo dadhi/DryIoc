@@ -46,26 +46,26 @@ The listed *.MsDI* packages are respective [Microsoft.Extensions.DependencyInjec
 
 #### Cold start - Registering services then opening the scope and resolving the root scoped service (e.g. controller) for the first time
 
-DryIoc 5.0.0 (.MsDI 5.0.0), MsDI 5.0.1, Grace 7.2.0 (.MsDI 7.1.0), Autofac 6.1.0 (.MsDI 7.1.0), Lamar 5.0.3
+DryIoc 5.0.0 (.MsDI 5.0.0), MsDI 5.0.1, Grace 7.2.0 (.MsDI 7.1.0), Autofac 6.2.0 (.MsDI 7.1.0), Lamar 5.0.3
 
 ```md
-BenchmarkDotNet=v0.12.0, OS=Windows 10.0.18363
+BenchmarkDotNet=v0.13.0, OS=Windows 10.0.19042.985 (20H2/October2020Update)
 Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
-.NET Core SDK=5.0.200
-  [Host]     : .NET Core 3.1.12 (CoreCLR 4.700.21.6504, CoreFX 4.700.21.6905), X64 RyuJIT
-  DefaultJob : .NET Core 3.1.12 (CoreCLR 4.700.21.6504, CoreFX 4.700.21.6905), X64 RyuJIT
+.NET SDK=5.0.202
+  [Host]     : .NET 5.0.5 (5.0.521.16609), X64 RyuJIT
+  DefaultJob : .NET 5.0.5 (5.0.521.16609), X64 RyuJIT
 
 
 |              Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
 |-------------------- |-------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|-------:|----------:|
-|                MsDI |     99.60 us |   1.880 us |   2.012 us |   1.00 |    0.00 |  11.4746 |  2.8076 |      - |  70.54 KB |
-|              DryIoc |    103.15 us |   1.769 us |   1.655 us |   1.03 |    0.03 |  10.2539 |  0.7324 |      - |  62.95 KB |
-|  DryIoc_MsDIAdapter |    128.59 us |   2.566 us |   2.853 us |   1.29 |    0.04 |  13.6719 |  1.2207 |      - |  84.21 KB |
-|               Grace | 17,297.74 us | 336.184 us | 492.774 us | 174.61 |    6.18 |  93.7500 | 31.2500 |      - |  729.5 KB |
-|   Grace_MsDIAdapter | 19,746.27 us | 257.440 us | 240.810 us | 197.80 |    3.07 | 125.0000 | 62.5000 |      - | 893.23 KB |
-|   Lamar_MsDIAdapter |  6,154.49 us |  99.811 us |  83.346 us |  61.56 |    1.82 | 101.5625 | 31.2500 |      - | 656.43 KB |
-|             Autofac |    609.34 us |   8.014 us |   6.692 us |   6.09 |    0.15 |  50.7813 | 25.3906 | 1.9531 | 315.88 KB |
-| Autofac_MsDIAdapter |    599.20 us |   6.511 us |   5.771 us |   5.99 |    0.15 |  54.6875 | 27.3438 | 1.9531 | 339.42 KB |
+|                MsDI |     95.35 us |   1.626 us |   2.805 us |   1.00 |    0.00 |  11.9629 |  3.1738 |      - |     73 KB |
+|              DryIoc |     85.03 us |   0.868 us |   0.812 us |   0.88 |    0.03 |   8.4229 |  0.6104 |      - |     52 KB |
+|  DryIoc_MsDIAdapter |     92.64 us |   0.807 us |   0.754 us |   0.96 |    0.03 |  10.6201 |  0.7324 |      - |     65 KB |
+|               Grace | 15,516.60 us | 135.363 us | 126.619 us | 160.82 |    6.01 | 109.3750 | 46.8750 |      - |    743 KB |
+|   Grace_MsDIAdapter | 18,376.58 us | 201.534 us | 188.515 us | 190.45 |    6.71 | 125.0000 | 62.5000 |      - |    911 KB |
+|   Lamar_MsDIAdapter |  5,532.70 us |  70.539 us |  62.531 us |  57.31 |    2.16 |  93.7500 | 39.0625 |      - |    611 KB |
+|             Autofac |    553.95 us |  10.116 us |   8.967 us |   5.74 |    0.18 |  51.7578 | 25.3906 | 1.9531 |    318 KB |
+| Autofac_MsDIAdapter |    542.17 us |   4.962 us |   4.143 us |   5.60 |    0.21 |  54.6875 | 27.3438 | 1.9531 |    340 KB |
 ```
 
 <details>
