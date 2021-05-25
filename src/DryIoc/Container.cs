@@ -12025,7 +12025,7 @@ namespace DryIoc
             {
                 spinWait.SpinOnce();
                 if (tickCount - tickStart > WaitForScopedServiceIsCreatedTimeoutTicks)
-                    Throw.It(Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForScopedServiceIsCreatedTimeoutTicks);
+                    Throw.It(Error.WaitForScopedServiceIsCreatedTimeoutExpired, itemRef.Key, WaitForScopedServiceIsCreatedTimeoutTicks);
                 tickCount = (uint)Environment.TickCount;
             }
 
@@ -12038,7 +12038,7 @@ namespace DryIoc
                 {
                     Monitor.Wait(itemRef);
                     if (tickCount - tickStart > WaitForScopedServiceIsCreatedTimeoutTicks)
-                        Throw.It(Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForScopedServiceIsCreatedTimeoutTicks);
+                        Throw.It(Error.WaitForScopedServiceIsCreatedTimeoutExpired, itemRef.Key, WaitForScopedServiceIsCreatedTimeoutTicks);
                     tickCount = (uint)Environment.TickCount;
                 }
 
@@ -13503,7 +13503,7 @@ namespace DryIoc
                 "Unable to interpret the nested lambda with Body:" + NewLine +
                 "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(
-                "DryIoc has waited for the creation of the scoped (or singleton) service by 'other party' for the {0} ticks without the completion. " + NewLine +
+                "DryIoc has waited for the creation of the scoped (or singleton) service with FactoryId `{0}` by \"other party\" for the {1} ticks without the completion. " + NewLine +
                 "It means that either the 'other party' is the parallel thread which has started (!) but unable to finish the creation of the service in the provided amount of time. " + NewLine +
                 "Or more likely the 'other party' is the same thread and there is an undetected recursive dependency or " + NewLine +
                 "the scoped service creation is failed with the exception and the exception was catched (!) but you are trying to resolve the failed service again. " + NewLine + 
