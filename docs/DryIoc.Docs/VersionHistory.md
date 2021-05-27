@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.7.8 Bug-fix release / 2021-05-27
+
+- fixed: #405 DryIoc has waited for the creation of the scoped ... with service name/type
+
 ## v4.7.7 Bug-fix release / 2021-05-10
 
 - fixed: #399 Func dependency on Singleton resolved under scope breaks after disposing scope when WithFuncAndLazyWithoutRegistration()
