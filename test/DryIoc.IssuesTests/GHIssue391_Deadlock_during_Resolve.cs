@@ -42,12 +42,8 @@ namespace DryIoc.IssuesTests
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<IA>());
             Assert.AreSame(Error.NameOf(Error.WaitForScopedServiceIsCreatedTimeoutExpired), ex.ErrorName);
 
-            var m = ex.Message;
-            var i = m.IndexOf('`');
-            var j = m.IndexOf('`', i + 1);
-            var factoryId = int.Parse(m.Substring(i + 1, j - 1 - i));
-            var reg = container.GetServiceRegistrations().First(r => r.Factory.FactoryID == factoryId);
-            Assert.AreEqual(typeof(A), reg.ServiceType);
+            var m = ex.TryGetDetails(container);
+            StringAssert.Contains("A`", m);
         }
 
         public interface IA {}
