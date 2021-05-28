@@ -4133,6 +4133,9 @@ namespace DryIoc.ImTools
         /// You may add the entry with the default Value to the map, and calculate and set it later (e.g. using the CAS).</summary>
         public V Value;
 
+        /// <summary>The Key is actually the Hash for this entry and the vice versa.</summary>
+        public int Key => Hash;
+
         /// <summary>Constructs the entry with the default value</summary>
         public ImMapEntry(int hash) => Hash = hash;
         /// <summary>Constructs the entry with the value</summary>

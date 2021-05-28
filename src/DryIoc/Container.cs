@@ -12701,7 +12701,6 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <inheritdoc />
         protected ContainerException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context)
             : base(info, context) {}
-#endif
 
         /// <summary>Tries to explain the specific exception based on the passed container</summary>
         public string TryGetDetails(IContainer container)
