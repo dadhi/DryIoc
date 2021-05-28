@@ -11548,7 +11548,7 @@ private ParameterServiceInfo(ParameterInfo p)
             {
                 spinWait.SpinOnce();
                 if (tickCount - tickStart > WaitForScopedServiceIsCreatedTimeoutTicks)
-                    Throw.It(Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForScopedServiceIsCreatedTimeoutTicks);
+                    Throw.WithDetails(itemRef.Key, Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForScopedServiceIsCreatedTimeoutTicks);
                 tickCount = (uint)Environment.TickCount;
             }
 
@@ -12440,10 +12440,10 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Pretty-prints info to string.</summary>
         public override string ToString()
         {
-            var s = new StringBuilder().Print(ServiceType);
+            var s = new StringBuilder("ServiceType=`").Print(ServiceType).Append('`');
             if (OptionalServiceKey != null)
-                s.Append(" with ServiceKey=").Print(OptionalServiceKey);
-            return s.Append(" with factory ").Append(Factory).ToString();
+                s.Append(" with ServiceKey=`").Print(OptionalServiceKey).Append('`');
+            return s.Append(" with Factory=`").Append(Factory).Append('`').ToString();
         }
     }
 
@@ -12671,6 +12671,18 @@ private ParameterServiceInfo(ParameterInfo p)
         public ContainerException(int error, string message)
             : this(error, message, null) { }
 
+        /// <summary>The optional additional exception data.</summary>
+        public readonly object Details;
+        private ContainerException(object details, int error, string message)
+            : this(error, message, null) => Details = details;
+
+        /// <summary>Creates exception with details object and the message.</summary>
+        public static object WithDetails(object details, int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
+        {
+            throw new ContainerException(details, error,
+                string.Format(GetMessage(ErrorCheck.Unspecified, error), Print(arg0), Print(arg1), Print(arg2), Print(arg3)));
+        }
+
         /// <summary>Creates exception with message describing cause and context of error,
         /// and leading/system exception causing it.</summary>
         public ContainerException(int errorCode, string message, Exception innerException)
@@ -12689,6 +12701,23 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <inheritdoc />
         protected ContainerException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context)
             : base(info, context) {}
+#endif
+
+        /// <summary>Tries to explain the specific exception based on the passed container</summary>
+        public string TryGetDetails(IContainer container)
+        {
+            var e = Error;
+            if (e == DryIoc.Error.WaitForScopedServiceIsCreatedTimeoutExpired)
+            {
+                var m = Message;
+                var factoryId = (int)Details;
+                var reg = container.GetServiceRegistrations().FirstOrDefault(r => r.Factory.FactoryID == factoryId);
+                if (reg.Factory == null)
+                    return "Unable to get the service registration for the problematic FactoryID=" + factoryId;
+                return "The service registration related to the problem is " + reg;
+            }
+            return string.Empty;
+        }
 
     }
 
@@ -12898,12 +12927,13 @@ private ParameterServiceInfo(ParameterInfo p)
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(
-                "DryIoc has waited for the creation of the scoped (or singleton) service by 'other party' for the {0} ticks without the completion. " + NewLine +
-                "It means that either the 'other party' is the parallel thread which has started (!) but unable to finish the creation of the service in the provided amount of time. " + NewLine +
-                "Or more likely the 'other party' is the same thread and there is an undetected recursive dependency or " + NewLine +
-                "the scoped service creation is failed with the exception and the exception was catched (!) but you are trying to resolve the failed service again. " + NewLine + 
+                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {1} ticks without the completion. " + NewLine +
+                "You may call `exception.TryGetDetails(container)` to get the details of the problematic service registration." + NewLine +
+                "The error means that either the \"other party\" is the parallel thread which has started but is unable to finish the creation of the service in the provided amount of time. " + NewLine +
+                "Or more likely the \"other party\"  is the same thread and there is an undetected recursive dependency or " + NewLine +
+                "the scoped service creation is failed with the exception and the exception was catched but you are trying to resolve the failed service again. " + NewLine + 
                 "For all those reasons DryIoc has a timeout to prevent the infinite waiting. " + NewLine +
-                $"You may change the default timeout via `Scope.{nameof(Scope.WaitForScopedServiceIsCreatedTimeoutTicks)}=NewValue`"),
+                $"You may change the default timeout via `Scope.{nameof(Scope.WaitForScopedServiceIsCreatedTimeoutTicks)}=NewNumberOfTicks`"),
             ServiceTypeIsNull = Of("Registered service type is null");
 
 #pragma warning restore 1591 // "Missing XML-comment"
@@ -13037,6 +13067,10 @@ private ParameterServiceInfo(ParameterInfo p)
         {
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
+
+        /// <summary>Just throws the exception with the <paramref name="error"/> code.</summary>
+        public static object WithDetails(object details, int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null) =>
+            ContainerException.WithDetails(details, error, arg0, arg1, arg2, arg3);
 
         /// <summary>Throws <paramref name="error"/> instead of returning value of <typeparamref name="T"/>.
         /// Supposed to be used in expression that require some return value.</summary>

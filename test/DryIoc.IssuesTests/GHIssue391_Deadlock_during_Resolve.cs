@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Linq;
 
 namespace DryIoc.IssuesTests
 {
@@ -39,6 +40,9 @@ namespace DryIoc.IssuesTests
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<IA>());
             Assert.AreSame(Error.NameOf(Error.WaitForScopedServiceIsCreatedTimeoutExpired), ex.ErrorName);
+
+            var m = ex.TryGetDetails(container);
+            StringAssert.Contains("A`", m);
         }
 
         public interface IA {}

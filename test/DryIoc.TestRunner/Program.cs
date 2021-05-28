@@ -50,8 +50,10 @@ namespace DryIoc.UnitTests
                 new SelectConstructorWithAllResolvableArgumentTests(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
-                new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
+                new GHIssue391_Deadlock_during_Resolve(),
                 new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration(),
+                new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made(),
+                new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added
