@@ -39,9 +39,9 @@ namespace DryIoc
     using System.Reflection;
     using System.Text;
     using System.Threading;
-    using System.Diagnostics.CodeAnalysis;  // for SuppressMessage
-    using System.Diagnostics;               // for StackTrace
-    using System.Runtime.CompilerServices;  // for MethodImplAttribute
+    using System.Diagnostics.CodeAnalysis; // for SuppressMessage
+    using System.Diagnostics;              // for StackTrace
+    using System.Runtime.CompilerServices; // for MethodImplAttribute
 
     using DryIoc.ImTools;
     using static DryIoc.ImTools.ArrayTools;
@@ -12377,7 +12377,7 @@ private ParameterServiceInfo(ParameterInfo p)
     }
 
     /// <summary>Specifies options to handle situation when registered service is already present in the registry.</summary>
-    public enum IfAlreadyRegistered
+    public enum IfAlreadyRegistered : byte
     {
         /// <summary>Appends new default registration or throws registration with the same key.</summary>
         AppendNotKeyed,
