@@ -1160,6 +1160,14 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |             Autofac |    553.95 us |  10.116 us |   8.967 us |   5.74 |    0.18 |  51.7578 | 25.3906 | 1.9531 |    318 KB |
 | Autofac_MsDIAdapter |    542.17 us |   4.962 us |   4.143 us |   5.60 |    0.21 |  54.6875 | 27.3438 | 1.9531 |    340 KB |
 
+## Optimizing the registrations
+
+|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|               MsDI | 98.24 us | 1.508 us | 1.410 us |  1.00 |    0.00 | 11.8408 | 2.9297 |     - |     73 KB |
+|             DryIoc | 83.81 us | 1.620 us | 1.733 us |  0.86 |    0.02 |  8.4229 | 0.4883 |     - |     52 KB |
+| DryIoc_MsDIAdapter | 90.85 us | 1.797 us | 2.797 us |  0.92 |    0.03 | 10.6201 | 0.7324 |     - |     65 KB |
+
 */
             [Benchmark(Baseline = true)]
             public object MsDI() => Measure(PrepareMsDi());
@@ -1174,19 +1182,19 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace_MsDIAdapter() => Measure(PrepareGraceMsDi());
 
-            [Benchmark]
+            // [Benchmark]
             public object Lamar_MsDIAdapter() => Measure(PrepareLamarMsDi());
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac_MsDIAdapter() => Measure(PrepareAutofacMsDi());
         }
 

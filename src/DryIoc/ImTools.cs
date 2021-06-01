@@ -87,6 +87,15 @@ namespace DryIoc.ImTools
         /// you may rewrite it without allocations as `instance.ToFunc{A, R}`
         /// </summary> 
         public static R ToFunc<T, R>(this R result, T ignoredArg) => result;
+
+        /// <summary>Performant swapper</summary>
+        [MethodImpl(256)]
+        public static void Swap<T>(ref T a, ref T b)
+        {
+            var t = a;
+            a = b;
+            b = t;
+        }
     }
 
     /// <summary>Helpers for lazy instantiations</summary>
@@ -1663,7 +1672,25 @@ namespace DryIoc.ImTools
             var sourceCount = source.Length;
             index = index < 0 ? sourceCount : index;
             var result = new T[index < sourceCount ? sourceCount : sourceCount + 1];
-            Array.Copy(source, result, sourceCount);
+            if (sourceCount < 6)
+                for (var i = 0; i < sourceCount; ++i)
+                    result[i] = source[i];
+            else
+                Array.Copy(source, 0, result, 0, sourceCount);
+            result[index] = value;
+            return result;
+        }
+
+        /// <summary>Updates the item in the copy of the array. The array should be non-empty.</summary>
+        public static T[] UpdateNonEmpty<T>(this T[] source, T value, int index)
+        {
+            var sourceCount = source.Length;
+            var result = new T[sourceCount];
+            if (sourceCount < 6)
+                for (var i = 0; i < sourceCount; ++i)
+                    result[i] = source[i];
+            else
+                Array.Copy(source, 0, result, 0, sourceCount);
             result[index] = value;
             return result;
         }
@@ -3020,12 +3047,28 @@ namespace DryIoc.ImTools
         /// <summary>Constructs the entry with the key and value</summary>
         public ImHashMapEntry(int hash, K key, V value) : base(hash) 
         {
-            Key = key;
+            Key   = key;
             Value = value;
         }
 
         /// <inheritdoc />
         public override int Count() => 1;
+
+        /// <inheritdoc />
+        public override ImHashMapEntry<K, V> GetEntryOrNull(int hash, K key) =>
+            Hash == hash && Key.Equals(key) ? this : null;
+
+        /// <inheritdoc />
+        public override Entry Update(ImHashMapEntry<K, V> newEntry) =>
+            Key.Equals(newEntry.Key) ? newEntry : this.WithConflicting(newEntry);
+
+        /// <inheritdoc />
+        public override Entry UpdateOrKeep<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterOrKeeper<S> updateOrKeep)
+        {
+            if (!Key.Equals(newEntry.Key))
+                return this.WithConflicting(newEntry);
+            return updateOrKeep(state, this, newEntry) != this ? newEntry : this;
+        }
 
 #if !DEBUG
         /// <inheritdoc />
@@ -3040,6 +3083,42 @@ namespace DryIoc.ImTools
         internal HashConflictingEntry(int hash, params ImHashMapEntry<K, V>[] conflicts) : base(hash) => Conflicts = conflicts;
 
         public override int Count() => Conflicts.Length;
+
+        /// <inheritdoc />
+        public override ImHashMapEntry<K, V> GetEntryOrNull(int hash, K key)
+        {
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !key.Equals(cs[i].Key)) --i;
+            return i != -1 ? cs[i] : null;
+        }
+
+        /// <inheritdoc />
+        public override Entry Update(ImHashMapEntry<K, V> newEntry)
+        {
+            var key = newEntry.Key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !key.Equals(cs[i].Key)) --i;
+            return new HashConflictingEntry<K, V>(Hash, cs.AppendOrUpdate(newEntry, i));
+        }
+
+        /// <inheritdoc />
+        public override Entry UpdateOrKeep<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterOrKeeper<S> updateOrKeep)
+        {
+            var key = newEntry.Key;
+            var cs = Conflicts;
+            var i = cs.Length - 1;
+            while (i != -1 && !key.Equals(cs[i].Key)) --i;
+            if (i == -1)
+                return new HashConflictingEntry<K, V>(Hash, cs.AppendToNonEmpty(newEntry));
+
+            var oldEntry = cs[i];
+            if (updateOrKeep(state, oldEntry, newEntry) != oldEntry)
+                return new HashConflictingEntry<K, V>(Hash, cs.UpdateNonEmpty(newEntry, i));
+
+            return this;
+        }
 
 #if !DEBUG
         public override string ToString()
@@ -3099,6 +3178,9 @@ namespace DryIoc.ImTools
         /// <summary>Removes the certainly present old entry and returns the new map without it.</summary>
         internal virtual ImHashMap<K, V> RemoveEntry(Entry entry) => this;
 
+        /// <summary>The delegate is supposed to return entry different from the oldEntry to update, and return the oldEntry to keep it.</summary>
+        public delegate ImHashMapEntry<K, V> UpdaterOrKeeper<S>(S state, ImHashMapEntry<K, V> oldEntry, ImHashMapEntry<K, V> newEntry);
+
         /// <summary>The base map entry for holding the hash and payload</summary>
         public abstract class Entry : ImHashMap<K, V>
         {
@@ -3111,6 +3193,15 @@ namespace DryIoc.ImTools
             internal override Entry GetMaxHashEntryOrDefault() => this;
 
             internal sealed override Entry GetEntryOrNull(int hash) => hash == Hash ? this : null;
+
+            /// <summary>Lookup for the entry by Hash and Key</summary>
+            public abstract ImHashMapEntry<K, V> GetEntryOrNull(int hash, K key);
+
+            /// <summary>Updating the entry with the new one</summary>
+            public abstract Entry Update(ImHashMapEntry<K, V> newEntry);
+
+            /// <summary>Updating the entry with the new one using the `update` method</summary>
+            public abstract Entry UpdateOrKeep<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterOrKeeper<S> updateOrKeep);
 
             /// <inheritdoc />
             public sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) =>
@@ -3263,43 +3354,36 @@ namespace DryIoc.ImTools
                 if (hash == e1.Hash)
                     return e1;
 
-                Entry swap = null;
                 if (pph < e1.Hash)
                 {
-                    swap = e1; e1 = pp; pp = swap;
+                    Fun.Swap(ref e1, ref pp);
                     if (pph < e0.Hash)
-                    {
-                        swap = e0; e0 = e1; e1 = swap;
-                    }
+                        Fun.Swap(ref e0, ref e1);
                 }
 
                 if (ph < pp.Hash)
                 {
-                    swap = pp; pp = p; p = swap;
+                    Fun.Swap(ref p, ref pp);
                     if (ph < e1.Hash)
                     {
-                        swap = e1; e1 = pp; pp = swap;
+                        Fun.Swap(ref pp, ref e1);
                         if (ph < e0.Hash)
-                        {
-                            swap = e0; e0 = e1; e1 = swap;
-                        }
+                            Fun.Swap(ref e1, ref e0);
                     }
                 }
 
                 Entry e = entry;
                 if (hash < p.Hash)
                 {
-                    swap = p; p = e; e = swap;
+                    Fun.Swap(ref e, ref p);
                     if (hash < pp.Hash)
                     {
-                        swap = pp; pp = p; p = swap;
+                        Fun.Swap(ref p, ref pp);
                         if (hash < e1.Hash)
                         {
-                            swap = e1; e1 = pp; pp = swap;
+                            Fun.Swap(ref pp, ref e1);
                             if (hash < e0.Hash)
-                            {
-                                swap = e0; e0 = e1; e1 = swap;
-                            }
+                                Fun.Swap(ref e1, ref e0);
                         }
                     }
                 }
@@ -4129,12 +4213,11 @@ namespace DryIoc.ImTools
     {
         /// <summary>The hash.</summary>
         public readonly int Hash;
+        /// <summary>The Key is actually the Hash for this entry and the vice versa.</summary>
+        public int Key => Hash;
         /// <summary>The value. Maybe modified if you need the Ref{Value} semantics. 
         /// You may add the entry with the default Value to the map, and calculate and set it later (e.g. using the CAS).</summary>
         public V Value;
-
-        /// <summary>The Key is actually the Hash for this entry and the vice versa.</summary>
-        public int Key => Hash;
 
         /// <summary>Constructs the entry with the default value</summary>
         public ImMapEntry(int hash) => Hash = hash;
@@ -5257,6 +5340,19 @@ namespace DryIoc.ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMapEntry<K, V> Entry<K, V>(int hash, K key, V value) => new ImHashMapEntry<K, V>(hash, key, value);
 
+        /// <summary>Creates the conflicting entry out of two entries</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        internal static ImHashMap<K, V>.Entry WithConflicting<K, V>(this ImHashMapEntry<K, V> one, ImHashMapEntry<K, V> two) => 
+            new HashConflictingEntry<K, V>(one.Hash, one, two);
+
+        /// <summary>Sets the value and returns the entry</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMapEntry<K, V> SetValue<K, V>(this ImHashMapEntry<K, V> e, V value) 
+        {
+            e.Value = value;
+            return e;
+        }
+
         private sealed class GoRightInBranch3<K, V> 
         {
             public ImHashMap<K, V>.Branch3 Br3;
@@ -6281,7 +6377,7 @@ namespace DryIoc.ImTools
 
             var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
             if (oldEntryOrMap is ImHashMap<K, V>.Entry oldEntry)
-                return map.ReplaceEntry(hash, oldEntry, UpdateEntry(oldEntry, newEntry));
+                return map.ReplaceEntry(hash, oldEntry, oldEntry.Update(newEntry));
 
             return oldEntryOrMap;
         }
@@ -6296,28 +6392,9 @@ namespace DryIoc.ImTools
             var hash = newEntry.Hash;
             var oldEntryOrMap = map.AddOrGetEntry(hash, newEntry);
             if (oldEntryOrMap is ImHashMap<K, V>.Entry oldEntry)
-                return map.ReplaceEntry(hash, oldEntry, UpdateEntry(oldEntry, newEntry));
+                return map.ReplaceEntry(hash, oldEntry, oldEntry.Update(newEntry));
 
             return oldEntryOrMap;
-        }
-
-        private static ImHashMap<K, V>.Entry UpdateEntry<K, V>(ImHashMap<K, V>.Entry oldEntry, ImHashMapEntry<K, V> newEntry)
-        {
-            if (oldEntry is ImHashMapEntry<K, V> kv)
-                return kv.Key.Equals(newEntry.Key) ? newEntry 
-                     : (ImHashMap<K, V>.Entry)new HashConflictingEntry<K, V>(oldEntry.Hash, kv, newEntry);
-
-            var hc = (HashConflictingEntry<K, V>)oldEntry;
-            var key = newEntry.Key;
-            var cs = hc.Conflicts;
-            var n = cs.Length;
-            var i = n - 1;
-            while (i != -1 && !key.Equals(cs[i].Key)) --i;
-            var newConflicts = new ImHashMapEntry<K, V>[i != -1 ? n : n + 1];
-            Array.Copy(cs, 0, newConflicts, 0, n);
-            newConflicts[i != -1 ? i : n] = newEntry;
-
-            return new HashConflictingEntry<K, V>(oldEntry.Hash, newConflicts);
         }
 
         /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
@@ -6348,20 +6425,10 @@ namespace DryIoc.ImTools
                 return kv.Key.Equals(key) ? new ImHashMapEntry<K, V>(newEntry.Hash, key, update(key, kv.Value, newEntry.Value))
                     : (ImHashMap<K, V>.Entry)new HashConflictingEntry<K, V>(oldEntry.Hash, kv, newEntry);
 
-            var hc = (HashConflictingEntry<K, V>)oldEntry;
-            var cs = hc.Conflicts;
-            var n = cs.Length;
-            var i = n - 1;
+            var cs = ((HashConflictingEntry<K, V>)oldEntry).Conflicts;
+            var i = cs.Length - 1;
             while (i != -1 && !key.Equals(cs[i].Key)) --i;
-
-            var newConflicts = new ImHashMapEntry<K, V>[i != -1 ? n : n + 1];
-            Array.Copy(cs, 0, newConflicts, 0, n);
-            if (i != -1)
-                newConflicts[i] = new ImHashMapEntry<K, V>(newEntry.Hash, key, update(key, cs[i].Value, newEntry.Value));
-            else
-                newConflicts[n] = newEntry;
-
-            return new HashConflictingEntry<K, V>(oldEntry.Hash, newConflicts);
+            return new HashConflictingEntry<K, V>(oldEntry.Hash, cs.AppendOrUpdate(newEntry, i));
         }
 
         /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
@@ -6379,19 +6446,11 @@ namespace DryIoc.ImTools
             if (entry is ImHashMapEntry<K, V> kv)
                 return kv.Key.Equals(key) ? map.ReplaceEntry(hash, entry, new ImHashMapEntry<K, V>(hash, key, value)) : map;
 
-            var hc = (HashConflictingEntry<K, V>)entry;
-            var cs = hc.Conflicts;
-            var n = cs.Length;
-            var i = n - 1;
+            var cs = ((HashConflictingEntry<K, V>)entry).Conflicts;
+            var i = cs.Length - 1;
             while (i != -1 && !key.Equals(cs[i].Key)) --i;
-            if (i == -1)
-                return map;
-            
-            var newConflicts = new ImHashMapEntry<K, V>[n];
-            Array.Copy(cs, 0, newConflicts, 0, n);
-            newConflicts[i] = new ImHashMapEntry<K, V>(hash, key, value);
-
-            return map.ReplaceEntry(hash, entry, new HashConflictingEntry<K, V>(hash, newConflicts));
+            return i == -1 ? map :
+                map.ReplaceEntry(hash, entry, new HashConflictingEntry<K, V>(hash, cs.UpdateNonEmpty(new ImHashMapEntry<K, V>(hash, key, value), i)));
         }
 
         /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
@@ -6409,17 +6468,11 @@ namespace DryIoc.ImTools
             if (entry is ImHashMapEntry<K, V> kv)
                 return kv.Key.Equals(key) ? map.ReplaceEntry(hash, entry, new ImHashMapEntry<K, V>(hash, key)) : map;
 
-            var hc = (HashConflictingEntry<K, V>)entry;
-            var cs = hc.Conflicts;
-            var n = cs.Length;
-            var i = n - 1;
+            var cs = ((HashConflictingEntry<K, V>)entry).Conflicts;
+            var i = cs.Length - 1;
             while (i != -1 && !key.Equals(cs[i].Key)) --i;
-            if (i == -1)
-                return map;
-            var newConflicts = new ImHashMapEntry<K, V>[n];
-            Array.Copy(cs, 0, newConflicts, 0, n);
-            newConflicts[i] = new ImHashMapEntry<K, V>(hash, key);
-            return map.ReplaceEntry(hash, entry, new HashConflictingEntry<K, V>(hash, newConflicts));
+            return i == -1 ? map :
+                map.ReplaceEntry(hash, entry, new HashConflictingEntry<K, V>(hash, cs.UpdateNonEmpty(new ImHashMapEntry<K, V>(hash, key), i)));
         }
 
         /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
@@ -6440,19 +6493,12 @@ namespace DryIoc.ImTools
                     ? map 
                     : map.ReplaceEntry(hash, entry, new ImHashMapEntry<K, V>(hash, key, value));
 
-            var hc = (HashConflictingEntry<K, V>)entry;
-            var cs = hc.Conflicts;
-            var n = cs.Length;
-            var i = n - 1;
+            var cs = ((HashConflictingEntry<K, V>)entry).Conflicts;
+            var i = cs.Length - 1;
             while (i != -1 && !key.Equals(cs[i].Key)) --i;
             if (i == -1 || ReferenceEquals(cs[i].Value, value = update(key, cs[i].Value, value)))
                 return map;
-
-            var newConflicts = new ImHashMapEntry<K, V>[n];
-            Array.Copy(cs, 0, newConflicts, 0, n);
-            newConflicts[i] = new ImHashMapEntry<K, V>(hash, key, value);
-
-            return map.ReplaceEntry(hash, entry, new HashConflictingEntry<K, V>(hash, newConflicts));
+            return map.ReplaceEntry(hash, entry, new HashConflictingEntry<K, V>(hash, cs.UpdateNonEmpty(new ImHashMapEntry<K, V>(hash, key, value), i)));
         }
 
         /// <summary>Updates the map with the new value and the `update` function if the key is found otherwise returns the same unchanged map.

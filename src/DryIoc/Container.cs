@@ -2324,95 +2324,94 @@ namespace DryIoc
             private Registry WithDefaultService(Factory factory, int serviceTypeHash, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered)
             {
                 var services = Services;
-                object newEntry = factory;
-                var oldEntry = services.GetValueOrDefault(serviceTypeHash, serviceType);
-                if (oldEntry != null)
+                var newEntry = ImHashMap.Entry(serviceTypeHash, serviceType, (object)factory);
+                if (services.IsEmpty)
+                    return WithServices(newEntry);
+
+                var mapOrOldEntry = services.AddOrGetEntry(serviceTypeHash, newEntry);
+                var oldEntry = mapOrOldEntry as ImHashMap<Type, object>.Entry;
+                if (oldEntry == null)
+                    return WithServices(mapOrOldEntry);
+
+                var updatedEntry = oldEntry.UpdateOrKeep(ifAlreadyRegistered, newEntry, (i, o, n) => 
                 {
-                    switch (ifAlreadyRegistered)
+                    var factory = (Factory)n.Value;
+                    switch (i)
                     {
                         case IfAlreadyRegistered.AppendNotKeyed:
-                            newEntry = oldEntry is FactoriesEntry fe
+                            return n.SetValue(o.Value is FactoriesEntry fe
                                 ? fe.With(factory)
-                                : FactoriesEntry.Empty.WithTwo((Factory)oldEntry, factory);
-                            break;
+                                : FactoriesEntry.Empty.WithTwo((Factory)o.Value, factory));
+
                         case IfAlreadyRegistered.Throw:
-                            newEntry = oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
+                            return n.SetValue(o.Value is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
                                 ? oldFactoriesEntry.With(factory)
-                                : Throw.For<object>(Error.UnableToRegisterDuplicateDefault, serviceType, factory, oldEntry);
-                            break;
+                                : Throw.For<object>(Error.UnableToRegisterDuplicateDefault, n.Key, factory, o));
+
                         case IfAlreadyRegistered.Replace:
-                            if (oldEntry is FactoriesEntry facEntryToReplace)
+                            if (o.Value is FactoriesEntry facEntryToReplace)
                             {
                                 if (facEntryToReplace.LastDefaultKey == null)
-                                    newEntry = facEntryToReplace.With(factory);
-                                else
-                                {
-                                    // remove defaults but keep keyed (issue #569) by collecting the only keyed factories
-                                    // and using them in a new factory entry
-                                    var keyedFactories = facEntryToReplace.Factories.Fold(
-                                        ImHashMap<object, Factory>.Empty,
-                                        (x, _, map) => x.Key is DefaultKey == false ? map.AddOrUpdate(x.Key, x.Value) : map);
-                                    if (!keyedFactories.IsEmpty)
-                                        newEntry = new FactoriesEntry(DefaultKey.Value,
-                                            keyedFactories.AddOrUpdate(DefaultKey.Value, factory));
-                                }
+                                    return n.SetValue(facEntryToReplace.With(factory));
+                                // remove defaults but keep keyed (issue #569) by collecting the only keyed factories
+                                // and using them in a new factory entry
+                                var keyedFactories = facEntryToReplace.Factories.Fold(ImHashMap<object, Factory>.Empty,
+                                    (x, _, map) => x.Key is DefaultKey == false ? map.AddOrUpdate(x.Key, x.Value) : map);
+                                if (!keyedFactories.IsEmpty)
+                                    return n.SetValue(new FactoriesEntry(DefaultKey.Value, keyedFactories.AddOrUpdate(DefaultKey.Value, factory)));
                             }
-                            break;
+                            return n;
 
                         case IfAlreadyRegistered.AppendNewImplementation:
-                            var oldImplFacsEntry = oldEntry as FactoriesEntry;
+                            var oldImplFacsEntry = o.Value as FactoriesEntry;
                             if (oldImplFacsEntry != null && oldImplFacsEntry.LastDefaultKey == null)
-                                newEntry = oldImplFacsEntry.With(factory);
-                            else
+                                return n.SetValue(oldImplFacsEntry.With(factory));
+
+                            var oldFactory = o.Value as Factory;
+                            var implementationType = factory.ImplementationType;
+                            if (implementationType == null ||
+                                oldFactory != null && oldFactory.ImplementationType != implementationType)
+                                return n.SetValue((oldImplFacsEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(factory));
+                            
+                            if (oldImplFacsEntry != null)
                             {
-                                var oldFactory = oldEntry as Factory;
-                                var implementationType = factory.ImplementationType;
-                                if (implementationType == null ||
-                                    oldFactory != null && oldFactory.ImplementationType != implementationType)
-                                    newEntry = (oldImplFacsEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(factory);
-                                else if (oldImplFacsEntry != null)
-                                {
-                                    var isNewImplType = true;
-                                    foreach (var f in oldImplFacsEntry.Factories.Enumerate())
-                                        if (f.Value.ImplementationType == implementationType)
-                                        {
-                                            isNewImplType = false;
-                                            break;
-                                        }
-
-                                    newEntry = isNewImplType 
-                                        ? (oldImplFacsEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(factory) 
-                                        : oldEntry;
-                                }
+                                var isNewImplType = true;
+                                foreach (var f in oldImplFacsEntry.Factories.Enumerate())
+                                    if (f.Value.ImplementationType == implementationType)
+                                    {
+                                        isNewImplType = false;
+                                        break;
+                                    }
+                                return isNewImplType
+                                    ? n.SetValue((oldImplFacsEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(factory))
+                                    : o;
                             }
-                            break;
-                        default: // IfAlreadyRegisteredKeepDefaultService
-                            newEntry = oldEntry is FactoriesEntry oldFacsEntry && oldFacsEntry.LastDefaultKey == null
-                                ? oldFacsEntry.With(factory)
-                                : oldEntry;
-                            break;
-                    }
-                }
+                            return n;
 
-                // services did not change
-                if (newEntry == oldEntry)
+                        default: // IfAlreadyRegisteredKeepDefaultService
+                            return o.Value is FactoriesEntry oldFacsEntry && oldFacsEntry.LastDefaultKey == null
+                                ? n.SetValue(oldFacsEntry.With(factory))
+                                : o;
+                    }
+                });
+
+                if (updatedEntry == oldEntry)
                     return this;
 
-                var newRegistry = WithServices(services.AddOrUpdate(serviceTypeHash, serviceType, newEntry));
+                var newRegistry = WithServices(services.ReplaceEntry(serviceTypeHash, oldEntry, updatedEntry));
 
-                if (oldEntry != null)
-                {
-                    if (oldEntry is Factory oldFactory)
-                        newRegistry.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
-                    else if (oldEntry is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
-                        oldFactoriesEntry.Factories.ForEach(
-                            new{ newRegistry, serviceTypeHash, serviceType }, 
-                            (x, _, s) =>
-                            {
-                                if (x.Key is DefaultKey)
-                                    s.newRegistry.DropFactoryCache(x.Value, s.serviceTypeHash, s.serviceType);
-                            });
-                }
+                // Don't forget the drop cache for the old value if any
+                var oldValue = oldEntry.GetEntryOrNull(serviceTypeHash, serviceType)?.Value;
+                if (oldValue is Factory oldFactory)
+                    newRegistry.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
+                else if (oldValue is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
+                    oldFactoriesEntry.Factories.ForEach(
+                        new{ newRegistry, serviceTypeHash, serviceType }, 
+                        (x, _, s) =>
+                        {
+                            if (x.Key is DefaultKey)
+                                s.newRegistry.DropFactoryCache(x.Value, s.serviceTypeHash, s.serviceType);
+                        });
 
                 return newRegistry;
             }
