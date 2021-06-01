@@ -8014,7 +8014,7 @@ namespace DryIoc
 
     /// <summary>Represents custom or resolution root service info, there is separate representation for parameter,
     /// property and field dependencies.</summary>
-    public class ServiceInfo : IServiceInfo
+    public class ServiceInfo : IServiceInfo // todo: @perf consider to remove the interface
     {
         /// <summary>Empty service info for convenience.</summary>
         public static readonly IServiceInfo Empty = new ServiceInfo(null);
@@ -11404,10 +11404,10 @@ private ParameterServiceInfo(ParameterInfo p)
     /// Scope is container to hold the shared per scope items and dispose <see cref="IDisposable"/> items.
     /// Scope uses Locking to ensure that the object factory called only once.
     /// </summary>
-    public sealed class Scope : IScope
+    public sealed class Scope : IScope // todo: @perf consider to remove the one-of interface
     {
         /// <summary>Parent scope in scope stack. Null for the root scope.</summary>
-        public IScope Parent { get; }
+        public IScope Parent { get; } // todo: @perf @mem split the scope class with the Parent, Name, IsDisposed
 
         /// <summary>Optional name associated with scope.</summary>
         public object Name { get; }
