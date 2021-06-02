@@ -75,7 +75,7 @@ namespace DryIoc
         { }
 
         /// <summary>Helper to create singleton scope</summary>
-        public static IScope NewSingletonScope() => new Scope(name: "<singletons>");
+        public static IScope NewSingletonScope() => Scope.Of("<singletons>");
 
         /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
@@ -1731,11 +1731,12 @@ namespace DryIoc
             withCache.TryCacheKeyedFactory(serviceTypeHash, serviceType, key, factory);
         }
 
+        // todo: @per split into the respective cases and save the memory - it may even simplify the things and we get rid of NoNameForScoped
         // The cases to store
-        // | Singleton of (ConstantExpression e)
-        // | Transient of (Expression e, int dependencyCount)
-        // | Scoped    of (Expression e)
-        // | ScopedTo  of (Expression e, object name)
+        // | Singleton of (ConstantExpression e) -> expression itself
+        // | Transient of (Expression e, int dependencyCount) -> KV<Expression, int>
+        // | Scoped    of (Expression e) -> expression itself
+        // | ScopedTo  of (Expression e, object name) -> KV<Expression, object>
         internal struct ExpressionCacheSlot
         {
             public Expression Expr;
@@ -2097,7 +2098,7 @@ namespace DryIoc
                 public override Registry WithoutCache() => 
                     _isChangePermitted == default 
                         ? new RegistryWithDecorators(Services, Wrappers, _decorators) 
-                        : new WithCacheAndDecorators(Services, Wrappers, _decorators, null, null, null, _isChangePermitted);
+                        : (Registry)new WithCacheAndDecorators(Services, Wrappers, _decorators, null, null, null, _isChangePermitted);
 
                 internal override Registry WithServices(ImHashMap<Type, object> services) =>
                     services == Services ? this :
@@ -4335,7 +4336,8 @@ namespace DryIoc
         internal static readonly PropertyInfo ParentProperty =
             typeof(IResolverContext).Property(nameof(IResolverContext.Parent));
 
-        internal static readonly MethodInfo OpenScopeMethod = typeof(ResolverContext).GetMethod(nameof(OpenScope));
+        internal static readonly MethodInfo OpenScopeMethod = typeof(ResolverContext)
+            .GetMethod(nameof(OpenScope), new[] {typeof(IResolverContext), typeof(object), typeof(bool) });
 
         /// <summary>Returns root or self resolver based on request.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
@@ -4411,26 +4413,39 @@ namespace DryIoc
         ///     handler.Handle(data);
         /// }
         /// ]]></code></example>
-        public static IResolverContext OpenScope(this IResolverContext r, object name = null, bool trackInParent = false)
+        public static IResolverContext OpenScope(this IResolverContext r, object name, bool trackInParent = false)
         {
             if (r.ScopeContext == null)
             {
                 // todo: may use `r.OwnCurrentScope` when its moved to `IResolverContext` from `IContainer`
                 var parentScope = r.CurrentScope;
-                var newOwnScope = new Scope(parentScope, name);
+                var newOwnScope = Scope.Of(parentScope, name);
                 if (trackInParent)
                     (parentScope ?? r.SingletonScope).TrackDisposable(newOwnScope);
                 return r.WithCurrentScope(newOwnScope);
             }
 
             var newContextScope = name == null
-                ? r.ScopeContext.SetCurrent(parent => new Scope(parent))
-                : r.ScopeContext.SetCurrent(parent => new Scope(parent, name));
-
+                ? r.ScopeContext.SetCurrent(parent => Scope.Of(parent))
+                : r.ScopeContext.SetCurrent(parent => Scope.Of(parent, name));
             if (trackInParent)
                 (newContextScope.Parent ?? r.SingletonScope).TrackDisposable(newContextScope);
             return r.WithCurrentScope(null);
         }
+
+        /// <summary>Opens scope with optional name and optional tracking of new scope in a parent scope.</summary>
+        /// <example><code lang="cs"><![CDATA[
+        /// using (var scope = container.OpenScope())
+        /// {
+        ///     var handler = scope.Resolve<IHandler>();
+        ///     handler.Handle(data);
+        /// }
+        /// ]]></code></example>
+        [MethodImpl((MethodImplOptions)256)]
+        public static IResolverContext OpenScope(this IResolverContext r) =>
+            r.ScopeContext == null 
+                ? r.WithCurrentScope(Scope.Of(r.CurrentScope))
+                : r.OpenScope(null);
 
         [MethodImpl((MethodImplOptions)256)]
         internal static bool TryGetUsedInstance(this IResolverContext r, int serviceTypeHash, Type serviceType, out object instance)
@@ -8052,7 +8067,7 @@ namespace DryIoc
 
         /// <summary>Strongly-typed version of Service Info.</summary> <typeparam name="TService">Service type.</typeparam>
         public class Typed<TService> : ServiceInfo
-        {
+        { 
             /// <summary>Creates service info object.</summary>
             public Typed() : base(typeof(TService)) { }
         }
@@ -10264,7 +10279,7 @@ private ParameterServiceInfo(ParameterInfo p)
             : reuse == DryIoc.Reuse.Scoped    ? new WithScopedReuse   (implementationType)
             : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(implementationType)
             : reuse == DryIoc.Reuse.ScopedOrSingleton ? new WithScopedOrSingletonReuse(implementationType)
-            : new WithReuse(implementationType, reuse);
+            : (ReflectionFactory)new WithReuse(implementationType, reuse);
 
         /// <summary>Creates the memory-optimized factory based on arguments</summary>
         public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null) 
@@ -11055,7 +11070,7 @@ private ParameterServiceInfo(ParameterInfo p)
             var factoryInstance = factoryMethod.FactoryExpression;
             return factoryInstance != null 
                 ? new FactoryMethod.WithFactoryExpression(factoryMember, factoryInstance) 
-                : new FactoryMethod.WithFactoryServiceInfo(factoryMember, factoryInfo);
+                : (FactoryMethod)new FactoryMethod.WithFactoryServiceInfo(factoryMember, factoryInfo);
         }
     }
 
@@ -11234,13 +11249,13 @@ private ParameterServiceInfo(ParameterInfo p)
                 : reuse == DryIoc.Reuse.Scoped    ? new WithScopedReuse   (factoryDelegate)
                 : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(factoryDelegate)
                 : reuse == DryIoc.Reuse.ScopedOrSingleton ? new WithScopedOrSingletonReuse(factoryDelegate)
-                : new WithReuse(factoryDelegate, reuse);
+                : (DelegateFactory)new WithReuse(factoryDelegate, reuse);
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
         public static DelegateFactory Of(FactoryDelegate factoryDelegate, Setup setup) =>
             setup == null || setup == Setup.Default
                 ? new DelegateFactory(factoryDelegate)
-                : new WithAllDetails(factoryDelegate, null, setup ?? Setup.Default);
+                : (DelegateFactory)new WithAllDetails(factoryDelegate, null, setup ?? Setup.Default);
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
         public static DelegateFactory Of(FactoryDelegate factoryDelegate, IReuse reuse, Setup setup) =>
@@ -11404,13 +11419,13 @@ private ParameterServiceInfo(ParameterInfo p)
     /// Scope is container to hold the shared per scope items and dispose <see cref="IDisposable"/> items.
     /// Scope uses Locking to ensure that the object factory called only once.
     /// </summary>
-    public sealed class Scope : IScope // todo: @perf consider to remove the one-of interface
+    public class Scope : IScope
     {
         /// <summary>Parent scope in scope stack. Null for the root scope.</summary>
-        public IScope Parent { get; } // todo: @perf @mem split the scope class with the Parent, Name, IsDisposed
+        public virtual IScope Parent => null;
 
         /// <summary>Optional name associated with scope.</summary>
-        public object Name { get; }
+        public virtual object Name => null;
 
         /// <summary>True if scope is disposed.</summary>
         public bool IsDisposed => _disposed == 1;
@@ -11438,40 +11453,79 @@ private ParameterServiceInfo(ParameterInfo p)
             return slots;
         }
 
-        /// <summary>Creates scope with optional parent and name.</summary>
-        public Scope(IScope parent = null, object name = null)
-            : this(parent, name, CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, 
-                ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty)
-        { }
+        ///<summary>Creating</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static IScope Of(IScope parent, object name)
+        {
+            if (parent == null && name == null)
+                return new Scope();
+            return new WithParentAndName(parent, name);
+        }
 
-        private Scope(IScope parent, object name, ImMap<object>[] maps, ImHashMap<Type, FactoryDelegate> factories, 
+        ///<summary>Creating</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static IScope Of(IScope parent)
+        {
+            if (parent == null)
+                return new Scope();
+            return new WithParentAndName(parent, null);
+        }
+
+        ///<summary>Creating</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static IScope Of(object name)
+        {
+            if (name == null)
+                return new Scope();
+            return new WithParentAndName(null, name);
+        }
+
+        /// <summary>Creates scope with optional parent and name.</summary>
+        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty) {}
+
+        /// <summary>The basic constructor</summary>
+        protected Scope(ImMap<object>[] maps, ImHashMap<Type, FactoryDelegate> factories, 
             ImList<IDisposable> unorderedDisposables, ImMap<IDisposable> disposables)
         {
-            Parent = parent;
-            Name = name;
             _unorderedDisposables = unorderedDisposables;
-            _disposables = disposables;
-            _factories = factories;
+            _disposables = disposables; // todo: @perf can we put the this into unorderedDisposables and save the space
+            _factories = factories;     // todo: @perf can we put the this into unorderedDisposables and save the space
             _maps = maps;
+        }
+
+        internal sealed class WithParentAndName : Scope
+        {
+            public override IScope Parent { get; }
+            public override object Name { get; }
+            internal WithParentAndName(IScope parent, object name) : base()
+            {
+                Parent = parent;
+                Name   = name;
+            }
+
+            internal WithParentAndName(IScope parent, object name, ImMap<object>[] maps, ImHashMap<Type, FactoryDelegate> factories, 
+                ImList<IDisposable> unorderedDisposables, ImMap<IDisposable> disposables) : base(maps, factories, unorderedDisposables, disposables)
+            {
+                Parent = parent;
+                Name   = name;
+            }
+
+            public override IScope Clone(bool withDisposables) =>
+                !withDisposables
+                ? new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _factories,
+                    ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty) // dropping the disposables
+                : new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _factories, // Не забыть скопировать папу (коментарий для дочки)
+                    _unorderedDisposables, _disposables);
         }
 
         /// <inheritdoc />
         public IScope Clone() => Clone(true);
 
         /// <inheritdoc />
-        public IScope Clone(bool withDisposables)
-        {
-            var slotsCopy = new ImMap<object>[MAP_COUNT];
-            for (var i = 0; i < MAP_COUNT; i++) 
-                slotsCopy[i] = _maps[i];
-
-            if (!withDisposables)
-                return new Scope(Parent?.Clone(withDisposables), Name, slotsCopy, _factories,
-                    ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty); // dropping the disposables
-
-            return new Scope(Parent?.Clone(withDisposables), // Не забыть скопировать папу (коментарий для дочки)
-                Name, slotsCopy, _factories, _unorderedDisposables, _disposables);
-        }
+        public virtual IScope Clone(bool withDisposables) =>
+            !withDisposables
+            ? new Scope(_maps.CopyNonEmpty(), _factories, ImList<IDisposable>.Empty, ImMap<IDisposable>.Empty) // dropping the disposables
+            : new Scope(_maps.CopyNonEmpty(), _factories, _unorderedDisposables, _disposables);
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
@@ -11732,11 +11786,7 @@ private ParameterServiceInfo(ParameterInfo p)
             _unorderedDisposables = ImList<IDisposable>.Empty;
             _disposables = ImMap<IDisposable>.Empty;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
-            
-            var maps = Interlocked.Exchange(ref _maps, _emptySlots);
-            var empty = ImMap<object>.Empty;
-            //for (int i = 0; i < MAP_COUNT; i++) maps[i] = empty;
-            //_mapsPool.Return(maps);
+            _maps = _emptySlots;
         }
 
         private static void SafelyDisposeOrderedDisposables(ImMap<IDisposable> disposables)
