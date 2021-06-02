@@ -792,7 +792,7 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<ExpressionCacheSlot> slot) => 
+        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<object> slot) => 
             _registry.Value.GetCachedFactoryExpression(factoryId, reuse, out slot);
 
         Factory IContainer.ResolveFactory(Request request)
@@ -1731,20 +1731,7 @@ namespace DryIoc
             withCache.TryCacheKeyedFactory(serviceTypeHash, serviceType, key, factory);
         }
 
-        // todo: @per split into the respective cases and save the memory - it may even simplify the things and we get rid of NoNameForScoped
-        // The cases to store
-        // | Singleton of (ConstantExpression e) -> expression itself
-        // | Transient of (Expression e, int dependencyCount) -> KV<Expression, int>
-        // | Scoped    of (Expression e) -> expression itself
-        // | ScopedTo  of (Expression e, object name) -> KV<Expression, object>
-        internal struct ExpressionCacheSlot
-        {
-            public Expression Expr;
-            public object ScopeNameOrDependencyCount; // null - singleton | NoNameForScoped - scoped | TransientDependencyCount - transient | scope name
-            public static readonly object NoNameForScoped = new object();
-        }
-
-        internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<ExpressionCacheSlot> entry = null)
+        internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<object> entry = null)
         {
             var withCache = _registry.Value as Registry.WithCache;
             if (withCache == null)
@@ -1755,6 +1742,28 @@ namespace DryIoc
             withCache.CacheFactoryExpression(factoryId, expr, reuse, dependencyCount, entry);
         }
 
+        internal sealed class ExprCacheOfTransientWithDepCount
+        {
+            public Expression Expr;
+            public int Count;
+            public ExprCacheOfTransientWithDepCount(Expression e, int n) 
+            {
+                Expr  = e;
+                Count = n;
+            }
+        }
+
+        internal sealed class ExprCacheOfScopedWithName
+        {
+            public Expression Expr;
+            public object Name;
+            public ExprCacheOfScopedWithName(Expression e, object n) 
+            {
+                Expr = e;
+                Name = n;
+            }
+        }
+
         internal class Registry
         {
             public static readonly Registry Empty = new Registry();
@@ -1763,7 +1772,7 @@ namespace DryIoc
             // Factories:
             public readonly ImHashMap<Type, object> Services;
             public readonly ImHashMap<Type, object> Wrappers;   // value is Factory // todo: @perf we may use the static predefined Wrappers and optimize away the instance one 
-            public virtual ImHashMap<Type, object> Decorators => ImHashMap<Type, object>.Empty; // value is Factory[]  // todo: @perf make it Factory or Factory[]
+            public virtual  ImHashMap<Type, object> Decorators => ImHashMap<Type, object>.Empty; // value is Factory[]  // todo: @perf make it Factory or Factory[]
 
             internal const int CACHE_SLOT_COUNT = 16;
             internal const int CACHE_SLOT_COUNT_MASK = CACHE_SLOT_COUNT - 1;
@@ -1775,7 +1784,7 @@ namespace DryIoc
             public virtual ImHashMap<Type, object>[] KeyedFactoryCache => null;
 
             ///<summary>The int key is the `FactoryID`</summary>
-            public virtual ImMap<ExpressionCacheSlot>[] FactoryExpressionCache => null;
+            public virtual ImMap<object>[] FactoryExpressionCache => null;
 
             internal virtual IsRegistryChangePermitted IsChangePermitted => default;
 
@@ -1839,40 +1848,24 @@ namespace DryIoc
                 return new KeyedFactoryCacheEntry((KeyedFactoryCacheEntry)x, k, f);
             }
 
-            internal class TransientDependencyCount
-            {
-                public int Value;
-                public TransientDependencyCount(int value) => Value = value;
-            }
 
-            internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<ExpressionCacheSlot> entry)
+            internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<object> entry)
             {
                 entry = FactoryExpressionCache?[factoryId & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(factoryId);
                 if (entry == null) 
                     return null;
 
-                var expr = entry.Value.Expr;
-                if (expr == null)
-                    return null; // could be null when the cache is reset by Unregister and IfAlreadyRegistered.Replace
+                var expr = entry.Value;
+                if (expr is Expression e)
+                    return reuse is SingletonReuse || reuse is CurrentScopeReuse sr && sr.Name == null ? e : null;
 
-                var scopeNameOrDependencyCount = entry.Value.ScopeNameOrDependencyCount;
+                if (expr is ExprCacheOfTransientWithDepCount t)
+                    return reuse == Reuse.Transient ? t.Expr : null;
 
-                if (reuse is SingletonReuse)
-                    return scopeNameOrDependencyCount == null ? expr : null;
+                if (expr is ExprCacheOfScopedWithName s)
+                    return reuse.Name != null && reuse.Name.Equals(s.Name) ? s.Expr : null;
 
-                if (reuse == Reuse.Transient)
-                    return scopeNameOrDependencyCount is TransientDependencyCount ? expr : null;
-
-                if (reuse is CurrentScopeReuse scoped)
-                {
-                    if (scoped.Name == null)
-                        return scopeNameOrDependencyCount == ExpressionCacheSlot.NoNameForScoped ? expr : null;
-
-                    if (ReferenceEquals(scoped.Name, scopeNameOrDependencyCount) || scoped.Name.Equals(scopeNameOrDependencyCount))
-                        return expr;
-                }
-
-                return null;
+                return null; // could be null when the cache is reset by Unregister and IfAlreadyRegistered.Replace
             }
 
             private Registry(ImHashMap<Type, object> wrapperFactories = null) : 
@@ -1898,7 +1891,7 @@ namespace DryIoc
                     new Registry.WithCacheAndDecorators(Services, Wrappers, _decorators, null, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, default);
 
                 public override Registry WithFactoryExpressionCache() =>
-                    new Registry.WithCacheAndDecorators(Services, Wrappers, _decorators, null, null, new ImMap<ExpressionCacheSlot>[CACHE_SLOT_COUNT], IsChangePermitted);
+                    new Registry.WithCacheAndDecorators(Services, Wrappers, _decorators, null, null, new ImMap<object>[CACHE_SLOT_COUNT], IsChangePermitted);
 
                 internal override Registry WithServices(ImHashMap<Type, object> services) =>
                     services == Services ? this : new RegistryWithDecorators(services, Wrappers, _decorators);
@@ -1919,8 +1912,8 @@ namespace DryIoc
                 protected ImHashMap<Type, object>[] _defaultFactoryCache;
                 public sealed override ImHashMap<Type, object>[] KeyedFactoryCache => _keyedFactoryCache;
                 protected ImHashMap<Type, object>[] _keyedFactoryCache;
-                public sealed override ImMap<ExpressionCacheSlot>[] FactoryExpressionCache => _factoryExpressionCache;
-                protected ImMap<ExpressionCacheSlot>[] _factoryExpressionCache;
+                public sealed override ImMap<object>[] FactoryExpressionCache => _factoryExpressionCache;
+                protected ImMap<object>[] _factoryExpressionCache;
                 internal sealed override IsRegistryChangePermitted IsChangePermitted => _isChangePermitted;
                 protected IsRegistryChangePermitted _isChangePermitted;
 
@@ -1929,8 +1922,8 @@ namespace DryIoc
                     ImHashMap<Type, object> wrappers,
                     ImHashMap<Type, object>[]  defaultFactoryCache,
                     ImHashMap<Type, object>[]  keyedFactoryCache,
-                    ImMap<ExpressionCacheSlot>[] factoryExpressionCache,
-                    IsRegistryChangePermitted isChangePermitted) : 
+                    ImMap<object>[]            factoryExpressionCache,
+                    IsRegistryChangePermitted  isChangePermitted) : 
                     base(services, wrappers)
                 {
                     _defaultFactoryCache    = defaultFactoryCache;
@@ -2003,21 +1996,21 @@ namespace DryIoc
                         Ref.Swap(ref entry.Value, key, factory, SetOrAddKeyedCacheFactory);
                 }
 
-                internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<ExpressionCacheSlot> entry)
+                internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<object> entry)
                 {
                     if (entry == null)
                     {
                         if (_factoryExpressionCache == null)
-                            Interlocked.CompareExchange(ref _factoryExpressionCache, new ImMap<ExpressionCacheSlot>[CACHE_SLOT_COUNT], null);
+                            Interlocked.CompareExchange(ref _factoryExpressionCache, new ImMap<object>[CACHE_SLOT_COUNT], null);
 
                         ref var map = ref _factoryExpressionCache[factoryId & CACHE_SLOT_COUNT_MASK];
                         if (map == null)
-                            Interlocked.CompareExchange(ref map, ImMap<ExpressionCacheSlot>.Empty, null);
+                            Interlocked.CompareExchange(ref map, ImMap<object>.Empty, null);
 
                         entry = map.GetEntryOrDefault(factoryId);
                         if (entry == null)
                         {
-                            entry = new ImMapEntry<ExpressionCacheSlot>(factoryId);
+                            entry = new ImMapEntry<object>(factoryId);
                             var oldMap = map;
                             var newMap = oldMap.AddOrKeepEntry(entry);
                             if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
@@ -2031,12 +2024,12 @@ namespace DryIoc
                         }
                     }
 
-                    entry.Value.Expr = expr;
-
                     if (reuse == Reuse.Transient)
-                        entry.Value.ScopeNameOrDependencyCount = new TransientDependencyCount(dependencyCount);
+                        entry.Value = new ExprCacheOfTransientWithDepCount(expr, dependencyCount);
                     else if (reuse is CurrentScopeReuse scoped)
-                        entry.Value.ScopeNameOrDependencyCount = scoped.Name ?? ExpressionCacheSlot.NoNameForScoped;
+                        entry.Value = scoped.Name == null ? expr : new ExprCacheOfScopedWithName(expr, scoped.Name);
+                    else
+                        entry.Value = expr;
                 }
 
                 internal override void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null)
@@ -2074,7 +2067,7 @@ namespace DryIoc
                         {
                             var factoryId = factory.FactoryID;
                             Ref.Swap(ref exprCache[factoryId & CACHE_SLOT_COUNT_MASK],
-                                factoryId, (x, i) => (x ?? ImMap<ExpressionCacheSlot>.Empty).UpdateToDefault(i));
+                                factoryId, (x, i) => (x ?? ImMap<object>.Empty).UpdateToDefault(i));
                         }
                     }
                 }
@@ -2090,7 +2083,7 @@ namespace DryIoc
                     ImHashMap<Type, object> decorators,
                     ImHashMap<Type, object>[] defaultFactoryCache, 
                     ImHashMap<Type, object>[] keyedFactoryCache, 
-                    ImMap<ExpressionCacheSlot>[] factoryExpressionCache, 
+                    ImMap<object>[]           factoryExpressionCache, 
                     IsRegistryChangePermitted isChangePermitted) :  
                     base(services, wrappers, defaultFactoryCache, keyedFactoryCache, factoryExpressionCache, isChangePermitted) =>
                     _decorators = decorators;
@@ -2130,7 +2123,7 @@ namespace DryIoc
                 new Registry.WithCache(Services, Wrappers, null, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, default);
 
             public virtual Registry WithFactoryExpressionCache() =>
-                new Registry.WithCache(Services, Wrappers, null, null, new ImMap<ExpressionCacheSlot>[CACHE_SLOT_COUNT], IsChangePermitted);
+                new Registry.WithCache(Services, Wrappers, null, null, new ImMap<object>[CACHE_SLOT_COUNT], IsChangePermitted);
 
             internal virtual Registry WithServices(ImHashMap<Type, object> services) =>
                 services == Services ? this : new Registry(services, Wrappers);
@@ -9643,20 +9636,17 @@ private ParameterServiceInfo(ParameterInfo p)
                 !Made.IsConditional;
 
             // First, lookup in the expression cache
-            ImMapEntry<Container.ExpressionCacheSlot> cacheEntry = null;
+            ImMapEntry<object> cacheEntry = null;
             if (cacheExpression)
             {
                 var cachedExpr = ((Container)container).GetCachedFactoryExpression(request.FactoryID, reuse, out cacheEntry);
                 if (cachedExpr != null)
                 {
                     if (reuse == DryIoc.Reuse.Transient &&
-                        cacheEntry.Value.ScopeNameOrDependencyCount is Container.Registry.TransientDependencyCount depCount && 
-                        depCount.Value > 0 &&
+                        cacheEntry.Value is Container.ExprCacheOfTransientWithDepCount t && t.Count > 0 &&
                         !rules.UsedForValidation && !rules.UsedForExpressionGeneration)
-                    {
                         for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
-                            p.DependencyCount += depCount.Value;
-                    }
+                            p.DependencyCount += t.Count;
                     return cachedExpr;
                 }
             }
@@ -9769,7 +9759,7 @@ private ParameterServiceInfo(ParameterInfo p)
                     ? request.CombineDecoratorWithDecoratedFactoryID() 
                     : request.FactoryID;
 
-                var singleton = Scope.NoItem; // NoItem is a marker for the value not created yet
+                var singleton = Scope.NoItem; // NoItem is a marker for the value is not created yet
 
                 // Creating a new local item with the id and the marker for not yet created item
                 var itemRef = new ImMapEntry<object>(id, Scope.NoItem); 
