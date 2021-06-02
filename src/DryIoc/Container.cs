@@ -1865,7 +1865,7 @@ namespace DryIoc
                 if (expr is ExprCacheOfScopedWithName s)
                     return reuse.Name != null && reuse.Name.Equals(s.Name) ? s.Expr : null;
 
-                return null; // could be null when the cache is reset by Unregister and IfAlreadyRegistered.Replace
+                return null; // could be `expr == null` when the cache is reset by Unregister and IfAlreadyRegistered.Replace
             }
 
             private Registry(ImHashMap<Type, object> wrapperFactories = null) : 
