@@ -7753,20 +7753,6 @@ namespace DryIoc
         Ignored 
     }
 
-    /// <summary>Provides information required for service resolution: service type
-    /// and optional <see cref="ServiceDetails"/></summary>
-    public interface IServiceInfo
-    {
-        /// <summary>The required piece of info: service type.</summary>
-        Type ServiceType { get; }
-
-        /// <summary>Additional optional details: service key, if-unresolved policy, required service type.</summary>
-        ServiceDetails Details { get; }
-
-        /// <summary>Creates info from service type and details.</summary>
-        IServiceInfo Create(Type serviceType, ServiceDetails details);
-    }
-
     /// <summary>Provides optional service resolution details: service key, required service type, what return when service is unresolved,
     /// default value if service is unresolved, custom service value.</summary>
     public sealed class ServiceDetails
@@ -7878,16 +7864,16 @@ namespace DryIoc
         }
     }
 
-    /// <summary>Contains tools for combining or propagating of <see cref="IServiceInfo"/> independent of its concrete implementations.</summary>
+    /// <summary>Contains tools for combining or propagating of <see cref="ServiceInfo"/> independent of its concrete implementations.</summary>
     public static class ServiceInfoTools
     {
         /// <summary>Creates service info with new type but keeping the details.</summary>
-        public static IServiceInfo With(this IServiceInfo source, Type serviceType) =>
-            source.Create(serviceType, source.Details);
+        [MethodImpl((MethodImplOptions)256)]
+        public static ServiceInfo With(this ServiceInfo source, Type serviceType) => source.Create(serviceType, source.Details);
 
         /// <summary>Creates new info with new IfUnresolved behavior or returns the original info if behavior is not different,
         /// or the passed info is not a <see cref="ServiceDetails.HasCustomValue"/>.</summary>
-        public static IServiceInfo WithIfUnresolved(this IServiceInfo source, IfUnresolved ifUnresolved)
+        public static ServiceInfo WithIfUnresolved(this ServiceInfo source, IfUnresolved ifUnresolved)
         {
             var details = source.Details;
             if (details.IfUnresolved == ifUnresolved || details.HasCustomValue)
@@ -7906,8 +7892,7 @@ namespace DryIoc
 
         // todo: @naming Should be renamed or better to be removed, the whole operation should be hidden behind abstraction
         /// <summary>Combines service info with details. The main goal is to combine service and required service type.</summary>
-        public static T WithDetails<T>(this T serviceInfo, ServiceDetails details)
-            where T : IServiceInfo
+        public static T WithDetails<T>(this T serviceInfo, ServiceDetails details) where T : ServiceInfo
         {
             details = details ?? ServiceDetails.Default;
             var sourceDetails = serviceInfo.Details;
@@ -7941,8 +7926,8 @@ namespace DryIoc
 
         /// <summary>Enables propagation/inheritance of info between dependency and its owner:
         /// for instance <see cref="ServiceDetails.RequiredServiceType"/> for wrappers.</summary>
-        public static IServiceInfo InheritInfoFromDependencyOwner(this IServiceInfo dependency,
-            IServiceInfo owner, IContainer container, FactoryType ownerType = FactoryType.Service)
+        public static ServiceInfo InheritInfoFromDependencyOwner(this ServiceInfo dependency,
+            ServiceInfo owner, IContainer container, FactoryType ownerType = FactoryType.Service)
         {
             var ownerDetails = owner.Details;
             if (ownerDetails == null || ownerDetails == ServiceDetails.Default)
@@ -8003,7 +7988,7 @@ namespace DryIoc
         /// <summary>Returns required service type if it is specified and assignable to service type,
         /// otherwise returns service type.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static Type GetActualServiceType(this IServiceInfo info)
+        public static Type GetActualServiceType(this ServiceInfo info)
         {
             var requiredServiceType = info.Details.RequiredServiceType;
             if (requiredServiceType != null && info.ServiceType.IsAssignableFrom(requiredServiceType))
@@ -8012,7 +7997,7 @@ namespace DryIoc
         }
 
         /// <summary>Appends info string representation into provided builder.</summary>
-        public static StringBuilder Print(this StringBuilder s, IServiceInfo info)
+        public static StringBuilder Print(this StringBuilder s, ServiceInfo info)
         {
             s.Print(info.ServiceType);
             var details = info.Details.ToString();
@@ -8022,10 +8007,23 @@ namespace DryIoc
 
     /// <summary>Represents custom or resolution root service info, there is separate representation for parameter,
     /// property and field dependencies.</summary>
-    public class ServiceInfo : IServiceInfo // todo: @perf consider to remove the interface
+    public class ServiceInfo
     {
+        /// <summary>Type of service to create. Indicates registered service in registry.</summary>
+        public Type ServiceType { get; }
+
+        /// <summary>Shortcut access to service key</summary>
+        public object ServiceKey => Details.ServiceKey;
+
+        /// <summary>Additional settings. If not specified uses <see cref="ServiceDetails.Default"/>.</summary>
+        public virtual ServiceDetails Details => ServiceDetails.Default;
+
+        /// <summary>Creates info from service type and details.</summary>
+        public virtual ServiceInfo Create(Type serviceType, ServiceDetails details) =>
+            details == ServiceDetails.Default ? new ServiceInfo(serviceType) : new WithDetails(serviceType, details);
+
         /// <summary>Empty service info for convenience.</summary>
-        public static readonly IServiceInfo Empty = new ServiceInfo(null);
+        public static readonly ServiceInfo Empty = new ServiceInfo(null);
 
         /// <summary>Creates info out of provided settings</summary>
         public static ServiceInfo Of(Type serviceType,
@@ -8065,26 +8063,11 @@ namespace DryIoc
             public Typed() : base(typeof(TService)) { }
         }
 
-        /// <summary>Type of service to create. Indicates registered service in registry.</summary>
-        public Type ServiceType { get; }
-
-        /// <summary>Shortcut access to service key</summary>
-        public object ServiceKey => Details.ServiceKey;
-
-        /// <summary>Additional settings. If not specified uses <see cref="ServiceDetails.Default"/>.</summary>
-        public virtual ServiceDetails Details => ServiceDetails.Default;
-
-        /// <summary>Creates info from service type and details.</summary>
-        public IServiceInfo Create(Type serviceType, ServiceDetails details) =>
-            details == ServiceDetails.Default ? new ServiceInfo(serviceType) : new WithDetails(serviceType, details);
-
         /// <summary>Prints info to string using <see cref="ServiceInfoTools.Print"/>.</summary> <returns>Printed string.</returns>
         public override string ToString() =>
             new StringBuilder().Print(this).ToString();
 
-#region Implementation
-
-        private ServiceInfo(Type serviceType) { ServiceType = serviceType; }
+        internal ServiceInfo(Type serviceType) => ServiceType = serviceType;
 
         private class WithDetails : ServiceInfo
         {
@@ -8099,15 +8082,23 @@ namespace DryIoc
             public TypedWithDetails(ServiceDetails details) { _details = details; }
             private readonly ServiceDetails _details;
         }
-
-#endregion
     }
 
-    /// <summary>Provides <see cref="IServiceInfo"/> for parameter,
-    /// by default using parameter name as <see cref="IServiceInfo.ServiceType"/>.</summary>
+    /// <summary>Provides <see cref="ServiceInfo"/> for parameter,
+    /// by default using parameter name as <see cref="ServiceInfo.ServiceType"/>.</summary>
     /// <remarks>For parameter default setting <see cref="ServiceDetails.IfUnresolved"/> is <see cref="IfUnresolved.Throw"/>.</remarks>
-    public class ParameterServiceInfo : IServiceInfo
+    public class ParameterServiceInfo : ServiceInfo
     {
+        /// <summary>Parameter info.</summary>
+        public readonly ParameterInfo Parameter;
+
+        private ParameterServiceInfo(ParameterInfo p) : 
+            base(p.ParameterType.IsByRef ? p.ParameterType.GetElementType() : p.ParameterType) =>
+            Parameter = p;
+
+        private ParameterServiceInfo(ParameterInfo p, Type serviceType) : base(serviceType) =>
+            Parameter = p;
+
         /// <summary>Creates service info from parameter alone, setting service type to parameter type,
         /// and setting resolution policy to <see cref="IfUnresolved.ReturnDefault"/> if parameter is optional.</summary>
         public static ParameterServiceInfo Of(ParameterInfo parameter)
@@ -8119,68 +8110,27 @@ namespace DryIoc
                 : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: parameter.DefaultValue));
         }
 
-        /// <summary>The parameter type or dereferenced parameter type for `ref`, `in`, `out` parameters</summary>
-        public readonly Type DereferencedParameterType;
-
-        /// <summary>Service type specified by <see cref="ParameterInfo.ParameterType"/>.</summary>
-        public virtual Type ServiceType => DereferencedParameterType;
-
-        /// <summary>Optional service details.</summary>
-        public virtual ServiceDetails Details => ServiceDetails.Default;
-
         /// <summary>Creates info from service type and details.</summary>
-        public IServiceInfo Create(Type serviceType, ServiceDetails details) =>
-            serviceType == ServiceType ? new WithDetails(Parameter, details) : new TypeWithDetails(Parameter, serviceType, details);
-
-        /// <summary>Parameter info.</summary>
-        public readonly ParameterInfo Parameter;
+        public override ServiceInfo Create(Type serviceType, ServiceDetails details) =>
+            serviceType == ServiceType ? new WithDetails(Parameter, details) : new WithDetails(Parameter, serviceType, details);
 
         /// <summary>Prints info to string using <see cref="ServiceInfoTools.Print"/>.</summary> <returns>Printed string.</returns>
         public override string ToString() =>
             new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name).ToString();
 
-private ParameterServiceInfo(ParameterInfo p)
-{
-    Parameter = p;
-    DereferencedParameterType = p.ParameterType.IsByRef
-        ? p.ParameterType.GetElementType()
-        : p.ParameterType;
-}
-
-        private class WithDetails : ParameterServiceInfo
+        private sealed class WithDetails : ParameterServiceInfo
         {
-            public override ServiceDetails Details => _details;
-            public WithDetails(ParameterInfo parameter, ServiceDetails details) : base(parameter) => _details = details;
-            private readonly ServiceDetails _details;
-        }
-
-        private sealed class TypeWithDetails : WithDetails
-        {
-            public override Type ServiceType => _serviceType;
-            public TypeWithDetails(ParameterInfo parameter, Type serviceType, ServiceDetails details) : base(parameter, details) => _serviceType = serviceType;
-            private readonly Type _serviceType;
+            public override ServiceDetails Details { get; }
+            public WithDetails(ParameterInfo parameter, ServiceDetails details) : base(parameter) => Details = details;
+            public WithDetails(ParameterInfo parameter, Type serviceType, ServiceDetails details) : base(parameter, serviceType) => Details = details;
         }
     }
 
     /// <summary>Base class for property and field dependency info.</summary>
-    public abstract class PropertyOrFieldServiceInfo : IServiceInfo
+    public abstract class PropertyOrFieldServiceInfo : ServiceInfo
     {
-        /// <summary>Create member info out of provide property or field.</summary>
-        /// <param name="member">Member is either property or field.</param> <returns>Created info.</returns>
-        public static PropertyOrFieldServiceInfo Of(MemberInfo member) =>
-            member.ThrowIfNull() is PropertyInfo
-                ? (PropertyOrFieldServiceInfo)new Property((PropertyInfo)member)
-                : new Field((FieldInfo)member);
-
-        /// <summary>The required service type. It will be either <see cref="FieldInfo.FieldType"/> or <see cref="PropertyInfo.PropertyType"/>.</summary>
-        public abstract Type ServiceType { get; }
-
         /// <summary>Optional details: service key, if-unresolved policy, required service type.</summary>
-        public virtual ServiceDetails Details => ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered;
-
-        /// <summary>Creates info from service type and details.</summary>
-        /// <param name="serviceType">Required service type.</param> <param name="details">Optional details.</param> <returns>Create info.</returns>
-        public abstract IServiceInfo Create(Type serviceType, ServiceDetails details);
+        public override ServiceDetails Details => ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered;
 
         /// <summary>Either <see cref="PropertyInfo"/> or <see cref="FieldInfo"/>.</summary>
         public abstract MemberInfo Member { get; }
@@ -8189,75 +8139,62 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <param name="holder">Holder of property or field.</param> <param name="value">Value to set.</param>
         public abstract void SetValue(object holder, object value);
 
-#region Implementation
+        private PropertyOrFieldServiceInfo(Type serviceType) : base(serviceType) {}
+
+        /// <summary>Create member info out of provide property or field.</summary>
+        /// <param name="member">Member is either property or field.</param> <returns>Created info.</returns>
+        public static PropertyOrFieldServiceInfo Of(MemberInfo member) =>
+            member.ThrowIfNull() is PropertyInfo
+                ? (PropertyOrFieldServiceInfo)new Property((PropertyInfo)member)
+                : new Field((FieldInfo)member);
 
         private class Property : PropertyOrFieldServiceInfo
         {
-            public override Type ServiceType => _property.PropertyType;
-
-            public override IServiceInfo Create(Type serviceType, ServiceDetails details) =>
-                serviceType == ServiceType ? new WithDetails(_property, details) : new TypeWithDetails(_property, serviceType, details);
-
             public override MemberInfo Member => _property;
+            private readonly PropertyInfo _property;
 
             public override void SetValue(object holder, object value) => _property.SetValue(holder, value, null);
+
+            public Property(PropertyInfo property) : base(property.PropertyType) => _property = property;
+            public Property(PropertyInfo property, Type serviceType) : base(serviceType) => _property = property;
+
+            public override ServiceInfo Create(Type serviceType, ServiceDetails details) =>
+                serviceType == ServiceType ? new WithDetails(_property, details) : new WithDetails(_property, serviceType, details);
 
             public override string ToString() =>
                 new StringBuilder().Print(this).Append(" as property ").Print(_property.Name).ToString();
 
-            private readonly PropertyInfo _property;
-            public Property(PropertyInfo property) { _property = property; }
-
-            private class WithDetails : Property
+            private sealed class WithDetails : Property
             {
                 public override ServiceDetails Details { get; }
-
-                public WithDetails(PropertyInfo property, ServiceDetails details) : base(property) { Details = details; }
-            }
-
-            private sealed class TypeWithDetails : WithDetails
-            {
-                public override Type ServiceType { get; }
-
-                public TypeWithDetails(PropertyInfo property, Type serviceType, ServiceDetails details)
-                    : base(property, details) { ServiceType = serviceType; }
+                public WithDetails(PropertyInfo property, ServiceDetails details) : base(property) => Details = details;
+                public WithDetails(PropertyInfo property, Type serviceType, ServiceDetails details) : base(property, serviceType) => Details = details;
             }
         }
 
         private class Field : PropertyOrFieldServiceInfo
         {
-            public override Type ServiceType => _field.FieldType;
-
-            public override IServiceInfo Create(Type serviceType, ServiceDetails details) =>
-                serviceType == null ? new WithDetails(_field, details) : new TypeWithDetails(_field, serviceType, details);
-
             public override MemberInfo Member => _field;
+            private readonly FieldInfo _field;
+
+            public Field(FieldInfo field) : base(field.FieldType) => _field = field;
+            public Field(FieldInfo field, Type serviceType) : base(serviceType) => _field = field;
+
+            public override ServiceInfo Create(Type serviceType, ServiceDetails details) =>
+                serviceType == null ? new WithDetails(_field, details) : new WithDetails(_field, serviceType, details);
 
             public override void SetValue(object holder, object value) => _field.SetValue(holder, value);
 
             public override string ToString() =>
                 new StringBuilder().Print(this).Append(" as field ").Print(_field.Name).ToString();
 
-            private readonly FieldInfo _field;
-            public Field(FieldInfo field) { _field = field; }
-
-            private class WithDetails : Field
+            private sealed class WithDetails : Field
             {
                 public override ServiceDetails Details { get; }
-
-                public WithDetails(FieldInfo field, ServiceDetails details) : base(field) { Details = details; }
-            }
-
-            private sealed class TypeWithDetails : WithDetails
-            {
-                public override Type ServiceType { get; }
-
-                public TypeWithDetails(FieldInfo field, Type serviceType, ServiceDetails details) : base(field, details)
-                { ServiceType = serviceType; }
+                public WithDetails(FieldInfo field, ServiceDetails details) : base(field) => Details = details;
+                public WithDetails(FieldInfo field, Type serviceType, ServiceDetails details) : base(field, serviceType) => Details = details;
             }
         }
-
-#endregion
     }
 
     /// <summary>Stored check results of two kinds: inherited down dependency chain and not.</summary>
@@ -8381,7 +8318,7 @@ private ParameterServiceInfo(ParameterInfo p)
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
             Field(null, typeof(Request).Field(nameof(EmptyOpensResolutionScope)));
 
-        internal static Request CreateForValidation(IContainer container, IServiceInfo serviceInfo, RequestStack stack)
+        internal static Request CreateForValidation(IContainer container, ServiceInfo serviceInfo, RequestStack stack)
         {
             // we are re-starting the dependency depth count from `1`
             ref var req = ref stack.GetOrPushRef(0);
@@ -8393,7 +8330,7 @@ private ParameterServiceInfo(ParameterInfo p)
         }
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
-        public static Request Create(IContainer container, IServiceInfo serviceInfo,
+        public static Request Create(IContainer container, ServiceInfo serviceInfo,
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null)
         {
             var serviceType = serviceInfo.ServiceType;
@@ -8448,7 +8385,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
         // todo: @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
         /// mutable, so that the ServiceKey or IfUnresolved can be changed in place.
-        internal IServiceInfo _serviceInfo;
+        internal ServiceInfo _serviceInfo;
 
         /// <summary>Input arguments provided with `Resolve`</summary>
         internal Expression[] InputArgExprs;
@@ -8582,7 +8519,7 @@ private ParameterServiceInfo(ParameterInfo p)
         /// <summary>Creates new request with provided info, and links current request as a parent.
         /// Allows to set some additional flags. Existing/parent request should be resolved to 
         /// factory via `WithResolvedFactory` before pushing info into it.</summary>
-        public Request Push(IServiceInfo info, RequestFlags additionalFlags = DefaultFlags)
+        public Request Push(ServiceInfo info, RequestFlags additionalFlags = DefaultFlags)
         {
             if (FactoryID == 0)
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
@@ -8617,7 +8554,7 @@ private ParameterServiceInfo(ParameterInfo p)
             return req;
         }
 
-        /// <summary>Composes service description into <see cref="IServiceInfo"/> and Pushes the new request.</summary>
+        /// <summary>Composes service description into <see cref="ServiceInfo"/> and Pushes the new request.</summary>
         public Request Push(Type serviceType, object serviceKey = null,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null, RequestFlags flags = DefaultFlags) =>
             Push(ServiceInfo.Of(serviceType.ThrowIfNull().ThrowIf(serviceType.IsOpenGeneric(), Error.ResolvingOpenGenericServiceTypeIsNotPossible),
@@ -8675,7 +8612,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
         /// <summary>Allow to switch current service info to the new one, e.g. in decorators.
         /// If info did not change then return the same this request.</summary>
-        public Request WithChangedServiceInfo(Func<IServiceInfo, IServiceInfo> getInfo)
+        public Request WithChangedServiceInfo(Func<ServiceInfo, ServiceInfo> getInfo)
         {
             var newServiceInfo = getInfo(_serviceInfo);
             return newServiceInfo == _serviceInfo ? this
@@ -9020,7 +8957,7 @@ private ParameterServiceInfo(ParameterInfo p)
 
         // Initial request without factory info yet
         private Request(IContainer container, Request parent, int dependencyDepth, int dependencyCount,
-            RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
+            RequestStack stack, RequestFlags flags, ServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
@@ -9038,12 +8975,10 @@ private ParameterServiceInfo(ParameterInfo p)
         // Request with resolved factory state
         private Request(IContainer container, 
             Request parent, int dependencyDepth, int dependencyCount, RequestStack stack,
-            RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs,
+            RequestFlags flags, ServiceInfo serviceInfo, Expression[] inputArgExprs,
             Type factoryImplType, Factory factory, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
-            : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, inputArgExprs)
-        {
+            : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, inputArgExprs) =>
             SetResolvedFactory(factoryImplType, factory , factoryID, factoryType, reuse, decoratedFactoryID);
-        }
 
         /// Severe the connection with the request pool up to the parent so that no one can change the Request state
         internal Request IsolateRequestChain()
@@ -9065,7 +9000,7 @@ private ParameterServiceInfo(ParameterInfo p)
         }
 
         private void SetServiceInfo(IContainer container, Request parent, int dependencyDepth, int dependencyCount,
-            RequestStack stack, RequestFlags flags, IServiceInfo serviceInfo, Expression[] inputArgExprs)
+            RequestStack stack, RequestFlags flags, ServiceInfo serviceInfo, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             DependencyDepth = dependencyDepth;
