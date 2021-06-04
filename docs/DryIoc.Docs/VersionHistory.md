@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.8.0 Small feature release / 2021-06-04
+
+- added: #406 Allow the registration of the partially closed implementation type
+
 ## v4.7.8 Bug-fix release / 2021-05-27
 
 - fixed: #405 DryIoc has waited for the creation of the scoped ... with service name/type

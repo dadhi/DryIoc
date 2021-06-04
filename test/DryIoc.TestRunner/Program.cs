@@ -10,12 +10,7 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
     
-            // new ContainerTests().Run();
-            // new SelectConstructorWithAllResolvableArgumentTests().Run();
-            // new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func().Run();
-            // new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration().Run();
-            // new DryIoc.UnitTests.DecoratorTests().Run();
-            //new GHIssue380_ExportFactory_throws_Container_disposed_exception().Run();
+            // new OpenGenericsTests().Run();
         }
 
         public static void RunAllTests()
@@ -47,12 +42,14 @@ namespace DryIoc.UnitTests
             var tests = new ITest[] 
             {
                 new ContainerTests(),
-                new SelectConstructorWithAllResolvableArgumentTests(),
+				new OpenGenericsTests(),
+				new SelectConstructorWithAllResolvableArgumentTests(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
                 new GHIssue391_Deadlock_during_Resolve(),
                 new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration(),
                 new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made(),
+                new GHIssue406_Allow_the_registration_of_the_partially_closed_implementation_type(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
             };
 

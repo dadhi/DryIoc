@@ -6,8 +6,13 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class OpenGenericsTests
+    public class OpenGenericsTests : ITest
     {
+        public int Run()
+        {
+            Registering_technically_non_generic_type_definition_service_type_but_compatible_with_implementation_should_work();
+            return 1;
+        }
         [Test]
         public void Resolving_non_registered_generic_should_throw()
         {
@@ -304,12 +309,14 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Registering_generic_but_not_closed_service_should_Throw()
+        public void Registering_technically_non_generic_type_definition_service_type_but_compatible_with_implementation_should_work()
         {
             var container = new Container();
 
-            Assert.Throws<ContainerException>(() =>
-                container.Register(typeof(Closed<>).BaseType, typeof(Closed<>)));
+            container.Register(typeof(Closed<>).GetBaseType(), typeof(Closed<>));
+
+            var x = container.Resolve<Open<string>>();
+            Assert.IsInstanceOf<Closed<string>>(x);
         }
 
         [Test] 
