@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.MefAttributedModel</id>
-    <version>6.1.0</version>
+    <version>7.0.0-preview-01</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,15 +13,11 @@
     <tags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
     <releaseNotes>
         <![CDATA[
-## v6.1.0
+## v7.0.0 
 
-- fixed: #349 ReuseAttribute treats ScopeName as string instead of object type
-- added: ReuseAttribute supports multiple scope names
-- relies on DryIocAttributes v6.1.0 and DryIoc v4.5.2
+Breaking:
 
-## v6.0.2
-
-- The referenced DryIocAttributes is updated to v6.0.1 (because some types are now used from the System.ComponentModel.Composition package)
+- Removing PCL and .NET 3.5, .NET 4.0 targets
 
 ]]>
     </releaseNotes>
@@ -40,26 +36,8 @@
     <file src="..\nuspecs\DryIoc.snk" />
     <file src="..\logo\logo128.png" target="logo.png" />
 
-    <!-- net35 -->
-    <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net35\DryIoc\MefAttributedModel" />
-
-    <!-- net40 -->
-    <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net40\DryIoc\MefAttributedModel" />
-
     <!-- net45 -->
     <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net45\DryIoc\MefAttributedModel" />
-
-    <!-- PCL Profile328: .NET Portable Subset (.NET Framework 4, Silverlight 5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-    <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\portable-net4+sl5+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc\MefAttributedModel" />
-
-    <!-- PCL Profile259: .NET Portable Subset (.NET Framework 4.5, Windows 8, Windows Phone 8.1, Windows Phone Silverlight 8) -->
-    <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\portable-net45+netcore45+wpa81+wp8+MonoAndroid1+MonoTouch1\DryIoc\MefAttributedModel" />
-
-    <!-- NetStandard1.0 (based on PCL Profile259) -->
-    <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="contentFiles\cs\netstandard1.0\DryIoc\MefAttributedModel" />
-
-    <!-- NetStandard1.3 (based on PCL Profile259) -->
-    <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="contentFiles\cs\netstandard1.3\DryIoc\MefAttributedModel" />
 
     <!-- NetStandard2.0 (based on PCL Profile259) -->
     <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="contentFiles\cs\netstandard2.0\DryIoc\MefAttributedModel" />

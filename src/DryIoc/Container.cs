@@ -8194,7 +8194,7 @@ namespace DryIoc
 
     /// <summary>Stored check results of two kinds: inherited down dependency chain and not.</summary>
     [Flags]
-    public enum RequestFlags
+    public enum RequestFlags : ushort
     {
         /// <summary>Not inherited</summary>
         TracksTransientDisposable = 1 << 1,
