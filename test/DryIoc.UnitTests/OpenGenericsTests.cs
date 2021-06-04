@@ -313,7 +313,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(Closed<>).GetBaseType(), typeof(Closed<>));
+            container.Register(typeof(Closed<>).BaseType, typeof(Closed<>));
 
             var x = container.Resolve<Open<string>>();
             Assert.IsInstanceOf<Closed<string>>(x);

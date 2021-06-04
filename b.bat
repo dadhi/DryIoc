@@ -20,7 +20,6 @@ echo:## Starting: TESTS...
 echo: 
 
 dotnet test --no-build -c:Release -p:DevMode=false
-dotnet test --no-build -c:Release -p:DevMode=false test\DryIoc.Microsoft.DependencyInjection.Specification.Tests
 
 
 if %ERRORLEVEL% neq 0 goto :error
