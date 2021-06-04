@@ -1407,14 +1407,14 @@ namespace DryIoc.MefAttributedModel
                 source.FactoryType == DryIoc.FactoryType.Wrapper ? DryIocAttributes.FactoryType.Wrapper :
                 DryIocAttributes.FactoryType.Service;
 
-            var ifUnresolved =
-                source.IfUnresolved == DryIoc.IfUnresolved.Throw ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
+            var d = source.GetServiceDetails();
+            var ifUnresolved = d.IfUnresolved == DryIoc.IfUnresolved.Throw ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
 
             return ConvertRequestInfo(source.DirectParent).Push(
                 source.ServiceType,
-                source.RequiredServiceType,
-                source.ServiceKey,
-                source.MetadataKey, source.Metadata,
+                d.RequiredServiceType,
+                d.ServiceKey,
+                d.MetadataKey, d.Metadata,
                 ifUnresolved,
                 source.FactoryID,
                 factoryType,
