@@ -141,7 +141,7 @@ namespace DryIoc
             }
         }
 
-        #region Compile-time generated parts - former DryIocZero
+        #region Compile-time generated parts
 
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID);
 

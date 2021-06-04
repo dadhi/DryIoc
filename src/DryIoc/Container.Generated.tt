@@ -91,7 +91,7 @@ Generation is completed successfully.
 There are <#=errCount#> generation issues (may be not an error dependent on context):
 
 The issues with run-time registrations may be solved by `container.RegisterPlaceholder<T>()` 
-in Registrations.ttinclude. Then you can replace placeholders using `DryIocZero.Container.Register`
+in Registrations.ttinclude. Then you can replace placeholders using `Container.Register`
 at runtime.
 
 <# } #>
