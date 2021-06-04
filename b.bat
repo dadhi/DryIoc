@@ -12,7 +12,9 @@ echo:
 echo:
 echo:## Starting: TestRunner... ##
 echo:
+
 dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+
 if %ERRORLEVEL% neq 0 goto :error
 echo:## Finished: TestRunner ##
 
@@ -20,7 +22,7 @@ echo:
 echo:## Starting: TESTS...
 echo: 
 
-dotnet test -c:Release -p:GeneratePackageOnBuild=false;DevMode=false;NoLegacy=true
+dotnet test --no-build -c:Release -p:DevMode=false;NoLegacy=true
 
 if %ERRORLEVEL% neq 0 goto :error
 

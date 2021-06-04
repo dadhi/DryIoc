@@ -270,6 +270,9 @@ namespace DryIoc
 
             // Improves performance a bit by first attempting to swap the registry while it is still unchanged.
             var r = _registry.Value;
+            var st = serviceType.GetTypeInfo();
+            if (st.IsGenericType && !st.IsGenericTypeDefinition && st.ContainsGenericParameters)
+                serviceType = serviceType.GetGenericTypeDefinition();
             if (!_registry.TrySwapIfStillCurrent(r, r.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
                 RegistrySwap(factory, serviceType, serviceKey, ifAlreadyRegistered);
         }
@@ -11113,10 +11116,6 @@ namespace DryIoc
                 if (serviceType.IsGenericDefinition())
                     ThrowIfImplementationAndServiceTypeParamsDontMatch(implType, serviceType);
 
-                else if (implType.IsGeneric() && serviceType.IsOpenGeneric())
-                    Throw.It(Error.RegisteringNotAGenericTypedefServiceType,
-                        serviceType, serviceType.GetGenericTypeDefinition());
-
                 else if (!serviceType.IsGeneric())
                     Throw.It(Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
 
@@ -14992,3 +14991,13 @@ namespace DryIoc.Messages
     }
 }
 #endif
+
+namespace DryIoc
+{
+    /// <summary>The testing utility</summary>
+    public interface ITest
+    {
+        /// <summary>Runs the tests and should return the number of run tests</summary>
+        int Run();
+    }
+}

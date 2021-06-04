@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Threading.Tasks;
 using DryIoc.IssuesTests;
 
 namespace DryIoc.UnitTests
@@ -11,10 +10,12 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
     
+            // new OpenGenericsTests().Run();
             // new GHIssue391_Deadlock_during_Resolve().Run();
             // new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration().Run();
             // new GHIssue380_ExportFactory_throws_Container_disposed_exception().Run();
             // new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made().Run();
+            // new GHIssue406_Allow_the_registration_of_the_partially_closed_implementation_type().Run();
         }
 
         public static void RunAllTests()
@@ -43,12 +44,15 @@ namespace DryIoc.UnitTests
             Console.WriteLine("NETCOREAPP2.1: Running UnitTests and IssueTests...");
             Console.WriteLine();
 
-            var tests = new ITest[] {
+            var tests = new ITest[] 
+            {
+                new OpenGenericsTests(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
                 new GHIssue391_Deadlock_during_Resolve(),
                 new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration(),
                 new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made(),
+                new GHIssue406_Allow_the_registration_of_the_partially_closed_implementation_type(),
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added
