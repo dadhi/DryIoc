@@ -61,7 +61,7 @@ Breaking:
         <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\net45\DryIoc" />
         <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\net45\DryIoc" />
 
-        <!-- .netstandard 2.0 (based on PCL Profile259 except for FEC) -->
+        <!-- .netstandard 2.0 -->
         <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\netstandard2.0\DryIoc" />
         <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\netstandard2.0\DryIoc" />
         <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard2.0\DryIoc" />

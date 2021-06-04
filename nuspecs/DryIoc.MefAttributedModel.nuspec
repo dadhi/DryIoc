@@ -36,10 +36,8 @@ Breaking:
     <file src="..\nuspecs\DryIoc.snk" />
     <file src="..\logo\logo128.png" target="logo.png" />
 
-    <!-- net45 -->
     <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="content\net45\DryIoc\MefAttributedModel" />
 
-    <!-- NetStandard2.0 (based on PCL Profile259) -->
     <file src="..\src\DryIoc.MefAttributedModel\AttributedModel.cs" target="contentFiles\cs\netstandard2.0\DryIoc\MefAttributedModel" />
 
   </files>

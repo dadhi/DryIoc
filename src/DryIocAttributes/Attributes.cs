@@ -63,8 +63,6 @@ namespace DryIocAttributes
     }
 
     /// <summary>Provides whole set of possible/supported export options.</summary>
-    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
-        Justification = "Not available in PCL.")]
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Method
         | AttributeTargets.Property
@@ -228,9 +226,7 @@ namespace DryIocAttributes
     public class TrackDisposableTransientAttribute : Attribute { }
 
     /// <summary>OBSOLETE: Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.</summary>
-    //[Obsolete("Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.")]
-    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
-        Justification = "Not available in PCL.")]
+    [Obsolete("Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.")]
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Method
         | AttributeTargets.Property
@@ -584,8 +580,6 @@ namespace DryIocAttributes
     }
 
     /// <summary>Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.</summary>
-    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
-        Justification = "Not available in PCL.")]
     [AttributeUsage(AttributeTargets.Parameter
         | AttributeTargets.Field
         | AttributeTargets.Property)]
