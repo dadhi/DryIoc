@@ -1,7 +1,7 @@
 Version History
 ---------------
 
-## v4.8.0 Bug-fix release / 2021-06-04
+## v4.8.0 Small feature release / 2021-06-04
 
 - added: #406 Allow the registration of the partially closed implementation type
 

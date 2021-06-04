@@ -17,7 +17,7 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-## v4.8.0 Bug-fix release
+## v4.8.0 Small feature release
 
 - added: #406 Allow the registration of the partially closed implementation type
 
