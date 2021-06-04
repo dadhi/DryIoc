@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>4.7.8</version>
+        <version>4.8.0</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,67 +14,9 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
-## v4.7.8 Bug-fix release
+## v4.8.0 Bug-fix release
 
-- fixed: #405 DryIoc has waited for the creation of the scoped ... with service name/type
-
-## v4.7.7 Bug-fix release
-
-- fixed: #399 Func dependency on Singleton resolved under scope breaks after disposing scope when WithFuncAndLazyWithoutRegistration()
-
-## v4.7.6 Bug-fix release
-
-- fixed: #391 Deadlock during Resolve
-- fixed: #394 For_Func_returned_type_with_lazy_dependency_Func_parameters_are_correctly_passed
-
-
-## v4.7.5 Bug-fix release
-
-- #390 NullReferenceException on Unregister
-- fixed the potential issue with the switching back from the SelectLastFactoryRule to the default rule
-
-
-## v4.7.4 Bug-fix release
-
-- #376 DryIoc.Interpreter seems to mess up the exception call stack
-- #378 Inconsistent resolution failure 
-
-
-## v4.7.3 Bug-fix release
-
-- #367 Resolve with FactoryMethod of instance throws DryIoc.ContainerException
-
-
-## v4.7.2 Bug-fix release
-
-- #365 Really fixing: Made.Of() Parameters incorrectly reused depending on Register() usage
-
-
-## v4.7.1 Bug-fix release
-
-- #365 Made.Of() Parameters incorrectly reused depending on Register() usage
-
-
-## v4.7.0 Feature release
-
-- #338 Child container disposes parent container singletons
-- #355 Auto mocking feature for unit testing
-- #356 Surface the FindFactoryWithTheMinReuseLifespan so it can be used together with the FactorySelector
-- #357 Avoid overload ambiguity for the ScopedTo(Type) by adding the separate ScopedToService
-- #358 Add and surface the Scope.Clone(withDisposables=false) to enable more ChildContainer scenarios
-- #359 DynamicRegistrationsAsFallback being unnecessary called multiple times
-- #360 Mark DynamicRegistrationProvider with the FactoryType (Service, Decorator or combination) to avoid unnecessary provider call and factory creation
-- #363 Add CreateChild method as the basis for CreateFacade and such
-
-
-## v4.6.0 Feature release
-
-- #216 Add Rules.WithThrowIfScopedOrSingletonHasTransientDependency 
-- #343 Scope validation for Transient does not work as expected 
-- #344 Scope is disposed before parent when using facade (added Scopes and Singleton cloning into CreateFacade)
-- #348 Create a child container without WithNoMoreRegistrationAllowed flag (surfacing IsRegistryChangePermitted in With method)
-- #350 Wrong scoped resolve (together with MS DI rules)
-- #352 Consider resolving the variance compatible open-generic the same as for collection of open-generics (added Rules.WithVarianceGenericTypesInResolve)
+- added: #406 Allow the registration of the partially closed implementation type
 
 ]]>
         </releaseNotes>
