@@ -4209,7 +4209,7 @@ namespace DryIoc.ImTools
     }
 
     /// <summary>Entry containing the Value in addition to the Hash</summary>
-    public sealed class ImMapEntry<V> : ImMap<V>
+    public class ImMapEntry<V> : ImMap<V>
     {
         /// <summary>The hash.</summary>
         public readonly int Hash;
@@ -4226,24 +4226,24 @@ namespace DryIoc.ImTools
 
 #if !DEBUG
         /// <inheritdoc />
-        public override string ToString() => "{H:" + Hash + ",V:" + Value + "}";
+        public sealed override string ToString() => "{H:" + Hash + ",V:" + Value + "}";
 #endif
 
         /// <inheritdoc />
-        public override int Count() => 1;
+        public sealed override int Count() => 1;
 
-        internal override ImMapEntry<V> GetMaxHashEntryOrDefault() => this;
-        internal override ImMapEntry<V> GetMinHashEntryOrDefault() => this;
+        internal sealed override ImMapEntry<V> GetMaxHashEntryOrDefault() => this;
+        internal sealed override ImMapEntry<V> GetMinHashEntryOrDefault() => this;
 
-        internal override ImMapEntry<V> GetEntryOrNull(int hash) => hash == Hash ? this : null;
+        internal sealed override ImMapEntry<V> GetEntryOrNull(int hash) => hash == Hash ? this : null;
 
-        internal override ImMap<V> AddOrGetEntry(int hash, ImMapEntry<V> entry) =>
+        internal sealed override ImMap<V> AddOrGetEntry(int hash, ImMapEntry<V> entry) =>
             hash > Hash ? new Leaf2(this, entry) : hash < Hash ? new Leaf2(entry, this) : (ImMap<V>)this;
 
-        internal override ImMap<V> ReplaceEntry(int hash, ImMapEntry<V> oldEntry, ImMapEntry<V> newEntry) => 
+        internal sealed override ImMap<V> ReplaceEntry(int hash, ImMapEntry<V> oldEntry, ImMapEntry<V> newEntry) => 
             this == oldEntry ? newEntry : oldEntry;
 
-        internal override ImMap<V> RemoveEntry(ImMapEntry<V> removedEntry) =>
+        internal sealed override ImMap<V> RemoveEntry(ImMapEntry<V> removedEntry) =>
             this == removedEntry ? Empty : this;
     }
 
