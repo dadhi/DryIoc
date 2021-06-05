@@ -8010,37 +8010,37 @@ namespace DryIoc
 
     /// <summary>Represents custom or resolution root service info, there is separate representation for parameter,
     /// property and field dependencies.</summary>
-    public class ServiceInfo
+    public abstract class ServiceInfo
     {
         /// <summary>Type of service to create. Indicates registered service in registry.</summary>
-        public Type ServiceType { get; }
+        public abstract Type ServiceType { get; }
 
         /// <summary>Additional settings. If not specified uses <see cref="ServiceDetails.Default"/>.</summary>
         public virtual ServiceDetails Details => ServiceDetails.Default;
 
         /// <summary>Creates info from service type and details.</summary>
         public virtual ServiceInfo Create(Type serviceType, ServiceDetails details) =>
-            details == ServiceDetails.Default ? new ServiceInfo(serviceType) : new WithDetails(serviceType, details);
+            details == ServiceDetails.Default ? new Typed(serviceType) : new WithDetails(serviceType, details);
 
         /// <summary>Creates info out of provided settings</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ServiceInfo Of(Type serviceType) => new ServiceInfo(serviceType);
+        public static ServiceInfo Of(Type serviceType) => new Typed(serviceType);
 
         /// <summary>Creates info out of provided settings</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved) =>
-            ifUnresolved == IfUnresolved.Throw ? new ServiceInfo(serviceType) :
+            ifUnresolved == IfUnresolved.Throw ? new Typed(serviceType) :
             ifUnresolved == IfUnresolved.ReturnDefault ? new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefault) : 
                 new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered);
 
         /// <summary>Creates info out of provided settings</summary>
         public static ServiceInfo Of(Type serviceType, object serviceKey) =>
-            serviceKey == null ? new ServiceInfo(serviceType) : 
+            serviceKey == null ? new Typed(serviceType) : 
             new WithDetails(serviceType, ServiceDetails.Of(null, serviceKey, IfUnresolved.Throw, null, null, null));
 
         /// <summary>Creates info out of provided settings</summary>
         public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved, object serviceKey) =>
-            serviceKey == null ? (ifUnresolved == IfUnresolved.Throw ? new ServiceInfo(serviceType)
+            serviceKey == null ? (ifUnresolved == IfUnresolved.Throw ? new Typed(serviceType)
                 : ifUnresolved == IfUnresolved.ReturnDefault ? new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefault)
                 : new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered))
                 : new WithDetails(serviceType, ServiceDetails.Of(null, serviceKey, ifUnresolved, null, null, null));
@@ -8056,91 +8056,111 @@ namespace DryIoc
                 requiredServiceType = null;
 
             return serviceKey == null && requiredServiceType == null && metadataKey == null && metadata == null
-                ? (ifUnresolved == IfUnresolved.Throw ? new ServiceInfo(serviceType)
+                ? (ifUnresolved == IfUnresolved.Throw ? new Typed(serviceType)
                 : ifUnresolved == IfUnresolved.ReturnDefault ? new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefault)
                 : new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered))
                 : new WithDetails(serviceType, ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
         }
 
+        /// <summary>Typed service info</summary>
+        public class Typed : ServiceInfo
+        { 
+            /// <inheritdoc />
+            public override Type ServiceType { get; }
+            /// <summary>Creates the service info</summary>
+            public Typed(Type serviceType) => ServiceType = serviceType.ThrowIfNull();
+        }
+
         /// <summary>Creates service info using typed <typeparamref name="TService"/>.</summary>
         public static Typed<TService> Of<TService>(IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null) =>
-            serviceKey == null && ifUnresolved == IfUnresolved.Throw
-                ? new Typed<TService>()
-                : new TypedWithDetails<TService>(ServiceDetails.Of(null, serviceKey, ifUnresolved));
+            serviceKey == null && ifUnresolved == IfUnresolved.Throw ? new Typed<TService>() :
+                new TypedWithDetails<TService>(ServiceDetails.Of(null, serviceKey, ifUnresolved));
 
         /// <summary>Strongly-typed version of Service Info.</summary> <typeparam name="TService">Service type.</typeparam>
         public class Typed<TService> : ServiceInfo
         { 
-            /// <summary>Creates service info object.</summary>
-            public Typed() : base(typeof(TService)) { }
+            /// <inheritdoc/>
+            public override Type ServiceType => typeof(TService);
         }
 
         /// <summary>Prints info to string using <see cref="ServiceInfoTools.Print"/>.</summary> <returns>Printed string.</returns>
-        public override string ToString() =>
-            new StringBuilder().Print(this).ToString();
+        public override string ToString() => new StringBuilder().Print(this).ToString();
 
-        internal ServiceInfo(Type serviceType) => ServiceType = serviceType.ThrowIfNull();
-
-        private class WithDetails : ServiceInfo
+        private sealed class WithDetails : Typed
         {
-            public override ServiceDetails Details => _details;
-            public WithDetails(Type serviceType, ServiceDetails details) : base(serviceType) { _details = details; }
-            private readonly ServiceDetails _details;
+            public override ServiceDetails Details { get;}
+            public WithDetails(Type serviceType, ServiceDetails details) : base(serviceType) => Details = details;
         }
 
-        private class TypedWithDetails<TService> : Typed<TService>
+        private sealed class TypedWithDetails<TService> : Typed<TService>
         {
-            public override ServiceDetails Details => _details;
-            public TypedWithDetails(ServiceDetails details) { _details = details; }
-            private readonly ServiceDetails _details;
+            public override ServiceDetails Details { get;}
+            public TypedWithDetails(ServiceDetails details) => Details = details;
         }
     }
 
-    /// <summary>Provides <see cref="ServiceInfo"/> for parameter,
-    /// by default using parameter name as <see cref="ServiceInfo.ServiceType"/>.</summary>
+    /// <summary>Provides <see cref="ServiceInfo"/> for parameter, by default using parameter type as <see cref="ServiceInfo.ServiceType"/>.</summary>
     /// <remarks>For parameter default setting <see cref="ServiceDetails.IfUnresolved"/> is <see cref="IfUnresolved.Throw"/>.</remarks>
     public class ParameterServiceInfo : ServiceInfo
     {
+        /// <inheritdoc/>
+        public override Type ServiceType => Parameter.ParameterType;
         /// <summary>Parameter info.</summary>
         public readonly ParameterInfo Parameter;
-
-        private ParameterServiceInfo(ParameterInfo p) : 
-            base(p.ParameterType.IsByRef ? p.ParameterType.GetElementType() : p.ParameterType) =>
-            Parameter = p;
-
-        private ParameterServiceInfo(ParameterInfo p, Type serviceType) : base(serviceType) =>
-            Parameter = p;
+        private ParameterServiceInfo(ParameterInfo p) => Parameter = p;
 
         /// <summary>Creates service info from parameter alone, setting service type to parameter type,
         /// and setting resolution policy to <see cref="IfUnresolved.ReturnDefault"/> if parameter is optional.</summary>
         public static ParameterServiceInfo Of(ParameterInfo parameter)
         {
+            var type = parameter.ParameterType;
             if (!parameter.IsOptional)
-                return new ParameterServiceInfo(parameter);
-            return new WithDetails(parameter, parameter.DefaultValue == null
+                return !type.IsByRef ? new ParameterServiceInfo(parameter) : new Typed(parameter, type.GetElementType());
+            var details = parameter.DefaultValue == null
                 ? ServiceDetails.IfUnresolvedReturnDefault
-                : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: parameter.DefaultValue));
+                : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: parameter.DefaultValue);
+            return !type.IsByRef ? new WithDetails(parameter, details) : new Typed.WithDetails(parameter, type.GetElementType(), details);
         }
 
         /// <summary>Creates info from service type and details.</summary>
         public override ServiceInfo Create(Type serviceType, ServiceDetails details) =>
-            serviceType == ServiceType ? new WithDetails(Parameter, details) : new WithDetails(Parameter, serviceType, details);
+            serviceType == ServiceType 
+                ? new WithDetails(Parameter, details) 
+                : new Typed.WithDetails(Parameter, serviceType, details);
 
         /// <summary>Prints info to string using <see cref="ServiceInfoTools.Print"/>.</summary> <returns>Printed string.</returns>
         public override string ToString() =>
             new StringBuilder().Print(this).Append(" as parameter ").Print(Parameter.Name).ToString();
 
+        private new class Typed : ParameterServiceInfo
+        {
+            /// <inheritdoc/>
+            public override Type ServiceType { get; }
+            public Typed(ParameterInfo parameter, Type serviceType) : base(parameter) => ServiceType = serviceType;
+            internal sealed new class WithDetails : Typed
+            {
+                public override ServiceDetails Details { get; }
+                public WithDetails(ParameterInfo parameter, Type serviceType, ServiceDetails details) : base(parameter, serviceType) => Details = details;
+            }
+
+            /// <summary>Creates info from service type and details.</summary>
+            public sealed override ServiceInfo Create(Type serviceType, ServiceDetails details) =>
+                new Typed.WithDetails(Parameter, serviceType, details);
+        }
+
         private sealed class WithDetails : ParameterServiceInfo
         {
             public override ServiceDetails Details { get; }
             public WithDetails(ParameterInfo parameter, ServiceDetails details) : base(parameter) => Details = details;
-            public WithDetails(ParameterInfo parameter, Type serviceType, ServiceDetails details) : base(parameter, serviceType) => Details = details;
         }
     }
 
     /// <summary>Base class for property and field dependency info.</summary>
-    public abstract class PropertyOrFieldServiceInfo : ServiceInfo
+    public abstract class PropertyOrFieldServiceInfo : ServiceInfo.Typed
     {
+        /// <summary>Creates the service info</summary>
+        public PropertyOrFieldServiceInfo(Type serviceType) : base(serviceType) {}
+
         /// <summary>Optional details: service key, if-unresolved policy, required service type.</summary>
         public override ServiceDetails Details => ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered;
 
@@ -8151,10 +8171,7 @@ namespace DryIoc
         /// <param name="holder">Holder of property or field.</param> <param name="value">Value to set.</param>
         public abstract void SetValue(object holder, object value);
 
-        private PropertyOrFieldServiceInfo(Type serviceType) : base(serviceType) {}
-
         /// <summary>Create member info out of provide property or field.</summary>
-        /// <param name="member">Member is either property or field.</param> <returns>Created info.</returns>
         public static PropertyOrFieldServiceInfo Of(MemberInfo member) =>
             member.ThrowIfNull() is PropertyInfo
                 ? (PropertyOrFieldServiceInfo)new Property((PropertyInfo)member)
