@@ -8173,9 +8173,7 @@ namespace DryIoc
 
         /// <summary>Create member info out of provide property or field.</summary>
         public static PropertyOrFieldServiceInfo Of(MemberInfo member) =>
-            member.ThrowIfNull() is PropertyInfo
-                ? (PropertyOrFieldServiceInfo)new Property((PropertyInfo)member)
-                : new Field((FieldInfo)member);
+            member.ThrowIfNull() is PropertyInfo ? new Property((PropertyInfo)member) : (PropertyOrFieldServiceInfo)new Field((FieldInfo)member);
 
         private class Property : PropertyOrFieldServiceInfo
         {
@@ -10577,7 +10575,11 @@ namespace DryIoc
 
             Expression a0 = null, a1 = null, a2 = null, a3 = null, a4 = null, a5 = null, a6 = null;
             var paramExprs = parameters.Length > 7 ? new Expression[parameters.Length] : null;
-            var paramSelector = rules.TryGetParameterSelector(Made)(request);
+            var rulesParams = rules._made.Parameters;
+            var madeParams  = Made.Parameters;
+            Func<ParameterInfo, ParameterServiceInfo> paramSelector = null;
+            if (rulesParams != null || madeParams != null)
+                paramSelector = (rules.OverrideRegistrationMade ? madeParams.OverrideWith(rulesParams) : rulesParams.OverrideWith(madeParams))(request);
 
             var inputArgs = request.InputArgExprs;
             var argsUsedMask = 0;
@@ -10605,7 +10607,7 @@ namespace DryIoc
                     }
                 }
 
-                var paramInfo = paramSelector(param) ?? ParameterServiceInfo.Of(param);
+                var paramInfo    = paramSelector?.Invoke(param) ?? ParameterServiceInfo.Of(param);
                 var paramRequest = request.Push(paramInfo);
                 var paramDetails = paramInfo.Details;
                 var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
@@ -11574,9 +11576,8 @@ namespace DryIoc
             return result;
         }
 
-        /// <summary>The amount of time to wait for the other party to create the scoped (or singleton) service. 
-        /// The default value of 5000 ticks rougly corresponds to the 5 seconds.</summary>
-        public static uint WaitForScopedServiceIsCreatedTimeoutTicks = 5000;
+        /// <summary>The amount of time to wait for the other party to create the scoped (or singleton) service.</summary>
+        public static uint WaitForScopedServiceIsCreatedTimeoutTicks = 3000;
 
         internal static object WaitForItemIsSet(ImMapEntry<object> itemRef)
         {
@@ -11743,7 +11744,7 @@ namespace DryIoc
                 }
             }
 
-            return Parent?.TryGetUsedInstance(r, hash, type, out instance) ?? false;
+            return Parent?.TryGetUsedInstance(r, hash, type, out instance) ?? false; // todo: @perf override with no Parent
         }
 
         /// <summary>Enumerates all the parent scopes upwards starting from this one.</summary>
