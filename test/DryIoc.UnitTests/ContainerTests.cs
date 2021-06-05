@@ -10,8 +10,9 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            Resolving_service_should_return_registered_implementation();
             Can_generate_expressions_from_closed_and_open_generic_registrations_via_required_service_type();
-            return 1;
+            return 2;
         }
 
         [Test]

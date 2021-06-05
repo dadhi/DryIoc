@@ -338,7 +338,7 @@ namespace DryIoc
                 return usedInstance;
 
             // todo: @perf Should we in the first place create the request here, or later in CreateExpression because it may be faster for the root service without dependency or with the delegate factory? 
-            var request = Request.Create(this, serviceType, ifUnresolved: ifUnresolved);
+            var request = Request.CreateResolutionRoot(this, serviceType, ifUnresolved);
             var factory = ((IContainer)this).ResolveFactory(request); // HACK: may mutate request, but it should be safe
 
             // Delegate to full blown Resolve aware of service key, open scope, etc.
@@ -700,7 +700,7 @@ namespace DryIoc
 
             propertiesAndFields = propertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.Auto;
 
-            var request = Request.Create(this, instanceType)
+            var request = Request.CreateResolutionRoot(this, instanceType)
                 .WithResolvedFactory(InstanceFactory.Of(instance, Reuse.Transient), 
                     skipRecursiveDependencyCheck: true, skipCaptiveDependencyCheck: true);
 
@@ -8023,14 +8023,31 @@ namespace DryIoc
             details == ServiceDetails.Default ? new ServiceInfo(serviceType) : new WithDetails(serviceType, details);
 
         /// <summary>Creates info out of provided settings</summary>
-        public static ServiceInfo Of(Type serviceType,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null) =>
-            Of(serviceType, null, ifUnresolved, serviceKey);
+        [MethodImpl((MethodImplOptions)256)]
+        public static ServiceInfo Of(Type serviceType) => new ServiceInfo(serviceType);
+
+        /// <summary>Creates info out of provided settings</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved) =>
+            ifUnresolved == IfUnresolved.Throw ? new ServiceInfo(serviceType) :
+            ifUnresolved == IfUnresolved.ReturnDefault ? new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefault) : 
+                new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered);
+
+        /// <summary>Creates info out of provided settings</summary>
+        public static ServiceInfo Of(Type serviceType, object serviceKey) =>
+            serviceKey == null ? new ServiceInfo(serviceType) : 
+            new WithDetails(serviceType, ServiceDetails.Of(null, serviceKey, IfUnresolved.Throw, null, null, null));
+
+        /// <summary>Creates info out of provided settings</summary>
+        public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved, object serviceKey) =>
+            serviceKey == null ? (ifUnresolved == IfUnresolved.Throw ? new ServiceInfo(serviceType)
+                : ifUnresolved == IfUnresolved.ReturnDefault ? new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefault)
+                : new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered))
+                : new WithDetails(serviceType, ServiceDetails.Of(null, serviceKey, ifUnresolved, null, null, null));
 
         /// <summary>Creates info out of provided settings</summary>
         public static ServiceInfo Of(Type serviceType, Type requiredServiceType,
-            IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null,
-            string metadataKey = null, object metadata = null)
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null, string metadataKey = null, object metadata = null)
         {
             (serviceType ?? requiredServiceType).ThrowIfNull();
 
@@ -8038,13 +8055,11 @@ namespace DryIoc
             if (serviceType == requiredServiceType)
                 requiredServiceType = null;
 
-            return serviceKey == null && requiredServiceType == null
-                && metadataKey == null && metadata == null
+            return serviceKey == null && requiredServiceType == null && metadataKey == null && metadata == null
                 ? (ifUnresolved == IfUnresolved.Throw ? new ServiceInfo(serviceType)
-                    : ifUnresolved == IfUnresolved.ReturnDefault ? new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefault)
-                    : new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered))
-                : new WithDetails(serviceType,
-                ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
+                : ifUnresolved == IfUnresolved.ReturnDefault ? new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefault)
+                : new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered))
+                : new WithDetails(serviceType, ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
         }
 
         /// <summary>Creates service info using typed <typeparamref name="TService"/>.</summary>
@@ -8064,7 +8079,7 @@ namespace DryIoc
         public override string ToString() =>
             new StringBuilder().Print(this).ToString();
 
-        internal ServiceInfo(Type serviceType) => ServiceType = serviceType;
+        internal ServiceInfo(Type serviceType) => ServiceType = serviceType.ThrowIfNull();
 
         private class WithDetails : ServiceInfo
         {
@@ -8360,11 +8375,30 @@ namespace DryIoc
         }
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
+        public static Request CreateResolutionRoot(IContainer container, Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        {
+            if (serviceType != null && serviceType.IsOpenGeneric())
+                Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
+
+            var flags = RequestFlags.IsResolutionCall;
+            var stack = RequestStack.Get();
+            ref var req = ref stack.GetOrPushRef(0);
+
+            var serviceTypeOrInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : (object)ServiceInfo.Of(serviceType, ifUnresolved);
+
+            // we are re-starting the dependency depth count from `1`
+            if (req == null)
+                req =  new Request(container, Empty, 1, 0, stack, flags, serviceTypeOrInfo, null);
+            else
+                req.SetServiceInfo(container, Empty, 1, 0, stack, flags, serviceTypeOrInfo, null);
+            return req;
+        }
+
+        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
         public static Request Create(IContainer container, Type serviceType,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             Request preResolveParent = null, RequestFlags flags = DefaultFlags, object[] inputArgs = null) =>
-            Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey),
-                preResolveParent, flags, inputArgs);
+            Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey), preResolveParent, flags, inputArgs);
 
         // todo: Make a property in v5.0
         /// <summary>Available in runtime only, provides access to container initiated the request.</summary>
@@ -8621,17 +8655,24 @@ namespace DryIoc
         /// Produces the new request with the changed `ifUnresolved` or returns original request otherwise
         public Request WithIfUnresolved(IfUnresolved ifUnresolved)
         {
-            if (_serviceInfo is Type && ifUnresolved == default)
-                return this;
+            ServiceInfo newServiceInfo = null;
+            var serviceTypeOrInfo = _serviceInfo;
+            if (serviceTypeOrInfo is Type t)
+            {
+                if (ifUnresolved == IfUnresolved.Throw)
+                    return this;
+                newServiceInfo = ServiceInfo.Of(t, ifUnresolved);
+            }
+            else 
+            {
+                var oldServiceInfo = (ServiceInfo)serviceTypeOrInfo;
+                if (oldServiceInfo.Details.IfUnresolved == ifUnresolved) 
+                    return this;
 
-            var oldServiceInfo = (ServiceInfo)_serviceInfo;
-            if (oldServiceInfo.Details.IfUnresolved == ifUnresolved) 
-                return this;
-
-            var newServiceInfo = oldServiceInfo.WithIfUnresolved(ifUnresolved);
-            if (newServiceInfo == oldServiceInfo)
-                return this;
-
+                newServiceInfo = oldServiceInfo.WithIfUnresolved(ifUnresolved);
+                if (newServiceInfo == oldServiceInfo)
+                    return this;
+            }
             return new Request(Container, DirectParent, DependencyDepth, DependencyCount, 
                 RequestStack, Flags, newServiceInfo, InputArgExprs,
                 _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
