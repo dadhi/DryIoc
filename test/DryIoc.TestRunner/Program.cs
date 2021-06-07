@@ -15,6 +15,7 @@ namespace DryIoc.UnitTests
 
         public static void RunAllTests()
         {
+            Scope.WaitForScopedServiceIsCreatedTimeoutTicks = 50; // @important
             var failed = false;
             var totalTestPassed = 0;
             void Run(Func<int> run, string name = null)

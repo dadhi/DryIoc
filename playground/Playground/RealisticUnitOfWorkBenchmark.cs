@@ -1180,27 +1180,26 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 
 |             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI | 92.17 us | 1.813 us | 3.492 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.54 KB |
 |             DryIoc | 83.32 us | 0.644 us | 0.602 us |  0.94 |    0.05 |  8.4229 | 0.6104 |     - |  51.76 KB |
 | DryIoc_MsDIAdapter | 91.00 us | 0.845 us | 0.706 us |  1.03 |    0.05 | 10.4980 | 0.7324 |     - |   64.9 KB |
+|               MsDI | 92.17 us | 1.813 us | 3.492 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.54 KB |
 
-## Optimizing ServiceInfo to serviceType in Request @wip
+## Optimizing out the ServiceInfo from the Request
 
 |             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI | 96.63 us | 1.865 us | 2.489 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.54 KB |
-|             DryIoc | 86.93 us | 1.315 us | 1.166 us |  0.90 |    0.03 |  7.8125 | 0.4883 |     - |  48.34 KB |
-| DryIoc_MsDIAdapter | 91.69 us | 1.595 us | 1.414 us |  0.95 |    0.03 |  9.8877 | 0.7324 |     - |  61.29 KB |
+|             DryIoc | 82.18 us | 1.473 us | 1.377 us |  1.00 |    0.00 |  7.0801 | 0.4883 |     - |  43.54 KB |
+| DryIoc_MsDIAdapter | 89.13 us | 1.748 us | 2.772 us |  1.08 |    0.04 |  9.1553 | 0.6104 |     - |  56.57 KB |
+|               MsDI | 91.95 us | 1.612 us | 1.508 us |  1.12 |    0.03 | 11.4746 | 2.8076 |     - |  70.54 KB |
 
 */
             [Benchmark(Baseline = true)]
-            public object MsDI() => Measure(PrepareMsDi());
-
-            [Benchmark]
             public object DryIoc() => Measure(PrepareDryIoc());
 
             [Benchmark]
             public object DryIoc_MsDIAdapter() => Measure(PrepareDryIocMsDi());
+            [Benchmark]
+            public object MsDI() => Measure(PrepareMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark
             //[Benchmark]

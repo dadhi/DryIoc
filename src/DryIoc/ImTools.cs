@@ -2501,13 +2501,21 @@ namespace DryIoc.ImTools
     public static class Hasher
     {
         /// <summary>Combines hashes of two fields</summary>
-        public static int Combine<T1, T2>(T1 a, T2 b) =>
-            Combine(a?.GetHashCode() ?? 0, b?.GetHashCode() ?? 0);
+        public static int Combine<T1, T2>(T1 a, T2 b) 
+        {
+            var bh = b?.GetHashCode() ?? 0;
+            if (ReferenceEquals(a, null))
+                return bh;
+            var ah = a.GetHashCode();
+            if (ah == 0)
+                return bh;
+            return Combine(ah, bh);
+        }
 
         /// <summary>Inspired by System.Tuple.CombineHashCodes</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static int Combine(int h1, int h2)
         {
-            if (h1 == 0) return h2;
             unchecked
             {
                 return (h1 << 5) + h1 ^ h2;
