@@ -8644,7 +8644,7 @@ namespace DryIoc
         /// <summary>Creates new request with provided info, and links current request as a parent.
         /// Allows to set some additional flags. Existing/parent request should be resolved to 
         /// factory via `WithResolvedFactory` before pushing info into it.</summary>
-        public Request PushParameter(ParameterInfo parameter, RequestFlags additionalFlags = default)
+        public Request Push(ParameterInfo parameter, RequestFlags additionalFlags = default)
         {
             if (FactoryID == 0)
                 Throw.It(Error.PushingToRequestWithoutFactory, ParameterServiceInfo.Of(parameter), this);
@@ -10675,7 +10675,7 @@ namespace DryIoc
                 }
 
                 var paramServiceInfo = paramSelector == null ? ParameterServiceInfo.OrNull(param) : paramSelector(param) ?? ParameterServiceInfo.OrNull(param);
-                var paramRequest  = paramServiceInfo == null ? request.PushParameter(param) : request.Push(paramServiceInfo);
+                var paramRequest  = paramServiceInfo == null ? request.Push(param) : request.Push(paramServiceInfo);
                 var paramDetails  = paramServiceInfo == null ? ServiceDetails.Default : paramServiceInfo.Details;
                 var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
                 if (usedOrCustomValExpr != null)
