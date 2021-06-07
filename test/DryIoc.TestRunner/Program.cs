@@ -9,8 +9,8 @@ namespace DryIoc.UnitTests
         public static void Main()
         {
             RunAllTests();
-    
-            // new OpenGenericsTests().Run();
+
+            // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
         }
 
         public static void RunAllTests()
