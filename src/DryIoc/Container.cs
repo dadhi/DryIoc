@@ -8478,12 +8478,12 @@ namespace DryIoc
         internal Expression[] InputArgExprs;
 
         /// <summary>Runtime known resolve factory, otherwise is <c>null</c></summary>
-        internal Factory Factory;
+        internal Factory Factory => _factoryOrImplType as Factory;
 
         /// <summary>Resolved factory ID, used to identify applied decorator.</summary>
         public int FactoryID { get; private set; }
 
-        // based on FactoryID
+        // based on the parent(s) and current request FactoryID
         private int _hashCode; // todo: @perf do we need to calculate and store the hash code if it is not used 
 
         /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
@@ -8493,8 +8493,8 @@ namespace DryIoc
         public int CombineDecoratorWithDecoratedFactoryID() => FactoryID | (DecoratedFactoryID << 16);
 
         /// <summary>Service implementation type if known.</summary>
-        public Type ImplementationType => _factoryImplType ?? Factory?.ImplementationType;
-        private Type _factoryImplType;
+        public Type ImplementationType => _factoryOrImplType as Type ?? Factory?.ImplementationType;
+        private object _factoryOrImplType;
 
         /// <summary>Service reuse.</summary>
         public IReuse Reuse { get; private set; }
@@ -8598,7 +8598,7 @@ namespace DryIoc
         public int ReuseLifespan => Reuse?.Lifespan ?? 0;
 
         /// <summary>Known implementation, or otherwise actual service type.</summary>
-        public Type GetKnownImplementationOrServiceType() => _factoryImplType ?? Factory?.ImplementationType ?? _actualServiceType;
+        public Type GetKnownImplementationOrServiceType() => _factoryOrImplType as Type ?? Factory?.ImplementationType ?? _actualServiceType;
 
         private ref Request GetOrPushPooledRequest(RequestStack stack, int indexInStack)
         {
@@ -8714,8 +8714,7 @@ namespace DryIoc
         {
             var serviceInfo = ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata);
             return new Request(Container, this, DependencyDepth + 1, 0, null, flags, serviceInfo, serviceInfo.GetActualServiceType(),
-                InputArgExprs, implementationType, null, // factory cannot be supplied in generated code
-                factoryID, factoryType, reuse, decoratedFactoryID);
+                InputArgExprs, implementationType, factoryID, factoryType, reuse, decoratedFactoryID);
         }
 
         internal static readonly Lazy<MethodInfo> PushMethodWith12Args = Lazy.Of(() =>
@@ -8739,7 +8738,7 @@ namespace DryIoc
             var actualServiceType = serviceInfo is Type t ? t : ((ServiceInfo)serviceInfo).GetActualServiceType();
             return new Request(Container, DirectParent, DependencyDepth, DependencyCount, 
                 RequestStack, Flags, serviceInfo, actualServiceType, InputArgExprs,
-                _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
+                _factoryOrImplType, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
         /// Produces the new request with the changed `ifUnresolved` or returns original request otherwise
@@ -8764,7 +8763,7 @@ namespace DryIoc
 
             return new Request(Container, DirectParent, DependencyDepth, DependencyCount, 
                 RequestStack, Flags, newServiceInfo, newServiceInfo.GetActualServiceType(), InputArgExprs,
-                _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
+                _factoryOrImplType, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
         // todo: in place mutation?
@@ -8772,7 +8771,7 @@ namespace DryIoc
         public Request WithFlags(RequestFlags newFlags) =>
             new Request(Container, DirectParent, DependencyDepth, DependencyCount,
                 RequestStack, newFlags, _serviceInfo, _actualServiceType, InputArgExprs,
-                _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
+                _factoryOrImplType, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // note: Mutates the request, required for proper caching
         /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
@@ -8797,7 +8796,7 @@ namespace DryIoc
         public Request WithInputArgs(Expression[] inputArgs) =>
             new Request(Container, DirectParent, DependencyDepth, DependencyCount,
                 RequestStack, Flags, _serviceInfo, _actualServiceType, inputArgs.Append(InputArgExprs),
-                _factoryImplType, Factory, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
+                _factoryOrImplType, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         /// <summary>Returns new request with set implementation details.</summary>
         /// <param name="factory">Factory to which request is resolved.</param>
@@ -8927,12 +8926,12 @@ namespace DryIoc
             if (copyRequest)
             {
                 IsolateRequestChain();
-                return new Request(Container, DirectParent, DependencyDepth, DependencyCount, null, flags, _serviceInfo, _actualServiceType,
-                    InputArgExprs, null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
+                return new Request(Container, DirectParent, DependencyDepth, DependencyCount, null, flags, _serviceInfo, _actualServiceType, InputArgExprs,
+                    factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             }
 
             Flags = flags;
-            SetResolvedFactory(null, factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
+            SetResolvedFactory(factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             return this;
         }
 
@@ -9113,9 +9112,9 @@ namespace DryIoc
         private Request(IContainer container, 
             Request parent, int dependencyDepth, int dependencyCount, RequestStack stack,
             RequestFlags flags, object serviceInfo, Type actualServiceType, Expression[] inputArgExprs,
-            Type factoryImplType, Factory factory, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
+            object factoryOrImplType, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
             : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, actualServiceType, inputArgExprs) =>
-            SetResolvedFactory(factoryImplType, factory, factoryID, factoryType, reuse, decoratedFactoryID);
+            SetResolvedFactory(factoryOrImplType, factoryID, factoryType, reuse, decoratedFactoryID);
 
         /// Severe the connection with the request pool up to the parent so that no one can change the Request state
         internal Request IsolateRequestChain()
@@ -9147,19 +9146,23 @@ namespace DryIoc
             DependencyDepth     = dependencyDepth;
             DependencyCount     = dependencyCount;
             Flags               = flags;
-            SetResolvedFactory(null, null, 0, FactoryType.Service, null, 0); // reset factory info
+            // resets the factory info:
+            _factoryOrImplType  = null;
+            Reuse               = null;
+            FactoryID           = 0;
+            DecoratedFactoryID  = 0;
+            _hashCode           = parent?._hashCode ?? 0;
+            FactoryType         = default;
         }
 
-        private void SetResolvedFactory(Type factoryImplType, 
-            Factory factory, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
+        private void SetResolvedFactory(object factoryOrImplType, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
         {
-            FactoryID = factoryID;
-            FactoryType = factoryType;
-            Reuse = reuse;
-            DecoratedFactoryID = decoratedFactoryID;
-            _hashCode = DirectParent == null ? FactoryID : Hasher.Combine(DirectParent._hashCode, FactoryID);
-            _factoryImplType = factoryImplType; // should be set from the runtime known `Factory` object
-            Factory = factory; // runtime state
+            _factoryOrImplType  = factoryOrImplType;
+            FactoryID           = factoryID;
+            FactoryType         = factoryType;
+            Reuse               = reuse;
+            DecoratedFactoryID  = decoratedFactoryID;
+            _hashCode           = DirectParent == null ? FactoryID : Hasher.Combine(DirectParent._hashCode, FactoryID);
         }
     }
 
