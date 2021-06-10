@@ -288,6 +288,28 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
+        public void How_Autofac_handles_service_with_missing_dependency()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<NoDep>();
+            var container = builder.Build();
+
+            Assert.Throws<DependencyResolutionException>(() => 
+                container.Resolve<NoDep>());
+        }
+
+        [Test]
+        public void How_Autofac_IEnumerable_handles_missing_service()
+        {
+            var builder = new ContainerBuilder();
+            var container = builder.Build();
+
+            var x = container.Resolve<IEnumerable<NoDep>>();
+
+            Assert.IsEmpty(x);
+        }
+
+        [Test]
         public void How_Autofac_IEnumerable_handles_service_with_missing_dependency()
         {
             var builder = new ContainerBuilder();
@@ -321,6 +343,16 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
+        public void How_DryIoc_IEnumerable_handles_missing_service()
+        {
+            var container = new Container();
+
+            var x = container.Resolve<IEnumerable<NoDep>>();
+
+            Assert.IsEmpty(x);
+        }
+
+        [Test]
         public void How_DryIoc_IEnumerable_handles_service_with_missing_dependency()
         {
             var container = new Container();
@@ -330,13 +362,19 @@ namespace DryIoc.IssuesTests
                 container.Resolve<IEnumerable<NoDep>>());
         }
 
+        [Test]
+        public void DryIoc_IEnumerable_may_exclude_service_with_missing_dependency()
+        {
+            var container = new Container();
+            container.Register<NoDep>();
+
+            container.Resolve<IEnumerable<NoDep>>(IfUnresolved.ReturnDefault);
+        }
+
         public class NoDep
         {
             public ISomeDep Dep { get; }
-            public NoDep(ISomeDep dep)
-            {
-                Dep = dep;
-            }
+            public NoDep(ISomeDep dep) => Dep = dep;
         }
 
         public interface ISomeDep { }
