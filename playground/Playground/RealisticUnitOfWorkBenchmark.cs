@@ -1200,6 +1200,14 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDIAdapter | 89.94 us | 1.798 us | 2.401 us |  1.09 |    0.03 |  9.0332 | 0.6104 |     - |   55.8 KB |
 |               MsDI | 94.11 us | 0.938 us | 0.877 us |  1.13 |    0.02 | 11.4746 | 2.8076 |     - |  70.55 KB |
 
+## Optimizing the Registry more
+
+|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|             DryIoc | 83.04 us | 1.407 us | 1.316 us |  1.00 |    0.00 |  6.7139 | 0.4883 |     - |  41.41 KB |
+| DryIoc_MsDIAdapter | 97.32 us | 1.849 us | 1.816 us |  1.17 |    0.02 |  8.7891 | 0.6104 |     - |  54.39 KB |
+|               MsDI | 90.81 us | 1.233 us | 1.093 us |  1.09 |    0.02 | 11.5967 | 3.0518 |     - |  70.85 KB |
+
 */
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
@@ -1210,22 +1218,22 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             public object MsDI() => Measure(PrepareMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark
-            [Benchmark]
+            // [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace_MsDIAdapter() => Measure(PrepareGraceMsDi());
 
-            [Benchmark]
+            // [Benchmark]
             public object Lamar_MsDIAdapter() => Measure(PrepareLamarMsDi());
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac_MsDIAdapter() => Measure(PrepareAutofacMsDi());
         }
 

@@ -2327,11 +2327,20 @@ namespace DryIoc.ImTools
         public T Swap(Func<T, T> getNewValue) =>
             Ref.Swap(ref _value, getNewValue);
 
-        /// Option without allocation for capturing `a` in closure of `getNewValue`
-        public T Swap<A>(A a, Func<T, A, T> getNewValue) => Ref.Swap(ref _value, a, getNewValue);
+        /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
+        /// May prevent closure creation for the delegate</summary>
+        public T Swap<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) => 
+             Ref.Swap(ref _value, a, getNewValue, retryCountUntilThrow);
 
-        /// Option without allocation for capturing `a` and `b` in closure of `getNewValue`
-        public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue) => Ref.Swap(ref _value, a, b, getNewValue);
+        /// <summary>Swap with the additional state <paramref name="a"/>, <paramref name="b"/> required for the delegate <paramref name="getNewValue"/>.
+        /// May prevent closure creation for the delegate</summary>
+        public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) => 
+             Ref.Swap(ref _value, a, b, getNewValue, retryCountUntilThrow);
+
+        /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
+        /// May prevent closure creation for the delegate</summary>
+        public T SwapAndGetNewValue<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) => 
+             Ref.SwapAndGetNewValue(ref _value, a, getNewValue, retryCountUntilThrow);
 
         /// <summary>Just sets new value ignoring any intermingled changes and returns the original value</summary>
         /// <param name="newValue"></param> <returns>old value</returns>
@@ -3043,7 +3052,7 @@ namespace DryIoc.ImTools
     public delegate V Update<K, V>(K key, V oldValue, V newValue);
 
     /// <summary>Entry containing the Key and Value in addition to the Hash</summary>
-    public sealed class ImHashMapEntry<K, V> : ImHashMap<K, V>.Entry
+    public class ImHashMapEntry<K, V> : ImHashMap<K, V>.Entry
     {
         /// <summary>The key</summary>
         public readonly K Key;

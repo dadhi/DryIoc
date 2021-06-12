@@ -211,14 +211,14 @@ namespace DryIoc
         /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
         /// <remarks>Decorator and Wrapper types are not included.</remarks>
         public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations() =>
-            _registry.Value.GetServiceRegistrations();
+             Registry.GetServiceRegistrations(_registry.Value);
 
-        // todo: Make `serviceKey` and `factoryType` optional
+        // todo: @api Make `serviceKey` and `factoryType` optional
         /// <summary>Searches for registered factories by type, and key (if specified),
         /// and by factory type (by default uses <see cref="FactoryType.Service"/>).
         /// May return empty, 1 or multiple factories.</summary>
         public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType) =>
-            _registry.Value.GetRegisteredFactories(serviceType.ThrowIfNull(), serviceKey, factoryType);
+            Registry.GetRegisteredFactories(_registry.Value, serviceType.ThrowIfNull(), serviceKey, factoryType);
 
         /// <summary>Stores factory into container using <paramref name="serviceType"/> and <paramref name="serviceKey"/> as key
         /// for later lookup.</summary>
@@ -248,26 +248,26 @@ namespace DryIoc
             var r = _registry.Value;
             if (serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition && serviceType.ContainsGenericParameters)
                 serviceType = serviceType.GetGenericTypeDefinition();
-            if (!_registry.TrySwapIfStillCurrent(r, r.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
+            if (!_registry.TrySwapIfStillCurrent(r, Registry.Register(r, factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
                 RegistrySwap(factory, serviceType, serviceKey, ifAlreadyRegistered);
         }
 
         // hiding nested lambda in method to reduce allocations
-        private Registry RegistrySwap(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered) => 
-            _registry.Swap(r => r.Register(factory, serviceType, ifAlreadyRegistered.Value, serviceKey));
+        private ImHashMap<Type, object> RegistrySwap(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered) => 
+            _registry.Swap(r => Registry.Register(r, factory, serviceType, ifAlreadyRegistered.Value, serviceKey));
 
         /// <inheritdoc />
         public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
             ThrowIfContainerDisposed();
-            return _registry.Value.IsRegistered(serviceType, serviceKey, factoryType, condition);
+            return Registry.IsRegistered(_registry.Value, serviceType, serviceKey, factoryType, condition);
         }
 
         /// <inheritdoc />
         public void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
             ThrowIfContainerDisposed();
-            _registry.Swap(r => r.Unregister(factoryType, serviceType, serviceKey, condition));
+            _registry.Swap(r => Registry.Unregister(r, factoryType, serviceType, serviceKey, condition));
         }
 
 #endregion
@@ -292,7 +292,7 @@ namespace DryIoc
                 return service;
 
             var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
-            var entry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
+            var entry = Registry.GetCachedDefaultFactoryOrDefault(_registry.Value, serviceTypeHash, serviceType);
             if (entry != null)
             {
                 if (entry.Value is FactoryDelegate cachedDelegate)
@@ -424,7 +424,7 @@ namespace DryIoc
                     : serviceKey == null ? scopeName
                     : KV.Of(scopeName, serviceKey);
 
-                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceTypeHash, serviceType, cacheKey, out var cacheEntry))
+                if (Registry.GetCachedKeyedFactoryOrDefault(_registry.Value, serviceTypeHash, serviceType, cacheKey, out var cacheEntry))
                 {
                     if (cacheEntry.Factory is FactoryDelegate cachedDelegate)
                         return cachedDelegate(this);
@@ -450,7 +450,7 @@ namespace DryIoc
             if (cacheKey != null && serviceKey == null && request.ServiceKey != null)
             {
                 cacheKey = scopeName == null ? request.ServiceKey : KV.Of(scopeName, request.ServiceKey);
-                if (_registry.Value.GetCachedKeyedFactoryOrDefault(serviceTypeHash, serviceType, cacheKey, out var cacheEntry))
+                if (Registry.GetCachedKeyedFactoryOrDefault(_registry.Value, serviceTypeHash, serviceType, cacheKey, out var cacheEntry))
                 {
                     if (cacheEntry.Factory is FactoryDelegate cachedDelegate)
                         return cachedDelegate(this);
@@ -719,7 +719,7 @@ namespace DryIoc
             (CurrentScope ?? SingletonScope).SetUsedInstance(serviceTypeHash, serviceType, factory);
             
              // reset the cache if any
-            var cacheEntry = _registry.Value.GetCachedDefaultFactoryOrDefault(serviceTypeHash, serviceType);
+            var cacheEntry = Registry.GetCachedDefaultFactoryOrDefault(_registry.Value, serviceTypeHash, serviceType);
             if (cacheEntry != null)
                 cacheEntry.Value = null;
         }
@@ -753,16 +753,27 @@ namespace DryIoc
         {
             ThrowIfContainerDisposed();
 
-            var registry =
-                registrySharing == RegistrySharing.Share ? 
-                    _registry :
-                registrySharing == RegistrySharing.CloneButKeepCache 
-                    ? Ref.Of(_registry.Value)
-                    : Ref.Of(_registry.Value.WithoutCache());
+            var registryOrServices = _registry.Value;
+            var r = registryOrServices as Registry;
 
-            if (isRegistryChangePermitted != null &&
-                isRegistryChangePermitted.Value != registry.Value.IsChangePermitted)
-                registry = Ref.Of(registry.Value.WithIsChangePermitted(isRegistryChangePermitted.Value));
+            var registry =
+                registrySharing == RegistrySharing.Share ? _registry :
+                registrySharing == RegistrySharing.CloneButKeepCache ? Ref.Of(registryOrServices)
+                // CloneAndDropCache
+                : r != null ? Ref.Of((ImHashMap<Type, object>)r.WithoutCache()) : Ref.Of(registryOrServices);
+
+            if (isRegistryChangePermitted.HasValue)
+            {
+                var isChangePermitted = isRegistryChangePermitted.Value;
+                r = registry.Value as Registry;
+                if (r != null)
+                {
+                    if (r.IsChangePermitted != isChangePermitted)
+                        registry = Ref.Of((ImHashMap<Type, object>)r.WithIsChangePermitted(isChangePermitted));
+                }
+                else if (isChangePermitted != IsRegistryChangePermitted.Permitted)
+                    registry = Ref.Of((ImHashMap<Type, object>)new Registry.AndCache(registryOrServices, isChangePermitted));
+            } 
 
             return new Container(rules ?? Rules, registry, singletonScope ?? NewSingletonScope(), scopeContext,
                 currentScope ?? _ownCurrentScope, _disposed, _disposeStackTrace, parent ?? _parent);
@@ -780,20 +791,24 @@ namespace DryIoc
             var hash = RuntimeHelpers.GetHashCode(serviceType);
 
             if (factoryType != null)
-                return _registry.Value.ClearCache(hash, serviceType, serviceKey, factoryType.Value);
+                return Registry.ClearCache(_registry.Value, hash, serviceType, serviceKey, factoryType.Value);
 
             var registry = _registry.Value;
-
-            var clearedServices  = registry.ClearCache(hash, serviceType, serviceKey, FactoryType.Service);
-            var clearedWrapper   = registry.ClearCache(hash, serviceType, serviceKey, FactoryType.Wrapper);
-            var clearedDecorator = registry.ClearCache(hash, serviceType, serviceKey, FactoryType.Decorator);
+            var clearedServices  = Registry.ClearCache(registry, hash, serviceType, serviceKey, FactoryType.Service);
+            var clearedWrapper   = Registry.ClearCache(registry, hash, serviceType, serviceKey, FactoryType.Wrapper);
+            var clearedDecorator = Registry.ClearCache(registry, hash, serviceType, serviceKey, FactoryType.Decorator);
 
             return clearedServices || clearedWrapper || clearedDecorator;
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<object> slot) => 
-            _registry.Value.GetCachedFactoryExpression(factoryId, reuse, out slot);
+        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<object> slot)
+        {
+            if (_registry.Value is Registry r) 
+                return r.GetCachedFactoryExpression(factoryId, reuse, out slot);
+            slot = null;
+            return null;
+        }
 
         Factory IContainer.ResolveFactory(Request request)
         {
@@ -866,7 +881,8 @@ namespace DryIoc
             if (Rules.FactorySelector != null && serviceKey == null)
                 return GetRuleSelectedServiceFactoryOrDefault(request, details, serviceType);
 
-            var serviceFactories = _registry.Value.Services;
+            var registryOrServices = _registry.Value;
+            var serviceFactories = registryOrServices is Registry r ? r.Services : registryOrServices;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             // For closed-generic type, when the entry is not found or the key in entry is not found go for the open-generic services
@@ -1024,7 +1040,8 @@ namespace DryIoc
 
         private Factory GetRuleSelectedServiceFactoryOrDefault(Request request, ServiceDetails details, Type serviceType)
         {
-            var serviceFactories = _registry.Value.Services;
+            var registryOrServices = _registry.Value;
+            var serviceFactories = registryOrServices is Registry r ? r.Services : registryOrServices;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             KV<object, Factory>[] factories;
@@ -1178,7 +1195,9 @@ namespace DryIoc
 
         KV<object, Factory>[] IContainer.GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics)
         {
-            var serviceFactories = _registry.Value.Services;
+            var registryOrServices = _registry.Value;
+            var serviceFactories = registryOrServices is Registry r ? r.Services : registryOrServices;
+
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             var factories = GetRegistryEntryKeyFactoryPairs(entry).ToArrayOrSelf();
@@ -1277,7 +1296,8 @@ namespace DryIoc
         Expression IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
             // return early if no decorators registered
-            if (_registry.Value.Decorators.IsEmpty && request.Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+            var r = _registry.Value as Registry;
+            if ((r == null || r.Decorators.IsEmpty) && request.Rules.DynamicRegistrationProviders.IsNullOrEmpty())
                 return null;
 
             var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
@@ -1413,7 +1433,8 @@ namespace DryIoc
 
         Factory IContainer.GetWrapperFactoryOrDefault(Type serviceType)
         {
-            var wrappers = _registry.Value.Wrappers;
+            var r = _registry.Value as Registry;
+            var wrappers = r != null ? r.Wrappers : WrappersSupport.Wrappers;
             var wrapper = wrappers.GetValueOrDefault(serviceType);
             if (wrapper == null)
             {
@@ -1427,8 +1448,7 @@ namespace DryIoc
         Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
         {
             var decorators = Empty<Factory>();
-
-            var allDecorators = _registry.Value.Decorators;
+            var allDecorators = _registry.Value is Registry r ? r.Decorators : ImHashMap<Type, object>.Empty;
             if (!allDecorators.IsEmpty)
                 decorators = (Factory[])allDecorators.GetValueOrDefault(serviceType) ?? Empty<Factory>();
 
@@ -1693,7 +1713,8 @@ namespace DryIoc
 
         private int                       _disposed;
         private StackTrace                _disposeStackTrace;
-        internal readonly Ref<Registry>   _registry;
+        // todo: @api expose in the IContainer interface for the internal use
+        internal readonly Ref<ImHashMap<Type, object>> _registry; // either map of Services or the Registry class
         private readonly IScope           _singletonScope;
         private readonly IScope           _ownCurrentScope;
         private readonly IScopeContext    _scopeContext;
@@ -1702,43 +1723,36 @@ namespace DryIoc
         internal void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
         {
             // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            var registry = _registry.Value;
-            if (registry.Services.IsEmpty)
+            var registryOrServices = _registry.Value;
+            var registry = registryOrServices as Registry;
+            if (registry == null ? registryOrServices.IsEmpty : registry.Services.IsEmpty)
                 return;
 
-            var withCache = registry as Registry.AndCache;
-            if (withCache == null)
-            {
-                _registry.Swap(r => r.WithDefaultFactoryCache()); // todo: @perf optimize
-                withCache = (Registry.AndCache)_registry.Value;
-            }
+            var withCache = registry as Registry.AndCache ??
+                (Registry.AndCache)_registry.SwapAndGetNewValue(0, (r, _) => (r as Registry ?? new Registry(r)).WithDefaultFactoryCache()); // todo: @perf optimize
+
             withCache.TryCacheDefaultFactory(serviceTypeHash, serviceType, factory);
         }
 
         internal void TryCacheKeyedFactory(int serviceTypeHash, Type serviceType, object key, object factory)
         {
             // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            var registry = _registry.Value;
-            if (registry.Services.IsEmpty)
+            var registryOrServices = _registry.Value;
+            var registry = registryOrServices as Registry;
+            if (registry == null ? registryOrServices.IsEmpty : registry.Services.IsEmpty)
                 return;
 
-            var withCache = registry as Registry.AndCache;
-            if (withCache == null)
-            {
-                _registry.Swap(r => r.WithKeyedFactoryCache()); // todo: @perf optimize
-                withCache = (Registry.AndCache)_registry.Value;
-            }
+            var withCache = registry as Registry.AndCache ??
+                (Registry.AndCache)_registry.SwapAndGetNewValue(0, (r, _) => (r as Registry ?? new Registry(r)).WithKeyedFactoryCache()); // todo: @perf optimize
+
             withCache.TryCacheKeyedFactory(serviceTypeHash, serviceType, key, factory);
         }
 
         internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<object> entry = null)
         {
-            var withCache = _registry.Value as Registry.AndCache;
-            if (withCache == null)
-            {
-                _registry.Swap(r => r.WithFactoryExpressionCache()); // todo: @perf optimize
-                withCache = (Registry.AndCache)_registry.Value;
-            }
+            var withCache = _registry.Value as Registry.AndCache ??
+                (Registry.AndCache)_registry.SwapAndGetNewValue(0, (r, _) => (r as Registry ?? new Registry(r)).WithFactoryExpressionCache()); // todo: @perf optimize
+
             withCache.CacheFactoryExpression(factoryId, expr, reuse, dependencyCount, entry);
         }
 
@@ -1764,9 +1778,9 @@ namespace DryIoc
             }
         }
 
-        internal class Registry
+        internal class Registry : ImHashMapEntry<Type, object>
         {
-            public static readonly Registry Default = new Registry(ImHashMap<Type, object>.Empty);
+            public static readonly ImHashMap<Type, object> Default = ImHashMap<Type, object>.Empty;
 
             public readonly ImHashMap<Type, object> Services;
             public virtual  ImHashMap<Type, object> Wrappers => WrappersSupport.Wrappers; // value is Factory 
@@ -1793,10 +1807,10 @@ namespace DryIoc
             }
 
             [MethodImpl((MethodImplOptions)256)]
-            public ImHashMapEntry<Type, object> GetCachedDefaultFactoryOrDefault(int serviceTypeHash, Type serviceType)
+            public static ImHashMapEntry<Type, object> GetCachedDefaultFactoryOrDefault(ImHashMap<Type, object> rs, int serviceTypeHash, Type serviceType)
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
-                var cache = DefaultFactoryCache;
+                var cache = (rs as Registry)?.DefaultFactoryCache;
                 return cache == null ? null : cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
             }
 
@@ -1814,10 +1828,11 @@ namespace DryIoc
             }
 
             [MethodImpl((MethodImplOptions)256)]
-            public bool GetCachedKeyedFactoryOrDefault(int serviceTypeHash, Type serviceType, object key, out KeyedFactoryCacheEntry result)
+            public static bool GetCachedKeyedFactoryOrDefault(ImHashMap<Type, object> rs,
+                int serviceTypeHash, Type serviceType, object key, out KeyedFactoryCacheEntry result)
             {
                 result = null;
-                var cache = KeyedFactoryCache;
+                var cache = (rs as Registry)?.KeyedFactoryCache;
                 if (cache != null)
                 {
                     var entry = cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
@@ -1866,7 +1881,7 @@ namespace DryIoc
                 return null; // could be `expr == null` when the cache is reset by Unregister and IfAlreadyRegistered.Replace
             }
 
-            private Registry(ImHashMap<Type, object> services) => Services = services;
+            internal Registry(ImHashMap<Type, object> services) : base(0, typeof(Registry)) => Services = services;
 
             internal sealed class AndWrappersAndDecorators : Registry
             {
@@ -1916,6 +1931,9 @@ namespace DryIoc
                 protected ImMap<object>[] _factoryExpressionCache;
                 internal sealed override IsRegistryChangePermitted IsChangePermitted => _isChangePermitted;
                 protected IsRegistryChangePermitted _isChangePermitted;
+
+                internal AndCache(ImHashMap<Type, object> services, IsRegistryChangePermitted  isChangePermitted) : base(services) =>
+                    _isChangePermitted = isChangePermitted;
 
                 internal AndCache(
                     ImHashMap<Type, object>    services,
@@ -2118,6 +2136,7 @@ namespace DryIoc
 
             public virtual Registry WithoutCache() => this;
 
+            // todo: @perf optimize to avoid creating the new Registry instance when called in WithCache and descendants
             public virtual Registry WithDefaultFactoryCache() =>
                 new AndCache(Services, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, null, default);
 
@@ -2142,9 +2161,11 @@ namespace DryIoc
                 isChangePermitted == default ? this :
                 (Registry)new AndCache(Services, null, null, null, isChangePermitted);
 
-            public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations()
+            public static IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations(ImHashMap<Type, object> registryOrServices)
             {
-                foreach (var entry in Services.Enumerate())
+                var r = registryOrServices as Registry;
+                var services = r == null ? registryOrServices : r.Services;
+                foreach (var entry in services.Enumerate())
                 {
                     if (entry.Value is Factory factory)
                         yield return new ServiceRegistrationInfo(factory, entry.Key, null);
@@ -2178,58 +2199,72 @@ namespace DryIoc
                 }
             }
 
-            public Registry Register(Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
+            public static ImHashMap<Type, object> Register(ImHashMap<Type, object> registryOrServices,
+                Factory factory, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
             {
-                if (IsChangePermitted != IsRegistryChangePermitted.Permitted)
-                    return IsChangePermitted == IsRegistryChangePermitted.Ignored ? this
+                var r = registryOrServices as Registry;
+                if (r != null && r.IsChangePermitted != IsRegistryChangePermitted.Permitted)
+                    return r.IsChangePermitted == IsRegistryChangePermitted.Ignored ? registryOrServices
                         : Throw.For<Registry>(Error.NoMoreRegistrationsAllowed,
                             serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factory);
 
                 var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
+                if (factory.FactoryType == FactoryType.Service)
+                {
+                    return serviceKey == null 
+                        ? WithDefaultService(r, registryOrServices, factory, serviceTypeHash, serviceType, ifAlreadyRegistered) 
+                        : WithKeyedService(r, registryOrServices, factory, serviceTypeHash, serviceType, ifAlreadyRegistered, serviceKey);
+                }
 
-                return factory.FactoryType == FactoryType.Service
-                        ? serviceKey == null 
-                            ? WithDefaultService(factory, serviceTypeHash, serviceType, ifAlreadyRegistered) 
-                            : WithKeyedService(factory, serviceTypeHash, serviceType, ifAlreadyRegistered, serviceKey)
-                    : factory.FactoryType == FactoryType.Decorator
-                        ? WithDecorators(Decorators.AddOrUpdate(serviceTypeHash, serviceType, factory.One(), 
-                            (_, older, newer) => Container.MergeSortedByLatestOrderOrRegistration((Factory[])older, (Factory[])newer)))
-                        : WithWrappers(Wrappers.AddOrUpdate(serviceTypeHash, serviceType, factory));
+                r = r ?? new Registry(registryOrServices); // todo: @perf remove the temporary new Registry allocation
+                return factory.FactoryType == FactoryType.Decorator
+                    ? r.WithDecorators(r.Decorators.AddOrUpdate(serviceTypeHash, serviceType, factory.One(), 
+                        (_, older, newer) => Container.MergeSortedByLatestOrderOrRegistration((Factory[])older, (Factory[])newer)))
+                    : r.WithWrappers(r.Wrappers.AddOrUpdate(serviceTypeHash, serviceType, factory));
             }
 
-            public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType)
+            public static Factory[] GetRegisteredFactories(ImHashMap<Type, object> registryOrServices,
+                Type serviceType, object serviceKey, FactoryType factoryType)
             {
                 serviceType = serviceType.ThrowIfNull();
                 switch (factoryType)
                 {
                     case FactoryType.Wrapper:
                     {
+                        var r = registryOrServices as Registry;
+                        var wrappers = r != null ? r.Wrappers : WrappersSupport.Wrappers;
                         // first checking for the explicitly provided say `MyWrapper<IMyService>`
-                        if (Wrappers.GetValueOrDefault(serviceType) is Factory wrapper)
+                        if (wrappers.GetValueOrDefault(serviceType) is Factory wrapper)
                             return wrapper.One();
 
                         var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
                         if (openGenServiceType != null &&
-                            Wrappers.GetValueOrDefault(openGenServiceType) is Factory openGenWrapper)
+                            wrappers.GetValueOrDefault(openGenServiceType) is Factory openGenWrapper)
                             return openGenWrapper.One();
 
                         if (serviceType.GetArrayElementTypeOrNull() != null &&
-                            Wrappers.GetValueOrDefault(typeof(IEnumerable<>)) is Factory collectionWrapper)
+                            wrappers.GetValueOrDefault(typeof(IEnumerable<>)) is Factory collectionWrapper)
                             return collectionWrapper.One();
 
                         return null;
                     }
                     case FactoryType.Decorator:
                     {
-                        var decorators = Decorators.GetValueOrDefault(serviceType) as Factory[];
+                        var r = registryOrServices as Registry;
+                        if (r == null)
+                            return null;
+                        var allDecorators = r.Decorators; 
+                        var decorators = allDecorators.GetValueOrDefault(serviceType) as Factory[];
                         var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
                         if (openGenServiceType != null)
-                            decorators = decorators.Append(Decorators.GetValueOrDefault(openGenServiceType) as Factory[]);
+                            decorators = decorators.Append(allDecorators.GetValueOrDefault(openGenServiceType) as Factory[]);
                         return decorators;
                     }
                     default:
                     {
-                        var entry = Services.GetValueOrDefault(serviceType);
+                        var r = registryOrServices as Registry;
+                        var services = r == null ? registryOrServices : r.Services; 
+                        var entry = services.GetValueOrDefault(serviceType);
                         if (entry == null)
                             return null;
 
@@ -2245,26 +2280,30 @@ namespace DryIoc
                 }
             }
 
-            public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
+            public static bool IsRegistered(ImHashMap<Type, object> registryOrServices,
+                Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
             {
                 serviceType = serviceType.ThrowIfNull();
                 switch (factoryType)
                 {
                     case FactoryType.Wrapper:
                     {
+                        var r = registryOrServices as Registry;
+                        var wrappers = r != null ? r.Wrappers : WrappersSupport.Wrappers;
+
                         // first checking for the explicitly provided say `MyWrapper<IMyService>`
-                        if (Wrappers.GetValueOrDefault(serviceType) is Factory wrapper &&
+                        if (wrappers.GetValueOrDefault(serviceType) is Factory wrapper &&
                             (condition == null || condition(wrapper)))
                             return true;
 
                         var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
                         if (openGenServiceType != null &&
-                            Wrappers.GetValueOrDefault(openGenServiceType) is Factory openGenWrapper &&
+                            wrappers.GetValueOrDefault(openGenServiceType) is Factory openGenWrapper &&
                             (condition == null || condition(openGenWrapper)))
                             return true;
 
                         if (serviceType.GetArrayElementTypeOrNull() != null &&
-                            Wrappers.GetValueOrDefault(typeof(IEnumerable<>)) is Factory collectionWrapper &&
+                            wrappers.GetValueOrDefault(typeof(IEnumerable<>)) is Factory collectionWrapper &&
                             (condition == null || condition(collectionWrapper)))
                             return true;
 
@@ -2272,13 +2311,18 @@ namespace DryIoc
                     }
                     case FactoryType.Decorator:
                     {
-                        if (Decorators.GetValueOrDefault(serviceType) is Factory[] decorators && decorators.Length != 0 &&
+                        var r = registryOrServices as Registry;
+                        if (r == null)
+                            return false;
+
+                        var allDecorators = r.Decorators;
+                        if (allDecorators.GetValueOrDefault(serviceType) is Factory[] decorators && decorators.Length != 0 &&
                             (condition == null || decorators.FindFirst(condition) != null))
                             return true;
 
                         var openGenServiceType = serviceType.GetGenericDefinitionOrNull();
                         if (openGenServiceType != null &&
-                            Decorators.GetValueOrDefault(openGenServiceType) is Factory[] openGenDecorators && openGenDecorators.Length != 0 &&
+                            allDecorators.GetValueOrDefault(openGenServiceType) is Factory[] openGenDecorators && openGenDecorators.Length != 0 &&
                             (condition == null || openGenDecorators.FindFirst(condition) != null))
                             return true;
 
@@ -2288,7 +2332,8 @@ namespace DryIoc
                     {
                         // We are not checking the open-generic for the closed-generic service type
                         // to be able to explicitly understand what registration is available - open or the closed-generic
-                        var entry = Services.GetValueOrDefault(serviceType);
+                        var services = registryOrServices is Registry r ? r.Services : registryOrServices; 
+                        var entry = services.GetValueOrDefault(serviceType);
                         if (entry == null)
                             return false;
 
@@ -2307,29 +2352,32 @@ namespace DryIoc
                 }
             }
 
-            public bool ClearCache(int hash, Type serviceType, object serviceKey, FactoryType factoryType)
+            public static bool ClearCache(ImHashMap<Type, object> registryOrServices,
+                int hash, Type serviceType, object serviceKey, FactoryType factoryType)
             {
-                var factories = GetRegisteredFactories(serviceType, serviceKey, factoryType);
+                var factories = GetRegisteredFactories(registryOrServices, serviceType, serviceKey, factoryType);
                 if (factories.IsNullOrEmpty())
                     return false;
 
-                for (var i = 0; i < factories.Length; i++)
-                    DropFactoryCache(factories[i], hash, serviceType, serviceKey);
+                if (registryOrServices is Registry r)
+                    for (var i = 0; i < factories.Length; i++)
+                        r.DropFactoryCache(factories[i], hash, serviceType, serviceKey);
 
                 return true;
             }
 
-            private Registry WithDefaultService(Factory factory, int serviceTypeHash, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered)
+            private static ImHashMap<Type, object> WithDefaultService(Registry r, ImHashMap<Type, object> registryOrServices,
+                Factory factory, int serviceTypeHash, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered)
             {
-                var services = Services;
+                var services = r == null ? registryOrServices : r.Services;
                 var newEntry = ImHashMap.Entry(serviceTypeHash, serviceType, (object)factory);
                 if (services.IsEmpty)
-                    return WithServices(newEntry);
+                    return r == null ? newEntry : r.WithServices(newEntry);
 
                 var mapOrOldEntry = services.AddOrGetEntry(serviceTypeHash, newEntry);
                 var oldEntry = mapOrOldEntry as ImHashMap<Type, object>.Entry;
                 if (oldEntry == null)
-                    return WithServices(mapOrOldEntry);
+                    return r == null ? mapOrOldEntry : r.WithServices(mapOrOldEntry);
 
                 var updatedEntry = oldEntry.UpdateOrKeep(ifAlreadyRegistered, newEntry, (i, o, n) => 
                 {
@@ -2394,30 +2442,35 @@ namespace DryIoc
                 });
 
                 if (updatedEntry == oldEntry)
-                    return this;
+                    return registryOrServices;
 
-                var newRegistry = WithServices(services.ReplaceEntry(serviceTypeHash, oldEntry, updatedEntry));
+                var newServices = services.ReplaceEntry(serviceTypeHash, oldEntry, updatedEntry);
+                if (r == null)
+                    return newServices;
+
+                r = r.WithServices(newServices);
 
                 // Don't forget the drop cache for the old value if any
                 var oldValue = oldEntry.GetEntryOrNull(serviceTypeHash, serviceType)?.Value;
                 if (oldValue is Factory oldFactory)
-                    newRegistry.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
+                    r.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
                 else if (oldValue is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
                     oldFactoriesEntry.Factories.ForEach(
-                        new{ newRegistry, serviceTypeHash, serviceType }, 
+                        new{ r, serviceTypeHash, serviceType }, 
                         (x, _, s) =>
                         {
                             if (x.Key is DefaultKey)
-                                s.newRegistry.DropFactoryCache(x.Value, s.serviceTypeHash, s.serviceType);
+                                s.r.DropFactoryCache(x.Value, s.serviceTypeHash, s.serviceType);
                         });
 
-                return newRegistry;
+                return r;
             }
 
-            private Registry WithKeyedService(Factory factory, int serviceTypeHash, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
+            private static ImHashMap<Type, object> WithKeyedService(Registry r, ImHashMap<Type, object> registryOrServices,
+                Factory factory, int serviceTypeHash, Type serviceType, IfAlreadyRegistered ifAlreadyRegistered, object serviceKey)
             {
+                var services = r == null ? registryOrServices : r.Services;
                 object newEntry = null;
-                var services = Services;
                 var oldEntry = services.GetValueOrDefault(serviceTypeHash, serviceType);
                 if (oldEntry != null)
                 {
@@ -2430,9 +2483,8 @@ namespace DryIoc
                             {
                                 var oldFacs = (FactoriesEntry)oldEntry;
                                 if (oldFacs.Factories.Contains(serviceKey))
-                                    return this; // keep the old registry
-                                newEntry = new FactoriesEntry(oldFacs.LastDefaultKey,
-                                    oldFacs.Factories.AddOrUpdate(serviceKey, factory));
+                                    return registryOrServices; // keep the old registry
+                                newEntry = new FactoriesEntry(oldFacs.LastDefaultKey, oldFacs.Factories.AddOrUpdate(serviceKey, factory));
                             }
                             break;
                         case IfAlreadyRegistered.Replace:
@@ -2461,21 +2513,27 @@ namespace DryIoc
                 if (newEntry == null)
                     newEntry = FactoriesEntry.Empty.With(factory, serviceKey);
 
-                var newRegistry = WithServices(services.AddOrUpdate(serviceTypeHash, serviceType, newEntry));
+                var newServices = services.AddOrUpdate(serviceTypeHash, serviceType, newEntry);
+                if (r == null)
+                    return newServices; 
+                
+                r = r.WithServices(newServices);
 
                 if (oldEntry != null && ifAlreadyRegistered == IfAlreadyRegistered.Replace &&
                     oldEntry is FactoriesEntry updatedOldFactories &&
                     updatedOldFactories.Factories.TryFind(serviceKey, out var droppedFactory))
-                    newRegistry.DropFactoryCache(droppedFactory, serviceTypeHash, serviceType, serviceKey);
+                    r.DropFactoryCache(droppedFactory, serviceTypeHash, serviceType, serviceKey);
 
-                return newRegistry;
+                return r;
             }
 
             // todo: @perf optimize allocations away
-            public Registry Unregister(FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
+            public static ImHashMap<Type, object> Unregister(ImHashMap<Type, object> registryOrServices,
+                FactoryType factoryType, Type serviceType, object serviceKey, Func<Factory, bool> condition)
             {
-                if (IsChangePermitted != IsRegistryChangePermitted.Permitted)
-                    return IsChangePermitted == IsRegistryChangePermitted.Ignored ? this
+                var r = registryOrServices as Registry;
+                if (r != null && r.IsChangePermitted != IsRegistryChangePermitted.Permitted)
+                    return r.IsChangePermitted == IsRegistryChangePermitted.Ignored ? registryOrServices
                         : Throw.For<Registry>(Error.NoMoreUnregistrationsAllowed,
                             serviceType, serviceKey != null ? "with key " + serviceKey : string.Empty, factoryType);
 
@@ -2483,8 +2541,12 @@ namespace DryIoc
                 switch (factoryType)
                 {
                     case FactoryType.Wrapper:
+                    {
+                        var wrappers = r != null ? r.Wrappers : WrappersSupport.Wrappers;
+                        if (r == null)
+                            r = new Registry(registryOrServices); // todo: @perf remove not required allocation
                         object removedWrapper = null;
-                        var registry = WithWrappers(Wrappers.Update(serviceTypeHash, serviceType, null, (_, factory, _null) =>
+                        r = r.WithWrappers(wrappers.Update(serviceTypeHash, serviceType, null, (_, factory, _null) =>
                         {
                             if (factory != null && condition != null && !condition((Factory)factory))
                                 return factory;
@@ -2493,53 +2555,60 @@ namespace DryIoc
                         }));
 
                         if (removedWrapper == null)
-                            return this;
-                        registry.DropFactoryCache((Factory)removedWrapper, serviceTypeHash, serviceType);
-                        return registry;
-
+                            return registryOrServices;
+                        r.DropFactoryCache((Factory)removedWrapper, serviceTypeHash, serviceType);
+                        return r;
+                    }
                     case FactoryType.Decorator:
+                    {
+                        if (r == null)
+                            return registryOrServices;
+                        var decorators = r.Decorators;
                         Factory[] removedDecorators = null;
                         // todo: @perf minimize allocations in the lambdas below
                         if (condition == null)
-                            registry = WithDecorators(Decorators.Update(serviceTypeHash, serviceType, null, (_, factories, _null) =>
+                            r = r.WithDecorators(decorators.Update(serviceTypeHash, serviceType, null, (_, factories, _null) =>
                             {
                                 removedDecorators = (Factory[])factories;
                                 return null;
                             }));
                         else
-                            registry = WithDecorators(Decorators.Update(serviceTypeHash, serviceType, null, (_, factories, _null) =>
+                            r = r.WithDecorators(decorators.Update(serviceTypeHash, serviceType, null, (_, factories, _null) =>
                             {
                                 removedDecorators = ((Factory[])factories).Match(condition);
                                 return removedDecorators == factories ? null : factories.To<Factory[]>().Except(removedDecorators).ToArray();
                             }));
 
                         if (removedDecorators.IsNullOrEmpty())
-                            return this;
+                            return registryOrServices;
 
                         for (var i = 0; i < removedDecorators.Length; i++)
-                            registry.DropFactoryCache(removedDecorators[i], serviceTypeHash, serviceType);
+                            r.DropFactoryCache(removedDecorators[i], serviceTypeHash, serviceType);
 
-                        return registry;
-
+                        return r;
+                    }
                     default:
-                        return UnregisterServiceFactory(serviceType, serviceKey, condition);
+                        return UnregisterServiceFactory(registryOrServices, serviceType, serviceKey, condition);
                 }
             }
 
             // todo: @perf optimize allocations away
-            private Registry UnregisterServiceFactory(Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
+            private static ImHashMap<Type, object> UnregisterServiceFactory(ImHashMap<Type, object> registryOrServices,
+                Type serviceType, object serviceKey = null, Func<Factory, bool> condition = null)
             {
+                var r = registryOrServices as Registry;
+                var services = r == null ? registryOrServices : r.Services;
+
                 object removed = null; // Factory or FactoriesEntry or Factory[]
-                ImHashMap<Type, object> services;
                 var hash = RuntimeHelpers.GetHashCode(serviceType);
                 if (serviceKey == null && condition == null) // simplest case with simplest handling
-                    services = Services.Update(hash, serviceType, null, (_, entry, _null) =>
+                    services = services.Update(hash, serviceType, null, (_, entry, _null) =>
                     {
                         removed = entry;
                         return null;
                     });
                 else
-                    services = Services.Update(hash, serviceType, null, (_, entry, _null) =>
+                    services = services.Update(hash, serviceType, null, (_, entry, _null) =>
                     {
                         if (entry == null)
                             return null;
@@ -2597,26 +2666,27 @@ namespace DryIoc
                     });
 
                 if (removed == null)
-                    return this;
+                    return registryOrServices;
 
-                var registry = WithServices(services);
+                if (r == null)
+                    return services;
 
+                r = r.WithServices(services);
                 if (removed is Factory f)
-                    registry.DropFactoryCache(f, hash, serviceType, serviceKey);
+                    r.DropFactoryCache(f, hash, serviceType, serviceKey);
                 else if (removed is Factory[] fs)
                     foreach (var rf in fs)
-                        registry.DropFactoryCache(rf, hash, serviceType, serviceKey);
+                        r.DropFactoryCache(rf, hash, serviceType, serviceKey);
                 else
                     foreach (var e in ((FactoriesEntry)removed).Factories.Enumerate())
-                        registry.DropFactoryCache(e.Value, hash, serviceType, serviceKey);
-
-                return registry;
+                        r.DropFactoryCache(e.Value, hash, serviceType, serviceKey);
+                return r;
             }
 
             internal virtual void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null) {}
         }
 
-        private Container(Rules rules, Ref<Registry> registry, IScope singletonScope,
+        private Container(Rules rules, Ref<ImHashMap<Type, object>> registry, IScope singletonScope,
             IScopeContext scopeContext = null, IScope ownCurrentScope = null,
             int disposed = 0, StackTrace disposeStackTrace = null,
             IResolverContext parent = null)
@@ -11251,11 +11321,11 @@ namespace DryIoc
 
             // todo: @perf Prevents from costly `WithResolvedFactory` call
             // todo: @hack with IContainer cast - move to the interface
-            var decorators = ((Container)request.Container)._registry.Value.Decorators;
-            if (!decorators.IsEmpty)
+            var c = (Container)request.Container;
+            if (c._registry.Value is Container.Registry r && !r.Decorators.IsEmpty)
             {
                 // todo: @perf optimize WithResolvedFactory for registered instance
-                var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
+                var decoratorExpr = ((IContainer)c).GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                 if (decoratorExpr != null)
                     return decoratorExpr;
             }
@@ -12592,7 +12662,7 @@ namespace DryIoc
     }
 
     /// <summary>What to do with registrations when creating the new container from the existent one.</summary>
-    public enum RegistrySharing
+    public enum RegistrySharing : byte
     {
         /// <summary>Shares both registrations and resolution cache if any</summary>
         Share = 0,
