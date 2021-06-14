@@ -331,7 +331,9 @@ public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
         public IServiceScope CreateScope()
         {
             var r = _scopedResolver;
-            var scope = r.ScopeContext == null ? Scope.Of(r.CurrentScope) : r.ScopeContext.SetCurrent(p => Scope.Of(p));
+            var scope = r.ScopeContext == null 
+                ? Scope.Of(r.OwnCurrentScope) 
+                : r.ScopeContext.SetCurrent(p => Scope.Of(p));
             return new DryIocServiceScope(r.WithCurrentScope(scope));
         }
 }

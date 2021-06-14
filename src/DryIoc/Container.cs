@@ -1711,14 +1711,13 @@ namespace DryIoc
 
 #region Implementation
 
-        private int                       _disposed;
-        private StackTrace                _disposeStackTrace;
-        // todo: @api expose in the IContainer interface for the internal use
+        private readonly IResolverContext _parent;
         internal readonly Ref<ImHashMap<Type, object>> _registry; // either map of Services or the Registry class
         private readonly IScope           _singletonScope;
         private readonly IScope           _ownCurrentScope;
-        private readonly IScopeContext    _scopeContext;
-        private readonly IResolverContext _parent;
+        private readonly IScopeContext    _scopeContext; // todo: @perf split into separate class
+        private StackTrace                _disposeStackTrace;
+        private int                       _disposed;
 
         internal void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
         {
@@ -1778,7 +1777,7 @@ namespace DryIoc
             }
         }
 
-        internal class Registry : ImHashMapEntry<Type, object>
+        internal class Registry : ImHashMapEntry<Type, object> // todo: @perf make use out Value, Hash, Type
         {
             public static readonly ImHashMap<Type, object> Default = ImHashMap<Type, object>.Empty;
 
@@ -1932,7 +1931,7 @@ namespace DryIoc
                 internal sealed override IsRegistryChangePermitted IsChangePermitted => _isChangePermitted;
                 protected IsRegistryChangePermitted _isChangePermitted;
 
-                internal AndCache(ImHashMap<Type, object> services, IsRegistryChangePermitted  isChangePermitted) : base(services) =>
+                internal AndCache(ImHashMap<Type, object> services, IsRegistryChangePermitted isChangePermitted) : base(services) =>
                     _isChangePermitted = isChangePermitted;
 
                 internal AndCache(
@@ -2686,6 +2685,7 @@ namespace DryIoc
             internal virtual void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null) {}
         }
 
+        // todo: @perf split the container per storage cases, because we always create a new container when opening the scope, look at `WithCurrentScope` 
         private Container(Rules rules, Ref<ImHashMap<Type, object>> registry, IScope singletonScope,
             IScopeContext scopeContext = null, IScope ownCurrentScope = null,
             int disposed = 0, StackTrace disposeStackTrace = null,
@@ -4372,6 +4372,9 @@ namespace DryIoc
         /// <summary>Current opened scope. May return the current scope from <see cref="ScopeContext"/> if context is not null.</summary>
         IScope CurrentScope { get; }
 
+        /// <summary>The current scope belonged to the resolver context and not to the scope context. Maybe null if ScopeContext is not null.</summary>
+        IScope OwnCurrentScope { get; }
+
         /// <summary>Creates the resolver context with specified current Container-OWN scope</summary>
         IResolverContext WithCurrentScope(IScope scope);
 
@@ -4472,8 +4475,7 @@ namespace DryIoc
         {
             if (r.ScopeContext == null)
             {
-                // todo: may use `r.OwnCurrentScope` when its moved to `IResolverContext` from `IContainer`
-                var parentScope = r.CurrentScope;
+                var parentScope = r.OwnCurrentScope;
                 var newOwnScope = Scope.Of(parentScope, name);
                 if (trackInParent)
                     (parentScope ?? r.SingletonScope).TrackDisposable(newOwnScope);
@@ -4499,7 +4501,7 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public static IResolverContext OpenScope(this IResolverContext r) =>
             r.ScopeContext == null 
-                ? r.WithCurrentScope(Scope.Of(r.CurrentScope))
+                ? r.WithCurrentScope(Scope.Of(r.OwnCurrentScope))
                 : r.OpenScope(null);
 
         [MethodImpl((MethodImplOptions)256)]
@@ -12675,9 +12677,6 @@ namespace DryIoc
     /// <summary>Combines registrator and resolver roles, plus rules and scope management.</summary>
     public interface IContainer : IRegistrator, IResolverContext
     {
-        /// <summary>Represents scope bound to container itself, and not an ambient (context) thingy.</summary>
-        IScope OwnCurrentScope { get; }
-
         // todo: @api replace with the below overload with more parameters
         /// <summary>Creates new container from the current one by specifying the listed parameters.
         /// If the null or default values are provided then the default or new values will be applied.
