@@ -403,5 +403,40 @@ namespace DryIoc.UnitTests
         }
 
         class N { }
+
+        [Test]
+        public void Inject_Enumerable_in_the_class_with_the_base_constructor()
+        {
+            var container = new Container();
+
+            container.Register<ISomething, Something1>();
+            container.Register<ISomething, Something2>();
+
+            container.Register<SomethingElse>();
+            container.Register<ISomethingRegistry, SomethingRegistry>();
+
+            var registry1 = container.Resolve<SomethingElse>();
+            Assert.AreEqual(2, registry1.Somethings.Count());
+
+            var registry2 = container.Resolve<ISomethingRegistry>();
+            Assert.AreEqual(2, registry2.Somethings.Count());
+        }
+
+        public interface ISomething {}
+        public class Something1 : ISomething {}
+        public class Something2 : ISomething {}
+        public interface ISomethingRegistry 
+        {
+            IEnumerable<ISomething> Somethings { get; }
+        }
+        public class SomethingElse : ISomethingRegistry
+        {
+            public IEnumerable<ISomething> Somethings { get; }
+            public SomethingElse(IEnumerable<ISomething> somethings = null) => Somethings = somethings;
+        }
+        public class SomethingRegistry : SomethingElse
+        {
+            public SomethingRegistry(IEnumerable<ISomething> somethings = null) : base(somethings) {}
+        }
     }
 }
