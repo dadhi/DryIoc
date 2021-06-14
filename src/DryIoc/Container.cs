@@ -13780,6 +13780,16 @@ namespace DryIoc
         /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
         public static Expression GetDefaultValueExpression(this Type type) =>
             !type.IsValueType ? ContainerTools.NullTypeConstant : (Expression)Call(GetDefaultMethod.MakeGenericMethod(type), Empty<Expression>());
+
+        /// <summary>Optimized version of the map GetValueOrDefault for the Type key and object value</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static object GetValueOrDefault(this ImHashMap<Type, object> map, Type t) =>
+            map.GetValueOrDefaultByReferenceEquals(RuntimeHelpers.GetHashCode(t), t);
+
+        /// <summary>Optimized version of the map AddOrUpdate for the Type key and object value</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<Type, object> AddOrUpdate(this ImHashMap<Type, object> map, Type t, object value) =>
+            map.AddOrUpdate(RuntimeHelpers.GetHashCode(t), t, value);
     }
 
     /// <summary>Provides pretty printing/debug view for number of types.</summary>
