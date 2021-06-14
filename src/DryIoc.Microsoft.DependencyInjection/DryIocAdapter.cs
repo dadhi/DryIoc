@@ -317,9 +317,9 @@ public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this I
         }
     }
 
-/// <summary>Creates/opens new scope in passed scoped container.</summary>
-public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
-{
+    /// <summary>Creates/opens new scope in passed scoped container.</summary>
+    public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
+    {
         private readonly IResolverContext _scopedResolver;
 
         /// <summary>Stores passed scoped container to open nested scope.</summary>
@@ -336,7 +336,7 @@ public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
                 : r.ScopeContext.SetCurrent(p => Scope.Of(p));
             return new DryIocServiceScope(r.WithCurrentScope(scope));
         }
-}
+    }
 
     /// <summary>Bare-bones IServiceScope implementations</summary>
     public sealed class DryIocServiceScope : IServiceScope
