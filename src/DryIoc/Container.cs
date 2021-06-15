@@ -9325,7 +9325,7 @@ namespace DryIoc
 
         private Setup(Func<Request, bool> condition,
             bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot, bool preventDisposal, bool weaklyReferenced,
-            bool allowDisposableTransient, bool trackDisposableTransient, bool useParentReuse, int disposalOrder, 
+            bool allowDisposableTransient, bool trackDisposableTransient, bool useParentReuse, int disposalOrder,
             bool preferOverMultipleResolved = false, bool asResolutionCallForExpressionGeneration = false)
         {
             Condition = condition;
