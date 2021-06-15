@@ -1192,21 +1192,21 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDIAdapter | 88.43 us | 1.100 us | 0.859 us |  1.20 |    0.03 |  9.1553 | 0.7324 |     - |  56.23 KB |
 |               MsDI | 93.63 us | 1.790 us | 1.915 us |  1.27 |    0.04 | 11.4746 | 2.8076 |     - |  70.54 KB |
 
-## Optimizing the Wrappers out of default Registry
-
-|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|             DryIoc | 83.40 us | 1.087 us | 0.964 us |  1.00 |    0.00 |  6.9580 | 0.4883 |     - |  42.82 KB |
-| DryIoc_MsDIAdapter | 89.94 us | 1.798 us | 2.401 us |  1.09 |    0.03 |  9.0332 | 0.6104 |     - |   55.8 KB |
-|               MsDI | 94.11 us | 0.938 us | 0.877 us |  1.13 |    0.02 | 11.4746 | 2.8076 |     - |  70.55 KB |
-
-## Optimizing the Registry more
+## Optimizing the Registry
 
 |             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
 |             DryIoc | 83.04 us | 1.407 us | 1.316 us |  1.00 |    0.00 |  6.7139 | 0.4883 |     - |  41.41 KB |
 | DryIoc_MsDIAdapter | 97.32 us | 1.849 us | 1.816 us |  1.17 |    0.02 |  8.7891 | 0.6104 |     - |  54.39 KB |
 |               MsDI | 90.81 us | 1.233 us | 1.093 us |  1.09 |    0.02 | 11.5967 | 3.0518 |     - |  70.85 KB |
+
+## Optimizing for the ImHashMap<Type, object>
+
+|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|             DryIoc | 79.92 us | 1.570 us | 3.447 us |  1.00 |    0.00 |  6.7139 | 0.4883 |     - |  41.41 KB |
+| DryIoc_MsDIAdapter | 93.65 us | 1.825 us | 1.874 us |  1.22 |    0.10 |  8.7891 | 0.4883 |     - |   54.4 KB |
+|               MsDI | 97.20 us | 0.446 us | 0.348 us |  1.29 |    0.09 | 11.4746 | 2.9297 |     - |  70.55 KB |
 
 */
             [Benchmark(Baseline = true)]
