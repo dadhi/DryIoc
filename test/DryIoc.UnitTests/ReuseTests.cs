@@ -873,11 +873,11 @@ namespace DryIoc.UnitTests
         class Go { }
 
         [Test]
-        public void Ordered_disposals_should_go_before_unordered()
+        public void Ordered_disposals_with_minus_one_should_go_before_unordered()
         {
             var c = new Container();
 
-            c.Register<Duck>(Reuse.Singleton, setup: Setup.With(disposalOrder: 1));
+            c.Register<Duck>(Reuse.Singleton, setup: Setup.With(disposalOrder: -1));
             c.Register<Quack>(Reuse.Singleton);
 
             var d = c.Resolve<Duck>();
@@ -912,7 +912,7 @@ namespace DryIoc.UnitTests
             Assert.IsFalse(q.LastTimeQuacked); // !!! here indication that dependency disposed before consumer
         }
 
-        [Test, Ignore("fixme")]
+        [Test]
         public void Can_specify_the_same_order()
         {
             var c = new Container();

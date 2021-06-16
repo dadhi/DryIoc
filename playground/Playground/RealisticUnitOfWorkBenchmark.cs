@@ -1131,9 +1131,9 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 
 |              Method |        Mean |     Error |    StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
 |-------------------- |------------:|----------:|----------:|-------:|--------:|---------:|--------:|-------:|----------:|
-|                MsDI |    139.2 us |   2.74 us |   3.47 us |   1.00 |    0.00 |  11.4746 |  2.6855 |      - |  70.55 KB |
 |              DryIoc |    134.9 us |   1.82 us |   1.70 us |   0.98 |    0.02 |  10.0098 |  0.7324 |      - |  61.84 KB |
 |  DryIoc_MsDIAdapter |    170.9 us |   2.54 us |   2.25 us |   1.24 |    0.04 |  13.1836 |  1.2207 |      - |  80.84 KB |
+|                MsDI |    139.2 us |   2.74 us |   3.47 us |   1.00 |    0.00 |  11.4746 |  2.6855 |      - |  70.55 KB |
 |               Grace | 25,575.2 us | 444.52 us | 394.06 us | 185.23 |    5.56 |  93.7500 | 31.2500 |      - | 729.54 KB |
 |   Grace_MsDIAdapter | 30,124.8 us | 420.66 us | 393.49 us | 217.89 |    7.17 | 125.0000 | 62.5000 |      - | 893.17 KB |
 |   Lamar_MsDIAdapter | 12,497.3 us | 249.21 us | 686.38 us |  87.91 |    4.85 |        - |       - |      - | 707.34 KB |
@@ -1148,65 +1148,11 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
   [Host]     : .NET 5.0.5 (5.0.521.16609), X64 RyuJIT
   DefaultJob : .NET 5.0.5 (5.0.521.16609), X64 RyuJIT
 
-
-|              Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
-|-------------------- |-------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|-------:|----------:|
-|                MsDI |     95.35 us |   1.626 us |   2.805 us |   1.00 |    0.00 |  11.9629 |  3.1738 |      - |     73 KB |
-|              DryIoc |     85.03 us |   0.868 us |   0.812 us |   0.88 |    0.03 |   8.4229 |  0.6104 |      - |     52 KB |
-|  DryIoc_MsDIAdapter |     92.64 us |   0.807 us |   0.754 us |   0.96 |    0.03 |  10.6201 |  0.7324 |      - |     65 KB |
-|               Grace | 15,516.60 us | 135.363 us | 126.619 us | 160.82 |    6.01 | 109.3750 | 46.8750 |      - |    743 KB |
-|   Grace_MsDIAdapter | 18,376.58 us | 201.534 us | 188.515 us | 190.45 |    6.71 | 125.0000 | 62.5000 |      - |    911 KB |
-|   Lamar_MsDIAdapter |  5,532.70 us |  70.539 us |  62.531 us |  57.31 |    2.16 |  93.7500 | 39.0625 |      - |    611 KB |
-|             Autofac |    553.95 us |  10.116 us |   8.967 us |   5.74 |    0.18 |  51.7578 | 25.3906 | 1.9531 |    318 KB |
-| Autofac_MsDIAdapter |    542.17 us |   4.962 us |   4.143 us |   5.60 |    0.21 |  54.6875 | 27.3438 | 1.9531 |    340 KB |
-
-## Optimizing the registrations
-
 |             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI | 98.24 us | 1.508 us | 1.410 us |  1.00 |    0.00 | 11.8408 | 2.9297 |     - |     73 KB |
-|             DryIoc | 83.81 us | 1.620 us | 1.733 us |  0.86 |    0.02 |  8.4229 | 0.4883 |     - |     52 KB |
-| DryIoc_MsDIAdapter | 90.85 us | 1.797 us | 2.797 us |  0.92 |    0.03 | 10.6201 | 0.7324 |     - |     65 KB |
-
-## Optimizing the OpenScope and Scope memory
-
-|             Method |     Mean |    Error |   StdDev |   Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|               MsDI | 96.86 us | 1.892 us | 2.653 us | 96.49 us |  1.00 |    0.00 | 11.4746 | 2.9297 |     - |  70.56 KB |
-|             DryIoc | 87.65 us | 1.640 us | 3.734 us | 86.01 us |  0.91 |    0.05 |  8.4229 | 0.6104 |     - |  51.96 KB |
-| DryIoc_MsDIAdapter | 88.44 us | 1.061 us | 0.886 us | 88.63 us |  0.90 |    0.02 | 10.6201 | 0.7324 |     - |  65.08 KB |
-
-## Optimizing the ExpressionCache
-
-|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|             DryIoc | 83.32 us | 0.644 us | 0.602 us |  0.94 |    0.05 |  8.4229 | 0.6104 |     - |  51.76 KB |
-| DryIoc_MsDIAdapter | 91.00 us | 0.845 us | 0.706 us |  1.03 |    0.05 | 10.4980 | 0.7324 |     - |   64.9 KB |
-|               MsDI | 92.17 us | 1.813 us | 3.492 us |  1.00 |    0.00 | 11.4746 | 2.8076 |     - |  70.54 KB |
-
-## Optimizing out the ServiceInfo from the Request
-
-|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|             DryIoc | 73.81 us | 1.468 us | 1.373 us |  1.00 |    0.00 |  6.9580 | 0.4883 |     - |  43.35 KB |
-| DryIoc_MsDIAdapter | 88.43 us | 1.100 us | 0.859 us |  1.20 |    0.03 |  9.1553 | 0.7324 |     - |  56.23 KB |
-|               MsDI | 93.63 us | 1.790 us | 1.915 us |  1.27 |    0.04 | 11.4746 | 2.8076 |     - |  70.54 KB |
-
-## Optimizing the Registry
-
-|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|             DryIoc | 83.04 us | 1.407 us | 1.316 us |  1.00 |    0.00 |  6.7139 | 0.4883 |     - |  41.41 KB |
-| DryIoc_MsDIAdapter | 97.32 us | 1.849 us | 1.816 us |  1.17 |    0.02 |  8.7891 | 0.6104 |     - |  54.39 KB |
-|               MsDI | 90.81 us | 1.233 us | 1.093 us |  1.09 |    0.02 | 11.5967 | 3.0518 |     - |  70.85 KB |
-
-## Optimizing for the ImHashMap<Type, object>
-
-|             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|             DryIoc | 79.92 us | 1.570 us | 3.447 us |  1.00 |    0.00 |  6.7139 | 0.4883 |     - |  41.41 KB |
-| DryIoc_MsDIAdapter | 93.65 us | 1.825 us | 1.874 us |  1.22 |    0.10 |  8.7891 | 0.4883 |     - |   54.4 KB |
-|               MsDI | 97.20 us | 0.446 us | 0.348 us |  1.29 |    0.09 | 11.4746 | 2.9297 |     - |  70.55 KB |
+|             DryIoc | 84.82 us | 1.653 us | 3.593 us |  1.00 |    0.00 |  6.7139 | 0.3662 |     - |  41.45 KB |
+| DryIoc_MsDIAdapter | 90.41 us | 1.005 us | 0.891 us |  1.11 |    0.09 |  8.7891 | 0.6104 |     - |  54.45 KB |
+|               MsDI | 97.62 us | 1.267 us | 1.123 us |  1.20 |    0.11 | 11.4746 | 2.8076 |     - |  70.54 KB |
 
 */
             [Benchmark(Baseline = true)]

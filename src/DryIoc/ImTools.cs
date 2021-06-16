@@ -2738,7 +2738,6 @@ namespace DryIoc.ImTools
             : "[" + Head + "," + Tail.Head + "," + Tail.Tail.Head + ", ...]";
 
         private ImList() { }
-
         private ImList(T head, ImList<T> tail)
         {
             Head = head;
