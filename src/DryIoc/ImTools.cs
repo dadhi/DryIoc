@@ -2723,9 +2723,9 @@ namespace DryIoc.ImTools
         /// <summary>Enumerates the list.</summary>
         public IEnumerable<T> Enumerate()
         {
-            if (IsEmpty)
+            if (Tail == null)
                 yield break;
-            for (var list = this; !list.IsEmpty; list = list.Tail)
+            for (var list = this; list.Tail != null; list = list.Tail)
                 yield return list.Head;
         }
 

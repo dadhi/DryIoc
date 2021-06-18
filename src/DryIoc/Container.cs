@@ -245,9 +245,9 @@ namespace DryIoc
                 ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
 
             // Improves performance a bit by first attempting to swap the registry while it is still unchanged.
-            var r = _registry.Value;
             if (serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition && serviceType.ContainsGenericParameters)
                 serviceType = serviceType.GetGenericTypeDefinition();
+            var r = _registry.Value;
             if (!_registry.TrySwapIfStillCurrent(r, Registry.Register(r, factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
                 RegistrySwap(factory, serviceType, serviceKey, ifAlreadyRegistered);
         }
@@ -2209,11 +2209,9 @@ namespace DryIoc
 
                 var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
                 if (factory.FactoryType == FactoryType.Service)
-                {
                     return serviceKey == null 
                         ? WithDefaultService(r, registryOrServices, factory, serviceTypeHash, serviceType, ifAlreadyRegistered) 
                         : WithKeyedService(r, registryOrServices, factory, serviceTypeHash, serviceType, ifAlreadyRegistered, serviceKey);
-                }
 
                 r = r ?? new Registry(registryOrServices); // todo: @perf remove the temporary new Registry allocation
                 return factory.FactoryType == FactoryType.Decorator
@@ -9943,23 +9941,16 @@ namespace DryIoc
 
         internal virtual bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules, bool throwIfInvalid)
         {
-            if (!isStaticallyChecked)
-                if (serviceType == null)
-                    return Throw.When(throwIfInvalid, Error.ServiceTypeIsNull);
+            if (serviceType == null)
+                return Throw.When(throwIfInvalid, Error.ServiceTypeIsNull);
 
             var setup = Setup;
             if (setup.FactoryType == FactoryType.Service)
             {
                 // Warn about registering disposable transient
                 var reuse = Reuse ?? rules.DefaultReuse;
-                if (reuse != DryIoc.Reuse.Transient)
-                    return true;
-
-                if (setup.AllowDisposableTransient || !rules.ThrowOnRegisteringDisposableTransient)
-                    return true;
-
-                if (setup.UseParentReuse ||
-                    setup.FactoryType == FactoryType.Decorator && ((Setup.DecoratorSetup)setup).UseDecorateeReuse)
+                if (reuse != DryIoc.Reuse.Transient || setup.AllowDisposableTransient || !rules.ThrowOnRegisteringDisposableTransient || 
+                    setup.UseParentReuse)
                     return true;
 
                 var knownImplOrServiceType = CanAccessImplementationType ? ImplementationType : serviceType;
@@ -9974,6 +9965,15 @@ namespace DryIoc
             {
                 if (serviceKey != null)
                     return Throw.When(throwIfInvalid, Error.DecoratorShouldNotBeRegisteredWithServiceKey, serviceKey);
+
+                var reuse = Reuse ?? rules.DefaultReuse;
+                if (reuse != DryIoc.Reuse.Transient || setup.AllowDisposableTransient || !rules.ThrowOnRegisteringDisposableTransient || 
+                    ((Setup.DecoratorSetup)setup).UseDecorateeReuse)
+                    return true;
+
+                var knownImplOrServiceType = CanAccessImplementationType ? ImplementationType : serviceType;
+                if (typeof(IDisposable).IsAssignableFrom(knownImplOrServiceType))
+                    return Throw.When(throwIfInvalid, Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType, serviceKey ?? "{no key}", this);
             }
 
             return true;

@@ -297,22 +297,24 @@ public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this I
         /// <summary>Unpacks the service descriptor to register the service in DryIoc container</summary>
         public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor)
         {
-            if (descriptor.ImplementationType != null)
+            var serviceType = descriptor.ServiceType;
+            var implType = descriptor.ImplementationType;
+            if (implType != null)
             {
-                container.Register(ReflectionFactory.Of(descriptor.ImplementationType, descriptor.Lifetime.ToReuse()), 
-                    descriptor.ServiceType, null, null, isStaticallyChecked: false);
+                container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType, null, null, 
+                    isStaticallyChecked: implType == serviceType);
             }
             else if (descriptor.ImplementationFactory != null)
             {
-                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory.ToFactoryDelegate, descriptor.Lifetime.ToReuse()), 
-                    descriptor.ServiceType, null, null, isStaticallyChecked: true);
+                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory.ToFactoryDelegate, descriptor.Lifetime.ToReuse()), serviceType, null, null, 
+                    isStaticallyChecked: true);
             }
             else
             {
                 var instance = descriptor.ImplementationInstance;
-                container.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton),
-                    descriptor.ServiceType, null, null, isStaticallyChecked: true);
-                container.TrackInstance(instance);
+                container.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton), serviceType, null, null, 
+                    isStaticallyChecked: true);
+                container.TrackInstance(instance); // todo: @naming rename to TrackSingletonInstance
             }
         }
     }

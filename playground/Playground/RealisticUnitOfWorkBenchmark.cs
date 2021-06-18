@@ -1500,6 +1500,13 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |             DryIoc | 1.257 us | 0.0134 us | 0.0112 us |  0.36 |    0.01 | 0.4711 | 0.0057 |     - |   2.89 KB |
 | DryIoc_MsDIAdapter | 2.044 us | 0.0344 us | 0.0322 us |  0.59 |    0.02 | 0.4768 | 0.0038 |     - |   2.94 KB |
 
+|             Method |     Mean |     Error |    StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |---------:|----------:|----------:|------:|--------:|-------:|-------:|------:|----------:|
+|             DryIoc | 1.983 us | 0.0383 us | 0.0456 us |  1.00 |    0.00 | 0.4730 | 0.0038 |     - |   2.91 KB |
+| DryIoc_MsDIAdapter | 3.294 us | 0.0651 us | 0.0847 us |  1.66 |    0.06 | 0.4807 | 0.0076 |     - |   2.96 KB |
+|               MsDI | 4.903 us | 0.0974 us | 0.1042 us |  2.47 |    0.07 | 0.7095 | 0.0076 |     - |   4.35 KB |
+|              Grace | 2.381 us | 0.0410 us | 0.0770 us |  1.21 |    0.06 | 0.5150 | 0.0076 |     - |   3.17 KB |
+
 */
             private IServiceProvider _msDi;
             private IContainer _dryIoc;
@@ -1530,21 +1537,21 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             }
 
             [Benchmark(Baseline = true)]
-            public object MsDI() => Measure(_msDi);
-
-            //[Benchmark]
-            public object DryIoc_WebRequestScoped() => Measure_WebRequestScoped(_dryIocWebRequestScoped);
-
-            [Benchmark]
             public object DryIoc() => Measure(_dryIoc);
 
             [Benchmark]
             public object DryIoc_MsDIAdapter() => Measure(_dryIocMsDi);
 
+            [Benchmark]
+            public object MsDI() => Measure(_msDi);
+
+            //[Benchmark]
+            public object DryIoc_WebRequestScoped() => Measure_WebRequestScoped(_dryIocWebRequestScoped);
+
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            // [Benchmark]
+            [Benchmark]
             public object Grace() => Measure(_grace);
 
             // [Benchmark]
