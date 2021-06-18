@@ -870,6 +870,8 @@ class Register_instance_example
 Ok, now we have a pre-created instance in the registry, but what if I need a different instances when opening a new scope.
 Say I want to put `RequestMessage` object into ASP request scope. A request message has a different value in different requests.
 
+### Method Use to add instance directly into scope
+
 In that case you we can use method `Use` to put instance directly into the current scope skipping the registration ceremony.
 
 __Caution:__ the instance put via `Use` does not support `serviceKey`, [Wrappers](Wrappers), and [Decorators](Decorators), 
