@@ -12454,11 +12454,11 @@ namespace DryIoc
     /// <summary>Policy to handle unresolved service.</summary>
     public enum IfUnresolved : byte
     {
-        /// <summary>If service is unresolved for whatever means, it will throw the respective exception.</summary>
+        /// <summary>If service is unresolved for whatever means, the Resolve will throw the respective exception.</summary>
         Throw = 0,
-        /// <summary>If service is unresolved for whatever means, it will return default(serviceType) value.</summary>
+        /// <summary>If service is unresolved for whatever means, the Resolve will return the default value.</summary>
         ReturnDefault,
-        /// <summary>If service is not registered, then it will return default, for other errors it will throw.</summary>
+        /// <summary>If service is not registered, then the Resolve will return the default value, for the other errors it will throw.</summary>
         ReturnDefaultIfNotRegistered,
     }
 

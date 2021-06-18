@@ -288,14 +288,36 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void How_Autofac_IEnumerable_handles_service_with_missing_dependency()
+        public void How_Autofac_handles_service_with_missing_dependency()
         {
             var builder = new ContainerBuilder();
-            builder.RegisterType<NoDep>();
+            builder.RegisterType<NoDepService>();
             var container = builder.Build();
 
             Assert.Throws<DependencyResolutionException>(() => 
-                container.Resolve<IEnumerable<NoDep>>());
+                container.Resolve<NoDepService>());
+        }
+
+        [Test]
+        public void How_Autofac_IEnumerable_handles_missing_service()
+        {
+            var builder = new ContainerBuilder();
+            var container = builder.Build();
+
+            var x = container.Resolve<IEnumerable<NoDepService>>();
+
+            Assert.IsEmpty(x);
+        }
+
+        [Test]
+        public void How_Autofac_IEnumerable_handles_service_with_missing_dependency()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterType<NoDepService>();
+            var container = builder.Build();
+
+            Assert.Throws<DependencyResolutionException>(() => 
+                container.Resolve<IEnumerable<NoDepService>>());
         }
 
         [Test]
@@ -303,7 +325,7 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            var d = container.Resolve<NoDep>(IfUnresolved.ReturnDefaultIfNotRegistered);
+            var d = container.Resolve<NoDepService>(IfUnresolved.ReturnDefaultIfNotRegistered);
 
             Assert.IsNull(d);
         }
@@ -312,31 +334,48 @@ namespace DryIoc.IssuesTests
         public void How_DryIoc_handles_service_with_missing_dependency()
         {
             var container = new Container();
-            container.Register<NoDep>();
+            container.Register<NoDepService>();
 
-            Assert.IsTrue(container.IsRegistered<NoDep>());
+            Assert.IsTrue(container.IsRegistered<NoDepService>());
+            Assert.IsFalse(container.IsRegistered<ISomeDep>());
 
             Assert.Throws<ContainerException>(() =>
-                container.Resolve<NoDep>(IfUnresolved.ReturnDefaultIfNotRegistered));
+                container.Resolve<NoDepService>(IfUnresolved.ReturnDefaultIfNotRegistered));
+        }
+
+        [Test]
+        public void How_DryIoc_IEnumerable_handles_missing_service()
+        {
+            var container = new Container();
+
+            var x = container.Resolve<IEnumerable<NoDepService>>();
+
+            Assert.IsEmpty(x);
         }
 
         [Test]
         public void How_DryIoc_IEnumerable_handles_service_with_missing_dependency()
         {
             var container = new Container();
-            container.Register<NoDep>();
+            container.Register<NoDepService>();
 
             Assert.Throws<ContainerException>(() =>
-                container.Resolve<IEnumerable<NoDep>>());
+                container.Resolve<IEnumerable<NoDepService>>());
         }
 
-        public class NoDep
+        [Test]
+        public void DryIoc_IEnumerable_may_exclude_service_with_missing_dependency()
+        {
+            var container = new Container();
+            container.Register<NoDepService>();
+
+            container.Resolve<IEnumerable<NoDepService>>(IfUnresolved.ReturnDefault);
+        }
+
+        public class NoDepService
         {
             public ISomeDep Dep { get; }
-            public NoDep(ISomeDep dep)
-            {
-                Dep = dep;
-            }
+            public NoDepService(ISomeDep dep) => Dep = dep;
         }
 
         public interface ISomeDep { }
