@@ -3068,18 +3068,18 @@ namespace DryIoc.ImTools
         }
 
         /// <inheritdoc />
-        public override int Count() => 1;
+        public sealed override int Count() => 1;
 
         /// <inheritdoc />
-        public override ImHashMapEntry<K, V> GetEntryOrNull(int hash, K key) =>
+        public sealed override ImHashMapEntry<K, V> GetEntryOrNull(int hash, K key) =>
             Hash == hash && Key.Equals(key) ? this : null;
 
         /// <inheritdoc />
-        public override Entry Update(ImHashMapEntry<K, V> newEntry) =>
+        public sealed override Entry Update(ImHashMapEntry<K, V> newEntry) =>
             Key.Equals(newEntry.Key) ? newEntry : this.WithConflicting(newEntry);
 
         /// <inheritdoc />
-        public override Entry UpdateOrKeep<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterOrKeeper<S> updateOrKeep)
+        public sealed override Entry UpdateOrKeep<S>(S state, ImHashMapEntry<K, V> newEntry, UpdaterOrKeeper<S> updateOrKeep)
         {
             if (!Key.Equals(newEntry.Key))
                 return this.WithConflicting(newEntry);
