@@ -10528,13 +10528,13 @@ namespace DryIoc
                     {
 
                         var newEntry = ImHashMap.Entry(genFacKey, closedGenFac);
-                        var oldEntryOrNewMap = ((ImHashMap<KV<Type, object>, ReflectionFactory>)x).AddOrGetEntry(newEntry);
-                        if (oldEntryOrNewMap is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
+                        var mapOrOldEntry = ((ImHashMap<KV<Type, object>, ReflectionFactory>)x).AddOrGetEntry(newEntry);
+                        if (mapOrOldEntry is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
                         {
                             closedGenericFactory = oldEntry.Value;
                             return x;
                         }
-                        return oldEntryOrNewMap;
+                        return mapOrOldEntry;
                     });
 
                 return closedGenericFactory;
@@ -10739,7 +10739,7 @@ namespace DryIoc
                     // When param is an empty array / collection, then we may use a default value instead (#581)
                     paramDetails.DefaultValue != null &&
                     injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
-                    ((NewArrayExpression) injectedExpr).Expressions.Count == 0)
+                    ((NewArrayExpression)injectedExpr).Expressions.Count == 0)
                 {
                     // Check if parameter dependency itself (without propagated parent details)
                     // does not allow default, then stop checking the rest of parameters.
@@ -10825,16 +10825,11 @@ namespace DryIoc
         {
             var actualServiceType = request.GetActualServiceType();
             var serviceExprType = serviceExpr.Type;
-            return serviceExprType == actualServiceType || actualServiceType.IsAssignableFrom(serviceExprType) 
-                    ? serviceExpr
-                : serviceExprType == typeof(object) 
-                    ? Convert(serviceExpr, actualServiceType)
-                : serviceExprType.HasConversionOperatorTo(actualServiceType) 
-                    ? Convert(serviceExpr, actualServiceType)
-                : request.IfUnresolved != IfUnresolved.Throw 
-                        ? null
-                        : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, actualServiceType, ctorOrMember,
-                            request);
+            return serviceExprType == actualServiceType || actualServiceType.IsAssignableFrom(serviceExprType) ? serviceExpr
+                 : serviceExprType == typeof(object) ? Convert(serviceExpr, actualServiceType)
+                 : serviceExprType.HasConversionOperatorTo(actualServiceType) ? Convert(serviceExpr, actualServiceType)
+                 : request.IfUnresolved != IfUnresolved.Throw ? null
+                 : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, actualServiceType, ctorOrMember, request);
         }
 
         // Check not yet used arguments provided via `Func<Arg, TService>` or `Resolve(.., args: new[] { arg })`
