@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.8.1 Bug-fix release / 2021-07-03
+
+- fixed: #412 ResolveMany not work with generics after any Unregister
+
 ## v4.8.0 Small feature release / 2021-06-04
 
 - added: #406 Allow the registration of the partially closed implementation type

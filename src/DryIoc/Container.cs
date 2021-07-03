@@ -597,7 +597,7 @@ namespace DryIoc
                 requiredItemType = unwrappedType;
 
             var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf()
-                .Where(x => x.Value != null)
+                .Where(x => x.Value != null) // filter out unregistered services
                 .Select(f => new ServiceRegistrationInfo(f.Value, requiredServiceType, f.Key));
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
@@ -639,11 +639,9 @@ namespace DryIoc
             {
                 items = items.Where(x => x.Factory.Setup.MatchesMetadata(metadataKey, metadata));
                 if (openGenericItems != null)
-                    openGenericItems = openGenericItems
-                        .Where(x => x.Factory.Setup.MatchesMetadata(metadataKey, metadata));
+                    openGenericItems = openGenericItems.Where(x => x.Factory.Setup.MatchesMetadata(metadataKey, metadata));
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems
-                        .Where(x => x.Factory.Setup.MatchesMetadata(metadataKey, metadata));
+                    variantGenericItems = variantGenericItems.Where(x => x.Factory.Setup.MatchesMetadata(metadataKey, metadata));
             }
 
             // Exclude composite parent service from items, skip decorators
@@ -2277,11 +2275,12 @@ namespace DryIoc
             {
                 foreach (var entry in Services.Enumerate())
                 {
-                    if (entry.Value.Value is Factory factory)
+                    var fe = entry.Value.Value;
+                    if (fe is Factory factory)
                         yield return new ServiceRegistrationInfo(factory, entry.Value.Key, null);
-                    else
+                    else if (fe != null) // maybe `null` for the unregistered service, see #412
                     {
-                        var factories = ((FactoriesEntry)entry.Value.Value).Factories;
+                        var factories = ((FactoriesEntry)fe).Factories;
                         foreach (var f in factories.Enumerate())
                             yield return new ServiceRegistrationInfo(f.Value, entry.Value.Key, f.Key);
                     }
