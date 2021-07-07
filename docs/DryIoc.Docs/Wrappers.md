@@ -16,7 +16,7 @@
     - [Meta or Tuple of A with Metadata](#meta-or-tuple-of-a-with-metadata)
       - [Dictionary Metadata](#dictionary-metadata)
     - [IEnumerable or array of A](#ienumerable-or-array-of-a)
-      - [Custom order of items in the collection](#custom-order-of-items-in-the-collection)
+      - [Custom order of items in the collection](#custom-order-of-items-in-the-collection-wrapper)
       - [Open-generics](#open-generics)
       - [Co-variant generics](#co-variant-generics)
       - [Composite Pattern support](#composite-pattern-support)
@@ -435,7 +435,7 @@ class Filtering_not_resolved_services
 
 #### Custom order of items in the collection wrapper
 
-To achieve the custom ordering we may use the [Meta or Tuple with Metadata](#meta-or-tuple-of-a-with-metadata) wrapper and the [Decorator](Decorator.md) feature.
+To achieve the custom ordering we may use the [Meta or Tuple with Metadata](#meta-or-tuple-of-a-with-metadata) wrapper and the [Decorator](Decorators.md) feature.
 
 ```cs 
 class Collection_with_custom_order
