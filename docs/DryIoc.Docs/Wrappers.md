@@ -16,7 +16,7 @@
     - [Meta or Tuple of A with Metadata](#meta-or-tuple-of-a-with-metadata)
       - [Dictionary Metadata](#dictionary-metadata)
     - [IEnumerable or array of A](#ienumerable-or-array-of-a)
-      - [Custom order of items in the collection](#custom-order-of-items-in-the-collection-wrapper)
+      - [Custom order of items in the collection wrapper](#custom-order-of-items-in-the-collection-wrapper)
       - [Open-generics](#open-generics)
       - [Co-variant generics](#co-variant-generics)
       - [Composite Pattern support](#composite-pattern-support)
