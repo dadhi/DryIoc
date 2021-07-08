@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
 
@@ -472,5 +473,20 @@ namespace DryIoc.UnitTests
         public class M : IM, IN { }
         public class N : IM, IN { }
 
+        [Test]
+        public void Test_issue_412_resolving_open_generics_collection_after_Unregister()
+        {
+            var container = new Container();
+
+            container.Register<NonRelevantService>();
+            container.Unregister<NonRelevantService>();
+            
+            var genericHandlers = container.ResolveMany<IHandler<X>>();
+            Assert.AreEqual(0, genericHandlers.Count());
+        }
+
+        public interface IHandler<T> { } 
+        public class X { }
+        public class NonRelevantService { }
     }
 }

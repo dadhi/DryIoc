@@ -13,13 +13,14 @@
     - [Keyed registrations](#keyed-registrations)
     - [Resolving as KeyValuePair wrapper](#resolving-as-keyvaluepair-wrapper)
   - [IsRegistered](#isregistered)
-    - [Implicit ways to know that service is registered](#implicit-ways-to-know-that-service-is-registered)
+    - [Implicit ways to know that a service is registered](#implicit-ways-to-know-that-a-service-is-registered)
   - [RegisterMany](#registermany)
   - [RegisterMapping](#registermapping)
   - [RegisterDelegate](#registerdelegate)
     - [The cure - RegisterDelegate with the dependency parameters](#the-cure---registerdelegate-with-the-dependency-parameters)
     - [RegisterDelegate is harder to use when types are not known](#registerdelegate-is-harder-to-use-when-types-are-not-known)
   - [RegisterInstance](#registerinstance)
+    - [Method Use to add instance directly into scope](#method-use-to-add-instance-directly-into-scope)
   - [RegisterInitializer](#registerinitializer)
     - [RegisterInitializer with the reuse different from the initialized object](#registerinitializer-with-the-reuse-different-from-the-initialized-object)
   - [RegisterPlaceholder](#registerplaceholder)
@@ -30,37 +31,37 @@
 
 We will use the following definitions:
 
-- __Resolution Root__ is a service object resolved from container by calling `Resolve` method, 
+- __Resolution Root__ is a service object resolved from the container by calling `Resolve` method, 
 e.g. in `var client = container.Resolve<IClient>();` `client` is a Resolution Root.
 - __Injected Dependency__ is an argument of type `IService` passed (injected) to the constructor of `SomeClient`.
-    It will be automatically created by container and injected into the client constructor when resolving `IClient` Resolution Root. 
+    It will be automatically created by the container and injected into the client constructor when resolving `IClient` Resolution Root. 
     When injecting dependency you do not need to call `container.Resolve` for the dependency itself.
-    _If not said otherwise Resolution and Injection will be used in the same sense of retrieving object from container._
+    _If not said otherwise Resolution and Injection will be used in the same sense of retrieving an object from the container._
 
     - __Constructor Injection__: Injecting dependencies into constructor parameters. 
-        __It is a preferable way__ because all dependencies are visible in a single place - a constructor. 
+        __This is the preferable way__ because all dependencies are visible in a single place - a constructor. 
         If constructor parameters are too many, this is an indication of [God object anti-pattern](http://en.wikipedia.org/wiki/God_object) 
         and violation of [Single Responsibility principle](http://en.wikipedia.org/wiki/Single_responsibility_principle). 
         That means, time to split your class into multiple cohesive units.
 
     - __Property/Field Injection__: Injecting dependencies as properties and fields of the class. Because properties may
-        be set not only in constructor but in any code at any time, it is harder to track and conclude about all class
-        dependencies. __Therefore, use the Property Injection as last-resort and strife for Constructor Injection as much as possible.__ 
+        be set not only in constructors but in any code at any time, it is harder to track and conclude about all class
+        dependencies. __Therefore, use the Property Injection as a last-resort and strive for Constructor Injection as much as possible.__ 
 
     DryIoc supports both Constructor and Property/Field injection.
 
 * __Implementation Type__ is an actual type used for service creation, e.g. `SomeClient` and `SomeService`. 
     In DryIoc Implementation Type may be open-generic: `OtherService<>`.
 
-* __Service Type__ is usually an abstract or an interface type using for service location and dependency injection, e.g. `IClient` and `IService`.
-    Service Type should be assignable from Implementation Type. It is possible to have multiple Service Types for single Implementation Type as it may
+* __Service Type__ is usually an abstract or an interface type used for service location and dependency injection, e.g. `IClient` and `IService`.
+    Service Type should be assignable from Implementation Type. It is possible to have multiple Service Types for a single Implementation Type as it may
     implement multiple interfaces. In addition you can use Implementation Type itself as Service Type, so the one type is used for injection and creation. 
     In DryIoc Service Type may be open-generic: `IService<>`.
 
 
 ## Registration API
 
-DryIoc supports registration vid `Register..` methods with the provided mapping of service and implementation types:
+DryIoc supports registration via `Register..` methods with the provided mapping of service and implementation types:
 ```cs 
 
 using System;
@@ -84,7 +85,7 @@ class Register_service_with_implementation_types
 __Note:__ The order of registrations is not important __here__, 
 but may be important for other cases, like [Decorators](Decorators) or Collection [Wrappers](Wrappers).
 
-If you don't know the type in compile-time you can specify a run-time `Type` instead:
+If you don't know the type at compile-time you can specify a run-time `Type` instead:
 ```cs 
 class Register_service_with_implementation_runtime_types
 {
@@ -98,7 +99,7 @@ class Register_service_with_implementation_runtime_types
 }
 ```
 
-Container will check if the service type is assignable to the implementation type and will throw exception otherwise.
+The container will check if the service type is assignable to the implementation type and will throw an exception otherwise.
 
 You can register open-generic as well:
 ```cs 
@@ -145,9 +146,9 @@ void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyReg
 ```
 
 You may call it directly by supplying the `factory` and the `serviceType`, 
-the other parameters are optional and maybe set to the default values (or the there is and overload where those parameters are optional).
+the other parameters are optional and may be set to the default values (or there is an overload where those parameters are optional).
 
-The factory in DryIoc is th entity holding all the required info and behavior for the service creation.
+The factory in DryIoc is the entity holding all the required info and behavior for the service creation.
 The `Factory` is the abstract class with the following concrete implementations
 
 - `ReflectionFactory` - creates a service based on the supplied implementation type
@@ -183,10 +184,10 @@ the `Register` methods.
 
 ## Registering as Singleton
 
-The registrations above are simple because they don't take into account a service lifetime, 
-that means they are Transient - the new service created each time it is resolved or injected. 
+The registrations above are simple because they don't take into account service lifetime, 
+that means they are Transient - a new service is created every time it is resolved or injected. 
 
-What if I want service to be a Singleton. Singleton means that the same service instance is used during container lifetime. 
+What if I want a service to be a Singleton. Singleton means that the same service instance is used over the whole lifetime of the container. 
 
 __Note:__ Usually, the container lifetime will match your application lifetime. 
 
@@ -216,9 +217,9 @@ class Singleton_service_registration
 } 
 ```
 
-Static singletons are considered an anti-pattern, because they hard to replace, for instance in tests.
-Here, when using DI / IoC Container, we may change `IService` to `SomeTestService` on registration side, without need to change 
-anything on consuming side. 
+Static singletons are considered an anti-pattern, because they are hard to replace, for instance in tests.
+Here, when using DI / IoC Container, we may replace `SomeService` with `SomeTestService` on registration side, without needing to change 
+anything on the consuming side.
 
 
 ## Registering multiple implementations
@@ -259,22 +260,22 @@ class Multiple_default_registrations
 }
 ```
 
-There are three different `ICommand` implementations registered. 
-By default there is no way to distinguish between them, therefore just resolving an `ICommand` will lead to error.
+Here three different `ICommand` implementations are registered. 
+By default there is no way to distinguish between them, therefore just resolving an `ICommand` will lead to an error.
 So you need to resolve a collection (`IEnumerable<ICommand>`) of commands.
 
-__Note:__ Additionally to `IEnumerable<T>`, DryIoc supports resolving an array `T[]` 
+__Note:__ In addition to `IEnumerable<T>`, DryIoc supports resolving an array `T[]` 
 or any interface implemented by array, e.g. `IList<T>`, `ICollection<T>`, `IReadOnlyList<T>`, `IReadOnlyCollection<T>`. 
 Check the documentation for collection [Wrappers](Wrappers). 
 
-For convenience DryIoc has dedicated `ResolveMany` method with couple of optional settings. 
+For convenience DryIoc has dedicated the `ResolveMany` method with a couple of optional settings. 
 
-Internally to store multiple default registrations, DryIoc uses special key type `DefaultKey`. 
-It has an interesting property `DefaultKey.RegistrationOrder`. More on keyed registrations below.
+Internally to store multiple default registrations, DryIoc uses a special key type `DefaultKey`. 
+This has an interesting property `DefaultKey.RegistrationOrder`. More on keyed registrations below.
 
-__Note:__ When resolving collection of multiple defaults, it always ordered in registration order.
+__Note:__ When resolving a collection of multiple defaults, it is always ordered in registration order.
 
-There are also a couple of ways to select a specific registration and avoid an exception in `Resolve<ICommand>`:
+There are also a couple of ways to select a specific registration and avoid an exception from the `Resolve<ICommand>`:
 
 - Using [condition](SpecifyDependencyAndPrimitiveValues.md#registering-with-condition): 
 `container.Register<ICommand, GetCommand>(setup: Setup.With(condition: req => req.IsResolutionRoot))` 
@@ -289,7 +290,7 @@ or to [named scope](ReuseAndScopes.md#reuseincurrentnamedscope-and-reuseinthread
 
 ### Keyed registrations
 
-To identify specific service implementation you may provide Service Key in registration. Service Key is value of arbitrary type which implements `Object.GetHashCode` and `Object.Equals`. Usual choice is enum type, string, or number.
+To identify specific service implementation you may provide a Service Key in registration. Service Key is a value of arbitrary type which implements `Object.GetHashCode` and `Object.Equals`. Usually an enum type, string, or number.
 ```cs 
 class Multiple_keyed_registrations
 {
@@ -312,7 +313,7 @@ class Multiple_keyed_registrations
         var setCommand = container.Resolve<ICommand>(serviceKey: CommandId.Set);
         Assert.IsInstanceOf<SetCommand>(setCommand);
 
-        // get array of all commands, don't matter the key
+        // get array of all commands, regardless of the key
         var commands = container.Resolve<ICommand[]>();
         Assert.AreEqual(3, commands.Length);
 
@@ -360,8 +361,8 @@ class Resolve_commands_with_keys
 
 ### Resolving as KeyValuePair wrapper
 
-DryIoc supports resolving of services registered with corresponding service key via `KeyValuePair<KeyType, ServiceType>` wrapper.
-It works both for default and keyed registrations, because a default registration internally identified with the special `DefaultKey` type. 
+DryIoc supports resolving of services registered with corresponding service key via a `KeyValuePair<KeyType, ServiceType>` wrapper.
+This works both for default and keyed registrations, because a default registration internally is identified with the special `DefaultKey` type. 
 
 __Note:__ When resolving a collection of services with service keys of different types, you need to specify `object` as `TKey` in a pair.
 
@@ -382,7 +383,7 @@ class Resolving_service_with_key_as_KeyValuePair
         container.Register<I, Y>();
         container.Register<I, Z>(serviceKey: "z");
 
-        // use an `object` key to get all of registrations
+        // use an `object` key to get all of the registrations
         var items = container.Resolve<KeyValuePair<object, I>[]>();
 
         // the keys of resolved items
@@ -395,7 +396,6 @@ class Resolving_service_with_key_as_KeyValuePair
         Assert.AreEqual(2, defaultItems.Length);
 
         // or the one with string key
-        // you may get only services with default keys
         var z = container.Resolve<KeyValuePair<string, I>[]>().Single().Value;
         Assert.IsInstanceOf<Z>(z);
     }
@@ -404,22 +404,21 @@ class Resolving_service_with_key_as_KeyValuePair
 
 You see, that you can filter registrations based on the `serviceKey` type.
 
-__Note:__ DryIoc does not guaranty return order for non-default keyed registrations. 
-So in example above it is not guarantied that `"z"` registration will be the last, because it was registered the last.
-
+__Note:__ DryIoc does not guarantee the return order for non-default keyed registrations. 
+So in the example above the `"z"` registration is not guaranteed to be the last, even though it was registered last.
 
 In case of multiple string keys you will get expected exception: _"Unable to resolve multiple ..."_.
 
 
 ## IsRegistered
 
-Sometimes you need to find, if a service is already registered. 
-`IsRegistered` method allows you to find, that specific service, decorator, or wrapper is registered into the Container.
+Sometimes you need to know if a service is already registered. 
+The `IsRegistered` method allows you to find out if that specific service, decorator, or wrapper is registered into the Container.
 
 Additionally, `IsRegistered` allows you to provide a `condition` to test registered implementation `Factory` of the service. 
 For instance, you may test for specific `Reuse`, or `Metadata`, or `Setup`.
 
-To find if `MyService` is registered as `Singleton`:
+To find out whether `MyService` is registered as `Singleton`:
 ```cs 
 class IsRegistered_examples
 {
@@ -447,8 +446,8 @@ class IsRegistered_examples
 }
 ```
 
-In above case we are looking for any default or keyed registration. 
-If you need to find service with specific key then specify the key:
+In the above case we are looking for any default or keyed registration. 
+If you need to find a service with specific key then specify the key:
 ```cs 
 class IsRegistered_with_key_examples
 {
@@ -462,7 +461,7 @@ class IsRegistered_with_key_examples
         c.Register<MyService>(serviceKey: "the key");
         Assert.IsTrue(c.IsRegistered<MyService>(serviceKey: "the key"));
 
-        // check that, there is no default registration
+        // Check that there is no default registration
         Assert.IsFalse(c.IsRegistered<MyService>(serviceKey: DefaultKey.Value));
 
         // Note, when key is not provided it will find any registered service
@@ -477,7 +476,7 @@ class IsRegistered_with_key_examples
 ```
 
 By default `IsRegistered` will look only for __services__, not for [decorators](Decorators) or [wrappers](Wrappers). 
-To look for them you need to specify corresponding FactoryType:
+To look for them you need to specify the corresponding FactoryType:
 ```cs 
 
 class IsRegistered_for_wrapper_or_decorators
@@ -496,7 +495,7 @@ class IsRegistered_for_wrapper_or_decorators
 }
 ```
 
-__Important:__ `IsRegistered` does not check if service is actually resolvable. 
+__Important:__ `IsRegistered` does not check if a service is actually resolvable. 
 For instance, if some of its dependencies are not registered. To check for resolvability use Resolve with `IfUnresolved.ReturnDefault`:
 
 ```cs 
@@ -513,13 +512,13 @@ class Check_if_resolvable
         c.Register<MyService>();
         Assert.IsTrue(c.Resolve<MyService>(ifUnresolved: IfUnresolved.ReturnDefault) != null);
 
-        // If you want just to check service resolvability without actually creating service then resolve it as Func wrapper.
+        // If you want just to check service resolvability without actually creating the service then resolve it as Func wrapper.
         Assert.IsTrue(c.Resolve<Func<MyService>>(ifUnresolved: IfUnresolved.ReturnDefault) != null);
     }
 }
 ```
 
-### Implicit ways to know that service is registered
+### Implicit ways to know that a service is registered
 
 There are other ways to get existing registration, that may fit to your needs.
 The basic one is to get all Container registrations and find the one you need.
@@ -544,12 +543,12 @@ class Get_specific_registration
 }
 ```
 
-`GetServiceRegistrations()` method will enumerate all service registrations in container. 
+`GetServiceRegistrations()` method will enumerate all service registrations in the container. 
 
 
 ## RegisterMany
 
-`RegisterMany` method allows to register single or multiple implementations of multiple services. 
+The `RegisterMany` method allows you to register single or multiple implementations of multiple services. 
 In addition, it may automatically deduce service types from given implementation types (or assemblies of implementation types).
 
 `RegisterMany` helps to automate batch registrations and registrations from assemblies.
@@ -572,7 +571,7 @@ public class RegisterMany_examples
     [Test]
     public void Example()
     {
-        // Allows to register B which implements IDisposable as Transient, which is default `RegisterMany` reuse.
+        // Allows registration of B which implements IDisposable as Transient, which is default `RegisterMany` reuse.
         var container = new Container(rules => rules
             .WithTrackingDisposableTransients()); 
 
@@ -651,7 +650,7 @@ __Note:__ If you really need to register something from the list, you may regist
 
 ## RegisterMapping
 
-`RegisterMapping` allows to map a new service to the already registered service and its implementation.
+`RegisterMapping` allows you to map a new service to the already registered service and its implementation.
 
 For example you may want to have a singleton implementation accessed via two different services (facades):
 ```cs 
@@ -766,25 +765,25 @@ class Register_delegate_with_resolved_dependencies
 }
 ```
 
-Though powerful, registering delegate may lead to the problems:
+Though powerful, registering delegate may lead to some problems:
 
-1. Memory leaks by capturing variables into delegate closure and keeping them for a container lifetime.
+1. Memory leaks by capturing variables into delegate closure and keeping them for the lifetime of the container.
 2. Delegate is the black box for Container, mostly because it should use the `Resolve` call inside to resolve the dependency cutting of the object graph analysis, which makes it hard to find type mismatches or diagnose other potential problems. Among the un-catched problems are:
 
     - [Recursive Dependency](ErrorDetectionAndResolution.md#RecursiveDependencyDetected)
     - [Captive Dependency](ErrorDetectionAndResolution.md#using-validate-to-check-for-captive-dependency)
 
-Therefore, try to use it only as a last resort. DryIoc has plenty of tools to cover for custom delegate in more effective way. 
-The alternative would be a [FactoryMethod](ConstructorSelection).
+Therefore, try to use it only as a last resort. DryIoc has plenty of tools to cover for custom delegate in more effective ways. 
+One alternative would be a [FactoryMethod](ConstructorSelection).
 
 Another alternative would be the **RegisterDelegate with the dependency parameters introduced in DryIoc v4.3**. See below...
 
 ### The cure - RegisterDelegate with the dependency parameters
 
-It solves the two problems mentioned in the [RegisterDelegate](#registerdelegate) above because 
+This solves the two problems mentioned in the [RegisterDelegate](#registerdelegate) above because 
 it **injects** the requested dependencies as the delegate arguments so there is no need to call `Resolve` inside the delegate.
 
-- The dependencies injection and their lifetime is controlled by container
+- The dependencies injection and their lifetime is controlled by the container
 - There is no black-box service location involved and both the [Recursive Dependency](ErrorDetectionAndResolution.md#RecursiveDependencyDetected) and the [Captive Dependency](ErrorDetectionAndResolution.md#using-validate-to-check-for-captive-dependency) problems are catched by the container.
 
 The example:
@@ -817,7 +816,7 @@ class Register_delegate_with_parameters
 
 ### RegisterDelegate is harder to use when types are not known
 
-Another thing, that delegate is usually hard to use when types are not known in the compile time. 
+Another thing, that delegate is usually hard to use when types are not known at compile time. 
 Given `type = typeof(Foo)` it is impossible to write `new type();`.
 To enable such use-case DryIoc allow to register delegate with runtime known type:
 
@@ -867,14 +866,14 @@ class Register_instance_example
 } 
 ```
 
-Ok, now we have a pre-created instance in the registry, but what if I need a different instances when opening a new scope.
+OK, now we have a pre-created instance in the registry, but what if I need a different instance when opening a new scope.
 Say I want to put `RequestMessage` object into ASP request scope. A request message has a different value in different requests.
 
 ### Method Use to add instance directly into scope
 
-In that case you we can use method `Use` to put instance directly into the current scope skipping the registration ceremony.
+In that case we can use method `Use` to put an instance directly into the current scope skipping the registration ceremony.
 
-__Caution:__ the instance put via `Use` does not support `serviceKey`, [Wrappers](Wrappers), and [Decorators](Decorators), 
+__Caution:__ the instance put in via `Use` does not support `serviceKey`, [Wrappers](Wrappers), and [Decorators](Decorators), 
 but instead it provides nice performance gains and less memory allocations.
 
 ```cs 

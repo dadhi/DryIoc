@@ -16,6 +16,7 @@
     - [Meta or Tuple of A with Metadata](#meta-or-tuple-of-a-with-metadata)
       - [Dictionary Metadata](#dictionary-metadata)
     - [IEnumerable or array of A](#ienumerable-or-array-of-a)
+      - [Custom order of items in the collection wrapper](#custom-order-of-items-in-the-collection-wrapper)
       - [Open-generics](#open-generics)
       - [Co-variant generics](#co-variant-generics)
       - [Composite Pattern support](#composite-pattern-support)
@@ -431,6 +432,46 @@ class Filtering_not_resolved_services
     }
 } 
 ```
+
+#### Custom order of items in the collection wrapper
+
+To achieve the custom ordering we may use the [Meta or Tuple with Metadata](#meta-or-tuple-of-a-with-metadata) wrapper and the [Decorator](Decorators.md) feature.
+
+```cs 
+class Collection_with_custom_order
+{
+    public sealed class OrderMetadata // may be an suitable data structure defined by you
+    { 
+        public readonly int Value;
+        public OrderMetadata(int value) => Value = value;
+    }
+
+    // The "decorator" method sorting the `I` collection based on the `OrderMetadata` before returning it.
+    static IEnumerable<I> SortByOrderMetadata(IEnumerable<Tuple<I, OrderMetadata>> ii) =>
+        ii.OrderBy(x => x.Item2.Value).Select(x => x.Item1);
+
+    [Test] public void Example()
+    {
+        var container = new Container();
+        container.Register<I, C>(setup: Setup.With(new OrderMetadata(3)));
+        container.Register<I, A>(setup: Setup.With(new OrderMetadata(1)));
+        container.Register<I, B>(setup: Setup.With(new OrderMetadata(2)));
+
+        container.RegisterDelegate<IEnumerable<Tuple<I, OrderMetadata>>, IEnumerable<I>>(SortByOrderMetadata, setup: Setup.Decorator);
+
+        var items = container.Resolve<I[]>();
+
+        Assert.IsInstanceOf<A>(items[0]);
+        Assert.IsInstanceOf<B>(items[1]);
+        Assert.IsInstanceOf<C>(items[2]);
+    }
+    interface I {}
+    class A : I { }
+    class B : I { }
+    class C : I { }
+}
+```
+
 
 #### Open-generics
 
