@@ -4347,23 +4347,28 @@ namespace DryIoc
                 typeof(TService), typeof(TRegisteredService), serviceKey, registeredServiceKey);
 
         // todo: Remove in VNext?
-        /// <summary>Forwards to <see cref="Registrator.RegisterPlaceholder"/>.</summary>
+        /// <summary>Register a service without implementation which can be provided later in terms
+        /// of normal registration with `IfAlreadyRegistered.Replace` parameter.
+        /// When the implementation is still not provided when the placeholder service is accessed, then the exception will be thrown.
+        /// This feature allows you to postpone the decision on implementation until it is later known.</summary>
+        /// <remarks>Internally the empty factory is registered with the setup `asResolutionCall: true`.
+        /// That means, instead of placing service instance into graph expression we put here redirecting call to
+        /// container Resolve.</remarks>
         public static void RegisterPlaceholder(this IContainer container, Type serviceType,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             Registrator.RegisterPlaceholder(container, serviceType, ifAlreadyRegistered, serviceKey);
 
         // todo: vNext: Remove, replaced by Registrator.RegisterPlaceholder
         /// <summary>Register a service without implementation which can be provided later in terms
-        /// of normal registration with IfAlreadyRegistered.Replace parameter.
-        /// When the implementation is still not provided when the placeholder service is accessed,
-        /// then the exception will be thrown.
-        /// This feature allows you to postpone decision on implementation until it is later known.</summary>
-        /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
+        /// of normal registration with `IfAlreadyRegistered.Replace` parameter.
+        /// When the implementation is still not provided when the placeholder service is accessed, then the exception will be thrown.
+        /// This feature allows you to postpone the decision on implementation until it is later known.</summary>
+        /// <remarks>Internally the empty factory is registered with the setup `asResolutionCall: true`.
         /// That means, instead of placing service instance into graph expression we put here redirecting call to
         /// container Resolve.</remarks>
         public static void RegisterPlaceholder<TService>(this IContainer container,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            container.RegisterPlaceholder(typeof(TService), ifAlreadyRegistered, serviceKey);
+            Registrator.RegisterPlaceholder(container, typeof(TService), ifAlreadyRegistered, serviceKey);
 
         /// Obsolete: please use WithAutoFallbackDynamicRegistration
         [Obsolete("Please use WithAutoFallbackDynamicRegistration instead")]
@@ -7979,16 +7984,26 @@ namespace DryIoc
                 typeof(TService), typeof(TRegisteredService), ifAlreadyRegistered, serviceKey, registeredServiceKey);
 
         /// <summary>Register a service without implementation which can be provided later in terms
-        /// of normal registration with IfAlreadyRegistered.Replace parameter.
-        /// When the implementation is still not provided when the placeholder service is accessed,
-        /// then the exception will be thrown.
-        /// This feature allows you to postpone decision on implementation until it is later known.</summary>
-        /// <remarks>Internally the empty factory is registered with the setup asResolutionCall set to true.
+        /// of normal registration with `IfAlreadyRegistered.Replace` parameter.
+        /// When the implementation is still not provided when the placeholder service is accessed, then the exception will be thrown.
+        /// This feature allows you to postpone the decision on implementation until it is later known.</summary>
+        /// <remarks>Internally the empty factory is registered with the setup `asResolutionCall: true`.
         /// That means, instead of placing service instance into graph expression we put here redirecting call to
         /// container Resolve.</remarks>
         public static void RegisterPlaceholder(this IRegistrator registrator, Type serviceType,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             registrator.Register(FactoryPlaceholder.Default, serviceType, serviceKey, ifAlreadyRegistered, true);
+
+        /// <summary>Register a service without implementation which can be provided later in terms
+        /// of normal registration with `IfAlreadyRegistered.Replace` parameter.
+        /// When the implementation is still not provided when the placeholder service is accessed, then the exception will be thrown.
+        /// This feature allows you to postpone the decision on implementation until it is later known.</summary>
+        /// <remarks>Internally the empty factory is registered with the setup `asResolutionCall: true`.
+        /// That means, instead of placing service instance into graph expression we put here redirecting call to
+        /// container Resolve.</remarks>
+        public static void RegisterPlaceholder<TService>(this IRegistrator registrator,
+            IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            registrator.RegisterPlaceholder(typeof(TService), ifAlreadyRegistered, serviceKey);
     }
 
     /// <summary>Extension methods for <see cref="IResolver"/>.</summary>
