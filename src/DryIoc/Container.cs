@@ -1194,10 +1194,12 @@ namespace DryIoc
             return !multipleFactories && minLifespanFactory != null ? minLifespanFactory : null;
         }
 
+        // todo: @perf add the version with the serviceTypeHash parameter
         KV<object, Factory>[] IContainer.GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics)
         {
-            var registryOrServices = _registry.Value;
-            var serviceFactories = registryOrServices is Registry r ? r.Services : registryOrServices;
+            var serviceFactories = _registry.Value;
+            if (serviceFactories is Registry r)
+                serviceFactories = r.Services;
 
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
