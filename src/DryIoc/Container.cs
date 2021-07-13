@@ -4642,7 +4642,7 @@ namespace DryIoc
             var requiredItemType = container.GetWrappedType(itemType, details.RequiredServiceType);
 
             var items = container.GetAllServiceFactories(requiredItemType)
-                .Map(requiredItemType, (it, x) => new ServiceRegistrationInfo(x.Value, requiredItemType, x.Key));
+                .Map(requiredItemType, (rt, x) => new ServiceRegistrationInfo(x.Value, rt, x.Key));
 
             if (requiredItemType.IsClosedGeneric())
             {
