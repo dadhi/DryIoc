@@ -1203,14 +1203,21 @@ namespace DryIoc
 
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-            var factories = GetRegistryEntryKeyFactoryPairs(entry).ToArrayOrSelf();
+            var factories = entry == null ? Empty<KV<object, Factory>>()
+                : entry is Factory f ? new[] { new KV<object, Factory>(DefaultKey.Value, f) }
+                : ((FactoriesEntry)entry).Factories.ToArray(x => KV.Of(x.Key, x.Value)).Match(x => x.Value != null); // filter out the Unregistered factories
+
+            // var factories = GetRegistryEntryKeyFactoryPairs(entry).ToArrayOrSelf();
 
             if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
             {
                 var openGenericServiceType  = serviceType.GetGenericTypeDefinition();
                 var openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
                 if (openGenericEntry != null)
-                    factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
+                    // factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
+                    factories = openGenericEntry is Factory gf
+                        ? factories.Append(new KV<object, Factory>(DefaultKey.Value, gf))
+                        : factories.Append(((FactoriesEntry)openGenericEntry).Factories.ToArray(x => KV.Of(x.Key, x.Value)).Match(x => x.Value != null)); // filter out the Unregistered factories
             }
 
             var withoutFlags = factories.IsNullOrEmpty() ? DynamicRegistrationFlags.NoFlags : DynamicRegistrationFlags.AsFallback;

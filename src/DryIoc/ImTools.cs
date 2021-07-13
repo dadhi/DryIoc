@@ -1715,30 +1715,46 @@ namespace DryIoc.ImTools
             return result;
         }
 
+        /// <summary>Returns the new array consisting from all items from source array plus the value.</summary>
+        public static T[] Append<T>(this T[] source, T value)
+        {
+            if (source == null || source.Length == 0)
+                return new T[] { value };
+            var sourceCount = source.Length;
+            var result = new T[sourceCount + 1];
+            if (sourceCount < 6)
+                for (var i = 0; i < sourceCount; ++i)
+                    result[i] = source[i];
+            else
+                Array.Copy(source, 0, result, 0, sourceCount);
+            result[sourceCount] = value;
+            return result;
+        }
+
         /// <summary>Returns new array with <paramref name="value"/> appended. Assumes that `source` is not empty to avoid the checks.</summary>
         public static T[] AppendToNonEmpty<T>(this T[] source, T value)
         {
-            var count = source.Length;
-            var result = new T[count + 1];
-            if (count < 6)
-                for (var i = 0; i < count; ++i)
+            var sourceCount = source.Length;
+            var result = new T[sourceCount + 1];
+            if (sourceCount < 6)
+                for (var i = 0; i < sourceCount; ++i)
                     result[i] = source[i];
             else
-                Array.Copy(source, 0, result, 0, count);
-            result[count] = value;
+                Array.Copy(source, 0, result, 0, sourceCount);
+            result[sourceCount] = value;
             return result;
         }
 
         /// <summary>Returns new array with <paramref name="value"/> prepended. Assumes that `source` is not empty to avoid the checks.</summary>
         public static T[] PrependToNonEmpty<T>(this T[] source, T value)
         {
-            var count = source.Length;
-            var result = new T[count + 1];
-            if (count < 6)
-                for (var i = 0; i < count; ++i)
+            var sourceCount = source.Length;
+            var result = new T[sourceCount + 1];
+            if (sourceCount < 6)
+                for (var i = 0; i < sourceCount; ++i)
                     result[i + 1] = source[i];
             else
-                Array.Copy(source, 0, result, 1, count);
+                Array.Copy(source, 0, result, 1, sourceCount);
             result[0] = value;
             return result;
         }
