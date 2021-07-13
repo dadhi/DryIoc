@@ -1056,10 +1056,10 @@ namespace DryIoc
                     return setup.Condition != null && !setup.Condition(request) 
                         || (details.MetadataKey != null || details.Metadata != null) && !setup.MatchesMetadata(details.MetadataKey, details.Metadata)
                         ? null
-                        : Rules.IsSelectLastRegisteredFactory ? defaultFactory 
+                        : Rules.IsSelectLastRegisteredFactory ? defaultFactory
                         : Rules.FactorySelector(request, defaultFactory, null);
 
-                factories = new[] {new KV<object, Factory>(DefaultKey.Value, defaultFactory)};
+                factories = new[] { new KV<object, Factory>(DefaultKey.Value, defaultFactory) };
             }
             else if (entry is FactoriesEntry e)
             {
@@ -1074,11 +1074,9 @@ namespace DryIoc
                     var openGenericServiceType = serviceType.GetGenericTypeDefinition();
                     openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
                     if (openGenericEntry != null)
-                    {
                         factories = openGenericEntry is Factory gf 
                             ? new[] { new KV<object, Factory>(DefaultKey.Value, gf) }
                             : ((FactoriesEntry)openGenericEntry).Factories.ToArray(x => KV.Of(x.Key, x.Value)).Match(x => x.Value != null); // filter out the Unregistered factories
-                    }
 
                     if (openGenericEntry == null && Rules.VariantGenericTypesInResolve)
                     {
@@ -1127,7 +1125,7 @@ namespace DryIoc
             if (factories.Length > 1)
                 Array.Sort(factories, _lastFactoryIDWinsComparer);
 
-            var matchedFactories = factories.Match(x => request.MatchFactoryConditionAndMetadata(x));
+            var matchedFactories = factories.Match(request, (r, x) => r.MatchFactoryConditionAndMetadata(x));
 
             if (matchedFactories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
             {
@@ -1142,7 +1140,7 @@ namespace DryIoc
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
             // so there should not be repeating of the check, and not match of Performance decrease.
             if (matchedFactories.Length > 1)
-                matchedFactories = matchedFactories.Match(request.MatchGeneratedFactory);
+                matchedFactories = matchedFactories.Match(request, (r, x) => r.MatchGeneratedFactory(x));
 
             if (matchedFactories.Length == 0)
                 return null;
