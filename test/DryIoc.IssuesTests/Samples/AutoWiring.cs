@@ -1,6 +1,6 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Reflection;
-using ImTools;
+using DryIoc.ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests.Samples
@@ -17,7 +17,7 @@ namespace DryIoc.IssuesTests.Samples
 
             var pluginAssembly = typeof(AutoWiring).GetAssembly();
 
-            var pluginTypes = pluginAssembly.GetTypes().Where(t => t.IsPublicOrNestedPublic() && !t.IsAbstract()
+            var pluginTypes = pluginAssembly.GetTypes().Where(t => t.IsPublicOrNestedPublic() && !t.IsAbstract
                 && t.GetImplementedTypes().Contains(typeof(IPlugin)));
 
             foreach (var pluginType in pluginTypes)

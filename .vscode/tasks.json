@@ -4,6 +4,20 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "build_benchmark",
+            "type": "process",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/playground/Playground/Playground.csproj"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
             "label": "build_testrunner",
             "type": "process",
             "command": "dotnet",

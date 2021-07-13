@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class SelectConstructorWithAllResolvableArgumentTests
+    public class SelectConstructorWithAllResolvableArgumentTests : ITest
     {
+        public int Run()
+        {
+            Can_specify_to_use_default_ctor_and_throw_correct_error_if_no_impl_type();
+            return 1;
+        }
+
         [Test]
         public void Container_is_providing_method_for_that_Test_default_constructor()
         {
@@ -49,12 +55,10 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register<InternalClient>(made: FactoryMethod.ConstructorWithResolvableArguments);
-
             var ex = Assert.Throws<ContainerException>(() =>
-                container.Resolve<InternalClient>());
+                container.Register<InternalClient>(made: FactoryMethod.ConstructorWithResolvableArguments));
 
-            StringAssert.StartsWith("code: Error.UnableToSelectCtor", ex.Message);
+            Assert.AreSame(Error.NameOf(Error.UnableToSelectSinglePublicConstructorFromNone), ex.ErrorName);
         }
 
         [Test]
@@ -162,9 +166,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<BaseA>());
 
-            Assert.AreEqual(
-                Error.NameOf(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection),
-                Error.NameOf(ex.Error));
+            Assert.AreEqual(Error.NameOf(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection), ex.ErrorName);
         }
 
         [Test]
@@ -194,7 +196,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void AutoConstructoSelection_will_throw_for_not_defined_impl_type()
+        public void AutoConstructorSelection_will_throw_for_not_defined_impl_type()
         {
             var container = new Container();
 

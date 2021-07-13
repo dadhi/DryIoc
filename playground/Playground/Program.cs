@@ -9,7 +9,7 @@ using System.Runtime.Serialization;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using DryIoc;
-using ImTools;
+using DryIoc.ImTools;
 using PerformanceTests;
 
 namespace Playground
@@ -44,6 +44,11 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+
+            // var bm = new RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve();
+            // bm.DryIoc();
+            // bm.DryIoc_MsDIAdapter();
+
             BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.Measure(

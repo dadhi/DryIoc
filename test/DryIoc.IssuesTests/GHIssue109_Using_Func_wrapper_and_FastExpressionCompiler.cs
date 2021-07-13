@@ -10,7 +10,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Should_be_able_to_resolve_Func()
         {
-            using (var c = new Container(Rules.Default.WithoutFastExpressionCompiler()))
+            using (var c = new Container())
             {
                 c.Register(Made.Of(() => new CancellationTokenSource()), Reuse.Singleton);
                 c.Register(Made.Of(r => ServiceInfo.Of<CancellationTokenSource>(), 
@@ -27,7 +27,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Should_be_able_to_resolve_Func_of_scoped()
         {
-            using (var c = new Container(Rules.Default.WithoutFastExpressionCompiler()))
+            using (var c = new Container())
             {
                 c.Register(Made.Of(() => new CancellationTokenSource()), Reuse.Scoped);
                 c.Register(Made.Of(r => ServiceInfo.Of<CancellationTokenSource>(),

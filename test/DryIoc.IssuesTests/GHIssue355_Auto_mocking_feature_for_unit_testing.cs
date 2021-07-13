@@ -84,7 +84,7 @@ namespace DryIoc.IssuesTests
                             return new[]
                             {
                                 new DynamicRegistration(
-                                    new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton, Setup.Default, serviceType),
+                                    DelegateFactory.Of(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton, Setup.Default),
                                     IfAlreadyRegistered.Keep),
                             };
                         }
@@ -171,13 +171,13 @@ namespace DryIoc.IssuesTests
 
                         var mockType = typeof(Mock<>).MakeGenericType(serviceType);
 
-                        var mockFactory = new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton);
+                        var mockFactory = DelegateFactory.Of(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton);
 
                         return new[] { new DynamicRegistration(mockFactory, IfAlreadyRegistered.Keep) };
                     }
 
                     // concrete types
-                    var concreteTypeFactory = new ReflectionFactory(serviceType, Reuse.Singleton,
+                    var concreteTypeFactory = ReflectionFactory.Of(serviceType, Reuse.Singleton,
                         FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
 
                     return new[] { new DynamicRegistration(concreteTypeFactory) };
@@ -233,7 +233,7 @@ namespace DryIoc.IssuesTests
                             return new[]
                             {
                                 new DynamicRegistration(
-                                    new DelegateFactory(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton, null, serviceType),
+                                    DelegateFactory.Of(r => ((Mock)r.Resolve(mockType)).Object, Reuse.Singleton),
                                     IfAlreadyRegistered.Keep),
                             };
                         }

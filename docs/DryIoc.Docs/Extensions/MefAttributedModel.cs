@@ -7,7 +7,6 @@
 - [MefAttributedModel](#mefattributedmodel)
   - [Overview](#overview)
   - [Comparing to MEF](#comparing-to-mef)
-    - [Works without System.ComponentModel.Composition](#works-without-systemcomponentmodelcomposition)
     - [Adds on top](#adds-on-top)
     - [Not supported](#not-supported)
   - [Concept](#concept)
@@ -48,11 +47,6 @@
 Enables the [MEF Attributed Programming Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs.110).aspx) in DryIoc.
 
 ## Comparing to MEF
-
-### Works without System.ComponentModel.Composition
-
-* The standard MEF attributes are re-defined in _Ported-net40.cs_.
-* Additional DryIoc attributes are define in _Attributes.cs_.
 
 ### Adds on top
 

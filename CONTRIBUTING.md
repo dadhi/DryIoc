@@ -45,18 +45,18 @@ If you found the problem with DryIoc:
 
 ### Build from the command line 
 
-Before sending the Pull Request please build the solution with the `build_no_legacy.bat` (or just `build.bat` for the V5-dev branch) located in the root folder.
+Before sending the Pull Request please build the solution with the `build.bat` located in the root folder.
 
-It will build all projects for in the Release configuration, will run unit tests and create the NuGet packages.
+It will build all projects for in the Release configuration, will run unit tests and [generate the documentation](#tldr).
 Make sure that there are no project build errors or failing tests.
 
 ### Develop in Visual Studio 2017+
 
-Open `DryIoc.sln` solution and re-build it. If something is failing you may try to close VS, run `build_no_legacy.bat` in the root folder, open VS and try to build again.
+Open `DryIoc.sln` solution and re-build it. If something is failing you may try to close VS, run `build.bat` in the root folder, open VS and try to build again.
 
-__Note:__ DryIoc projects are multi-targeting the multiple platforms, e.g. `DryIoc` targets 6+ platforms which makes it slower to build. 
-To speedup the development DryIoc has `<DevMode>true</DevMode>` MSBuild property set to `true` in `Directory.Build.props` file in the root folder. 
-This setting minimizes the number of platforms to build - that's why you need to run `build_no_legacy.bat` to test your work on all platforms.
+__Note:__ DryIoc targets multiple platforms (via msbuild project multi-targeting) which makes it slower to build. 
+To speedup the development DryIoc has `<DevMode>true</DevMode>` (TODO: Point to change) MSBuild property set to `true` in `Directory.Build.props` file in the root folder. 
+This setting minimizes the number of platforms to build - that's why you need to run `build.bat` to test your work for all platforms.
 
 __Productivity hint:__ I am using [NCrunch](http://www.ncrunch.net/) extension to build and run the tests continuously to get an immediate feedback, quickly find regressions, and generally experiment with the code.
 
@@ -66,7 +66,7 @@ DryIoc provides the friendly VSCode developing experience.
 
 Basically you need just the **C# extension** installed. 
 
-Then you may run the `build_no_legacy.bat` (or just `build.bat` for the V5-dev branch) from the shell to ensure packages are restored, code is built, tests are passing and packages are created.
+Then you may run the `build.bat` from the shell to ensure packages are restored, code is built, tests are passing and packages are created.
 
 You may go to the test projects in the _test_ sub-folder and Run or Debug the tests via the editor lens provided by the extension.
 

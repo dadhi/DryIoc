@@ -1,9 +1,9 @@
 using System;
 using NUnit.Framework;
-using ImTools;
+using DryIoc.ImTools;
 
-using FastExpressionCompiler.LightExpression;
-using static FastExpressionCompiler.LightExpression.Expression;
+using DryIoc.FastExpressionCompiler.LightExpression;
+using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 
 namespace DryIoc.IssuesTests
 {

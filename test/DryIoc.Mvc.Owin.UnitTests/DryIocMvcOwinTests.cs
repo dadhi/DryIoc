@@ -47,7 +47,7 @@ namespace DryIoc.Mvc.Owin.UnitTests
             {
                 app.UseDryIocOwinMiddleware(
                     container.WithMvc(ArrayTools.Empty<Assembly>()),
-                    scope => scope.UseInstance(new Greeting { Message = "Hey, DryIoc!" }));
+                    scope => scope.Use(new Greeting { Message = "Hey, DryIoc!" }));
             }))
             {
                 var response = await server.HttpClient.GetAsync("/");

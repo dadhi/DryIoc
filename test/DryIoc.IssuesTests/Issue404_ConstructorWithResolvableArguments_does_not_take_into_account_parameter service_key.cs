@@ -19,7 +19,7 @@ namespace DryIoc.IssuesTests
 
             container.Register(typeof(ICloud), typeof(Cloud),
                 made: Made.Of(parameters: Parameters.Of.Name("conn", serviceKey: "somekey"),
-                              factoryMethod: FactoryMethod.ConstructorWithResolvableArguments));
+                              factoryMethodSelector: FactoryMethod.ConstructorWithResolvableArguments));
 
             var cloud = container.Resolve<ICloud>();
             Assert.IsNotNull(cloud);

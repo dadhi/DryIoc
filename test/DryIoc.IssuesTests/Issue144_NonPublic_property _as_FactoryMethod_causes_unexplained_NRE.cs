@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
 
             var prop = typeof(C).GetProperty("P", BindingFlags.NonPublic | BindingFlags.Static);
 
-            var factory = new ReflectionFactory(typeof(string), made: Made.Of(prop));
+            var factory = typeof(string).ToFactory(made: Made.Of(prop));
 
             c.Register(factory, typeof(string), null, IfAlreadyRegistered.Replace, true);
 

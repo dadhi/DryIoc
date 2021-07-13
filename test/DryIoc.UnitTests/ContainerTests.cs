@@ -1,13 +1,20 @@
 using System.Linq;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ContainerTests
+    public class ContainerTests : ITest
     {
+        public int Run()
+        {
+            Resolving_service_should_return_registered_implementation();
+            Can_generate_expressions_from_closed_and_open_generic_registrations_via_required_service_type();
+            return 2;
+        }
+
         [Test]
         public void Resolving_service_should_return_registered_implementation()
         {

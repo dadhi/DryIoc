@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using NUnit.Framework;
-using static FastExpressionCompiler.LightExpression.Expression;
+using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 
 namespace DryIoc.UnitTests
 {
@@ -18,7 +18,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
 
             container.Register(typeof(Bla<>), made: Made.Of(
-                t => t.GetConstructorOrNull(typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()[0]))));
+                t => t.GetConstructorOrNull(typeof(Func<>).MakeGenericType(t.GetGenericArguments()[0]))));
 
             container.Register(typeof(SomeService), typeof(SomeService));
 
@@ -31,8 +31,8 @@ namespace DryIoc.UnitTests
         public void I_should_be_able_to_add_rule_to_resolve_not_registered_service()
         {
             var container = new Container(Rules.Default.WithUnknownServiceResolvers(request =>
-                !request.ServiceType.IsValueType() && !request.ServiceType.IsAbstract()
-                    ? new ReflectionFactory(request.ServiceType)
+                !request.ServiceType.IsValueType && !request.ServiceType.IsAbstract
+                    ? request.ServiceType.ToFactory()
                     : null));
 
             var service = container.Resolve<NotRegisteredService>();
@@ -44,8 +44,8 @@ namespace DryIoc.UnitTests
         public void I_can_remove_rule_to_resolve_not_registered_service()
         {
             Rules.UnknownServiceResolver unknownServiceResolver = request =>
-                !request.ServiceType.IsValueType() && !request.ServiceType.IsAbstract()
-                    ? new ReflectionFactory(request.ServiceType)
+                !request.ServiceType.IsValueType && !request.ServiceType.IsAbstract
+                    ? request.ServiceType.ToFactory()
                     : null;
 
             IContainer container = new Container(Rules.Default.WithUnknownServiceResolvers(unknownServiceResolver));
@@ -137,8 +137,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container(rules => rules
                 .WithConcreteTypeDynamicRegistrations()
-                .WithUnknownServiceResolvers(r => r.ServiceType == typeof(Xx) ?
-                    new DelegateFactory(_ => new Xx(null)) : null));
+                .WithUnknownServiceResolvers(r => r.ServiceType == typeof(Xx) ? DelegateFactory.Of(_ => new Xx(null)) : null));
 
             var xx = container.Resolve<Xx>();
 
@@ -229,7 +228,9 @@ namespace DryIoc.UnitTests
         public void You_can_specify_rules_to_disable_registration_based_on_reuse_type()
         {
             var container = new Container(Rules.Default.WithFactorySelector(
-                (request, factories) => factories.FirstOrDefault(f => f.Key.Equals(request.ServiceKey) && !(f.Value.Reuse is SingletonReuse)).Value));
+                (request, f, factories) => 
+                    f != null ? (request.ServiceKey == null && !(f.Reuse is SingletonReuse) ? f : null)
+                    : factories.FirstOrDefault(x => x.Key.Equals(request.ServiceKey) && !(x.Value.Reuse is SingletonReuse)).Value));
 
             container.Register<IService, Service>(Reuse.Singleton);
             var service = container.Resolve(typeof(IService), IfUnresolved.ReturnDefault);

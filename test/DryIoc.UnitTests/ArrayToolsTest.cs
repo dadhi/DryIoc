@@ -1,5 +1,5 @@
-﻿using System.Linq;
-using ImTools;
+using System.Linq;
+using DryIoc.ImTools;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests

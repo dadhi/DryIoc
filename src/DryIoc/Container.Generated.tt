@@ -34,7 +34,7 @@ THE SOFTWARE.
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Linq.Expressions" #>
 <#@ import Namespace="DryIoc" #>
-<#@ import Namespace="ImTools" #>
+<#@ import Namespace="DryIoc.ImTools" #>
 <#@ include File="CompileTimeRegistrations.ttinclude" #>
 <#
 var container = GetContainerWithRegistrations().With(rules => rules.ForExpressionGeneration());
@@ -91,7 +91,7 @@ Generation is completed successfully.
 There are <#=errCount#> generation issues (may be not an error dependent on context):
 
 The issues with run-time registrations may be solved by `container.RegisterPlaceholder<T>()` 
-in Registrations.ttinclude. Then you can replace placeholders using `DryIocZero.Container.Register`
+in Registrations.ttinclude. Then you can replace placeholders using `Container.Register`
 at runtime.
 
 <# } #>
@@ -107,7 +107,7 @@ using System;
 using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
-using ImTools;
+using DryIoc.ImTools;
 
 // Specified `NamespaceUsings` if any:
 <# foreach (var ns in NamespaceUsings) {#>

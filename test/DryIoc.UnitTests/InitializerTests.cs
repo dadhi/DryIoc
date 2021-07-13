@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace DryIoc.UnitTests
 {
@@ -13,11 +13,12 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<InitializableService>();
-            container.RegisterDelegateDecorator<InitializableService>(r => (x =>
-            {
-                x.Initialize("blah");
-                return x;
-            }));
+            container.RegisterDelegate<InitializableService, InitializableService>(x =>
+                {
+                    x.Initialize("blah");
+                    return x;
+                },
+                setup: Setup.Decorator);
 
             var service = container.Resolve<InitializableService>();
 
@@ -29,8 +30,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IInitializable<InitializableService>, InitializableService>();
-            container.RegisterDelegateDecorator<IInitializable<InitializableService>>(
-                r => x => x.Initialize("blah"));
+            container.RegisterDelegate<IInitializable<InitializableService>, IInitializable<InitializableService>>(
+                x => x.Initialize("blah"), setup: Setup.DecoratorWith(useDecorateeReuse: true));
 
             var service = (InitializableService)container.Resolve<IInitializable<InitializableService>>();
 

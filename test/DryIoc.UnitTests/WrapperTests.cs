@@ -36,7 +36,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Lazy<IService>>(made: Made.Of(
-                t => t.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()))));
+                t => t.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(t.GetGenericArguments()))));
             container.Register<IService, Service>();
 
             var service = container.Resolve<Lazy<IService>>();
@@ -49,7 +49,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<Lazy<IService>>(made: Made.Of(
-                t => t.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(t.GetGenericParamsAndArgs()))));
+                t => t.GetConstructorOrNull(args: typeof(Func<>).MakeGenericType(t.GetGenericArguments()))));
             container.Register<IService, Service>();
             container.Register<IService, AnotherService>(serviceKey: "named");
 

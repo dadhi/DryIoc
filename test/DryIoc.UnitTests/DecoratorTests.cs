@@ -3,13 +3,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using NUnit.Framework;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class DecoratorTests
+    public class DecoratorTests : ITest
     {
+        public int Run()
+        {
+            Delegate_decorator_with_the_runtime_service_types_RegisterDelegate();
+            return 1;
+        }
+
         [Test]
         public void Should_resolve_decorator()
         {
@@ -281,7 +287,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.RegisterDelegateDecorator<IOperation>(_ => op => new MeasureExecutionTimeOperationDecorator(op));
+            container.RegisterDelegate<IOperation, IOperation>(op => new MeasureExecutionTimeOperationDecorator(op), 
+                setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
 
@@ -294,8 +301,9 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
             container.Register<IMeasurer, Measurer>();
-            container.RegisterDelegateDecorator<IOperation>(r =>
-                op => MeasureExecutionTimeOperationDecorator.MeasureWith(op, r.Resolve<IMeasurer>()));
+            container.RegisterDelegate<IOperation, IMeasurer, IOperation>(
+                (op, m) => MeasureExecutionTimeOperationDecorator.MeasureWith(op, m), 
+                setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
 
@@ -319,8 +327,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
-            container.RegisterDelegateDecorator<IOperation>(r => op => new RetryOperationDecorator(op));
-            container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
+            container.RegisterDelegate<IOperation, IOperation>(op => new RetryOperationDecorator(op), setup: Setup.Decorator);
+            container.RegisterDelegate<IOperation, IOperation>(op => new MeasureExecutionTimeOperationDecorator(op), setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
 
@@ -334,7 +342,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
             container.Register<IOperation, RetryOperationDecorator>(setup: Setup.Decorator);
-            container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
+            container.RegisterDelegate<IOperation, IOperation>(op => new MeasureExecutionTimeOperationDecorator(op), setup: Setup.Decorator);
             container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.Decorator);
 
             var operation = container.Resolve<IOperation>();
@@ -354,7 +362,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register<IOperation, SomeOperation>();
             container.Register<IOperation, RetryOperationDecorator>(setup: Setup.DecoratorWith(order: 3));
-            container.RegisterDelegateDecorator<IOperation>(r => op => new MeasureExecutionTimeOperationDecorator(op));
+            container.RegisterDelegate<IOperation, IOperation>(op => new MeasureExecutionTimeOperationDecorator(op), setup: Setup.Decorator);
             container.Register<IOperation, AsyncOperationDecorator>(setup: Setup.DecoratorWith(order: 1));
 
             var operation = container.Resolve<IOperation>();
@@ -370,17 +378,32 @@ namespace DryIoc.UnitTests
 
 
         [Test]
-        public void Delegate_decorator_will_use_decoratee_reuse()
+        public void Delegate_decorator_may_use_decoratee_reuse()
         {
             var container = new Container();
             container.Register<IOperation, SomeOperation>(Reuse.Singleton);
-            container.RegisterDelegateDecorator<IOperation>(r =>
-                op => new MeasureExecutionTimeOperationDecorator(op));
+            container.RegisterDelegate<IOperation, IOperation>(op => new MeasureExecutionTimeOperationDecorator(op), 
+                setup: Setup.DecoratorWith(useDecorateeReuse: true));
 
             var operation = container.Resolve<IOperation>();
 
             Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
             Assert.AreSame(operation, container.Resolve<IOperation>());
+        }
+
+        [Test, Ignore("todo: @fixme")]
+        public void Delegate_decorator_with_the_runtime_service_types_RegisterDelegate()
+        {
+            // var container = new Container();
+            // container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            // container.RegisterDelegate(typeof(IOperation), typeof(IOperation),
+            //     op => new MeasureExecutionTimeOperationDecorator((IOperation)op), 
+            //     setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            // var operation = container.Resolve<IOperation>();
+
+            // Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
+            // Assert.AreSame(operation, container.Resolve<IOperation>());
         }
 
         [Test]

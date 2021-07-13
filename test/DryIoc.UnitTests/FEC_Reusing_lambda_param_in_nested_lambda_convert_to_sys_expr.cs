@@ -1,10 +1,10 @@
-#if !PCL && !NET35 && !NET40 && !NET403 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETCOREAPP1_0 && !NETCOREAPP1_1
+#if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETCOREAPP1_0 && !NETCOREAPP1_1
 #define SUPPORTS_FAST_EXPRESSION_COMPILER
 #endif
 
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
-using FastExpressionCompiler.LightExpression;
-using static FastExpressionCompiler.LightExpression.Expression;
+using DryIoc.FastExpressionCompiler.LightExpression;
+using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 #else
 using System.Linq.Expressions;
 using static System.Linq.Expressions.Expression;

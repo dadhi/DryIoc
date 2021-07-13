@@ -28,10 +28,8 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Diagnostics.CodeAnalysis;
-
 using Autofac.Core;
 using Autofac.Features.OwnedInstances;
-
 using DryIoc;
 
 namespace Autofac
@@ -522,6 +520,6 @@ namespace Autofac.Core.Registration
     public class ComponentNotRegisteredException : DependencyResolutionException
     {
         /// Constructor
-        public ComponentNotRegisteredException(string message) : base(message) { }
+        public ComponentNotRegisteredException(string message) : base(message) {}
     }
 }

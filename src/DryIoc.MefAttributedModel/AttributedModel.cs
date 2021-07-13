@@ -22,10 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#if NET35 || NET40 || PCL || NETSTANDARD1_0 || NETSTANDARD1_3 
-#define NO_CUSTOM_ATTRIBUTE_DATA
-#endif
-
 namespace DryIoc.MefAttributedModel
 {
     using System;
@@ -36,7 +32,7 @@ namespace DryIoc.MefAttributedModel
     using System.Text;
     using System.Threading;
     using DryIocAttributes;
-    using ImTools;
+    using DryIoc.ImTools;
 
     /// <summary>Implements MEF Attributed Programming Model.
     /// Documentation is available at https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Extensions/MefAttributedModel.md </summary>
@@ -62,8 +58,8 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Adjusts the rules to provide the full MEF compatibility.</summary>
         public static Rules WithMefRules(this Rules rules)
         {
-            var importMadeOf = rules.FactoryMethod == null ? _defaultImportMadeOf :
-                Made.Of(request => GetImportingConstructor(request, rules.FactoryMethod),
+            var importMadeOf = rules.FactoryMethodOrSelector == null ? _defaultImportMadeOf :
+                Made.Of(request => GetImportingConstructor(request, rules.FactoryMethodOrSelector),
                     GetImportedParameter, _getImportedPropertiesAndFields);
 
             return rules.With(importMadeOf)
@@ -378,7 +374,7 @@ namespace DryIoc.MefAttributedModel
 
             // Export does not make sense for static or abstract type
             // because the instance of such type can't be created (resolved).
-            if (!type.IsStatic() && !type.IsAbstract())
+            if (!type.IsStatic() && !type.IsAbstract)
             {
                 var typeAttributes = GetAllExportAttributes(type);
                 if (IsExportDefined(typeAttributes, shouldRegisterWithoutExport))
@@ -526,7 +522,7 @@ namespace DryIoc.MefAttributedModel
             };
         }
 
-        private static bool CanBeExported(Type type) => type.IsClass() && !type.IsCompilerGenerated();
+        private static bool CanBeExported(Type type) => type.IsClass && !type.IsCompilerGenerated();
 
         private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute) => 
             new ReuseInfo { ReuseType = attribute.CreationPolicy == CreationPolicy.NonShared ? ReuseType.Transient : ReuseType.Singleton };
@@ -552,7 +548,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Rules
 
-        private static FactoryMethod GetImportingConstructor(DryIoc.Request request, FactoryMethodSelector fallbackSelector = null)
+        private static FactoryMethod GetImportingConstructor(DryIoc.Request request, object fallbackMethodOrSelector = null)
         {
             var implType = request.ImplementationType;
             var ctors = implType.PublicAndInternalConstructors().ToArrayOrSelf();
@@ -567,11 +563,11 @@ namespace DryIoc.MefAttributedModel
             if (ctor == null)
             {
                 // next try to fallback defined constructor, it may be defined as ConstructorWithResolvableArguments
-                if (fallbackSelector != null)
+                if (fallbackMethodOrSelector != null)
                 {
-                    var fallbackCtor = fallbackSelector(request);
-                    if (fallbackCtor != null)
-                        return fallbackCtor;
+                    var fallbackMethod = fallbackMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)fallbackMethodOrSelector)(request);
+                    if (fallbackMethod != null)
+                        return fallbackMethod;
                 }
 
                 // at the end try default constructor
@@ -965,12 +961,12 @@ namespace DryIoc.MefAttributedModel
         {
             var attributes = type.GetAttributes();
 
-            for (var baseType = type.GetBaseType();
+            for (var baseType = type.BaseType;
                 baseType != typeof(object) && baseType != null;
-                baseType = baseType.GetBaseType())
+                baseType = baseType.BaseType)
                 attributes = attributes.Append(GetInheritedExportAttributes(baseType));
 
-            var interfaces = type.GetImplementedInterfaces();
+            var interfaces = type.GetInterfaces();
             if (interfaces.Length != 0)
                 for (var i = 0; i < interfaces.Length; i++)
                     attributes = attributes.Append(GetInheritedExportAttributes(interfaces[i]));
@@ -1007,25 +1003,23 @@ namespace DryIoc.MefAttributedModel
         /// otherwise (for single or nu types) returns passed key as-is..</returns>
         public object EnsureUniqueServiceKey(Type serviceType, object serviceKey)
         {
-            _store.Swap(x => x
-                .AddOrUpdate(serviceKey, new[] { KV.Of(serviceType, 1) }, (types, newTypes) =>
-                  {
-                      var newType = newTypes[0].Key;
-                      var typeAndCountIndex = types.IndexOf(t => t.Key == newType);
-                      if (typeAndCountIndex != -1)
-                      {
-                          var typeAndCount = types[typeAndCountIndex];
+            _store.Swap(x => x.AddOrUpdate(serviceKey, new[]{ KV.Of(serviceType, 1) }, (sk, types, newTypes) =>
+            {
+                var newType = newTypes[0].Key;
+                var typeAndCountIndex = types.IndexOf(t => t.Key == newType);
+                if (typeAndCountIndex != -1)
+                {
+                    var typeAndCount = types[typeAndCountIndex];
 
-                          // Change the serviceKey only when multiple same types are registered with the same key
-                          serviceKey = KV.Of(serviceKey, typeAndCount.Value);
+                    // Change the serviceKey only when multiple same types are registered with the same key
+                    serviceKey = KV.Of(serviceKey, typeAndCount.Value);
 
-                          typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
-                          return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
-                      }
+                    typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
+                    return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
+                }
 
-                      return types.Append(newTypes);
-                  }));
-
+                return types.Append(newTypes);
+            }));
             return serviceKey;
         }
 
@@ -1220,7 +1214,7 @@ namespace DryIoc.MefAttributedModel
                 return code.AppendType((Type)x);
 
             var type = x.GetType();
-            if (type.IsEnum())
+            if (type.IsEnum)
                 return code.AppendEnum(type, x);
 
             if (ifNotRecognized != null)
@@ -1338,12 +1332,12 @@ namespace DryIoc.MefAttributedModel
         public ReflectionFactory CreateFactory(Func<string, Type> typeProvider = null)
         {
             if (!IsLazy)
-                return new ReflectionFactory(ImplementationType, GetReuse(), GetMade(), GetSetup());
+                return ReflectionFactory.Of(ImplementationType, GetReuse(), GetMade(), GetSetup());
 
             typeProvider = typeProvider.ThrowIfNull();
             var made = GetMade(typeProvider);
             var setup = GetSetup(made);
-            return new ReflectionFactory(() => typeProvider(ImplementationTypeFullName), GetReuse(), made, setup);
+            return ReflectionFactory.Of(() => typeProvider(ImplementationTypeFullName), GetReuse(), made, setup);
         }
 
         // todo: fix multi-threading
@@ -1396,7 +1390,7 @@ namespace DryIoc.MefAttributedModel
             IEnumerable<Attribute> metaAttrs = ImplementationType.GetAttributes();
             if (made != null && made.FactoryMethodKnownResultType != null)
             {
-                var member = made.FactoryMethod(request: null).ConstructorOrMethodOrMember;
+                var member = (made.FactoryMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)made.FactoryMethodOrSelector)(null))?.ConstructorOrMethodOrMember;
                 if (member != null)
                     metaAttrs = metaAttrs.Concat(member.GetAttributes());
             }
@@ -1413,14 +1407,14 @@ namespace DryIoc.MefAttributedModel
                 source.FactoryType == DryIoc.FactoryType.Wrapper ? DryIocAttributes.FactoryType.Wrapper :
                 DryIocAttributes.FactoryType.Service;
 
-            var ifUnresolved =
-                source.IfUnresolved == DryIoc.IfUnresolved.Throw ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
+            var d = source.GetServiceDetails();
+            var ifUnresolved = d.IfUnresolved == DryIoc.IfUnresolved.Throw ? IfUnresolved.Throw : IfUnresolved.ReturnDefault;
 
             return ConvertRequestInfo(source.DirectParent).Push(
                 source.ServiceType,
-                source.RequiredServiceType,
-                source.ServiceKey,
-                source.MetadataKey, source.Metadata,
+                d.RequiredServiceType,
+                d.ServiceKey,
+                d.MetadataKey, d.Metadata,
                 ifUnresolved,
                 source.FactoryID,
                 factoryType,
@@ -1869,55 +1863,3 @@ namespace DryIoc.MefAttributedModel
     #pragma warning restore 659
     #endregion
 }
-
-#if NO_CUSTOM_ATTRIBUTE_DATA
-namespace DryIoc.MefAttributedModel
-{
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Reflection;
-
-    /// <summary>Fake polyfill for the reflection API missing in the PCL profiles.</summary>
-    /// <remarks>Actually, PCL-Net45 has CustomAttributeData class, but it's almost empty.</remarks>
-    public class CustomAttributeData
-    {
-        /// <summary>Gets or sets the constructor information.</summary>
-        public ConstructorInfo Constructor { get; set; }
-
-        /// <summary>Gets or sets the constructor arguments.</summary>
-        public IList<CustomAttributeTypedArgument> ConstructorArguments { get; set; }
-
-        /// <summary>Gets or sets the named arguments.</summary>
-        public IList<CustomAttributeNamedArgument> NamedArguments { get; set; }
-
-        /// <summary>Fake poly-fill for the reflection API missing in the PCL profiles.</summary>
-        public struct CustomAttributeTypedArgument
-        {
-            /// <summary>Gets or sets the type of the value.</summary>
-            public Type ArgumentType { get; set; }
-
-            /// <summary>Gets or sets the value.</summary>
-            public object Value { get; set; }
-        }
-
-        /// <summary>Fake poly-fill for the reflection API missing in the PCL profiles.</summary>
-        public struct CustomAttributeNamedArgument
-        {
-            /// <summary>Gets or sets the argument member information.</summary>
-            public MemberInfo MemberInfo { get; set; }
-
-            /// <summary>Gets or sets the value of the argument.</summary>
-            public CustomAttributeTypedArgument TypedValue { get; set; }
-        }
-
-        /// <summary>Returns an empty data list as the functionality is not available.</summary>
-        /// <param name="type"></param> <returns></returns>
-        public static IEnumerable<CustomAttributeData> GetCustomAttributes(Type type)
-        {
-            return Enumerable.Empty<CustomAttributeData>();
-        }
-    }
-}
-#endif
- 

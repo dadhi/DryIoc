@@ -121,7 +121,7 @@ namespace DryIoc.SignalR
         /// concrete type which implements <see cref="Hub"/> or <see cref="IHub"/>.</summary>
         /// <param name="type">Type to check.</param> <returns><c>True if hub type.</c></returns>
         public static bool IsHubType(Type type) => 
-            !type.IsAbstract() && (
+            !type.IsAbstract && (
                 type.BaseType == typeof(Hub) ||
                 type.IsAssignableTo(typeof(IHub)));
     }

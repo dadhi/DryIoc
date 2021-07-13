@@ -1,7 +1,7 @@
 using System;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Order;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace Playground
 {

@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Order;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace Playground
 {

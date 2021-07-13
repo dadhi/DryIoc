@@ -32,7 +32,7 @@ namespace DryIoc.IssuesTests
     public class AutomaticThreadLocalScopeContext : IScopeContext
     {
         readonly ThreadLocal<IScope> _threadScope = 
-            new ThreadLocal<IScope>(() => new Scope(name: ThreadScopeContext.ScopeContextName), trackAllValues: true);
+            new ThreadLocal<IScope>(() => Scope.Of(ThreadScopeContext.ScopeContextName), trackAllValues: true);
 
         public IScope GetCurrentOrDefault()
         {

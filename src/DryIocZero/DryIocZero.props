@@ -1,7 +1,0 @@
-<Project>
-  <PropertyGroup>
-    <DryIocZeroCompileTimeDeps>$(SolutionDir)nuspecs\DryIocZero\tools</DryIocZeroCompileTimeDeps>
-    <DryIocAssembly>$(DryIocZeroCompileTimeDeps)\DryIoc.dll.3.1.0\net45\DryIoc.dll</DryIocAssembly>
-    <ExpressionToCodeLibAssembly>$(DryIocZeroCompileTimeDeps)\ExpressionToCodeLib.2.6.0\net452\ExpressionToCodeLib.dll</ExpressionToCodeLibAssembly>
-  </PropertyGroup>
-</Project>

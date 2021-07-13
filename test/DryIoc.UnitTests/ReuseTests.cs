@@ -873,11 +873,11 @@ namespace DryIoc.UnitTests
         class Go { }
 
         [Test]
-        public void Ordered_disposals_should_go_before_unordered()
+        public void Ordered_disposals_with_minus_one_should_go_before_unordered()
         {
             var c = new Container();
 
-            c.Register<Duck>(Reuse.Singleton, setup: Setup.With(disposalOrder: 1));
+            c.Register<Duck>(Reuse.Singleton, setup: Setup.With(disposalOrder: -1));
             c.Register<Quack>(Reuse.Singleton);
 
             var d = c.Resolve<Duck>();
@@ -910,6 +910,35 @@ namespace DryIoc.UnitTests
             Assert.IsTrue(q.IsDisposed);
 
             Assert.IsFalse(q.LastTimeQuacked); // !!! here indication that dependency disposed before consumer
+        }
+
+        [Test]
+        public void Can_specify_the_same_order()
+        {
+            var c = new Container();
+
+            c.Register<XD>(Reuse.Singleton, setup: Setup.With(disposalOrder: 1));
+            c.Register<YD>(Reuse.Singleton, setup: Setup.With(disposalOrder: 1));
+
+            var x = c.Resolve<XD>();
+            var y = c.Resolve<YD>();
+
+            c.Dispose();
+
+            Assert.IsTrue(x.IsDisposed, "x should be disposed");
+            Assert.IsTrue(y.IsDisposed, "y should be disposed");
+        }
+
+        public class XD : IDisposable
+        {
+            public bool IsDisposed;
+            public void Dispose() => IsDisposed = true;
+        }
+
+        public class YD : IDisposable
+        {
+            public bool IsDisposed;
+            public void Dispose() => IsDisposed = true;
         }
 
         public class Duck : IDisposable

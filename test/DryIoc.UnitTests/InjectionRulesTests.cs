@@ -3,7 +3,7 @@ using System.Reflection;
 using DryIoc.UnitTests.CUT;
 using Me;
 using NUnit.Framework;
-using static FastExpressionCompiler.LightExpression.Expression;
+using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 
 #pragma warning disable 0649 // Field '...' is never assigned to, and will always have its default value null
 

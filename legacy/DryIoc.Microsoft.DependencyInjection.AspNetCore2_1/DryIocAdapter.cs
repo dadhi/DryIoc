@@ -240,7 +240,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
     }
 
-    /// Bare-bones IServiceScope implementations
+    /// <summary>Bare-bones IServiceScope implementation </summary>
     public sealed class DryIocServiceScope : IServiceScope
     {
         /// <inheritdoc />
@@ -269,6 +269,7 @@ namespace DryIoc.Microsoft.DependencyInjection
     }
 
 
+    /// <summary>
     /// This is a implementation supposed to be used with the `HostBuilder` like this:
     /// <code><![CDATA[
     /// static async Task Main()
@@ -278,7 +279,7 @@ namespace DryIoc.Microsoft.DependencyInjection
     ///         {
     ///             services.AddHostedService<MyBootstrapService>();
     ///         })
-    ///         .UseServiceProviderFactory(  new DryIocServiceProviderFactory()  )
+    ///         .UseServiceProviderFactory( new DryIocServiceProviderFactory() )
     ///         .ConfigureContainer<Container>((hostContext, container) =>
     ///         {
     ///             container.Register<FooService>(Reuse.Scoped);
@@ -289,6 +290,7 @@ namespace DryIoc.Microsoft.DependencyInjection
     ///     await host.RunAsync(); 
     /// }
     /// ]]></code>
+    /// </summary>
     public class DryIocServiceProviderFactory : IServiceProviderFactory<IContainer>
     {
         private readonly IContainer _container;

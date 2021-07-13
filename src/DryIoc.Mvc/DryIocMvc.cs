@@ -314,7 +314,7 @@ namespace DryIoc.Mvc
         public void OnBeginRequest(object sender, EventArgs _)
         {
             DefaultScopeContext.SetCurrent(scope =>
-                scope ?? new Scope(parent: null, name: Reuse.WebRequestScopeName));
+                scope ?? Scope.Of(Reuse.WebRequestScopeName));
         }
 
         /// <inheritdoc />
