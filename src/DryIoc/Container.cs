@@ -1213,21 +1213,12 @@ namespace DryIoc
                     factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
             }
 
-            if (!factories.IsNullOrEmpty())
-            {
-                if (Rules.HasDynamicRegistrationProvider(
-                    DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback))
-                    return CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback,
-                        factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
-            }
-            else
-            {
-                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service))
-                    return CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.NoFlags,
-                        factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
-            }
+            var withoutFlags = factories.IsNullOrEmpty() ? DynamicRegistrationFlags.NoFlags : DynamicRegistrationFlags.AsFallback;
+
+            if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags))
+                return CombineRegisteredWithDynamicFactories(
+                    DynamicRegistrationFlags.Service, withoutFlags,
+                    factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
 
             return factories;
         }
@@ -5226,8 +5217,11 @@ namespace DryIoc
                 return false;
 
             for (var i = 0; i < allFlags.Length; ++i)
-                if ((allFlags[i] & withFlags) == withFlags && (allFlags[i] & withoutFlags) == 0)
+            {
+                var f = allFlags[i];
+                if ((f & withFlags) == withFlags && (f & withoutFlags) == 0)
                     return true;
+            }
 
             return false;
         }
