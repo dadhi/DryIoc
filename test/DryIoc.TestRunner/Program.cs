@@ -45,6 +45,7 @@ namespace DryIoc.UnitTests
             {
                 new ContainerTests(),
                 new OpenGenericsTests(),
+                new DynamicRegistrationsTests(),
                 new SelectConstructorWithAllResolvableArgumentTests(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),

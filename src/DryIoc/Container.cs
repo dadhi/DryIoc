@@ -1269,7 +1269,8 @@ namespace DryIoc
         {
             // return early if no decorators registered
             var r = _registry.Value as Registry;
-            if ((r == null || r.Decorators.IsEmpty) && request.Rules.DynamicRegistrationProviders.IsNullOrEmpty())
+            if ((r == null || r.Decorators.IsEmpty) &&
+                !request.Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Decorator)) // todo: @perf reuse its result
                 return null;
 
             var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
@@ -1314,7 +1315,7 @@ namespace DryIoc
 
             // Append generic type argument decorators, registered as Object
             // Note: the condition for type arguments should be checked before generating the closed generic version
-            var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
+            var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object)); // todo: @perf this is always called - find the way cut the number of calls, maybe check the condition first
             if (!typeArgDecorators.IsNullOrEmpty())
                 genericDecorators = Container.MergeSortedByLatestOrderOrRegistration(genericDecorators,
                     typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r)));
@@ -1420,16 +1421,19 @@ namespace DryIoc
         // todo: @perf pass the serviceTypeHash
         Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
         {
-            var decorators = _registry.Value is Registry r 
-                ? (Factory[])r.Decorators.GetValueOrDefault(serviceType) ?? Empty<Factory>()
-                : Empty<Factory>();
+            var decorators = _registry.Value is Registry r
+                ? (Factory[])r.Decorators.GetValueOrDefault(serviceType)
+                : null;
 
-            var withoutFlags = decorators.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags; 
-            if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Decorator, withoutFlags))
+            var withoutFlags = decorators != null ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
+            var withFlags = serviceType != typeof(object) ? DynamicRegistrationFlags.Decorator : 
+                DynamicRegistrationFlags.Decorator | DynamicRegistrationFlags.DecoratorOfAnyTypeViaObjectServiceType;
+
+            if (Rules.HasDynamicRegistrationProvider(withFlags, withoutFlags))
                 return CombineRegisteredWithDynamicFactories(
-                    DynamicRegistrationFlags.Decorator, withoutFlags,
-                    decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)),
-                    true, FactoryType.Decorator, serviceType).Map(x => x.Value);
+                    withFlags, withoutFlags,
+                    decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)), // todo: @perf too much to-array allocations without the need 
+                    true, FactoryType.Decorator, serviceType).Map(x => x.Value);       // todo: @perf too much to-array allocations without the need
 
             return decorators;
         }
@@ -1592,7 +1596,6 @@ namespace DryIoc
 
                 if (dynamicRegistrations.IsNullOrEmpty())
                     continue;
-
 
                 if (resultFactories.IsNullOrEmpty())
                     resultFactories = dynamicRegistrations.Match(state, 
@@ -3940,6 +3943,15 @@ namespace DryIoc
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
+            DynamicRegistrationFlags flags,
+            Func<Type, object, IEnumerable<Type>> getImplTypes, Func<Type, Factory> factory = null) =>
+            container.ThrowIfNull()
+                .With(rules => rules.WithDynamicRegistrationsAsFallback(flags,
+                    Rules.AutoFallbackDynamicRegistrations(getImplTypes, factory)));
+
+        /// <summary>Provides automatic fallback resolution mechanism for not normally registered
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations((_, __) => implTypes);
 
@@ -3959,9 +3971,17 @@ namespace DryIoc
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
+            Func<Type, object, IEnumerable<Assembly>> getImplTypeAssemblies, Func<Type, Factory> factory = null) =>
+            container.WithAutoFallbackDynamicRegistrations(DryIoc.Rules.DefaultDynamicRegistrationFlags, getImplTypeAssemblies, factory);
+
+        /// <summary>Provides automatic fallback resolution mechanism for not normally registered
+        /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
+        public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
+            DynamicRegistrationFlags flags,
             Func<Type, object, IEnumerable<Assembly>> getImplTypeAssemblies,
             Func<Type, Factory> factory = null) =>
-            container.ThrowIfNull().With(rules => rules.WithDynamicRegistrations(
+            container.ThrowIfNull().With(rules => rules.WithDynamicRegistrationsAsFallback(
+                flags,
                 Rules.AutoFallbackDynamicRegistrations(
                     (serviceType, serviceKey) =>
                     {
@@ -3969,8 +3989,8 @@ namespace DryIoc
                         if (assemblies == null)
                             return Empty<Type>();
                         return assemblies
-                            .SelectMany(ReflectionTools.GetLoadedTypes)
-                            .Where(Registrator.IsImplementationType)
+                            .SelectMany(a => ReflectionTools.GetLoadedTypes(a))
+                            .Where(t => Registrator.IsImplementationType(t))
                             .ToArray();
                     },
                     factory)));
@@ -4950,8 +4970,7 @@ namespace DryIoc
         /// <summary>Optional service key: if null the default <see cref="DefaultDynamicKey"/> will be used. </summary>
         public readonly object ServiceKey;
 
-        /// <summary>Constructs the info</summary>
-
+        /// <summary>Constructs the registration</summary>
         public DynamicRegistration(Factory factory,
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.AppendNotKeyed, object serviceKey = null)
         {
@@ -4966,14 +4985,16 @@ namespace DryIoc
     [Flags]
     public enum DynamicRegistrationFlags : byte
     {
-        /// <summary>No flags - to use in `GetDynamicRegistrationProvidersOrDefault`</summary>
+        /// <summary>No flags - to use in `HasDynamicRegistrationProvider`</summary>
         NoFlags       = 0,
         /// <summary>Use as AsFallback only</summary>
         AsFallback    = 1,
         /// <summary>Provider may have the services provided</summary>
         Service       = 1 << 1,
         /// <summary>Provider may have the decorators provided</summary>
-        Decorator     = 1 << 2
+        Decorator     = 1 << 2,
+        /// <summary>Specifies that provider should be asked for the `object` service type to get the decorator for the generic `T` service</summary>
+        DecoratorOfAnyTypeViaObjectServiceType = 1 << 3, 
     } 
 
     // todo: @incomplete use Copy for setting the rules
@@ -5190,8 +5211,10 @@ namespace DryIoc
 
         /// <summary>The flags per dynamic registration provider, match the respective `DynamicRegistrationProviders`</summary>
         public DynamicRegistrationFlags[] DynamicRegistrationFlags { get; private set; }
-        private static DynamicRegistrationFlags _defaultDynamicRegistrationFlags =
-            DryIoc.DynamicRegistrationFlags.Service | DryIoc.DynamicRegistrationFlags.Decorator;
+
+        /// <summary>Only services and no decorators as it will greately affect the performance, 
+        /// calling the provider for every resolved service</summary>
+        public static DynamicRegistrationFlags DefaultDynamicRegistrationFlags = DryIoc.DynamicRegistrationFlags.Service; 
 
         /// <summary>Get the specific providers with the specified flags and without the flags or return `null` if nothing found</summary>
         public bool HasDynamicRegistrationProvider(DynamicRegistrationFlags withFlags, 
@@ -5215,29 +5238,32 @@ namespace DryIoc
         public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, DynamicRegistrationFlags flags)
         {
             var newRules = Clone(cloneMade: false);
-            newRules._settings |= Settings.UseDynamicRegistrationsAsFallbackOnly;
             newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(provider);
-            newRules.DynamicRegistrationFlags = DynamicRegistrationFlags.Append(flags);
+            newRules.DynamicRegistrationFlags     = DynamicRegistrationFlags.Append(flags);
             return newRules;
         }
 
         /// <summary>Returns the new rules with the passed dynamic registration rules appended.</summary>
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
-            WithDynamicRegistrations(_defaultDynamicRegistrationFlags, rules);
+            WithDynamicRegistrations(DefaultDynamicRegistrationFlags, rules);
 
         /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
         /// The rules applied only when no normal registrations found!</summary>
         public Rules WithDynamicRegistrationsAsFallback(params DynamicRegistrationProvider[] rules) =>
-            WithDynamicRegistrations(_defaultDynamicRegistrationFlags | DryIoc.DynamicRegistrationFlags.AsFallback, rules);
+            WithDynamicRegistrations(DefaultDynamicRegistrationFlags | DryIoc.DynamicRegistrationFlags.AsFallback, rules);
+
+        /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
+        /// The rules applied only when no normal registrations found!</summary>
+        public Rules WithDynamicRegistrationsAsFallback(DynamicRegistrationFlags flags, params DynamicRegistrationProvider[] rules) =>
+            WithDynamicRegistrations(flags | DryIoc.DynamicRegistrationFlags.AsFallback, rules);
 
         /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
         /// The rules applied only when no normal registrations found!</summary>
         public Rules WithDynamicRegistrations(DynamicRegistrationFlags flags, params DynamicRegistrationProvider[] rules)
         {
             var newRules = Clone(cloneMade: false);
-            newRules._settings |= Settings.UseDynamicRegistrationsAsFallbackOnly;
             newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(rules);
-            newRules.DynamicRegistrationFlags = WithDynamicRegistrationProviderFlags(rules?.Length ?? 0, flags);
+            newRules.DynamicRegistrationFlags     = WithDynamicRegistrationProviderFlags(rules?.Length ?? 0, flags);
             return newRules;
         }
 
@@ -5255,8 +5281,8 @@ namespace DryIoc
             return DynamicRegistrationFlags.Append(newFlags);
         }
 
-        // todo: @obsolete
-        /// <summary>Obsolete["Instead use <![CDATA[(GetDynamicRegistrationProvidersOrDefault(DynamicRegistrationProviderFlags.UseAsFallback)]]>"]</summary>
+        /// <summary>Obsolete: Instead use `HasDynamicRegistrationProvider(DynamicRegistrationFlags.AsFallback)`</summary>
+        [Obsolete("Instead use `HasDynamicRegistrationProvider(DynamicRegistrationFlags.AsFallback)`")]
         public bool UseDynamicRegistrationsAsFallbackOnly =>
             (_settings & Settings.UseDynamicRegistrationsAsFallbackOnly) != 0;
 
@@ -5372,7 +5398,7 @@ namespace DryIoc
             Func<Type, object, IEnumerable<Type>> getImplementationTypes,
             Func<Type, Factory> factory = null)
         {
-            // cache factory for implementation type to enable reuse semantics
+            // cache factory for the implementation type! to cut on the number of dynamic lookups
             var factories = Ref.Of(ImHashMap<Type, Factory>.Empty);
 
             return (serviceType, serviceKey) =>
@@ -5782,7 +5808,7 @@ namespace DryIoc
             EagerCachingSingletonForFasterAccess = 1 << 7,
             ThrowIfRuntimeStateRequired = 1 << 8,
             CaptureContainerDisposeStackTrace = 1 << 9,
-            UseDynamicRegistrationsAsFallbackOnly = 1 << 10, // todo: @obsolete now there are individual flags per provider
+            UseDynamicRegistrationsAsFallbackOnly = 1 << 10, // todo: @obsolete there are individual flags per provider now
             IgnoringReuseForFuncWithArgs = 1 << 11,
             OverrideRegistrationMade = 1 << 12,
             FuncAndLazyWithoutRegistration = 1 << 13,

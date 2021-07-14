@@ -2,12 +2,20 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using DryIoc.ImTools;
 
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class DynamicRegistrationsTests
+    public class DynamicRegistrationsTests : ITest
     {
+        public int Run()
+        {
+            Can_register_dynamic_decorator();
+            Should_not_call_default_dynamic_registration_providers_for_decorators();
+            return 2;
+        }
+
         private IEnumerable<DynamicRegistration> GetX(Type serviceType, object key)
         {
             if (serviceType == typeof(X))
@@ -229,10 +237,9 @@ namespace DryIoc.UnitTests
         [Test]
         public void Should_exclude_decorators_from_dynamic_services()
         {
-            var container = new Container()
-                .WithAutoFallbackDynamicRegistrations(
-                    (t, k) => new[] { typeof(D) },
-                    type => type.ToFactory(setup: Setup.Decorator));
+            var container = new Container().WithAutoFallbackDynamicRegistrations(
+                (t, k) => new[] { typeof(D) },
+                type => type.ToFactory(setup: Setup.Decorator));
 
             container.Register<X>();
 
@@ -244,10 +251,15 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_register_dynamic_decorator()
         {
-            var container = new Container()
-                .WithAutoFallbackDynamicRegistrations(
-                    (t, k) => new[] { typeof(D) },
-                    type => type.ToFactory(setup: Setup.Decorator));
+            var providerCallCount = 0;
+            var container = new Container().WithAutoFallbackDynamicRegistrations(
+                DynamicRegistrationFlags.Decorator,
+                (t, k) =>
+                {
+                    ++providerCallCount;
+                    return t == typeof(X) ? new[] { typeof(D) } : null;
+                },
+                t => t.ToFactory(setup: Setup.Decorator));
 
             container.Register<X, A>();
 
@@ -255,6 +267,29 @@ namespace DryIoc.UnitTests
 
             Assert.IsInstanceOf<D>(x);
             Assert.IsInstanceOf<A>(((D)x).X);
+            Assert.AreEqual(2, providerCallCount);
+        }
+
+        [Test]
+        public void Should_not_call_default_dynamic_registration_providers_for_decorators()
+        {
+            var providerCallCount = 0;
+
+            var container = new Container()
+                .WithAutoFallbackDynamicRegistrations(
+                    (t, k) =>
+                    {
+                        ++providerCallCount;
+                        return new[] { typeof(C) }; // non related type
+                    }, 
+                    type => type.ToFactory());
+
+            container.Register<D>();
+            container.Register<X, A>();
+
+            var d = container.Resolve<D>();
+
+            Assert.AreEqual(0, providerCallCount);
         }
 
         public class X { }
