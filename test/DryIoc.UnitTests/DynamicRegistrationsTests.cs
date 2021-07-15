@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -12,8 +12,9 @@ namespace DryIoc.UnitTests
         public int Run()
         {
             Can_register_dynamic_decorator();
+            Can_register_open_generic_dynamic_decorator();
             Should_not_call_default_dynamic_registration_providers_for_decorators();
-            return 2;
+            return 3;
         }
 
         private IEnumerable<DynamicRegistration> GetX(Type serviceType, object key)
@@ -268,6 +269,63 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<D>(x);
             Assert.IsInstanceOf<A>(((D)x).X);
             Assert.AreEqual(2, providerCallCount);
+        }
+
+        [Test]
+        public void Can_register_open_generic_dynamic_decorator()
+        {
+            var providerCallCount = 0;
+            var container = new Container().WithAutoFallbackDynamicRegistrations(
+                DynamicRegistrationFlags.Decorator,
+                (t, k) =>
+                {
+                    ++providerCallCount;
+                    return t.IsGenericType && t.GetGenericTypeDefinition() == typeof(A<>) ? typeof(D<>).One() : null;
+                },
+                t => t.ToFactory(setup: Setup.Decorator));
+
+            container.Register(typeof(A<>));
+
+            var x = container.Resolve<A<int>>();
+
+            Assert.IsInstanceOf<D<int>>(x);
+            Assert.AreEqual(typeof(A<int>), ((D<int>)x).Decoratee.GetType());
+            Assert.AreEqual(4, providerCallCount);
+        }
+
+        [Test]
+        public void Can_register_open_generic_dynamic_decorator_and_resolve_with_different_type_arguments()
+        {
+            var providerCallCount = 0;
+            var container = new Container().WithAutoFallbackDynamicRegistrations(
+                DynamicRegistrationFlags.Decorator,
+                (t, k) =>
+                {
+                    ++providerCallCount;
+                    return t.IsGenericType && t.GetGenericTypeDefinition() == typeof(A<>) ? typeof(D<>).One() : null;
+                },
+                t => t.ToFactory(setup: Setup.Decorator));
+
+            container.Register(typeof(A<>));
+
+            var x = container.Resolve<A<int>>();
+
+            Assert.IsInstanceOf<D<int>>(x);
+            Assert.AreEqual(typeof(A<int>), ((D<int>)x).Decoratee.GetType());
+            Assert.AreEqual(4, providerCallCount);
+
+            var y = container.Resolve<A<string>>();
+
+            Assert.IsInstanceOf<D<string>>(y);
+            Assert.AreEqual(typeof(A<string>), ((D<string>)y).Decoratee.GetType());
+            Assert.AreEqual(8, providerCallCount);
+        }
+
+        class A<T> {}
+        class D<T> : A<T>
+        {
+            public A<T> Decoratee;
+            public D(A<T> a) => Decoratee = a;
         }
 
         [Test]

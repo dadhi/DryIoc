@@ -1433,7 +1433,7 @@ namespace DryIoc
                 return CombineRegisteredWithDynamicFactories(
                     withFlags, withoutFlags,
                     decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)), // todo: @perf too much to-array allocations without the need 
-                    true, FactoryType.Decorator, serviceType).Map(x => x.Value);       // todo: @perf too much to-array allocations without the need
+                    false, FactoryType.Decorator, serviceType).Map(x => x.Value);       // todo: @perf too much to-array allocations without the need
 
             return decorators;
         }

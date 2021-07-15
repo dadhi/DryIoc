@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using DryIoc.IssuesTests;
 
@@ -10,6 +10,7 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
+            //new DynamicRegistrationsTests().Run();
             // new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration().Run();
             // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
         }
