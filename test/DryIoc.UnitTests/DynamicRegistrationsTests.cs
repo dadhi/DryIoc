@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -274,15 +274,22 @@ namespace DryIoc.UnitTests
         [Test]
         public void Can_register_open_generic_dynamic_decorator()
         {
-            var providerCallCount = 0;
+            var dynamicLookups = new List<KV<Type, object>>();
+            var dynamicResults = new List<Factory>();
+
             var container = new Container().WithAutoFallbackDynamicRegistrations(
                 DynamicRegistrationFlags.Decorator,
                 (t, k) =>
                 {
-                    ++providerCallCount;
+                    dynamicLookups.Add(KV.Of(t, k));
                     return t.IsGenericType && t.GetGenericTypeDefinition() == typeof(A<>) ? typeof(D<>).One() : null;
                 },
-                t => t.ToFactory(setup: Setup.Decorator));
+                t =>
+                {
+                    var f = t.ToFactory(setup: Setup.Decorator);
+                    dynamicResults.Add(f);
+                    return f;
+                });
 
             container.Register(typeof(A<>));
 
@@ -290,21 +297,29 @@ namespace DryIoc.UnitTests
 
             Assert.IsInstanceOf<D<int>>(x);
             Assert.AreEqual(typeof(A<int>), ((D<int>)x).Decoratee.GetType());
-            Assert.AreEqual(4, providerCallCount);
+            Assert.AreEqual(4, dynamicLookups.Count);
+            Assert.AreEqual(1, dynamicResults.Count);
         }
 
         [Test]
         public void Can_register_open_generic_dynamic_decorator_and_resolve_with_different_type_arguments()
         {
-            var providerCallCount = 0;
+            var dynamicLookups = new List<KV<Type, object>>();
+            var dynamicResults = new List<Factory>();
+
             var container = new Container().WithAutoFallbackDynamicRegistrations(
                 DynamicRegistrationFlags.Decorator,
                 (t, k) =>
                 {
-                    ++providerCallCount;
+                    dynamicLookups.Add(KV.Of(t, k));
                     return t.IsGenericType && t.GetGenericTypeDefinition() == typeof(A<>) ? typeof(D<>).One() : null;
                 },
-                t => t.ToFactory(setup: Setup.Decorator));
+                t =>
+                {
+                    var f = t.ToFactory(setup: Setup.Decorator);
+                    dynamicResults.Add(f);
+                    return f;
+                });
 
             container.Register(typeof(A<>));
 
@@ -312,13 +327,15 @@ namespace DryIoc.UnitTests
 
             Assert.IsInstanceOf<D<int>>(x);
             Assert.AreEqual(typeof(A<int>), ((D<int>)x).Decoratee.GetType());
-            Assert.AreEqual(4, providerCallCount);
+            Assert.AreEqual(4, dynamicLookups.Count);
+            Assert.AreEqual(1, dynamicResults.Count);
 
             var y = container.Resolve<A<string>>();
 
             Assert.IsInstanceOf<D<string>>(y);
             Assert.AreEqual(typeof(A<string>), ((D<string>)y).Decoratee.GetType());
-            Assert.AreEqual(8, providerCallCount);
+            Assert.AreEqual(8, dynamicLookups.Count);
+            Assert.AreEqual(1, dynamicResults.Count);
         }
 
         class A<T> {}
