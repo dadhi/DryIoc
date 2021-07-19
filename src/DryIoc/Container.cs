@@ -1293,7 +1293,10 @@ namespace DryIoc
                     var openGenericServiceType = serviceType.GetGenericTypeDefinition();
                     openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
                     if (openGenericEntry != null)
-                        factories = GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf();
+                        factories = openGenericEntry is Factory f ? new[] { new KV<object, Factory>(DefaultKey.Value, f) } : 
+                            openGenericEntry.To<FactoriesEntry>().Factories
+                                .Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray()
+                                .Match(x => x.Value != null);
 
                     if (openGenericEntry == null && Rules.VariantGenericTypesInResolve)
                     {
@@ -1407,14 +1410,24 @@ namespace DryIoc
             var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-            var factories = GetRegistryEntryKeyFactoryPairs(entry).ToArrayOrSelf();
+            var factories = entry == null ? Empty<KV<object, Factory>>()
+                : entry is Factory f ? new[] { new KV<object, Factory>(DefaultKey.Value, f) }
+                : entry.To<FactoriesEntry>().Factories
+                    .Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray()
+                    .Match(x => x.Value != null); // filter out the Unregistered factories
 
             if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
             {
                 var openGenericServiceType  = serviceType.GetGenericTypeDefinition();
                 var openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
                 if (openGenericEntry != null)
-                    factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
+                {
+                    factories = openGenericEntry is Factory gf
+                        ? factories.Append(new KV<object, Factory>(DefaultKey.Value, gf))
+                        : factories.Append(((FactoriesEntry)openGenericEntry).Factories
+                            .Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray()
+                            .Match(x => x.Value != null)); // filter out the Unregistered factories
+                }
             }
 
             var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
@@ -1425,14 +1438,6 @@ namespace DryIoc
 
             return factories;
         }
-
-        private static IEnumerable<KV<object, Factory>> GetRegistryEntryKeyFactoryPairs(object entry) =>
-            entry == null
-                ? Empty<KV<object, Factory>>()
-                : entry is Factory f ? new[] { new KV<object, Factory>(DefaultKey.Value, f) }
-                // todo: optimize
-                : entry.To<FactoriesEntry>().Factories.Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray()
-                       .Match(x => x.Value != null); // filter out the Unregistered factories
 
         Expression IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
