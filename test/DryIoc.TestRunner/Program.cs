@@ -47,6 +47,7 @@ namespace DryIoc.UnitTests
             var tests = new ITest[] 
             {
                 new OpenGenericsTests(),
+                new DynamicRegistrationsTests(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
                 new GHIssue391_Deadlock_during_Resolve(),
