@@ -31,6 +31,7 @@ THE SOFTWARE.
 #endif
 #if !PCL && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETSTANDARD1_3 && !NETSTANDARD1_4 && !NETSTANDARD1_5 && !NETSTANDARD1_6
 #define SUPPORTS_SERIALIZABLE
+#define SUPPORTS_ICLONEABLE
 #define SUPPORTS_STACK_TRACE
 #define SUPPORTS_MANAGED_THREAD_ID
 #endif
@@ -1158,8 +1159,9 @@ namespace DryIoc
             }
 
             // Most common case when we have a single default factory and no dynamic rules to always apply
-            if (entry is Factory singleDefaultFactory && !Rules.HasDynamicRegistrationProvider(
-                DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)) 
+            if (entry is Factory singleDefaultFactory &&
+                (Rules.DynamicRegistrationProviders == null ||
+                !Rules.HasDynamicRegistrationProvider(serviceType, DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))) 
             {
                 if (serviceKey != null && serviceKey != DefaultKey.Value || 
                     !singleDefaultFactory.CheckCondition(request) ||
@@ -1169,29 +1171,19 @@ namespace DryIoc
                 return singleDefaultFactory;
             }
 
-            var factories = entry == null ? null
+            var factories = entry == null ? Empty<KV<object, Factory>>()
                 : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
                 : entry.To<FactoriesEntry>().Factories
                     .Visit(new List<KV<object, Factory>>(2), (x, list) => list.Add(KV.Of(x.Key, x.Value))).ToArray() // todo: optimize - we may not need ToArray here
                     .Match(x => x.Value != null); // filter out the Unregistered factories (see #390)
 
-            if (!factories.IsNullOrEmpty()) // check for the additional (not the fallback) factories, because we have the standard factories
-            {
-                if (Rules.HasDynamicRegistrationProvider(
-                    DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
-                    factories = CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback,
-                        factories, true, FactoryType.Service, serviceType, serviceKey);
-            }
-            else // otherwise when no standard factories are found get the fallback as well as always applied dynamic registrations
-            {
-                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service))
-                    factories = CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.NoFlags,
-                        factories, true, FactoryType.Service, serviceType, serviceKey);
-            }
+            var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
+            if (Rules.HasDynamicRegistrationProvider(serviceType, DynamicRegistrationFlags.Service, withoutFlags))
+                factories = CombineRegisteredWithDynamicFactories(
+                    DynamicRegistrationFlags.Service, withoutFlags,
+                    factories, true, FactoryType.Service, serviceType, serviceKey);
 
-            if (factories.IsNullOrEmpty())
+            if (factories.Length == 0)
                 return null;
 
             // For requested keyed service (which may be a `DefaultKey` or `DefaultDynamicKey`)
@@ -1280,7 +1272,7 @@ namespace DryIoc
             KV<object, Factory>[] factories;
             if (entry is Factory singleDefaultFactory)
             {
-                if (!Rules.HasDynamicRegistrationProvider(
+                if (!Rules.HasDynamicRegistrationProvider(serviceType,
                     DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
                     return request.MatchFactoryConditionAndMetadata(singleDefaultFactory)
                         ? Rules.FactorySelector(request, DefaultKey.Value.Pair<object, Factory>(singleDefaultFactory).One())
@@ -1331,21 +1323,10 @@ namespace DryIoc
                 }
             }
 
-            if (factories.Length != 0)
-            {
-                if (Rules.HasDynamicRegistrationProvider(
-                    DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
-                    factories = CombineRegisteredWithDynamicFactories( 
-                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback,
-                        factories, true, FactoryType.Service, serviceType);
-            }
-            else
-            {
-                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service))
-                    factories = CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.NoFlags,
-                        factories, true, FactoryType.Service, serviceType);
-            }
+            var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
+            if (Rules.HasDynamicRegistrationProvider(serviceType, DynamicRegistrationFlags.Service, withoutFlags))
+                factories = CombineRegisteredWithDynamicFactories(
+                    DynamicRegistrationFlags.Service, withoutFlags, factories, true, FactoryType.Service, serviceType);
 
             if (factories.Length == 0)
                 return null;
@@ -1436,21 +1417,11 @@ namespace DryIoc
                     factories = factories.Append(GetRegistryEntryKeyFactoryPairs(openGenericEntry).ToArrayOrSelf());
             }
 
-            if (!factories.IsNullOrEmpty())
-            {
-                if (Rules.HasDynamicRegistrationProvider(
-                    DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback))
-                    return CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.AsFallback,
-                        factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
-            }
-            else
-            {
-                if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service))
-                    return CombineRegisteredWithDynamicFactories(
-                        DynamicRegistrationFlags.Service, DynamicRegistrationFlags.NoFlags,
-                        factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
-            }
+            var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
+            if (Rules.HasDynamicRegistrationProvider(serviceType, DynamicRegistrationFlags.Service, withoutFlags))
+                return CombineRegisteredWithDynamicFactories(
+                    DynamicRegistrationFlags.Service, withoutFlags,
+                    factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
 
             return factories;
         }
@@ -5728,6 +5699,24 @@ namespace DryIoc
             return false;
         }
 
+        /// <summary>Get the specific providers with the specified flags and without the flags or return `null` if nothing found</summary>
+        public bool HasDynamicRegistrationProvider(Type serviceType, 
+            DynamicRegistrationFlags withFlags, DynamicRegistrationFlags withoutFlags = DryIoc.DynamicRegistrationFlags.NoFlags)
+        {
+            var allFlags = DynamicRegistrationFlags;
+            if (allFlags == null || allFlags.Length == 0)
+                return false;
+
+            for (var i = 0; i < allFlags.Length; ++i)
+            {
+                var f = allFlags[i];
+                if ((f & withFlags) == withFlags && (f & withoutFlags) == 0)
+                    return serviceType.IsServiceTypeAndNonWrapper();
+            }
+
+            return false;
+        }
+
         /// <summary>Returns the new rules with the passed dynamic registration rule appended.</summary>
         public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, DynamicRegistrationFlags flags)
         {
@@ -5778,8 +5767,8 @@ namespace DryIoc
             return DynamicRegistrationFlags.Append(newFlags);
         }
 
-        // [Obsolete("Instead use `HasDynamicRegistrationProvider(DynamicRegistrationFlags.AsFallback)`")]
-        /// <summary>Obsolete: Instead use `HasDynamicRegistrationProvider(DynamicRegistrationFlags.AsFallback)`</summary>
+        // [Obsolete("Instead use `HasDynamicRegistrationProvider`")]
+        /// <summary>Obsolete: Instead use `HasDynamicRegistrationProvider`</summary>
         public bool UseDynamicRegistrationsAsFallbackOnly =>
             (_settings & Settings.UseDynamicRegistrationsAsFallbackOnly) != 0;
 
@@ -7340,29 +7329,40 @@ namespace DryIoc
                 (registrator as IResolverContext)?.SingletonScope.TrackDisposableWithoutDisposalOrder(d);
         }
 
-        /// <summary>List of types excluded by default from RegisterMany convention.</summary>
-        public static readonly string[] ExcludedGeneralPurposeServiceTypes =
+        /// <summary>Checks some common .NET types to exclude.</summary>
+        public static bool IsExcludedGeneralPurposeServiceType(this Type type)
         {
-            "System.Object",
-            "System.IDisposable",
-            "System.ValueType",
-            "System.ICloneable",
-            "System.IEquatable",
-            "System.IComparable",
-            "System.Runtime.Serialization.ISerializable",
-            "System.Collections.IStructuralEquatable",
-            "System.Collections.IEnumerable",
-            "System.Collections.IList",
-            "System.Collections.ICollection",
-        };
-
-        /// <summary>Checks that type is not in the list of <see cref="ExcludedGeneralPurposeServiceTypes"/>.</summary>
-        public static bool IsExcludedGeneralPurposeServiceType(this Type type) =>
-            ExcludedGeneralPurposeServiceTypes.IndexOf((type.Namespace + "." + type.Name).Split('`')[0]) != -1;
+            if (type == typeof(object))
+                return true;
+            if (type == typeof(IDisposable))
+                return true;
+            if (type == typeof(IComparable))
+                return true;
+#if SUPPORTS_SERIALIZABLE
+            if (type == typeof(System.Runtime.Serialization.ISerializable))
+                return true;
+#endif
+#if SUPPORTS_ICLONEABLE
+            if (type == typeof(ICloneable))
+                return true;
+#endif
+            if (type.IsGeneric())
+            {
+                var genType = type.GetGenericTypeDefinition();
+                if (genType == typeof(IEquatable<>))
+                    return true;
+            }
+            return false;
+        }
 
         /// <summary>Checks that type can be used a service type.</summary>
         public static bool IsServiceType(this Type type) =>
-            !type.IsPrimitive() && !type.IsCompilerGenerated() && !type.IsExcludedGeneralPurposeServiceType();
+            !type.IsPrimitive() && !type.IsExcludedGeneralPurposeServiceType() && !type.IsCompilerGenerated();
+
+        /// <summary>Checks that type can be used a service type excluding the predefined Wrapper types.</summary>
+        public static bool IsServiceTypeAndNonWrapper(this Type type) =>
+            !type.IsPrimitive() && !type.IsExcludedGeneralPurposeServiceType() && !type.IsCompilerGenerated()
+            &&  (!type.IsGeneric() || WrappersSupport.Wrappers.GetValueOrDefault(type.GetGenericTypeDefinition()) == null);
 
         /// <summary>Checks if type can be used as implementation type for reflection factory,
         /// and therefore registered to container. Usually used to discover implementation types from assembly.</summary>
@@ -13860,7 +13860,7 @@ namespace DryIoc
         /// <summary>Returns true if class is compiler generated. Checking for CompilerGeneratedAttribute
         /// is not enough, because this attribute is not applied for classes generated from "async/await".</summary>
         public static bool IsCompilerGenerated(this Type type) =>
-            type.FullName != null && type.FullName.Contains("<>c__DisplayClass"); // todo: @perf simplify the check
+            type.GetTypeInfo().GetCustomAttributes(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false).Any();
 
         /// <summary>Returns true if type is generic.</summary>
         public static bool IsGeneric(this Type type) =>

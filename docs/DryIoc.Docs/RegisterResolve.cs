@@ -618,35 +618,11 @@ public class RegisterMany_examples
 } /*md
 ```
 
-DryIoc does not consider some types as a service type for `RegisterMany` method. 
-You may examine the excluded types by looking at `Registrator.ExcludedGeneralPurposeServiceTypes` property.
-The value may depend on your .NET framework.
+DryIoc does not consider some types as a service type for the `RegisterMany` method.
+The excluded types include .NET primitive types, `object`, `string` and the general purpose interfaces like `IDisposable`, `ICloneable`, etc.
+The compiler-generated types are also excluded. 
 
-```cs md*/
-class RegisterMany_excludes_these_types
-{
-    [Test] public void Example()
-    {
-        var excludedTypes = Registrator.ExcludedGeneralPurposeServiceTypes;
-        Assert.IsNotEmpty(excludedTypes);
-    }
-}/*md
-```
-
-The excluded types are:
-
-  - `System.IDisposable`
-  - `System.ValueType`
-  - `System.ICloneable`
-  - `System.IEquatable`
-  - `System.IComparable`
-  - `System.Runtime.Serialization.ISerializable`
-  - `System.Collections.IStructuralEquatable`
-  - `System.Collections.IEnumerable`
-  - `System.Collections.IList`
-  - `System.Collections.ICollection`
-
-__Note:__ If you really need to register something from the list, you may register it with standalone `Register` method.
+__Note:__ If you really need to register something from the excluded list, you may register it with the standalone `Register` method.
 
 
 ## RegisterMapping
