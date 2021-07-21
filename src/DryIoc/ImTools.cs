@@ -2148,6 +2148,9 @@ namespace ImTools
         /// ]]</c></example>
         public bool TrySwapIfStillCurrent(T currentValue, T newValue) =>
             Interlocked.CompareExchange(ref _value, newValue, currentValue) == currentValue;
+
+        /// <summary>Just sets </summary>
+        public void UnsafeSet(T newValue) => _value = newValue;
     }
 
     /// <summary>Provides optimistic-concurrency consistent <see cref="Swap{T}"/> operation.</summary>
