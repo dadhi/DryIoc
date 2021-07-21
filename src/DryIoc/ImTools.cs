@@ -1880,6 +1880,18 @@ namespace ImTools
                     : Empty<T>();
             }
 
+            if (source.Length == 3)
+            {
+                var condition0 = condition(source[0]);
+                var condition1 = condition(source[1]);
+                var condition2 = condition(source[2]);
+                return condition0 && condition1 && condition2 ? source
+                    : condition0 ? (condition1 ? new[] { source[0], source[1] } : condition2 ? new[] { source[0], source[2] } : new[] { source[0] })
+                    : condition1 ? (condition2 ? new[] { source[1], source[2] } : new[] { source[1] })
+                    : condition2 ? new[] { source[2] }
+                    : Empty<T>();
+            }
+
             var matchStart = 0;
             T[] matches = null;
             var matchFound = false;
@@ -1916,6 +1928,18 @@ namespace ImTools
                 return condition0 && condition1 ? source
                     : condition0 ? new[] { source[0] }
                     : condition1 ? new[] { source[1] }
+                    : Empty<T>();
+            }
+
+            if (source.Length == 3)
+            {
+                var condition0 = condition(state, source[0]);
+                var condition1 = condition(state, source[1]);
+                var condition2 = condition(state, source[2]);
+                return condition0 && condition1 && condition2 ? source
+                    : condition0 ? (condition1 ? new[] { source[0], source[1] } : condition2 ? new[] { source[0], source[2] } : new[] { source[0] })
+                    : condition1 ? (condition2 ? new[] { source[1], source[2] } : new[] { source[1] })
+                    : condition2 ? new[] { source[2] }
                     : Empty<T>();
             }
 
