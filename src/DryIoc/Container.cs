@@ -11223,19 +11223,19 @@ namespace DryIoc
                     made = Made.Of(closedFactoryMethod, made.Parameters, made.PropertiesAndFields);
                 }
 
+                var details = request._serviceInfo.Details;
                 if (implType != null)
                 {
                     implType = implType.IsGenericParameter
                         ? closedTypeArgs[0]
-                        : Throw.IfThrows<ArgumentException, Type>(() => implType.MakeGenericType(closedTypeArgs), 
-                            !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
-                            Error.NoMatchedGenericParamConstraints, implType, request);
+                        : implType.TryCloseGenericTypeOrMethod(closedTypeArgs, (t, a) => t.MakeGenericType(a), 
+                            !ifErrorReturnDefault && details.IfUnresolved == IfUnresolved.Throw, Error.NoMatchedGenericParamConstraints, request);
                     if (implType == null)
                         return null;
                 }
 
                 var knownImplOrServiceType = implType ?? made.FactoryMethodKnownResultType ?? serviceType;
-                var serviceKey = request.ServiceKey;
+                var serviceKey = details.ServiceKey;
                 serviceKey = (serviceKey as OpenGenericTypeKey)?.ServiceKey ?? serviceKey ?? DefaultKey.Value;
                 var generatedFactoryKey = KV.Of(knownImplOrServiceType, serviceKey);
 
@@ -11253,33 +11253,9 @@ namespace DryIoc
                     Caching = openFactory.Caching
                 };
 
-                // todo: @perf attempt 2 to remove closedGenericFactory from the closure
-                // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
-                // var entry = _generatedFactories.SwapAndGetNewValue(generatedFactoryKey, closedGenericFactory,
-                //     (x, genFacKey, closedGenFac) => x.GetOrAddEntry(Entry.Of(genFacKey, default(ReflectionFactory)));
-                // if (entry.Value != null)
-                //     closedGenericFactory = entry.Value
-                // else
-                //     entry.Value = closedGenericFactory = new ReflectionFactory(implType, openFactory.Reuse, made, openFactory.Setup)
-                //     {
-                //         GeneratorFactoryID = openFactory.FactoryID,
-                //         Caching = openFactory.Caching
-                //     };
-
-                // todo: @perf attempt 1 to remove closedGenericFactory from the closure
-                // we should use whatever the first factory is registered because it can be used already in decorators and recursive factories check
-                // _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
-                //     (x, genFacKey, closedGenFac) => 
-                //     {
-                //         var currFac = x.GetValueOrDefault(genFacKey);
-                //         if (currFac == null)
-                //             return x.AddOrUpdate(genFacKey, closedGenFac); // todo: @api should be the AddUnsafe instead
-                //         closedGenericFactory = currFac;
-                //         return x;
-                //     });
-
                 _generatedFactories.Swap(generatedFactoryKey, closedGenericFactory,
-                    (x, genFacKey, closedGenFac) => x.AddOrUpdate(genFacKey, closedGenFac, (oldFac, _) => closedGenericFactory = oldFac));
+                    (x, genFacKey, closedGenFac) => x.AddOrUpdate(genFacKey, closedGenFac, 
+                    (oldFac, _) => closedGenericFactory = oldFac));
 
                 return closedGenericFactory;
             }
@@ -11487,10 +11463,8 @@ namespace DryIoc
                     if (isFactoryServiceTypeClosed)
                     {
                         factoryServiceType = factoryServiceType.GetGenericTypeDefinition().ThrowIfNull();
-                        var closedFactoryServiceType = Throw.IfThrows<ArgumentException, Type>(
-                            () => factoryServiceType.MakeGenericType(resultFactoryServiceTypeArgs),
-                            !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
-                            Error.NoMatchedGenericParamConstraints, factoryServiceType, request);
+                        var closedFactoryServiceType = factoryServiceType.TryCloseGenericTypeOrMethod(resultFactoryServiceTypeArgs, (t, a) => t.MakeGenericType(a),
+                            !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw, Error.NoMatchedGenericParamConstraints, request);
 
                         if (closedFactoryServiceType == null)
                             return null;
@@ -11504,10 +11478,8 @@ namespace DryIoc
 
                 // Close the factory type implementation
                 // and get factory member to use from it.
-                var closedFactoryImplType = Throw.IfThrows<ArgumentException, Type>(
-                    () => factoryImplType.MakeGenericType(resultFactoryImplTypeArgs),
-                    !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
-                    Error.NoMatchedGenericParamConstraints, factoryImplType, request);
+                var closedFactoryImplType = factoryImplType.TryCloseGenericTypeOrMethod(resultFactoryImplTypeArgs, (t, a) => t.MakeGenericType(a),
+                    !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw, Error.NoMatchedGenericParamConstraints, request);
 
                 if (closedFactoryImplType == null)
                     return null;
@@ -11566,10 +11538,8 @@ namespace DryIoc
 
                 MatchOpenGenericConstraints(methodTypeParams, resultMethodTypeArgs);
 
-                factoryMember = Throw.IfThrows<ArgumentException, MethodInfo>(
-                    () => openFactoryMethod.MakeGenericMethod(resultMethodTypeArgs),
-                    !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw,
-                    Error.NoMatchedGenericParamConstraints, factoryImplType, request);
+                factoryMember = openFactoryMethod.TryCloseGenericTypeOrMethod(resultMethodTypeArgs, (m, a) => m.MakeGenericMethod(a),
+                    !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw, Error.NoMatchedGenericParamConstraints, request);
 
                 if (factoryMember == null)
                     return null;
@@ -13837,6 +13807,22 @@ namespace DryIoc
                 if (matchedParams[i] != null)
                     return false;
             return true;
+        }
+
+        /// <summary>Where the `T` should be either Type or MethodInfo</summary>
+        internal static T TryCloseGenericTypeOrMethod<T>(this T openGenericTypeOrMethod, 
+            Type[] typeArgs, Func<T, Type[], T> closeGeneric, bool throwCondition, int error, Request r)
+        {
+            try
+            {
+                return closeGeneric(openGenericTypeOrMethod, typeArgs);
+            }
+            catch (ArgumentException ex)
+            {
+                if (throwCondition)
+                    throw Throw.GetMatchedException(ErrorCheck.OperationThrows, error, openGenericTypeOrMethod, r, null, null, ex);
+                return default(T);
+            }
         }
 
         /// <summary>Returns true if class is compiler generated. Checking for CompilerGeneratedAttribute
