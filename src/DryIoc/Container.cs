@@ -4960,8 +4960,9 @@ namespace DryIoc
             if (type.GetTypeInfo().IsGenericType)
             {
                 var typeDef = type.GetGenericTypeDefinition();
-                for (var i = 0; i < FuncTypes.Length; ++i)
-                    if (ReferenceEquals(FuncTypes[i], typeDef))
+                var funcTypes = FuncTypes;
+                for (var i = 0; i < funcTypes.Length; ++i)
+                    if (ReferenceEquals(funcTypes[i], typeDef))
                         return true;
             }
             return false;
@@ -9294,7 +9295,7 @@ namespace DryIoc
 
                 var reuseLifespan = reuse?.Lifespan ?? 0;
 
-                var checkCaptiveDependency = !skipCaptiveDependencyCheck && !factory.Setup.OpenResolutionScope &&
+                var checkCaptiveDependency = !skipCaptiveDependencyCheck && !IsDirectlyWrappedInFunc() && !factory.Setup.OpenResolutionScope &&
                     (Rules.ThrowIfDependencyHasShorterReuseLifespan       && reuseLifespan >  0 ||
                      Rules.ThrowIfScopedOrSingletonHasTransientDependency && reuseLifespan == 0);
 
@@ -9303,7 +9304,7 @@ namespace DryIoc
 
                 // Means we are incrementing the count when resolving the Factory for the first time,
                 // and not twice for the decorators
-                var dependencyCountIncrement = Factory == null ? 1 : 0; 
+                var dependencyCountIncrement = Factory == null ? 1 : 0;
 
                 for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
                 {
@@ -9317,7 +9318,7 @@ namespace DryIoc
 
                     if (checkCaptiveDependency)
                     {
-                        if (p.OpensResolutionScope ||
+                        if (p.OpensResolutionScope || 
                             scopedOrSingleton && p.Reuse is SingletonReuse ||
                             p.FactoryType == FactoryType.Wrapper && p._actualServiceType.IsFunc())
                             checkCaptiveDependency = false; // stop the check
@@ -10170,6 +10171,7 @@ namespace DryIoc
             if (getAsRsolutionCall)
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope, setup.AsResolutionCall);
 
+            // todo: @perf check for the false non-caching
             var cacheExpression = 
                 Caching != FactoryCaching.DoNotCache &&
                 FactoryType == FactoryType.Service &&
