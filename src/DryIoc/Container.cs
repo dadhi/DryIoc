@@ -1421,19 +1421,16 @@ namespace DryIoc
                 var openGenericServiceType  = serviceType.GetGenericTypeDefinition();
                 var openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
                 if (openGenericEntry != null)
-                {
                     factories = openGenericEntry is Factory gf
                         ? factories.Append(new KV<object, Factory>(DefaultKey.Value, gf))
                         : factories.Append(((FactoriesEntry)openGenericEntry).Factories
                             .Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray()
                             .Match(x => x.Value != null)); // filter out the Unregistered factories
-                }
             }
 
             var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
             if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags))
-                return CombineRegisteredWithDynamicFactories(
-                    DynamicRegistrationFlags.Service, withoutFlags,
+                return CombineRegisteredWithDynamicFactories(DynamicRegistrationFlags.Service, withoutFlags,
                     factories, bothClosedAndOpenGenerics, FactoryType.Service, serviceType);
 
             return factories;
@@ -1466,8 +1463,15 @@ namespace DryIoc
             if (!decorators.IsNullOrEmpty()) // todo: @perf check earlier for `p.DirectParent.IsEmpty && p.DirectParent.FactoryType != FactoryType.Service` to avoid method calling and check inside
             {
                 appliedDecoratorIDs = GetAppliedDecoratorIDs(request);
-                if (!appliedDecoratorIDs.IsNullOrEmpty())
-                    decorators = decorators.Match(appliedDecoratorIDs, (ids, d) => ids.IndexOf(d.FactoryID) == -1);
+                if (appliedDecoratorIDs.Length != 0)
+                    decorators = decorators.Match(appliedDecoratorIDs, (ids, d) =>
+                    {
+                        var id = d.FactoryID;
+                        for (var i = 0; i < ids.Length; ++i)
+                            if (id == ids[i])
+                                return false;
+                        return true;
+                    });
             }
 
             // Append open-generic decorators
@@ -1489,8 +1493,7 @@ namespace DryIoc
             // Note: the condition for type arguments should be checked before generating the closed generic version
             var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
             if (!typeArgDecorators.IsNullOrEmpty())
-                genericDecorators = genericDecorators.Append(
-                    typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r)));
+                genericDecorators = genericDecorators.Append(typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r)));
 
             // Filter out already applied generic decorators
             // And combine with rest of decorators
@@ -1499,20 +1502,19 @@ namespace DryIoc
                 appliedDecoratorIDs = appliedDecoratorIDs ?? GetAppliedDecoratorIDs(request);
                 if (!appliedDecoratorIDs.IsNullOrEmpty())
                 {
-                    genericDecorators = genericDecorators
-                        .Match(appliedDecoratorIDs, 
-                            (appliedDecIds, d) =>
-                            {
-                                var factoryGenerator = d.FactoryGenerator;
-                                if (factoryGenerator == null)
-                                    return appliedDecIds.IndexOf(d.FactoryID) == -1;
+                    genericDecorators = genericDecorators.Match(appliedDecoratorIDs, 
+                        (appliedDecIds, d) =>
+                        {
+                            var factoryGenerator = d.FactoryGenerator;
+                            if (factoryGenerator == null)
+                                return appliedDecIds.IndexOf(d.FactoryID) == -1;
 
-                                foreach (var entry in factoryGenerator.GeneratedFactories.Enumerate())
-                                    if (appliedDecIds.IndexOf(entry.Value.FactoryID) != -1)
-                                        return false;
+                            foreach (var entry in factoryGenerator.GeneratedFactories.Enumerate())
+                                if (appliedDecIds.IndexOf(entry.Value.FactoryID) != -1)
+                                    return false;
 
-                                return true;
-                            });
+                            return true;
+                        });
                 }
 
                 // Generate closed-generic versions
@@ -1608,14 +1610,12 @@ namespace DryIoc
 
         private static int[] GetAppliedDecoratorIDs(Request request)
         {
+            var requestFactoryID = request.FactoryID;
             var appliedIDs = Empty<int>();
             for (var p = request.DirectParent; !p.IsEmpty && p.FactoryType != FactoryType.Service; p = p.DirectParent)
-            {
-                if (p.FactoryType == FactoryType.Decorator &&
-                    p.DecoratedFactoryID == request.FactoryID)
+                if (p.FactoryType == FactoryType.Decorator && p.DecoratedFactoryID == requestFactoryID)
                     appliedIDs = appliedIDs.Append(p.FactoryID);
-            }
-            return appliedIDs;
+            return  appliedIDs;
         }
 
         Factory IContainer.GetWrapperFactoryOrDefault(Type serviceType)
@@ -1634,17 +1634,14 @@ namespace DryIoc
         // todo: @perf pass the serviceTypeHash
         Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
         {
-            var decorators = _registry.Value is Registry r
-                ? (Factory[])r.Decorators.GetValueOrDefault(serviceType)
-                : null;
+            var decorators = _registry.Value.Decorators.GetValueOrDefault(serviceType) as Factory[];
 
             var withoutFlags = decorators != null ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
             var withFlags = serviceType != typeof(object) ? DynamicRegistrationFlags.Decorator : 
                 DynamicRegistrationFlags.Decorator | DynamicRegistrationFlags.DecoratorOfAnyTypeViaObjectServiceType;
 
             if (Rules.HasDynamicRegistrationProvider(withFlags, withoutFlags))
-                return CombineRegisteredWithDynamicFactories(
-                    withFlags, withoutFlags,
+                return CombineRegisteredWithDynamicFactories(withFlags, withoutFlags,
                     decorators.Map(d => new KV<object, Factory>(DefaultKey.Value, d)), // todo: @perf too much to-array allocations without the need 
                     false, FactoryType.Decorator, serviceType).Map(x => x.Value);      // todo: @perf too much to-array allocations without the need
 
@@ -5344,7 +5341,7 @@ namespace DryIoc
                 .ThrowIfNull(Error.NotFoundMetaCtorWithTwoArgs, typeArgs, request);
 
             var metadataType = typeArgs[1];
-            var serviceType = typeArgs[0];
+            var serviceType  = typeArgs[0];
 
             var container = request.Container;
             var requiredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
@@ -5365,22 +5362,27 @@ namespace DryIoc
             }
 
             // if the service keys for some reason are not unique
-            factories = factories
-                .Match(metadataType, (mType, f) =>
+            factories = factories.Match(metadataType, (mType, f) =>
+            {
+                var metadata = f.Value.Setup.Metadata;
+                if (metadata == null)
+                    return false;
+
+                if (mType == typeof(object))
+                    return true;
+
+                if (metadata is IDictionary<string, object> metadataDict)
                 {
-                    var metadata = f.Value.Setup.Metadata;
-                    if (metadata == null)
-                        return false;
-
-                    if (mType == typeof(object))
+                    if (mType == typeof(IDictionary<string, object>))
                         return true;
+                    foreach (var m in metadataDict.Values)
+                        if (mType.IsTypeOf(m))
+                            return true;
+                    return false;
+                }
 
-                    var metadataDict = metadata as IDictionary<string, object>;
-                    if (metadataDict != null)
-                        return mType == typeof(IDictionary<string, object>) || metadataDict.Values.Any(m => mType.IsTypeOf(m));
-
-                    return mType.IsTypeOf(metadata);
-                });
+                return mType.IsTypeOf(metadata);
+            });
 
             if (factories.Length == 0)
                 return null;
