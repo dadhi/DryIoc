@@ -2107,6 +2107,28 @@ namespace ImTools
             return results;
         }
 
+        /// Map with additional two states to use in <paramref name="map"/> to minimize allocations in <paramref name="map"/> lambda closure 
+        public static R[] Map<T, A, B, R>(this T[] source, A a, B b, Func<A, B, T, R> map)
+        {
+            if (source == null)
+                return null;
+
+            var sourceCount = source.Length;
+            if (sourceCount == 0)
+                return Empty<R>();
+
+            if (sourceCount == 1)
+                return new[] { map(a, b, source[0]) };
+
+            if (sourceCount == 2)
+                return new[] { map(a, b, source[0]), map(a, b, source[1]) };
+
+            var results = new R[sourceCount];
+            for (var i = 0; i < source.Length; i++)
+                results[i] = map(a, b, source[i]);
+            return results;
+        }
+
         /// <summary>Maps all items from source to result collection. 
         /// If possible uses fast array Map otherwise Enumerable.Select.</summary>
         /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>

@@ -5073,17 +5073,14 @@ namespace DryIoc
 
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
-            var items = container.GetAllServiceFactories(requiredItemType)
-                .Map(x => new ServiceRegistrationInfo(x.Value, requiredItemType, x.Key))
-                .ToArrayOrSelf();
+            var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf()
+                .Map(requiredItemType, (t, x) => new ServiceRegistrationInfo(x.Value, t, x.Key));
 
             if (requiredItemType.IsClosedGeneric())
             {
-                var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
-                var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
-                    .Map(f => new ServiceRegistrationInfo(f.Value, requiredItemType,
-                         new OpenGenericTypeKey(requiredItemType.GetGenericDefinitionOrNull(), f.Key)))
-                    .ToArrayOrSelf();
+                var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
+                var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType).ToArrayOrSelf()
+                    .Map(requiredItemOpenGenericType, requiredItemType, (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new OpenGenericTypeKey(gt, f.Key)));
                 items = items.Append(openGenericItems);
             }
 
@@ -7323,6 +7320,8 @@ namespace DryIoc
         public static bool IsExcludedGeneralPurposeServiceType(this Type type)
         {
             if (type == typeof(object))
+                return true;
+            if (type == typeof(string))
                 return true;
             if (type == typeof(IDisposable))
                 return true;
