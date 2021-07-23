@@ -1993,6 +1993,18 @@ namespace ImTools
                     : Empty<R>();
             }
 
+            if (source.Length == 3)
+            {
+                var condition0 = condition(source[0]);
+                var condition1 = condition(source[1]);
+                var condition2 = condition(source[2]);
+                return condition0 && condition1 && condition2 ? new[] { map(source[0]), map(source[1]), map(source[2]) }
+                    : condition0 ? (condition1 ? new[] { map(source[0]), map(source[1]) } : condition2 ? new[] { map(source[0]), map(source[2]) } : new[] { map(source[0]) })
+                    : condition1 ? (condition2 ? new[] { map(source[1]), map(source[2]) } : new[] { map(source[1]) })
+                    : condition2 ? new[] { map(source[2]) }
+                    : Empty<R>();
+            }
+
             var matchStart = 0;
             R[] matches = null;
             var matchFound = false;
@@ -2036,6 +2048,18 @@ namespace ImTools
                 return condition0 && condition1 ? new[] { map(state, source[0]), map(state, source[1]) }
                     : condition0 ? new[] { map(state, source[0]) }
                     : condition1 ? new[] { map(state, source[1]) }
+                    : Empty<R>();
+            }
+
+            if (source.Length == 3)
+            {
+                var condition0 = condition(state, source[0]);
+                var condition1 = condition(state, source[1]);
+                var condition2 = condition(state, source[2]);
+                return condition0 && condition1 && condition2 ? new[] { map(state, source[0]), map(state, source[1]), map(state, source[2]) }
+                    : condition0 ? (condition1 ? new[] { map(state, source[0]), map(state, source[1]) } : condition2 ? new[] { map(state, source[0]), map(state, source[2]) } : new[] { map(state, source[0]) })
+                    : condition1 ? (condition2 ? new[] { map(state, source[1]), map(state, source[2]) } : new[] { map(state, source[1]) })
+                    : condition2 ? new[] { map(state, source[2]) }
                     : Empty<R>();
             }
 
