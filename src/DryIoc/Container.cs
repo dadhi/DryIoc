@@ -597,8 +597,8 @@ namespace DryIoc
             if (unwrappedType != null && unwrappedType != typeof(void)) // accounting for the resolved action GH#114
                 requiredItemType = unwrappedType;
 
-            var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf()
-                .Match(x => x.Value != null) // filter out unregistered services
+            var items = container.GetAllServiceFactories(requiredItemType)
+                .Where(x => x.Value != null) // filter out unregistered services
                 .Select(f => new ServiceRegistrationInfo(f.Value, requiredServiceType, f.Key));
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
