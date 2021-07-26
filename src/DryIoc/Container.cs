@@ -598,7 +598,7 @@ namespace DryIoc
                 requiredItemType = unwrappedType;
 
             var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf()
-                .Where(x => x.Value != null) // filter out unregistered services
+                .Match(x => x.Value != null) // filter out unregistered services
                 .Select(f => new ServiceRegistrationInfo(f.Value, requiredServiceType, f.Key));
 
             IEnumerable<ServiceRegistrationInfo> openGenericItems = null;
@@ -5116,13 +5116,13 @@ namespace DryIoc
             var details = request._serviceInfo.Details;
             var requiredItemType = container.GetWrappedType(itemType, details.RequiredServiceType);
 
-            var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf()
+            var items = container.GetAllServiceFactories(requiredItemType).ToArrayOrSelf() // todo: @bug check for the unregistered values 
                 .Map(requiredItemType, (t, x) => new ServiceRegistrationInfo(x.Value, t, x.Key));
 
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
-                var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType).ToArrayOrSelf()
+                var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType).ToArrayOrSelf()  // todo: @bug check for the unregistered values
                     .Map(requiredItemOpenGenericType, requiredItemType, (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new OpenGenericTypeKey(gt, f.Key)));
                 items = items.Append(openGenericItems);
             }
