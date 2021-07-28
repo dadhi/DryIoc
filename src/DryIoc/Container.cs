@@ -1178,7 +1178,8 @@ namespace DryIoc
                     .Visit(new List<KV<object, Factory>>(2), (x, list) => list.Add(KV.Of(x.Key, x.Value))).ToArray() // todo: optimize - we may not need ToArray here
                     .Match(x => x.Value != null); // filter out the Unregistered factories (see #390)
 
-            if (Rules.DynamicRegistrationProviders != null)
+            if (Rules.DynamicRegistrationProviders != null &&
+                !serviceType.IsExcludedGeneralPurposeServiceType())
                 factories = CombineRegisteredServiceWithDynamicFactories(factories, serviceType, openGenericServiceType, serviceKey);
 
             if (factories.Length == 0)
@@ -1325,7 +1326,8 @@ namespace DryIoc
                 }
             }
 
-            if (Rules.DynamicRegistrationProviders != null)
+            if (Rules.DynamicRegistrationProviders != null && 
+                !serviceType.IsExcludedGeneralPurposeServiceType())
                 factories = CombineRegisteredServiceWithDynamicFactories(factories, serviceType, openGenericServiceType);
 
             if (factories.Length == 0)
@@ -1426,7 +1428,8 @@ namespace DryIoc
                             .Match(x => x.Value != null)); // filter out the Unregistered factories
             }
 
-            if (Rules.DynamicRegistrationProviders != null)
+            if (Rules.DynamicRegistrationProviders != null &&
+                !serviceType.IsExcludedGeneralPurposeServiceType())
                 return CombineRegisteredServiceWithDynamicFactories(factories, serviceType, openGenericServiceType);
 
             return factories;
@@ -1444,7 +1447,8 @@ namespace DryIoc
                     .Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray()
                     .Match(x => x.Value != null); // filter out the Unregistered factories
 
-            if (Rules.DynamicRegistrationProviders != null)
+            if (Rules.DynamicRegistrationProviders != null &&
+                !serviceType.IsExcludedGeneralPurposeServiceType())
                 return CombineRegisteredServiceWithDynamicFactories(factories, serviceType, null);
 
             return factories;
