@@ -2542,6 +2542,57 @@ namespace ImTools
         public T OrDefault(T defaultValue = default) => HasValue ? Value : defaultValue;
     }
 
+    /// <summary>Ever growing list methods</summary>
+    public static class GrowingList
+    {
+        /// <summary>Default initial capacity </summary>
+        public const int DefaultInitialCapacity = 2;
+
+        /// Push the new slot and return the ref to it
+        public static ref T PushSlot<T>(ref T[] items, int count)
+        {
+            if (items == null)
+                items = new T[DefaultInitialCapacity];
+            else if (count >= items.Length)
+                Expand(ref items);
+            return ref items[count];
+        }
+
+        /// Adds the new item possibly extending the item collection
+        public static void Push<T>(ref T[] items, int count, T item)
+        {
+            if (items == null)
+                items = new T[DefaultInitialCapacity];
+            else if (count >= items.Length)
+                Expand(ref items);
+            items[count] = item;
+        }
+
+        /// Expands the items starting with 2
+        internal static void Expand<T>(ref T[] items)
+        {
+            var count = items.Length;
+            var newItems = new T[count << 1]; // count x 2
+            if (count < 6)
+                for (var i = 0; i < count; ++i)
+                    newItems[i] = items[i];
+            else
+                Array.Copy(items, 0, newItems, 0, count);
+        }
+
+        ///<summary>Creates the final array out of the list, so that you cannot use after that!</summary>
+        public static T[] ResizeToArray<T>(T[] items, int count)
+        {
+            if (count < items.Length)
+                Array.Resize(ref items, count); 
+            return items;
+        }
+
+        /// <inheritdoc />
+        public static string ToString<T>(T[] items, int count) =>
+            $"Count {count} of {(count == 0 || items == null || items.Length == 0 ? "empty" : "first (" + items[0] + ") and last (" + items[count - 1] + ")")}";
+    }
+
     /// <summary>Ever growing list</summary>
     public struct GrowingList<T>
     {
@@ -2567,36 +2618,56 @@ namespace ImTools
             if (Items == null)
                 Items = new T[DefaultInitialCapacity];
             else if (Count >= Items.Length)
-                Items = Expand(Items);
+                GrowingList.Expand(ref Items);
             return ref Items[Count++];
         }
 
         /// Adds the new item possibly extending the item collection
-        public void PushSlot(T item)
+        public void Push(T item)
         {
             if (Items == null)
                 Items = new T[DefaultInitialCapacity];
             else if (Count >= Items.Length)
-                Items = Expand(Items);
+                GrowingList.Expand(ref Items);
             Items[Count++] = item;
         }
 
         /// Pops the item - just moving the counter back
         public void Pop() => --Count;
 
-        /// Expands the items starting with 2
-        private static T[] Expand(T[] items)
+        ///<summary>Creates the final array out of the list, so that you cannot use after that!</summary>
+        public T[] ResizeToArray()
         {
-            var count = items.Length;
-            var newItems = new T[count << 1]; // count x 2
-            Array.Copy(items, 0, newItems, 0, count);
-            return newItems;
+            var items = Items;
+            if (Count < items.Length)
+                Array.Resize(ref items, Count); 
+            return items;
         }
 
         /// <inheritdoc />
         public override string ToString() =>
             $"Count {Count} of {(Count == 0 || Items == null || Items.Length == 0 ? "empty" : "first (" + Items[0] + ") and last (" + Items[Count - 1] + ")")}";
     }
+
+    /// <summary>The structure of arrays (SOA) to hold the keys and values of the map.
+    /// The arrays may have the bigger capacity than the actual item count, so you need to use `Count` to get the valid number of items.</summary>
+    public struct KeysAndValues<K, V>
+    {
+        /// <summary>The keys</summary>
+        public K[] Keys;
+        /// <summary>The values</summary>
+        public V[] Values;
+        /// <summary>The actual item count - the same for keys and values</summary>
+        public int Count;
+        /// <summary>Constructs the structure</summary>
+        public KeysAndValues(K[] keys, V[] values, int count)
+        {
+            Keys   = keys;
+            Values = values;
+            Count  = count;
+        }
+    }
+
 
     /// <summary>Immutable list - simplest linked list with the Head and the Tail.</summary>
     public sealed class ImList<T>
@@ -5747,6 +5818,68 @@ namespace ImTools
 
             return state;
         }
+
+        private static void Push(ImHashMapEntry<K, V> entry, ref KeysAndValues<K, V> keysAndValues)
+        {
+            var n = keysAndValues.Count;
+            GrowingList.Push(ref keysAndValues.Keys,   n, entry.Key);
+            GrowingList.Push(ref keysAndValues.Values, n, entry.Value);
+            keysAndValues.Count = n + 1; 
+        }
+
+        /// <summary>Split the map into the keys and values in the data-oriented way (SOA - a structure of arrays instead of array of structures), 
+        /// producing the shapeless homogenous arrays of keys and values instead of heterogenous pairs of specific shape which are harder to compose and adapt to the required API.
+        /// The passed `keysAndValues` may already contain the data, the new keys and values will be appended to the same arrays, enabling the concat operation
+        /// using the already pre-allocated space.</summary>
+        public int ToKeysAndValues<S>(S state, Func<ImHashMapEntry<K, V>, S, bool> condition, ref KeysAndValues<K, V> keysAndValues, ImHashMap<K, V>[] parentsStack = null)
+        {
+            var count = keysAndValues.Count;
+            var entry = Entry;
+            if (Height == 1 && entry is ImHashMapConflicts<K, V> == false)
+            {
+                if (condition(entry, state))
+                    Push(entry, ref keysAndValues);
+            }
+            else if (Height != 0)
+            {
+                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
+                var node = this;
+                var parentCount = -1;
+                while (node.Height != 0 || parentCount != -1)
+                {
+                    if (node.Height != 0)
+                    {
+                        parentsStack[++parentCount] = node;
+                        node = node.Left;
+                    }
+                    else
+                    {
+                        node = parentsStack[parentCount--];
+                        entry = node.Entry;
+                        if (!(entry is ImHashMapConflicts<K, V> conflicts))
+                        {
+                            if (condition(entry, state))
+                                Push(entry, ref keysAndValues);
+                        }
+                        else
+                        {
+                            var conflict = conflicts.Conflicts;
+                            for (var i = 0; i < conflict.Length; i++)
+                            {
+                                entry = conflict[i];
+                                if (condition(entry, state))
+                                    Push(entry, ref keysAndValues);
+                            }
+                        }
+
+                        node = node.Right;
+                    }
+                }
+            }
+
+            return keysAndValues.Count - count;
+        }
+
 
         /// <summary>
         /// Depth-first in-order traversal as described in http://en.wikipedia.org/wiki/Tree_traversal
