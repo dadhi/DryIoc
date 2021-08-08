@@ -1179,7 +1179,8 @@ namespace DryIoc
                     .Match(x => x.Value != null); // filter out the Unregistered factories (see #390)
 
             if (Rules.DynamicRegistrationProviders != null &&
-                !serviceType.IsExcludedGeneralPurposeServiceType())
+                !serviceType.IsExcludedGeneralPurposeServiceType() &&
+                !((IContainer)this).IsWrapper(serviceType))
                 factories = CombineRegisteredServiceWithDynamicFactories(factories, serviceType, openGenericServiceType, serviceKey);
 
             if (factories.Length == 0)
@@ -1327,7 +1328,8 @@ namespace DryIoc
             }
 
             if (Rules.DynamicRegistrationProviders != null && 
-                !serviceType.IsExcludedGeneralPurposeServiceType())
+                !serviceType.IsExcludedGeneralPurposeServiceType() &&
+                !((IContainer)this).IsWrapper(serviceType))
                 factories = CombineRegisteredServiceWithDynamicFactories(factories, serviceType, openGenericServiceType);
 
             if (factories.Length == 0)
@@ -1437,8 +1439,7 @@ namespace DryIoc
 
         KV<object, Factory>[] IContainer.GetServiceRegisteredAndDynamicFactories(Type serviceType)
         {
-            var registry = _registry.Value;
-            var serviceFactories = registry.Services;
+            var serviceFactories = _registry.Value.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             var factories = entry == null ? Empty<KV<object, Factory>>()
@@ -1647,6 +1648,13 @@ namespace DryIoc
                     wrapper = wrappers.GetValueOrDefault(serviceType);
             }
             return wrapper as Factory;
+        }
+
+        bool IContainer.IsWrapper(Type serviceType, Type openGenericServiceType)
+        {
+            var wrappers = _registry.Value.Wrappers;
+            return wrappers.GetValueOrDefault(serviceType) != null || openGenericServiceType != null
+                && wrappers.GetValueOrDefault(openGenericServiceType) != null;
         }
 
         // todo: @perf pass the serviceTypeHash
@@ -5407,7 +5415,7 @@ namespace DryIoc
             var requiredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
 
             var factories = container
-                .GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true)
+                .GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true) // todo: @perf use the GetServiceRegisteredAndDynamicFactories
                 .ToArrayOrSelf();
 
             if (factories.Length == 0)
@@ -13209,6 +13217,9 @@ namespace DryIoc
         /// <summary>Searches for registered wrapper factory and returns it, or null if not found.</summary>
         /// <param name="serviceType">Service type to look for.</param> <returns>Found wrapper factory or null.</returns>
         Factory GetWrapperFactoryOrDefault(Type serviceType);
+
+        /// <summary>Returns the true if the type is wrapper</summary>
+        bool IsWrapper(Type serviceType, Type openGenericServiceType = null);
 
         /// <summary>Returns all decorators registered for the service type.</summary> <returns>Decorator factories.</returns>
         Factory[] GetDecoratorFactoriesOrDefault(Type serviceType);
