@@ -2326,7 +2326,7 @@ namespace DryIoc
 
                         var factories = ((FactoriesEntry)entry).Factories;
                         if (serviceKey == null)
-                            return condition == null || factories.Enumerate().FirstOrDefault(f => condition(f.Value)) != null;
+                            return condition == null || factories.Enumerate().FirstOrDefault(f => condition(f.Value)) != null; // todo: @perf optimize allocations and speedup as it is used by MS.DI now
 
                         factory = factories.GetValueOrDefault(serviceKey);
                         return factory != null && (condition == null || condition(factory));

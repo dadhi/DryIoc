@@ -21,6 +21,8 @@ Breaking:
 
 - Removing PCL and .NET 3.5, .NET 4.0 targets
 
+Performance speedup and the memory footprint reduced
+
 ]]>
     </PackageReleaseNotes>
     </PropertyGroup>

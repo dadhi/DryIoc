@@ -13,7 +13,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     public class DryIocAdapterSpecificationTests : DependencyInjectionSpecificationTests
     {
-        protected override IServiceProvider CreateServiceProvider(IServiceCollection services) => DryIocAdapter.Create(services);
+        protected override IServiceProvider CreateServiceProvider(IServiceCollection services) => 
+          new DryIocServiceProviderFactory().CreateBuilder(services).BuildServiceProvider();
 
         internal class TestServiceCollection : List<ServiceDescriptor>, IServiceCollection
         {
@@ -51,7 +52,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             collection.Add(ServiceDescriptor.Describe(typeof(IService), typeof(ServiceB), secondLifetime));
 
             IServiceProvider msProvider = collection.BuildServiceProvider();
-            IServiceProvider dryiocProvider = DryIocAdapter.Create(collection);
+            IServiceProvider dryiocProvider = CreateServiceProvider(collection);
 
             if (usingScope)
             {

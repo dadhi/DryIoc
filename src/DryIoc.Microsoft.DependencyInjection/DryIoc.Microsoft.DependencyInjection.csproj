@@ -3,8 +3,8 @@
         <TargetFrameworks>netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
-        <VersionPrefix>5.1.0</VersionPrefix>
-        <VersionSuffix></VersionSuffix>
+        <VersionPrefix>6.0.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -15,6 +15,11 @@
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+
+## v6.0.0
+
+- Depends on the DryIoc v5
+- Depends on the Microsoft.Extensions.DependencyInjection.Abstractions 6.0.0-preview.7.21377.19
 
 ## v5.1.0
 
@@ -37,6 +42,6 @@ Updated DryIoc to v4.5.0 with the performance improvements and the new features
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="3.1.8" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0-preview.7.21377.19" />
     </ItemGroup>
 </Project>
