@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.DependencyInjection.Specification;
+using Microsoft.Extensions.DependencyInjection.Specification.Fakes;
 using NUnit.Framework;
 
 // uncomment when I want to copy some test here for testing.
@@ -67,6 +68,28 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             // assert
             Assert.IsInstanceOf(expectedResolveType, msService, "Microsoft changed the implementation");
             Assert.IsInstanceOf(expectedResolveType, dryiocService, "DryIoc resolves the requested type different than microsofts di implementation");
+        }
+
+        [Test]
+        public void OpenGenericsWithIsService_DoubleTest()
+        {
+            if (!SupportsIServiceProviderIsService)
+            {
+                return;
+            }
+
+            // Arrange
+            var collection = new TestServiceCollection();
+            collection.AddTransient(typeof(IFakeOpenGenericService<>), typeof(FakeOpenGenericService<>));
+            var provider = CreateServiceProvider(collection);
+
+            // Act
+            var serviceProviderIsService = provider.GetService<IServiceProviderIsService>();
+
+            // Assert
+            Assert.NotNull(serviceProviderIsService);
+            Assert.True(serviceProviderIsService.IsService(typeof(IFakeOpenGenericService<IFakeService>)));
+            Assert.False(serviceProviderIsService.IsService(typeof(IFakeOpenGenericService<>)));
         }
 
         public interface IService
