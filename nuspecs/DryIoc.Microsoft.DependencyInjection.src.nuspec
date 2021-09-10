@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.Microsoft.DependencyInjection.src</id>
-    <version>5.1.0</version>
+    <version>6.0.0-preview-02</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,14 @@
     <tags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</tags>
     <releaseNotes>
 <![CDATA[
+
+## v6.0.0
+
+- Depends on the DryIoc v5
+- Depends on the Microsoft.Extensions.DependencyInjection.Abstractions 6.0.0-preview.7.21377.19
+- Provides the implementation of IServiceProviderIsService
+- Provides the implementation of ISupportRequiredService
+
 
 ## v5.1.0
 

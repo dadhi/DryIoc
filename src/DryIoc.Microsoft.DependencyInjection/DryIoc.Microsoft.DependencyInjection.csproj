@@ -4,7 +4,7 @@
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
         <VersionPrefix>6.0.0</VersionPrefix>
-        <VersionSuffix>preview-01</VersionSuffix>
+        <VersionSuffix>preview-02</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -20,6 +20,9 @@
 
 - Depends on the DryIoc v5
 - Depends on the Microsoft.Extensions.DependencyInjection.Abstractions 6.0.0-preview.7.21377.19
+- Provides the implementation of IServiceProviderIsService
+- Provides the implementation of ISupportRequiredService
+
 
 ## v5.1.0
 
