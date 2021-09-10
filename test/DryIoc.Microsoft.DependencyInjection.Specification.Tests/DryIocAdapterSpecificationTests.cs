@@ -86,6 +86,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             // Act
             var serviceProviderIsService = provider.GetService<IServiceProviderIsService>();
 
+            Assert.NotNull(serviceProviderIsService.IsService(typeof(IServiceProvider)));
+
             // Assert
             Assert.NotNull(serviceProviderIsService);
             Assert.True(serviceProviderIsService.IsService(typeof(IFakeOpenGenericService<IFakeService>)));
