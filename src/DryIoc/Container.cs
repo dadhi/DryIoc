@@ -1650,11 +1650,11 @@ namespace DryIoc
             return wrapper as Factory;
         }
 
-        bool IContainer.IsWrapper(Type serviceType, Type openGenericServiceType)
+        bool IContainer.IsWrapper(Type serviceType, Type openGenericServiceType) // todo: @perf optimize this
         {
             var wrappers = _registry.Value.Wrappers;
-            return wrappers.GetValueOrDefault(serviceType) != null || openGenericServiceType != null
-                && wrappers.GetValueOrDefault(openGenericServiceType) != null;
+            return wrappers.GetValueOrDefault(serviceType) != null // todo: @todo reorder things to get faster results for the open-generic wrappers - for the rest perf won't change 
+                || openGenericServiceType != null && wrappers.GetValueOrDefault(openGenericServiceType) != null;
         }
 
         // todo: @perf pass the serviceTypeHash

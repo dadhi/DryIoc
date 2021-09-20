@@ -249,7 +249,7 @@ namespace DryIoc.MefAttributedModel
             container.Use(new ServiceKeyStore());
 
             // decorator to filter in a presence of multiple same keys
-            // note: it explicitly set to Transient to produce new results for new filtered collection,
+            // note: it is explicitly set to Transient to produce new results for new filtered collection,
             // otherwise it may be set to Singleton by container wide rules and always produce the results for the first resolved collection
             container.Register(typeof(IEnumerable<>), Reuse.Transient, _filterCollectionByMultiKey, Setup.Decorator);
 
