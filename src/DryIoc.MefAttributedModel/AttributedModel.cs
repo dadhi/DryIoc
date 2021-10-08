@@ -262,7 +262,7 @@ namespace DryIoc.MefAttributedModel
 
         internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey) => 
             serviceKey == null
-            ? source.Select(x => x.Value)
+            ? source.Select(x => x.Value) // todo: @perf optimize
             : source.Where(x =>
                 {
                     if (x.Key is DefaultKey || x.Key is DefaultDynamicKey)

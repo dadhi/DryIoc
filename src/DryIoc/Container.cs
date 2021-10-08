@@ -1466,7 +1466,7 @@ namespace DryIoc
 
             var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
             if (arrayElementType != null)
-                request = request.WithChangedServiceInfo(x =>
+                request = request.WithChangedServiceInfo(x => // todo: @perf optimize allocations
                     x.With(typeof(IEnumerable<>).MakeGenericType(arrayElementType)));
 
             var serviceType = request.ServiceType;
@@ -1510,7 +1510,7 @@ namespace DryIoc
 
             // Append generic type argument decorators, registered as Object
             // Note: the condition for type arguments should be checked before generating the closed generic version
-            var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object));
+            var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object)); // todo: @perf add the rule for the object decorator to speedup the check
             if (!typeArgDecorators.IsNullOrEmpty())
                 genericDecorators = genericDecorators.Append(typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r)));
 
@@ -10712,13 +10712,13 @@ namespace DryIoc
 
             return req =>
             {
-                var properties = req.ImplementationType.GetMembers(x => x.DeclaredProperties, includeBase: withBase)
+                var properties = req.ImplementationType.GetMembers(x => x.DeclaredProperties, includeBase: withBase) // todo: @perf optimize allocations 
                     .Match(p => p.IsInjectable(withNonPublic, withPrimitive), p => info(p, req));
 
                 if (!withFields)
                     return properties;
 
-                var fields = req.ImplementationType
+                var fields = req.ImplementationType // todo: @perf optimize allocations and maybe combine with properties
                     .GetMembers(x => x.DeclaredFields, includeBase: withBase)
                     .Match(f => f.IsInjectable(withNonPublic, withPrimitive), f => info(f, req));
 
