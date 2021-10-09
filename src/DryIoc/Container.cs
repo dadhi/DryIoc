@@ -5537,11 +5537,14 @@ namespace DryIoc
         private static Rules WithMicrosoftDependencyInjectionRules(Rules rules)
         {
             rules = rules.Clone(cloneMade: true);
-            rules._settings |= Settings.TrackingDisposableTransients;
-            rules._settings &= ~Settings.ThrowOnRegisteringDisposableTransient;
-            rules._settings &= ~Settings.VariantGenericTypesInResolvedCollection;
+            var settings = rules._settings;
+            rules._settings = (settings | Settings.TrackingDisposableTransients) 
+                & ~Settings.ThrowOnRegisteringDisposableTransient
+                & ~Settings.VariantGenericTypesInResolvedCollection;
+
             rules._factorySelector = SelectLastRegisteredFactory;
             rules._made._factoryMethod = DryIoc.FactoryMethod.ConstructorWithResolvableArguments;
+
             return rules;
         }
 
@@ -6072,19 +6075,25 @@ namespace DryIoc
         public bool TrackingDisposableTransients =>
             (_settings & Settings.TrackingDisposableTransients) != 0;
 
-        /// <summary>Turns tracking of disposable transients in dependency parent scope, or in current scope if service
-        /// is resolved directly.
+        /// <summary>
+        /// Turns on the storing of disposable transients in the current scope or in the singleton scope if no scopes are opened.
+        /// It is required to be able to Dispose the Transient at specific time when the scope is disposed or where container
+        /// with singletons is disposed.
         ///
-        /// If there is no open scope at the moment then resolved transient won't be tracked and it is up to you
-        /// to dispose it! That's is similar situation to creating service by new - you have full control.
-        ///
-        /// If dependency wrapped in Func somewhere in parent chain then it also won't be tracked, because
-        /// Func supposedly means multiple object creation and for container it is not clear what to do, so container
-        /// delegates that to user. Func here is the similar to Owned relationship type in Autofac library.
+        /// The storing disposable transients in the singleton scope means that they won't be disposed until
+        /// the whole container is disposed. That may pose a problem similar to the "memory leak" because more and more transients
+        /// will be created and stored never disposed until whole container is disposed. Therefore you 
+        /// need to think if you really need the disposable to be the Transient. Whatever, just be aware of it.
         /// </summary>
-        /// <remarks>Turning this setting On automatically turns off <see cref="ThrowOnRegisteringDisposableTransient"/>.</remarks>
         public Rules WithTrackingDisposableTransients() =>
             WithSettings((_settings | Settings.TrackingDisposableTransients) & ~Settings.ThrowOnRegisteringDisposableTransient);
+
+        /// <summary>
+        /// The opposite of <see cref="WithTrackingDisposableTransients" /> removing the tracking, 
+        /// which maybe helpful e.g. for undoing the rule from the Microsoft.DependencyInjection conforming rules.
+        /// </summary>
+        public Rules WithoutTrackingDisposableTransients() =>
+            WithSettings(_settings & ~Settings.TrackingDisposableTransients);
 
         /// <summary><see cref="WithoutEagerCachingSingletonForFasterAccess"/>.</summary>
         public bool EagerCachingSingletonForFasterAccess =>
@@ -6333,7 +6342,9 @@ namespace DryIoc
         }
 
         private Rules Clone(bool cloneMade) =>
-            new Rules(_settings, FactorySelector, DefaultReuse, cloneMade ? _made.Clone() : _made, 
+            new Rules(
+                _settings, FactorySelector, DefaultReuse, 
+                cloneMade ? _made.Clone() : _made, 
                 DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter, DynamicRegistrationProviders, 
                 DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
