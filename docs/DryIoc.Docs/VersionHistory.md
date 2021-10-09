@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.8.2 Improvement release
+
+- fixed: #429 Memory leak on MS DI with Disposable Transient
+
 ## v4.8.1 Bug-fix release / 2021-07-03
 
 - fixed: #412 ResolveMany not work with generics after any Unregister
