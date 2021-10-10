@@ -10,12 +10,14 @@ namespace DryIoc.IssuesTests
         ///     Currently, resolving the list as <see cref="IReadOnlyList{BaseClass}" /> fails in this test.
         ///     The list is registered as its implementation and mapped to the interface.
         /// </summary>
-        [Test, Ignore("fixme")]
+        [Test]
         public void RegisterCovariantImplementationTypeWithMapping()
         {
             var container = new Container();
+            
             // Register the implementation as itself
             container.Register(Made.Of(() => new List<SubClass>()));
+
             // Register the interface with base type parameter
             container.RegisterMapping<IReadOnlyList<BaseClass>, List<SubClass>>();
 

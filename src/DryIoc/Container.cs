@@ -7452,6 +7452,7 @@ namespace DryIoc
             return serviceTypes;
         }
 
+        // todo: @bug @perf why don't we just IsAssignableFrom
         /// <summary>The same `GetImplementedServiceTypes` but instead of collecting the service types just check the <paramref name="serviceType"/> is implemented</summary>
         public static bool IsImplementingServiceType(this Type type, Type serviceType)
         {
@@ -11193,16 +11194,18 @@ namespace DryIoc
             if (isStaticallyChecked || implType == null)
                 return true;
 
-            if (!implType.IsGenericDefinition())
+            var implTypeInfo = implType.GetTypeInfo();
+            if (!implTypeInfo.IsGenericTypeDefinition)
             {
-                if (implType.IsOpenGeneric())
-                    Throw.It(Error.RegisteringNotAGenericTypedefImplType, implType, implType.GetGenericDefinitionOrNull());
+                if (implTypeInfo.IsGenericType && implTypeInfo.ContainsGenericParameters)
+                    Throw.It(Error.RegisteringNotAGenericTypedefImplType, implType, implType.GetGenericTypeDefinition());
 
                 else if (implType != serviceType && serviceType != typeof(object))
                 {
-                    if (!serviceType.IsGenericDefinition())
+                    var serviceTypeInfo = serviceType.GetTypeInfo();
+                    if (!serviceTypeInfo.IsGenericTypeDefinition)
                     {
-                        if (!implType.IsImplementingServiceType(serviceType))
+                        if (!serviceTypeInfo.IsAssignableFrom(implTypeInfo))
                             Throw.It(Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
                     }
                     else
