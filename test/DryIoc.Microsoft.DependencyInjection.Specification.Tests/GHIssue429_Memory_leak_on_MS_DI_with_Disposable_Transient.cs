@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -8,35 +9,53 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
     public class GHIssue429_Memory_leak_on_MS_DI_with_Disposable_Transient
     {
         [Test]
-        public void Test1()
+        public void Test_with_MS_DI_rules()
         {
+            DisposableViewModel[] xs = null;
+            using (var container = new Container()
+                .WithDependencyInjectionAdapter(new ServiceCollection()))
+            {
+                container.Register<DisposableViewModel>(Reuse.Transient);
+
+                xs = ResolveManyTimes<DisposableViewModel>(container);
+            }
+
+            foreach (var x in xs)
+                Assert.IsTrue(x.IsDisposed);
+        }
+
+        [Test]
+        public void Test_without_disposable_transient()
+        {
+            DisposableViewModel[] xs = null;
             using (var container = new Container()
                 .WithDependencyInjectionAdapter(new ServiceCollection())
                 .With(rules => rules.WithoutTrackingDisposableTransients()))
             {
                 container.Register<DisposableViewModel>(Reuse.Transient);
 
-                ResolveManyTimes(container, typeof(DisposableViewModel));
+                xs = ResolveManyTimes<DisposableViewModel>(container);
             }
+
+            foreach (var x in xs)
+                Assert.IsFalse(x.IsDisposed);
         }
 
-        private static void ResolveManyTimes(IResolver container, Type typeToResolve)
+        private static T[] ResolveManyTimes<T>(IResolver container, int times = 10)
         {
-            for (var i = 0; i < 100; i++)
+            var xs = new T[times];
+            for (var i = 0; i < times; i++)
             {
-                container.Resolve(typeToResolve);
+                xs[i] = container.Resolve<T>();
             }
-        }
 
-        internal class NotDisposableViewModel
-        {
+            return xs;
         }
 
         internal class DisposableViewModel : IDisposable
         {
-            public void Dispose()
-            {
-            }
+            public bool IsDisposed;
+            public void Dispose() => IsDisposed = true;
         }
     }
 }
