@@ -1455,6 +1455,8 @@ namespace DryIoc
             return factories;
         }
 
+        private static int _objectTypeHash = RuntimeHelpers.GetHashCode(typeof(object));
+
         Expression IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
             var container = request.Container;
@@ -1510,7 +1512,8 @@ namespace DryIoc
 
             // Append generic type argument decorators, registered as Object
             // Note: the condition for type arguments should be checked before generating the closed generic version
-            var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object)); // todo: @perf add the rule for the object decorator to speedup the check
+            // Note: the dynamic rules for the object is not supported, sorry - to much of performance hog to be called every time
+            var typeArgDecorators = _registry.Value.Decorators.GetValueOrDefault(_objectTypeHash, typeof(object)) as Factory[];
             if (!typeArgDecorators.IsNullOrEmpty())
             {
                 typeArgDecorators = typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r));
