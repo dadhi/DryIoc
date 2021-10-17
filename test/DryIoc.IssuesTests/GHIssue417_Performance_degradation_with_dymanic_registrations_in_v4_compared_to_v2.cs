@@ -18,6 +18,9 @@ namespace DryIoc.IssuesTests
             var x = new Slow();
             container.InjectPropertiesAndFields(x);
 
+            // var y = new Slow();
+            // container.InjectPropertiesAndFields(y);
+
             Assert.IsInstanceOf<MyService>(x.ImportedServices[0].Value);
         }
 

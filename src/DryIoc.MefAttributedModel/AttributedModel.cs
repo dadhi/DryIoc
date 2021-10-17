@@ -100,25 +100,23 @@ namespace DryIoc.MefAttributedModel
         /// <returns>The container with made registration.</returns>
         public static IContainer WithImportsSatisfiedNotification(this IContainer container)
         {
-            container.Register<object>(
-                made: _importsSatisfiedNotificationFactoryMethod,
-                setup: _importsSatisfiedNotificationDecoratorSetup);
+            var made = Made.Of(typeof(AttributedModel).SingleMethod(nameof(NotifyImportsSatisfied), includeNonPublic: true));
+
+            var decoratorSetup = Setup.DecoratorWith(
+                r => r.GetKnownImplementationOrServiceType().IsAssignableTo<IPartImportsSatisfiedNotification>(), // todo: @perf can we filter it without registering the `object` decorator
+                order: int.MinValue, // Important, sets the decorator as a first one, so it will always being called
+                useDecorateeReuse: true);
+
+            container.Register<object>(made: made, setup: decoratorSetup);
+
             return container;
         }
 
         internal static TService NotifyImportsSatisfied<TService>(TService service)
         {
-            (service as IPartImportsSatisfiedNotification)?.OnImportsSatisfied();
+            ((IPartImportsSatisfiedNotification)service).OnImportsSatisfied();
             return service;
         }
-
-        private static readonly Made _importsSatisfiedNotificationFactoryMethod = Made.Of(
-            typeof(AttributedModel).SingleMethod(nameof(NotifyImportsSatisfied), includeNonPublic: true));
-
-        private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
-            r => r.GetKnownImplementationOrServiceType().IsAssignableTo<IPartImportsSatisfiedNotification>(),
-            order: int.MinValue, // Important, sets the decorator as a first one, so it will always being called
-            useDecorateeReuse: true);
 
         #endregion
 
@@ -248,31 +246,29 @@ namespace DryIoc.MefAttributedModel
             // map to convert the non-unique keys into an unique ones: ContractName/Key -> { ContractType, count }[]
             container.Use(new ServiceKeyStore());
 
+            var filterCollectionByMultiKey = Made.Of(
+                typeof(AttributedModel).SingleMethod(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
+                parameters: Parameters.Of.Type(r => r.ServiceKey));
+
             // decorator to filter in a presence of multiple same keys
             // note: it is explicitly set to Transient to produce new results for new filtered collection,
             // otherwise it may be set to Singleton by container wide rules and always produce the results for the first resolved collection
-            container.Register(typeof(IEnumerable<>), Reuse.Transient, _filterCollectionByMultiKey, Setup.Decorator);
+            container.Register(typeof(IEnumerable<>), Reuse.Transient, filterCollectionByMultiKey, 
+                Setup.DecoratorWith(condition: r => r.ServiceKey != null));
 
             return container;
         }
 
-        private static readonly Made _filterCollectionByMultiKey = Made.Of(
-            typeof(AttributedModel).SingleMethod(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
-            parameters: Parameters.Of.Type(request => request.ServiceKey));
-
         internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey) => 
-            serviceKey == null
-            ? source.Select(x => x.Value) // todo: @perf optimize
-            : source.Where(x =>
-                {
-                    if (x.Key is DefaultKey || x.Key is DefaultDynamicKey)
-                        return false;
-                    if (serviceKey.Equals(x.Key))
-                        return true;
-                    var multiKey = x.Key as KV<object, int>;
-                    return multiKey != null && serviceKey.Equals(multiKey.Key);
-                })
-                .Select(x => x.Value);
+            source.Match(x =>
+            {
+                if (x.Key is DefaultKey || x.Key is DefaultDynamicKey)
+                    return false;
+                if (serviceKey.Equals(x.Key))
+                    return true;
+                var multiKey = x.Key as KV<object, int>;
+                return multiKey != null && serviceKey.Equals(multiKey.Key);
+            }, x => x.Value);
 
         #endregion
 

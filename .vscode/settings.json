@@ -1,5 +1,8 @@
 {
     "cSpell.words": [
         "decoratee"
-    ]
+    ],
+    "files.watcherExclude": {
+        "**/target": true
+    }
 }

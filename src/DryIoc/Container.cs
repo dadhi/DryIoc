@@ -1512,7 +1512,11 @@ namespace DryIoc
             // Note: the condition for type arguments should be checked before generating the closed generic version
             var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(typeof(object)); // todo: @perf add the rule for the object decorator to speedup the check
             if (!typeArgDecorators.IsNullOrEmpty())
-                genericDecorators = genericDecorators.Append(typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r)));
+            {
+                typeArgDecorators = typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r));
+                if (typeArgDecorators.Length > 0)
+                    genericDecorators = genericDecorators.Append(typeArgDecorators);
+            }
 
             // Filter out already applied generic decorators
             // And combine with rest of decorators
@@ -9179,7 +9183,7 @@ namespace DryIoc
         public int ReuseLifespan => Reuse?.Lifespan ?? 0;
 
         /// <summary>Known implementation, or otherwise actual service type.</summary>
-        public Type GetKnownImplementationOrServiceType() => ImplementationType ?? GetActualServiceType();
+        public Type GetKnownImplementationOrServiceType() => _factoryImplType ?? Factory?.ImplementationType ?? _actualServiceType;
 
         /// <summary>Creates new request with provided info, and links current request as a parent.
         /// Allows to set some additional flags. Existing/parent request should be resolved to 
@@ -10168,7 +10172,11 @@ namespace DryIoc
         }
 
         /// <summary>Checks that condition is met for request or there is no condition setup.</summary>
-        public bool CheckCondition(Request request) => (Setup.Condition == null || Setup.Condition(request));
+        public bool CheckCondition(Request request)
+        {
+            var condition = Setup.Condition;
+            return condition == null || condition(request);
+        }
 
         /// <summary>Shortcut for <see cref="DryIoc.Setup.FactoryType"/>.</summary>
         public FactoryType FactoryType => Setup.FactoryType;
