@@ -36,7 +36,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 
         public interface IValidator<in T>
         {
-            public bool IsValid(T settings);
+            bool IsValid(T settings);
         }
 
         public abstract class AbstractValidator<T> : IValidator<T>
