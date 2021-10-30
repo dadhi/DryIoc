@@ -2006,7 +2006,9 @@ namespace DryIoc
                         return decoratedExpr.CompileToFactoryDelegate(request.Rules.UseFastExpressionCompiler, request.Rules.UseInterpretation);
                 }
 
-                return GetInstanceFromScopeChainOrSingletons;
+                return request.IfUnresolved == IfUnresolved.Throw
+                    ? GetInstanceFromScopeChainOrSingletons
+                    : GetInstanceFromScopeChainOrSingletonsOrDefault;
             }
 
             /// <summary>Called for Injection as dependency.</summary>
@@ -2020,32 +2022,35 @@ namespace DryIoc
             public override Expression CreateExpressionOrDefault(Request request) =>
                 Resolver.CreateResolutionExpression(request);
 
-#region Implementation
-
             private object GetInstanceFromScopeChainOrSingletons(IResolverContext r)
             {
-                for (var scope = r.CurrentScope; scope != null; scope = scope.Parent)
+                for (var s = r.CurrentScope; s != null; s = s.Parent)
                 {
-                    var result = GetAndUnwrapOrDefault(scope, FactoryID);
+                    var result = GetAndUnwrapOrDefault(s, FactoryID);
                     if (result != null)
                         return result;
                 }
 
-                var instance = GetAndUnwrapOrDefault(r.SingletonScope, FactoryID);
-                return instance.ThrowIfNull(Error.UnableToFindSingletonInstance);
+                return GetAndUnwrapOrDefault(r.SingletonScope, FactoryID).ThrowIfNull(Error.UnableToFindSingletonInstance);
             }
 
-            private static object GetAndUnwrapOrDefault(IScope scope, int factoryId)
+            private object GetInstanceFromScopeChainOrSingletonsOrDefault(IResolverContext r)
             {
-                object value;
-                if (!scope.TryGet(out value, factoryId))
-                    return null;
-                return (value as WeakReference)?.Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed)
+                for (var s = r.CurrentScope; s != null; s = s.Parent)
+                {
+                    var result = GetAndUnwrapOrDefault(s, FactoryID);
+                    if (result != null)
+                        return result;
+                }
+
+                return GetAndUnwrapOrDefault(r.SingletonScope, FactoryID);
+            }
+
+            private static object GetAndUnwrapOrDefault(IScope scope, int factoryId) =>
+                !scope.TryGet(out var value, factoryId) ? null :
+                (value as WeakReference)?.Target.ThrowIfNull(Error.WeakRefReuseWrapperGCed)
                    ?? (value as HiddenDisposable)?.Value
                    ?? value;
-            }
-
-#endregion
         }
 
         internal sealed class Registry
