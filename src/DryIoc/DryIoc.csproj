@@ -5,7 +5,7 @@
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.8.3</VersionPrefix>
+        <VersionPrefix>4.8.4</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -17,6 +17,11 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v4.8.4 Bug-fix release
+
+- fixed: #434 ReturnDefaultIfNotRegistered is not respected between scopes
+- fixed: #435 hangfire use dryioc report ContainerIsDisposed
+
 ## v4.8.3 Bug-fix release
 
 - fixed: #418 Resolving interfaces with covariant type parameter fails when using RegisterMapping

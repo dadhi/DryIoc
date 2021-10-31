@@ -1,6 +1,11 @@
 Version History
 ---------------
 
+## v4.8.4 Bug-fix release / 2021-10-31
+
+- fixed: #434 ReturnDefaultIfNotRegistered is not respected between scopes
+- fixed: #435 hangfire use dryioc report ContainerIsDisposed
+
 ## v4.8.3 Bug-fix release / 2021-10-21
 
 - fixed: #418 Resolving interfaces with covariant type parameter fails when using RegisterMapping
