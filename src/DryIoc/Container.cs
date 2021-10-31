@@ -2007,7 +2007,7 @@ namespace DryIoc
                 }
 
                 return request.IfUnresolved == IfUnresolved.Throw
-                    ? GetInstanceFromScopeChainOrSingletons
+                    ? (FactoryDelegate)GetInstanceFromScopeChainOrSingletons
                     : GetInstanceFromScopeChainOrSingletonsOrDefault;
             }
 
