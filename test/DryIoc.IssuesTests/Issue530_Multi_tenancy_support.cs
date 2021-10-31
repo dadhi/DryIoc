@@ -51,14 +51,17 @@ namespace DryIoc.IssuesTests
             c.Register<IThing, ScopedThing>(Reuse.Scoped);
             c.Register<ThingUser>();
 
-            Assert.IsInstanceOf<SingleThing>(c.Resolve<ThingUser>().Thing);
+            var user = c.Resolve<ThingUser>();
+            Assert.IsInstanceOf<SingleThing>(user.Thing);
 
             using (var scope = c.OpenScope())
             {
-                Assert.IsInstanceOf<ScopedThing>(scope.Resolve<ThingUser>().Thing);
+                user = scope.Resolve<ThingUser>();
+                Assert.IsInstanceOf<ScopedThing>(user.Thing);
             }
 
-            Assert.IsInstanceOf<SingleThing>(c.Resolve<ThingUser>().Thing);
+            user = c.Resolve<ThingUser>();
+            Assert.IsInstanceOf<SingleThing>(user.Thing);
         }
 
         public interface IThing {}

@@ -4893,10 +4893,11 @@ namespace DryIoc
         internal static readonly MethodInfo OpenScopeMethod =
             typeof(ResolverContext).GetTypeInfo().GetDeclaredMethod(nameof(OpenScope));
 
-        /// <summary>Returns root or self resolver based on request.</summary>
+        /// <summary>Returns root resolver for the singletons or the non scoped dependency of singletons, 
+        /// or the current resolver for the rest.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
-             request.Reuse is CurrentScopeReuse == false &&
-             request.DirectParent.IsSingletonOrDependencyOfSingleton &&
+            request.Reuse is CurrentScopeReuse == false &&
+            request.DirectParent.IsSingletonOrDependencyOfSingleton &&
             !request.OpensResolutionScope && 
             request.Rules.ThrowIfDependencyHasShorterReuseLifespan
                 ? RootOrSelfExpr
@@ -11796,7 +11797,8 @@ namespace DryIoc
         {
             // GetConstant here is needed to check the runtime state rule
             var delegateExpr = request.Container.GetConstantExpression(_factoryDelegate);
-            var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
+            // Here we are using the simplified GetRootOrSelfExpr - if we injecting resolver in the singleton it should be the root container
+            var resolverExpr = request.Reuse is SingletonReuse ? ResolverContext.RootOrSelfExpr : FactoryDelegateCompiler.ResolverContextParamExpr;
             return Convert(Invoke(delegateExpr, resolverExpr), request.GetActualServiceType());
         }
 

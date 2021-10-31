@@ -10,18 +10,19 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
     [TestFixture]
     public class GHIssue435_hangfire_use_dryioc_report_ContainerIsDisposed : DependencyInjectionSpecificationTests
     {
-        protected override IServiceProvider CreateServiceProvider(IServiceCollection services) => DryIocAdapter.Create(services);
+        protected override IServiceProvider CreateServiceProvider(IServiceCollection services) => 
+            DryIocAdapter.Create(services);
 
-        [Test, Ignore("failing")]
+        [Test]
         public void SingletonFactory_Test()
         {
             var collection = new ServiceCollection();
-            
+
             collection.AddSingleton<ISingletonFactory>(r => new SingletonFactory(r));
             collection.AddTransient<IFakeService, FakeService>();
-            
-            
+
             var serviceProvider = CreateServiceProvider(collection);
+        
             var scopeFactory = serviceProvider.GetService<IServiceScopeFactory>();
             ISingletonFactory singletonFactory;
             using (var scope = scopeFactory.CreateScope())
@@ -39,7 +40,6 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
         public class FakeService : IFakeService, IFakeScopedService, IFakeSingletonService, IDisposable
         {
             public bool Disposed { get; private set; }
-
             public void Dispose()
             {
                 if (Disposed)
