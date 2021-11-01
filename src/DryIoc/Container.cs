@@ -5254,8 +5254,8 @@ namespace DryIoc
         /// <returns>Expression: <c><![CDATA[r => new Lazy<TService>(() => r.Resolve{TService}(key, ifUnresolved, requiredType))]]></c></returns>
         public static Expression GetLazyExpressionOrDefault(Request request, bool nullWrapperForUnresolvedService = false)
         {
-            var lazyType = request.GetActualServiceType();
-            var serviceType = lazyType.GetGenericParamsAndArgs()[0];
+            var lazyType       = request.GetActualServiceType();
+            var serviceType    = lazyType.GetGenericParamsAndArgs()[0];
             var serviceRequest = request.Push(serviceType);
 
             var container = request.Container;

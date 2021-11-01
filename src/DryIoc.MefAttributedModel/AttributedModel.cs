@@ -328,9 +328,6 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info, 
             Lazy<ServiceKeyStore> serviceKeyStore = null)
         {
-            serviceKeyStore = serviceKeyStore ?? new Lazy<ServiceKeyStore>(() =>
-                ((IResolver)registrator).Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault));
-
             // factory is used for all exports of implementation
             var factory = info.CreateFactory();
 
@@ -343,7 +340,7 @@ namespace DryIoc.MefAttributedModel
                 var serviceKey = export.ServiceKey;
                 if (serviceKey != null)
                 {
-                    var store = serviceKeyStore.Value;
+                    var store = serviceKeyStore?.Value ?? ((IResolver)registrator).Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault);
                     if (store != null)
                         serviceKey = store.EnsureUniqueServiceKey(serviceType, serviceKey);
                 }
@@ -362,6 +359,10 @@ namespace DryIoc.MefAttributedModel
         /// If no exports found, the method returns empty enumerable.</summary>
         public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(Type type) => GetExportedRegistrations(type, false);
 
+        // todo: Review the need for factory service key
+        // - May be export factory AsWrapper to hide from collection resolution
+        // - Use an unique (GUID) service key
+        private static Attribute[] _factoryTypeAttributes = new Attribute[] { new ExportAttribute(Constants.InstanceFactory) };
 
         /// <summary>Creates registration info DTOs for provided type and/or for exported members.
         /// If no exports found, the method returns empty enumerable.</summary>
@@ -393,8 +394,7 @@ namespace DryIoc.MefAttributedModel
                     continue;
 
                 var memberReturnType = member.GetReturnTypeOrDefault();
-                var memberRegistrationInfo = GetRegistrationInfoOrDefault(memberReturnType, memberAttributes)
-                    .ThrowIfNull();
+                var memberRegistrationInfo = GetRegistrationInfoOrDefault(memberReturnType, memberAttributes).ThrowIfNull();
 
                 var factoryMethod = new FactoryMethodInfo
                 {
@@ -407,13 +407,7 @@ namespace DryIoc.MefAttributedModel
                     // if no export for instance factory, then add one
                     if (typeRegistrationInfo == null)
                     {
-                        // todo: Review the need for factory service key
-                        // - May be export factory AsWrapper to hide from collection resolution
-                        // - Use an unique (GUID) service key
-                        var factoryKey = Constants.InstanceFactory;
-
-                        var factoryTypeAttributes = new Attribute[] { new ExportAttribute(factoryKey) };
-                        typeRegistrationInfo = GetRegistrationInfoOrDefault(type, factoryTypeAttributes).ThrowIfNull();
+                        typeRegistrationInfo = GetRegistrationInfoOrDefault(type, _factoryTypeAttributes).ThrowIfNull();
                         yield return typeRegistrationInfo;
                     }
 
@@ -851,9 +845,36 @@ namespace DryIoc.MefAttributedModel
             return info;
         }
 
-        private static bool IsExportDefined(Attribute[] attributes, bool shouldRegisterWithoutExport) => 
-            (shouldRegisterWithoutExport || attributes.Length != 0 && attributes.IndexOf(a => a is ExportAttribute || a is ExportManyAttribute) != -1) &&
-            (attributes.Length == 0 || attributes.IndexOf(a => a is PartNotDiscoverableAttribute) == -1);
+        private static bool IsExportDefined(Attribute[] attributes, bool shouldRegisterWithoutExport)
+        {
+            if (shouldRegisterWithoutExport)
+            {
+                if (attributes.Length == 0)
+                    return true;
+
+                for (var i = 0; i < attributes.Length; ++i)
+                {
+                    var a = attributes[i];
+                    if (a is PartNotDiscoverableAttribute)
+                        return false; // return earlier if part is not discoverable
+                }
+                return true;
+            }
+
+            if (attributes.Length == 0)
+                return false;
+
+            var exported = false;
+            for (var i = 0; i < attributes.Length; ++i)
+            {
+                var a = attributes[i];
+                if (a is PartNotDiscoverableAttribute)
+                    return false; // return earlier if part is not discoverable
+                if (a is ExportAttribute || a is ExportManyAttribute)
+                    exported = true;
+            }
+            return exported;
+        }
 
         private static ExportInfo[] GetExportsFromExportAttribute(ExportAttribute attribute,
             ExportedRegistrationInfo info, Type implementationType)
@@ -1365,8 +1386,7 @@ namespace DryIoc.MefAttributedModel
 
             var condition = ConditionType == null
                 ? (Func<DryIoc.Request, bool>)null
-                : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType))
-                    .Evaluate(ConvertRequestInfo(r));
+                : r => ((ExportConditionAttribute)Activator.CreateInstance(ConditionType)).Evaluate(ConvertRequestInfo(r));
 
             if (FactoryType == DryIoc.FactoryType.Decorator)
                 return Decorator == null ? Setup.Decorator : Decorator.GetSetup(condition);
@@ -1492,29 +1512,21 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Metadata key suffix for the C# representation of the custom attribute constructors.</summary>
         public const string ToCodeKeySuffix = ".ToCode()";
-
         private void CollectAttributeConstructorsCode(IDictionary<string, object> metadata)
         {
-            var attributes = CustomAttributeData.GetCustomAttributes(ImplementationType)
-                .Select(item => new
+            var attributes = CustomAttributeData.GetCustomAttributes(ImplementationType);
+            foreach (var a in attributes)
+            {
+                var fullTypeName = a.Constructor.DeclaringType.FullName;
+                if (metadata.ContainsKey(fullTypeName))
                 {
-                    // ReSharper disable PossibleNullReferenceException
-                    // ReSharper disable AssignNullToNotNullAttribute
-                    Key = item.Constructor.DeclaringType.FullName,
-                    Value = string.Format("new {0}({1})",
-                            item.Constructor.DeclaringType.FullName,
-                            string.Join(", ", ArrayTools.Map(item.ConstructorArguments, a => a.ToString()).ToArrayOrSelf())) +
-                            (item.NamedArguments.Any() ?
-                                " { " + string.Join(", ", item.NamedArguments.Map(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArrayOrSelf()) + " }" :
-                                string.Empty)
-                    // ReSharper restore AssignNullToNotNullAttribute
-                    // ReSharper restore PossibleNullReferenceException
-                })
-                .OrderBy(item => item.Key);
-
-            foreach (var attr in attributes)
-                if (metadata.ContainsKey(attr.Key))
-                    metadata[attr.Key + ToCodeKeySuffix] = attr.Value;
+                    var args = string.Join(", ", ArrayTools.Map(a.ConstructorArguments, x => x.ToString()).ToArrayOrSelf());
+                    var ctor = string.Format("new {0}({1})", fullTypeName, args);
+                    if (a.NamedArguments.Any())
+                        ctor += " { " + string.Join(", ", a.NamedArguments.Map(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArrayOrSelf()) + " }";
+                    metadata[fullTypeName + ToCodeKeySuffix] = ctor;
+                }
+            }
         }
 
         private static IDictionary<string, object> CollectExportedMetadata(IEnumerable<Attribute> attributes)
