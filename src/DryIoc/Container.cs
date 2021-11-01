@@ -1714,6 +1714,7 @@ namespace DryIoc
             return wrappedType == null ? serviceType : ((IContainer)this).GetWrappedType(wrappedType);
         }
 
+        // todo @perf optimize lambda allocations and parameter usage
         /// <summary>Converts known item into literal expression or wraps it in a constant expression.</summary>
         public Expression GetConstantExpression(object item, Type itemType = null, bool throwIfStateRequired = false)
         {
@@ -1726,7 +1727,9 @@ namespace DryIoc
 
             var convertible = item as IConvertibleToExpression;
             if (convertible != null)
-                return convertible.ToExpression(it => GetConstantExpression(it, null, throwIfStateRequired));
+                return throwIfStateRequired 
+                    ? convertible.ToExpression(it => GetConstantExpression(it, null, true))
+                    : convertible.ToExpression(it => GetConstantExpression(it, null, false));
 
             var actualItemType = item.GetType();
             if (actualItemType.GetGenericDefinitionOrNull() == typeof(KV<,>))
@@ -5410,7 +5413,9 @@ namespace DryIoc
                 return null;
 
             var serviceType = typeArgs[1];
-            var serviceRequest = request.Push(serviceType, serviceKey);
+            var serviceRequest = serviceKey == null
+                ? request.PushServiceType(serviceType)
+                : request.Push(serviceType, serviceKey);
             var serviceFactory = request.Container.ResolveFactory(serviceRequest);
             var serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)

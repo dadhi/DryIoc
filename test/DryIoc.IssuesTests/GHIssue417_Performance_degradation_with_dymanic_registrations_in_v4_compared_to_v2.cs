@@ -18,8 +18,18 @@ namespace DryIoc.IssuesTests
             var x = new Slow();
             container.InjectPropertiesAndFields(x);
 
-            // var y = new Slow();
-            // container.InjectPropertiesAndFields(y);
+            Assert.IsInstanceOf<MyService>(x.ImportedServices[0].Value);
+        }
+
+        [Test]
+        public void SuperSlowTest()
+        {
+            var container = new Container().WithMef();
+
+            container.Register<IService, MyService>(setup: Setup.With(metadataOrFuncOfMetadata: "42"));
+
+            var x = new SuperSlow();
+            container.InjectPropertiesAndFields(x);
 
             Assert.IsInstanceOf<MyService>(x.ImportedServices[0].Value);
         }
@@ -28,6 +38,12 @@ namespace DryIoc.IssuesTests
         {
             [Import]
             public Lazy<IService>[] ImportedServices { get; set; }
+        }
+
+        public class SuperSlow
+        {
+            [Import]
+            public Lazy<IService, string>[] ImportedServices { get; set; }
         }
 
         public interface IService { }
