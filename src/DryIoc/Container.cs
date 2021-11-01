@@ -1694,8 +1694,24 @@ namespace DryIoc
                 }
             }
 
-            return wrappedType == null ? serviceType
-                : ((IContainer)this).GetWrappedType(wrappedType, null);
+            return wrappedType == null ? serviceType : ((IContainer)this).GetWrappedType(wrappedType);
+        }
+
+        Type IContainer.GetWrappedType(Type serviceType)
+        {
+            var wrappedType = serviceType.GetArrayElementTypeOrNull();
+            if (wrappedType == null)
+            {
+                var factory = ((IContainer)this).GetWrapperFactoryOrDefault(serviceType);
+                if (factory != null)
+                {
+                    wrappedType = ((Setup.WrapperSetup)factory.Setup).GetWrappedTypeOrNullIfWrapsRequired(serviceType);
+                    if (wrappedType == null)
+                        return null;
+                }
+            }
+
+            return wrappedType == null ? serviceType : ((IContainer)this).GetWrappedType(wrappedType);
         }
 
         /// <summary>Converts known item into literal expression or wraps it in a constant expression.</summary>
@@ -5256,7 +5272,7 @@ namespace DryIoc
         {
             var lazyType       = request.GetActualServiceType();
             var serviceType    = lazyType.GetGenericParamsAndArgs()[0];
-            var serviceRequest = request.Push(serviceType);
+            var serviceRequest = request.PushServiceType(serviceType);
 
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
@@ -5312,7 +5328,7 @@ namespace DryIoc
                 request = request.WithInputArgs(argExprs);
             }
 
-            var serviceRequest = request.Push(serviceType, flags: RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
+            var serviceRequest = request.PushServiceType(serviceType, RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
             var container = request.Container;
             var serviceExpr = container.Rules.FuncAndLazyWithoutRegistration && !isAction
                 ? Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true)
@@ -5417,7 +5433,6 @@ namespace DryIoc
         {
             var metaType = request.GetActualServiceType();
             var typeArgs = metaType.GetGenericParamsAndArgs();
-
             var metaCtor = metaType.GetConstructorOrNull(typeArgs)
                 .ThrowIfNull(Error.NotFoundMetaCtorWithTwoArgs, typeArgs, request);
 
@@ -5427,6 +5442,7 @@ namespace DryIoc
             var container = request.Container;
             var requiredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
 
+            // todo: @perf if resolving the Meta inside the IEnumerable which is the usual case then we call GetAllServiceFactories all over again for each item in the enumerable
             var factories = container
                 .GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true) // todo: @perf use the GetServiceRegisteredAndDynamicFactories
                 .ToArrayOrSelf();
@@ -8488,7 +8504,7 @@ namespace DryIoc
             return (s.Length == 0 ? s : s.Append('}')).ToString();
         }
 
-        private ServiceDetails(Type requiredServiceType, IfUnresolved ifUnresolved,
+        internal ServiceDetails(Type requiredServiceType, IfUnresolved ifUnresolved,
             object serviceKey, string metadataKey, object metadata,
             object value, bool hasCustomValue)
         {
@@ -8624,6 +8640,47 @@ namespace DryIoc
             return dependency.Create(serviceType, serviceDetails);
         }
 
+        /// <summary>Enables propagation/inheritance of info between dependency and its owner:
+        /// for instance <see cref="ServiceDetails.RequiredServiceType"/> for wrappers.</summary>
+        public static IServiceInfo InheritInfoFromDependencyOwner(this Type serviceType,
+            IServiceInfo owner, IContainer container, FactoryType ownerFactoryType = FactoryType.Service)
+        {
+            var ownerDetails = owner.Details;
+            if (ownerDetails == null || ownerDetails == ServiceDetails.Default)
+                return ServiceInfo.OfServiceType(serviceType);
+
+            var ifUnresolved = IfUnresolved.Throw;
+            var ownerIfUnresolved = ownerDetails.IfUnresolved;
+            if (ownerIfUnresolved == IfUnresolved.ReturnDefault) // ReturnDefault is always inherited
+                ifUnresolved = ownerIfUnresolved;
+
+            var ownerRequiredServiceType = ownerDetails.RequiredServiceType;
+
+            object serviceKey  = null;
+            string metadataKey = null;
+            object metadata    = null;
+
+            // Inherit some things through wrappers and decorators
+            if (ownerFactoryType == FactoryType.Wrapper ||
+                ownerFactoryType == FactoryType.Decorator &&
+                container.GetWrappedType(serviceType).IsAssignableTo(owner.ServiceType))
+            {
+                if (ownerIfUnresolved == IfUnresolved.ReturnDefaultIfNotRegistered)
+                    ifUnresolved = ownerIfUnresolved;
+                serviceKey = ownerDetails.ServiceKey;
+                metadataKey = ownerDetails.MetadataKey;
+                metadata = ownerDetails.Metadata;
+            }
+
+            if (ownerFactoryType != FactoryType.Service && ownerRequiredServiceType != null && ownerRequiredServiceType != serviceType) // if only dependency does not have its own
+                return ServiceInfo.OfServiceAndRequiredType(serviceType, ownerRequiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata);
+
+            if (serviceKey == null && metadataKey == null && metadata == null && ifUnresolved == IfUnresolved.Throw)
+                return ServiceInfo.OfServiceType(serviceType);
+
+            return ServiceInfo.Of(serviceType, null, ifUnresolved, serviceKey, metadataKey, metadata);
+        }
+
         /// <summary>Returns required service type if it is specified and assignable to service type,
         /// otherwise returns service type.</summary>
         public static Type GetActualServiceType(this IServiceInfo info)
@@ -8674,6 +8731,15 @@ namespace DryIoc
                 ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
         }
 
+        /// <summary>Creates info out of provided settings</summary>
+        public static ServiceInfo OfServiceAndRequiredType(Type serviceType, Type requiredServiceType,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null,
+            string metadataKey = null, object metadata = null) =>
+            new WithDetails(serviceType, new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata, null, false));
+
+        /// <summary>Creates from the service type</summary>
+        public static ServiceInfo OfServiceType(Type serviceType) => new ServiceInfo(serviceType);
+
         /// <summary>Creates service info using typed <typeparamref name="TService"/>.</summary>
         public static Typed<TService> Of<TService>(IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null) =>
             serviceKey == null && ifUnresolved == IfUnresolved.Throw
@@ -8704,9 +8770,7 @@ namespace DryIoc
         public override string ToString() =>
             new StringBuilder().Print(this).ToString();
 
-#region Implementation
-
-        private ServiceInfo(Type serviceType) { ServiceType = serviceType; }
+        private ServiceInfo(Type serviceType) => ServiceType = serviceType;
 
         private class WithDetails : ServiceInfo
         {
@@ -8721,8 +8785,6 @@ namespace DryIoc
             public TypedWithDetails(ServiceDetails details) { _details = details; }
             private readonly ServiceDetails _details;
         }
-
-#endregion
     }
 
     /// <summary>Provides <see cref="IServiceInfo"/> for parameter,
@@ -9202,16 +9264,14 @@ namespace DryIoc
             if (FactoryID == 0)
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
 
-            var flags = Flags & InheritedFlags | additionalFlags;
             var serviceInfo = info.ThrowIfNull().InheritInfoFromDependencyOwner(_serviceInfo, Container, FactoryType);
 
             var stack = RequestStack;
             var indexInStack = IndexInStack + 1;
             if (stack == null)
             {
-                stack = RequestStack.Get(indexInStack);
-
                 // traverse all the requests up including the resolution root and set the new stack to them
+                stack = RequestStack.Get(indexInStack);
                 Request parent = null;
                 do
                 {
@@ -9221,14 +9281,43 @@ namespace DryIoc
                 while ((parent.Flags & RequestFlags.IsResolutionCall) == 0 && !parent.DirectParent.IsEmpty);
             }
 
+            var flags = Flags & InheritedFlags | additionalFlags;
             ref var req = ref stack.GetOrPushRef(indexInStack);
             if (req == null)
-                req  = new Request(Container, this, DependencyDepth + 1, 0,
-                    RequestStack, flags, serviceInfo, InputArgExprs);
+                req  = new Request(Container, this, DependencyDepth + 1, 0, RequestStack, flags, serviceInfo, InputArgExprs);
             else
-                req.SetServiceInfo(Container, this, DependencyDepth + 1, 0,
-                    RequestStack, flags, serviceInfo, InputArgExprs);
-            
+                req.SetServiceInfo(Container, this, DependencyDepth + 1, 0, RequestStack, flags, serviceInfo, InputArgExprs);
+            return req;
+        }
+
+        /// <summary>Creates new request with provided info, and links current request as a parent.
+        /// Allows to set some additional flags. Existing/parent request should be resolved to 
+        /// factory via `WithResolvedFactory` before pushing info into it.</summary>
+        public Request PushServiceType(Type serviceType, RequestFlags additionalFlags = DefaultFlags)
+        {
+            var serviceInfo = serviceType.InheritInfoFromDependencyOwner(_serviceInfo, Container, FactoryType);
+
+            var stack = RequestStack;
+            var indexInStack = IndexInStack + 1;
+            if (stack == null)
+            {
+                // traverse all the requests up including the resolution root and set the new stack to them
+                stack = RequestStack.Get(indexInStack);
+                Request parent = null;
+                do
+                {
+                    parent = parent == null ? this : parent.DirectParent;
+                    parent.RequestStack = stack;
+                }
+                while ((parent.Flags & RequestFlags.IsResolutionCall) == 0 && !parent.DirectParent.IsEmpty);
+            }
+
+            var flags = Flags & InheritedFlags | additionalFlags;
+            ref var req = ref stack.GetOrPushRef(indexInStack);
+            if (req == null)
+                req  = new Request(Container, this, DependencyDepth + 1, 0, RequestStack, flags, serviceInfo, InputArgExprs);
+            else
+                req.SetServiceInfo(Container, this, DependencyDepth + 1, 0, RequestStack, flags, serviceInfo, InputArgExprs);
             return req;
         }
 
@@ -13095,7 +13184,8 @@ namespace DryIoc
         public bool AsResolutionRoot => Factory.Setup.AsResolutionRoot;
 
         /// <summary>Shortcut to service info.</summary>
-        public ServiceInfo ToServiceInfo() => ServiceInfo.Of(ServiceType, serviceKey: OptionalServiceKey);
+        public ServiceInfo ToServiceInfo() => OptionalServiceKey == null 
+            ? ServiceInfo.OfServiceType(ServiceType) : ServiceInfo.Of(ServiceType, serviceKey: OptionalServiceKey);
 
         /// <summary>Overrides the service type and pushes the original service type to required service type</summary>
         public ServiceInfo ToServiceInfo(Type serviceType) =>
@@ -13269,6 +13359,11 @@ namespace DryIoc
         /// <param name="requiredServiceType">Required service type or null if don't care.</param>
         /// <returns>Unwrapped service type in case it corresponds to registered generic wrapper, or input type in all other cases.</returns>
         Type GetWrappedType(Type serviceType, Type requiredServiceType);
+
+        /// <summary>If <paramref name="serviceType"/> is generic type then this method checks if the type registered as generic wrapper,
+        /// and recursively unwraps and returns its type argument. This type argument is the actual service type we want to find.
+        /// Otherwise, method returns the input <paramref name="serviceType"/>.</summary>
+        Type GetWrappedType(Type serviceType);
 
         /// <summary>Converts known items into custom expression or wraps in a constant expression.</summary>
         /// <param name="item">Item to convert.</param>

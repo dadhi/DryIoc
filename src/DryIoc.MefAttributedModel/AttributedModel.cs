@@ -1026,22 +1026,22 @@ namespace DryIoc.MefAttributedModel
         {
             _store.Swap(x => x
                 .AddOrUpdate(serviceKey, new[] { KV.Of(serviceType, 1) }, (types, newTypes) =>
-                  {
-                      var newType = newTypes[0].Key;
-                      var typeAndCountIndex = types.IndexOf(t => t.Key == newType);
-                      if (typeAndCountIndex != -1)
-                      {
-                          var typeAndCount = types[typeAndCountIndex];
+                {
+                    var newType = newTypes[0].Key;
+                    var typeAndCountIndex = types.IndexOf(newType, (n, t) => t.Key == n);
+                    if (typeAndCountIndex != -1)
+                    {
+                        var typeAndCount = types[typeAndCountIndex];
 
-                          // Change the serviceKey only when multiple same types are registered with the same key
-                          serviceKey = KV.Of(serviceKey, typeAndCount.Value);
+                        // Change the serviceKey only when multiple same types are registered with the same key
+                        serviceKey = KV.Of(serviceKey, typeAndCount.Value);
 
-                          typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
-                          return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
-                      }
+                        typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
+                        return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
+                    }
 
-                      return types.Append(newTypes);
-                  }));
+                    return types.Append(newTypes);
+                }));
 
             return serviceKey;
         }
@@ -1342,8 +1342,9 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < Exports.Length; i++)
             {
                 var e = Exports[i];
-                if (e.ServiceKey != null)
-                    e.ServiceKey = keyStore.EnsureUniqueServiceKey(e.ServiceType, e.ServiceKey);
+                var key = e.ServiceKey; 
+                if (key != null)
+                    e.ServiceKey = keyStore.EnsureUniqueServiceKey(e.ServiceType, key);
             }
 
             return this;
@@ -1410,7 +1411,7 @@ namespace DryIoc.MefAttributedModel
                 return ArrayTools.Empty<Attribute>();
 
             IEnumerable<Attribute> metaAttrs = ImplementationType.GetAttributes();
-            if (made != null && made.FactoryMethodKnownResultType != null)
+            if (made?.FactoryMethodKnownResultType != null)
             {
                 var member = made.FactoryMethod(request: null).ConstructorOrMethodOrMember;
                 if (member != null)
