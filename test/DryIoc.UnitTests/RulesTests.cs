@@ -351,7 +351,7 @@ namespace DryIoc.UnitTests
                 : null));
 
             var s = new ConnectionString("aaa");
-            container.Register(Made.Of(() => new ConStrUser(Arg.Index<ConnectionString>(0)), r => s));
+            container.Register(Made.Of(() => new ConStrUser(Arg.Index<ConnectionString>(0)), argValues: r => s));
 
             var user = container.Resolve<ConStrUser>();
             Assert.AreEqual("aaa", user.S.Value);
@@ -363,7 +363,7 @@ namespace DryIoc.UnitTests
             var container = new Container(rules => rules.WithThrowIfRuntimeStateRequired());
 
             var s = new ConnectionString("aaa");
-            container.Register(Made.Of(() => new ConStrUser(Arg.Index<ConnectionString>(0)), r => s));
+            container.Register(Made.Of(() => new ConStrUser(Arg.Index<ConnectionString>(0)), argValues: r => s));
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<ConStrUser>());
             Assert.AreEqual(Error.StateIsRequiredToUseItem, ex.Error);

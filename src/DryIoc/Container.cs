@@ -6868,6 +6868,7 @@ namespace DryIoc
             Of(r => DryIoc.FactoryMethod.Of(getConstructor(r.ImplementationType).ThrowIfNull(Error.GotNullConstructorFromFactoryMethod, r)),
                 parameters, propertiesAndFields);
 
+        // todo: @bug @breaking @NET6 @remove or rename the overload as it's not compiled by .NET 6 compiler because it infers the type of lambda to object
         /// <summary>Defines factory method using expression of constructor call (with properties), or static method call.</summary>
         /// <typeparam name="TService">Type with constructor or static method.</typeparam>
         /// <param name="serviceReturningExpr">Expression tree with call to constructor with properties:
@@ -6913,7 +6914,8 @@ namespace DryIoc
 
         private static TypedMade<TService> FromExpression<TService>(
             Func<MemberInfo, FactoryMethodSelector> getFactoryMethodSelector,
-            System.Linq.Expressions.LambdaExpression serviceReturningExpr, params Func<Request, object>[] argValues)
+            System.Linq.Expressions.LambdaExpression serviceReturningExpr, 
+            params Func<Request, object>[] argValues)
         {
             var callExpr = serviceReturningExpr.ThrowIfNull().Body;
             if (callExpr.NodeType == System.Linq.Expressions.ExpressionType.Convert) // proceed without Cast expression.
