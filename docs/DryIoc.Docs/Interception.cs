@@ -204,7 +204,7 @@ public class Register_and_use_async_interceptor
 
 ## Decorator with LinFu DynamicProxy
 
-Lately, there was a new release of [LinFu.DynamicProxy]() with .NET Standard 2.0 support.
+Lately, there was a new release of [LinFu.DynamicProxy](https://github.com/philiplaureano/LinFu.DynamicProxy) with .NET Standard 2.0 support.
 
 It is interesting to at least have an alternative to Castle.DynamicProxy. Let's try it out :-)
 

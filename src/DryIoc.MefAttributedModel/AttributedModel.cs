@@ -96,25 +96,23 @@ namespace DryIoc.MefAttributedModel
         /// <returns>The container with made registration.</returns>
         public static IContainer WithImportsSatisfiedNotification(this IContainer container)
         {
-            container.Register<object>(
-                made: _importsSatisfiedNotificationFactoryMethod,
-                setup: _importsSatisfiedNotificationDecoratorSetup);
+            var made = Made.Of(typeof(AttributedModel).SingleMethod(nameof(NotifyImportsSatisfied), includeNonPublic: true));
+
+            var decoratorSetup = Setup.DecoratorWith(
+                r => r.GetKnownImplementationOrServiceType().IsAssignableTo<IPartImportsSatisfiedNotification>(), // todo: @perf can we filter it without registering the `object` decorator
+                order: int.MinValue, // Important, sets the decorator as a first one, so it will always being called
+                useDecorateeReuse: true);
+
+            container.Register<object>(made: made, setup: decoratorSetup);
+
             return container;
         }
 
         internal static TService NotifyImportsSatisfied<TService>(TService service)
         {
-            (service as IPartImportsSatisfiedNotification)?.OnImportsSatisfied();
+            ((IPartImportsSatisfiedNotification)service).OnImportsSatisfied();
             return service;
         }
-
-        private static readonly Made _importsSatisfiedNotificationFactoryMethod = Made.Of(
-            typeof(AttributedModel).SingleMethod(nameof(NotifyImportsSatisfied), includeNonPublic: true));
-
-        private static readonly Setup _importsSatisfiedNotificationDecoratorSetup = Setup.DecoratorWith(
-            r => r.GetKnownImplementationOrServiceType().IsAssignableTo<IPartImportsSatisfiedNotification>(),
-            order: int.MinValue, // Important, sets the decorator as a first one, so it will always being called
-            useDecorateeReuse: true);
 
         #endregion
 
@@ -244,31 +242,29 @@ namespace DryIoc.MefAttributedModel
             // map to convert the non-unique keys into an unique ones: ContractName/Key -> { ContractType, count }[]
             container.Use(new ServiceKeyStore());
 
+            var filterCollectionByMultiKey = Made.Of(
+                typeof(AttributedModel).SingleMethod(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
+                parameters: Parameters.Of.Type(r => r.ServiceKey));
+
             // decorator to filter in a presence of multiple same keys
-            // note: it explicitly set to Transient to produce new results for new filtered collection,
+            // note: it is explicitly set to Transient to produce new results for new filtered collection,
             // otherwise it may be set to Singleton by container wide rules and always produce the results for the first resolved collection
-            container.Register(typeof(IEnumerable<>), Reuse.Transient, _filterCollectionByMultiKey, Setup.Decorator);
+            container.Register(typeof(IEnumerable<>), Reuse.Transient, filterCollectionByMultiKey, 
+                Setup.DecoratorWith(condition: r => r.ServiceKey != null));
 
             return container;
         }
 
-        private static readonly Made _filterCollectionByMultiKey = Made.Of(
-            typeof(AttributedModel).SingleMethod(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
-            parameters: Parameters.Of.Type(request => request.ServiceKey));
-
         internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey) => 
-            serviceKey == null
-            ? source.Select(x => x.Value)
-            : source.Where(x =>
-                {
-                    if (x.Key is DefaultKey || x.Key is DefaultDynamicKey)
-                        return false;
-                    if (serviceKey.Equals(x.Key))
-                        return true;
-                    var multiKey = x.Key as KV<object, int>;
-                    return multiKey != null && serviceKey.Equals(multiKey.Key);
-                })
-                .Select(x => x.Value);
+            source.Match(x =>
+            {
+                if (x.Key is DefaultKey || x.Key is DefaultDynamicKey)
+                    return false;
+                if (serviceKey.Equals(x.Key))
+                    return true;
+                var multiKey = x.Key as KV<object, int>;
+                return multiKey != null && serviceKey.Equals(multiKey.Key);
+            }, x => x.Value);
 
         #endregion
 
@@ -328,9 +324,6 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info, 
             Lazy<ServiceKeyStore> serviceKeyStore = null)
         {
-            serviceKeyStore = serviceKeyStore ?? new Lazy<ServiceKeyStore>(() =>
-                ((IResolver)registrator).Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault));
-
             // factory is used for all exports of implementation
             var factory = info.CreateFactory();
 
@@ -343,7 +336,7 @@ namespace DryIoc.MefAttributedModel
                 var serviceKey = export.ServiceKey;
                 if (serviceKey != null)
                 {
-                    var store = serviceKeyStore.Value;
+                    var store = serviceKeyStore?.Value ?? ((IResolver)registrator).Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault);
                     if (store != null)
                         serviceKey = store.EnsureUniqueServiceKey(serviceType, serviceKey);
                 }
@@ -362,6 +355,10 @@ namespace DryIoc.MefAttributedModel
         /// If no exports found, the method returns empty enumerable.</summary>
         public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(Type type) => GetExportedRegistrations(type, false);
 
+        // todo: Review the need for factory service key
+        // - May be export factory AsWrapper to hide from collection resolution
+        // - Use an unique (GUID) service key
+        private static Attribute[] _factoryTypeAttributes = new Attribute[] { new ExportAttribute(Constants.InstanceFactory) };
 
         /// <summary>Creates registration info DTOs for provided type and/or for exported members.
         /// If no exports found, the method returns empty enumerable.</summary>
@@ -393,8 +390,7 @@ namespace DryIoc.MefAttributedModel
                     continue;
 
                 var memberReturnType = member.GetReturnTypeOrDefault();
-                var memberRegistrationInfo = GetRegistrationInfoOrDefault(memberReturnType, memberAttributes)
-                    .ThrowIfNull();
+                var memberRegistrationInfo = GetRegistrationInfoOrDefault(memberReturnType, memberAttributes).ThrowIfNull();
 
                 var factoryMethod = new FactoryMethodInfo
                 {
@@ -407,13 +403,7 @@ namespace DryIoc.MefAttributedModel
                     // if no export for instance factory, then add one
                     if (typeRegistrationInfo == null)
                     {
-                        // todo: Review the need for factory service key
-                        // - May be export factory AsWrapper to hide from collection resolution
-                        // - Use an unique (GUID) service key
-                        var factoryKey = Constants.InstanceFactory;
-
-                        var factoryTypeAttributes = new Attribute[] { new ExportAttribute(factoryKey) };
-                        typeRegistrationInfo = GetRegistrationInfoOrDefault(type, factoryTypeAttributes).ThrowIfNull();
+                        typeRegistrationInfo = GetRegistrationInfoOrDefault(type, _factoryTypeAttributes).ThrowIfNull();
                         yield return typeRegistrationInfo;
                     }
 
@@ -851,9 +841,36 @@ namespace DryIoc.MefAttributedModel
             return info;
         }
 
-        private static bool IsExportDefined(Attribute[] attributes, bool shouldRegisterWithoutExport) => 
-            (shouldRegisterWithoutExport || attributes.Length != 0 && attributes.IndexOf(a => a is ExportAttribute || a is ExportManyAttribute) != -1) &&
-            (attributes.Length == 0 || attributes.IndexOf(a => a is PartNotDiscoverableAttribute) == -1);
+        private static bool IsExportDefined(Attribute[] attributes, bool shouldRegisterWithoutExport)
+        {
+            if (shouldRegisterWithoutExport)
+            {
+                if (attributes.Length == 0)
+                    return true;
+
+                for (var i = 0; i < attributes.Length; ++i)
+                {
+                    var a = attributes[i];
+                    if (a is PartNotDiscoverableAttribute)
+                        return false; // return earlier if part is not discoverable
+                }
+                return true;
+            }
+
+            if (attributes.Length == 0)
+                return false;
+
+            var exported = false;
+            for (var i = 0; i < attributes.Length; ++i)
+            {
+                var a = attributes[i];
+                if (a is PartNotDiscoverableAttribute)
+                    return false; // return earlier if part is not discoverable
+                if (a is ExportAttribute || a is ExportManyAttribute)
+                    exported = true;
+            }
+            return exported;
+        }
 
         private static ExportInfo[] GetExportsFromExportAttribute(ExportAttribute attribute,
             ExportedRegistrationInfo info, Type implementationType)
@@ -1003,23 +1020,23 @@ namespace DryIoc.MefAttributedModel
         /// otherwise (for single or nu types) returns passed key as-is..</returns>
         public object EnsureUniqueServiceKey(Type serviceType, object serviceKey)
         {
-            _store.Swap(x => x.AddOrUpdate(serviceKey, new[]{ KV.Of(serviceType, 1) }, (sk, types, newTypes) =>
-            {
-                var newType = newTypes[0].Key;
-                var typeAndCountIndex = types.IndexOf(t => t.Key == newType);
-                if (typeAndCountIndex != -1)
-                {
-                    var typeAndCount = types[typeAndCountIndex];
+            _store.Swap(x => x.AddOrUpdate(serviceKey, new[] { KV.Of(serviceType, 1) }, (sk, types, newTypes) =>
+                   {
+                       var newType = newTypes[0].Key;
+                       var typeAndCountIndex = types.IndexOf(newType, (n, t) => t.Key == n);
+                       if (typeAndCountIndex != -1)
+                       {
+                           var typeAndCount = types[typeAndCountIndex];
 
-                    // Change the serviceKey only when multiple same types are registered with the same key
-                    serviceKey = KV.Of(serviceKey, typeAndCount.Value);
+                                  // Change the serviceKey only when multiple same types are registered with the same key
+                                  serviceKey = KV.Of(serviceKey, typeAndCount.Value);
 
-                    typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
-                    return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
-                }
+                           typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
+                           return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
+                       }
 
-                return types.Append(newTypes);
-            }));
+                       return types.Append(newTypes);
+                   }));
             return serviceKey;
         }
 
@@ -1319,8 +1336,9 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < Exports.Length; i++)
             {
                 var e = Exports[i];
-                if (e.ServiceKey != null)
-                    e.ServiceKey = keyStore.EnsureUniqueServiceKey(e.ServiceType, e.ServiceKey);
+                var key = e.ServiceKey; 
+                if (key != null)
+                    e.ServiceKey = keyStore.EnsureUniqueServiceKey(e.ServiceType, key);
             }
 
             return this;
@@ -1388,7 +1406,7 @@ namespace DryIoc.MefAttributedModel
                 return ArrayTools.Empty<Attribute>();
 
             IEnumerable<Attribute> metaAttrs = ImplementationType.GetAttributes();
-            if (made != null && made.FactoryMethodKnownResultType != null)
+            if (made?.FactoryMethodKnownResultType != null)
             {
                 var member = (made.FactoryMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)made.FactoryMethodOrSelector)(null))?.ConstructorOrMethodOrMember;
                 if (member != null)
@@ -1490,29 +1508,21 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Metadata key suffix for the C# representation of the custom attribute constructors.</summary>
         public const string ToCodeKeySuffix = ".ToCode()";
-
         private void CollectAttributeConstructorsCode(IDictionary<string, object> metadata)
         {
-            var attributes = CustomAttributeData.GetCustomAttributes(ImplementationType)
-                .Select(item => new
+            var attributes = CustomAttributeData.GetCustomAttributes(ImplementationType);
+            foreach (var a in attributes)
+            {
+                var fullTypeName = a.Constructor.DeclaringType.FullName;
+                if (metadata.ContainsKey(fullTypeName))
                 {
-                    // ReSharper disable PossibleNullReferenceException
-                    // ReSharper disable AssignNullToNotNullAttribute
-                    Key = item.Constructor.DeclaringType.FullName,
-                    Value = string.Format("new {0}({1})",
-                            item.Constructor.DeclaringType.FullName,
-                            string.Join(", ", ArrayTools.Map(item.ConstructorArguments, a => a.ToString()).ToArrayOrSelf())) +
-                            (item.NamedArguments.Any() ?
-                                " { " + string.Join(", ", item.NamedArguments.Map(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArrayOrSelf()) + " }" :
-                                string.Empty)
-                    // ReSharper restore AssignNullToNotNullAttribute
-                    // ReSharper restore PossibleNullReferenceException
-                })
-                .OrderBy(item => item.Key);
-
-            foreach (var attr in attributes)
-                if (metadata.ContainsKey(attr.Key))
-                    metadata[attr.Key + ToCodeKeySuffix] = attr.Value;
+                    var args = string.Join(", ", ArrayTools.Map(a.ConstructorArguments, x => x.ToString()).ToArrayOrSelf());
+                    var ctor = string.Format("new {0}({1})", fullTypeName, args);
+                    if (a.NamedArguments.Any())
+                        ctor += " { " + string.Join(", ", a.NamedArguments.Map(na => na.MemberInfo.Name + " = " + na.TypedValue).ToArrayOrSelf()) + " }";
+                    metadata[fullTypeName + ToCodeKeySuffix] = ctor;
+                }
+            }
         }
 
         private static IDictionary<string, object> CollectExportedMetadata(IEnumerable<Attribute> attributes)

@@ -2022,6 +2022,18 @@ namespace DryIoc.ImTools
                 return c0 && c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
             }
 
+            if (source.Length == 3)
+            {
+                var condition0 = condition(source[0]);
+                var condition1 = condition(source[1]);
+                var condition2 = condition(source[2]);
+                return condition0 && condition1 && condition2 ? source
+                    : condition0 ? (condition1 ? new[] { source[0], source[1] } : condition2 ? new[] { source[0], source[2] } : new[] { source[0] })
+                    : condition1 ? (condition2 ? new[] { source[1], source[2] } : new[] { source[1] })
+                    : condition2 ? new[] { source[2] }
+                    : Empty<T>();
+            }
+
             var matchStart = 0;
             T[] matches = null;
             var matchFound = false;
@@ -2057,6 +2069,18 @@ namespace DryIoc.ImTools
                 var c0 = condition(state, source[0]);
                 var c1 = condition(state, source[1]);
                 return c0 && c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
+            }
+
+            if (source.Length == 3)
+            {
+                var condition0 = condition(state, source[0]);
+                var condition1 = condition(state, source[1]);
+                var condition2 = condition(state, source[2]);
+                return condition0 && condition1 && condition2 ? source
+                    : condition0 ? (condition1 ? new[] { source[0], source[1] } : condition2 ? new[] { source[0], source[2] } : new[] { source[0] })
+                    : condition1 ? (condition2 ? new[] { source[1], source[2] } : new[] { source[1] })
+                    : condition2 ? new[] { source[2] }
+                    : Empty<T>();
             }
 
             var matchStart = 0;
@@ -2139,6 +2163,18 @@ namespace DryIoc.ImTools
                 return c0 && c1 ? new[] { map(source[0]), map(source[1]) } : c0 ? new[] { map(source[0]) } : c1 ? new[] { map(source[1]) } : Empty<R>();
             }
 
+            if (source.Length == 3)
+            {
+                var condition0 = condition(source[0]);
+                var condition1 = condition(source[1]);
+                var condition2 = condition(source[2]);
+                return condition0 && condition1 && condition2 ? new[] { map(source[0]), map(source[1]), map(source[2]) }
+                    : condition0 ? (condition1 ? new[] { map(source[0]), map(source[1]) } : condition2 ? new[] { map(source[0]), map(source[2]) } : new[] { map(source[0]) })
+                    : condition1 ? (condition2 ? new[] { map(source[1]), map(source[2]) } : new[] { map(source[1]) })
+                    : condition2 ? new[] { map(source[2]) }
+                    : Empty<R>();
+            }
+
             var matchStart = 0;
             R[] matches = null;
             var matchFound = false;
@@ -2182,6 +2218,18 @@ namespace DryIoc.ImTools
                 return condition0 && condition1 ? new[] { map(state, source[0]), map(state, source[1]) }
                     : condition0 ? new[] { map(state, source[0]) }
                     : condition1 ? new[] { map(state, source[1]) }
+                    : Empty<R>();
+            }
+
+            if (source.Length == 3)
+            {
+                var condition0 = condition(state, source[0]);
+                var condition1 = condition(state, source[1]);
+                var condition2 = condition(state, source[2]);
+                return condition0 && condition1 && condition2 ? new[] { map(state, source[0]), map(state, source[1]), map(state, source[2]) }
+                    : condition0 ? (condition1 ? new[] { map(state, source[0]), map(state, source[1]) } : condition2 ? new[] { map(state, source[0]), map(state, source[2]) } : new[] { map(state, source[0]) })
+                    : condition1 ? (condition2 ? new[] { map(state, source[1]), map(state, source[2]) } : new[] { map(state, source[1]) })
+                    : condition2 ? new[] { map(state, source[2]) }
                     : Empty<R>();
             }
 
@@ -2299,6 +2347,28 @@ namespace DryIoc.ImTools
             return results;
         }
 
+        /// Map with additional two states to use in <paramref name="map"/> to minimize allocations in <paramref name="map"/> lambda closure 
+        public static R[] Map<T, A, B, R>(this T[] source, A a, B b, Func<A, B, T, R> map)
+        {
+            if (source == null)
+                return null;
+
+            var sourceCount = source.Length;
+            if (sourceCount == 0)
+                return Empty<R>();
+
+            if (sourceCount == 1)
+                return new[] { map(a, b, source[0]) };
+
+            if (sourceCount == 2)
+                return new[] { map(a, b, source[0]), map(a, b, source[1]) };
+
+            var results = new R[sourceCount];
+            for (var i = 0; i < source.Length; i++)
+                results[i] = map(a, b, source[i]);
+            return results;
+        }
+
         /// <summary>Maps all items from source to result collection. If possible uses fast array Map otherwise Enumerable.Select.</summary>
         /// <typeparam name="T">Source item type</typeparam> <typeparam name="R">Result item type</typeparam>
         /// <param name="source">Source items</param> <param name="map">Function to convert item from source to result.</param>
@@ -2375,6 +2445,9 @@ namespace DryIoc.ImTools
         /// ]]</c></example>
         public bool TrySwapIfStillCurrent(T currentValue, T newValue) =>
             Interlocked.CompareExchange(ref _value, newValue, currentValue) == currentValue;
+
+        /// <summary>Just sets </summary>
+        public void UnsafeSet(T newValue) => _value = newValue;
     }
 
     /// <summary>Provides optimistic-concurrency consistent <see cref="Swap{T}"/> operation.</summary>
@@ -2658,6 +2731,57 @@ namespace DryIoc.ImTools
         public T OrDefault(T defaultValue = default) => HasValue ? Value : defaultValue;
     }
 
+    /// <summary>Ever growing list methods</summary>
+    public static class GrowingList
+    {
+        /// <summary>Default initial capacity </summary>
+        public const int DefaultInitialCapacity = 2;
+
+        /// Push the new slot and return the ref to it
+        public static ref T PushSlot<T>(ref T[] items, int count)
+        {
+            if (items == null)
+                items = new T[DefaultInitialCapacity];
+            else if (count >= items.Length)
+                Expand(ref items);
+            return ref items[count];
+        }
+
+        /// Adds the new item possibly extending the item collection
+        public static void Push<T>(ref T[] items, int count, T item)
+        {
+            if (items == null)
+                items = new T[DefaultInitialCapacity];
+            else if (count >= items.Length)
+                Expand(ref items);
+            items[count] = item;
+        }
+
+        /// <summary>Expands the items starting with 2</summary>
+        internal static void Expand<T>(ref T[] items)
+        {
+            var count = items.Length;
+            var newItems = new T[count << 1]; // count x 2
+            if (count < 6)
+                for (var i = 0; i < count; ++i)
+                    newItems[i] = items[i];
+            else
+                Array.Copy(items, 0, newItems, 0, count);
+        }
+
+        ///<summary>Creates the final array out of the list, so that you cannot use after that!</summary>
+        public static T[] ResizeToArray<T>(T[] items, int count)
+        {
+            if (count < items.Length)
+                Array.Resize(ref items, count); 
+            return items;
+        }
+
+        /// <inheritdoc />
+        public static string ToString<T>(T[] items, int count) =>
+            $"Count {count} of {(count == 0 || items == null || items.Length == 0 ? "empty" : "first (" + items[0] + ") and last (" + items[count - 1] + ")")}";
+    }
+
     /// <summary>Ever growing list</summary>
     public struct GrowingList<T>
     {
@@ -2683,39 +2807,58 @@ namespace DryIoc.ImTools
             if (Items == null)
                 Items = new T[DefaultInitialCapacity];
             else if (Count >= Items.Length)
-                Items = Expand(Items);
+                GrowingList.Expand(ref Items);
             return ref Items[Count++];
         }
 
         /// <summary>Adds the new item possibly extending the item collection</summary>
-        public void PushSlot(T item)
+        public void Push(T item)
         {
             if (Items == null)
                 Items = new T[DefaultInitialCapacity];
             else if (Count >= Items.Length)
-                Items = Expand(Items);
+                GrowingList.Expand(ref Items);
             Items[Count++] = item;
         }
 
         /// <summary>Pops the item - just moving the counter back</summary>
         public void Pop() => --Count;
 
+        ///<summary>Creates the final array out of the list, so that you cannot use after that!</summary>
+        public T[] ResizeToArray()
+        {
+            var items = Items;
+            if (Count < items.Length)
+                Array.Resize(ref items, Count); 
+            return items;
+        }
+
         // todo: @naming think of the better name
         /// <summary>Pops the item - just moving the counter back</summary>
         public T PopItem() => Items[--Count];
 
-        /// <summary>Expands the items starting with 2</summary>
-        private static T[] Expand(T[] items)
-        {
-            var count = items.Length;
-            var newItems = new T[count << 1]; // count x 2
-            Array.Copy(items, 0, newItems, 0, count);
-            return newItems;
-        }
-
         /// <inheritdoc />
         public override string ToString() =>
             $"Count {Count} of {(Count == 0 || Items == null || Items.Length == 0 ? "empty" : "first (" + Items[0] + ") and last (" + Items[Count - 1] + ")")}";
+    }
+
+    /// <summary>The structure of arrays (SOA) to hold the keys and values of the map.
+    /// The arrays may have the bigger capacity than the actual item count, so you need to use `Count` to get the valid number of items.</summary>
+    public struct KeysAndValues<K, V>
+    {
+        /// <summary>The keys</summary>
+        public K[] Keys;
+        /// <summary>The values</summary>
+        public V[] Values;
+        /// <summary>The actual item count - the same for keys and values</summary>
+        public int Count;
+        /// <summary>Constructs the structure</summary>
+        public KeysAndValues(K[] keys, V[] values, int count)
+        {
+            Keys   = keys;
+            Values = values;
+            Count  = count;
+        }
     }
 
     /// <summary>Immutable list - simplest linked list with the Head and the Tail.</summary>
@@ -4237,6 +4380,67 @@ namespace DryIoc.ImTools
 
                 return new Branch3(Left, midLeft, middle, midRight, newRight);
             }
+        }
+
+        /// <summary>Split the map into the keys and values in the data-oriented way (SOA - a structure of arrays instead of array of structures), 
+        /// producing the shapeless homogenous arrays of keys and values instead of heterogenous pairs of specific shape which are harder to compose and adapt to the required API.
+        /// The passed `keysAndValues` may already contain the data, the new keys and values will be appended to the same arrays, enabling the concat operation
+        /// using the already pre-allocated space.</summary>
+        public int ToKeysAndValues<S>(S state, Func<ImHashMapEntry<K, V>, S, bool> condition, ref KeysAndValues<K, V> keysAndValues, ImHashMap<K, V>[] parentsStack = null)
+        {
+            var count = keysAndValues.Count;
+            var entry = Entry;
+            if (Height == 1 && entry is ImHashMapConflicts<K, V> == false)
+            {
+                if (condition(entry, state))
+                    Push(entry, ref keysAndValues);
+            }
+            else if (Height != 0)
+            {
+                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
+                var node = this;
+                var parentCount = -1;
+                while (node.Height != 0 || parentCount != -1)
+                {
+                    if (node.Height != 0)
+                    {
+                        parentsStack[++parentCount] = node;
+                        node = node.Left;
+                    }
+                    else
+                    {
+                        node = parentsStack[parentCount--];
+                        entry = node.Entry;
+                        if (!(entry is ImHashMapConflicts<K, V> conflicts))
+                        {
+                            if (condition(entry, state))
+                                Push(entry, ref keysAndValues);
+                        }
+                        else
+                        {
+                            var conflict = conflicts.Conflicts;
+                            for (var i = 0; i < conflict.Length; i++)
+                            {
+                                entry = conflict[i];
+                                if (condition(entry, state))
+                                    Push(entry, ref keysAndValues);
+                            }
+                        }
+
+                        node = node.Right;
+                    }
+                }
+            }
+
+            return keysAndValues.Count - count;
+        }
+
+        private static void Push(ImHashMapEntry<K, V> entry, ref KeysAndValues<K, V> keysAndValues)
+        {
+            var n = keysAndValues.Count;
+            GrowingList.Push(ref keysAndValues.Keys,   n, entry.Key);
+            GrowingList.Push(ref keysAndValues.Values, n, entry.Value);
+            keysAndValues.Count = n + 1; 
         }
     }
 

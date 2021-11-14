@@ -370,7 +370,7 @@ class Injecting_the_value_of_a_primitive_type
     {
         var c = new Container();
 
-        c.Register<Foo>(Made.Of(() => new Foo(Arg.Index<string>(0)), _ => "my string"));
+        c.Register<Foo>(Made.Of(() => new Foo(Arg.Index<string>(0)), argValues: _ => "my string"));
 
         Assert.AreEqual("my string", c.Resolve<Foo>().Name);
     }

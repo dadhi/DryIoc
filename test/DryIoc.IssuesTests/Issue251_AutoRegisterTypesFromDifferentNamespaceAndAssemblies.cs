@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
     public class Issue251_AutoRegisterTypesFromDifferentNamespaceAndAssemblies
     {
         [Test]
-        public void Test()
+        public void Test1()
         {
             var container = new Container()
                 .WithAutoFallbackDynamicRegistrations(GetType().Assembly);
@@ -17,7 +17,6 @@ namespace DryIoc.IssuesTests
         }
 
         public interface IRepository<T> {}
-
         public class Repository<T> : IRepository<T> {}
     }
 }

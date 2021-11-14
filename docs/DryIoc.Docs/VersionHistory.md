@@ -1,6 +1,20 @@
 Version History
 ---------------
 
+## v4.8.4 Bug-fix release / 2021-10-31
+
+- fixed: #434 ReturnDefaultIfNotRegistered is not respected between scopes
+- fixed: #435 hangfire use dryioc report ContainerIsDisposed
+
+## v4.8.3 Bug-fix release / 2021-10-21
+
+- fixed: #418 Resolving interfaces with covariant type parameter fails when using RegisterMapping
+- fixed: #432 Resolving interfaces with contravariant type parameter fails with RegisteringImplementationNotAssignableToServiceType error
+
+## v4.8.2 Improvement release / 2021-10
+
+- fixed: #429 Memory leak on MS DI with Disposable Transient
+
 ## v4.8.1 Bug-fix release / 2021-07-03
 
 - fixed: #412 ResolveMany not work with generics after any Unregister
