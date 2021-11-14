@@ -560,8 +560,9 @@ namespace DryIoc
                 requiredItemType = unwrappedType;
 
             var items = container.GetServiceRegisteredAndDynamicFactories(requiredItemType)
-                .Where(x => x.Value != null) // filter out unregistered services
-                .Select(f => new ServiceRegistrationInfo(f.Value, requiredServiceType, f.Key));
+                .Match(requiredServiceType,
+                    (_, x) => x.Value != null, // filter out unregistered services
+                    (t, f) => new ServiceRegistrationInfo(f.Value, t, f.Key));
 
             ServiceRegistrationInfo[] openGenericItems = null;
             if (requiredItemType.IsClosedGeneric())
@@ -942,12 +943,6 @@ namespace DryIoc
                 : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
                 : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value)).Match(x => x.Value != null); // filter out the Unregistered factories (see #390)
  
-            var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
-            if (Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags))
-                factories = CombineRegisteredWithDynamicFactories(
-                    DynamicRegistrationFlags.Service, withoutFlags,
-                    factories, true, FactoryType.Service, serviceType, serviceKey);
-
             if (Rules.DynamicRegistrationProviders != null &&
                 !serviceType.IsExcludedGeneralPurposeServiceType() &&
                 !((IContainer)this).IsWrapper(serviceType, openGenericServiceType))
@@ -974,7 +969,7 @@ namespace DryIoc
                 return null;
 
             // For multiple matched factories if the single one has a condition, then use it
-            factories = factories.Match(request, (r, x) => r.MatchFactoryConditionAndMetadata(x.Value));
+            factories = factories.Match(request, (r, x) => r.MatchFactoryConditionAndMetadata(x));
 
             // Check the for the reuse matching scopes (for a single the check will be down the road) (BBIssue: #175)
             if (factories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
@@ -1000,8 +995,7 @@ namespace DryIoc
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
             // so there should not be repeating of the check, and not match of Performance decrease.
             if (factories.Length > 1)
-                factories = factories.Match(request, (r, x) => 
-                    x.Value.FactoryGenerator == null || x.Value.FactoryGenerator.GetGeneratedFactory(r, ifErrorReturnDefault: true) != null);
+                factories = factories.Match(request, (r, x) => r.MatchGeneratedFactory(x));
 
             if (factories.Length > 1)
             {
@@ -1112,7 +1106,7 @@ namespace DryIoc
 
             // optimize for the case with the single factory
             if (factories.Length == 1)
-                return request.MatchFactoryConditionAndMetadata(factories[0].Value)
+                return request.MatchFactoryConditionAndMetadata(details, factories[0].Value)
                     ? Rules.FactorySelector(request, factories[0].Value, null)
                     : null;
 
@@ -1126,7 +1120,7 @@ namespace DryIoc
             {
                 // Check for the matching scopes. Only for more than one factory, 
                 // for the single factory the check will be down the road (BBIssue #175)
-                matchedFactories = matchedFactories.Match(request, (r, x) => r.MatchFactoryReuse(x));
+                matchedFactories = matchedFactories.Match(request, (r, x) => r.MatchFactoryReuse(x.Value));
                 // Add asResolutionCall for the factory to prevent caching of in-lined expression in context with not matching condition (BBIssue #382)
                 if (matchedFactories.Length == 1 && !request.IsResolutionCall)
                     matchedFactories[0].Value.SetAsResolutionCall();
@@ -1270,25 +1264,25 @@ namespace DryIoc
             return result;
         }
 
-            private static int _objectTypeHash = RuntimeHelpers.GetHashCode(typeof(object));
+        private static int _objectTypeHash = RuntimeHelpers.GetHashCode(typeof(object));
 
-            KV<object, Factory>[] IContainer.GetServiceRegisteredAndDynamicFactories(Type serviceType)
-            {
-                var serviceFactories = _registry.Value.Services;
-                var entry = serviceFactories.GetValueOrDefault(serviceType);
+        KV<object, Factory>[] IContainer.GetServiceRegisteredAndDynamicFactories(Type serviceType) // todo @perf pass the serviceTypeHash
+        {
+            var registryOrServices = _registry.Value;
+            var r = registryOrServices as Registry;
+            var serviceFactories = r == null ? registryOrServices : r.Services;
+            var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-                var factories = entry == null ? Empty<KV<object, Factory>>()
-                    : entry is Factory f ? new[] { new KV<object, Factory>(DefaultKey.Value, f) }
-                    : entry.To<FactoriesEntry>().Factories
-                        .Visit(new List<KV<object, Factory>>(), (x, l) => l.Add(KV.Of(x.Key, x.Value))).ToArray()
-                        .Match(x => x.Value != null); // filter out the Unregistered factories
+            var factories = entry == null ? Empty<KV<object, Factory>>()
+                : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
+                : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value)).Match(x => x.Value != null); // filter out the Unregistered factories (see #390)
 
-                if (Rules.DynamicRegistrationProviders != null &&
-                    !serviceType.IsExcludedGeneralPurposeServiceType())
-                    return CombineRegisteredServiceWithDynamicFactories(factories, serviceType, null);
+            if (Rules.DynamicRegistrationProviders != null &&
+                !serviceType.IsExcludedGeneralPurposeServiceType())
+                return CombineRegisteredServiceWithDynamicFactories(factories, serviceType, null);
 
-                return factories;
-            }
+            return factories;
+        }
 
         Expression IContainer.GetDecoratorExpressionOrDefault(Request request)
         {
@@ -1296,7 +1290,7 @@ namespace DryIoc
             // return early if no decorators registered
             var r = _registry.Value as Registry;
             if ((r == null || r.Decorators.IsEmpty) &&
-				(container.Rules.DynamicRegistrationProviders == null || 
+                (container.Rules.DynamicRegistrationProviders == null ||
                 !container.Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Decorator))) // todo: @perf reuse its result
                 return null;
 
@@ -1348,7 +1342,7 @@ namespace DryIoc
             // Append generic type argument decorators, registered as Object
             // Note: the condition for type arguments should be checked before generating the closed generic version
             // Note: the dynamic rules for the object is not supported, sorry - too much of performance hog to be called every time
-            var typeArgDecorators = _registry.Value.Decorators.GetValueOrDefault(_objectTypeHash, typeof(object)) as Factory[];
+            var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(_objectTypeHash, typeof(object)) as Factory[];
             if (!typeArgDecorators.IsNullOrEmpty())
                 genericDecorators = Container.MergeSortedByLatestOrderOrRegistration(genericDecorators,
                     typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r)));
@@ -1448,18 +1442,30 @@ namespace DryIoc
             return wrapper as Factory;
         }
 
-            bool IContainer.IsWrapper(Type serviceType, Type openGenericServiceType) // todo: @perf optimize this
-            {
-                var wrappers = _registry.Value.Wrappers;
-                return wrappers.GetValueOrDefault(serviceType) != null // todo: @todo reorder things to get faster results for the open-generic wrappers - for the rest perf won't change 
-                    || openGenericServiceType != null && wrappers.GetValueOrDefault(openGenericServiceType) != null;
-            }
+        bool IContainer.IsWrapper(Type serviceType, Type openGenericServiceType)
+        {
+            var r = _registry.Value as Registry;
+            var wrappers = r != null ? r.Wrappers : WrappersSupport.Wrappers;
+            return wrappers.GetValueOrDefault(serviceType) != null // todo: @todo reorder things to get faster results for the open-generic wrappers - for the rest perf won't change 
+                || openGenericServiceType != null && wrappers.GetValueOrDefault(openGenericServiceType) != null;
+        }
 
-        // todo: @perf pass the serviceTypeHash
         Factory[] IContainer.GetDecoratorFactoriesOrDefault(Type serviceType)
         {
             var decorators = _registry.Value is Registry r
                 ? (Factory[])r.Decorators.GetValueOrDefault(serviceType)
+                : null;
+
+            if (Rules.DynamicRegistrationProviders != null)
+                return CombineRegisteredDecoratorWithDynamicFactories(decorators, serviceType);
+
+            return decorators;
+        }
+
+        Factory[] IContainer.GetDecoratorFactoriesOrDefault(int serviceTypeHash, Type serviceType)
+        {
+            var decorators = _registry.Value is Registry r
+                ? (Factory[])r.Decorators.GetValueOrDefault(serviceTypeHash, serviceType)
                 : null;
 
             if (Rules.DynamicRegistrationProviders != null)
@@ -1576,42 +1582,22 @@ namespace DryIoc
                 new FactoriesEntry(LastDefaultKey, Factories.AddOrUpdate(serviceKey, factory));
         }
 
-        sealed class CombineDynamicFactoriesState
+        Type IContainer.GetWrappedType(Type serviceType)
         {
-            public DefaultDynamicKey _dynamicKey;
-            public KV<object, Factory>[] ResultFactories;
-            public readonly Type ServiceType;
-            public readonly object ServiceKey;
-            public readonly Rules Rules;
-            public readonly FactoryType FactoryType;
-            public CombineDynamicFactoriesState(Rules r, FactoryType ft, Type t, object k)
+            var wrappedType = serviceType.GetArrayElementTypeOrNull();
+            if (wrappedType == null)
             {
-                Rules       = r;
-                FactoryType = ft;
-                ServiceType = t;
-                ServiceKey  = k;
-            }
-
-            public DefaultDynamicKey NextDynamicKey() => 
-                _dynamicKey = _dynamicKey == null ? DefaultDynamicKey.Value : _dynamicKey.Next();
-        }
-
-            Type IContainer.GetWrappedType(Type serviceType)
-            {
-                var wrappedType = serviceType.GetArrayElementTypeOrNull();
-                if (wrappedType == null)
+                var factory = ((IContainer)this).GetWrapperFactoryOrDefault(serviceType);
+                if (factory != null)
                 {
-                    var factory = ((IContainer)this).GetWrapperFactoryOrDefault(serviceType);
-                    if (factory != null)
-                    {
-                        wrappedType = ((Setup.WrapperSetup)factory.Setup).GetWrappedTypeOrNullIfWrapsRequired(serviceType);
-                        if (wrappedType == null)
-                            return null;
-                    }
+                    wrappedType = ((Setup.WrapperSetup)factory.Setup).GetWrappedTypeOrNullIfWrapsRequired(serviceType);
+                    if (wrappedType == null)
+                        return null;
                 }
-
-                return wrappedType == null ? serviceType : ((IContainer)this).GetWrappedType(wrappedType);
             }
+
+            return wrappedType == null ? serviceType : ((IContainer)this).GetWrappedType(wrappedType);
+        }
 
         private static readonly LastFactoryIDWinsComparer _lastFactoryIDWinsComparer = new LastFactoryIDWinsComparer();
         private struct LastFactoryIDWinsComparer : IComparer<KV<object, Factory>>
@@ -1648,166 +1634,167 @@ namespace DryIoc
 #region Implementation
 
         private readonly IResolverContext _parent;
-
-            private KV<object, Factory>[] CombineRegisteredServiceWithDynamicFactories(
-                KV<object, Factory>[] factories, Type serviceType, Type openGenericServiceType, object serviceKey = null)
-            {
-                var withFlags    = DynamicRegistrationFlags.Service;
-                var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
-
-                // Assign unique continuous keys across all of dynamic providers,
-                // to prevent duplicate keys and peeking the wrong factory by collection wrappers
-                // NOTE: Given that dynamic registration always return the same implementation types in the same order
-                // then the dynamic key will be assigned deterministically, so that even if `CombineRegisteredWithDynamicFactories`
-                // is called multiple times during the resolution (like for `ResolveMany`) it is possible to match the required factory by its order.
-                DefaultDynamicKey dynamicKey = null;
-
-                var dynamicFlags = Rules.DynamicRegistrationFlags;
-                for (var i = 0; i < dynamicFlags.Length; ++i)
-                { 
-                    var flag = dynamicFlags[i];
-                    if ((flag & withFlags) != withFlags || (flag & withoutFlags) != 0)
-                        continue;
-
-                    var dynamicRegistrationProvider = Rules.DynamicRegistrationProviders[i];
-                    var dynamicRegistrations = dynamicRegistrationProvider(serviceType, serviceKey).ToArrayOrSelf();
-
-                    restartWithOpenGenericRegistrations:
-                    if (dynamicRegistrations.Length != 0)
-                    {
-                        if (factories.Length == 0)
-                            foreach (var x in dynamicRegistrations)
-                            {
-                                var d = x.Factory;
-                                if (d.FactoryType == FactoryType.Service && d.ValidateAndNormalizeRegistration(serviceType, serviceKey, false, Rules))
-                                    factories = factories.Append(KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey?.Next() ?? DefaultDynamicKey.Value), d));
-                            }
-                        else
-                        {
-                            foreach (var x in dynamicRegistrations)
-                            {
-                                var d = x.Factory;
-                                if (d.FactoryType != FactoryType.Service || !d.ValidateAndNormalizeRegistration(serviceType, serviceKey, false, Rules))
-                                    continue; // skip non-relevant factory types and invalid factories
-
-                                if (x.ServiceKey == null) // for the default dynamic factory
-                                    switch (x.IfAlreadyRegistered)
-                                    {
-                                        case IfAlreadyRegistered.Keep: // accept the default if result factories don't contain it already
-                                        case IfAlreadyRegistered.Throw:
-                                            if (factories.IndexOf(f => f.Key is DefaultKey || f.Key is DefaultDynamicKey) != -1)
-                                                continue; // skip if the factories are already containing the default factory
-                                            break;
-
-                                        case IfAlreadyRegistered.Replace: // remove the default from the result factories
-                                            factories = factories.Match(f => !(f.Key is DefaultKey || f.Key is DefaultDynamicKey));
-                                            break;
-
-                                        case IfAlreadyRegistered.AppendNotKeyed:
-                                            break;
-
-                                        case IfAlreadyRegistered.AppendNewImplementation:
-                                            if (d.CanAccessImplementationType &&
-                                                factories.IndexOf(d.ImplementationType, (it, f) => f.Value.CanAccessImplementationType && f.Value.ImplementationType == it) != -1)
-                                                continue; // skip if the factories contains the factory with the same dynamic implementation type
-                                            break;
-                                    }
-                                else // for the keyed dynamic factory
-                                    switch (x.IfAlreadyRegistered)
-                                    {
-                                        case IfAlreadyRegistered.Replace:
-                                            factories = factories.Match(x.ServiceKey, (k, f) => !f.Key.Equals(k));
-                                            break; // remove from the factories the factory with the same key
-
-                                        default:
-                                            if (factories.IndexOf(x.ServiceKey, (k, f) => f.Key.Equals(k)) != -1)
-                                                continue; // keep the dynamic factory with the new service key, otherwise skip it
-                                            break;
-                                    }
-
-                                factories = factories.Append(KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey?.Next() ?? DefaultDynamicKey.Value), d));
-                            }
-                        }
-                    }
-
-                    if (openGenericServiceType != null) // todo: @bug check if we need todo that for  AsFallback
-                    {
-                        dynamicRegistrations = dynamicRegistrationProvider(openGenericServiceType, serviceKey).ToArrayOrSelf();
-                        openGenericServiceType = null; // prevent the infinite loop
-                        goto restartWithOpenGenericRegistrations;
-                    }
-                }
-                return factories;
-            }
-
-            private Factory[] CombineRegisteredDecoratorWithDynamicFactories(Factory[] factories, Type serviceType)
-            {
-                var withFlags = DynamicRegistrationFlags.Decorator;
-                if (serviceType == typeof(object))
-                    withFlags |= DynamicRegistrationFlags.DecoratorOfAnyTypeViaObjectServiceType;
-
-                var withoutFlags = factories != null ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
-
-                var dynamicFlags = Rules.DynamicRegistrationFlags;
-                for (var i = 0; i < dynamicFlags.Length; ++i)
-                { 
-                    var flag = dynamicFlags[i];
-                    if ((flag & withFlags) != withFlags || (flag & withoutFlags) != 0)
-                        continue;
-
-                    var dynamicRegistrationProvider = Rules.DynamicRegistrationProviders[i];
-                    var dynamicRegistrations = dynamicRegistrationProvider(serviceType, null).ToArrayOrSelf();
-                    if (dynamicRegistrations.IsNullOrEmpty())
-                        continue;
-
-                    if (factories.IsNullOrEmpty())
-                    {
-                        foreach (var x in dynamicRegistrations)
-                        {
-                            var d = x.Factory;
-                            if (d.FactoryType == FactoryType.Decorator && d.ValidateAndNormalizeRegistration(serviceType, null, false, Rules))
-                                factories = factories.Append(d);
-                        }
-                        continue;
-                    }
-
-                    foreach (var x in dynamicRegistrations)
-                    {
-                        var d = x.Factory;
-                        if (d.FactoryType != FactoryType.Decorator || !d.ValidateAndNormalizeRegistration(serviceType, null, false, Rules))
-                            continue; // skip non-relevant factory types and invalid factories
-
-                        switch (x.IfAlreadyRegistered)
-                        {
-                            case IfAlreadyRegistered.Keep:
-                            case IfAlreadyRegistered.Throw:
-                                continue;
-
-                            case IfAlreadyRegistered.Replace:
-                                factories = Empty<Factory>(); // remove the default from the result factories
-                                break;
-
-                            case IfAlreadyRegistered.AppendNotKeyed:
-                                break;
-
-                            case IfAlreadyRegistered.AppendNewImplementation:
-                                if (d.CanAccessImplementationType &&
-                                    factories.IndexOf(d.ImplementationType, (it, f) => f.CanAccessImplementationType && f.ImplementationType == it) != -1)
-                                    continue; // skip if the factories contains the factory with the same dynamic implementation type
-                                break;
-                        }
-                        factories = factories.Append(d);
-                    }
-                }
-
-                return factories;
-            }
         internal readonly Ref<ImHashMap<Type, object>> _registry; // either map of Services or the Registry class
         private readonly IScope           _singletonScope;
         private readonly IScope           _ownCurrentScope;
         private readonly IScopeContext    _scopeContext; // todo: @perf split into separate class
         private StackTrace                _disposeStackTrace;
         private int                       _disposed;
+
+        // todo: @perf split into with and without the serviceKey
+        private KV<object, Factory>[] CombineRegisteredServiceWithDynamicFactories(
+            KV<object, Factory>[] factories, Type serviceType, Type openGenericServiceType, object serviceKey = null)
+        {
+            var withFlags    = DynamicRegistrationFlags.Service;
+            var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
+
+            // Assign unique continuous keys across all of dynamic providers,
+            // to prevent duplicate keys and peeking the wrong factory by collection wrappers
+            // NOTE: Given that dynamic registration always return the same implementation types in the same order
+            // then the dynamic key will be assigned deterministically, so that even if `CombineRegisteredWithDynamicFactories`
+            // is called multiple times during the resolution (like for `ResolveMany`) it is possible to match the required factory by its order.
+            DefaultDynamicKey dynamicKey = null;
+
+            var dynamicFlags = Rules.DynamicRegistrationFlags;
+            for (var i = 0; i < dynamicFlags.Length; ++i)
+            { 
+                var flag = dynamicFlags[i];
+                if ((flag & withFlags) != withFlags || (flag & withoutFlags) != 0)
+                    continue;
+
+                var dynamicRegistrationProvider = Rules.DynamicRegistrationProviders[i];
+                var dynamicRegistrations = dynamicRegistrationProvider(serviceType, serviceKey).ToArrayOrSelf();
+
+                restartWithOpenGenericRegistrations:
+                if (dynamicRegistrations.Length != 0)
+                {
+                    if (factories.Length == 0)
+                        foreach (var x in dynamicRegistrations)
+                        {
+                            var d = x.Factory;
+                            if (d.FactoryType == FactoryType.Service && d.ValidateAndNormalizeRegistration(serviceType, serviceKey, false, Rules, true))
+                                factories = factories.Append(KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey?.Next() ?? DefaultDynamicKey.Value), d));
+                        }
+                    else
+                    {
+                        foreach (var x in dynamicRegistrations)
+                        {
+                            var d = x.Factory;
+                            if (d.FactoryType != FactoryType.Service || !d.ValidateAndNormalizeRegistration(serviceType, serviceKey, false, Rules, true))
+                                continue; // skip non-relevant factory types and invalid factories
+
+                            if (x.ServiceKey == null) // for the default dynamic factory
+                                switch (x.IfAlreadyRegistered)
+                                {
+                                    case IfAlreadyRegistered.Keep: // accept the default if result factories don't contain it already
+                                    case IfAlreadyRegistered.Throw:
+                                        if (factories.IndexOf(f => f.Key is DefaultKey || f.Key is DefaultDynamicKey) != -1)
+                                            continue; // skip if the factories are already containing the default factory
+                                        break;
+
+                                    case IfAlreadyRegistered.Replace: // remove the default from the result factories
+                                        factories = factories.Match(f => !(f.Key is DefaultKey || f.Key is DefaultDynamicKey));
+                                        break;
+
+                                    case IfAlreadyRegistered.AppendNotKeyed:
+                                        break;
+
+                                    case IfAlreadyRegistered.AppendNewImplementation:
+                                        if (d.CanAccessImplementationType &&
+                                            factories.IndexOf(d.ImplementationType, (it, f) => f.Value.CanAccessImplementationType && f.Value.ImplementationType == it) != -1)
+                                            continue; // skip if the factories contains the factory with the same dynamic implementation type
+                                        break;
+                                }
+                            else // for the keyed dynamic factory
+                                switch (x.IfAlreadyRegistered)
+                                {
+                                    case IfAlreadyRegistered.Replace:
+                                        factories = factories.Match(x.ServiceKey, (k, f) => !f.Key.Equals(k));
+                                        break; // remove from the factories the factory with the same key
+
+                                    default:
+                                        if (factories.IndexOf(x.ServiceKey, (k, f) => f.Key.Equals(k)) != -1)
+                                            continue; // keep the dynamic factory with the new service key, otherwise skip it
+                                        break;
+                                }
+
+                            factories = factories.Append(KV.Of(x.ServiceKey ?? (dynamicKey = dynamicKey?.Next() ?? DefaultDynamicKey.Value), d));
+                        }
+                    }
+                }
+
+                if (openGenericServiceType != null) // todo: @bug check if we need todo that for  AsFallback
+                {
+                    dynamicRegistrations = dynamicRegistrationProvider(openGenericServiceType, serviceKey).ToArrayOrSelf();
+                    openGenericServiceType = null; // prevent the infinite loop
+                    goto restartWithOpenGenericRegistrations;
+                }
+            }
+            return factories;
+        }
+
+        private Factory[] CombineRegisteredDecoratorWithDynamicFactories(Factory[] factories, Type serviceType)
+        {
+            var withFlags = DynamicRegistrationFlags.Decorator;
+            if (serviceType == typeof(object))
+                withFlags |= DynamicRegistrationFlags.DecoratorOfAnyTypeViaObjectServiceType;
+
+            var withoutFlags = factories != null ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
+
+            var dynamicFlags = Rules.DynamicRegistrationFlags;
+            for (var i = 0; i < dynamicFlags.Length; ++i)
+            { 
+                var flag = dynamicFlags[i];
+                if ((flag & withFlags) != withFlags || (flag & withoutFlags) != 0)
+                    continue;
+
+                var dynamicRegistrationProvider = Rules.DynamicRegistrationProviders[i];
+                var dynamicRegistrations = dynamicRegistrationProvider(serviceType, null).ToArrayOrSelf();
+                if (dynamicRegistrations.IsNullOrEmpty())
+                    continue;
+
+                if (factories.IsNullOrEmpty())
+                {
+                    foreach (var x in dynamicRegistrations)
+                    {
+                        var d = x.Factory;
+                        if (d.FactoryType == FactoryType.Decorator && d.ValidateAndNormalizeRegistration(serviceType, null, false, Rules, true))
+                            factories = factories.Append(d);
+                    }
+                    continue;
+                }
+
+                foreach (var x in dynamicRegistrations)
+                {
+                    var d = x.Factory;
+                    if (d.FactoryType != FactoryType.Decorator || !d.ValidateAndNormalizeRegistration(serviceType, null, false, Rules, true))
+                        continue; // skip non-relevant factory types and invalid factories
+
+                    switch (x.IfAlreadyRegistered)
+                    {
+                        case IfAlreadyRegistered.Keep:
+                        case IfAlreadyRegistered.Throw:
+                            continue;
+
+                        case IfAlreadyRegistered.Replace:
+                            factories = Empty<Factory>(); // remove the default from the result factories
+                            break;
+
+                        case IfAlreadyRegistered.AppendNotKeyed:
+                            break;
+
+                        case IfAlreadyRegistered.AppendNewImplementation:
+                            if (d.CanAccessImplementationType &&
+                                factories.IndexOf(d.ImplementationType, (it, f) => f.CanAccessImplementationType && f.ImplementationType == it) != -1)
+                                continue; // skip if the factories contains the factory with the same dynamic implementation type
+                            break;
+                    }
+                    factories = factories.Append(d);
+                }
+            }
+
+            return factories;
+        }
 
         internal void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
         {
@@ -4997,7 +4984,7 @@ namespace DryIoc
             var requiredServiceType = container.GetWrappedType(serviceType, details.RequiredServiceType);
 
             // todo: @perf if resolving the Meta inside the IEnumerable which is the usual case then we call GetAllServiceFactories all over again for each item in the enumerable
-            var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true) // todo: @perf use the GetServiceRegisteredAndDynamicFactories
+            var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true); // todo: @perf use the GetServiceRegisteredAndDynamicFactories
             if (factories.Length == 0)
                 return null;
 
@@ -7050,7 +7037,7 @@ namespace DryIoc
             if (type == typeof(ICloneable))
                 return true;
 #endif
-            if (type.IsGeneric())
+            if (type.IsGenericType)
             {
                 var genType = type.GetGenericTypeDefinition();
                 if (genType == typeof(IEquatable<>))
@@ -8205,12 +8192,12 @@ namespace DryIoc
 
         /// <summary>Enables propagation/inheritance of info between dependency and its owner:
         /// for instance <see cref="ServiceDetails.RequiredServiceType"/> for wrappers.</summary>
-        public static IServiceInfo InheritInfoFromDependencyOwner(this Type serviceType,
-            IServiceInfo owner, IContainer container, FactoryType ownerFactoryType = FactoryType.Service)
+        public static ServiceInfo InheritInfoFromDependencyOwner(this Type serviceType,
+            ServiceInfo owner, IContainer container, FactoryType ownerFactoryType = FactoryType.Service)
         {
             var ownerDetails = owner.Details;
             if (ownerDetails == null || ownerDetails == ServiceDetails.Default)
-                return ServiceInfo.OfServiceType(serviceType);
+                return ServiceInfo.Of(serviceType);
 
             var ifUnresolved = IfUnresolved.Throw;
             var ownerIfUnresolved = ownerDetails.IfUnresolved;
@@ -8239,7 +8226,7 @@ namespace DryIoc
                 return ServiceInfo.OfServiceAndRequiredType(serviceType, ownerRequiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata);
 
             if (serviceKey == null && metadataKey == null && metadata == null && ifUnresolved == IfUnresolved.Throw)
-                return ServiceInfo.OfServiceType(serviceType);
+                return ServiceInfo.Of(serviceType);
 
             return ServiceInfo.Of(serviceType, null, ifUnresolved, serviceKey, metadataKey, metadata);
         }
@@ -8266,15 +8253,12 @@ namespace DryIoc
     /// property and field dependencies.</summary>
     public abstract class ServiceInfo
     {
-
         /// <summary>Creates info out of provided settings</summary>
         public static ServiceInfo OfServiceAndRequiredType(Type serviceType, Type requiredServiceType,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null,
             string metadataKey = null, object metadata = null) =>
             new WithDetails(serviceType, new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata, null, false));
 
-        /// <summary>Creates from the service type</summary>
-        public static ServiceInfo OfServiceType(Type serviceType) => new ServiceInfo(serviceType);
         /// <summary>Type of service to create. Indicates registered service in registry.</summary>
         public abstract Type ServiceType { get; }
 
@@ -8886,7 +8870,6 @@ namespace DryIoc
             }
 
             var flags = Flags & InheritedFlags | additionalFlags;
-
             var depDepth = DependencyDepth;
             ref var req = ref GetOrPushPooledRequest(RequestStack, depDepth);
             if (req == null)
@@ -8899,31 +8882,25 @@ namespace DryIoc
         /// <summary>Creates new request with provided info, and links current request as a parent.
         /// Allows to set some additional flags. Existing/parent request should be resolved to 
         /// factory via `WithResolvedFactory` before pushing info into it.</summary>
-        public Request PushServiceType(Type serviceType, RequestFlags additionalFlags = DefaultFlags)
+        public Request PushServiceType(Type serviceType, RequestFlags additionalFlags = default)
         {
-            var serviceInfo = serviceType.InheritInfoFromDependencyOwner(_serviceInfo, Container, FactoryType);
-
-            var stack = RequestStack;
-            var indexInStack = IndexInStack + 1;
-            if (stack == null)
+            object info;
+            if (_serviceInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default) 
             {
-                // traverse all the requests up including the resolution root and set the new stack to them
-                stack = RequestStack.Get(indexInStack);
-                Request parent = null;
-                do
-                {
-                    parent = parent == null ? this : parent.DirectParent;
-                    parent.RequestStack = stack;
-                }
-                while ((parent.Flags & RequestFlags.IsResolutionCall) == 0 && !parent.DirectParent.IsEmpty);
+                info = serviceType.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
+                if (info is ServiceInfo i)
+                    serviceType = i.GetActualServiceType();
             }
+            else
+                info = ServiceInfo.Of(serviceType);
 
             var flags = Flags & InheritedFlags | additionalFlags;
-            ref var req = ref stack.GetOrPushRef(indexInStack);
+            var depDepth = DependencyDepth;
+            ref var req = ref GetOrPushPooledRequest(RequestStack, depDepth);
             if (req == null)
-                req  = new Request(Container, this, DependencyDepth + 1, 0, RequestStack, flags, serviceInfo, InputArgExprs);
+                req  = new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, serviceType, InputArgExprs);
             else
-                req.SetServiceInfo(Container, this, DependencyDepth + 1, 0, RequestStack, flags, serviceInfo, InputArgExprs);
+                req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, serviceType, InputArgExprs);
             return req;
         }
 
@@ -10715,7 +10692,7 @@ namespace DryIoc
                     made = Made.Of(closedFactoryMethod, made.Parameters, made.PropertiesAndFields);
                 }
 
-                var details = request._serviceInfo.Details;
+                var details = request.GetServiceDetails();
                 if (implType != null)
                 {
                     implType = implType.IsGenericParameter
@@ -11139,7 +11116,7 @@ namespace DryIoc
                 {
                     if (!serviceType.IsGenericTypeDefinition)
                     {
-                        if if (!serviceTypeInfo.IsAssignableFrom(implTypeInfo))
+                        if (!serviceType.IsAssignableFrom(implType))
                             return Throw.When(throwIfInvalid, Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
                     }
                     else if (implType.GetImplementedTypes().IndexOf(serviceType, (st, t) => t == st || t.GetGenericDefinitionOrNull() == st) == -1)
@@ -12746,7 +12723,7 @@ namespace DryIoc
 
         /// <summary>Shortcut to service info.</summary>
         public ServiceInfo ToServiceInfo() => OptionalServiceKey == null 
-            ? ServiceInfo.OfServiceType(ServiceType) : ServiceInfo.Of(ServiceType, serviceKey: OptionalServiceKey);
+            ? ServiceInfo.Of(ServiceType) : ServiceInfo.Of(ServiceType, serviceKey: OptionalServiceKey);
 
         /// <summary>Overrides the service type and pushes the original service type to required service type</summary>
         public ServiceInfo ToServiceInfo(Type serviceType) =>
@@ -12895,8 +12872,14 @@ namespace DryIoc
         /// <param name="serviceType">Service type to look for.</param> <returns>Found wrapper factory or null.</returns>
         Factory GetWrapperFactoryOrDefault(Type serviceType);
 
-        /// <summary>Returns all decorators registered for the service type.</summary> <returns>Decorator factories.</returns>
+        /// <summary>Faster lookups for the type and its generic type definition in the registered Wrappers.</summary>
+        bool IsWrapper(Type serviceType, Type openGenericServiceType = null);
+
+        /// <summary>Returns all decorators registered for the service type.</summary>
         Factory[] GetDecoratorFactoriesOrDefault(Type serviceType);
+
+        /// <summary>Returns all decorators registered for the service type.</summary>
+        Factory[] GetDecoratorFactoriesOrDefault(int serviceTypeHash, Type serviceType);
 
         /// <summary>Creates decorator expression: it could be either Func{TService,TService},
         /// or service expression for replacing decorators.</summary>

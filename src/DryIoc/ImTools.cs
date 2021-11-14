@@ -106,7 +106,7 @@ namespace DryIoc.ImTools
     }
 
     /// <summary>Just a helper state with the number of mutable fields with the nice names ;) Maybe used together with Fold or other methods required state</summary>
-    public sealed class St<A> 
+    public sealed class St<A>
     {
         /// <summary>A</summary>
         public A a;
@@ -117,7 +117,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Puts the pooled instance back replacing the old one</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public void Reset() 
+        public void Reset()
         {
             a = default;
             Pooled = this; // we don't need to do the atomic update here because we don't care what instance is ended up to be pooled
@@ -125,7 +125,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Puts the pooled instance back replacing the old one</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public A ResetButGetA() 
+        public A ResetButGetA()
         {
             var a1 = a;
             a = default;
@@ -134,10 +134,10 @@ namespace DryIoc.ImTools
         }
 
         internal static St<A> Pooled;
-    } 
+    }
 
     /// <summary>Just a helper state with the number of mutable fields with the nice names ;) Maybe used together with Fold or other methods required state</summary>
-    public sealed class St<A, B> 
+    public sealed class St<A, B>
     {
         /// <summary>A</summary>
         public A a;
@@ -150,7 +150,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Puts the pooled instance back replacing the old one</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public void Reset() 
+        public void Reset()
         {
             a = default;
             b = default;
@@ -159,7 +159,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Puts the pooled instance back replacing the old one</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public A ResetButGetA() 
+        public A ResetButGetA()
         {
             var a1 = a;
             a = default;
@@ -170,7 +170,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Puts the pooled instance back replacing the old one</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public B ResetButGetB() 
+        public B ResetButGetB()
         {
             var b1 = b;
             a = default;
@@ -180,10 +180,10 @@ namespace DryIoc.ImTools
         }
 
         internal static St<A, B> Pooled;
-    } 
+    }
 
     /// <summary>State factory and helper methods</summary>
-    public static class St 
+    public static class St
     {
         /// <summary>Creates the state out of the passed arguments</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -191,12 +191,12 @@ namespace DryIoc.ImTools
 
         /// <summary>Atomically pops the pooled instance (if exist) or creates the new one and sets the fields to the passed arguments</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static St<A> Rent<A>(A a) 
+        public static St<A> Rent<A>(A a)
         {
             var st = Interlocked.Exchange(ref St<A>.Pooled, null) ?? new St<A>();
             st.a = a;
             return st;
-        } 
+        }
 
         /// <summary>Creates the state out of the passed arguments</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -204,12 +204,12 @@ namespace DryIoc.ImTools
 
         /// <summary>Atomically pops the pooled instance (if exist) or creates the new one and sets the fields to the passed arguments</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static St<A, B> Rent<A, B>(A a, B b) 
+        public static St<A, B> Rent<A, B>(A a, B b)
         {
             var st = Interlocked.Exchange(ref St<A, B>.Pooled, null) ?? new St<A, B>();
             st.a = a; st.b = b;
             return st;
-        } 
+        }
     }
 
     /// <summary>Replacement for `Void` type which can be used as a type argument and value.
@@ -1171,7 +1171,7 @@ namespace DryIoc.ImTools
         public interface union
         {
             Tag Tag { get; }
-            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
+            R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9);
         }
 
@@ -1192,7 +1192,7 @@ namespace DryIoc.ImTools
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case1; }
 
             [MethodImpl((MethodImplOptions)256)]
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map1(Case);
 
             public T1 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1211,7 +1211,7 @@ namespace DryIoc.ImTools
             public static implicit operator case2(T2 x) => new case2(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case2; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map2(Case);
 
             public T2 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1230,7 +1230,7 @@ namespace DryIoc.ImTools
             public static implicit operator case3(T3 x) => new case3(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case3; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map3(Case);
 
             public T3 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1249,7 +1249,7 @@ namespace DryIoc.ImTools
             public static implicit operator case4(T4 x) => new case4(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case4; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map4(Case);
 
             public T4 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1268,7 +1268,7 @@ namespace DryIoc.ImTools
             public static implicit operator case5(T5 x) => new case5(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case5; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map5(Case);
 
             public T5 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1287,7 +1287,7 @@ namespace DryIoc.ImTools
             public static implicit operator case6(T6 x) => new case6(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case6; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map6(Case);
 
             public T6 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1306,7 +1306,7 @@ namespace DryIoc.ImTools
             public static implicit operator case7(T7 x) => new case7(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case7; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map7(Case);
 
             public T7 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1325,7 +1325,7 @@ namespace DryIoc.ImTools
             public static implicit operator case8(T8 x) => new case8(x);
 
             public Tag Tag { [MethodImpl((MethodImplOptions)256)] get => Tag.Case8; }
-            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5, 
+            public R Match<R>(Func<T1, R> map1, Func<T2, R> map2, Func<T3, R> map3, Func<T4, R> map4, Func<T5, R> map5,
                 Func<T6, R> map6, Func<T7, R> map7, Func<T8, R> map8, Func<T9, R> map9) => map8(Case);
 
             public T8 Value { [MethodImpl((MethodImplOptions)256)] get => Case; }
@@ -1643,7 +1643,7 @@ namespace DryIoc.ImTools
             if (source == null || source.Length == 0)
                 return added;
             var sourceCount = source.Length;
-            var addedCount  = added.Length;
+            var addedCount = added.Length;
             var result = new T[sourceCount + addedCount];
             if (sourceCount < 6)
                 for (var i = 0; i < sourceCount; ++i)
@@ -1700,7 +1700,7 @@ namespace DryIoc.ImTools
         public static T[] AppendNonEmpty<T>(this T[] source, params T[] added)
         {
             var sourceCount = source.Length;
-            var addedCount  = added.Length;
+            var addedCount = added.Length;
             var result = new T[sourceCount + addedCount];
             if (sourceCount < 6)
                 for (var i = 0; i < sourceCount; ++i)
@@ -2415,17 +2415,17 @@ namespace DryIoc.ImTools
 
         /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
         /// May prevent closure creation for the delegate</summary>
-        public T Swap<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) => 
+        public T Swap<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
              Ref.Swap(ref _value, a, getNewValue, retryCountUntilThrow);
 
         /// <summary>Swap with the additional state <paramref name="a"/>, <paramref name="b"/> required for the delegate <paramref name="getNewValue"/>.
         /// May prevent closure creation for the delegate</summary>
-        public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) => 
+        public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
              Ref.Swap(ref _value, a, b, getNewValue, retryCountUntilThrow);
 
         /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
         /// May prevent closure creation for the delegate</summary>
-        public T SwapAndGetNewValue<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) => 
+        public T SwapAndGetNewValue<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
              Ref.SwapAndGetNewValue(ref _value, a, getNewValue, retryCountUntilThrow);
 
         /// <summary>Just sets new value ignoring any intermingled changes and returns the original value</summary>
@@ -2502,8 +2502,8 @@ namespace DryIoc.ImTools
         /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
         /// May prevent closure creation for the delegate</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue, 
-            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW) 
+        public static T Swap<T, A>(ref T value, A a, Func<T, A, T> getNewValue,
+            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
             where T : class
         {
             var spinWait = new SpinWait();
@@ -2599,7 +2599,7 @@ namespace DryIoc.ImTools
     public static class Hasher
     {
         /// <summary>Combines hashes of two fields</summary>
-        public static int Combine<T1, T2>(T1 a, T2 b) 
+        public static int Combine<T1, T2>(T1 a, T2 b)
         {
             var bh = b?.GetHashCode() ?? 0;
             if (ReferenceEquals(a, null))
@@ -2773,7 +2773,7 @@ namespace DryIoc.ImTools
         public static T[] ResizeToArray<T>(T[] items, int count)
         {
             if (count < items.Length)
-                Array.Resize(ref items, count); 
+                Array.Resize(ref items, count);
             return items;
         }
 
@@ -2829,7 +2829,7 @@ namespace DryIoc.ImTools
         {
             var items = Items;
             if (Count < items.Length)
-                Array.Resize(ref items, Count); 
+                Array.Resize(ref items, Count);
             return items;
         }
 
@@ -2840,25 +2840,6 @@ namespace DryIoc.ImTools
         /// <inheritdoc />
         public override string ToString() =>
             $"Count {Count} of {(Count == 0 || Items == null || Items.Length == 0 ? "empty" : "first (" + Items[0] + ") and last (" + Items[Count - 1] + ")")}";
-    }
-
-    /// <summary>The structure of arrays (SOA) to hold the keys and values of the map.
-    /// The arrays may have the bigger capacity than the actual item count, so you need to use `Count` to get the valid number of items.</summary>
-    public struct KeysAndValues<K, V>
-    {
-        /// <summary>The keys</summary>
-        public K[] Keys;
-        /// <summary>The values</summary>
-        public V[] Values;
-        /// <summary>The actual item count - the same for keys and values</summary>
-        public int Count;
-        /// <summary>Constructs the structure</summary>
-        public KeysAndValues(K[] keys, V[] values, int count)
-        {
-            Keys   = keys;
-            Values = values;
-            Count  = count;
-        }
     }
 
     /// <summary>Immutable list - simplest linked list with the Head and the Tail.</summary>
@@ -3220,9 +3201,9 @@ namespace DryIoc.ImTools
         /// <summary>Constructs the entry with the key and value</summary>
         public ImHashMapEntry(int hash, K key) : base(hash) => Key = key;
         /// <summary>Constructs the entry with the key and value</summary>
-        public ImHashMapEntry(int hash, K key, V value) : base(hash) 
+        public ImHashMapEntry(int hash, K key, V value) : base(hash)
         {
-            Key   = key;
+            Key = key;
             Value = value;
         }
 
@@ -3383,7 +3364,7 @@ namespace DryIoc.ImTools
                 hash > Hash ? new Leaf2(this, entry) : hash < Hash ? new Leaf2(entry, this) : (ImHashMap<K, V>)this;
 
             /// <inheritdoc />
-            public sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) => 
+            public sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
                 this == oldEntry ? newEntry : oldEntry;
 
             internal sealed override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
@@ -3409,7 +3390,7 @@ namespace DryIoc.ImTools
             internal override Entry GetMinHashEntryOrDefault() => Entry0;
             internal override Entry GetMaxHashEntryOrDefault() => Entry1;
 
-            internal override Entry GetEntryOrNull(int hash) => 
+            internal override Entry GetEntryOrNull(int hash) =>
                 Entry0.Hash == hash ? Entry0 : Entry1.Hash == hash ? Entry1 : null;
 
             public override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry) =>
@@ -3430,7 +3411,7 @@ namespace DryIoc.ImTools
             public Leaf2Plus1(Entry plus, Leaf2 leaf)
             {
                 Plus = plus;
-                L    = leaf;
+                L = leaf;
             }
 
             public override int Count() => Plus.Count() + L.Entry0.Count() + L.Entry1.Count();
@@ -3444,7 +3425,7 @@ namespace DryIoc.ImTools
 
             internal override Entry GetEntryOrNull(int hash)
             {
-                if (hash == Plus.Hash) 
+                if (hash == Plus.Hash)
                     return Plus;
                 Entry e0 = L.Entry0, e1 = L.Entry1;
                 return e0.Hash == hash ? e0 : e1.Hash == hash ? e1 : null;
@@ -3452,20 +3433,20 @@ namespace DryIoc.ImTools
 
             public sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
             {
-                if (hash == Plus.Hash) 
+                if (hash == Plus.Hash)
                     return Plus;
                 Entry e0 = L.Entry0, e1 = L.Entry1;
                 return hash == e0.Hash ? e0 : hash == e1.Hash ? e1 : (ImHashMap<K, V>)new Leaf2Plus1Plus1(entry, this);
             }
 
             public sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
-                oldEntry == Plus     ? new Leaf2Plus1(newEntry, L) :
+                oldEntry == Plus ? new Leaf2Plus1(newEntry, L) :
                 oldEntry == L.Entry0 ? new Leaf2Plus1(Plus, new Leaf2(newEntry, L.Entry1)) :
                                        new Leaf2Plus1(Plus, new Leaf2(L.Entry0, newEntry));
 
             internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
                 removedEntry == Plus ? L :
-                removedEntry == L.Entry0 ? 
+                removedEntry == L.Entry0 ?
                     (Plus.Hash < L.Entry1.Hash ? new Leaf2(Plus, L.Entry1) : new Leaf2(L.Entry1, Plus)) :
                     (Plus.Hash < L.Entry0.Hash ? new Leaf2(Plus, L.Entry0) : new Leaf2(L.Entry0, Plus));
         }
@@ -3488,12 +3469,12 @@ namespace DryIoc.ImTools
             public override string ToString() => "{L211:{P:" + Plus + ", L:" + L + "}}";
 #endif
 
-            internal sealed override Entry GetMinHashEntryOrDefault() 
+            internal sealed override Entry GetMinHashEntryOrDefault()
             {
                 var m = L.GetMinHashEntryOrDefault();
                 return Plus.Hash < m.Hash ? Plus : m;
             }
-            internal sealed override Entry GetMaxHashEntryOrDefault() 
+            internal sealed override Entry GetMaxHashEntryOrDefault()
             {
                 var m = L.GetMaxHashEntryOrDefault();
                 return Plus.Hash > m.Hash ? Plus : m;
@@ -3501,9 +3482,9 @@ namespace DryIoc.ImTools
 
             internal override Entry GetEntryOrNull(int hash)
             {
-                if (hash == Plus.Hash) 
+                if (hash == Plus.Hash)
                     return Plus;
-                if (hash == L.Plus.Hash) 
+                if (hash == L.Plus.Hash)
                     return L.Plus;
                 Entry e0 = L.L.Entry0, e1 = L.L.Entry1;
                 return e0.Hash == hash ? e0 : e1.Hash == hash ? e1 : null;
@@ -3567,15 +3548,15 @@ namespace DryIoc.ImTools
             }
 
             public sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
-                oldEntry == Plus       ? new Leaf2Plus1Plus1(newEntry, L) :
-                oldEntry == L.Plus     ? new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(newEntry, L.L)) :
+                oldEntry == Plus ? new Leaf2Plus1Plus1(newEntry, L) :
+                oldEntry == L.Plus ? new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(newEntry, L.L)) :
                 oldEntry == L.L.Entry0 ? new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(L.Plus, new Leaf2(newEntry, L.L.Entry1))) :
                                          new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(L.Plus, new Leaf2(L.L.Entry0, newEntry)));
 
             internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
-                removedEntry == Plus ? L : 
+                removedEntry == Plus ? L :
                 removedEntry == L.Plus ? new Leaf2Plus1(Plus, L.L) :
-                removedEntry == L.L.Entry0 ? 
+                removedEntry == L.L.Entry0 ?
                     (L.Plus.Hash < L.L.Entry1.Hash ? new Leaf2Plus1(Plus, new Leaf2(L.Plus, L.L.Entry1)) : new Leaf2Plus1(Plus, new Leaf2(L.L.Entry1, L.Plus))) :
                     (L.Plus.Hash < L.L.Entry0.Hash ? new Leaf2Plus1(Plus, new Leaf2(L.Plus, L.L.Entry0)) : new Leaf2Plus1(Plus, new Leaf2(L.L.Entry0, L.Plus)));
         }
@@ -3621,14 +3602,14 @@ namespace DryIoc.ImTools
                 (ImHashMap<K, V>)new Leaf5Plus1(entry, this);
 
             public sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry) =>
-                oldEntry == Entry0 ? new Leaf5(newEntry, Entry1, Entry2, Entry3, Entry4) : 
+                oldEntry == Entry0 ? new Leaf5(newEntry, Entry1, Entry2, Entry3, Entry4) :
                 oldEntry == Entry1 ? new Leaf5(Entry0, newEntry, Entry2, Entry3, Entry4) :
                 oldEntry == Entry2 ? new Leaf5(Entry0, Entry1, newEntry, Entry3, Entry4) :
                 oldEntry == Entry3 ? new Leaf5(Entry0, Entry1, Entry2, newEntry, Entry4) :
                                      new Leaf5(Entry0, Entry1, Entry2, Entry3, newEntry);
 
             internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) =>
-                removedEntry == Entry0 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry1, Entry2))) : 
+                removedEntry == Entry0 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry1, Entry2))) :
                 removedEntry == Entry1 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry0, Entry2))) :
                 removedEntry == Entry2 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry0, Entry1))) :
                 removedEntry == Entry3 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry2, new Leaf2(Entry0, Entry1))) :
@@ -3643,7 +3624,7 @@ namespace DryIoc.ImTools
             public Leaf5Plus1(Entry plus, Leaf5 l)
             {
                 Plus = plus;
-                L    = l;
+                L = l;
             }
 
             public override int Count() => Plus.Count() + L.Count();
@@ -3652,20 +3633,20 @@ namespace DryIoc.ImTools
             public override string ToString() => "{L51:{P:" + Plus + ",L:" + L + "}}";
 #endif
 
-            internal sealed override Entry GetMinHashEntryOrDefault() => Plus.Hash < L.Entry0.Hash ? Plus : L.Entry0; 
-            internal sealed override Entry GetMaxHashEntryOrDefault() => Plus.Hash > L.Entry4.Hash ? Plus : L.Entry4; 
+            internal sealed override Entry GetMinHashEntryOrDefault() => Plus.Hash < L.Entry0.Hash ? Plus : L.Entry0;
+            internal sealed override Entry GetMaxHashEntryOrDefault() => Plus.Hash > L.Entry4.Hash ? Plus : L.Entry4;
 
             internal override Entry GetEntryOrNull(int hash)
             {
-                if (hash == Plus.Hash) 
-                    return Plus; 
+                if (hash == Plus.Hash)
+                    return Plus;
                 var l = L;
-                return hash == l.Entry0.Hash ? l.Entry0 
-                    :  hash == l.Entry1.Hash ? l.Entry1 
-                    :  hash == l.Entry2.Hash ? l.Entry2 
-                    :  hash == l.Entry3.Hash ? l.Entry3 
-                    :  hash == l.Entry4.Hash ? l.Entry4 
-                    :  null;
+                return hash == l.Entry0.Hash ? l.Entry0
+                    : hash == l.Entry1.Hash ? l.Entry1
+                    : hash == l.Entry2.Hash ? l.Entry2
+                    : hash == l.Entry3.Hash ? l.Entry3
+                    : hash == l.Entry4.Hash ? l.Entry4
+                    : null;
             }
 
             public sealed override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
@@ -3674,13 +3655,13 @@ namespace DryIoc.ImTools
                 var ph = p.Hash;
                 if (ph == hash)
                     return p;
-                var l = L; 
+                var l = L;
                 return hash == l.Entry0.Hash ? l.Entry0
-                    :  hash == l.Entry1.Hash ? l.Entry1 
-                    :  hash == l.Entry2.Hash ? l.Entry2
-                    :  hash == l.Entry3.Hash ? l.Entry3
-                    :  hash == l.Entry4.Hash ? l.Entry4
-                    :  (ImHashMap<K, V>)new Leaf5Plus1Plus1(entry, this);
+                    : hash == l.Entry1.Hash ? l.Entry1
+                    : hash == l.Entry2.Hash ? l.Entry2
+                    : hash == l.Entry3.Hash ? l.Entry3
+                    : hash == l.Entry4.Hash ? l.Entry4
+                    : (ImHashMap<K, V>)new Leaf5Plus1Plus1(entry, this);
             }
 
             public sealed override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
@@ -3688,13 +3669,13 @@ namespace DryIoc.ImTools
                 var p = Plus;
                 if (oldEntry == p)
                     return new Leaf5Plus1(newEntry, L);
-                var l = L; 
+                var l = L;
                 Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
-                return oldEntry == e0 ? new Leaf5Plus1(p, new Leaf5(newEntry, e1, e2, e3, e4)) 
-                    :  oldEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, newEntry, e2, e3, e4)) 
-                    :  oldEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, newEntry, e3, e4)) 
-                    :  oldEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, newEntry, e4)) 
-                    :                   new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, newEntry));
+                return oldEntry == e0 ? new Leaf5Plus1(p, new Leaf5(newEntry, e1, e2, e3, e4))
+                    : oldEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, newEntry, e2, e3, e4))
+                    : oldEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, newEntry, e3, e4))
+                    : oldEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, newEntry, e4))
+                    : new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, newEntry));
             }
 
             internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
@@ -3704,7 +3685,7 @@ namespace DryIoc.ImTools
                     return L;
 
                 var ph = p.Hash;
-                var l = L; 
+                var l = L;
                 Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
 
                 if (ph < e4.Hash)
@@ -3729,11 +3710,11 @@ namespace DryIoc.ImTools
                 }
 
                 return removedEntry == e0 ? new Leaf5(e1, e2, e3, e4, p)
-                    :  removedEntry == e1 ? new Leaf5(e0, e2, e3, e4, p)
-                    :  removedEntry == e2 ? new Leaf5(e0, e1, e3, e4, p)
-                    :  removedEntry == e3 ? new Leaf5(e0, e1, e2, e4, p)
-                    :  removedEntry == e4 ? new Leaf5(e0, e1, e2, e3, p)
-                    :                       new Leaf5(e0, e1, e2, e3, e4);
+                    : removedEntry == e1 ? new Leaf5(e0, e2, e3, e4, p)
+                    : removedEntry == e2 ? new Leaf5(e0, e1, e3, e4, p)
+                    : removedEntry == e3 ? new Leaf5(e0, e1, e2, e4, p)
+                    : removedEntry == e4 ? new Leaf5(e0, e1, e2, e3, p)
+                    : new Leaf5(e0, e1, e2, e3, e4);
             }
         }
 
@@ -3750,7 +3731,7 @@ namespace DryIoc.ImTools
             public Leaf5Plus1Plus1(Entry plus, Leaf5Plus1 l)
             {
                 Plus = plus;
-                L    = l;
+                L = l;
             }
 
             public override int Count() => Plus.Count() + L.Count();
@@ -3763,7 +3744,7 @@ namespace DryIoc.ImTools
             {
                 var m = L.GetMinHashEntryOrDefault();
                 return Plus.Hash < m.Hash ? Plus : m;
-            } 
+            }
             internal sealed override Entry GetMaxHashEntryOrDefault()
             {
                 var m = L.GetMaxHashEntryOrDefault();
@@ -3777,12 +3758,12 @@ namespace DryIoc.ImTools
                 if (hash == L.Plus.Hash)
                     return L.Plus;
                 var l = L.L;
-                return hash == l.Entry0.Hash ? l.Entry0 
-                    :  hash == l.Entry1.Hash ? l.Entry1 
-                    :  hash == l.Entry2.Hash ? l.Entry2 
-                    :  hash == l.Entry3.Hash ? l.Entry3 
-                    :  hash == l.Entry4.Hash ? l.Entry4 
-                    :  null;
+                return hash == l.Entry0.Hash ? l.Entry0
+                    : hash == l.Entry1.Hash ? l.Entry1
+                    : hash == l.Entry2.Hash ? l.Entry2
+                    : hash == l.Entry3.Hash ? l.Entry3
+                    : hash == l.Entry4.Hash ? l.Entry4
+                    : null;
             }
 
             public override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
@@ -3821,7 +3802,7 @@ namespace DryIoc.ImTools
                     return e4;
 
                 var right = hash > e4.Hash && ph > e4.Hash && pph > e4.Hash;
-                var left  = !right && hash < e0.Hash && ph < e0.Hash && pph < e0.Hash;
+                var left = !right && hash < e0.Hash && ph < e0.Hash && pph < e0.Hash;
 
                 Entry swap = null;
                 if (pph < e4.Hash)
@@ -3945,7 +3926,7 @@ namespace DryIoc.ImTools
 
                 var l = L.L;
                 Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
-                int pph = pp.Hash, ph = p.Hash; 
+                int pph = pp.Hash, ph = p.Hash;
                 if (pph < e4.Hash)
                 {
                     swap = e4; e4 = pp; pp = swap;
@@ -3991,13 +3972,13 @@ namespace DryIoc.ImTools
                     }
                 }
 
-                return removedEntry == e0 ? new Leaf5Plus1(p, new Leaf5(e1, e2, e3, e4, pp)) 
-                    :  removedEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, e2, e3, e4, pp))
-                    :  removedEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e3, e4, pp))
-                    :  removedEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e4, pp))
-                    :  removedEntry == e4 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, pp))
-                    :  removedEntry == pp ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, e4))
-                    :                       new Leaf5Plus1(pp,new Leaf5(e0, e1, e2, e3, e4));
+                return removedEntry == e0 ? new Leaf5Plus1(p, new Leaf5(e1, e2, e3, e4, pp))
+                    : removedEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, e2, e3, e4, pp))
+                    : removedEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e3, e4, pp))
+                    : removedEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e4, pp))
+                    : removedEntry == e4 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, pp))
+                    : removedEntry == pp ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, e4))
+                    : new Leaf5Plus1(pp, new Leaf5(e0, e1, e2, e3, e4));
             }
         }
 
@@ -4012,8 +3993,8 @@ namespace DryIoc.ImTools
             {
                 Debug.Assert(left != Empty && right != Empty, $"left:{left} != Empty && right:{right} != Empty");
                 MidEntry = entry;
-                Left     = left;
-                Right    = right;
+                Left = left;
+                Right = right;
             }
 
             public sealed override int Count() => MidEntry.Count() + Left.Count() + Right.Count();
@@ -4022,15 +4003,15 @@ namespace DryIoc.ImTools
             public override string ToString() => "{B2:{E:" + MidEntry + ",L:" + Left + ",R:" + Right + "}}";
 #endif
 
-            internal sealed override Entry GetMinHashEntryOrDefault() => Left .GetMinHashEntryOrDefault();
+            internal sealed override Entry GetMinHashEntryOrDefault() => Left.GetMinHashEntryOrDefault();
             internal sealed override Entry GetMaxHashEntryOrDefault() => Right.GetMaxHashEntryOrDefault();
 
-            internal override Entry GetEntryOrNull(int hash) 
+            internal override Entry GetEntryOrNull(int hash)
             {
                 var h = MidEntry.Hash;
-                return hash > h ? Right.GetEntryOrNull(hash) 
-                    :  hash < h ? Left .GetEntryOrNull(hash) 
-                    :  MidEntry;
+                return hash > h ? Right.GetEntryOrNull(hash)
+                    : hash < h ? Left.GetEntryOrNull(hash)
+                    : MidEntry;
             }
 
             public override ImHashMap<K, V> AddOrGetEntry(int hash, Entry entry)
@@ -4040,7 +4021,7 @@ namespace DryIoc.ImTools
                 if (hash > e.Hash)
                 {
                     var right = Right;
-                    if (right is OnTheVergeOfBalance r) 
+                    if (right is OnTheVergeOfBalance r)
                     {
                         ImHashMap<K, V> splitRight = null;
                         newBranch = r.AddOrGetEntry(hash, ref entry, ref splitRight);
@@ -4054,7 +4035,7 @@ namespace DryIoc.ImTools
                 if (hash < e.Hash)
                 {
                     var left = Left;
-                    if (left is OnTheVergeOfBalance l) 
+                    if (left is OnTheVergeOfBalance l)
                     {
                         ImHashMap<K, V> splitRight = null;
                         newBranch = l.AddOrGetEntry(hash, ref entry, ref splitRight);
@@ -4072,11 +4053,11 @@ namespace DryIoc.ImTools
             {
                 var h = MidEntry.Hash;
                 return hash > h ? new Branch2(Left, MidEntry, Right.ReplaceEntry(hash, oldEntry, newEntry))
-                    :  hash < h ? new Branch2(Left.ReplaceEntry(hash, oldEntry, newEntry), MidEntry, Right)
-                    :  new Branch2(Left, newEntry, Right);
+                    : hash < h ? new Branch2(Left.ReplaceEntry(hash, oldEntry, newEntry), MidEntry, Right)
+                    : new Branch2(Left, newEntry, Right);
             }
 
-            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry) 
+            internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
             {
                 // The downward phase for deleting an element from a 2-3 tree is the same as the downward phase
                 // for inserting an element except for the case when the element to be deleted is equal to the value in
@@ -4093,7 +4074,7 @@ namespace DryIoc.ImTools
                     if (newRight == Empty)
                     {
                         // if the left node is not full yet then merge
-                        if (Left is Leaf2Plus1Plus1 == false) 
+                        if (Left is Leaf2Plus1Plus1 == false)
                             return Left.AddOrGetEntry(mid.Hash, mid);
                         return new Branch2(Left.RemoveEntry(removedEntry = Left.GetMaxHashEntryOrDefault()), removedEntry, mid); //! the height does not change
                     }
@@ -4106,7 +4087,7 @@ namespace DryIoc.ImTools
                             return new Branch2(new Branch2(lb3.Left, lb3.Entry0, lb3.Middle), lb3.Entry1, new Branch2(lb3.Right, mid, newRight));
 
                         // the the hole has a 2-node as a parent and a 2-node as a sibling.
-                        var lb2 = (Branch2)Left; 
+                        var lb2 = (Branch2)Left;
                         return new Branch3(lb2.Left, lb2.MidEntry, lb2.Right, mid, newRight);
                     }
 
@@ -4121,7 +4102,7 @@ namespace DryIoc.ImTools
                 var newLeft = Left.RemoveEntry(removedEntry);
                 if (newLeft == Empty)
                 {
-                    if (Right is Leaf2Plus1Plus1 == false) 
+                    if (Right is Leaf2Plus1Plus1 == false)
                         return Right.AddOrGetEntry(mid.Hash, mid);
                     return new Branch2(mid, removedEntry = Right.GetMinHashEntryOrDefault(), Right.RemoveEntry(removedEntry)); //! the height does not change
                 }
@@ -4148,14 +4129,14 @@ namespace DryIoc.ImTools
             public readonly Entry Entry0, Entry1;
             public readonly ImHashMap<K, V> Left, Middle, Right;
 
-            public Branch3(ImHashMap<K, V> left, Entry e0, ImHashMap<K, V> middle, Entry e1, ImHashMap<K, V> right) 
+            public Branch3(ImHashMap<K, V> left, Entry e0, ImHashMap<K, V> middle, Entry e1, ImHashMap<K, V> right)
             {
                 Debug.Assert(e0.Hash < e1.Hash, $"e0.Hash:{e0.Hash} < e1.Hash{e1.Hash}");
-                Left   = left;
+                Left = left;
                 Entry0 = e0;
                 Middle = middle;
                 Entry1 = e1;
-                Right  = right;
+                Right = right;
             }
 
             public override int Count() => Entry0.Count() + Entry1.Count() + Left.Count() + Middle.Count() + Right.Count();
@@ -4164,10 +4145,10 @@ namespace DryIoc.ImTools
             public override string ToString() => "{B3:{E0:" + Entry0 + ",E1:" + Entry0 + ",L:" + Left + ",M:" + Middle + ",R:" + Right + "}}";
 #endif
 
-            internal override Entry GetMinHashEntryOrDefault() => Left .GetMinHashEntryOrDefault();
+            internal override Entry GetMinHashEntryOrDefault() => Left.GetMinHashEntryOrDefault();
             internal override Entry GetMaxHashEntryOrDefault() => Right.GetMaxHashEntryOrDefault();
 
-            internal override Entry GetEntryOrNull(int hash) 
+            internal override Entry GetEntryOrNull(int hash)
             {
                 var h1 = Entry1.Hash;
                 if (hash > h1)
@@ -4289,18 +4270,18 @@ namespace DryIoc.ImTools
             public override ImHashMap<K, V> ReplaceEntry(int hash, Entry oldEntry, Entry newEntry)
             {
                 int h0 = Entry0.Hash, h1 = Entry1.Hash;
-                return hash > h1 ? new Branch3(Left, Entry0, Middle, Entry1, Right.ReplaceEntry(hash, oldEntry, newEntry)) 
-                    :  hash < h0 ? new Branch3(Left.ReplaceEntry(hash, oldEntry, newEntry), Entry0, Middle, Entry1, Right)
-                    :  hash > h0 && hash < h1 ? new Branch3(Left, Entry0, Middle.ReplaceEntry(hash, oldEntry, newEntry), Entry1, Right)
-                    :  oldEntry == Entry0 ? new Branch3(Left, newEntry, Middle, Entry1, Right) : new Branch3(Left, Entry0, Middle, newEntry, Right);
+                return hash > h1 ? new Branch3(Left, Entry0, Middle, Entry1, Right.ReplaceEntry(hash, oldEntry, newEntry))
+                    : hash < h0 ? new Branch3(Left.ReplaceEntry(hash, oldEntry, newEntry), Entry0, Middle, Entry1, Right)
+                    : hash > h0 && hash < h1 ? new Branch3(Left, Entry0, Middle.ReplaceEntry(hash, oldEntry, newEntry), Entry1, Right)
+                    : oldEntry == Entry0 ? new Branch3(Left, newEntry, Middle, Entry1, Right) : new Branch3(Left, Entry0, Middle, newEntry, Right);
             }
 
             internal override ImHashMap<K, V> RemoveEntry(Entry removedEntry)
             {
-                var midLeft  = Entry0;
-                var middle   = Middle;
+                var midLeft = Entry0;
+                var middle = Middle;
                 var midRight = Entry1;
-                var right    = Right;
+                var right = Right;
 
                 // case 1, downward: swap the predecessor entry (max left entry) with the mid entry, then proceed to remove the predecessor from the Left branch
                 if (removedEntry == midLeft)
@@ -4311,7 +4292,7 @@ namespace DryIoc.ImTools
                     var newLeft = Left.RemoveEntry(removedEntry);
                     if (newLeft == Empty)
                     {
-                        if (middle is Leaf2Plus1Plus1 == false) 
+                        if (middle is Leaf2Plus1Plus1 == false)
                             return new Branch2(middle.AddOrGetEntry(midLeft.Hash, midLeft), midRight, right); //! the height does not change
                         return new Branch3(midLeft, removedEntry = middle.GetMinHashEntryOrDefault(), middle.RemoveEntry(removedEntry), midRight, right); //! the height does not change
                     }
@@ -4381,67 +4362,6 @@ namespace DryIoc.ImTools
                 return new Branch3(Left, midLeft, middle, midRight, newRight);
             }
         }
-
-        /// <summary>Split the map into the keys and values in the data-oriented way (SOA - a structure of arrays instead of array of structures), 
-        /// producing the shapeless homogenous arrays of keys and values instead of heterogenous pairs of specific shape which are harder to compose and adapt to the required API.
-        /// The passed `keysAndValues` may already contain the data, the new keys and values will be appended to the same arrays, enabling the concat operation
-        /// using the already pre-allocated space.</summary>
-        public int ToKeysAndValues<S>(S state, Func<ImHashMapEntry<K, V>, S, bool> condition, ref KeysAndValues<K, V> keysAndValues, ImHashMap<K, V>[] parentsStack = null)
-        {
-            var count = keysAndValues.Count;
-            var entry = Entry;
-            if (Height == 1 && entry is ImHashMapConflicts<K, V> == false)
-            {
-                if (condition(entry, state))
-                    Push(entry, ref keysAndValues);
-            }
-            else if (Height != 0)
-            {
-                parentsStack = parentsStack ?? new ImHashMap<K, V>[Height];
-                var node = this;
-                var parentCount = -1;
-                while (node.Height != 0 || parentCount != -1)
-                {
-                    if (node.Height != 0)
-                    {
-                        parentsStack[++parentCount] = node;
-                        node = node.Left;
-                    }
-                    else
-                    {
-                        node = parentsStack[parentCount--];
-                        entry = node.Entry;
-                        if (!(entry is ImHashMapConflicts<K, V> conflicts))
-                        {
-                            if (condition(entry, state))
-                                Push(entry, ref keysAndValues);
-                        }
-                        else
-                        {
-                            var conflict = conflicts.Conflicts;
-                            for (var i = 0; i < conflict.Length; i++)
-                            {
-                                entry = conflict[i];
-                                if (condition(entry, state))
-                                    Push(entry, ref keysAndValues);
-                            }
-                        }
-
-                        node = node.Right;
-                    }
-                }
-            }
-
-            return keysAndValues.Count - count;
-        }
-
-        private static void Push(ImHashMapEntry<K, V> entry, ref KeysAndValues<K, V> keysAndValues)
-        {
-            var n = keysAndValues.Count;
-            GrowingList.Push(ref keysAndValues.Keys,   n, entry.Key);
-            GrowingList.Push(ref keysAndValues.Values, n, entry.Value);
-            keysAndValues.Count = n + 1; 
-        }
     }
 
     /// <summary>Entry containing the Value in addition to the Hash</summary>
@@ -4476,7 +4396,7 @@ namespace DryIoc.ImTools
         internal sealed override ImMap<V> AddOrGetEntry(int hash, ImMapEntry<V> entry) =>
             hash > Hash ? new Leaf2(this, entry) : hash < Hash ? new Leaf2(entry, this) : (ImMap<V>)this;
 
-        internal sealed override ImMap<V> ReplaceEntry(int hash, ImMapEntry<V> oldEntry, ImMapEntry<V> newEntry) => 
+        internal sealed override ImMap<V> ReplaceEntry(int hash, ImMapEntry<V> oldEntry, ImMapEntry<V> newEntry) =>
             this == oldEntry ? newEntry : oldEntry;
 
         internal sealed override ImMap<V> RemoveEntry(ImMapEntry<V> removedEntry) =>
@@ -4494,7 +4414,7 @@ namespace DryIoc.ImTools
         public static readonly ImMap<V> Empty = new ImMap<V>();
 
         /// <summary>Prints the map tree in JSON-ish format in release mode and enumerates the keys in DEBUG.</summary>
-        public override string ToString() 
+        public override string ToString()
         {
 #if DEBUG
             // for the debug purposes we just output the first N keys in array
@@ -4551,7 +4471,7 @@ namespace DryIoc.ImTools
             internal sealed override ImMapEntry<V> GetMinHashEntryOrDefault() => Entry0;
             internal sealed override ImMapEntry<V> GetMaxHashEntryOrDefault() => Entry1;
 
-            internal override ImMapEntry<V> GetEntryOrNull(int hash) => 
+            internal override ImMapEntry<V> GetEntryOrNull(int hash) =>
                 Entry0.Hash == hash ? Entry0 : Entry1.Hash == hash ? Entry1 : null;
 
             internal override ImMap<V> AddOrGetEntry(int hash, ImMapEntry<V> entry) =>
@@ -4573,7 +4493,7 @@ namespace DryIoc.ImTools
             public Leaf2Plus1(ImMapEntry<V> plus, Leaf2 leaf)
             {
                 Plus = plus;
-                L    = leaf;
+                L = leaf;
             }
 
             public override int Count() => 3;
@@ -4587,7 +4507,7 @@ namespace DryIoc.ImTools
 
             internal override ImMapEntry<V> GetEntryOrNull(int hash)
             {
-                if (hash == Plus.Hash) 
+                if (hash == Plus.Hash)
                     return Plus;
                 ImMapEntry<V> e0 = L.Entry0, e1 = L.Entry1;
                 return e0.Hash == hash ? e0 : e1.Hash == hash ? e1 : null;
@@ -4596,14 +4516,14 @@ namespace DryIoc.ImTools
             internal override ImMap<V> AddOrGetEntry(int hash, ImMapEntry<V> entry)
             {
                 var p = Plus;
-                if (hash == p.Hash) 
+                if (hash == p.Hash)
                     return p;
                 ImMapEntry<V> e0 = L.Entry0, e1 = L.Entry1;
                 return hash == e0.Hash ? e0 : hash == e1.Hash ? e1 : (ImMap<V>)new Leaf2Plus1Plus1(entry, this);
             }
 
             internal override ImMap<V> ReplaceEntry(int hash, ImMapEntry<V> oldEntry, ImMapEntry<V> newEntry) =>
-                oldEntry == Plus     ? new Leaf2Plus1(newEntry, L) :
+                oldEntry == Plus ? new Leaf2Plus1(newEntry, L) :
                 oldEntry == L.Entry0 ? new Leaf2Plus1(Plus, new Leaf2(newEntry, L.Entry1)) :
                                        new Leaf2Plus1(Plus, new Leaf2(L.Entry0, newEntry));
 
@@ -4632,12 +4552,12 @@ namespace DryIoc.ImTools
             public override string ToString() => "{L211:{P:" + Plus + ",L:" + L + "}}";
 #endif
 
-            internal sealed override ImMapEntry<V> GetMinHashEntryOrDefault() 
+            internal sealed override ImMapEntry<V> GetMinHashEntryOrDefault()
             {
                 var m = L.GetMinHashEntryOrDefault();
                 return Plus.Hash < m.Hash ? Plus : m;
             }
-            internal sealed override ImMapEntry<V> GetMaxHashEntryOrDefault() 
+            internal sealed override ImMapEntry<V> GetMaxHashEntryOrDefault()
             {
                 var m = L.GetMaxHashEntryOrDefault();
                 return Plus.Hash > m.Hash ? Plus : m;
@@ -4645,9 +4565,9 @@ namespace DryIoc.ImTools
 
             internal override ImMapEntry<V> GetEntryOrNull(int hash)
             {
-                if (hash == Plus.Hash) 
+                if (hash == Plus.Hash)
                     return Plus;
-                if (hash == L.Plus.Hash) 
+                if (hash == L.Plus.Hash)
                     return L.Plus;
                 ImMapEntry<V> e0 = L.L.Entry0, e1 = L.L.Entry1;
                 return e0.Hash == hash ? e0 : e1.Hash == hash ? e1 : null;
@@ -4718,15 +4638,15 @@ namespace DryIoc.ImTools
             }
 
             internal override ImMap<V> ReplaceEntry(int hash, ImMapEntry<V> oldEntry, ImMapEntry<V> newEntry) =>
-                oldEntry == Plus       ? new Leaf2Plus1Plus1(newEntry, L) :
-                oldEntry == L.Plus     ? new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(newEntry, L.L)) :
+                oldEntry == Plus ? new Leaf2Plus1Plus1(newEntry, L) :
+                oldEntry == L.Plus ? new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(newEntry, L.L)) :
                 oldEntry == L.L.Entry0 ? new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(L.Plus, new Leaf2(newEntry, L.L.Entry1))) :
                                          new Leaf2Plus1Plus1(Plus, new Leaf2Plus1(L.Plus, new Leaf2(L.L.Entry0, newEntry)));
 
             internal override ImMap<V> RemoveEntry(ImMapEntry<V> removedEntry) =>
-                removedEntry == Plus ? L : 
+                removedEntry == Plus ? L :
                 removedEntry == L.Plus ? new Leaf2Plus1(Plus, L.L) :
-                removedEntry == L.L.Entry0 ? 
+                removedEntry == L.L.Entry0 ?
                     (L.Plus.Hash < L.L.Entry1.Hash ? new Leaf2Plus1(Plus, new Leaf2(L.Plus, L.L.Entry1)) : new Leaf2Plus1(Plus, new Leaf2(L.L.Entry1, L.Plus))) :
                     (L.Plus.Hash < L.L.Entry0.Hash ? new Leaf2Plus1(Plus, new Leaf2(L.Plus, L.L.Entry0)) : new Leaf2Plus1(Plus, new Leaf2(L.L.Entry0, L.Plus)));
         }
@@ -4772,14 +4692,14 @@ namespace DryIoc.ImTools
                 (ImMap<V>)new Leaf5Plus1(entry, this);
 
             internal override ImMap<V> ReplaceEntry(int hash, ImMapEntry<V> oldEntry, ImMapEntry<V> newEntry) =>
-                oldEntry == Entry0 ? new Leaf5(newEntry, Entry1, Entry2, Entry3, Entry4) : 
+                oldEntry == Entry0 ? new Leaf5(newEntry, Entry1, Entry2, Entry3, Entry4) :
                 oldEntry == Entry1 ? new Leaf5(Entry0, newEntry, Entry2, Entry3, Entry4) :
                 oldEntry == Entry2 ? new Leaf5(Entry0, Entry1, newEntry, Entry3, Entry4) :
                 oldEntry == Entry3 ? new Leaf5(Entry0, Entry1, Entry2, newEntry, Entry4) :
                                      new Leaf5(Entry0, Entry1, Entry2, Entry3, newEntry);
 
             internal override ImMap<V> RemoveEntry(ImMapEntry<V> removedEntry) =>
-                removedEntry == Entry0 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry1, Entry2))) : 
+                removedEntry == Entry0 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry1, Entry2))) :
                 removedEntry == Entry1 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry0, Entry2))) :
                 removedEntry == Entry2 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry3, new Leaf2(Entry0, Entry1))) :
                 removedEntry == Entry3 ? new Leaf2Plus1Plus1(Entry4, new Leaf2Plus1(Entry2, new Leaf2(Entry0, Entry1))) :
@@ -4795,7 +4715,7 @@ namespace DryIoc.ImTools
             public Leaf5Plus1(ImMapEntry<V> plus, Leaf5 l)
             {
                 Plus = plus;
-                L    = l;
+                L = l;
             }
 
             public override int Count() => 6;
@@ -4804,20 +4724,20 @@ namespace DryIoc.ImTools
             public override string ToString() => "{L51:{P:" + Plus + ",L:" + L + "}}";
 #endif
 
-            internal sealed override ImMapEntry<V> GetMinHashEntryOrDefault() => Plus.Hash < L.Entry0.Hash ? Plus : L.Entry0; 
-            internal sealed override ImMapEntry<V> GetMaxHashEntryOrDefault() => Plus.Hash > L.Entry4.Hash ? Plus : L.Entry4; 
+            internal sealed override ImMapEntry<V> GetMinHashEntryOrDefault() => Plus.Hash < L.Entry0.Hash ? Plus : L.Entry0;
+            internal sealed override ImMapEntry<V> GetMaxHashEntryOrDefault() => Plus.Hash > L.Entry4.Hash ? Plus : L.Entry4;
 
             internal override ImMapEntry<V> GetEntryOrNull(int hash)
             {
-                if (hash == Plus.Hash) 
-                    return Plus; 
+                if (hash == Plus.Hash)
+                    return Plus;
                 var l = L;
-                return hash == l.Entry0.Hash ? l.Entry0 
-                    :  hash == l.Entry1.Hash ? l.Entry1 
-                    :  hash == l.Entry2.Hash ? l.Entry2 
-                    :  hash == l.Entry3.Hash ? l.Entry3 
-                    :  hash == l.Entry4.Hash ? l.Entry4 
-                    :  null;
+                return hash == l.Entry0.Hash ? l.Entry0
+                    : hash == l.Entry1.Hash ? l.Entry1
+                    : hash == l.Entry2.Hash ? l.Entry2
+                    : hash == l.Entry3.Hash ? l.Entry3
+                    : hash == l.Entry4.Hash ? l.Entry4
+                    : null;
             }
 
             internal override ImMap<V> AddOrGetEntry(int hash, ImMapEntry<V> entry)
@@ -4826,13 +4746,13 @@ namespace DryIoc.ImTools
                 var ph = p.Hash;
                 if (ph == hash)
                     return p;
-                var l = L; 
+                var l = L;
                 return hash == l.Entry0.Hash ? l.Entry0
-                    :  hash == l.Entry1.Hash ? l.Entry1 
-                    :  hash == l.Entry2.Hash ? l.Entry2
-                    :  hash == l.Entry3.Hash ? l.Entry3
-                    :  hash == l.Entry4.Hash ? l.Entry4
-                    :  (ImMap<V>)new Leaf5Plus1Plus1(entry, this);
+                    : hash == l.Entry1.Hash ? l.Entry1
+                    : hash == l.Entry2.Hash ? l.Entry2
+                    : hash == l.Entry3.Hash ? l.Entry3
+                    : hash == l.Entry4.Hash ? l.Entry4
+                    : (ImMap<V>)new Leaf5Plus1Plus1(entry, this);
             }
 
             internal override ImMap<V> ReplaceEntry(int hash, ImMapEntry<V> oldEntry, ImMapEntry<V> newEntry)
@@ -4840,13 +4760,13 @@ namespace DryIoc.ImTools
                 var p = Plus;
                 if (oldEntry == p)
                     return new Leaf5Plus1(newEntry, L);
-                var l = L; 
+                var l = L;
                 ImMapEntry<V> e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4;
-                return oldEntry == e0 ? new Leaf5Plus1(p, new Leaf5(newEntry, e1, e2, e3, e4)) 
-                    :  oldEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, newEntry, e2, e3, e4)) 
-                    :  oldEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, newEntry, e3, e4)) 
-                    :  oldEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, newEntry, e4)) 
-                    :                   new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, newEntry));
+                return oldEntry == e0 ? new Leaf5Plus1(p, new Leaf5(newEntry, e1, e2, e3, e4))
+                    : oldEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, newEntry, e2, e3, e4))
+                    : oldEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, newEntry, e3, e4))
+                    : oldEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, newEntry, e4))
+                    : new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, newEntry));
             }
 
             internal override ImMap<V> RemoveEntry(ImMapEntry<V> removedEntry)
@@ -4856,7 +4776,7 @@ namespace DryIoc.ImTools
                     return L;
 
                 var ph = p.Hash;
-                var l = L; 
+                var l = L;
                 ImMapEntry<V> e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
 
                 if (ph < e4.Hash)
@@ -4881,11 +4801,11 @@ namespace DryIoc.ImTools
                 }
 
                 return removedEntry == e0 ? new Leaf5(e1, e2, e3, e4, p)
-                    :  removedEntry == e1 ? new Leaf5(e0, e2, e3, e4, p)
-                    :  removedEntry == e2 ? new Leaf5(e0, e1, e3, e4, p)
-                    :  removedEntry == e3 ? new Leaf5(e0, e1, e2, e4, p)
-                    :  removedEntry == e4 ? new Leaf5(e0, e1, e2, e3, p)
-                    :                       new Leaf5(e0, e1, e2, e3, e4);
+                    : removedEntry == e1 ? new Leaf5(e0, e2, e3, e4, p)
+                    : removedEntry == e2 ? new Leaf5(e0, e1, e3, e4, p)
+                    : removedEntry == e3 ? new Leaf5(e0, e1, e2, e4, p)
+                    : removedEntry == e4 ? new Leaf5(e0, e1, e2, e3, p)
+                    : new Leaf5(e0, e1, e2, e3, e4);
             }
         }
 
@@ -4903,7 +4823,7 @@ namespace DryIoc.ImTools
             public Leaf5Plus1Plus1(ImMapEntry<V> plus, Leaf5Plus1 l)
             {
                 Plus = plus;
-                L    = l;
+                L = l;
             }
 
             public sealed override int Count() => 7;
@@ -4916,7 +4836,7 @@ namespace DryIoc.ImTools
             {
                 var m = L.GetMinHashEntryOrDefault();
                 return Plus.Hash < m.Hash ? Plus : m;
-            } 
+            }
             internal sealed override ImMapEntry<V> GetMaxHashEntryOrDefault()
             {
                 var m = L.GetMaxHashEntryOrDefault();
@@ -4930,12 +4850,12 @@ namespace DryIoc.ImTools
                 if (hash == L.Plus.Hash)
                     return L.Plus;
                 var l = L.L;
-                return hash == l.Entry0.Hash ? l.Entry0 
-                    :  hash == l.Entry1.Hash ? l.Entry1 
-                    :  hash == l.Entry2.Hash ? l.Entry2 
-                    :  hash == l.Entry3.Hash ? l.Entry3 
-                    :  hash == l.Entry4.Hash ? l.Entry4 
-                    :  null;
+                return hash == l.Entry0.Hash ? l.Entry0
+                    : hash == l.Entry1.Hash ? l.Entry1
+                    : hash == l.Entry2.Hash ? l.Entry2
+                    : hash == l.Entry3.Hash ? l.Entry3
+                    : hash == l.Entry4.Hash ? l.Entry4
+                    : null;
             }
 
             internal override ImMap<V> AddOrGetEntry(int hash, ImMapEntry<V> entry)
@@ -4974,7 +4894,7 @@ namespace DryIoc.ImTools
                     return e4;
 
                 var right = hash > e4.Hash && ph > e4.Hash && pph > e4.Hash;
-                var left  = !right && hash < e0.Hash && ph < e0.Hash && pph < e0.Hash;
+                var left = !right && hash < e0.Hash && ph < e0.Hash && pph < e0.Hash;
 
                 ImMapEntry<V> swap = null;
                 if (pph < e4.Hash)
@@ -5097,7 +5017,7 @@ namespace DryIoc.ImTools
 
                 var l = L.L;
                 ImMapEntry<V> e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
-                int pph = pp.Hash, ph = p.Hash; 
+                int pph = pp.Hash, ph = p.Hash;
                 if (pph < e4.Hash)
                 {
                     swap = e4; e4 = pp; pp = swap;
@@ -5143,13 +5063,13 @@ namespace DryIoc.ImTools
                     }
                 }
 
-                return removedEntry == e0 ? new Leaf5Plus1(p, new Leaf5(e1, e2, e3, e4, pp)) 
-                    :  removedEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, e2, e3, e4, pp))
-                    :  removedEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e3, e4, pp))
-                    :  removedEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e4, pp))
-                    :  removedEntry == e4 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, pp))
-                    :  removedEntry == pp ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, e4))
-                    :                       new Leaf5Plus1(pp,new Leaf5(e0, e1, e2, e3, e4));
+                return removedEntry == e0 ? new Leaf5Plus1(p, new Leaf5(e1, e2, e3, e4, pp))
+                    : removedEntry == e1 ? new Leaf5Plus1(p, new Leaf5(e0, e2, e3, e4, pp))
+                    : removedEntry == e2 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e3, e4, pp))
+                    : removedEntry == e3 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e4, pp))
+                    : removedEntry == e4 ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, pp))
+                    : removedEntry == pp ? new Leaf5Plus1(p, new Leaf5(e0, e1, e2, e3, e4))
+                    : new Leaf5Plus1(pp, new Leaf5(e0, e1, e2, e3, e4));
             }
         }
 
@@ -5162,8 +5082,8 @@ namespace DryIoc.ImTools
             {
                 Debug.Assert(left != Empty && right != Empty, $"left:{left} != Empty && right:{right} != Empty");
                 MidEntry = entry;
-                Left     = left;
-                Right    = right;
+                Left = left;
+                Right = right;
             }
 
             public sealed override int Count() => 1 + Left.Count() + Right.Count();
@@ -5172,15 +5092,15 @@ namespace DryIoc.ImTools
             public override string ToString() => "{B2:{E:" + MidEntry + ",L:" + Left + ",R:" + Right + "}}";
 #endif
 
-            internal sealed override ImMapEntry<V> GetMinHashEntryOrDefault() => Left .GetMinHashEntryOrDefault();
+            internal sealed override ImMapEntry<V> GetMinHashEntryOrDefault() => Left.GetMinHashEntryOrDefault();
             internal sealed override ImMapEntry<V> GetMaxHashEntryOrDefault() => Right.GetMaxHashEntryOrDefault();
 
-            internal override ImMapEntry<V> GetEntryOrNull(int hash) 
+            internal override ImMapEntry<V> GetEntryOrNull(int hash)
             {
                 var mh = MidEntry.Hash;
-                return hash > mh ? Right.GetEntryOrNull(hash) 
-                    :  hash < mh ? Left .GetEntryOrNull(hash) 
-                    :  MidEntry;
+                return hash > mh ? Right.GetEntryOrNull(hash)
+                    : hash < mh ? Left.GetEntryOrNull(hash)
+                    : MidEntry;
             }
 
             internal override ImMap<V> AddOrGetEntry(int hash, ImMapEntry<V> entry)
@@ -5190,7 +5110,7 @@ namespace DryIoc.ImTools
                 if (hash > e.Hash)
                 {
                     var right = Right;
-                    if (right is OnTheVergeOfBalance r) 
+                    if (right is OnTheVergeOfBalance r)
                     {
                         ImMap<V> splitRight = null;
                         newBranch = r.AddOrGetEntry(hash, ref entry, ref splitRight);
@@ -5204,7 +5124,7 @@ namespace DryIoc.ImTools
                 if (hash < e.Hash)
                 {
                     var left = Left;
-                    if (left is OnTheVergeOfBalance l) 
+                    if (left is OnTheVergeOfBalance l)
                     {
                         ImMap<V> splitRight = null;
                         newBranch = l.AddOrGetEntry(hash, ref entry, ref splitRight);
@@ -5222,11 +5142,11 @@ namespace DryIoc.ImTools
             {
                 var h = MidEntry.Hash;
                 return hash > h ? new Branch2(Left, MidEntry, Right.ReplaceEntry(hash, oldEntry, newEntry))
-                    :  hash < h ? new Branch2(Left.ReplaceEntry(hash, oldEntry, newEntry), MidEntry, Right)
-                    :  new Branch2(Left, newEntry, Right);
+                    : hash < h ? new Branch2(Left.ReplaceEntry(hash, oldEntry, newEntry), MidEntry, Right)
+                    : new Branch2(Left, newEntry, Right);
             }
 
-            internal override ImMap<V> RemoveEntry(ImMapEntry<V> removedEntry) 
+            internal override ImMap<V> RemoveEntry(ImMapEntry<V> removedEntry)
             {
                 // The downward phase for deleting an element from a 2-3 tree is the same as the downward phase
                 // for inserting an element except for the case when the element to be deleted is equal to the value in
@@ -5243,7 +5163,7 @@ namespace DryIoc.ImTools
                     if (newRight == Empty)
                     {
                         // if the left node is not full yet then merge
-                        if (Left is Leaf2Plus1Plus1 == false) 
+                        if (Left is Leaf2Plus1Plus1 == false)
                             return Left.AddOrGetEntry(mid.Hash, mid);
                         return new Branch2(Left.RemoveEntry(removedEntry = Left.GetMaxHashEntryOrDefault()), removedEntry, mid); //! the height does not change
                     }
@@ -5256,7 +5176,7 @@ namespace DryIoc.ImTools
                             return new Branch2(new Branch2(lb3.Left, lb3.Entry0, lb3.Middle), lb3.Entry1, new Branch2(lb3.Right, mid, newRight));
 
                         // the the hole has a 2-node as a parent and a 2-node as a sibling.
-                        var lb2 = (Branch2)Left; 
+                        var lb2 = (Branch2)Left;
                         return new Branch3(lb2.Left, lb2.MidEntry, lb2.Right, mid, newRight);
                     }
 
@@ -5271,7 +5191,7 @@ namespace DryIoc.ImTools
                 var newLeft = Left.RemoveEntry(removedEntry);
                 if (newLeft == Empty)
                 {
-                    if (Right is Leaf2Plus1Plus1 == false) 
+                    if (Right is Leaf2Plus1Plus1 == false)
                         return Right.AddOrGetEntry(mid.Hash, mid);
                     return new Branch2(mid, removedEntry = Right.GetMinHashEntryOrDefault(), Right.RemoveEntry(removedEntry)); //! the height does not change
                 }
@@ -5298,14 +5218,14 @@ namespace DryIoc.ImTools
             public readonly ImMapEntry<V> Entry0, Entry1;
             public readonly ImMap<V> Left, Middle, Right;
 
-            public Branch3(ImMap<V> left, ImMapEntry<V> e0, ImMap<V> middle, ImMapEntry<V> e1, ImMap<V> right) 
+            public Branch3(ImMap<V> left, ImMapEntry<V> e0, ImMap<V> middle, ImMapEntry<V> e1, ImMap<V> right)
             {
                 Debug.Assert(e0.Hash < e1.Hash, $"e0.Hash:{e0.Hash} < e1.Hash{e1.Hash}");
-                Left   = left;
+                Left = left;
                 Entry0 = e0;
                 Middle = middle;
                 Entry1 = e1;
-                Right  = right;
+                Right = right;
             }
 
             public override int Count() => 2 + Left.Count() + Middle.Count() + Right.Count();
@@ -5314,10 +5234,10 @@ namespace DryIoc.ImTools
             public override string ToString() => "{B3:{E0:" + Entry0 + ",E1:" + Entry0 + ",L:" + Left + ",M:" + Middle + ",R:" + Right + "}}";
 #endif
 
-            internal override ImMapEntry<V> GetMinHashEntryOrDefault() => Left .GetMinHashEntryOrDefault();
+            internal override ImMapEntry<V> GetMinHashEntryOrDefault() => Left.GetMinHashEntryOrDefault();
             internal override ImMapEntry<V> GetMaxHashEntryOrDefault() => Right.GetMaxHashEntryOrDefault();
 
-            internal override ImMapEntry<V> GetEntryOrNull(int hash) 
+            internal override ImMapEntry<V> GetEntryOrNull(int hash)
             {
                 var h1 = Entry1.Hash;
                 if (hash > h1)
@@ -5439,18 +5359,18 @@ namespace DryIoc.ImTools
             internal override ImMap<V> ReplaceEntry(int hash, ImMapEntry<V> oldEntry, ImMapEntry<V> newEntry)
             {
                 int h0 = Entry0.Hash, h1 = Entry1.Hash;
-                return hash > h1 ? new Branch3(Left, Entry0, Middle, Entry1, Right.ReplaceEntry(hash, oldEntry, newEntry)) 
-                    :  hash < h0 ? new Branch3(Left.ReplaceEntry(hash, oldEntry, newEntry), Entry0, Middle, Entry1, Right)
-                    :  hash > h0 && hash < h1 ? new Branch3(Left, Entry0, Middle.ReplaceEntry(hash, oldEntry, newEntry), Entry1, Right)
-                    :  oldEntry == Entry0 ? new Branch3(Left, newEntry, Middle, Entry1, Right) : new Branch3(Left, Entry0, Middle, newEntry, Right);
+                return hash > h1 ? new Branch3(Left, Entry0, Middle, Entry1, Right.ReplaceEntry(hash, oldEntry, newEntry))
+                    : hash < h0 ? new Branch3(Left.ReplaceEntry(hash, oldEntry, newEntry), Entry0, Middle, Entry1, Right)
+                    : hash > h0 && hash < h1 ? new Branch3(Left, Entry0, Middle.ReplaceEntry(hash, oldEntry, newEntry), Entry1, Right)
+                    : oldEntry == Entry0 ? new Branch3(Left, newEntry, Middle, Entry1, Right) : new Branch3(Left, Entry0, Middle, newEntry, Right);
             }
 
             internal override ImMap<V> RemoveEntry(ImMapEntry<V> removedEntry)
             {
-                var midLeft  = Entry0;
-                var middle   = Middle;
+                var midLeft = Entry0;
+                var middle = Middle;
                 var midRight = Entry1;
-                var right    = Right;
+                var right = Right;
 
                 // case 1, downward: swap the predecessor entry (max left entry) with the mid entry, then proceed to remove the predecessor from the Left branch
                 if (removedEntry == midLeft)
@@ -5461,7 +5381,7 @@ namespace DryIoc.ImTools
                     var newLeft = Left.RemoveEntry(removedEntry);
                     if (newLeft == Empty)
                     {
-                        if (middle is Leaf2Plus1Plus1 == false) 
+                        if (middle is Leaf2Plus1Plus1 == false)
                             return new Branch2(middle.AddOrGetEntry(midLeft.Hash, midLeft), midRight, right); //! the height does not change
                         return new Branch3(midLeft, removedEntry = middle.GetMinHashEntryOrDefault(), middle.RemoveEntry(removedEntry), midRight, right); //! the height does not change
                     }
@@ -5578,18 +5498,18 @@ namespace DryIoc.ImTools
 
         /// <summary>Creates the conflicting entry out of two entries</summary>
         [MethodImpl((MethodImplOptions)256)]
-        internal static ImHashMap<K, V>.Entry WithConflicting<K, V>(this ImHashMapEntry<K, V> one, ImHashMapEntry<K, V> two) => 
+        internal static ImHashMap<K, V>.Entry WithConflicting<K, V>(this ImHashMapEntry<K, V> one, ImHashMapEntry<K, V> two) =>
             new HashConflictingEntry<K, V>(one.Hash, one, two);
 
         /// <summary>Sets the value and returns the entry</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMapEntry<K, V> SetValue<K, V>(this ImHashMapEntry<K, V> e, V value) 
+        public static ImHashMapEntry<K, V> SetValue<K, V>(this ImHashMapEntry<K, V> e, V value)
         {
             e.Value = value;
             return e;
         }
 
-        private sealed class GoRightInBranch3<K, V> 
+        private sealed class GoRightInBranch3<K, V>
         {
             public ImHashMap<K, V>.Branch3 Br3;
         }
@@ -5643,9 +5563,9 @@ namespace DryIoc.ImTools
                 }
                 else if (map is ImHashMap<K, V>.Leaf2Plus1 l21)
                 {
-                    var p  = l21.Plus;
+                    var p = l21.Plus;
                     var ph = p.Hash;
-                    var l  = l21.L;
+                    var l = l21.L;
                     ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
                     if (ph < e1.Hash)
                     {
@@ -5660,15 +5580,15 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e0).Conflicts) yield return c;
                     if (e1 is ImHashMapEntry<K, V> v1) yield return v1;
                     else foreach (var c in ((HashConflictingEntry<K, V>)e1).Conflicts) yield return c;
-                    if (p  is ImHashMapEntry<K, V> v2) yield return v2;
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p ).Conflicts) yield return c;
+                    if (p is ImHashMapEntry<K, V> v2) yield return v2;
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) yield return c;
                 }
                 else if (map is ImHashMap<K, V>.Leaf2Plus1Plus1 l211)
                 {
-                    var p  = l211.Plus;
+                    var p = l211.Plus;
                     var pp = l211.L.Plus;
                     var ph = pp.Hash;
-                    var l  = l211.L.L;
+                    var l = l211.L.L;
                     ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
                     if (ph < e1.Hash)
                     {
@@ -5699,8 +5619,8 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e1).Conflicts) yield return c;
                     if (pp is ImHashMapEntry<K, V> v2) yield return v2;
                     else foreach (var c in ((HashConflictingEntry<K, V>)pp).Conflicts) yield return c;
-                    if (p  is ImHashMapEntry<K, V> v3) yield return v3;
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts)  yield return c;
+                    if (p is ImHashMapEntry<K, V> v3) yield return v3;
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) yield return c;
                 }
                 else if (map is ImHashMap<K, V>.Leaf5 l5)
                 {
@@ -5717,9 +5637,9 @@ namespace DryIoc.ImTools
                 }
                 else if (map is ImHashMap<K, V>.Leaf5Plus1 l51)
                 {
-                    var p  = l51.Plus;
+                    var p = l51.Plus;
                     var ph = p.Hash;
-                    var l  = l51.L;
+                    var l = l51.L;
                     ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
                     if (ph < e4.Hash)
                     {
@@ -5752,13 +5672,13 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e3).Conflicts) yield return c;
                     if (e4 is ImHashMapEntry<K, V> v4) yield return v4;
                     else foreach (var c in ((HashConflictingEntry<K, V>)e4).Conflicts) yield return c;
-                    if (p  is ImHashMapEntry<K, V> v5) yield return v5;
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts)  yield return c;
+                    if (p is ImHashMapEntry<K, V> v5) yield return v5;
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) yield return c;
                 }
                 else if (map is ImHashMap<K, V>.Leaf5Plus1Plus1 l511)
                 {
                     var l = l511.L.L;
-                    ImHashMap<K, V>.Entry 
+                    ImHashMap<K, V>.Entry
                         e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus, swap = null;
                     var h = pp.Hash;
                     if (h < e4.Hash)
@@ -5820,15 +5740,15 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e4).Conflicts) yield return c;
                     if (pp is ImHashMapEntry<K, V> v5) yield return v5;
                     else foreach (var c in ((HashConflictingEntry<K, V>)pp).Conflicts) yield return c;
-                    if (p  is ImHashMapEntry<K, V> v6) yield return v6;
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts)  yield return c;
+                    if (p is ImHashMapEntry<K, V> v6) yield return v6;
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) yield return c;
                 }
 
                 if (count == 0)
                     break; // we yield the leaf and there is nothing in stack - we are DONE!
 
                 var b = parents.Get(--count); // otherwise get the parent
-                if (b is ImHashMap<K,V>.Branch2 pb2)
+                if (b is ImHashMap<K, V>.Branch2 pb2)
                 {
                     if (pb2.MidEntry is ImHashMapEntry<K, V> v) yield return v;
                     else foreach (var c in ((HashConflictingEntry<K, V>)pb2.MidEntry).Conflicts) yield return c;
@@ -5845,7 +5765,7 @@ namespace DryIoc.ImTools
                     br3Wrapper = null; // set to null to mark that the wrapper is in use and longer shared
                     map = pb3.Middle;
                 }
-                else 
+                else
                 {
                     br3Wrapper = (GoRightInBranch3<K, V>)b;
                     if (br3Wrapper.Br3.Entry1 is ImHashMapEntry<K, V> v) yield return v;
@@ -5906,9 +5826,9 @@ namespace DryIoc.ImTools
                 }
                 else if (map is ImHashMap<K, V>.Leaf2Plus1 l21)
                 {
-                    var p  = l21.Plus;
+                    var p = l21.Plus;
                     var ph = p.Hash;
-                    var l  = l21.L;
+                    var l = l21.L;
                     ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
                     if (ph < e1.Hash)
                     {
@@ -5923,15 +5843,15 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e0).Conflicts) handler(c, i++, state);
                     if (e1 is ImHashMapEntry<K, V> v1) handler(v1, i++, state);
                     else foreach (var c in ((HashConflictingEntry<K, V>)e1).Conflicts) handler(c, i++, state);
-                    if (p  is ImHashMapEntry<K, V> v2) handler(v2, i++, state);
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p ).Conflicts) handler(c, i++, state);
+                    if (p is ImHashMapEntry<K, V> v2) handler(v2, i++, state);
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) handler(c, i++, state);
                 }
                 else if (map is ImHashMap<K, V>.Leaf2Plus1Plus1 l211)
                 {
-                    var p  = l211.Plus;
+                    var p = l211.Plus;
                     var pp = l211.L.Plus;
                     var ph = pp.Hash;
-                    var l  = l211.L.L;
+                    var l = l211.L.L;
                     ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
                     if (ph < e1.Hash)
                     {
@@ -5962,8 +5882,8 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e1).Conflicts) handler(c, i++, state);
                     if (pp is ImHashMapEntry<K, V> v2) handler(v2, i++, state);
                     else foreach (var c in ((HashConflictingEntry<K, V>)pp).Conflicts) handler(c, i++, state);
-                    if (p  is ImHashMapEntry<K, V> v3) handler(v3, i++, state);
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts)  handler(c, i++, state);
+                    if (p is ImHashMapEntry<K, V> v3) handler(v3, i++, state);
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) handler(c, i++, state);
                 }
                 else if (map is ImHashMap<K, V>.Leaf5 l5)
                 {
@@ -5980,9 +5900,9 @@ namespace DryIoc.ImTools
                 }
                 else if (map is ImHashMap<K, V>.Leaf5Plus1 l51)
                 {
-                    var p  = l51.Plus;
+                    var p = l51.Plus;
                     var ph = p.Hash;
-                    var l  = l51.L;
+                    var l = l51.L;
                     ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
                     if (ph < e4.Hash)
                     {
@@ -6015,13 +5935,13 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e3).Conflicts) handler(c, i++, state);
                     if (e4 is ImHashMapEntry<K, V> v4) handler(v4, i++, state);
                     else foreach (var c in ((HashConflictingEntry<K, V>)e4).Conflicts) handler(c, i++, state);
-                    if (p  is ImHashMapEntry<K, V> v5) handler(v5, i++, state);
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts)  handler(c, i++, state);
+                    if (p is ImHashMapEntry<K, V> v5) handler(v5, i++, state);
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) handler(c, i++, state);
                 }
                 else if (map is ImHashMap<K, V>.Leaf5Plus1Plus1 l511)
                 {
                     var l = l511.L.L;
-                    ImHashMap<K, V>.Entry 
+                    ImHashMap<K, V>.Entry
                         e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus, swap = null;
                     var h = pp.Hash;
                     if (h < e4.Hash)
@@ -6083,15 +6003,15 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e4).Conflicts) handler(c, i++, state);
                     if (pp is ImHashMapEntry<K, V> v5) handler(v5, i++, state);
                     else foreach (var c in ((HashConflictingEntry<K, V>)pp).Conflicts) handler(c, i++, state);
-                    if (p  is ImHashMapEntry<K, V> v6) handler(v6, i++, state);
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts)  handler(c, i++, state);
+                    if (p is ImHashMapEntry<K, V> v6) handler(v6, i++, state);
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) handler(c, i++, state);
                 }
 
                 if (count == 0)
                     break; // we yield the leaf and there is nothing in stack - we are DONE!
 
                 var b = parents.Get(--count); // otherwise get the parent
-                if (b is ImHashMap<K,V>.Branch2 pb2)
+                if (b is ImHashMap<K, V>.Branch2 pb2)
                 {
                     if (pb2.MidEntry is ImHashMapEntry<K, V> v) handler(v, i++, state);
                     else foreach (var c in ((HashConflictingEntry<K, V>)pb2.MidEntry).Conflicts) handler(c, i++, state);
@@ -6108,7 +6028,7 @@ namespace DryIoc.ImTools
                     br3Wrapper = null; // set to null to mark that the wrapper is in use and longer shared
                     map = pb3.Middle;
                 }
-                else 
+                else
                 {
                     br3Wrapper = (GoRightInBranch3<K, V>)b;
                     if (br3Wrapper.Br3.Entry1 is ImHashMapEntry<K, V> v) handler(v, i++, state);
@@ -6179,9 +6099,9 @@ namespace DryIoc.ImTools
                 }
                 else if (map is ImHashMap<K, V>.Leaf2Plus1 l21)
                 {
-                    var p  = l21.Plus;
+                    var p = l21.Plus;
                     var ph = p.Hash;
-                    var l  = l21.L;
+                    var l = l21.L;
                     ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
                     if (ph < e1.Hash)
                     {
@@ -6196,15 +6116,15 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e0).Conflicts) handler.Invoke(c, i++, state);
                     if (e1 is ImHashMapEntry<K, V> v1) handler.Invoke(v1, i++, state);
                     else foreach (var c in ((HashConflictingEntry<K, V>)e1).Conflicts) handler.Invoke(c, i++, state);
-                    if (p  is ImHashMapEntry<K, V> v2) handler.Invoke(v2, i++, state);
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p ).Conflicts) handler.Invoke(c, i++, state);
+                    if (p is ImHashMapEntry<K, V> v2) handler.Invoke(v2, i++, state);
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) handler.Invoke(c, i++, state);
                 }
                 else if (map is ImHashMap<K, V>.Leaf2Plus1Plus1 l211)
                 {
-                    var p  = l211.Plus;
+                    var p = l211.Plus;
                     var pp = l211.L.Plus;
                     var ph = pp.Hash;
-                    var l  = l211.L.L;
+                    var l = l211.L.L;
                     ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, swap = null;
                     if (ph < e1.Hash)
                     {
@@ -6235,8 +6155,8 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e1).Conflicts) handler.Invoke(c, i++, state);
                     if (pp is ImHashMapEntry<K, V> v2) handler.Invoke(v2, i++, state);
                     else foreach (var c in ((HashConflictingEntry<K, V>)pp).Conflicts) handler.Invoke(c, i++, state);
-                    if (p  is ImHashMapEntry<K, V> v3) handler.Invoke(v3, i++, state);
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts)  handler.Invoke(c, i++, state);
+                    if (p is ImHashMapEntry<K, V> v3) handler.Invoke(v3, i++, state);
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) handler.Invoke(c, i++, state);
                 }
                 else if (map is ImHashMap<K, V>.Leaf5 l5)
                 {
@@ -6253,9 +6173,9 @@ namespace DryIoc.ImTools
                 }
                 else if (map is ImHashMap<K, V>.Leaf5Plus1 l51)
                 {
-                    var p  = l51.Plus;
+                    var p = l51.Plus;
                     var ph = p.Hash;
-                    var l  = l51.L;
+                    var l = l51.L;
                     ImHashMap<K, V>.Entry e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
                     if (ph < e4.Hash)
                     {
@@ -6288,13 +6208,13 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e3).Conflicts) handler.Invoke(c, i++, state);
                     if (e4 is ImHashMapEntry<K, V> v4) handler.Invoke(v4, i++, state);
                     else foreach (var c in ((HashConflictingEntry<K, V>)e4).Conflicts) handler.Invoke(c, i++, state);
-                    if (p  is ImHashMapEntry<K, V> v5) handler.Invoke(v5, i++, state);
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts)  handler.Invoke(c, i++, state);
+                    if (p is ImHashMapEntry<K, V> v5) handler.Invoke(v5, i++, state);
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) handler.Invoke(c, i++, state);
                 }
                 else if (map is ImHashMap<K, V>.Leaf5Plus1Plus1 l511)
                 {
                     var l = l511.L.L;
-                    ImHashMap<K, V>.Entry 
+                    ImHashMap<K, V>.Entry
                         e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus, swap = null;
                     var h = pp.Hash;
                     if (h < e4.Hash)
@@ -6356,15 +6276,15 @@ namespace DryIoc.ImTools
                     else foreach (var c in ((HashConflictingEntry<K, V>)e4).Conflicts) handler.Invoke(c, i++, state);
                     if (pp is ImHashMapEntry<K, V> v5) handler.Invoke(v5, i++, state);
                     else foreach (var c in ((HashConflictingEntry<K, V>)pp).Conflicts) handler.Invoke(c, i++, state);
-                    if (p  is ImHashMapEntry<K, V> v6) handler.Invoke(v6, i++, state);
-                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts)  handler.Invoke(c, i++, state);
+                    if (p is ImHashMapEntry<K, V> v6) handler.Invoke(v6, i++, state);
+                    else foreach (var c in ((HashConflictingEntry<K, V>)p).Conflicts) handler.Invoke(c, i++, state);
                 }
 
                 if (count == 0)
                     break; // we yield the leaf and there is nothing in stack - we are DONE!
 
                 var b = parents.Get(--count); // otherwise get the parent
-                if (b is ImHashMap<K,V>.Branch2 pb2)
+                if (b is ImHashMap<K, V>.Branch2 pb2)
                 {
                     if (pb2.MidEntry is ImHashMapEntry<K, V> v) handler.Invoke(v, i++, state);
                     else foreach (var c in ((HashConflictingEntry<K, V>)pb2.MidEntry).Conflicts) handler.Invoke(c, i++, state);
@@ -6381,7 +6301,7 @@ namespace DryIoc.ImTools
                     br3Wrapper = null; // set to null to mark that the wrapper is in use and longer shared
                     map = pb3.Middle;
                 }
-                else 
+                else
                 {
                     br3Wrapper = (GoRightInBranch3<K, V>)b;
                     if (br3Wrapper.Br3.Entry1 is ImHashMapEntry<K, V> v) handler.Invoke(v, i++, state);
@@ -6407,12 +6327,12 @@ namespace DryIoc.ImTools
 
         /// <summary>Converts map to an array with the minimum allocations</summary>
         public static S[] ToArray<K, V, S>(this ImHashMap<K, V> map, Func<ImHashMapEntry<K, V>, S> selector) =>
-            map == ImHashMap<K, V>.Empty ? ArrayTools.Empty<S>() : 
+            map == ImHashMap<K, V>.Empty ? ArrayTools.Empty<S>() :
                 map.ForEach(St.Rent(new S[map.Count()], selector), (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
 
         /// <summary>Converts map to an array with the minimum allocations</summary>
         public static ImHashMapEntry<K, V>[] ToArray<K, V>(this ImHashMap<K, V> map) =>
-            map == ImHashMap<K, V>.Empty ? ArrayTools.Empty<ImHashMapEntry<K, V>>() : 
+            map == ImHashMap<K, V>.Empty ? ArrayTools.Empty<ImHashMapEntry<K, V>>() :
                 map.ForEach(new ImHashMapEntry<K, V>[map.Count()], (e, i, a) => a[i] = e);
 
         /// <summary>Converts the map to the dictionary</summary>
@@ -6457,7 +6377,7 @@ namespace DryIoc.ImTools
         {
             var e = map.GetEntryOrNull(hash);
             if (e is HashConflictingEntry<K, V> c)
-                foreach (var x in c.Conflicts) 
+                foreach (var x in c.Conflicts)
                     if (x.Key.Equals(key))
                         return x;
 
@@ -6477,7 +6397,7 @@ namespace DryIoc.ImTools
             }
             else if (e is HashConflictingEntry<K, V> hc)
             {
-                foreach (var x in hc.Conflicts) 
+                foreach (var x in hc.Conflicts)
                     if (x.Key.Equals(key))
                         return x.Value;
             }
@@ -6503,7 +6423,7 @@ namespace DryIoc.ImTools
             }
             else if (e is HashConflictingEntry<K, V> hc)
             {
-                foreach (var x in hc.Conflicts) 
+                foreach (var x in hc.Conflicts)
                     if (x.Key == key)
                         return x.Value;
             }
@@ -6526,8 +6446,8 @@ namespace DryIoc.ImTools
             }
             else if (e is HashConflictingEntry<K, V> hc)
             {
-                foreach (var x in hc.Conflicts) 
-                    if (x.Key.Equals(key)) 
+                foreach (var x in hc.Conflicts)
+                    if (x.Key.Equals(key))
                     {
                         value = x.Value;
                         return true;
@@ -6554,8 +6474,8 @@ namespace DryIoc.ImTools
             }
             else if (e is HashConflictingEntry<K, V> hc)
             {
-                foreach (var x in hc.Conflicts) 
-                    if (x.Key == key) 
+                foreach (var x in hc.Conflicts)
+                    if (x.Key == key)
                     {
                         value = x.Value;
                         return true;
@@ -6581,7 +6501,7 @@ namespace DryIoc.ImTools
             if (mapOrOldEntry is ImHashMap<K, V>.Entry oldEntry && oldEntry != newEntry)
             {
                 if (oldEntry is ImHashMapEntry<K, V> kv)
-                    return kv.Key.Equals(newEntry.Key) ? oldEntry 
+                    return kv.Key.Equals(newEntry.Key) ? oldEntry
                         : map.ReplaceEntry(hash, oldEntry, new HashConflictingEntry<K, V>(hash, kv, newEntry));
 
                 var key = newEntry.Key;
@@ -6595,7 +6515,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) 
+        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value)
         {
             var newEntry = new ImHashMapEntry<K, V>(hash, key, value);
             if (map == ImHashMap<K, V>.Empty)
@@ -6610,7 +6530,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Adds or updates (no in-place mutation) the map with the new entry, always returning the NEW map!</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdateEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) 
+        public static ImHashMap<K, V> AddOrUpdateEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry)
         {
             if (map == ImHashMap<K, V>.Empty)
                 return newEntry;
@@ -6630,7 +6550,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update) 
+        public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update)
         {
             var newEntry = new ImHashMapEntry<K, V>(hash, key, value);
             if (map == ImHashMap<K, V>.Empty)
@@ -6663,7 +6583,7 @@ namespace DryIoc.ImTools
             map.AddOrUpdate(key.GetHashCode(), key, value, update);
 
         /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
-        public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) 
+        public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, int hash, K key, V value)
         {
             var entry = map.GetEntryOrNull(hash);
             if (entry == null)
@@ -6685,7 +6605,7 @@ namespace DryIoc.ImTools
             map.Update(key.GetHashCode(), key, value);
 
         /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
-        public static ImHashMap<K, V> UpdateToDefault<K, V>(this ImHashMap<K, V> map, int hash, K key) 
+        public static ImHashMap<K, V> UpdateToDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
         {
             var entry = map.GetEntryOrNull(hash);
             if (entry == null)
@@ -6715,8 +6635,8 @@ namespace DryIoc.ImTools
                 return map;
 
             if (entry is ImHashMapEntry<K, V> kv)
-                return !kv.Key.Equals(key) || ReferenceEquals(kv.Value, value = update(key, kv.Value, value)) 
-                    ? map 
+                return !kv.Key.Equals(key) || ReferenceEquals(kv.Value, value = update(key, kv.Value, value))
+                    ? map
                     : map.ReplaceEntry(hash, entry, new ImHashMapEntry<K, V>(hash, key, value));
 
             var cs = ((HashConflictingEntry<K, V>)entry).Conflicts;
@@ -6734,7 +6654,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrKeepEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) 
+        public static ImHashMap<K, V> AddOrKeepEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry)
         {
             if (map == ImHashMap<K, V>.Empty)
                 return newEntry;
@@ -6774,7 +6694,7 @@ namespace DryIoc.ImTools
                 return kv.Key.Equals(newEntry.Key) ? oldEntry : (ImHashMap<K, V>.Entry)new HashConflictingEntry<K, V>(oldEntry.Hash, kv, newEntry);
 
             var hc = (HashConflictingEntry<K, V>)oldEntry;
-            var key  = newEntry.Key;
+            var key = newEntry.Key;
             var cs = hc.Conflicts;
             var n = cs.Length;
             var i = n - 1;
@@ -6791,7 +6711,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImHashMap<K, V> AddOrKeep<K, V>(this ImHashMap<K, V> map, K key, V value) => 
+        public static ImHashMap<K, V> AddOrKeep<K, V>(this ImHashMap<K, V> map, K key, V value) =>
             map.AddOrKeep(key.GetHashCode(), key, value);
 
         /// <summary>Returns the new map without the specified hash and key (if found) or returns the same map otherwise</summary>
@@ -6845,7 +6765,7 @@ namespace DryIoc.ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static ImMapEntry<V> Entry<V>(int hash, V value) => new ImMapEntry<V>(hash, value);
 
-        private sealed class GoRightInBranch3<V> 
+        private sealed class GoRightInBranch3<V>
         {
             public ImMap<V>.Branch3 Br3;
         }
@@ -6894,9 +6814,9 @@ namespace DryIoc.ImTools
                 }
                 else if (map is ImMap<V>.Leaf2Plus1 l21)
                 {
-                    var p  = l21.Plus;
+                    var p = l21.Plus;
                     var ph = p.Hash;
-                    var l  = l21.L;
+                    var l = l21.L;
                     ImMapEntry<V> e0 = l.Entry0, e1 = l.Entry1, swap = null;
                     if (ph < e1.Hash)
                     {
@@ -6909,14 +6829,14 @@ namespace DryIoc.ImTools
 
                     yield return e0;
                     yield return e1;
-                    yield return p ;
+                    yield return p;
                 }
                 else if (map is ImMap<V>.Leaf2Plus1Plus1 l211)
                 {
-                    var p  = l211.Plus;
+                    var p = l211.Plus;
                     var pp = l211.L.Plus;
                     var ph = pp.Hash;
-                    var l  = l211.L.L;
+                    var l = l211.L.L;
                     ImMapEntry<V> e0 = l.Entry0, e1 = l.Entry1, swap = null;
                     if (ph < e1.Hash)
                     {
@@ -6944,7 +6864,7 @@ namespace DryIoc.ImTools
                     yield return e0;
                     yield return e1;
                     yield return pp;
-                    yield return p ;
+                    yield return p;
                 }
                 else if (map is ImMap<V>.Leaf5 l5)
                 {
@@ -6956,9 +6876,9 @@ namespace DryIoc.ImTools
                 }
                 else if (map is ImMap<V>.Leaf5Plus1 l51)
                 {
-                    var p  = l51.Plus;
+                    var p = l51.Plus;
                     var ph = p.Hash;
-                    var l  = l51.L;
+                    var l = l51.L;
                     ImMapEntry<V> e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
                     if (ph < e4.Hash)
                     {
@@ -6986,12 +6906,12 @@ namespace DryIoc.ImTools
                     yield return e2;
                     yield return e3;
                     yield return e4;
-                    yield return p ;
+                    yield return p;
                 }
                 else if (map is ImMap<V>.Leaf5Plus1Plus1 l511)
                 {
                     var l = l511.L.L;
-                    ImMapEntry<V> 
+                    ImMapEntry<V>
                         e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus, swap = null;
                     var h = pp.Hash;
                     if (h < e4.Hash)
@@ -7047,7 +6967,7 @@ namespace DryIoc.ImTools
                     yield return e3;
                     yield return e4;
                     yield return pp;
-                    yield return p ;
+                    yield return p;
                 }
 
                 if (count == 0)
@@ -7069,7 +6989,7 @@ namespace DryIoc.ImTools
                     br3Wrapper = null; // set to null to mark that the wrapper is in use and longer shared
                     map = pb3.Middle;
                 }
-                else 
+                else
                 {
                     br3Wrapper = (GoRightInBranch3<V>)b;
                     yield return br3Wrapper.Br3.Entry1;
@@ -7112,7 +7032,7 @@ namespace DryIoc.ImTools
                     map = b3.Left;
                     continue;
                 }
-                
+
                 if (map is ImMapEntry<V> l1)
                     handler(l1, i++, state);
                 else if (map is ImMap<V>.Leaf2 l2)
@@ -7122,9 +7042,9 @@ namespace DryIoc.ImTools
                 }
                 else if (map is ImMap<V>.Leaf2Plus1 l21)
                 {
-                    var p  = l21.Plus;
+                    var p = l21.Plus;
                     var ph = p.Hash;
-                    var l  = l21.L;
+                    var l = l21.L;
                     ImMapEntry<V> e0 = l.Entry0, e1 = l.Entry1, swap = null;
                     if (ph < e1.Hash)
                     {
@@ -7137,14 +7057,14 @@ namespace DryIoc.ImTools
 
                     handler(e0, i++, state);
                     handler(e1, i++, state);
-                    handler(p,  i++, state);
+                    handler(p, i++, state);
                 }
                 else if (map is ImMap<V>.Leaf2Plus1Plus1 l211)
                 {
-                    var p  = l211.Plus;
+                    var p = l211.Plus;
                     var pp = l211.L.Plus;
                     var ph = pp.Hash;
-                    var l  = l211.L.L;
+                    var l = l211.L.L;
                     ImMapEntry<V> e0 = l.Entry0, e1 = l.Entry1, swap = null;
                     if (ph < e1.Hash)
                     {
@@ -7172,7 +7092,7 @@ namespace DryIoc.ImTools
                     handler(e0, i++, state);
                     handler(e1, i++, state);
                     handler(pp, i++, state);
-                    handler(p,  i++, state);
+                    handler(p, i++, state);
                 }
                 else if (map is ImMap<V>.Leaf5 l5)
                 {
@@ -7184,9 +7104,9 @@ namespace DryIoc.ImTools
                 }
                 else if (map is ImMap<V>.Leaf5Plus1 l51)
                 {
-                    var p  = l51.Plus;
+                    var p = l51.Plus;
                     var ph = p.Hash;
-                    var l  = l51.L;
+                    var l = l51.L;
                     ImMapEntry<V> e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, swap = null;
                     if (ph < e4.Hash)
                     {
@@ -7214,12 +7134,12 @@ namespace DryIoc.ImTools
                     handler(e2, i++, state);
                     handler(e3, i++, state);
                     handler(e4, i++, state);
-                    handler(p , i++, state);
+                    handler(p, i++, state);
                 }
                 else if (map is ImMap<V>.Leaf5Plus1Plus1 l511)
                 {
                     var l = l511.L.L;
-                    ImMapEntry<V> 
+                    ImMapEntry<V>
                         e0 = l.Entry0, e1 = l.Entry1, e2 = l.Entry2, e3 = l.Entry3, e4 = l.Entry4, p = l511.Plus, pp = l511.L.Plus, swap = null;
                     var h = pp.Hash;
                     if (h < e4.Hash)
@@ -7275,7 +7195,7 @@ namespace DryIoc.ImTools
                     handler(e3, i++, state);
                     handler(e4, i++, state);
                     handler(pp, i++, state);
-                    handler(p , i++, state);
+                    handler(p, i++, state);
                 }
 
                 if (count == 0)
@@ -7297,7 +7217,7 @@ namespace DryIoc.ImTools
                     br3Wrapper = null; // set to null to mark that the wrapper is in use and longer shared
                     map = pb3.Middle;
                 }
-                else 
+                else
                 {
                     br3Wrapper = (GoRightInBranch3<V>)b;
                     handler(br3Wrapper.Br3.Entry1, i++, state);
@@ -7424,7 +7344,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Updates the map with the new value if the hash is found otherwise returns the same unchanged map.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> Update<V>(this ImMap<V> map, int hash, V value) 
+        public static ImMap<V> Update<V>(this ImMap<V> map, int hash, V value)
         {
             var entry = map.GetEntryOrNull(hash);
             return entry == null ? map : map.ReplaceEntry(hash, entry, new ImMapEntry<V>(hash, value));
@@ -7440,7 +7360,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> AddOrKeepEntry<V>(this ImMap<V> map, ImMapEntry<V> newEntry) 
+        public static ImMap<V> AddOrKeepEntry<V>(this ImMap<V> map, ImMapEntry<V> newEntry)
         {
             if (map == ImMap<V>.Empty)
                 return newEntry;
@@ -7450,7 +7370,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the hash is already present</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static ImMap<V> AddOrKeep<V>(this ImMap<V> map, int hash, V value) 
+        public static ImMap<V> AddOrKeep<V>(this ImMap<V> map, int hash, V value)
         {
             var newEntry = new ImMapEntry<V>(hash, value); // todo: @perf newEntry may not be needed here - consider the pooling of entries here
             if (map == ImMap<V>.Empty)
@@ -7522,7 +7442,7 @@ namespace DryIoc.ImTools
         public static bool TryFind<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, out V value, int partHashMask = PARTITION_HASH_MASK)
         {
             var p = parts[hash & partHashMask];
-            if (p != null) 
+            if (p != null)
                 return p.TryFind(hash, key, out value);
             value = default(V);
             return false;
@@ -7537,11 +7457,11 @@ namespace DryIoc.ImTools
         /// <summary>Lookup for the value by the key using the hash code and checking the key with the `object.ReferenceEquals` for equality,
         /// returns the `true` and the found value or the `false`</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, out V value, 
+        public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, out V value,
             int partHashMask = PARTITION_HASH_MASK) where K : class
         {
             var p = parts[hash & partHashMask];
-            if (p != null) 
+            if (p != null)
                 return p.TryFindByReferenceEquals(hash, key, out value);
             value = default(V);
             return false;
@@ -7550,7 +7470,7 @@ namespace DryIoc.ImTools
         /// <summary>Lookup for the value by the key using its hash and checking the key with the `object.ReferenceEquals` for equality, 
         /// returns the default `V` if hash, key are not found.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, K key, int partHashMask = PARTITION_HASH_MASK) where K : class => 
+        public static V GetValueOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V>[] parts, K key, int partHashMask = PARTITION_HASH_MASK) where K : class =>
             parts.GetValueOrDefaultByReferenceEquals(key.GetHashCode(), key, partHashMask);
 
         /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
@@ -7564,7 +7484,7 @@ namespace DryIoc.ImTools
         }
 
         /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
-        [MethodImpl((MethodImplOptions) 256)]
+        [MethodImpl((MethodImplOptions)256)]
         public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, K key, V value, int partHashMask = PARTITION_HASH_MASK) =>
             parts.AddOrUpdate(key.GetHashCode(), key, value, partHashMask);
 
@@ -7572,7 +7492,7 @@ namespace DryIoc.ImTools
             Ref.Swap(ref part, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v));
 
         /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
-        [MethodImpl((MethodImplOptions) 256)]
+        [MethodImpl((MethodImplOptions)256)]
         public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, Update<K, V> update,
             int partHashMask = PARTITION_HASH_MASK)
         {
@@ -7593,8 +7513,8 @@ namespace DryIoc.ImTools
         }
 
         /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partion</summary>
-        [MethodImpl((MethodImplOptions) 256)]
-        public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] parts, K key, V value, 
+        [MethodImpl((MethodImplOptions)256)]
+        public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] parts, K key, V value,
             int partHashMask = PARTITION_HASH_MASK) =>
             parts.AddOrKeep(key.GetHashCode(), key, value, partHashMask);
 
@@ -7609,7 +7529,7 @@ namespace DryIoc.ImTools
         {
             if (parents == null)
                 parents = new MapParentStack();
-            foreach (var map in parts) 
+            foreach (var map in parts)
             {
                 if (map == ImHashMap<K, V>.Empty)
                     continue;
@@ -7621,12 +7541,12 @@ namespace DryIoc.ImTools
         /// <summary>Do something for each entry.
         /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
         /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
-        public static S ForEach<K, V, S>(this ImHashMap<K, V>[] parts, S state, Action<ImHashMapEntry<K, V>, int, S> handler, 
+        public static S ForEach<K, V, S>(this ImHashMap<K, V>[] parts, S state, Action<ImHashMapEntry<K, V>, int, S> handler,
             MapParentStack parents = null)
         {
             if (parents == null)
                 parents = new MapParentStack();
-            foreach (var map in parts) 
+            foreach (var map in parts)
             {
                 if (map == ImHashMap<K, V>.Empty)
                     continue;
@@ -7673,15 +7593,15 @@ namespace DryIoc.ImTools
         public static bool TryFind<V>(this ImMap<V>[] parts, int hash, out V value, int partHashMask = PARTITION_HASH_MASK)
         {
             var p = parts[hash & partHashMask];
-            if (p != null) 
+            if (p != null)
                 return p.TryFind(hash, out value);
             value = default(V);
             return false;
         }
 
         /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
-        [MethodImpl((MethodImplOptions) 256)]
-        public static void AddOrUpdate<V>(this ImMap<V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK) 
+        [MethodImpl((MethodImplOptions)256)]
+        public static void AddOrUpdate<V>(this ImMap<V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK)
         {
             ref var part = ref parts[hash & partHashMask];
             var p = part;
@@ -7693,7 +7613,7 @@ namespace DryIoc.ImTools
             Ref.Swap(ref part, hash, value, (x, h, v) => x.AddOrUpdate(h, v));
 
         /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
-        [MethodImpl((MethodImplOptions) 256)]
+        [MethodImpl((MethodImplOptions)256)]
         public static void AddOrUpdate<V>(this ImMap<V>[] parts, int hash, V value, Update<int, V> update, int partHashMask = PARTITION_HASH_MASK)
         {
             ref var part = ref parts[hash & partHashMask];
@@ -7717,7 +7637,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Updates the map with the new value if the hash is found otherwise returns the same unchanged map.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void Update<V>(this ImMap<V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK) 
+        public static void Update<V>(this ImMap<V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK)
         {
             ref var part = ref parts[hash & partHashMask];
             var p = part;
@@ -7736,7 +7656,7 @@ namespace DryIoc.ImTools
         {
             if (parents == null)
                 parents = new MapParentStack();
-            foreach (var map in parts) 
+            foreach (var map in parts)
             {
                 if (map == ImMap<V>.Empty)
                     continue;
@@ -7752,7 +7672,7 @@ namespace DryIoc.ImTools
         {
             if (parents == null)
                 parents = new MapParentStack();
-            foreach (var map in parts) 
+            foreach (var map in parts)
             {
                 if (map == ImMap<V>.Empty)
                     continue;

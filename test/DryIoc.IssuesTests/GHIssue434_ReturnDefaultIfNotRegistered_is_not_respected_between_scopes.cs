@@ -6,24 +6,6 @@ namespace DryIoc.IssuesTests
     public class GHIssue434_ReturnDefaultIfNotRegistered_is_not_respected_between_scopes
     {
         [Test]
-        public void Test_UseInstance()
-        {
-            var container = new Container();
-
-            using (var scope = container.OpenScope())
-            {
-                var foo = scope.Resolve<Foo>(IfUnresolved.ReturnDefaultIfNotRegistered); // Does not throw
-                scope.UseInstance<Foo>(new Foo()); // Do a registration within the scope
-            }
-
-            using (var scope = container.OpenScope())
-            {
-                var foo = scope.Resolve<Foo>(IfUnresolved.ReturnDefaultIfNotRegistered);
-                Assert.IsNull(foo);
-            }
-        }
-
-        [Test]
         public void Test_Use()
         {
             var container = new Container();

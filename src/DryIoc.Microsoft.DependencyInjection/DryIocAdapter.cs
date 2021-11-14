@@ -148,6 +148,10 @@ namespace DryIoc.Microsoft.DependencyInjection
             return container;
         }
 
+        /// <summary>Sugar to create the DryIoc container and adapter populated with services</summary>
+        public static IServiceProvider CreateServiceProvider(this IServiceCollection services) => 
+            new Container(DryIoc.Rules.MicrosoftDependencyInjectionRules).WithDependencyInjectionAdapter(services);
+
         /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
         public static IContainer WithCompositionRoot(this IContainer container, Type compositionRootType)
         {

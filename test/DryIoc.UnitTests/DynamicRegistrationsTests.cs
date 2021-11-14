@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using ImTools;
 using DryIoc.ImTools;
 
 namespace DryIoc.UnitTests
