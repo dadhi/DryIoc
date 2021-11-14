@@ -1180,7 +1180,7 @@ namespace DryIoc
 
             if (Rules.DynamicRegistrationProviders != null &&
                 !serviceType.IsExcludedGeneralPurposeServiceType() &&
-                !((IContainer)this).IsWrapper(serviceType))
+                !((IContainer)this).IsWrapper(serviceType, openGenericServiceType))
                 factories = CombineRegisteredServiceWithDynamicFactories(factories, serviceType, openGenericServiceType, serviceKey);
 
             if (factories.Length == 0)
@@ -1329,7 +1329,7 @@ namespace DryIoc
 
             if (Rules.DynamicRegistrationProviders != null && 
                 !serviceType.IsExcludedGeneralPurposeServiceType() &&
-                !((IContainer)this).IsWrapper(serviceType))
+                !((IContainer)this).IsWrapper(serviceType, openGenericServiceType))
                 factories = CombineRegisteredServiceWithDynamicFactories(factories, serviceType, openGenericServiceType);
 
             if (factories.Length == 0)
