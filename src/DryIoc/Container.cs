@@ -1743,7 +1743,7 @@ namespace DryIoc
             // to prevent duplicate keys and peeking the wrong factory by collection wrappers
             // NOTE: Given that dynamic registration always return the same implementation types in the same order
             // then the dynamic key will be assigned deterministically, so that even if `CombineRegisteredWithDynamicFactories`
-            // is called multiple times during the resolution (like for `ResolveMany`) it is possible to match the required factory by its order.
+            // is called multiple times during the resolution (like for `ResolveMany` ???) it is possible to match the required factory by its order.
             DefaultDynamicKey dynamicKey = null;
 
             var dynamicFlags = Rules.DynamicRegistrationFlags;
@@ -4876,8 +4876,10 @@ namespace DryIoc
                 for (var i = 0; i < items.Length; i++)
                 {
                     var item = items[i];
-                    var itemRequest = request.Push(itemType, item.OptionalServiceKey,
-                        IfUnresolved.ReturnDefaultIfNotRegistered, requiredServiceType: item.ServiceType);
+
+                    var itemInfo = ServiceInfo.Of(itemType, item.ServiceType, IfUnresolved.ReturnDefaultIfNotRegistered, item.OptionalServiceKey);
+                    var itemRequest = request.Push(itemInfo);
+                        //factory: item.Factory);
 
                     var itemExpr = container.ResolveFactory(itemRequest)?.GetExpressionOrDefault(itemRequest);
                     if (itemExpr != null)
