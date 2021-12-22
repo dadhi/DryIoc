@@ -8960,7 +8960,7 @@ namespace DryIoc
             var depDepth = DependencyDepth;
             ref var req = ref GetOrPushPooledRequest(RequestStack, depDepth);
             if (req == null)
-                req = new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
+                req = new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs, factory);
             else
                 req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
             return req;
@@ -9159,12 +9159,12 @@ namespace DryIoc
         {
             var factoryId = factory.FactoryID;
             var decoratedFactoryID = 0;
-            if (Factory != null) // resolving the factory for the second time, usually happens in decorators
+            if (Factory != null && FactoryID != 0) // resolving the factory for the second time, usually happens in decorators, FactoryID is 0 for factory resolved for collection item
             {
-                if (Factory.FactoryID == factoryId)
+                if (FactoryID == factoryId)
                     return this; // stop resolving to the same factory twice
 
-                if (Factory.FactoryType != FactoryType.Decorator &&
+                if (FactoryType != FactoryType.Decorator &&
                     factory.FactoryType == FactoryType.Decorator)
                     decoratedFactoryID = FactoryID;
             }
@@ -9464,6 +9464,14 @@ namespace DryIoc
             object factoryOrImplType, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
             : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, actualServiceType, inputArgExprs) =>
             SetResolvedFactory(factoryOrImplType, factoryID, factoryType, reuse, decoratedFactoryID);
+
+        // Request with collection item factory
+        private Request(IContainer container,
+            Request parent, int dependencyDepth, int dependencyCount, RequestStack stack,
+            RequestFlags flags, object serviceInfo, Type actualServiceType, Expression[] inputArgExprs,
+            Factory factory)
+            : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, actualServiceType, inputArgExprs) =>
+            _factoryOrImplType = factory;
 
         /// Severe the connection with the request pool up to the parent so that no one can change the Request state
         internal Request IsolateRequestChain()
