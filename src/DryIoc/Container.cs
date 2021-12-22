@@ -8947,7 +8947,7 @@ namespace DryIoc
 
         /// <summary>Creates new request with provided info, and links current request as a parent.
         /// The factory is the one resolved for the collection item.</summary>
-        public Request Push(ServiceInfo info, Factory factory) // todo: @wip factory is unused
+        public Request Push(ServiceInfo info, Factory factory) // todo: @wip factory is not fully used
         {
             if (FactoryID == 0)
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
@@ -8960,9 +8960,10 @@ namespace DryIoc
             var depDepth = DependencyDepth;
             ref var req = ref GetOrPushPooledRequest(RequestStack, depDepth);
             if (req == null)
-                req = new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs, factory);
-            else
-                req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
+                return new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs, factory);
+
+            req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
+            req._factoryOrImplType = factory;
             return req;
         }
 
