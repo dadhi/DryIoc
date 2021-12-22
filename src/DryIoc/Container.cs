@@ -4878,8 +4878,7 @@ namespace DryIoc
                     var item = items[i];
 
                     var itemInfo = ServiceInfo.Of(itemType, item.ServiceType, IfUnresolved.ReturnDefaultIfNotRegistered, item.OptionalServiceKey);
-                    var itemRequest = request.Push(itemInfo);
-                        //factory: item.Factory);
+                    var itemRequest = request.Push(itemInfo, item.Factory);
 
                     var itemExpr = container.ResolveFactory(itemRequest)?.GetExpressionOrDefault(itemRequest);
                     if (itemExpr != null)
@@ -8010,6 +8009,7 @@ namespace DryIoc
         Ignored
     }
 
+    // todo: @perf @memory split by IfUnresolved and separate the Metadata
     /// <summary>Provides optional service resolution details: service key, required service type, what return when service is unresolved,
     /// default value if service is unresolved, custom service value.</summary>
     public sealed class ServiceDetails
@@ -8932,6 +8932,27 @@ namespace DryIoc
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
 
             var flags = Flags & InheritedFlags | additionalFlags;
+
+            if (_serviceInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
+                info = info.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
+
+            var depDepth = DependencyDepth;
+            ref var req = ref GetOrPushPooledRequest(RequestStack, depDepth);
+            if (req == null)
+                req = new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
+            else
+                req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
+            return req;
+        }
+
+        /// <summary>Creates new request with provided info, and links current request as a parent.
+        /// The factory is the one resolved for the collection item.</summary>
+        public Request Push(ServiceInfo info, Factory factory) // todo: @wip factory is unused
+        {
+            if (FactoryID == 0)
+                Throw.It(Error.PushingToRequestWithoutFactory, info, this);
+
+            var flags = Flags & InheritedFlags;
 
             if (_serviceInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
                 info = info.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
