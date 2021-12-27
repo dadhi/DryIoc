@@ -4949,7 +4949,7 @@ namespace DryIoc
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
             {
-                var serviceFactory = container.ResolveFactory(serviceRequest);
+                var serviceFactory = factory ?? container.ResolveFactory(serviceRequest);
                 if (serviceFactory == null)
                     return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
                 serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);

@@ -137,9 +137,8 @@ namespace DryIoc.MefAttributedModel
                 made: _createLazyWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
 
-            var lazyFactory = new ExpressionFactory(r =>
-                WrappersSupport.GetLazyExpressionOrDefault(r, nullWrapperForUnresolvedService: true),
-                setup: Setup.Wrapper);
+            var lazyFactory = new WrapperExpressionFactory((r, f) =>
+                WrappersSupport.GetLazyExpressionOrDefault(r, f, nullWrapperForUnresolvedService: true));
             container.Register(typeof(Lazy<>), lazyFactory, IfAlreadyRegistered.Replace);
 
             return container;
