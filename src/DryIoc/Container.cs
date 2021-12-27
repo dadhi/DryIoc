@@ -4743,7 +4743,7 @@ namespace DryIoc
                 new ExpressionFactory(GetLazyEnumerableExpressionOrDefault, setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
-                new ExpressionFactory(r => GetLazyExpressionOrDefault(r), setup: Setup.Wrapper));
+                new WrapperExpressionFactory((r, f) => GetLazyExpressionOrDefault(r, f)));
 
             wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
                 new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
@@ -4875,7 +4875,7 @@ namespace DryIoc
             Array.Sort(items); // to resolve the items in order of registration
 
             var itemExprs = new Expression[items.Length];
-            var e = 0;
+            var itemExprIndex = 0;
             for (var i = 0; i < items.Length; i++)
             {
                 var item = items[i];
@@ -4903,11 +4903,11 @@ namespace DryIoc
 
                 var itemExpr = factory.GetExpressionOrDefault(itemRequest);
                 if (itemExpr != null)
-                    itemExprs[e++] = itemExpr;
+                    itemExprs[itemExprIndex++] = itemExpr;
             }
 
-            if (e < itemExprs.Length)
-                Array.Resize(ref itemExprs, e);
+            if (itemExprIndex < itemExprs.Length)
+                Array.Resize(ref itemExprs, itemExprIndex);
             return NewArrayInit(itemType, itemExprs);
         }
 
@@ -4938,8 +4938,9 @@ namespace DryIoc
         /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
         /// <param name="request">The resolution request.</param>
         /// <param name="nullWrapperForUnresolvedService">if set to <c>true</c> then check for service registration before creating resolution expression.</param>
+        /// <param name="factory">The already resolved factory by the collection or the higher wrapper.</param>
         /// <returns>Expression: <c><![CDATA[r => new Lazy<TService>(() => r.Resolve{TService}(key, ifUnresolved, requiredType))]]></c></returns>
-        public static Expression GetLazyExpressionOrDefault(Request request, bool nullWrapperForUnresolvedService = false)
+        public static Expression GetLazyExpressionOrDefault(Request request, Factory factory = null, bool nullWrapperForUnresolvedService = false)
         {
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericArguments()[0];
@@ -8797,7 +8798,7 @@ namespace DryIoc
         public RequestFlags Flags; // todo: @perf combine with the FactoryType or other numeric fields
 
         // todo: @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
-        /// mutable, so that the ServiceKey or IfUnresolved can be changed in place.
+        // The field is mutable so that the ServiceKey or IfUnresolved can be changed in place.
         internal object _serviceInfo; // the Type or the ServiceInfo
 
         /// <summary>Input arguments provided with `Resolve`</summary>
@@ -9182,7 +9183,8 @@ namespace DryIoc
         {
             var factoryId = factory.FactoryID;
             var decoratedFactoryID = 0;
-            if (Factory != null && FactoryID != 0) // resolving the factory for the second time, usually happens in decorators, FactoryID is 0 for factory resolved for collection item
+            // resolving the factory for the second time, usually happens in decorators, FactoryID is 0 for factory resolved for collection item
+            if (Factory != null && FactoryID != 0)
             {
                 if (FactoryID == factoryId)
                     return this; // stop resolving to the same factory twice
@@ -9230,7 +9232,7 @@ namespace DryIoc
                     (reuse as CurrentScopeReuse)?.ScopedOrSingleton == true;
 
                 // Means we are incrementing the count when resolving the Factory for the first time,
-                // and not twice for the decorators
+                // and not twice for the decorators (for the decorator the Factory would be not null and set to the Decorator factory)
                 var dependencyCountIncrement = Factory == null ? 1 : 0;
 
                 for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
@@ -10037,16 +10039,22 @@ namespace DryIoc
         /// <summary>Returns the closed-generic generated factory or `null`</summary>
         public virtual Factory GetGeneratedFactoryOrDefault(Request request, bool ifErrorReturnDefault = false) => null;
 
-        /// <summary>The main factory method to create service expression, e.g. "new Client(new Service())".
+        /// <summary>The main factory method to create a service expression, e.g. "new Client(new Service())".
         /// If <paramref name="request"/> has <see cref="Request.InputArgExprs"/> specified, they could be used in expression.</summary>
-        /// <param name="request">Service request.</param>
-        /// <returns>Created expression.</returns>
         public abstract Expression CreateExpressionOrDefault(Request request);
+
+        /// <summary>Passes to expession creation the factory found by the collection or higher wrapper.
+        /// The method is implemented by the wrappers. By default we just ignoring the passed factory and relying on the re-Resolve - it is a usual path.</summary>
+        public virtual Expression CreateExpressionWithWrappedFactory(Request request, Factory factory) => CreateExpressionOrDefault(request);
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
         public virtual Expression GetExpressionOrDefault(Request request)
         {
+            // The factory usually is null unleast it is provided by the collection or other higher wrapper.
+            // We are storing it in the local variable here because the WithResolvedFactory on the next line will override it with "this" factory.
+            var wrappedFactory = request.FactoryID == 0 ? request.Factory : null;
+
             request = request.WithResolvedFactory(this);
 
             // First look for decorators if it is not already a decorator
@@ -10146,7 +10154,7 @@ namespace DryIoc
             }
 
             // At last, create the object graph with all of the dependencies created and injected
-            serviceExpr = CreateExpressionOrDefault(request);
+            serviceExpr = wrappedFactory == null ? CreateExpressionOrDefault(request) : CreateExpressionWithWrappedFactory(request, wrappedFactory);
             if (serviceExpr == null)
             {
                 Container.TryThrowUnableToResolve(request);
@@ -11509,7 +11517,7 @@ namespace DryIoc
         public override Setup Setup { get; } // todo: @perf split
         private readonly Func<Request, Expression> _getServiceExpression;
 
-        /// <summary>Wraps provided delegate into factory.</summary>
+        /// <summary>Constructor</summary>
         public ExpressionFactory(Func<Request, Expression> getServiceExpression, IReuse reuse = null, Setup setup = null)
         {
             _getServiceExpression = getServiceExpression.ThrowIfNull();
@@ -11517,8 +11525,32 @@ namespace DryIoc
             Setup = setup ?? Setup.Default;
         }
 
-        /// <summary>Creates service expression using wrapped delegate.</summary>
+        /// <inheritdoc/>
         public override Expression CreateExpressionOrDefault(Request request) => _getServiceExpression(request);
+    }
+
+    /// <summary>Creates service expression using client provided expression factory delegate.</summary>
+    public sealed class WrapperExpressionFactory : Factory
+    {
+        /// <inheritdoc/>
+        public override IReuse Reuse { get; } // todo: @perf split
+        /// <inheritdoc/>
+        public override Setup Setup { get; } // todo: @perf split
+        private readonly Func<Request, Factory, Expression> _getServiceExpression;
+
+        /// <summary>Constructor</summary>
+        public WrapperExpressionFactory(Func<Request, Factory, Expression> getServiceExpression, IReuse reuse = null, Setup setup = null)
+        {
+            _getServiceExpression = getServiceExpression;
+            Reuse = reuse;
+            Setup = setup ?? Setup.Wrapper;
+        }
+
+        /// <inheritdoc/>
+        public override Expression CreateExpressionOrDefault(Request request) => _getServiceExpression(request, null);
+
+        /// <inheritdoc/>
+        public override Expression CreateExpressionWithWrappedFactory(Request request, Factory factory) => _getServiceExpression(request, factory);
     }
 
     /// <summary>Wraps the instance in registry</summary>
@@ -11622,7 +11654,7 @@ namespace DryIoc
             if (serviceType.IsArray)
                 serviceType = typeof(IEnumerable<>).MakeGenericType(serviceType.GetElementType());
 
-            // todo: @perf Prevents from costly `WithResolvedFactory` call
+            // todo: @perf Prevents the costly `WithResolvedFactory` call
             // todo: @hack with IContainer cast - move to the interface
             var c = (Container)request.Container;
             if (c._registry.Value is Container.Registry r && !r.Decorators.IsEmpty)
