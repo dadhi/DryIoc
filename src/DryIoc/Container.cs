@@ -4893,6 +4893,7 @@ namespace DryIoc
                     var condition = factory.Setup.Condition;
                     if (condition != null && !condition(itemRequest))
                         continue;
+                    // make the closing of the open-generic as the last check because it perf hog and some items may be already filtered out by predecessor checks.
                     if (factory.GeneratedFactories != null)
                         factory = factory.GetGeneratedFactoryOrDefault(itemRequest);
                 }
