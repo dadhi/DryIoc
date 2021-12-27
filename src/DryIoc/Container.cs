@@ -4868,24 +4868,45 @@ namespace DryIoc
             if (metadataKey != null || metadata != null)
                 items = items.Match(metadataKey, metadata, (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
 
-            var itemExprs = Empty<Expression>();
-            if (!items.IsNullOrEmpty())
+            if (items.IsNullOrEmpty())
+                return NewArrayInit(itemType, Empty<Expression>());
+
+            // todo: @perf replace explicit Sort with the insertion of the resolved expressions (which may be less than items) in the right position
+            Array.Sort(items); // to resolve the items in order of registration
+
+            var itemExprs = new Expression[items.Length];
+            var e = 0;
+            for (var i = 0; i < items.Length; i++)
             {
-                Array.Sort(items); // to resolve the items in order of registration
+                var item = items[i];
 
-                for (var i = 0; i < items.Length; i++)
+                var itemInfo = ServiceInfo.Of(itemType, item.ServiceType, IfUnresolved.ReturnDefaultIfNotRegistered, item.OptionalServiceKey);
+                var itemRequest = request.Push(itemInfo, item.Factory);
+
+                var factory = item.Factory;
+                if (itemType != item.ServiceType)
+                    factory = container.ResolveFactory(itemRequest);
+                else
                 {
-                    var item = items[i];
-
-                    var itemInfo = ServiceInfo.Of(itemType, item.ServiceType, IfUnresolved.ReturnDefaultIfNotRegistered, item.OptionalServiceKey);
-                    var itemRequest = request.Push(itemInfo, item.Factory);
-
-                    var itemExpr = container.ResolveFactory(itemRequest)?.GetExpressionOrDefault(itemRequest);
-                    if (itemExpr != null)
-                        itemExprs = itemExprs.Append(itemExpr);
+                    if (!itemRequest.MatchFactoryReuse(factory))
+                        continue;
+                    var condition = factory.Setup.Condition;
+                    if (condition != null && !condition(itemRequest))
+                        continue;
+                    if (factory.GeneratedFactories != null)
+                        factory = factory.GetGeneratedFactoryOrDefault(itemRequest);
                 }
+
+                if (factory == null)
+                    continue;
+
+                var itemExpr = factory.GetExpressionOrDefault(itemRequest);
+                if (itemExpr != null)
+                    itemExprs[e++] = itemExpr;
             }
 
+            if (e < itemExprs.Length)
+                Array.Resize(ref itemExprs, e);
             return NewArrayInit(itemType, itemExprs);
         }
 
