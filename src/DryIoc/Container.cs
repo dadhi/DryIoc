@@ -1444,6 +1444,8 @@ namespace DryIoc
 
         bool IContainer.IsWrapper(Type serviceType, Type openGenericServiceType)
         {
+            if (serviceType.IsArray)
+                return true;
             var r = _registry.Value as Registry;
             var wrappers = r != null ? r.Wrappers : WrappersSupport.Wrappers;
             return wrappers.GetValueOrDefault(serviceType) != null // todo: @todo reorder things to get faster results for the open-generic wrappers - for the rest perf won't change 
