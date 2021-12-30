@@ -22,7 +22,7 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<MyService>(x.ImportedServices[0].Value);
         }
 
-        [Test]
+        [Test, Ignore("todo: @fixme")]
         public void SuperSlowTest()
         {
             var dynamicRulesTriggered = new List<object>();
