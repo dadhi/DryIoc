@@ -231,6 +231,24 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Should_NOT_resolve_any_Scoped_meta_of_service_from_the_root_container()
+        {
+            var container = new Container();
+
+            container.Register<Zzz>();
+            container.Register<IService<string>, Service<string>>(Reuse.Scoped, setup: Setup.With(metadataOrFuncOfMetadata: 3));
+
+            var ex = Assert.Throws<ContainerException>(() => 
+                container.Resolve<Zzz>());
+
+        }
+
+        class Zzz
+        {
+            public Zzz(Meta<IService<string>, int> s) {}
+        }
+
+        [Test]
         public void When_one_service_is_registered_with_name_and_other_is_default_only_one_named_should_be_resolved()
         {
             var container = new Container();

@@ -995,7 +995,7 @@ namespace DryIoc
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
             // so there should not be repeating of the check, and not match of Performance decrease.
             if (factories.Length > 1)
-                factories = factories.Match(request, (r, x) => r.MatchGeneratedFactory(x));
+                factories = factories.Match(request, (r, x) => r.MatchGeneratedFactory(x.Value));
 
             if (factories.Length > 1)
             {
@@ -1129,7 +1129,7 @@ namespace DryIoc
             // Match open-generic implementation with closed service type. Performance is OK because the generated factories are cached -
             // so there should not be repeating of the check, and not match of Performance decrease.
             if (matchedFactories.Length > 1)
-                matchedFactories = matchedFactories.Match(request, (r, x) => r.MatchGeneratedFactory(x));
+                matchedFactories = matchedFactories.Match(request, (r, x) => r.MatchGeneratedFactory(x.Value));
 
             if (matchedFactories.Length == 0)
                 return null;
@@ -4732,7 +4732,7 @@ namespace DryIoc
         {
             var wrappers = ImHashMap<Type, object>.Empty;
 
-            var arrayExpr = new ExpressionFactory(GetArrayExpression, setup: Setup.Wrapper);
+            var arrayExpr = new ExpressionFactory(r => GetArrayExpression(r), setup: Setup.Wrapper);
             CollectionWrapperID = arrayExpr.FactoryID;
 
             var arrayInterfaces = SupportedCollectionTypes;
@@ -4740,43 +4740,43 @@ namespace DryIoc
                 wrappers = wrappers.AddOrUpdate(arrayInterfaces[i], arrayExpr);
 
             wrappers = wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
-                new ExpressionFactory(GetLazyEnumerableExpressionOrDefault, setup: Setup.Wrapper));
+                new ExpressionFactory(r => GetLazyEnumerableExpressionOrDefault(r), setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
                 new WrapperExpressionFactory((r, f) => GetLazyExpressionOrDefault(r, f)));
 
             wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
-                new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
+                new ExpressionFactory(r => GetKeyValuePairExpressionOrDefault(r), setup: Setup.WrapperWith(1)));
 
             wrappers = wrappers.AddOrUpdate(typeof(Meta<,>),
-                new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
+                new WrapperExpressionFactory((r, f) => GetMetaExpressionOrDefault(r, f), setup: Setup.WrapperWith(0)));
 
             wrappers = wrappers.AddOrUpdate(typeof(Tuple<,>),
-                new ExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
+                new WrapperExpressionFactory((r, f) => GetMetaExpressionOrDefault(r, f), setup: Setup.WrapperWith(0)));
 
             wrappers = wrappers.AddOrUpdate(typeof(System.Linq.Expressions.LambdaExpression),
-                new ExpressionFactory(GetLambdaExpressionExpressionOrDefault, setup: Setup.Wrapper));
+                new ExpressionFactory(r => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(FastExpressionCompiler.LightExpression.LambdaExpression),
-                new ExpressionFactory(GetFastExpressionCompilerLambdaExpressionExpressionOrDefault, setup: Setup.Wrapper));
+                new ExpressionFactory(r => GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate),
-                new ExpressionFactory(GetFactoryDelegateExpressionOrDefault, setup: Setup.Wrapper));
+                new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate<>),
-                new ExpressionFactory(GetFactoryDelegateExpressionOrDefault, setup: Setup.WrapperWith(0)));
+                new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.WrapperWith(0)));
 
             wrappers = wrappers.AddOrUpdate(typeof(Func<>),
-                new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.Wrapper));
+                new ExpressionFactory(r => GetFuncOrActionExpressionOrDefault(r), setup: Setup.Wrapper));
 
             // Skip the `i == 0` because `Func<>` type was added above
             for (var i = 1; i < FuncTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(FuncTypes[i],
-                    new ExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.WrapperWith(i)));
+                    new ExpressionFactory(r => GetFuncOrActionExpressionOrDefault(r), setup: Setup.WrapperWith(i)));
 
             for (var i = 0; i < ActionTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(ActionTypes[i],
-                    new ExpressionFactory(GetFuncOrActionExpressionOrDefault,
+                    new ExpressionFactory(r => GetFuncOrActionExpressionOrDefault(r),
                     setup: Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
 
             wrappers = wrappers.AddContainerInterfaces();
@@ -4879,29 +4879,25 @@ namespace DryIoc
             for (var i = 0; i < items.Length; i++)
             {
                 var item = items[i];
+                requiredItemType = item.ServiceType;
+                var itemInfo = ServiceInfo.Of(itemType, requiredItemType, IfUnresolved.ReturnDefaultIfNotRegistered, item.OptionalServiceKey);
+                var itemRequest = request.Push(itemInfo);
 
-                var itemInfo = ServiceInfo.Of(itemType, item.ServiceType, IfUnresolved.ReturnDefaultIfNotRegistered, item.OptionalServiceKey);
-                var itemRequest = request.Push(itemInfo, item.Factory);
-
-                var factory = item.Factory;
-                if (itemType != item.ServiceType)
-                    factory = container.ResolveFactory(itemRequest);
+                Factory factory;
+                if (itemType == requiredItemType)
+                {
+                    // We at least looking at the unwrapped type, so we may that type factory condition
+                    factory = itemRequest.MatchFactoryOrNull(item.Factory);
+                }
                 else
                 {
-                    if (!itemRequest.MatchFactoryReuse(factory))
-                        continue;
-                    var condition = factory.Setup.Condition;
-                    if (condition != null && !condition(itemRequest))
-                        continue;
-                    // make the closing of the open-generic as the last check because it perf hog and some items may be already filtered out by predecessor checks.
-                    if (factory.GeneratedFactories != null)
-                        factory = factory.GetGeneratedFactoryOrDefault(itemRequest);
+                    // We need to resolve the wrapper factory (the usual case with the required service different from the item service type)
+                    factory = container.ResolveFactory(itemRequest);
+                    // Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all available information
+                    itemRequest._factoryOrImplType = item.Factory;
                 }
 
-                if (factory == null)
-                    continue;
-
-                var itemExpr = factory.GetExpressionOrDefault(itemRequest);
+                var itemExpr = factory?.GetExpressionOrDefault(itemRequest);
                 if (itemExpr != null)
                     itemExprs[itemExprIndex++] = itemExpr;
             }
@@ -5084,37 +5080,97 @@ namespace DryIoc
         /// registered factories with the same metadata type ignoring keys.
         /// - if metadata is IDictionary{string, object},
         ///  then the First value matching the TMetadata type will be returned.</summary>
-        public static Expression GetMetaExpressionOrDefault(Request request)
+        public static Expression GetMetaExpressionOrDefault(Request request, Factory serviceFactory = null)
         {
             var metaType = request.GetActualServiceType();
             var typeArgs = metaType.GetGenericArguments();
-            var metaCtor = metaType.GetConstructorOrNull(typeArgs)
-                .ThrowIfNull(Error.NotFoundMetaCtorWithTwoArgs, typeArgs, request);
+            var metaCtor = metaType.GetConstructorOrNull(typeArgs).ThrowIfNull(Error.NotFoundMetaCtorWithTwoArgs, typeArgs, request);
 
             var metadataType = typeArgs[1];
             var serviceType = typeArgs[0];
 
-            var container = request.Container;
             var details = request.GetServiceDetails();
+            var serviceKey = details.ServiceKey;
+
+            var container = request.Container;
             var requiredServiceType = container.GetWrappedType(serviceType, details.RequiredServiceType);
 
-            // todo: @perf if resolving the Meta inside the IEnumerable which is the usual case then we call GetAllServiceFactories all over again for each item in the enumerable
-            var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true); // todo: @perf use the GetServiceRegisteredAndDynamicFactories
-            if (factories.Length == 0)
-                return null;
-
-            var serviceKey = details.ServiceKey;
-            if (serviceKey != null)
+            // The factory is passed from the higher wrapper (collection or other).
+            // It was already checked by the higher wrapper so no need to repeat the check here.
+            if (serviceFactory != null)
             {
-                factories = factories.Match(serviceKey, (key, f) => key.Equals(f.Key));
-                if (factories.Length == 0)
+                // The check is only relevant to metadata, the higher wrappers know nothing about it.
+                if (!MatchMetadataType(metadataType, serviceFactory))
                     return null;
             }
-
-            // if the service keys for some reason are not unique
-            factories = factories.Match(metadataType, (mType, f) =>
+            else
             {
-                var metadata = f.Value.Setup.Metadata;
+                // todo: @perf use the GetServiceRegisteredAndDynamicFactories
+                var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true);
+                if (factories.Length == 0)
+                    return null;
+
+                if (serviceKey != null)
+                {
+                    factories = factories.Match(serviceKey, (key, f) => key.Equals(f.Key));
+                    if (factories.Length == 0)
+                        return null;
+                }
+
+                // if the service keys for some reason are not unique
+                factories = factories.Match(metadataType, (mType, f) => MatchMetadataType(mType, f.Value));
+                if (factories.Length == 0)
+                    return null;
+
+                // Prevent non-determinism when more than 1 factory is matching the metadata
+                if (factories.Length > 1)
+                {
+                    if (details.IfUnresolved == IfUnresolved.Throw)
+                        Throw.It(Error.UnableToSelectFromManyRegistrationsWithMatchingMetadata, metadataType, factories, request);
+                    return null;
+                }
+
+                var keyedFactory = factories[0];
+                if (keyedFactory == null)
+                    return null;
+
+                // The key may be different in case of initial serviceKey was null.
+                // It even may be a non-default key, see Should_resolve_any_named_service_with_corresponding_metadata_If_name_is_not_specified_in_resolve
+                serviceKey     = keyedFactory.Key;
+                serviceFactory = keyedFactory.Value;
+            }
+
+            var serviceRequest = request.Push(ServiceInfo.Of(serviceType, serviceKey));
+
+            Factory factory;
+            if (requiredServiceType == serviceType)
+            {
+                // We at least looking at the unwrapped type, so we may check that type factory condition
+                factory = serviceRequest.MatchFactoryOrNull(serviceFactory);
+            }
+            else
+            {
+                // Going to resolve the nested wrapper (the usual case when required is different from the service type)
+                factory = container.ResolveFactory(serviceRequest);
+                // Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all available information
+                serviceRequest._factoryOrImplType = serviceFactory;
+            }
+
+            var serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
+            if (serviceExpr == null)
+                return null;
+
+            var resultMetadata = serviceFactory.Setup.Metadata;
+            if (metadataType != typeof(object) &&
+                resultMetadata is IDictionary<string, object> resultMetadataDict && metadataType != typeof(IDictionary<string, object>))
+                resultMetadata = resultMetadataDict.Values.FirstOrDefault(oldMap => metadataType.IsTypeOf(oldMap));
+
+            var metadataExpr = container.GetConstantExpression(resultMetadata, metadataType);
+            return New(metaCtor, serviceExpr, metadataExpr);
+
+            bool MatchMetadataType(Type mType, Factory f)
+            {
+                var metadata = f.Setup.Metadata;
                 if (metadata == null)
                     return false;
 
@@ -5132,41 +5188,7 @@ namespace DryIoc
                 }
 
                 return mType.IsTypeOf(metadata);
-            });
-
-            if (factories.Length == 0)
-                return null;
-
-            // Prevent non-determinism when more than 1 factory is matching the metadata
-            if (factories.Length > 1)
-            {
-                if (details.IfUnresolved == IfUnresolved.Throw)
-                    Throw.It(Error.UnableToSelectFromManyRegistrationsWithMatchingMetadata, metadataType, factories, request);
-                return null;
             }
-
-            var factory = factories[0];
-            if (factory == null)
-                return null;
-
-            serviceKey = factory.Key;
-
-            var serviceRequest = request.Push(serviceType, serviceKey);
-            var serviceFactory = container.ResolveFactory(serviceRequest);
-            var serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
-            if (serviceExpr == null)
-                return null;
-
-            var resultMetadata = factory.Value.Setup.Metadata;
-            if (metadataType != typeof(object))
-            {
-                var resultMetadataDict = resultMetadata as IDictionary<string, object>;
-                if (resultMetadataDict != null && metadataType != typeof(IDictionary<string, object>))
-                    resultMetadata = resultMetadataDict.Values.FirstOrDefault(oldMap => metadataType.IsTypeOf(oldMap));
-            }
-
-            var metadataExpr = container.GetConstantExpression(resultMetadata, metadataType);
-            return New(metaCtor, serviceExpr, metadataExpr);
         }
     }
 
@@ -8399,7 +8421,7 @@ namespace DryIoc
         /// <summary>Creates info out of the provided settings</summary>
         public static ServiceInfo Of(Type serviceType, object serviceKey) =>
             serviceKey == null ? new Typed(serviceType) :
-            new WithDetails(serviceType, ServiceDetails.Of(null, serviceKey, IfUnresolved.Throw, null, null, null));
+            new WithDetails(serviceType, ServiceDetails.Of(null, serviceKey, IfUnresolved.Throw, null, null, null)); // todo: @perf introduce details just with the key
 
         /// <summary>Creates info out of provided settings</summary>
         public static ServiceInfo Of(Type serviceType, ServiceDetails details) =>
@@ -8645,10 +8667,25 @@ namespace DryIoc
         }
 
         public static bool MatchFactoryReuse(this Request r, Factory f) => f.Reuse?.CanApply(r) ?? true;
-        public static bool MatchGeneratedFactory(this Request r, KV<object, Factory> f)
+
+        public static bool MatchGeneratedFactory(this Request r, Factory f) =>
+            f.GeneratedFactories == null || f.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true) != null;
+
+        public static Factory MatchFactoryOrNull(this Request r, Factory f)
         {
-            var fac = f.Value;
-            return fac.GeneratedFactories == null || fac.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true) != null;
+            var reuse = f.Reuse;
+            if (reuse != null && !reuse.CanApply(r))
+                return null;
+
+            var condition = f.Setup.Condition;
+            if (condition != null && !condition(r))
+                return null;
+
+            // make the closing of the open-generic as the last check because it perf hog and some items may be already filtered out by predecessor checks.
+            if (f.GeneratedFactories != null)
+                return f.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true);
+
+            return f;
         }
     }
 
@@ -8821,7 +8858,7 @@ namespace DryIoc
 
         /// <summary>Service implementation type if known.</summary>
         public Type ImplementationType => _factoryOrImplType as Type ?? Factory?.ImplementationType;
-        private object _factoryOrImplType;
+        internal object _factoryOrImplType;
 
         /// <summary>Service reuse.</summary>
         public IReuse Reuse { get; private set; }
@@ -8965,28 +9002,6 @@ namespace DryIoc
                 req = new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
             else
                 req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
-            return req;
-        }
-
-        /// <summary>Creates new request with provided info, and links current request as a parent.
-        /// The factory is the one resolved for the collection item.</summary>
-        public Request Push(ServiceInfo info, Factory factory) // todo: @wip factory is not fully used
-        {
-            if (FactoryID == 0)
-                Throw.It(Error.PushingToRequestWithoutFactory, info, this);
-
-            var flags = Flags & InheritedFlags;
-
-            if (_serviceInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
-                info = info.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
-
-            var depDepth = DependencyDepth;
-            ref var req = ref GetOrPushPooledRequest(RequestStack, depDepth);
-            if (req == null)
-                return new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs, factory);
-
-            req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
-            req._factoryOrImplType = factory;
             return req;
         }
 
@@ -9489,14 +9504,6 @@ namespace DryIoc
             object factoryOrImplType, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
             : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, actualServiceType, inputArgExprs) =>
             SetResolvedFactory(factoryOrImplType, factoryID, factoryType, reuse, decoratedFactoryID);
-
-        // Request with collection item factory
-        private Request(IContainer container,
-            Request parent, int dependencyDepth, int dependencyCount, RequestStack stack,
-            RequestFlags flags, object serviceInfo, Type actualServiceType, Expression[] inputArgExprs,
-            Factory factory)
-            : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, actualServiceType, inputArgExprs) =>
-            _factoryOrImplType = factory;
 
         /// Severe the connection with the request pool up to the parent so that no one can change the Request state
         internal Request IsolateRequestChain()
@@ -10043,9 +10050,10 @@ namespace DryIoc
         /// If <paramref name="request"/> has <see cref="Request.InputArgExprs"/> specified, they could be used in expression.</summary>
         public abstract Expression CreateExpressionOrDefault(Request request);
 
-        /// <summary>Passes to expession creation the factory found by the collection or higher wrapper.
-        /// The method is implemented by the wrappers. By default we just ignoring the passed factory and relying on the re-Resolve - it is a usual path.</summary>
-        public virtual Expression CreateExpressionWithWrappedFactory(Request request, Factory factory) => CreateExpressionOrDefault(request);
+        /// <summary>The method is the optimization, its behavior should be the same as the `CreateExpressionOrDefault`.
+        /// It accepts the service factory found by the collection or higher wrapper.
+        /// Here in the default implementation we just ignoring the passed factory.</summary>
+        public virtual Expression CreateExpressionWithWrappedFactory(Request request, Factory serviceFactory) => CreateExpressionOrDefault(request);
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
@@ -10053,7 +10061,7 @@ namespace DryIoc
         {
             // The factory usually is null unleast it is provided by the collection or other higher wrapper.
             // We are storing it in the local variable here because the WithResolvedFactory on the next line will override it with "this" factory.
-            var wrappedFactory = request.FactoryID == 0 ? request.Factory : null;
+            var serviceFactory = request.FactoryID == 0 ? request.Factory : null;
 
             request = request.WithResolvedFactory(this);
 
@@ -10154,7 +10162,7 @@ namespace DryIoc
             }
 
             // At last, create the object graph with all of the dependencies created and injected
-            serviceExpr = wrappedFactory == null ? CreateExpressionOrDefault(request) : CreateExpressionWithWrappedFactory(request, wrappedFactory);
+            serviceExpr = serviceFactory == null ? CreateExpressionOrDefault(request) : CreateExpressionWithWrappedFactory(request, serviceFactory);
             if (serviceExpr == null)
             {
                 Container.TryThrowUnableToResolve(request);
@@ -11550,7 +11558,7 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request) => _getServiceExpression(request, null);
 
         /// <inheritdoc/>
-        public override Expression CreateExpressionWithWrappedFactory(Request request, Factory factory) => _getServiceExpression(request, factory);
+        public override Expression CreateExpressionWithWrappedFactory(Request request, Factory serviceFactory) => _getServiceExpression(request, serviceFactory);
     }
 
     /// <summary>Wraps the instance in registry</summary>
@@ -13743,7 +13751,7 @@ namespace DryIoc
         public static bool IsOpenGeneric(this Type type) => type.IsGenericType && type.ContainsGenericParameters;
 
         /// <summary>Returns generic type definition if type is generic and null otherwise.</summary>
-        [MethodImpl((MethodImplOptions)256)]
+        /// [MethodImpl((MethodImplOptions)256)]
         public static Type GetGenericDefinitionOrNull(this Type type) => type.IsGenericType ? type.GetGenericTypeDefinition() : null;
 
         /// <summary>If type is array returns is element type, otherwise returns null.</summary>

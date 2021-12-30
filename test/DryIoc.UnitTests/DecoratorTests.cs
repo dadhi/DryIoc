@@ -1065,11 +1065,7 @@ namespace DryIoc.UnitTests
         public class OperationUser<T> : IOperationUser<T>
         {
             public Meta<Func<IOperation<T>>, string> GetOperation { get; set; }
-
-            public OperationUser(Meta<Func<IOperation<T>>, string> getOperation)
-            {
-                GetOperation = getOperation;
-            }
+            public OperationUser(Meta<Func<IOperation<T>>, string> getOperation) => GetOperation = getOperation;
         }
 
         public interface IOperation
@@ -1160,11 +1156,7 @@ namespace DryIoc.UnitTests
         public class MeasureExecutionTimeOperationDecorator<T> : IOperation<T>
         {
             public IOperation<T> Decorated;
-
-            public MeasureExecutionTimeOperationDecorator(IOperation<T> operation)
-            {
-                Decorated = operation;
-            }
+            public MeasureExecutionTimeOperationDecorator(IOperation<T> operation) => Decorated = operation;
         }
 
         public class LazyDecorator : IOperation

@@ -1,6 +1,7 @@
 using System;
-using NUnit.Framework;
+using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using NUnit.Framework;
 using DryIoc.MefAttributedModel;
 
 namespace DryIoc.IssuesTests
@@ -24,7 +25,14 @@ namespace DryIoc.IssuesTests
         [Test]
         public void SuperSlowTest()
         {
-            var container = new Container().WithMef();
+            var dynamicRulesTriggered = new List<object>();
+            IEnumerable<DynamicRegistration> CountDynamicRulesTriggered(Type type, object key) 
+            { 
+                dynamicRulesTriggered.Add(new { type, key });
+                return null;
+            }
+
+            var container = new Container(rules => rules.WithDynamicRegistrations(CountDynamicRulesTriggered)).WithMef();
 
             container.Register<IService, MyService>(setup: Setup.With(metadataOrFuncOfMetadata: "42"));
 
@@ -32,6 +40,7 @@ namespace DryIoc.IssuesTests
             container.InjectPropertiesAndFields(x);
 
             Assert.IsInstanceOf<MyService>(x.ImportedServices[0].Value);
+            Assert.AreEqual(1, dynamicRulesTriggered.Count);
         }
 
         public class Slow
