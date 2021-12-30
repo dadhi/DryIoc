@@ -708,6 +708,21 @@ namespace PerformanceTests
                        BmarkDryIoc | 47,340.9 us | 175.076 us | 146.196 us | 368.47 |    3.79 |     90.9091 |           - |           - |            759.4 KB |
                    BmarkDryIocMsDi | 46,669.8 us | 302.005 us | 282.496 us | 363.92 |    4.44 |    181.8182 |     90.9091 |           - |           855.37 KB |
 
+            ## DryIoc v6 and DI.MS.DI v6
+
+            BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19043
+            Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+            .NET Core SDK=6.0.100
+            [Host]     : .NET Core 5.0.7 (CoreCLR 5.0.721.25508, CoreFX 5.0.721.25508), X64 RyuJIT
+            DefaultJob : .NET Core 5.0.7 (CoreCLR 5.0.721.25508, CoreFX 5.0.721.25508), X64 RyuJIT
+
+
+            |             Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+            |------------------- |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+            |             DryIoc | 82.05 us | 1.613 us | 2.695 us |  1.00 |    0.00 |  6.7139 | 0.3662 |     - |  41.65 KB |
+            | DryIoc_MsDIAdapter | 94.16 us | 1.201 us | 1.065 us |  1.17 |    0.06 |  8.5449 | 0.6104 |     - |  52.79 KB |
+            |               MsDI | 97.14 us | 1.337 us | 1.185 us |  1.21 |    0.06 | 13.7939 | 4.6387 |     - |  84.73 KB |
+
             */
 
             [Benchmark(Baseline = true)]
@@ -719,16 +734,16 @@ namespace PerformanceTests
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(PrepareDryIocMsDi());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            //[Benchmark]
             public object BmarkGraceMsDi() => Measure(PrepareGraceMsDi());
 
-            [Benchmark]
+            // [Benchmark]
             public object BmarkAutofac() => Measure(PrepareAutofac());
 
-            [Benchmark]
+            // [Benchmark]
             public object BmarkAutofacMsDi() => Measure(PrepareAutofacMsDi());
         }
 

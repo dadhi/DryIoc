@@ -421,7 +421,7 @@ namespace PerformanceTests
 
         public static IServiceProvider PrepareDryIocMsDi()
         {
-            var serviceProvider = DryIocAdapter.Create(AddServices());
+            var serviceProvider = DryIocAdapter.CreateServiceProvider(AddServices());
             ResolveDummyPopulation(serviceProvider);
             return serviceProvider;
         }
