@@ -11819,7 +11819,8 @@ namespace DryIoc
             // otherwise just return a constant
             var instanceExpr = request.Container.GetConstantExpression(Instance);
             var serviceType = request.GetActualServiceType();
-            if (serviceType.GetTypeInfo().IsAssignableFrom(ImplementationType.GetTypeInfo()))
+            var implType = ImplementationType;
+            if (implType != null && serviceType.GetTypeInfo().IsAssignableFrom(implType.GetTypeInfo()))
                 return instanceExpr;
             return Convert(instanceExpr, serviceType);
         }
