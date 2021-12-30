@@ -1,5 +1,4 @@
-﻿using System;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
@@ -26,26 +25,25 @@ namespace DryIoc.IssuesTests
             c.RegisterInstance<string>(null, setup: Setup.With(asResolutionCall: true));
 
             var s = c.Resolve<string>();
+            Assert.AreEqual(null, s);
+
             var a = c.Resolve<A>();
+            Assert.AreEqual(null, a.S);
 
             var a2 = c.Resolve<A>(new object[] { "Hello World" });
+            Assert.AreEqual("Hello World", a2.S);
 
             c.RegisterInstance<string>(null);
             var a3 = c.Resolve<A>();
+            Assert.AreEqual(null, a3.S);
 
             c.RegisterInstance<string>("Hello New Registration");
             var a4 = c.Resolve<A>();
+            Assert.AreEqual("Hello New Registration", a4.S);
 
             c.RegisterDelegate<string>(() => "Hello Another Registration");
             var a5 = c.Resolve<A>();
-
-            Console.WriteLine("Hello s: " + (s ?? "null"));
-            Console.WriteLine("Hello a.S: " + (a.S ?? "null"));
-            Console.WriteLine("Hello a2.S: " + (a2.S ?? "null"));
-            Console.WriteLine("Hello a3.S: " + (a3.S ?? "null"));
-
-            Console.WriteLine("Hello a4.S: " + (a4.S ?? "null"));
-            Console.WriteLine("Hello a5.S: " + (a5.S ?? "null"));
+            Assert.AreEqual("Hello Another Registration", a5.S);
         }
 
         class A
