@@ -6534,7 +6534,19 @@ namespace DryIoc
         /// <param name="mostResolvable">(optional) Instructs to select constructor with max number of params which all are resolvable.</param>
         /// <param name="includeNonPublic">(optional) Consider the non-public constructors.</param>
         /// <returns>Constructor or null if not found.</returns>
-        public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) => request =>
+        public static FactoryMethodSelector Constructor(bool mostResolvable = false, bool includeNonPublic = false) =>
+            mostResolvable 
+            ? (FactoryMethodSelector)(request => MostResolvableConstructor(request, includeNonPublic))
+            : (request => Constructor(request, includeNonPublic));
+
+        private static FactoryMethod Constructor(Request request, bool includeNonPublic)
+        {
+            var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+            var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
+            return ctors.Length == 1 ? new FactoryMethod(ctors[0]) : null;
+        }
+
+        private static FactoryMethod MostResolvableConstructor(Request request, bool includeNonPublic)
         {
             var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
             // todo: @perf we can inline this because we do double checking on the number of constructors
@@ -6546,10 +6558,6 @@ namespace DryIoc
             // if there is only one constructor then use it
             if (ctorCount == 1)
                 return new FactoryMethod(ctors[0]);
-
-            // stop here if you need a lookup for most resolvable constructor
-            if (!mostResolvable)
-                return null;
 
             var paramSelector = request.Rules.TryGetParameterSelector(request.Made)(request);
 
@@ -6681,7 +6689,7 @@ namespace DryIoc
                     Error.UnableToFindCtorWithAllResolvableArgs, request.InputArgExprs, request);
 
             return new FactoryMethod(mostResolvedCtor, mostResolvedExprs);
-        };
+        }
 
         /// <summary>Easy way to specify default constructor to be used for resolution.</summary>
         public static FactoryMethodSelector DefaultConstructor(bool includeNonPublic = false) => request =>
