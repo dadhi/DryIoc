@@ -5913,7 +5913,7 @@ namespace DryIoc
                     return null;
 
                 var factory = new ReflectionFactory(concreteType,
-                    made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
+                    made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam);
 
                 // to enable fallback to other rules if unresolved try to resolve expression first and return null
                 return factory.GetExpressionOrDefault(request.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null ? factory : null;
@@ -5947,7 +5947,7 @@ namespace DryIoc
 
                 // the condition checks that factory is resolvable
                 factory = new ReflectionFactory(implType, reuse,
-                    DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic,
+                    DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam,
                     Setup.With(condition: req => factory?.GetExpressionOrDefault(req.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null));
 
                 return factory;
@@ -6546,12 +6546,20 @@ namespace DryIoc
             return ctors.Length == 1 ? new FactoryMethod(ctors[0]) : null;
         }
 
-        private static FactoryMethod MostResolvableConstructor(Request request, bool includeNonPublic)
+        private static FactoryMethod MostResolvableConstructor(Request request, bool includeNonPublic, 
+            Func<Type, ParameterInfo[], bool> condition = null)
         {
             var implType = request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
             // todo: @perf we can inline this because we do double checking on the number of constructors
             var ctors = implType.Constructors(includeNonPublic).ToArrayOrSelf();
+
             var ctorCount = ctors.Length;
+            if (ctorCount != 0 && condition != null)
+            {
+                ctors = ctors.Match(condition, (cond, c) => cond(c.DeclaringType, c.GetParameters()));
+                ctorCount = ctors.Length;
+            }
+
             if (ctorCount == 0)
                 return null;
 
@@ -6707,6 +6715,12 @@ namespace DryIoc
         /// Works both for resolving service and Func{TArgs..., TService}</summary>
         public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublic =
             Constructor(mostResolvable: true, includeNonPublic: true);
+
+        /// <summary>Searches for a single constructor excluding the ones with the same implemengtation type as parameter.
+        /// Used by the AutoConcrete type resolution to avoid selection of recursive constructors like `Foo(Foo f)`</summary>
+        public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam =
+            request => MostResolvableConstructor(request, true,
+                (implType, ps) => ps.FindFirst(implType, (t, p) => t == p.ParameterType) == null);
 
         /// <summary>Just creates a thingy from the constructor</summary>
         public FactoryMethod(ConstructorInfo constructor) => 
