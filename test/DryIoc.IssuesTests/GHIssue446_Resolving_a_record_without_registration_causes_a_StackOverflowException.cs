@@ -13,6 +13,11 @@ namespace DryIoc.IssuesTests
             container.Resolve<Foo>();
         }
 
-        record Foo;
+        //record Foo;
+        class Foo
+        {
+            public Foo() {}
+            protected Foo(Foo f) {}
+        }
     }
 }
