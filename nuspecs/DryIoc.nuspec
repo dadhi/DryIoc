@@ -2,9 +2,9 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>4.8.5</version>
+        <version>4.8.6</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
         <icon>logo.png</icon>
@@ -14,6 +14,10 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v4.8.6 Bug-fix release
+
+- fixed: #446 Resolving a record without registration causes a StackOverflowException
+
 ## v4.8.5 Bug-fix release
 
 - fixed: NY bug of RegisterInstance of null string
