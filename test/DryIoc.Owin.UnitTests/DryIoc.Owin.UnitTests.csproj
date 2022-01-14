@@ -7,10 +7,6 @@
         <PackageReference Include="Microsoft.Owin.Testing" Version="4.2.0" />
     </ItemGroup>
 
-    <!-- <ItemGroup>
-        <Reference Include="System.Net.Http" />
-    </ItemGroup> -->
-
     <ItemGroup>
         <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
         <ProjectReference Include="..\..\src\DryIoc.Owin\DryIoc.Owin.csproj" />

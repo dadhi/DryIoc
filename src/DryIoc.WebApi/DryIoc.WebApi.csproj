@@ -27,10 +27,6 @@
         <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.2.7" />
     </ItemGroup>
 
-    <!-- <ItemGroup>
-        <Reference Include="System.Net.Http" />
-    </ItemGroup> -->
-
     <ItemGroup>
         <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
     </ItemGroup>

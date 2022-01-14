@@ -26,10 +26,6 @@
         <PackageReference Include="Microsoft.AspNet.WebApi.Owin" Version="5.2.7" />
     </ItemGroup>
 
-    <!-- <ItemGroup>
-        <Reference Include="System.Net.Http" />
-    </ItemGroup> -->
-
     <ItemGroup>
         <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
         <ProjectReference Include="..\DryIoc.Owin\DryIoc.Owin.csproj" />
