@@ -116,7 +116,7 @@ namespace DryIoc
 
             if (IsDisposed)
             {
-                s += " has been DISPOSED!" + NewLine;
+                s += " is disposed!" + NewLine;
                 if (_disposeStackTrace != null)
                     s += " Dispose stack-trace " + _disposeStackTrace;
                 else
@@ -4915,10 +4915,10 @@ namespace DryIoc
         /// <summary>Returns root resolver for the singletons or the non scoped dependency of singletons, 
         /// or the current resolver for the rest.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
-            request.Reuse is CurrentScopeReuse == false &&
+            request.Reuse is CurrentScopeReuse == false && 
             request.DirectParent.IsSingletonOrDependencyOfSingleton &&
             !request.OpensResolutionScope && 
-            request.Rules.ThrowIfDependencyHasShorterReuseLifespan
+            request.Rules.ThrowIfDependencyHasShorterReuseLifespan // todo: @bug introduced by fixing the #378
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 

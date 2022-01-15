@@ -29,9 +29,8 @@ namespace DryIoc.IssuesTests
             c.RegisterExports(typeof(DecoratedService), typeof(UndecoratedService), typeof(DependencyService));
 
             // 2. IDecoratedService should be created via a factory method
-            var decoratorSetup = Setup.DecoratorWith(useDecorateeReuse: false);
             var factoryMethod = new Func<Lazy<IDecoratedService>, IDecoratedService>(DecorateService).Method;
-            c.Register(typeof(IDecoratedService), reuse: Reuse.Transient, made: Made.Of(factoryMethod), setup: decoratorSetup);
+            c.Register(typeof(IDecoratedService), reuse: Reuse.Transient, made: Made.Of(factoryMethod), setup: Setup.DecoratorWith(useDecorateeReuse: false));
 
             // global scope is opened once on application startup
             using (var globalScope = c.OpenScope())
