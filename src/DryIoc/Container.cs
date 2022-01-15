@@ -5275,7 +5275,8 @@ namespace DryIoc
         {
             var lazyType       = request.GetActualServiceType();
             var serviceType    = lazyType.GetGenericParamsAndArgs()[0];
-            var serviceRequest = request.PushServiceType(serviceType);
+            // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
+            var serviceRequest = request.PushServiceType(serviceType, RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
 
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
@@ -9205,8 +9206,7 @@ namespace DryIoc
         /// <summary>Returns true if request is First in First Resolve call.</summary>
         public bool OpensResolutionScope => !IsEmpty && (DirectParent.Flags & RequestFlags.OpensResolutionScope) != 0;
 
-        /// <summary>Checks if the request Or its parent is wrapped in Func.
-        /// Use <see cref="IsDirectlyWrappedInFunc"/> for the direct Func wrapper.</summary>
+        /// <summary>Checks if the request Or its parent is wrapped in Func. Use `IsDirectlyWrappedInFunc` for the direct Func wrapper.</summary>
         public bool IsWrappedInFunc() => (Flags & RequestFlags.IsWrappedInFunc) != 0;
 
         /// <summary>Checks if the request is directly wrapped in Func</summary>
@@ -10528,7 +10528,7 @@ namespace DryIoc
         protected virtual Expression ApplyReuse(Expression serviceExpr, Request request)
         {
             // This optimization eagerly creates singleton during the construction of object graph
-            // Singleton is created once and then is stred for the container lifetime (until Сontainer.SingletonScope is disposed).
+            // Singleton is created once and then is stored for the container lifetime (until Сontainer.SingletonScope is disposed).
             // That's why we are always intepreting them even if `Rules.WithoutInterpretationForTheFirstResolution()` is set.
             if (request.Reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
                 !request.TracksTransientDisposable && !request.IsWrappedInFunc())
