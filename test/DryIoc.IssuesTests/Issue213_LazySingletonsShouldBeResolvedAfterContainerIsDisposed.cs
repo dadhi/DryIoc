@@ -25,7 +25,7 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(machine.Truc);
         }
 
-        //[Test]
+        [Test]
         public void Lazy_singletons_should_resolve_after_container_disposed_without_throwing_for_captive_dependency()
         {
             var container = new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan());

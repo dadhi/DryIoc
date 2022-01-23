@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
+using FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -10,14 +11,42 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_FactoryMethod_fails();
-            Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_RegisterDelegate_fails();
+            Minimal_test();
+            Resolve_undecorated_singleton_with_lazy_scoped_dependency_from_the_scope_should_succeed();
+            Resolve_undecorated_lazy_singleton_with_lazy_scoped_dependency_from_the_scope_should_succeed();
+            // Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_FactoryMethod_fails();
+            //Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_RegisterDelegate_fails_with_allow_captive_dependency_rule();
             Nested_scopes_decorated_resolution_should_throw_the_DependencyHasShorterReuseLifespan();
 
-            return 3;
+            return 6;
         }
 
         [Test]
+        public void Minimal_test()
+        {
+            var c = new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan());
+
+            c.Register<A>(Reuse.Singleton);
+            c.Register<D>(Reuse.Singleton);
+
+            A a;
+            using (var s = c.OpenScope())
+            {
+                a = s.Resolve<A>();
+            }
+
+            Assert.IsNotNull(a.D.Value);
+        }
+
+        class A
+        {
+            public Lazy<D> D;
+            public A(Lazy<D> d) => D = d;
+        }
+
+        class D { }
+
+        //[Test]
         public void Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_FactoryMethod_fails()
         {
             var c = new Container().WithMef()
@@ -29,8 +58,8 @@ namespace DryIoc.IssuesTests
             c.RegisterExports(typeof(DecoratedService), typeof(UndecoratedService), typeof(DependencyService));
 
             // 2. IDecoratedService should be created via a factory method
-            var factoryMethod = new Func<Lazy<IDecoratedService>, IDecoratedService>(DecorateService).Method;
-            c.Register(typeof(IDecoratedService), reuse: Reuse.Transient, made: Made.Of(factoryMethod), setup: Setup.DecoratorWith(useDecorateeReuse: false));
+            c.RegisterDelegate<Lazy<IDecoratedService>, IDecoratedService>(
+                DecorateService, Reuse.Transient, setup: Setup.DecoratorWith(useDecorateeReuse: false));
 
             // global scope is opened once on application startup
             using (var globalScope = c.OpenScope())
@@ -58,19 +87,16 @@ namespace DryIoc.IssuesTests
         }
 
         [Test]
-        public void Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_RegisterDelegate_fails()
+        public void Resolve_undecorated_singleton_with_lazy_scoped_dependency_from_the_scope_should_succeed()
         {
             var c = new Container().WithMef()
                 .With(rules => rules
                 .WithoutThrowIfDependencyHasShorterReuseLifespan()
                 .WithDefaultReuse(Reuse.Scoped));
 
-            // 1. default registrations
-            c.RegisterExports(typeof(DecoratedService), typeof(DependencyService));
-
-            // 2. IDecoratedService should be created via a factory method
-            var decoratorSetup = Setup.DecoratorWith(useDecorateeReuse: false);
-            c.RegisterDelegate<Lazy<IDecoratedService>, IDecoratedService>(DecorateService, Reuse.Transient, decoratorSetup);
+            // The DependencyService would be scoped because of the container default reuse,
+            // so it happens it will be resolved from the resolver of the singleton parent which is root container instead of scope
+            c.RegisterExports(typeof(UndecoratedService), typeof(DependencyService));
 
             // global scope is opened once on application startup
             using (var globalScope = c.OpenScope())
@@ -80,6 +106,68 @@ namespace DryIoc.IssuesTests
                 {
                     Assert.DoesNotThrow(() =>
                     {
+                        var decorated = requestScope.Resolve<IUndecoratedService>();
+                        decorated.Hello();
+                    },
+                    "Failed to resolve the undecorated singleton service with scoped dependency!");
+                }
+            }
+        }
+
+        [Test]
+        public void Resolve_undecorated_lazy_singleton_with_lazy_scoped_dependency_from_the_scope_should_succeed()
+        {
+            var c = new Container().WithMef()
+                .With(rules => rules
+                .WithoutThrowIfDependencyHasShorterReuseLifespan()
+                .WithoutEagerCachingSingletonForFasterAccess()
+                .WithDefaultReuse(Reuse.Scoped));
+
+            // The DependencyService would be scoped because of the container default reuse,
+            // so it happens it will be resolved from the resolver of the singleton parent which is root container instead of scope
+            c.RegisterExports(typeof(UndecoratedService), typeof(DependencyService));
+
+            // global scope is opened once on application startup
+            using (var globalScope = c.OpenScope())
+            {
+                // request scopes are created for each request
+                using (var requestScope = globalScope.OpenScope())
+                {
+                    Assert.DoesNotThrow(() =>
+                    {
+                        var decorated = requestScope.Resolve<IUndecoratedService>();
+                        decorated.Hello();
+                    },
+                    "Failed to resolve the undecorated singleton service with scoped dependency!");
+                }
+            }
+        }
+
+        //[Test]
+        public void Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_RegisterDelegate_fails_with_allow_captive_dependency_rule()
+        {
+            var c = new Container().WithMef()
+                .With(rules => rules
+                .WithoutThrowIfDependencyHasShorterReuseLifespan()
+                .WithDefaultReuse(Reuse.Scoped));
+
+            // The DependencyService would be scoped because of the container default reuse,
+            // so it happens it will be resolved from the resolver of the singleton parent which is root container instead of scope
+            c.RegisterExports(typeof(DecoratedService), typeof(DependencyService));
+
+            // IDecoratedService should be created via a factory method
+            c.RegisterDelegate<Lazy<IDecoratedService>, IDecoratedService>(DecorateService, 
+                Reuse.Transient, Setup.DecoratorWith(useDecorateeReuse: false));
+
+            // global scope is opened once on application startup
+            using (var globalScope = c.OpenScope())
+            {
+                // request scopes are created for each request
+                using (var requestScope = globalScope.OpenScope())
+                {
+                    Assert.DoesNotThrow(() =>
+                    {
+                        //var decoratedExpr = requestScope.Resolve<LambdaExpression>(typeof(IDecoratedService));
                         var decorated = requestScope.Resolve<IDecoratedService>();
                         decorated.Hello();
                     },
@@ -95,10 +183,11 @@ namespace DryIoc.IssuesTests
                 .With(rules => rules
                 .WithDefaultReuse(Reuse.Scoped));
 
-            // 1. default registrations
+            // The DependencyService would be scoped because of the container default reuse and 
+            // the Decorator will also be a scoped becuase it does not specify as reuse.
             c.RegisterExports(typeof(DecoratedService), typeof(DependencyService));
 
-            // 2. IDecoratedService should be created via a factory method
+            // IDecoratedService should be created via a factory method
             var decoratorSetup = Setup.DecoratorWith(useDecorateeReuse: false);
             c.RegisterDelegate<Lazy<IDecoratedService>, IDecoratedService>(DecorateService, setup: decoratorSetup);
 
@@ -110,6 +199,7 @@ namespace DryIoc.IssuesTests
                 {
                     var ex = Assert.Throws<ContainerException>(() =>
                     {
+                        //var decoratedExpr = requestScope.Resolve<LambdaExpression>(typeof(IDecoratedService));
                         var decorated = requestScope.Resolve<IDecoratedService>();
                         decorated.Hello();
                     });

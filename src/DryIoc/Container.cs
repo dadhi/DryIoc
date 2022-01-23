@@ -3522,7 +3522,7 @@ namespace DryIoc
                 var callArgs = callExpr.Arguments.ToListOrSelf();
                 if (method == Scope.GetOrAddViaFactoryDelegateMethod)
                 {
-                    r = r.Root ?? r;
+                    //r = r.Root ?? r; // todo: @wip remove
 
                     // check if scoped dependency is already in scope, then just return it
                     var factoryId = (int) ConstValue(callArgs[0]);
@@ -3544,7 +3544,7 @@ namespace DryIoc
 
                 if (method == Scope.TrackDisposableMethod)
                 {
-                    r = r.Root ?? r;
+                    // r = r.Root ?? r; todo: @wip remove
                     if (!TryInterpret(r, callArgs[0], paramExprs, paramValues, parentArgs, useFec, out var service))
                         return false;
                     if (service is IDisposable d) 
@@ -3733,7 +3733,9 @@ namespace DryIoc
 #else
                 var throwIfNoScopeArg = args[1];
 #endif
-                return (bool)((ConstantExpression)throwIfNoScopeArg).Value ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
+                return (bool)((ConstantExpression)throwIfNoScopeArg).Value 
+                    ? Throw.For<IScope>(Error.NoCurrentScope, r + NewLine + " resolving the `" + callExpr + "`".Truncate()) 
+                    : null;
             }
 
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
@@ -3795,6 +3797,9 @@ namespace DryIoc
                 scope.AddUnorderedDisposable(disp);
             return result;
         }
+
+        private static string Truncate(this string s, int maxLength = 1000, string truncationSuffix = "…") =>
+            s?.Length > maxLength ? s.Substring(0, maxLength) + truncationSuffix : s;
 
         private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r, 
             MethodCallExpression callExpr, object paramExprs, object paramValues, ParentLambdaArgs parentArgs, bool useFec)
@@ -4912,13 +4917,17 @@ namespace DryIoc
         internal static readonly MethodInfo OpenScopeMethod =
             typeof(ResolverContext).GetTypeInfo().GetDeclaredMethod(nameof(OpenScope));
 
-        /// <summary>Returns root resolver for the singletons or the non scoped dependency of singletons, 
-        /// or the current resolver for the rest.</summary>
+        // TODO @wip
+        /// <summary>Used when we need the resolver context in the expression for e.g. resolution calls dependency,
+        /// injecting the resolver context as parameter, opening the resolution scope, etc.
+        /// If the dependency is ...
+        /// Traverses the parent containers until the root or returns itself if it is already a root.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
-            request.Reuse is CurrentScopeReuse == false && 
+            request.Reuse is CurrentScopeReuse == false &&
+            //!request.IsWrappedInFunc() &&
             request.DirectParent.IsSingletonOrDependencyOfSingleton &&
-            !request.OpensResolutionScope && 
-            request.Rules.ThrowIfDependencyHasShorterReuseLifespan // todo: @bug introduced by fixing the #378
+            !request.OpensResolutionScope //&&
+            //request.Rules.ThrowIfDependencyHasShorterReuseLifespan // todo: @bug introduced by fixing the #378
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
@@ -5276,7 +5285,8 @@ namespace DryIoc
             var lazyType       = request.GetActualServiceType();
             var serviceType    = lazyType.GetGenericParamsAndArgs()[0];
             // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
-            var serviceRequest = request.PushServiceType(serviceType, RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
+            var serviceRequest = request.PushServiceType(serviceType, 
+                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
 
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
@@ -13651,7 +13661,8 @@ namespace DryIoc
                 "Unable to register service with duplicate key '{0}': {1}" + NewLine +
                 " There is already registered service with the same key {2}."),
             NoCurrentScope = Of(
-                "No current scope is available: probably you are registering to, or resolving from outside of the scope. " + NewLine +
+                "No current scope is available - probably you are registering to or resolving from outside of the scope. " + NewLine +
+                "It also may be because of the scoped dependency has singletons in its parent chain so the dependency is resolved from the root container resolver." + NewLine +
                 "Current resolver context is: {0}."),
             ContainerIsDisposed = Of(
                 "Container is disposed and should not be used: {0}"),
