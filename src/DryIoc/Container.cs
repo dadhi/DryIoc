@@ -3522,8 +3522,7 @@ namespace DryIoc
                 var callArgs = callExpr.Arguments.ToListOrSelf();
                 if (method == Scope.GetOrAddViaFactoryDelegateMethod)
                 {
-                    //r = r.Root ?? r; // todo: @wip remove
-
+                    r = r.Root ?? r;
                     // check if scoped dependency is already in scope, then just return it
                     var factoryId = (int) ConstValue(callArgs[0]);
                     if (!r.SingletonScope.TryGet(out result, factoryId))
@@ -3544,7 +3543,7 @@ namespace DryIoc
 
                 if (method == Scope.TrackDisposableMethod)
                 {
-                    // r = r.Root ?? r; todo: @wip remove
+                    r = r.Root ?? r;
                     if (!TryInterpret(r, callArgs[0], paramExprs, paramValues, parentArgs, useFec, out var service))
                         return false;
                     if (service is IDisposable d) 

@@ -63,6 +63,36 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(machine.Truc);
         }
 
+        // [Test] // todo: @fixme
+        public void Lazy_singleton_resolved_in_scope_can_got_a_value_outside_a_scope()
+        {
+            var c = new Container();
+
+            c.Register<S>(Reuse.Singleton);
+
+            Lazy<S> s;
+            using (var scope = c.OpenScope())
+                s = scope.Resolve<Lazy<S>>();
+
+            Assert.IsNotNull(s.Value);
+        }
+
+        // [Test]// todo: @fixme
+        public void Lazy_non_eager_singleton_resolved_in_scope_can_got_a_value_outside_a_scope()
+        {
+            var c = new Container(rules => rules.WithoutEagerCachingSingletonForFasterAccess());
+
+            c.Register<S>(Reuse.Singleton);
+
+            Lazy<S> s;
+            using (var scope = c.OpenScope())
+                s = scope.Resolve<Lazy<S>>();
+
+            Assert.IsNotNull(s.Value);
+        }
+
+        class S {}
+
         public class Truc {}
 
         public class LazyMachine
