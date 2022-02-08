@@ -583,9 +583,14 @@ namespace DryIoc.MefAttributedModel
         private static PropertyOrFieldServiceInfo GetImportedPropertiesAndFieldsOnly(MemberInfo member, DryIoc.Request request)
         {
             var attributes = member.GetAttributes().ToArrayOrSelf();
-            var details = attributes.Length == 0 ? null
-                : GetFirstImportDetailsOrNull(member.GetReturnTypeOrDefault(), attributes, request);
-            return details == null ? null : PropertyOrFieldServiceInfo.Of(member).WithDetails(details);
+            if (attributes.Length == 0)
+                return null;
+
+            var details = GetFirstImportDetailsOrNull(member.GetReturnTypeOrDefault(), attributes, request);
+            if (details == null)
+                return null;
+
+            return PropertyOrFieldServiceInfo.Of(member).WithDetails(details);
         }
 
         private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, DryIoc.Request request) => 

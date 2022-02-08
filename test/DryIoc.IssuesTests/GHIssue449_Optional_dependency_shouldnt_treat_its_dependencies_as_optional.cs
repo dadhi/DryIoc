@@ -1,4 +1,3 @@
-using System;
 using NUnit.Framework;
 using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
@@ -20,7 +19,19 @@ namespace DryIoc.IssuesTests
             Assert.IsNull(x.HardDrive);
         }
 
-        // [Test] // doesn't work as expected
+        [Test]
+        public void Import_AllowDefault_DoesntImportServiceWithoutDependencies_without_MEF()
+        {
+            var container = new Container();
+            container.Register<Computer2>();
+            container.Register<IHardDrive, SamsungHardDrive2>();
+
+            var x = container.Resolve<Computer2>();
+
+            Assert.IsNull(x.HardDrive);
+        }
+
+        [Test] // doesn't work as expected
         public void Import_AllowDefault_DoesntImportServiceWithoutDependencies()
         {
             var container = new Container().WithMef();
@@ -55,6 +66,12 @@ namespace DryIoc.IssuesTests
             public IHardDrive HardDrive { get; set; }
         }
 
+        public class Computer2
+        {
+            public IHardDrive HardDrive { get; }
+            public Computer2(IHardDrive hardDrive = null) => HardDrive = hardDrive;
+        }
+
         public interface IHardDrive
         {
             ILogicBoard LogicBoard { get; }
@@ -64,6 +81,12 @@ namespace DryIoc.IssuesTests
         {
             [Import]
             public ILogicBoard LogicBoard { get; set; }
+        }
+
+        public class SamsungHardDrive2 : IHardDrive
+        {
+            public ILogicBoard LogicBoard { get; }
+            public SamsungHardDrive2(ILogicBoard logicBoard) => LogicBoard = logicBoard;
         }
 
         public interface ILogicBoard { }

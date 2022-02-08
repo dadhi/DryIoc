@@ -10862,21 +10862,19 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.ReturnDefaultIfNotRegistered,
             GetServiceInfo serviceInfo = null)
         {
-            GetServiceInfo info = (m, r) =>
-                serviceInfo != null ? serviceInfo(m, r) :
-                PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(ifUnresolved: ifUnresolved));
-
+            serviceInfo = serviceInfo ?? (GetServiceInfo)((m, r) => PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(ifUnresolved: ifUnresolved)));
             return req =>
             {
-                var properties = req.ImplementationType.GetMembers(x => x.DeclaredProperties, includeBase: withBase) // todo: @perf optimize allocations 
-                    .Match(p => p.IsInjectable(withNonPublic, withPrimitive), p => info(p, req));
+                var properties = req.ImplementationType
+                    .GetMembers(x => x.DeclaredProperties, includeBase: withBase) // todo: @perf optimize allocations 
+                    .Match(p => p.IsInjectable(withNonPublic, withPrimitive), p => serviceInfo(p, req));
 
                 if (!withFields)
                     return properties;
 
                 var fields = req.ImplementationType // todo: @perf optimize allocations and maybe combine with properties
                     .GetMembers(x => x.DeclaredFields, includeBase: withBase)
-                    .Match(f => f.IsInjectable(withNonPublic, withPrimitive), f => info(f, req));
+                    .Match(f => f.IsInjectable(withNonPublic, withPrimitive), f => serviceInfo(f, req));
 
                 return properties.Append(fields);
             };
@@ -11055,6 +11053,7 @@ namespace DryIoc
             ConstructorInfo ctor;
             MethodBase ctorOrMethod;
             Expression factoryExpr = null;
+            var failedToGetMember = false;
             if (factoryMethod == null)
             {
                 ctorOrMethod = ctor = _knownSingleCtor ?? request.ImplementationType.SingleConstructor();
@@ -11077,13 +11076,13 @@ namespace DryIoc
                 {
                     if (rules.UsedForValidation)
                     {
-                        TryGetMemberAssignments(request, container, rules);
+                        TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
                         return request.GetActualServiceType().GetDefaultValueExpression();
                     }
 
+                    var assignements = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
                     var newExpr = New((ConstructorInfo)ctorOrMember, factoryMethod.ResolvedParameterExpressions);
-                    var assignements = TryGetMemberAssignments(request, container, rules);
-                    return assignements == null ? newExpr : (Expression)MemberInit(newExpr, assignements);
+                    return failedToGetMember ? null : assignements == null ? newExpr : (Expression)MemberInit(newExpr, assignements);
                 }
 
                 ctorOrMethod = ctorOrMember as MethodBase;
@@ -11100,16 +11099,15 @@ namespace DryIoc
                 if (rules.UsedForValidation)
                 {
                     if (ctor != null)
-                        TryGetMemberAssignments(request, container, rules);
+                        TryGetMemberAssignments(ref failedToGetMember, request, container, rules); // ignore the results for validation
                     return request.GetActualServiceType().GetDefaultValueExpression();
                 }
                  
                 if (ctor == null)
                     return ConvertExpressionIfNeeded(Call(factoryExpr, (MethodInfo)ctorOrMethod), request, ctorOrMethod);
-                var assignements = TryGetMemberAssignments(request, container, rules);
-                return assignements != null
-                    ? (Expression)MemberInit(New(ctor, Empty<Expression>()), assignements)
-                    : New(ctor, Empty<Expression>());
+                var assignments = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
+                var newExpr = New(ctor, Empty<Expression>());
+                return failedToGetMember ? null : assignments == null ? newExpr : (Expression)MemberInit(newExpr, assignments);
             }
 
             Expression arg0 = null, arg1 = null, arg2 = null, arg3 = null, arg4 = null;
@@ -11213,14 +11211,11 @@ namespace DryIoc
             if (ctor == null)
                 return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMethod);
 
-            var assignments = TryGetMemberAssignments(request, container, rules);
-            if (assignments == null)
-                return serviceExpr;
-
-            return MemberInit((NewExpression)serviceExpr, assignments);
+            var assgnments = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
+            return failedToGetMember ? null : assgnments == null ? serviceExpr : MemberInit((NewExpression)serviceExpr, assgnments);
         }
 
-        private MemberAssignment[] TryGetMemberAssignments(Request request, IContainer container, Rules rules)
+        private MemberAssignment[] TryGetMemberAssignments(ref bool failedToGet, Request request, IContainer container, Rules rules)
         {
             if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
                 return null;
@@ -11240,7 +11235,10 @@ namespace DryIoc
                     if (memberExpr != null)
                         assignments = assignments.Append(Bind(member.Member, memberExpr));
                     else if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+                    {
+                        failedToGet = true;
                         return null;
+                    };
                 }
 
             return assignments;
