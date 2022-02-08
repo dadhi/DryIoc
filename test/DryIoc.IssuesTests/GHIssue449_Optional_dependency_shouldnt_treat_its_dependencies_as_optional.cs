@@ -57,7 +57,7 @@ namespace DryIoc.IssuesTests
 
         public interface IHardDrive
         {
-            public ILogicBoard LogicBoard { get; }
+            ILogicBoard LogicBoard { get; }
         }
 
         public class SamsungHardDrive : IHardDrive
