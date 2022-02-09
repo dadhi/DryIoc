@@ -14921,6 +14921,7 @@ namespace System.Reflection
             _type.GetCustomAttributes(attributeType, inherit).Cast<Attribute>();
 
         public Type BaseType => _type.BaseType;
+        public bool IsDefined(Type attributeType, bool inherit) => _type.IsDefined(attributeType, inherit);
         public bool IsGenericType => _type.IsGenericType;
         public bool IsGenericTypeDefinition => _type.IsGenericTypeDefinition;
         public bool ContainsGenericParameters => _type.ContainsGenericParameters;
