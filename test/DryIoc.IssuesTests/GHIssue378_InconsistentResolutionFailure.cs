@@ -46,7 +46,7 @@ namespace DryIoc.IssuesTests
 
         class D { }
 
-        //[Test]
+        // [Test]
         public void Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_FactoryMethod_fails()
         {
             var c = new Container().WithMef()
@@ -143,7 +143,7 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        //[Test]
+        // [Test]
         public void Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_RegisterDelegate_fails_with_allow_captive_dependency_rule()
         {
             var c = new Container().WithMef()

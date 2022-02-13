@@ -4922,11 +4922,10 @@ namespace DryIoc
         /// If the dependency is ...
         /// Traverses the parent containers until the root or returns itself if it is already a root.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
-            request.Reuse is CurrentScopeReuse == false &&
-            //!request.IsWrappedInFunc() &&
-            request.DirectParent.IsSingletonOrDependencyOfSingleton &&
-            !request.OpensResolutionScope //&&
-            //request.Rules.ThrowIfDependencyHasShorterReuseLifespan // todo: @bug introduced by fixing the #378
+            request.Reuse is CurrentScopeReuse == false 
+            && (request.DirectParent.IsSingletonOrDependencyOfSingleton || request.IsDirectlyWrappedInFunc())
+            && !request.OpensResolutionScope
+            //&& request.Rules.ThrowIfDependencyHasShorterReuseLifespan // todo: @bug introduced by fixing the #378
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
@@ -5281,8 +5280,8 @@ namespace DryIoc
         /// <returns>Expression: <c><![CDATA[r => new Lazy<TService>(() => r.Resolve{TService}(key, ifUnresolved, requiredType))]]></c></returns>
         public static Expression GetLazyExpressionOrDefault(Request request, bool nullWrapperForUnresolvedService = false)
         {
-            var lazyType       = request.GetActualServiceType();
-            var serviceType    = lazyType.GetGenericParamsAndArgs()[0];
+            var lazyType    = request.GetActualServiceType();
+            var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
             var serviceRequest = request.PushServiceType(serviceType, 
                 RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);

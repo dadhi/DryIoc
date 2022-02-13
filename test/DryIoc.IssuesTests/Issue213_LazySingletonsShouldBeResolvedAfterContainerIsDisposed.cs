@@ -63,7 +63,7 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(machine.Truc);
         }
 
-        // [Test] // todo: @fixme
+        [Test]
         public void Lazy_singleton_resolved_in_scope_can_got_a_value_outside_a_scope()
         {
             var c = new Container();
@@ -77,7 +77,7 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(s.Value);
         }
 
-        // [Test]// todo: @fixme
+        [Test]
         public void Lazy_non_eager_singleton_resolved_in_scope_can_got_a_value_outside_a_scope()
         {
             var c = new Container(rules => rules.WithoutEagerCachingSingletonForFasterAccess());
@@ -91,7 +91,23 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(s.Value);
         }
 
+        [Test]
+        public void Lazy_non_eager_singleton_injected_in_scope_can_got_a_value_outside_a_scope()
+        {
+            var c = new Container(rules => rules.WithoutEagerCachingSingletonForFasterAccess());
+
+            c.Register<S>(Reuse.Singleton);
+            c.Register<Q>(Reuse.Transient);
+
+            Q q;
+            using (var scope = c.OpenScope())
+                q = scope.Resolve<Q>();
+
+            Assert.IsNotNull(q.S.Value);
+        }
+
         class S {}
+        class Q { public Q(Lazy<S> s) => S = s; public Lazy<S> S; }
 
         public class Truc {}
 

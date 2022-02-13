@@ -59,27 +59,6 @@ namespace DryIoc.IssuesTests.FastExpressionCompiler
             Assert.IsInstanceOf<A>(f(null));
         }
 
-
-        // todo: WIP - prepare for compiling the expression with the nested lambdas
-        //[Test, Ignore("todo: WIP - prepare for compiling the expression with the nested lambdas")]
-        //public void I_can_compile_the_Expression_with_invocation_of_nested_lambda_with_pre_created_closure_constants()
-        //{
-        //    var rParam = Parameter(typeof(IResolverContext), "r");
-
-        //    var c = new C();
-
-        //    var expr = Lambda<Func<IResolverContext, A>>(
-        //        New(typeof(A).GetTypeInfo().DeclaredConstructors.First(),
-        //            Invoke(Lambda<Func<B>>(New(typeof(B).GetTypeInfo().DeclaredConstructors.First(), Constant(c)))),
-        //            Constant(c)),
-        //        rParam);
-
-        //    var closureInfo = new ExpressionCompiler.ClosureInfo(ClosureStatus.UserProvided | ClosureStatus.HasClosure, closureConstants, constantUsage);
-
-        //    var f = expr.TryCompileWithPreCreatedClosure<Func<IResolverContext, A>>(new object[] { c }, new int[]{ 1 });
-        //    Assert.IsInstanceOf<A>(f(null));
-        //}
-
         public class A
         {
             public B B { get; }
