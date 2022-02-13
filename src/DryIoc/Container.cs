@@ -127,6 +127,25 @@ namespace DryIoc
             return s;
         }
 
+        private void TryCaptureDisposeStackTrace()
+        {
+            try { _disposeStackTrace = new StackTrace(); }
+            catch { }
+        }
+
+        private void DisposeScopeContextCurrentScope()
+        {
+            IScope currentScope = null;
+            _scopeContext.SetCurrent(s =>
+            {
+                // save the current scope for the later,
+                // do dispose it AFTER its parent is actually set to be a new ambient current scope.
+                currentScope = s;
+                return s?.Parent;
+            });
+            currentScope?.Dispose();
+        }
+
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
         {
@@ -134,29 +153,17 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref _disposed, 1, 0) == 1)
                 return;
 
-            // Nice to have disposal stack-trace, but we can live without it if something goes wrong
+            // nice to have a disposal stack-trace, but we can live without it if something goes wrong
             if (Rules.CaptureContainerDisposeStackTrace)
-                try { _disposeStackTrace = new StackTrace(); }
-                catch { }
+                TryCaptureDisposeStackTrace();
 
+            // for the scoped container
             if (_parent != null)
             {
                 if (_ownCurrentScope != null)
-                {
                     _ownCurrentScope.Dispose();
-                }
                 else if (_scopeContext != null)
-                {
-                    IScope currentScope = null;
-                    _scopeContext.SetCurrent(s =>
-                    {
-                        // save the current scope for the later,
-                        // do dispose it AFTER its parent is actually set to be a new ambient current scope.
-                        currentScope = s;
-                        return s?.Parent;
-                    });
-                    currentScope?.Dispose();
-                }
+                    DisposeScopeContextCurrentScope();
             }
             else
             {
@@ -4916,10 +4923,8 @@ namespace DryIoc
         internal static readonly MethodInfo OpenScopeMethod =
             typeof(ResolverContext).GetTypeInfo().GetDeclaredMethod(nameof(OpenScope));
 
-        // TODO @wip
         /// <summary>Used when we need the resolver context in the expression for e.g. resolution calls dependency,
         /// injecting the resolver context as parameter, opening the resolution scope, etc.
-        /// If the dependency is ...
         /// Traverses the parent containers until the root or returns itself if it is already a root.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
             request.Reuse is CurrentScopeReuse == false 
