@@ -1,6 +1,8 @@
 {
     "cSpell.words": [
-        "decoratee"
+        "cref",
+        "decoratee",
+        "overriden"
     ],
     "files.watcherExclude": {
         "**/target": true

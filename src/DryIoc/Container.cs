@@ -127,7 +127,7 @@ namespace DryIoc
             return s;
         }
 
-        private void TryCaptureDisposeStackTrace()
+        private void TryCaptureContainerDisposeStackTrace()
         {
             try { _disposeStackTrace = new StackTrace(); }
             catch { }
@@ -155,7 +155,7 @@ namespace DryIoc
 
             // nice to have a disposal stack-trace, but we can live without it if something goes wrong
             if (Rules.CaptureContainerDisposeStackTrace)
-                TryCaptureDisposeStackTrace();
+                TryCaptureContainerDisposeStackTrace();
 
             // for the scoped container
             if (_parent != null)
@@ -266,7 +266,7 @@ namespace DryIoc
         /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
         public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked)
         {
-            ThrowIfContainerDisposed();
+            ThrowIfRootContainerDisposed();
 
             if (serviceKey == null)
                 serviceKey = Rules.DefaultRegistrationServiceKey;
@@ -292,14 +292,14 @@ namespace DryIoc
         /// <inheritdoc />
         public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
-            ThrowIfContainerDisposed();
+            ThrowIfRootContainerDisposed();
             return _registry.Value.IsRegistered(serviceType, serviceKey, factoryType, condition);
         }
 
         /// <inheritdoc />
         public void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
-            ThrowIfContainerDisposed();
+            ThrowIfRootContainerDisposed();
             _registry.Swap(r => r.Unregister(factoryType, serviceType, serviceKey, condition));
         }
 
@@ -369,7 +369,7 @@ namespace DryIoc
 
         private object ResolveAndCache(int serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved)
         {
-            ThrowIfContainerDisposed();
+            ThrowIfRootContainerDisposed();
 
             if (ResolverContext.TryGetUsedInstance(this, serviceType, out var usedInstance))
                 return usedInstance;
@@ -476,7 +476,7 @@ namespace DryIoc
             }
 
             // Cache is missed, so get the factory and put it into cache:
-            ThrowIfContainerDisposed();
+            ThrowIfRootContainerDisposed();
 
             var request = Request.Create(this, serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, default, args);
             var factory = ((IContainer)this).ResolveFactory(request);
@@ -692,6 +692,12 @@ namespace DryIoc
                 Throw.It(Error.ContainerIsDisposed, ToString());
         }
 
+        private void ThrowIfRootContainerDisposed()
+        {
+            if (_singletonScope.IsDisposed)
+                Throw.It(Error.ContainerIsDisposed, ToString());
+        }
+
 #endregion
 
 #region IResolverContext
@@ -727,9 +733,8 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public IResolverContext WithCurrentScope(IScope scope)
         {
-            ThrowIfContainerDisposed();
-            return new Container(Rules, _registry, _singletonScope, _scopeContext,
-                scope, _disposed, _disposeStackTrace, parent: this);
+            ThrowIfRootContainerDisposed();
+            return new Container(Rules, _registry, _singletonScope, _scopeContext, scope, 0, null, parent: this);
         }
 
         /// [Obsolete("Please use `RegisterInstance` or `Use` method instead")]
@@ -991,6 +996,9 @@ namespace DryIoc
 
         /// <summary>Indicates that container is disposed.</summary>
         public bool IsDisposed => _disposed == 1 || _singletonScope.IsDisposed;
+
+        /// <inheritdoc />
+        public object DisposeInfo => _disposeStackTrace;
 
         /// <inheritdoc />
         public IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope) =>
@@ -3529,7 +3537,7 @@ namespace DryIoc
                 var callArgs = callExpr.Arguments.ToListOrSelf();
                 if (method == Scope.GetOrAddViaFactoryDelegateMethod)
                 {
-                    r = r.Root ?? r;
+                    // r = r.Root ?? r;
                     // check if scoped dependency is already in scope, then just return it
                     var factoryId = (int) ConstValue(callArgs[0]);
                     if (!r.SingletonScope.TryGet(out result, factoryId))
@@ -3550,7 +3558,7 @@ namespace DryIoc
 
                 if (method == Scope.TrackDisposableMethod)
                 {
-                    r = r.Root ?? r;
+                    // r = r.Root ?? r;
                     if (!TryInterpret(r, callArgs[0], paramExprs, paramValues, parentArgs, useFec, out var service))
                         return false;
                     if (service is IDisposable d) 
@@ -3756,7 +3764,7 @@ namespace DryIoc
                 return itemRef.Value;
 
             if (scope.IsDisposed)
-                Throw.It(Error.ScopeIsDisposed, scope.ToString());
+                Throw.ScopeIsDisposed(scope, r);
 
             itemRef = new ImMapEntry<object>(id, Scope.NoItem);
             var oldMap = map;
@@ -3847,7 +3855,7 @@ namespace DryIoc
                 return itemRef.Value;
 
             if (scope.IsDisposed)
-                Throw.It(Error.ScopeIsDisposed, scope.ToString());
+                Throw.ScopeIsDisposed(scope, r);
 
             itemRef = new ImMapEntry<object>(id, Scope.NoItem);
             var oldMap = map;
@@ -3924,7 +3932,7 @@ namespace DryIoc
                 return null; // result is null in this case
 
             if (scope.IsDisposed)
-                Throw.It(Error.ScopeIsDisposed, scope.ToString());
+                Throw.ScopeIsDisposed(scope, r);
 
             // check if scoped dependency is already in scope, then just return it
             var id = (int)((ConstantExpression)args[3]).Value;
@@ -4013,7 +4021,7 @@ namespace DryIoc
                 return itemRef.Value;
 
             if (scope.IsDisposed)
-                Throw.It(Error.ScopeIsDisposed, scope.ToString());
+                Throw.ScopeIsDisposed(scope, r);
 
             itemRef = new ImMapEntry<object>(id, Scope.NoItem);
             var oldMap = map;
@@ -4882,6 +4890,10 @@ namespace DryIoc
         /// <summary>True if container is disposed.</summary>
         bool IsDisposed { get; }
 
+        /// <summary>Usually the disposal stack trace (if supported) to add the error message 
+        /// to identify the place and possible reason of disposal. The `null` otherwise</summary>
+        object DisposeInfo { get; }
+
         /// <summary>Parent context of the scoped context.</summary>
         IResolverContext Parent { get; }
 
@@ -4930,7 +4942,7 @@ namespace DryIoc
             request.Reuse is CurrentScopeReuse == false 
             && (request.DirectParent.IsSingletonOrDependencyOfSingleton || request.IsDirectlyWrappedInFunc())
             && !request.OpensResolutionScope
-            //&& request.Rules.ThrowIfDependencyHasShorterReuseLifespan // todo: @bug introduced by fixing the #378
+            && request.Rules.ThrowIfDependencyHasShorterReuseLifespan // see the #378
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
@@ -10549,7 +10561,7 @@ namespace DryIoc
                 var container = request.Container;
                 var scope = (Scope)container.SingletonScope;
                 if (scope.IsDisposed)
-                    Throw.It(Error.ScopeIsDisposed, scope.ToString());
+                    Throw.ScopeIsDisposed(scope, container);
 
                 var id = request.FactoryType == FactoryType.Decorator
                     ? request.CombineDecoratorWithDecoratedFactoryID() 
@@ -12116,7 +12128,7 @@ namespace DryIoc
         private object TryGetOrAdd(ref ImMap<object> map, int id, CreateScopedValue createValue, int disposalOrder = 0)
         {
             if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
+                Throw.ScopeIsDisposed(this, null);
 
             var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
             var oldMap = map;
@@ -12173,7 +12185,7 @@ namespace DryIoc
         internal object TryGetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
         {
             if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
+                Throw.ScopeIsDisposed(this, r);
 
             var itemRef = new ImMapEntry<object>(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
@@ -12272,7 +12284,7 @@ namespace DryIoc
         internal ImMapEntry<object> TryAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
         {
             if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
+                Throw.ScopeIsDisposed(this, r);
 
             var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
@@ -12326,7 +12338,7 @@ namespace DryIoc
             Func<IResolverContext, Expression, bool, object> createValue, int disposalOrder = 0)
         {
             if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
+                Throw.ScopeIsDisposed(this, resolveContext); // todo: @spell resolve -> resolver
 
             var itemRef = new ImMapEntry<object>(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
@@ -12370,7 +12382,7 @@ namespace DryIoc
         public void SetOrAdd(int id, object item)
         {
             if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
+                Throw.ScopeIsDisposed(this, null);
 
             var itemRef = new ImMapEntry<object>(id, item);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
@@ -12388,7 +12400,7 @@ namespace DryIoc
         public object GetOrTryAdd(int id, object newItem, int disposalOrder)
         {
             if (_disposed == 1)
-                Throw.It(Error.ScopeIsDisposed, ToString());
+                Throw.ScopeIsDisposed(this, null);
 
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
 
@@ -12549,11 +12561,8 @@ namespace DryIoc
             _unorderedDisposables = ImList<IDisposable>.Empty;
             _disposables = ImMap<IDisposable>.Empty;
             _factories = ImHashMap<Type, FactoryDelegate>.Empty;
-            
-            var maps = Interlocked.Exchange(ref _maps, _emptySlots);
-            var empty = ImMap<object>.Empty;
-            //for (int i = 0; i < MAP_COUNT; i++) maps[i] = empty;
-            //_mapsPool.Return(maps);
+
+            Interlocked.Exchange(ref _maps, _emptySlots);
         }
 
         private static void SafelyDisposeOrderedDisposables(ImMap<IDisposable> disposables)
@@ -12761,7 +12770,7 @@ namespace DryIoc
         public object Name { get; }
 
         /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
-        public bool CanApply(Request request) =>
+        public bool CanApply(Request request) => // todo: @wip check for IsDisposed
             ScopedOrSingleton || 
             (Name == null ? request.Container.CurrentScope != null : request.Container.GetNamedScope(Name, false) != null);
 
@@ -13627,7 +13636,8 @@ namespace DryIoc
             RecursiveDependencyDetected = Of(
                 "Recursive dependency is detected when resolving " + NewLine + "{0}."),
             ScopeIsDisposed = Of(
-                "Scope {0} is disposed and scoped instances are disposed and no longer available."),
+                "Scope {0} is disposed and scoped instances are disposed and no longer available." + NewLine + 
+                "Dispose stack-trace: " + NewLine + "{1}"),
             NotFoundOpenGenericImplTypeArgInService = Of(
                 "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}."),
             UnableToSelectCtor = Of(
@@ -13932,6 +13942,11 @@ namespace DryIoc
         /// <summary>Throws the one with manyh collected exceptions</summary>
         public static void Many(int error, params ContainerException[] errors) => 
             throw new ContainerException(error, errors);
+
+        /// <summary>Throws the exception with info about the disposed scope and 
+        /// the dispose stack trace if it is supported by resolver context.</summary>
+        public static void ScopeIsDisposed(IScope scope, IResolverContext r) =>
+            It(Error.ScopeIsDisposed, scope.ToString(), r?.DisposeInfo ?? "<not available>");
     }
 
     /// <summary>Called from the generated code to check if WeakReference.Value is GCed.</summary>

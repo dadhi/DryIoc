@@ -13,9 +13,9 @@ namespace DryIoc.IssuesTests
         {
             Minimal_test();
             Resolve_undecorated_singleton_with_lazy_scoped_dependency_from_the_scope_should_succeed();
-            //Resolve_undecorated_lazy_singleton_with_lazy_scoped_dependency_from_the_scope_should_succeed();
-            //Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_FactoryMethod_fails();
-            //Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_RegisterDelegate_fails_with_allow_captive_dependency_rule();
+            Resolve_undecorated_non_eager_singleton_with_lazy_scoped_dependency_from_the_scope_should_succeed();
+            Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_FactoryMethod_fails();
+            Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_RegisterDelegate_fails_with_allow_captive_dependency_rule();
             Nested_scopes_decorated_resolution_should_throw_the_DependencyHasShorterReuseLifespan();
 
             return 6;
@@ -46,7 +46,7 @@ namespace DryIoc.IssuesTests
 
         class D { }
 
-        // [Test]
+        [Test]
         public void Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_FactoryMethod_fails()
         {
             var c = new Container().WithMef()
@@ -114,8 +114,8 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        // [Test]
-        public void Resolve_undecorated_lazy_singleton_with_lazy_scoped_dependency_from_the_scope_should_succeed()
+        [Test]
+        public void Resolve_undecorated_non_eager_singleton_with_lazy_scoped_dependency_from_the_scope_should_succeed()
         {
             var c = new Container().WithMef()
                 .With(rules => rules
@@ -143,7 +143,7 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        // [Test]
+        [Test]
         public void Nested_scopes_undecorated_resolution_succeeds_but_decorated_resolution_with_the_RegisterDelegate_fails_with_allow_captive_dependency_rule()
         {
             var c = new Container().WithMef()

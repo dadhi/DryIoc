@@ -636,16 +636,19 @@ namespace DryIoc.UnitTests
             var container = new Container(rules => rules
                 .WithCaptureContainerDisposeStackTrace());
 
+            container.Register<S>(Reuse.Scoped);
+
             var scope = container.OpenScope();
             scope.Dispose();
 
             var ex = Assert.Throws<ContainerException>(() =>
-                scope.Resolve<string>());
+                scope.Resolve<S>());
 
-            Assert.AreEqual(Error.NameOf(Error.ContainerIsDisposed), Error.NameOf(ex.Error));
-
+            Assert.AreEqual(Error.NameOf(Error.ScopeIsDisposed), Error.NameOf(ex.Error));
             StringAssert.Contains("stack-trace", ex.Message);
         }
+
+        class S {}
 
         [Test]
         public void DisposedContainer_error_message_should_include_tip_how_to_enable_stack_trace()

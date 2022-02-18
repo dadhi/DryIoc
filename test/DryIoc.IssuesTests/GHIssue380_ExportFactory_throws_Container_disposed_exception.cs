@@ -11,7 +11,7 @@ namespace DryIoc.IssuesTests
         public int Run()
         {
             MefExportFactoryDoesntThrow();
-            // DryIocExportFactoryDoesntThrow();
+            DryIocExportFactoryDoesntThrow();
 
             return 2;
         }
