@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using System.ComponentModel.Composition;
 using DryIoc.MefAttributedModel;
+using System;
 
 namespace DryIoc.IssuesTests
 {
@@ -31,7 +32,7 @@ namespace DryIoc.IssuesTests
             Assert.IsNull(x.HardDrive);
         }
 
-        [Test] // doesn't work as expected
+        [Test]
         public void Import_AllowDefault_DoesntImportServiceWithoutDependencies()
         {
             var container = new Container().WithMef();
@@ -60,6 +61,25 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(x.HardDrive.LogicBoard);
         }
 
+        // [Test] // doesn't work as expected
+        public void Import_LazyAllowDefault_DoesntImportServiceWithoutDependencies()
+        {
+            var container = new Container().WithMef();
+            container.Register<IHardDrive, HitachiHardDrive>();
+
+            var x = new Computer3();
+            container.InjectPropertiesAndFields(x);
+
+            // should be null: couldn't assemble a computer with a hard drive
+            // because logic board for the hard drive is not registered
+            Assert.IsNull(x.HardDrive);
+
+            // instead, we currently have this situation:
+            //Assert.That(x.HardDrive, Is.Not.Null);
+            //Assert.That(x.HardDrive.Value, Is.Not.Null);
+            //Assert.That(() => x.HardDrive.Value.LogicBoard, Throws.Exception.TypeOf<NullReferenceException>());
+        }
+
         public class Computer
         {
             [Import(AllowDefault = true)]
@@ -70,6 +90,20 @@ namespace DryIoc.IssuesTests
         {
             public IHardDrive HardDrive { get; }
             public Computer2(IHardDrive hardDrive = null) => HardDrive = hardDrive;
+        }
+
+        public class Computer3
+        {
+            [Import(AllowDefault = true)]
+            public Lazy<IHardDrive> HardDrive { get; set; }
+        }
+
+        public class HitachiHardDrive : IHardDrive
+        {
+            [Import] // this dependency is missing
+            public Lazy<ILogicBoard> LazyLogicBoard { get; set; }
+
+            public ILogicBoard LogicBoard => LazyLogicBoard.Value;
         }
 
         public interface IHardDrive
