@@ -3931,9 +3931,6 @@ namespace DryIoc
             if (scope == null)
                 return null; // result is null in this case
 
-            if (scope.IsDisposed)
-                Throw.ScopeIsDisposed(scope, r);
-
             // check if scoped dependency is already in scope, then just return it
             var id = (int)((ConstantExpression)args[3]).Value;
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
@@ -4979,23 +4976,38 @@ namespace DryIoc
             if (currentScope == null)
                 return throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
 
-            if (name == null)
-                return currentScope;
-
-            if (name is IScopeName scopeName)
+            var s = currentScope;
+            if (name != null)
             {
-                for (var s = currentScope; s != null; s = s.Parent)
-                    if (scopeName.Match(s.Name))
-                        return s;
-            }
-            else
-            {
-                for (var s = currentScope; s != null; s = s.Parent)
-                    if (ReferenceEquals(name, s.Name) || name.Equals(s.Name))
-                        return s;
+                if (name is IScopeName scopeName)
+                {
+                    for (; s != null; s = s.Parent)
+                        if (scopeName.Match(s.Name))
+                            break;
+                }
+                else
+                {
+                    for (; s != null; s = s.Parent)
+                        if (ReferenceEquals(name, s.Name) || name.Equals(s.Name))
+                            break;
+                }
             }
 
-            return !throwIfNotFound ? null : Throw.For<IScope>(Error.NoMatchedScopeFound, name, currentScope);
+            if (s == null)
+            {
+                if (throwIfNotFound)
+                    Throw.It(Error.NoMatchedScopeFound, name, currentScope);
+                return null;
+            }
+
+            if (s.IsDisposed)
+            {
+                if (throwIfNotFound)
+                    Throw.ScopeIsDisposed(s, r);
+                return null;
+            }
+
+            return s;
         }
 
         /// <summary>Opens scope with optional name and optional tracking of new scope in a parent scope.</summary>
@@ -12770,9 +12782,8 @@ namespace DryIoc
         public object Name { get; }
 
         /// <summary>Returns true if scope is open and the name is matching with reuse <see cref="Name"/>.</summary>
-        public bool CanApply(Request request) => // todo: @wip check for IsDisposed
-            ScopedOrSingleton || 
-            (Name == null ? request.Container.CurrentScope != null : request.Container.GetNamedScope(Name, false) != null);
+        public bool CanApply(Request request) =>
+            ScopedOrSingleton || request.Container.GetNamedScope(Name, false) != null;
 
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
