@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -55,6 +55,18 @@ namespace DryIoc.UnitTests
             var types = typeof(B).GetImplementedTypes(ReflectionTools.AsImplementedType.ObjectType);
 
             Assert.That(types, Is.EqualTo(new[] { typeof(IB), typeof(C), typeof(object) }));
+        }
+
+        [Test]
+        public void IsCompilerGenerated_returns_false_for_string_type()
+        {
+            Assert.That(typeof(string).IsCompilerGenerated(), Is.False);
+        }
+
+        [Test]
+        public void IsCompilerGenerated_returns_true_for_anonymous_type()
+        {
+            Assert.That(new { }.GetType().IsCompilerGenerated(), Is.True);
         }
     }
 

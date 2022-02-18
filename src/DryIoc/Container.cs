@@ -14104,7 +14104,7 @@ namespace DryIoc
         /// <summary>Returns true if class is compiler generated. Checking for CompilerGeneratedAttribute
         /// is not enough, because this attribute is not applied for classes generated from "async/await".</summary>
         public static bool IsCompilerGenerated(this Type type) =>
-            type.GetTypeInfo().GetCustomAttributes(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false).Any();
+            type.GetTypeInfo().IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false);
 
         /// <summary>Returns true if type is generic.</summary>
         public static bool IsGeneric(this Type type) =>
@@ -14951,6 +14951,7 @@ namespace System.Reflection
             _type.GetCustomAttributes(attributeType, inherit).Cast<Attribute>();
 
         public Type BaseType => _type.BaseType;
+        public bool IsDefined(Type attributeType, bool inherit) => _type.IsDefined(attributeType, inherit);
         public bool IsGenericType => _type.IsGenericType;
         public bool IsGenericTypeDefinition => _type.IsGenericTypeDefinition;
         public bool ContainsGenericParameters => _type.ContainsGenericParameters;
