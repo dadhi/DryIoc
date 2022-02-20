@@ -5127,7 +5127,7 @@ namespace DryIoc
                 new ExpressionFactory(GetLazyEnumerableExpressionOrDefault, setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
-                new ExpressionFactory(r => GetLazyExpressionOrDefault(r), setup: Setup.Wrapper));
+                new ExpressionFactory(r => GetLazyExpressionOrDefault(r, false), setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
                 new ExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
@@ -5318,10 +5318,18 @@ namespace DryIoc
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
             {
+                // Here we need to know if the lazy is resolvable, 
+                // by resolving the factory we are checking that the service itself is registered...
                 var serviceFactory = container.ResolveFactory(serviceRequest);
                 if (serviceFactory == null)
                     return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
                 serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
+
+                // But what about its dependencies. In order to check on them we need to get the expression,
+                // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
+                // Plus we need to stop on the encountering the root service because lazy permits a circular dependencies.
+                // The dependency check is the open question, see #449
+                // todo: @note keeping the code for illustration
                 // var expr = serviceFactory.GetExpressionOrDefault(serviceRequest);
                 // if (expr == null)
                 //     return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
