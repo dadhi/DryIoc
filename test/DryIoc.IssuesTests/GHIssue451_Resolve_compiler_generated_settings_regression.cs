@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
         public void ExportSingletonPropertyWorks()
         {
             var container = new Container().WithMef()
-				.With(rules => rules
+                .With(rules => rules
                 .WithoutThrowIfDependencyHasShorterReuseLifespan()
                 .WithDefaultReuse(Reuse.ScopedOrSingleton));
 
@@ -36,7 +36,7 @@ namespace DryIoc.IssuesTests
         }
 
         // read-only interface to access the application settings
-        public interface ISettings {}
+        public interface ISettings { }
 
         // additional code
         partial class Settings : ISettings
@@ -46,7 +46,7 @@ namespace DryIoc.IssuesTests
         }
 
         // generated code from App.settings
-        //[System.Runtime.CompilerServices.CompilerGenerated]
+        [System.Runtime.CompilerServices.CompilerGenerated]
         internal sealed partial class Settings
         {
             public static Settings Default { get; } = new Settings();

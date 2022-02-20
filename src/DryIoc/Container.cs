@@ -5322,6 +5322,9 @@ namespace DryIoc
                 if (serviceFactory == null)
                     return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
                 serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
+                // var expr = serviceFactory.GetExpressionOrDefault(serviceRequest);
+                // if (expr == null)
+                //     return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
             }
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
@@ -6301,6 +6304,10 @@ namespace DryIoc
         /// <summary>Allows Func of service to be resolved even without registered service.</summary>
         public Rules WithFuncAndLazyWithoutRegistration() =>
             WithSettings(_settings | Settings.FuncAndLazyWithoutRegistration);
+
+        /// <summary>Removes the rule `FuncAndLazyWithoutRegistration`.</summary>
+        public Rules WithoutFuncAndLazyWithoutRegistration() =>
+            WithSettings(_settings & ~Settings.FuncAndLazyWithoutRegistration);
 
         /// Commands to use FastExpressionCompiler - set by default.
         public bool UseFastExpressionCompiler =>
@@ -14104,7 +14111,9 @@ namespace DryIoc
         /// <summary>Returns true if class is compiler generated. Checking for CompilerGeneratedAttribute
         /// is not enough, because this attribute is not applied for classes generated from "async/await".</summary>
         public static bool IsCompilerGenerated(this Type type) =>
-            type.GetTypeInfo().IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false);
+            type.Name[0] == '<'; // consider the types with obstruct names like `<>blah` as compiler-generated
+            // instead of using the CGAttribute, see the #451 for more details
+            //type.GetTypeInfo().IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false);
 
         /// <summary>Returns true if type is generic.</summary>
         public static bool IsGeneric(this Type type) =>
