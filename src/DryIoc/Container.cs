@@ -101,24 +101,24 @@ namespace DryIoc
             return s;
         }
 
-            private void TryCaptureContainerDisposeStackTrace()
-            {
-                try { _disposeStackTrace = new StackTrace(); }
-                catch { }
-            }
+        private void TryCaptureContainerDisposeStackTrace()
+        {
+            try { _disposeStackTrace = new StackTrace(); }
+            catch { }
+        }
 
-            private void DisposeScopeContextCurrentScope()
+        private void DisposeScopeContextCurrentScope()
+        {
+            IScope currentScope = null;
+            _scopeContext.SetCurrent(s =>
             {
-                IScope currentScope = null;
-                _scopeContext.SetCurrent(s =>
-                {
                     // save the current scope for the later,
                     // do dispose it AFTER its parent is actually set to be a new ambient current scope.
                     currentScope = s;
-                    return s?.Parent;
-                });
-                currentScope?.Dispose();
-            }
+                return s?.Parent;
+            });
+            currentScope?.Dispose();
+        }
 
         /// <summary>Dispose either open scope, or container with singletons, if no scope opened.</summary>
         public void Dispose()
@@ -648,11 +648,11 @@ namespace DryIoc
                 Throw.It(Error.ContainerIsDisposed, ToString());
         }
 
-            private void ThrowIfRootContainerDisposed()
-            {
-                if (_singletonScope.IsDisposed)
-                    Throw.It(Error.ContainerIsDisposed, ToString());
-            }
+        private void ThrowIfRootContainerDisposed()
+        {
+            if (_singletonScope.IsDisposed)
+                Throw.It(Error.ContainerIsDisposed, ToString());
+        }
 
         #endregion
 
@@ -750,8 +750,8 @@ namespace DryIoc
         /// <summary>Indicates that container is disposed.</summary>
         public bool IsDisposed => _disposed == 1 || _singletonScope.IsDisposed;
 
-            /// <inheritdoc />
-            public object DisposeInfo => _disposeStackTrace;
+        /// <inheritdoc />
+        public object DisposeInfo => _disposeStackTrace;
 
         /// <inheritdoc />
         public IContainer With(Rules rules, IScopeContext scopeContext, RegistrySharing registrySharing, IScope singletonScope) =>
@@ -3352,21 +3352,21 @@ namespace DryIoc
             if (expr is CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression ss)
             {
                 result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, ss, paramExprs, paramValues, parentArgs);
-                    return true;
-                }
+                return true;
+            }
 
             if (expr is CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression ssd)
-                {
+            {
                 result = InterpretGetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(r, ssd, paramExprs, paramValues, parentArgs);
-                    return true;
-                }
+                return true;
+            }
 
             var callExpr = (MethodCallExpression)expr;
             var method = callExpr.Method;
             var methodDeclaringType = method.DeclaringType;
 
             if (methodDeclaringType == typeof(CurrentScopeReuse))
-                {
+            {
                 if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateWithDisposalOrderMethod)
                 {
                     result = InterpretGetScopedViaFactoryDelegateWithDisposalOrder(r, callExpr, paramExprs, paramValues, parentArgs);
@@ -3474,7 +3474,7 @@ namespace DryIoc
                     var args = (InstanceTwoArgumentsMethodCallExpression)callExpr;
                     if (!TryInterpret(r, args.Argument0, paramExprs, paramValues, parentArgs, out var service))
                         return false;
-                    if (service is IDisposable d) 
+                    if (service is IDisposable d)
                         result = r.SingletonScope.TrackDisposable(d, TryGetIntConstantValue(args.Argument1));
                     return true;
                 }
@@ -3519,7 +3519,7 @@ namespace DryIoc
                     return true;
                 }
             }
-            
+
             if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
             {
                 result = r.Root ?? r;
@@ -3529,7 +3529,7 @@ namespace DryIoc
             // fallback to reflection invocation
             object instance = null;
             var callObjectExpr = callExpr.Object;
-            if (callObjectExpr != null) 
+            if (callObjectExpr != null)
             {
                 if (callObjectExpr is ConstantExpression oc)
                     instance = oc.Value;
@@ -3552,10 +3552,10 @@ namespace DryIoc
                         return false;
                 }
                 result = method.Invoke(instance, args);
-                }
+            }
 
-                    return true;
-                }
+            return true;
+        }
 
         private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r,
             CurrentScopeReuse.GetScopedViaFactoryDelegatexpression e,
@@ -3657,7 +3657,7 @@ namespace DryIoc
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
             itemRef.Value = result;
-                
+
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
                 scope.AddDisposable(disp, TryGetIntConstantValue(args.Argument4));
 
@@ -4575,7 +4575,7 @@ namespace DryIoc
         /// injecting the resolver context as parameter, opening the resolution scope, etc.
         /// Traverses the parent containers until the root or returns itself if it is already a root.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
-            request.Reuse is CurrentScopeReuse == false 
+            request.Reuse is CurrentScopeReuse == false
             && (request.DirectParent.IsSingletonOrDependencyOfSingleton || request.IsDirectlyWrappedInFunc())
             && !request.OpensResolutionScope
             && request.Rules.ThrowIfDependencyHasShorterReuseLifespan // see the #378
@@ -4975,7 +4975,7 @@ namespace DryIoc
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericArguments()[0];
             // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
-            var serviceRequest = request.PushServiceType(serviceType, 
+            var serviceRequest = request.PushServiceType(serviceType,
                 RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
 
             var container = request.Container;
@@ -5183,7 +5183,7 @@ namespace DryIoc
 
                 // The key may be different in case of initial serviceKey was null.
                 // It even may be a non-default key, see Should_resolve_any_named_service_with_corresponding_metadata_If_name_is_not_specified_in_resolve
-                serviceKey     = keyedFactory.Key;
+                serviceKey = keyedFactory.Key;
                 serviceFactory = keyedFactory.Value;
             }
 
@@ -6259,7 +6259,7 @@ namespace DryIoc
             else if (ctorsOrCtorOrType is Type t)
                 ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
             else
-               Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+                Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
 
             if (ctors.Length != 0 && condition != null)
                 ctors = ctors.Match(condition, (cond, c) => cond(c.DeclaringType, c.GetParameters()));
@@ -13381,7 +13381,7 @@ namespace DryIoc
             RecursiveDependencyDetected = Of(
                 "Recursive dependency is detected when resolving " + NewLine + "{0}."),
             ScopeIsDisposed = Of(
-                "Scope {0} is disposed and scoped instances are disposed and no longer available." + NewLine + 
+                "Scope {0} is disposed and scoped instances are disposed and no longer available." + NewLine +
                 "Dispose stack-trace: " + NewLine + "{1}"),
             NotFoundOpenGenericImplTypeArgInService = Of(
                 "Unable to find for open-generic implementation {0} the type argument {1} when resolving {2}."),
@@ -13906,8 +13906,8 @@ namespace DryIoc
         /// <summary>Returns true if type of <paramref name="obj"/> is assignable to source <paramref name="type"/>.</summary>
         public static bool IsTypeOf(this Type type, object obj) =>
             type != null && obj != null && type.IsAssignableFrom(obj.GetType());
-            // instead of using the CGAttribute, see the #451 for more details
-            //type.GetTypeInfo().IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false);
+        // instead of using the CGAttribute, see the #451 for more details
+        //type.GetTypeInfo().IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false);
 
         /// <summary>Returns true if provided type IsPrimitive in .Net terms, or enum, or string,
         /// or array of primitives if <paramref name="orArrayOfPrimitives"/> is true.</summary>
