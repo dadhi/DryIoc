@@ -1,6 +1,14 @@
 Version History
 ---------------
 
+## v4.8.6 Bug-fix release / 2022-01-07
+
+- fixed: #446 Resolving a record without registration causes a StackOverflowException
+
+## v4.8.5 Bug-fix release / 2021-12-31
+
+- fixed: NY bug of RegisterInstance of null string
+
 ## v4.8.4 Bug-fix release / 2021-10-31
 
 - fixed: #434 ReturnDefaultIfNotRegistered is not respected between scopes

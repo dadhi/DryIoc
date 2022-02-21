@@ -2,9 +2,9 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.WebApi</id>
-        <version>4.0.0</version>
+        <version>4.1.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
+        <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
         <icon>logo.png</icon>
@@ -13,33 +13,18 @@
         <tags>Web ASP API Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
 <![CDATA[
-v4.0.0:
-- Support for DryIoc v4
-v3.0.0:
-- Support for DryIoc v3
-v2.2:
-- changed: Reference latest DryIoc 2.10
-v2.1.2:
-- workaround for: #379: Trouble with Batch Request - Made DryIocDependencyResolver constructor public
-v2.1.1:
-- fixed: #341: DryIoc WebApi: Unable to resolve constructor for internal web api controllers
-v2.1.0:
-- added: Optional ThrowIfUnresolved parameter in WithWebApi, DryIocDependencyResolver
-- added: Helper DryIocWebApi.IsController method which relies on DefaultHttpControllerTypeResolver
+## v4.1.0:
+
+- Support for DryIoc v4.8.6
+- fixed: #444 Update the dependencies to the latest versions at 14/01/2022
 ]]>
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc" version="4.0.0" />
-
-                <dependency id="Microsoft.AspNet.WebApi.Client" version="5.2.6" />
-                <dependency id="Microsoft.AspNet.WebApi.Core" version="5.2.6" />
-                <dependency id="Newtonsoft.Json" version="11.0.2" />
+                <dependency id="DryIoc" version="4.8.6" />
+                <dependency id="Microsoft.AspNet.WebApi.Core" version="5.2.7" />
             </group>
         </dependencies>
-        <frameworkAssemblies>
-            <frameworkAssembly assemblyName="System.Net.Http" />
-        </frameworkAssemblies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />

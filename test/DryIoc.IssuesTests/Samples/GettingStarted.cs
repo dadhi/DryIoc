@@ -45,7 +45,7 @@ namespace DryIoc.IssuesTests.Samples
             Assert.That(client.Service, Is.SameAs(anotherClient.Service));
         }
 
-        //[Test]
+        [Test]
         public void If_you_forgot_to_register_service_type_Container_will_guide_you_with_exception_message()
         {
             var container = new Container();
@@ -55,24 +55,16 @@ namespace DryIoc.IssuesTests.Samples
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IClient>());
 
-            var expected =
-#if DEBUG
-@"Unable to resolve IService as parameter ""service""
-  in SomeClient: IClient #27
-  from container
-Where no service registrations found
-  and no dynamic registrations found in 0 Rules.DynamicServiceProviders
-  and nothing in 0 Rules.UnknownServiceResolvers";
-#else
-@"Unable to resolve DryIoc.IssuesTests.Samples.IService as parameter ""service""
-  in DryIoc.IssuesTests.Samples.SomeClient: DryIoc.IssuesTests.Samples.IClient
-  from container
-Where no service registrations found
-  and no dynamic registrations found in 0 Rules.DynamicServiceProviders
-  and nothing in 0 Rules.UnknownServiceResolvers";
-#endif
+            // Unable to resolve IService as parameter "service"
+            //   in SomeClient: IClient #27
+            //   from container
+            // Where no service registrations found
+            //   and no dynamic registrations found in 0 Rules.DynamicServiceProviders
+            //   and nothing in 0 Rules.UnknownServiceResolvers
 
-            Assert.AreEqual(expected, ex.Message);
+            StringAssert.Contains("Unable to resolve", ex.Message);
+            StringAssert.Contains("parameter \"service\"", ex.Message);
+            StringAssert.Contains("Where no service registrations found", ex.Message);
         }
 
         [Test]
