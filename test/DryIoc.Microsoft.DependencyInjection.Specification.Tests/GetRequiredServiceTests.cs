@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 
@@ -30,8 +31,6 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
                 provider.GetRequiredService<Buz>());
         }
 
-        public class Buz
-        {
-        }
+        public class Buz {}
     }
 }
