@@ -65,13 +65,15 @@ namespace DryIoc.IssuesTests
         public void Import_LazyAllowDefault_DoesntImportServiceWithoutDependencies()
         {
             var container = new Container().WithMef();
-                // .With(r => r.WithoutFuncAndLazyWithoutRegistration());
+            // .With(r => r.WithoutFuncAndLazyWithoutRegistration());
 
-            container.Register<IHardDrive, HitachiHardDrive>();
+            // container.Register<IHardDrive, HitachiHardDrive>();
+            container.Register<IHardDrive, SamsungHardDrive>();
 
             var x = new Computer3();
             container.InjectPropertiesAndFields(x);
 
+            //var h = x.HardDrive;
             // should be null: couldn't assemble a computer with a hard drive
             // because logic board for the hard drive is not registered
             Assert.IsNull(x.HardDrive);
@@ -105,7 +107,13 @@ namespace DryIoc.IssuesTests
             [Import] // this dependency is missing
             public Lazy<ILogicBoard> LazyLogicBoard { get; set; }
 
-            public ILogicBoard LogicBoard => LazyLogicBoard.Value;
+            public ILogicBoard LogicBoard
+            {
+                get
+                {
+                    return LazyLogicBoard.Value;
+                }
+            }
         }
 
         public interface IHardDrive

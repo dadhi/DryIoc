@@ -5312,8 +5312,9 @@ namespace DryIoc
             var lazyType    = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
-            var serviceRequest = request.PushServiceType(serviceType, 
-                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
+            var serviceRequest = request.PushServiceType(serviceType,
+                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall |
+                RequestFlags.CheckTheRegistrationWithoutCreatingExpression);
 
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
@@ -5329,7 +5330,9 @@ namespace DryIoc
                 // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
                 // Plus we need to stop on the encountering the root service because lazy permits a circular dependencies.
                 // The dependency check is the open question, see #449
-                // todo: @note keeping the code for illustration
+
+                // todo: @wip check if lazy is recursive before getting the expression
+
                 // var expr = serviceFactory.GetExpressionOrDefault(serviceRequest);
                 // if (expr == null)
                 //     return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
@@ -9053,6 +9056,9 @@ namespace DryIoc
 
         /// <summary>Non inherited. Indicates the root service inside the function.</summary>
         IsDirectlyWrappedInFunc = 1 << 9,
+
+        ///<summary></summary>
+        CheckTheRegistrationWithoutCreatingExpression = 1 << 10 
     }
 
     /// Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations
@@ -9115,7 +9121,8 @@ namespace DryIoc
     {
         internal static readonly RequestFlags InheritedFlags
             = RequestFlags.IsSingletonOrDependencyOfSingleton
-            | RequestFlags.IsWrappedInFunc;
+            | RequestFlags.IsWrappedInFunc
+            | RequestFlags.CheckTheRegistrationWithoutCreatingExpression;
 
         private const RequestFlags DefaultFlags = default;
 
