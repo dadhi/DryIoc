@@ -61,7 +61,7 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(x.HardDrive.LogicBoard);
         }
 
-        //[Test] // doesn't work as expected
+        // [Test] // doesn't work as expected
         public void Import_LazyAllowDefault_DoesntImportServiceWithoutDependencies()
         {
             var container = new Container().WithMef();

@@ -5313,8 +5313,7 @@ namespace DryIoc
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
             var serviceRequest = request.PushServiceType(serviceType,
-                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall |
-                RequestFlags.CheckTheRegistrationWithoutCreatingExpression);
+                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
 
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
@@ -5330,12 +5329,15 @@ namespace DryIoc
                 // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
                 // Plus we need to stop on the encountering the root service because lazy permits a circular dependencies.
                 // The dependency check is the open question, see #449
-
-                // todo: @wip check if lazy is recursive before getting the expression
-
-                // var expr = serviceFactory.GetExpressionOrDefault(serviceRequest);
-                // if (expr == null)
-                //     return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
+                // todo: @wip
+                // if (!request.HasRecursiveParentUntilResolutionRoot(serviceFactory.FactoryID))
+                // {
+                //     serviceRequest.Flags |= RequestFlags.CheckTheRegistrationWithoutCreatingExpression;
+                //     var expr = serviceFactory.GetExpressionOrDefault(serviceRequest);
+                //     if (expr == null)
+                //         return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
+                //     serviceRequest.Flags &= RequestFlags.CheckTheRegistrationWithoutCreatingExpression;
+                // }
             }
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
@@ -9274,6 +9276,8 @@ namespace DryIoc
         /// <summary>Checks if request has parent with service type of Func with arguments.</summary>
         public bool IsWrappedInFuncWithArgs() => InputArgExprs != null;
 
+        internal bool CheckTheRegistrationWithoutCreatingExpression() => (Flags & RequestFlags.CheckTheRegistrationWithoutCreatingExpression) != 0;
+
         /// <summary>Returns expression for func arguments.</summary>
         public Expression GetInputArgsExpr() =>
             InputArgExprs == null ? Constant(null, typeof(object[]))
@@ -9656,6 +9660,15 @@ namespace DryIoc
                 if (p.FactoryID == factoryID)
                     return true;
             }
+            return false;
+        }
+
+        /// <summary>Check for the parents until very end.</summary>
+        public bool HasRecursiveParentUntilResolutionRoot(int factoryID)
+        {
+            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                if (p.FactoryID == factoryID)
+                    return true;
             return false;
         }
 
@@ -10446,6 +10459,7 @@ namespace DryIoc
                 Caching != FactoryCaching.DoNotCache &&
                 FactoryType == FactoryType.Service &&
                 !request.IsResolutionRoot &&
+                (request.Flags & RequestFlags.CheckTheRegistrationWithoutCreatingExpression) == 0 &&
                 !request.IsDirectlyWrappedInFunc() && 
                 !request.IsWrappedInFuncWithArgs() &&
                 !(request.Reuse.Name is IScopeName) &&
