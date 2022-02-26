@@ -5320,24 +5320,14 @@ namespace DryIoc
             {
                 // Here we need to know if the lazy is resolvable, 
                 // by resolving the factory we are checking that the service itself is registered...
+                // But what about its dependencies. In order to check on them we need to get the expression,
+                // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
+                // Plus we need to stop on the encountering the root service because lazy permits a circular dependencies.
+                // See #449 for additional details
                 var serviceFactory = container.ResolveFactory(serviceRequest);
                 if (serviceFactory == null)
                     return null;
                 serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
-
-                // But what about its dependencies. In order to check on them we need to get the expression,
-                // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
-                // Plus we need to stop on the encountering the root service because lazy permits a circular dependencies.
-                // The dependency check is the open question, see #449
-                // todo: @wip
-                // if (!request.HasRecursiveParentUntilResolutionRoot(serviceFactory.FactoryID))
-                // {
-                //     serviceRequest.Flags |= RequestFlags.CheckTheRegistrationWithoutCreatingExpression;
-                //     var expr = serviceFactory.GetExpressionOrDefault(serviceRequest);
-                //     if (expr == null)
-                //         return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
-                //     serviceRequest.Flags &= RequestFlags.CheckTheRegistrationWithoutCreatingExpression;
-                // }
             }
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
@@ -9057,10 +9047,7 @@ namespace DryIoc
         IsGeneratedResolutionDependencyExpression = 1 << 8,
 
         /// <summary>Non inherited. Indicates the root service inside the function.</summary>
-        IsDirectlyWrappedInFunc = 1 << 9,
-
-        ///<summary></summary>
-        CheckTheRegistrationWithoutCreatingExpression = 1 << 10 
+        IsDirectlyWrappedInFunc = 1 << 9
     }
 
     /// Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations
@@ -9123,8 +9110,7 @@ namespace DryIoc
     {
         internal static readonly RequestFlags InheritedFlags
             = RequestFlags.IsSingletonOrDependencyOfSingleton
-            | RequestFlags.IsWrappedInFunc
-            | RequestFlags.CheckTheRegistrationWithoutCreatingExpression;
+            | RequestFlags.IsWrappedInFunc;
 
         private const RequestFlags DefaultFlags = default;
 
@@ -9275,8 +9261,6 @@ namespace DryIoc
 
         /// <summary>Checks if request has parent with service type of Func with arguments.</summary>
         public bool IsWrappedInFuncWithArgs() => InputArgExprs != null;
-
-        internal bool CheckTheRegistrationWithoutCreatingExpression() => (Flags & RequestFlags.CheckTheRegistrationWithoutCreatingExpression) != 0;
 
         /// <summary>Returns expression for func arguments.</summary>
         public Expression GetInputArgsExpr() =>
@@ -10459,8 +10443,7 @@ namespace DryIoc
                 Caching != FactoryCaching.DoNotCache &&
                 FactoryType == FactoryType.Service &&
                 !request.IsResolutionRoot &&
-                (request.Flags & RequestFlags.CheckTheRegistrationWithoutCreatingExpression) == 0 &&
-                !request.IsDirectlyWrappedInFunc() && 
+                !request.IsDirectlyWrappedInFunc() &&
                 !request.IsWrappedInFuncWithArgs() &&
                 !(request.Reuse.Name is IScopeName) &&
                 !setup.AsResolutionCall && // see #295
