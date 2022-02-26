@@ -61,27 +61,33 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(x.HardDrive.LogicBoard);
         }
 
-        // [Test] // doesn't work as expected
-        public void Import_LazyAllowDefault_DoesntImportServiceWithoutDependencies()
+        [Test]
+        public void Import_Lazy_with_AllowDefault_Should_not_check_into_dependencies()
         {
-            var container = new Container().WithMef();
-            // .With(r => r.WithoutFuncAndLazyWithoutRegistration());
+            var container = new Container().WithMef()
+                .With(r => r.WithoutFuncAndLazyWithoutRegistration());
 
-            // container.Register<IHardDrive, HitachiHardDrive>();
             container.Register<IHardDrive, SamsungHardDrive>();
 
             var x = new Computer3();
             container.InjectPropertiesAndFields(x);
 
-            //var h = x.HardDrive;
-            // should be null: couldn't assemble a computer with a hard drive
-            // because logic board for the hard drive is not registered
-            Assert.IsNull(x.HardDrive);
+            Assert.That(x.HardDrive, Is.Not.Null);   // it is not null because the registration of HardDrive is present but its dependencies are not checked yet (cause laziness)
+            Assert.That(x.HardDrive.Value, Is.Null); // it is null because of allow default and we failing to get the dependency
+        }
 
-            // instead, we currently have this situation:
-            //Assert.That(x.HardDrive, Is.Not.Null);
-            //Assert.That(x.HardDrive.Value, Is.Not.Null);
-            //Assert.That(() => x.HardDrive.Value.LogicBoard, Throws.Exception.TypeOf<NullReferenceException>());
+        [Test]
+        public void Import_Lazy_with_AllowDefault_Should_not_check_into_Lazy_dependencies_as_well()
+        {
+            var container = new Container().WithMef();
+
+            container.Register<IHardDrive, HitachiHardDrive>();
+
+            var x = new Computer3();
+            container.InjectPropertiesAndFields(x);
+
+            Assert.That(x.HardDrive, Is.Not.Null); // it is not null because the registration of HardDrive is present but its dependencies are not checked yet (cause laziness)
+            Assert.That(x.HardDrive.Value, Is.Null); // it is null because of allow default and we failing to get the dependency - even if dependency is lazy, we still check the registration
         }
 
         public class Computer

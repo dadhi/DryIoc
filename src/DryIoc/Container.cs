@@ -5322,7 +5322,7 @@ namespace DryIoc
                 // by resolving the factory we are checking that the service itself is registered...
                 var serviceFactory = container.ResolveFactory(serviceRequest);
                 if (serviceFactory == null)
-                    return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
+                    return null;
                 serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
 
                 // But what about its dependencies. In order to check on them we need to get the expression,
