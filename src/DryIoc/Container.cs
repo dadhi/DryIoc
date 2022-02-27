@@ -4983,19 +4983,14 @@ namespace DryIoc
             {
                 // Here we need to know if the lazy is resolvable, 
                 // by resolving the factory we are checking that the service itself is registered...
-                var serviceFactory = factory ?? container.ResolveFactory(serviceRequest);
-                if (serviceFactory == null)
-                    return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
-                serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
-
                 // But what about its dependencies. In order to check on them we need to get the expression,
                 // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
                 // Plus we need to stop on the encountering the root service because lazy permits a circular dependencies.
-                // The dependency check is the open question, see #449
-                // todo: @note keeping the code for illustration
-                // var expr = serviceFactory.GetExpressionOrDefault(serviceRequest);
-                // if (expr == null)
-                //     return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
+                // See #449 for additional details
+                var serviceFactory = factory ?? container.ResolveFactory(serviceRequest);
+                if (serviceFactory == null)
+                    return null;
+                serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
             }
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
@@ -9422,6 +9417,15 @@ namespace DryIoc
                 if (p.FactoryID == factoryID)
                     return true;
             }
+            return false;
+        }
+
+        /// <summary>Check for the parents until very end.</summary>
+        public bool HasRecursiveParentUntilResolutionRoot(int factoryID)
+        {
+            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                if (p.FactoryID == factoryID)
+                    return true;
             return false;
         }
 

@@ -1,6 +1,13 @@
 Version History
 ---------------
 
+## v4.8.7 Bug-fix release / 2022-02-27
+
+- fixed: #435 hangfire use dryioc report ContainerIsDisposed
+- fixed: #449 Optional dependency shouldn't treat its own dependencies as optional
+- fixed: #451 Compiler-generated type as a service
+- fixed: #456 One more regression
+
 ## v4.8.6 Bug-fix release / 2022-01-07
 
 - fixed: #446 Resolving a record without registration causes a StackOverflowException
