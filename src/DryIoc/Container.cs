@@ -8196,7 +8196,6 @@ namespace DryIoc
         /// <summary>Metadata value to find in resolved service.</summary>
         public readonly object Metadata;
 
-
         /// <summary>Indicates that the custom value is specified.</summary>
         public readonly bool HasCustomValue;
 
@@ -8498,9 +8497,11 @@ namespace DryIoc
         /// <summary>Creates info out of provided settings</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved) =>
-            ifUnresolved == IfUnresolved.Throw ? new Typed(serviceType) :
-            ifUnresolved == IfUnresolved.ReturnDefault ? new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefault) :
-                new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered);
+            ifUnresolved == IfUnresolved.Throw 
+                ? new Typed(serviceType) :
+            ifUnresolved == IfUnresolved.ReturnDefault
+                ? new TypedIfUnresolvedReturnDefault(serviceType)
+                : new TypedIfUnresolvedReturnDefaultIfNotRegistered(serviceType);
 
         /// <summary>Creates info out of the provided settings</summary>
         public static ServiceInfo Of(Type serviceType, object serviceKey) =>
@@ -8530,8 +8531,9 @@ namespace DryIoc
 
             return serviceKey == null && requiredServiceType == null && metadataKey == null && metadata == null
                 ? (ifUnresolved == IfUnresolved.Throw ? new Typed(serviceType)
-                : ifUnresolved == IfUnresolved.ReturnDefault ? new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefault)
-                : new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered))
+                : ifUnresolved == IfUnresolved.ReturnDefault 
+                ? new TypedIfUnresolvedReturnDefault(serviceType)
+                : new TypedIfUnresolvedReturnDefaultIfNotRegistered(serviceType))
                 : new WithDetails(serviceType, ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
         }
 
@@ -8542,6 +8544,18 @@ namespace DryIoc
             public override Type ServiceType { get; }
             /// <summary>Creates the service info</summary>
             public Typed(Type serviceType) => ServiceType = serviceType.ThrowIfNull();
+        }
+
+        private sealed class TypedIfUnresolvedReturnDefault : Typed
+        {
+            public override ServiceDetails Details => ServiceDetails.IfUnresolvedReturnDefault;
+            public TypedIfUnresolvedReturnDefault(Type serviceType) : base(serviceType) {}
+        }
+
+        private sealed class TypedIfUnresolvedReturnDefaultIfNotRegistered : Typed
+        {
+            public override ServiceDetails Details => ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered;
+            public TypedIfUnresolvedReturnDefaultIfNotRegistered(Type serviceType) : base(serviceType) {}
         }
 
         /// <summary>Creates service info using typed <typeparamref name="TService"/>.</summary>
@@ -9778,6 +9792,7 @@ namespace DryIoc
         [Flags]
         private enum Settings : ushort
         {
+            Default = 0,
             AsResolutionCall = 1 << 1,
             OpenResolutionScope = 1 << 2,
             PreventDisposal = 1 << 3,
