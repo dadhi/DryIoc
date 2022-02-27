@@ -4381,7 +4381,7 @@ namespace DryIoc
             var reuseExpr = r.Reuse == null ? Constant(null, typeof(IReuse))
                 : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
 
-            // todo: @perf @wip replace with the comparison to ServiceDetails.Default 
+            // todo: @perf replace with the comparison to ServiceDetails.Default 
             if (d.IfUnresolved == IfUnresolved.Throw && d.RequiredServiceType == null && d.ServiceKey == null && d.MetadataKey == null && d.Metadata == null &&
                 factoryType == FactoryType.Service && flags == default(RequestFlags) && decoratedFactoryID == 0)
                 return Call(parentExpr, Request.PushMethodWith4Args.Value,
@@ -5274,7 +5274,7 @@ namespace DryIoc
         DecoratorOfAnyTypeViaObjectServiceType = 1 << 3,
     }
 
-    // todo: @incomplete use Copy for setting the rules
+    // todo: @wip use Copy for setting the rules
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
     {
@@ -7542,7 +7542,7 @@ namespace DryIoc
                 dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType),
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        // todo: @feature @incomplete
+        // todo: @feature @wip
         // /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         // public static void RegisterDelegate(
         //     this IRegistrator r, Type serviceType, Type depType, Func<object, object> factory,

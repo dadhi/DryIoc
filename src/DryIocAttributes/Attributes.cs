@@ -381,7 +381,7 @@ namespace DryIocAttributes
         ReturnDefaultIfNotRegistered,
     }
 
-    // todo: @incomplete we are repeating the DryIoc.Request here, but we need just a little functionality of it
+    // todo: @wip we are repeating the DryIoc.Request here, but we need just a little functionality of it
     /// <summary>Dependency request path information.</summary>
     public sealed class Request
     {
