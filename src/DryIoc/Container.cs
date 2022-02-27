@@ -9776,7 +9776,7 @@ namespace DryIoc
         }
 
         [Flags]
-        private enum Settings
+        private enum Settings : ushort
         {
             AsResolutionCall = 1 << 1,
             OpenResolutionScope = 1 << 2,
