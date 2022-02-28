@@ -391,19 +391,34 @@ namespace DryIoc.UnitTests
             Assert.AreSame(operation, container.Resolve<IOperation>());
         }
 
-        [Test, Ignore("todo: @fixme")]
+        [Test]
         public void Delegate_decorator_with_the_runtime_service_types_RegisterDelegate()
         {
-            // var container = new Container();
-            // container.Register<IOperation, SomeOperation>(Reuse.Singleton);
-            // container.RegisterDelegate(typeof(IOperation), typeof(IOperation),
-            //     op => new MeasureExecutionTimeOperationDecorator((IOperation)op), 
-            //     setup: Setup.DecoratorWith(useDecorateeReuse: true));
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.RegisterDelegate(typeof(IOperation), typeof(IOperation),
+                op => new MeasureExecutionTimeOperationDecorator((IOperation)op), 
+                setup: Setup.DecoratorWith(useDecorateeReuse: true));
 
-            // var operation = container.Resolve<IOperation>();
+            var operation = container.Resolve<IOperation>();
 
-            // Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
-            // Assert.AreSame(operation, container.Resolve<IOperation>());
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
+            Assert.AreSame(operation, container.Resolve<IOperation>());
+        }
+
+        [Test]
+        public void Delegate_decorator_with_the_runtime_service_types_RegisterDelegate_should_throw_on_the_wrong_type()
+        {
+            var container = new Container();
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.RegisterDelegate(typeof(IOperation), typeof(IOperation),
+                op => new object(), // wrong type
+                setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<IOperation>());
+
+            Assert.AreSame(Error.NameOf(Error.NoConversionOperatorFoundWhenInterpretingTheConvertExpression), ex.ErrorName);
         }
 
         [Test]
