@@ -7780,6 +7780,46 @@ namespace DryIoc
         public static void Use<TService>(this IResolverContext r, TService instance) =>
             r.Use(typeof(TService), instance.ToFactoryDelegate);
 
+        /// <summary>Adding the instance directly to the scope for resolution mapped to the multiple services</summary>
+        public static void UseMany(this IResolverContext r, object instance, params Type[] serviceTypes)
+        {
+            FactoryDelegate f = instance.ToFactoryDelegate;
+            foreach (var t in serviceTypes)
+                r.Use(t, f);
+        }
+
+        /// <summary>Adding the instance directly to the scope for resolution mapped to the multiple services</summary>
+        public static void UseMany(this IRegistrator r, object instance, params Type[] serviceTypes)
+        {
+            FactoryDelegate f = instance.ToFactoryDelegate;
+            foreach (var t in serviceTypes)
+                r.Use(t, f);
+        }
+
+        /// <summary>Adding the instance directly to the scope for resolution mapped to the multiple services</summary>
+        public static void UseMany(this IContainer c, object instance, params Type[] serviceTypes) =>
+            ((IResolverContext)c).UseMany(instance, serviceTypes);
+
+        /// <summary>Adding the produced instance directly to the scope for resolution mapped to the multiple services</summary>
+        public static void UseMany(this IResolverContext r, Func<IResolverContext, object> factory, params Type[] serviceTypes)
+        {
+            FactoryDelegate f = factory.ToFactoryDelegate;
+            foreach (var t in serviceTypes)
+                r.Use(t, f);
+        }
+
+        /// <summary>Adding the produced instance directly to the scope for resolution mapped to the multiple services</summary>
+        public static void UseMany(this IRegistrator r, Func<IResolverContext, object> factory, params Type[] serviceTypes)
+        {
+            FactoryDelegate f = factory.ToFactoryDelegate;
+            foreach (var t in serviceTypes)
+                r.Use(t, f);
+        }
+
+        /// <summary>Adding the instance directly to the scope for resolution mapped to the multiple services</summary>
+        public static void UseMany(this IContainer c, Func<IResolverContext, object> factory, params Type[] serviceTypes) =>
+            ((IResolverContext)c).UseMany(factory, serviceTypes);
+
         /// <summary>Adding the factory directly to the scope for resolution</summary>
         public static void Use<TService>(this IRegistrator r, Func<IResolverContext, TService> factory) =>
             r.Use(typeof(TService), factory.ToFactoryDelegate);
