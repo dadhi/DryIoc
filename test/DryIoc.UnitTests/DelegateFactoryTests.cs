@@ -184,7 +184,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterDelegate(typeof (IService), _ => new Service());
+            container.RegisterDelegate(typeof(IService), _ => new Service());
 
             var service = container.Resolve<IService>();
             Assert.That(service, Is.InstanceOf<Service>());
@@ -195,7 +195,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterDelegate(typeof (IService), _ => "blah");
+            container.RegisterDelegate(typeof(IService), _ => "blah");
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
@@ -210,14 +210,14 @@ namespace DryIoc.UnitTests
         public void Cannot_register_delegate_for_open_generic_service_type()
         {
             var container = new Container();
-            
-            var ex = Assert.Throws<ContainerException>(() => 
+
+            var ex = Assert.Throws<ContainerException>(() =>
             container.RegisterDelegate(typeof(OpenGenericFriend<>), resolver => "nah"));
 
             Assert.AreEqual(Error.ImpossibleToRegisterOpenGenericWithRegisterDelegate, ex.Error);
         }
 
-        public class OpenGenericFriend<T> {}
+        public class OpenGenericFriend<T> { }
     }
 }
 

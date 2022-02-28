@@ -34,7 +34,7 @@ namespace DryIoc.IssuesTests
             Assert.IsTrue(container.IsRegistered<B>());
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<B>());
-            Assert.AreEqual(Error.NameOf(Error.RegisteredDelegateResultIsNotOfServiceType), ex.ErrorName);
+            Assert.AreEqual(Error.NameOf(Error.NoConversionOperatorFoundWhenInterpretingTheConvertExpression), ex.ErrorName);
         }
 
         [Test]
@@ -71,6 +71,6 @@ namespace DryIoc.IssuesTests
             public C(A a, B b) => (A, B) = (a, b);
         }
 
-        class Wrong {}
+        class Wrong { }
     }
 }

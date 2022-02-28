@@ -6215,6 +6215,9 @@ namespace DryIoc
             return new WithFactoryExpression(methodOrMember, Constant(factoryInstance));
         }
 
+        internal static FactoryMethod OfFactory<F>(MemberInfo methodOrMember, F factory) =>
+            new WithFactoryExpression(methodOrMember, ConstantOf<F>(factory));
+
         /// <summary>Discovers the static factory method or member by name in <typeparamref name="TFactory"/>.
         /// Should play nice with C# <see langword="nameof"/> operator.</summary>
         public static FactoryMethod Of<TFactory>(string methodOrMemberName) =>
@@ -7550,52 +7553,21 @@ namespace DryIoc
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
+        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
         public static void RegisterDelegate<TDep1>(
             this IRegistrator r, Type serviceType, Func<TDep1, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            RegisterDelegateFunc<Func<TDep1, object>>(r, serviceType,
-                dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType),
-                reuse, setup, ifAlreadyRegistered, serviceKey);
-
-        private static Lazy<MethodInfo>[] _invokeMethods =
-        {
-            new Lazy<MethodInfo>(() => typeof(Func<object, object>).GetMethod(InvokeMethodName)),
-            new Lazy<MethodInfo>(() => typeof(Func<object, object, object>).GetMethod(InvokeMethodName)),
-        };
+            RegisterDelegateFunc<Func<TDep1, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container.
         /// The delegate accepts the object parameters with the runtime known types</summary>
         public static void RegisterDelegate(
             this IRegistrator r, Type serviceType, Type depType, Func<object, object> factory,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
-        {
-            var factoryMethod = new FactoryMethod.WithFactoryExpression(_invokeMethods[0].Value, ConstantOf(factory));
-            var made = Made.Of(factoryMethod, Parameters.Of.Position(0, depType));
-            r.Register(ReflectionFactory.Of(default(Type), reuse, made, setup),
-                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
-        }
-
-        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
-        public static void RegisterDelegate<TDep1, TDep2>(
-            this IRegistrator r, Type serviceType, Func<TDep1, TDep2, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            RegisterDelegateFunc<Func<TDep1, TDep2, object>>(r, serviceType,
-                (dep1, dep2) => factory(dep1, dep2).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType),
-                reuse, setup, ifAlreadyRegistered, serviceKey);
-
-        /// <summary>Registers delegate with the explicit arguments to be injected by container.
-        /// The delegate accepts the object parameters with the runtime known types</summary>
-        public static void RegisterDelegate(
-            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type,
-            Func<object, object, object> factory,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
-        {
-            var factoryMethod = new FactoryMethod.WithFactoryExpression(_invokeMethods[1].Value, ConstantOf(factory));
-            var made = Made.Of(factoryMethod, Parameters.Of.Position(0, dep1Type).Position(1, dep2Type));
-            r.Register(ReflectionFactory.Of(default(Type), reuse, made, setup),
-                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
-        }
+            r.Register(ReflectionFactory.Of(default(Type), reuse,
+                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[0].Value, factory), Parameters.Of.Position(0, depType)),
+                setup),
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true); // true because we could not check types inside lambda before its actually invoked
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TService>(
@@ -7603,11 +7575,45 @@ namespace DryIoc
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
+        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+        public static void RegisterDelegate<TDep1, TDep2>(
+            this IRegistrator r, Type serviceType, Func<TDep1, TDep2, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            RegisterDelegateFunc<Func<TDep1, TDep2, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        /// <summary>Registers delegate with the explicit arguments to be injected by container.
+        /// The delegate accepts the object parameters with the runtime known types</summary>
+        public static void RegisterDelegate(
+            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type,
+            Func<object, object, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register(ReflectionFactory.Of(default(Type), reuse,
+                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[1].Value, factory),
+                Parameters.Of.Position(0, dep1Type).Position(1, dep2Type)), setup),
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+        public static void RegisterDelegate<TDep1, TDep2, TDep3>(
+            this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            RegisterDelegateFunc<Func<TDep1, TDep2, TDep3, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        /// <summary>Registers delegate with the explicit arguments to be injected by container.
+        /// The delegate accepts the object parameters with the runtime known types</summary>
+        public static void RegisterDelegate(
+            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type, Type dep3Type,
+            Func<object, object, object, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register(ReflectionFactory.Of(default(Type), reuse,
+                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[2].Value, factory),
+                Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type)), setup),
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
@@ -7615,11 +7621,45 @@ namespace DryIoc
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
+        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4>(
+            this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            RegisterDelegateFunc<Func<TDep1, TDep2, TDep3, TDep4, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        /// <summary>Registers delegate with the explicit arguments to be injected by container.
+        /// The delegate accepts the object parameters with the runtime known types</summary>
+        public static void RegisterDelegate(
+            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type, Type dep3Type, Type dep4Type,
+            Func<object, object, object, object, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register(ReflectionFactory.Of(default(Type), reuse,
+                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[3].Value, factory),
+                Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type).Position(3, dep4Type)), setup),
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5>(
+            this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, TDep5, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            RegisterDelegateFunc<Func<TDep1, TDep2, TDep3, TDep4, TDep5, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        /// <summary>Registers delegate with the explicit arguments to be injected by container.
+        /// The delegate accepts the object parameters with the runtime known types</summary>
+        public static void RegisterDelegate(
+            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type, Type dep3Type, Type dep4Type, Type dep5Type,
+            Func<object, object, object, object, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register(ReflectionFactory.Of(default(Type), reuse,
+                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[4].Value, factory),
+                Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type).Position(3, dep4Type).Position(4, dep5Type)), setup),
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TService>(
@@ -7627,13 +7667,58 @@ namespace DryIoc
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
+        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6>(
+            this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            RegisterDelegateFunc<Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        /// <summary>Registers delegate with the explicit arguments to be injected by container.
+        /// The delegate accepts the object parameters with the runtime known types</summary>
+        public static void RegisterDelegate(
+            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type, Type dep3Type, Type dep4Type, Type dep5Type, Type dep6Type,
+            Func<object, object, object, object, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register(ReflectionFactory.Of(default(Type), reuse,
+                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[5].Value, factory),
+                Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type).Position(3, dep4Type).Position(4, dep5Type).Position(5, dep6Type)), setup),
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
+        /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
+        public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7>(
+            this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            RegisterDelegateFunc<Func<TDep1, TDep2, TDep3, TDep4, TDep5, TDep6, TDep7, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        /// <summary>Registers delegate with the explicit arguments to be injected by container.
+        /// The delegate accepts the object parameters with the runtime known types</summary>
+        public static void RegisterDelegate(
+            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type, Type dep3Type, Type dep4Type, Type dep5Type, Type dep6Type, Type dep7Type,
+            Func<object, object, object, object, object> factory,
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            r.Register(ReflectionFactory.Of(default(Type), reuse,
+                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[6].Value, factory),
+                Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type).Position(3, dep4Type).Position(4, dep5Type).Position(5, dep6Type).Position(6, dep7Type)), setup),
+                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+
         private const string InvokeMethodName = "Invoke";
+        private static Lazy<Lazy<MethodInfo>[]> _invokeMethods = new Lazy<Lazy<MethodInfo>[]>(() => new[]
+        {
+            new Lazy<MethodInfo>(() => typeof(Func<object, object>).GetMethod(InvokeMethodName)),
+            new Lazy<MethodInfo>(() => typeof(Func<object, object, object>).GetMethod(InvokeMethodName)),
+            new Lazy<MethodInfo>(() => typeof(Func<object, object, object, object>).GetMethod(InvokeMethodName)),
+            new Lazy<MethodInfo>(() => typeof(Func<object, object, object, object, object>).GetMethod(InvokeMethodName)),
+            new Lazy<MethodInfo>(() => typeof(Func<object, object, object, object, object, object>).GetMethod(InvokeMethodName)),
+            new Lazy<MethodInfo>(() => typeof(Func<object, object, object, object, object, object, object>).GetMethod(InvokeMethodName)),
+            new Lazy<MethodInfo>(() => typeof(Func<object, object, object, object, object, object, object, object>).GetMethod(InvokeMethodName))
+        });
+
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
             TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey) =>
             r.Register(ReflectionFactory.Of(serviceType, reuse,
