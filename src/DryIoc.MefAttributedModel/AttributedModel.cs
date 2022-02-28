@@ -41,10 +41,10 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Maps the supported reuse types to respective DryIoc reuse.</summary>
         public static readonly ImHashMap<ReuseType, Func<object, IReuse>> SupportedReuseTypes = ImHashMap<ReuseType, Func<object, IReuse>>
             .Empty
-            .AddOrUpdate(ReuseType.Transient,         _ => Reuse.Transient)
-            .AddOrUpdate(ReuseType.Singleton,         _ => Reuse.Singleton)
-            .AddOrUpdate(ReuseType.Scoped,            n => n == null ? Reuse.Scoped : n is object[] names ? Reuse.ScopedTo(names) : Reuse.ScopedTo(n))
-            .AddOrUpdate(ReuseType.ResolutionScope,   _ => Reuse.Scoped)
+            .AddOrUpdate(ReuseType.Transient, _ => Reuse.Transient)
+            .AddOrUpdate(ReuseType.Singleton, _ => Reuse.Singleton)
+            .AddOrUpdate(ReuseType.Scoped, n => n == null ? Reuse.Scoped : n is object[] names ? Reuse.ScopedTo(names) : Reuse.ScopedTo(n))
+            .AddOrUpdate(ReuseType.ResolutionScope, _ => Reuse.Scoped)
             .AddOrUpdate(ReuseType.ScopedOrSingleton, _ => Reuse.ScopedOrSingleton);
 
         private static readonly PropertiesAndFieldsSelector _getImportedPropertiesAndFields =
@@ -69,7 +69,7 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Adjusts the rules with <see cref="WithMefRules"/> to provide the full MEF compatibility.
         /// In addition registers the MEF specific wrappers, and adds support for <see cref="IPartImportsSatisfiedNotification"/>.</summary>
-        public static IContainer WithMef(this IContainer container) => 
+        public static IContainer WithMef(this IContainer container) =>
             container
                 .With(WithMefRules)
                 .WithImportsSatisfiedNotification()
@@ -80,11 +80,11 @@ namespace DryIoc.MefAttributedModel
         /// <summary>The basic rules to support MEF/DryIoc Attributes for
         /// specifying service construction via <see cref="ImportingConstructorAttribute"/>,
         /// and for specifying injected dependencies via Import attributes.</summary>
-        public static Rules WithMefAttributedModel(this Rules rules) => 
+        public static Rules WithMefAttributedModel(this Rules rules) =>
             rules.WithMefRules();
 
         /// <summary>Applies the <see cref="WithMefAttributedModel(Rules)"/> to the container.</summary>
-        public static IContainer WithMefAttributedModel(this IContainer container) => 
+        public static IContainer WithMefAttributedModel(this IContainer container) =>
             container.With(WithMefAttributedModel);
 
         #region IPartImportsSatisfiedNotification support
@@ -203,7 +203,7 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Creates the <see cref="ExportFactory{T, TMetadata}"/>.</summary>
         internal static ExportFactory<T, TMetadata> CreateExportFactoryWithMetadata<T, TMetadata>(
-            Meta<KeyValuePair<object, Func<T>>, TMetadata> metaFactory, IContainer container) => 
+            Meta<KeyValuePair<object, Func<T>>, TMetadata> metaFactory, IContainer container) =>
             new ExportFactory<T, TMetadata>(() =>
             {
                 var scope = container.With(r => r.WithDefaultReuse(Reuse.Scoped)).OpenScope();
@@ -217,14 +217,14 @@ namespace DryIoc.MefAttributedModel
                     scope.Dispose();
                     throw;
                 }
-            }, 
+            },
             metaFactory.Metadata);
 
         private static readonly Made _createExportFactoryWithMetadataMethod = Made.Of(
             typeof(AttributedModel).SingleMethod(nameof(CreateExportFactoryWithMetadata), includeNonPublic: true));
 
         /// <summary>Creates the <see cref="Lazy{T, TMetadata}"/>.</summary>
-        internal static Lazy<T, TMetadata> CreateLazyWithMetadata<T, TMetadata>(Meta<Lazy<T>, TMetadata> metaFactory) => 
+        internal static Lazy<T, TMetadata> CreateLazyWithMetadata<T, TMetadata>(Meta<Lazy<T>, TMetadata> metaFactory) =>
             metaFactory == null || metaFactory.Value == null ? null :
             new Lazy<T, TMetadata>(() => metaFactory.Value.Value, metaFactory.Metadata);
 
@@ -248,13 +248,13 @@ namespace DryIoc.MefAttributedModel
             // decorator to filter in a presence of multiple same keys
             // note: it is explicitly set to Transient to produce new results for new filtered collection,
             // otherwise it may be set to Singleton by container wide rules and always produce the results for the first resolved collection
-            container.Register(typeof(IEnumerable<>), Reuse.Transient, filterCollectionByMultiKey, 
+            container.Register(typeof(IEnumerable<>), Reuse.Transient, filterCollectionByMultiKey,
                 Setup.DecoratorWith(condition: r => r.ServiceKey != null));
 
             return container;
         }
 
-        internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey) => 
+        internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey) =>
             source.Match(x =>
             {
                 if (x.Key is DefaultKey || x.Key is DefaultDynamicKey)
@@ -269,7 +269,7 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Registers implementation type(s) with provided registrator/container.
         /// Expects the implementation type with the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
-        public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> types) => 
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> types) =>
             registrator.RegisterExports(types.ThrowIfNull().SelectMany(t => GetExportedRegistrations(t)));
 
         /// <summary>Registers implementation type(s) with provided registrator/container.
@@ -279,24 +279,24 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Registers implementation type(s) with provided registrator/container.
         /// Expects the implementation type with the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
-        public static void RegisterExports(this IRegistrator registrator, params Type[] types) => 
+        public static void RegisterExports(this IRegistrator registrator, params Type[] types) =>
             registrator.RegisterExports((IEnumerable<Type>)types);
 
         /// <summary>Registers implementation type(s) with provided registrator/container.
         /// Expects the implementation type with or without the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
-        public static void RegisterExportsAndTypes(this IRegistrator registrator, params Type[] types) => 
+        public static void RegisterExportsAndTypes(this IRegistrator registrator, params Type[] types) =>
             registrator.RegisterExportsAndTypes((IEnumerable<Type>)types);
 
         /// <summary>First scans (<see cref="Scan"/>) the provided assemblies to find the types annotated with
         /// <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/>, or <see cref="ExportManyAttribute"/>.
         /// Then registers the found types into registrator/container.</summary>
-        public static void RegisterExports(this IRegistrator registrator, IEnumerable<Assembly> assemblies) => 
+        public static void RegisterExports(this IRegistrator registrator, IEnumerable<Assembly> assemblies) =>
             registrator.RegisterExports(Scan(assemblies));
 
         /// <summary>First scans (<see cref="Scan"/>) the provided assemblies to find the types annotated with
         /// <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/>, or <see cref="ExportManyAttribute"/>.
         /// Then registers the found types into registrator/container.</summary>
-        public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies) => 
+        public static void RegisterExports(this IRegistrator registrator, params Assembly[] assemblies) =>
             registrator.RegisterExports((IEnumerable<Assembly>)assemblies);
 
         /// <summary>Registers new factories into registrator/container based on provided registration info's, which
@@ -320,7 +320,7 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Registers factories into registrator/container based on single provided info, which could
         /// contain multiple exported services with single implementation.</summary>
-        public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info, 
+        public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info,
             Lazy<ServiceKeyStore> serviceKeyStore = null)
         {
             // factory is used for all exports of implementation
@@ -513,7 +513,7 @@ namespace DryIoc.MefAttributedModel
 
         private static bool CanBeExported(Type type) => type.IsClass && !type.IsCompilerGenerated();
 
-        private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute) => 
+        private static ReuseInfo GetReuseInfo(PartCreationPolicyAttribute attribute) =>
             new ReuseInfo { ReuseType = attribute.CreationPolicy == CreationPolicy.NonShared ? ReuseType.Transient : ReuseType.Singleton };
 
         /// <summary>Converts reuse info into pre-defined (<see cref="SupportedReuseTypes"/>) or custom reuse object.</summary>
@@ -523,10 +523,10 @@ namespace DryIoc.MefAttributedModel
                 return null; // unspecified reuse, decided by container rules
 
             if (reuseInfo.CustomReuseType != null)
-                return 
+                return
                     reuseInfo.ScopeName == null && (reuseInfo.ScopeNames == null || reuseInfo.ScopeNames.Length == 0) ?
                         (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType) :
-                    reuseInfo.ScopeName != null ? 
+                    reuseInfo.ScopeName != null ?
                         (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType, reuseInfo.ScopeName) :
                         (IReuse)Activator.CreateInstance(reuseInfo.CustomReuseType, reuseInfo.ScopeNames);
 
@@ -588,7 +588,7 @@ namespace DryIoc.MefAttributedModel
             return PropertyOrFieldServiceInfo.Of(member).WithDetails(details);
         }
 
-        private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, DryIoc.Request request) => 
+        private static ServiceDetails GetFirstImportDetailsOrNull(Type type, Attribute[] attributes, DryIoc.Request request) =>
             GetImportDetails(type, attributes, request) ?? GetImportExternalDetails(type, attributes, request);
 
         private static ServiceDetails GetImportDetails(Type type, Attribute[] attributes, DryIoc.Request request)
@@ -745,7 +745,7 @@ namespace DryIoc.MefAttributedModel
 
         #region Implementation
 
-        private static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type type, Attribute[] attributes, 
+        private static ExportedRegistrationInfo GetRegistrationInfoOrDefault(Type type, Attribute[] attributes,
             bool shouldRegisterWithoutExport = false)
         {
             if (type.IsOpenGeneric())
@@ -776,7 +776,7 @@ namespace DryIoc.MefAttributedModel
                 {
                     var reuseAttr = (ReuseAttribute)attribute;
                     info.Reuse = reuseAttr.CustomReuseType == null
-                        ? new ReuseInfo { ReuseType       = reuseAttr.ReuseType,       ScopeName = reuseAttr.ScopeName, ScopeNames = reuseAttr.ScopeNames }
+                        ? new ReuseInfo { ReuseType = reuseAttr.ReuseType, ScopeName = reuseAttr.ScopeName, ScopeNames = reuseAttr.ScopeNames }
                         : new ReuseInfo { CustomReuseType = reuseAttr.CustomReuseType, ScopeName = reuseAttr.ScopeName, ScopeNames = reuseAttr.ScopeNames };
                 }
                 else if (attribute is OpenResolutionScopeAttribute)
@@ -833,7 +833,7 @@ namespace DryIoc.MefAttributedModel
 
             if (info.HasMetadataAttribute)
                 info.InitExportedMetadata(attributes);
-            
+
             if (info.Exports == null)
             {
                 if (shouldRegisterWithoutExport)
@@ -1032,8 +1032,8 @@ namespace DryIoc.MefAttributedModel
                        {
                            var typeAndCount = types[typeAndCountIndex];
 
-                                  // Change the serviceKey only when multiple same types are registered with the same key
-                                  serviceKey = KV.Of(serviceKey, typeAndCount.Value);
+                           // Change the serviceKey only when multiple same types are registered with the same key
+                           serviceKey = KV.Of(serviceKey, typeAndCount.Value);
 
                            typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
                            return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
@@ -1047,7 +1047,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Retrieves types and their count used with specified <paramref name="serviceKey"/>.</summary>
         /// <param name="serviceKey">Service key to get info.</param>
         /// <returns>Types and their count for the specified key, if key is not stored - returns null.</returns>
-        public KV<Type, int>[] GetServiceTypesOrDefault(object serviceKey) => 
+        public KV<Type, int>[] GetServiceTypesOrDefault(object serviceKey) =>
             _store.Value.GetValueOrDefault(serviceKey);
     }
 
@@ -1107,7 +1107,7 @@ namespace DryIoc.MefAttributedModel
             Messages[errorIndex - _containerErrorCount];
 
         /// <summary>Returns the name of error with the provided error code.</summary>
-        public static string NameOf(int error) => 
+        public static string NameOf(int error) =>
             typeof(Error).GetTypeInfo().DeclaredFields
                 .Where(f => f.FieldType == typeof(int))
                 .Where((_, i) => i == error - _containerErrorCount + 1)
@@ -1141,9 +1141,10 @@ namespace DryIoc.MefAttributedModel
 
         private AttributedModelException(int error, string message) : this(error, message, null) { }
 
-        private AttributedModelException(int error, string message, Exception innerException) : 
-            base(error, message, innerException, (e, m, _) => 
-            FormatMessage(MefAttributedModel.Error.NameOf(e), m)) { }
+        private AttributedModelException(int error, string message, Exception innerException) :
+            base(error, message, innerException, (e, m, _) =>
+            FormatMessage(MefAttributedModel.Error.NameOf(e), m))
+        { }
     }
 
     /// <summary>Converts provided literal into valid C# code. Used for generating registration code
@@ -1151,15 +1152,15 @@ namespace DryIoc.MefAttributedModel
     public static class PrintCode
     {
         /// <summary>Prints valid c# Boolean literal: true/false.</summary>
-        public static StringBuilder AppendBool(this StringBuilder code, bool x) => 
+        public static StringBuilder AppendBool(this StringBuilder code, bool x) =>
             code.Append(x ? "true" : "false");
 
         /// <summary>Prints valid c# string constant.</summary>
-        public static StringBuilder AppendString(this StringBuilder code, string x) => 
+        public static StringBuilder AppendString(this StringBuilder code, string x) =>
             x == null ? code.Append("null") : code.Append('"').Append(x.Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n")).Append('"');
 
         /// <summary>Prints valid c# Type literal: <c>typeof(Namespace.Type)</c>.</summary>
-        public static StringBuilder AppendType(this StringBuilder code, Type x) => 
+        public static StringBuilder AppendType(this StringBuilder code, Type x) =>
             x == null ? code.Append("null") : code.Append("typeof(")
             .Print(x, t => t == typeof(void) ? "void" : t.FullName ?? t.Name)
             .Append(')');
@@ -1178,7 +1179,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Prints the <see cref="Dictionary{TKey, TValue}"/> where keys are strings.</summary>
-        public static StringBuilder AppendDictionary<TValue>(this StringBuilder code, 
+        public static StringBuilder AppendDictionary<TValue>(this StringBuilder code,
             IDictionary<string, TValue> dictionary, Func<StringBuilder, string, TValue, StringBuilder> appendValue = null)
         {
             if (appendValue == null)
@@ -1201,11 +1202,11 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Prints the <see cref="Dictionary{TKey, TValue}"/> where keys and values are strings.</summary>
-        public static StringBuilder AppendDictionary(this StringBuilder code, IDictionary<string, string> dictionary) => 
+        public static StringBuilder AppendDictionary(this StringBuilder code, IDictionary<string, string> dictionary) =>
             code.AppendDictionary(dictionary, (c, k, v) => c.AppendString(v));
 
         /// <summary>Determines whether the type is null-able.</summary>
-        public static bool IsNullable(this Type type) => 
+        public static bool IsNullable(this Type type) =>
             type.GetTypeInfo().IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
 
         /// <summary>Prints code items.</summary>
@@ -1269,30 +1270,78 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Specifies the reuse information</summary>
         public ReuseInfo Reuse;
 
-        // todo: combines bool fields to bit flags
+        private Setup.Settings _flags;
+
         /// <summary>Corresponds to <see cref="Setup.OpenResolutionScope"/>.</summary>
-        public bool OpenResolutionScope;
+        public bool OpenResolutionScope
+        {
+            get => (_flags & Setup.Settings.OpenResolutionScope) != 0;
+            internal set => _flags = value ? _flags | Setup.Settings.OpenResolutionScope : _flags & ~Setup.Settings.OpenResolutionScope;
+        }
 
         /// <summary>Corresponds to <see cref="Setup.AsResolutionCall"/>.</summary>
-        public bool AsResolutionCall;
+        public bool AsResolutionCall
+        {
+            get => (_flags & Setup.Settings.AsResolutionCall) != 0;
+            internal set => _flags = value ? _flags | Setup.Settings.AsResolutionCall : _flags & ~Setup.Settings.AsResolutionCall;
+        }
 
         /// <summary>Corresponds to <see cref="Setup.AsResolutionRoot"/>.</summary>
-        public bool AsResolutionRoot;
+        public bool AsResolutionRoot
+        {
+            get => (_flags & Setup.Settings.AsResolutionRoot) != 0;
+            internal set => _flags = value ? _flags | Setup.Settings.AsResolutionRoot : _flags & ~Setup.Settings.AsResolutionRoot;
+        }
 
         /// <summary>Specifies to prevent disposal of reused instance if it is disposable</summary>
-        public bool PreventDisposal;
+        public bool PreventDisposal
+        {
+            get => (_flags & Setup.Settings.PreventDisposal) != 0;
+            internal set => _flags = value ? _flags | Setup.Settings.PreventDisposal : _flags & ~Setup.Settings.PreventDisposal;
+        }
 
         /// <summary>Specifies to store reused instance as WeakReference.</summary>
-        public bool WeaklyReferenced;
+        public bool WeaklyReferenced
+        {
+            get => (_flags & Setup.Settings.WeaklyReferenced) != 0;
+            internal set => _flags = value ? _flags | Setup.Settings.WeaklyReferenced : _flags & ~Setup.Settings.WeaklyReferenced;
+        }
 
         /// <summary>Allows registering transient disposable. But the disposal is up to you.</summary>
-        public bool AllowDisposableTransient;
+        public bool AllowDisposableTransient
+        {
+            get => (_flags & Setup.Settings.AllowDisposableTransient) != 0;
+            internal set => _flags = value ? _flags | Setup.Settings.AllowDisposableTransient : _flags & ~Setup.Settings.AllowDisposableTransient;
+        }
 
         /// <summary>Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</summary>
-        public bool TrackDisposableTransient;
+        public bool TrackDisposableTransient
+        {
+            get => (_flags & Setup.Settings.TrackDisposableTransient) != 0;
+            internal set => _flags = value ? _flags | Setup.Settings.TrackDisposableTransient : _flags & ~Setup.Settings.TrackDisposableTransient;
+        }
 
         /// <summary>Instructs to use parent reuse. Applied only if Reuse is not specified.</summary>
-        public bool UseParentReuse;
+        public bool UseParentReuse
+        {
+            get => (_flags & Setup.Settings.UseParentReuse) != 0;
+            internal set => _flags = value ? _flags | Setup.Settings.UseParentReuse : _flags & ~Setup.Settings.UseParentReuse;
+        }
+
+        /// <summary>When single service is resolved, but multiple candidates found, this setting will be used to prefer this one.</summary>
+        public bool PreferInSingleServiceResolve
+        {
+            get => (_flags & Setup.Settings.PreferInSingleServiceResolve) != 0;
+            internal set => _flags = value ? _flags | Setup.Settings.PreferInSingleServiceResolve : _flags & ~Setup.Settings.PreferInSingleServiceResolve;
+        }
+
+        /// <summary>Does not add the resolution scope into the parent or singleton scope,
+        /// preventing possibly unwanted holding of the scope (and its services) for the lifespan of the container.</summary>
+        public bool AvoidResolutionScopeTracking
+        {
+            get => (_flags & Setup.Settings.AvoidResolutionScopeTracking) != 0;
+            internal set => _flags = value ? _flags | Setup.Settings.AvoidResolutionScopeTracking : _flags & ~Setup.Settings.AvoidResolutionScopeTracking;
+        }
 
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
@@ -1340,7 +1389,7 @@ namespace DryIoc.MefAttributedModel
             for (var i = 0; i < Exports.Length; i++)
             {
                 var e = Exports[i];
-                var key = e.ServiceKey; 
+                var key = e.ServiceKey;
                 if (key != null)
                     e.ServiceKey = keyStore.EnsureUniqueServiceKey(e.ServiceType, key);
             }
@@ -1647,7 +1696,7 @@ namespace DryIoc.MefAttributedModel
                     DryIoc.IfUnresolved.ReturnDefault, InstanceFactory.ServiceKey)));
         }
 
-        private MemberInfo GetMember(Type declaringType) => 
+        private MemberInfo GetMember(Type declaringType) =>
             declaringType
                 .GetAllMembers(includeBase: true)
                 .FirstOrDefault(m =>
@@ -1716,9 +1765,9 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Compares with another info for equality.</summary>
         public override bool Equals(object obj) =>
             obj is ReuseInfo other
-            && other.ReuseType       == ReuseType
+            && other.ReuseType == ReuseType
             && other.CustomReuseType == CustomReuseType
-            && other.ScopeName       == ScopeName
+            && other.ScopeName == ScopeName
             && (other.ScopeNames == null && ScopeNames == null || (other.ScopeNames?.SequenceEqual(ScopeNames) ?? false));
 
         /// <summary>Converts info to the C# code representation.</summary>
@@ -1791,7 +1840,7 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Generates valid c# code to re-create the info.</summary>
         /// <param name="code">Code to append generated code to.</param>
         /// <returns>Code with appended generated info.</returns>
-        public StringBuilder ToCode(StringBuilder code = null) => 
+        public StringBuilder ToCode(StringBuilder code = null) =>
             (code ?? new StringBuilder())
                 .Append("new ExportInfo(").AppendType(ServiceType).Append(", ")
                 .AppendCode(ServiceKey).Append(", ")
@@ -1820,7 +1869,7 @@ namespace DryIoc.MefAttributedModel
         public bool AlwaysWrapsRequiredServiceType;
 
         /// <summary>Creates Wrapper setup from this info.</summary>
-        public Setup GetSetup() => 
+        public Setup GetSetup() =>
             Setup.WrapperWith(WrappedServiceTypeArgIndex, AlwaysWrapsRequiredServiceType);
 
         /// <summary>Used to compare wrappers info for equality.</summary>
@@ -1833,7 +1882,7 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
-        public StringBuilder ToCode(StringBuilder code = null) => 
+        public StringBuilder ToCode(StringBuilder code = null) =>
             (code ?? new StringBuilder())
                 .Append("new WrapperInfo { WrappedServiceTypeArgIndex = ")
                 .AppendCode(WrappedServiceTypeArgIndex).Append(", AlwaysWrapsRequiredServiceType = ")
@@ -1853,7 +1902,7 @@ namespace DryIoc.MefAttributedModel
         public bool UseDecorateeReuse;
 
         /// <summary>Converts info to corresponding decorator setup.</summary>
-        public Setup GetSetup(Func<DryIoc.Request, bool> condition = null) => 
+        public Setup GetSetup(Func<DryIoc.Request, bool> condition = null) =>
             DecoratedServiceKey == null && condition == null && Order == 0 && !UseDecorateeReuse
             ? Setup.Decorator
             : Setup.DecoratorWith(r =>
@@ -1869,11 +1918,11 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Converts info to valid C# code to be used in generation scenario.</summary>
-        public StringBuilder ToCode(StringBuilder code) => 
+        public StringBuilder ToCode(StringBuilder code) =>
             code.Append("new DecoratorInfo { DecoratedServiceKey = ")
                 .AppendCode(DecoratedServiceKey).Append(", Order = ").AppendCode(Order)
                 .Append(", UseDecorateeReuse = ").AppendBool(UseDecorateeReuse).Append(" }");
     }
-    #pragma warning restore 659
+#pragma warning restore 659
     #endregion
 }

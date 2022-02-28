@@ -9764,7 +9764,7 @@ namespace DryIoc
         /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
         public bool PreventDisposal => (_settings & Settings.PreventDisposal) != 0;
 
-        /// <summary>When single service is resolved, but multiple candidates found, this options will be used to prefer this one.</summary>
+        /// <summary>When single service is resolved, but multiple candidates found, this setting will be used to prefer this one.</summary>
         public bool PreferInSingleServiceResolve => (_settings & Settings.PreferInSingleServiceResolve) != 0;
 
         /// <summary>Does not add the resolution scope into the parent or singleton scope,
@@ -9812,9 +9812,9 @@ namespace DryIoc
             if (asResolutionCallForExpressionGeneration)
                 _settings |= Settings.AsResolutionCallForExpressionGeneration;
         }
-
+#pragma warning disable CS1591
         [Flags]
-        private enum Settings : ushort
+        public enum Settings : ushort
         {
             Default = 0,
             AsResolutionCall = 1 << 1,
@@ -9829,6 +9829,7 @@ namespace DryIoc
             AsResolutionCallForExpressionGeneration = 1 << 10,
             AvoidResolutionScopeTracking = 1 << 11,
         }
+#pragma warning restore CS1591
 
         private Settings _settings;
 
