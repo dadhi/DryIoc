@@ -112,9 +112,9 @@ namespace DryIoc
             IScope currentScope = null;
             _scopeContext.SetCurrent(s =>
             {
-                    // save the current scope for the later,
-                    // do dispose it AFTER its parent is actually set to be a new ambient current scope.
-                    currentScope = s;
+                // save the current scope for the later,
+                // do dispose it AFTER its parent is actually set to be a new ambient current scope.
+                currentScope = s;
                 return s?.Parent;
             });
             currentScope?.Dispose();
@@ -5274,7 +5274,6 @@ namespace DryIoc
         DecoratorOfAnyTypeViaObjectServiceType = 1 << 3,
     }
 
-    // todo: @wip use Copy for setting the rules
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
     {
@@ -5283,16 +5282,16 @@ namespace DryIoc
 
         private static Rules WithMicrosoftDependencyInjectionRules(Rules rules)
         {
-            rules = rules.Clone(cloneMade: true);
-            var settings = rules._settings;
-            rules._settings = (settings | Settings.TrackingDisposableTransients | Settings.SelectLastRegisteredFactory)
+            var newRules = rules.Clone(cloneMade: true);
+            newRules._made.FactoryMethodOrSelector = DryIoc.FactoryMethod.ConstructorWithResolvableArguments;
+
+            newRules._settings = (rules._settings
+                | Settings.TrackingDisposableTransients | Settings.SelectLastRegisteredFactory)
                 & ~Settings.ThrowOnRegisteringDisposableTransient
                 & ~Settings.VariantGenericTypesInResolvedCollection;
 
-            rules._factorySelector = SelectLastRegisteredFactory;
-            rules._made.FactoryMethodOrSelector = DryIoc.FactoryMethod.ConstructorWithResolvableArguments;
-
-            return rules;
+            newRules.FactorySelector = SelectLastRegisteredFactory;
+            return newRules;
         }
 
         /// <summary>The rules implementing the conventions of Microsoft.Extension.DependencyInjection library.</summary>
@@ -5329,16 +5328,16 @@ namespace DryIoc
         public int DependencyCountInLambdaToSplitBigObjectGraph { get; private set; }
 
         /// <summary>Sets the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/></summary>
-        public Rules WithDependencyCountInLambdaToSplitBigObjectGraph(int dependencyCount) =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, dependencyCount < 1 ? 1 : dependencyCount,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        public Rules WithDependencyCountInLambdaToSplitBigObjectGraph(int dependencyCount)
+        {
+            var rules = Clone();
+            rules.DependencyCountInLambdaToSplitBigObjectGraph = dependencyCount < 1 ? 1 : dependencyCount;
+            return rules;
+        }
 
         /// <summary>Disables the <see cref="DependencyCountInLambdaToSplitBigObjectGraph"/> limitation.</summary>
         public Rules WithoutDependencyCountInLambdaToSplitBigObjectGraph() =>
             WithDependencyCountInLambdaToSplitBigObjectGraph(int.MaxValue);
-
 
         /// <summary>Shorthand to <see cref="Made.FactoryMethodOrSelector"/></summary>
         public object FactoryMethodOrSelector => _made.FactoryMethodOrSelector;
@@ -5375,31 +5374,32 @@ namespace DryIoc
         /// <param name="made">New Made.Of rules.</param>
         /// <param name="overrideRegistrationMade">Instructs to override registration level Made.Of</param>
         /// <returns>New rules.</returns>
-        public Rules With(Made made, bool overrideRegistrationMade = false) =>
-            new Rules(
-                _settings | (overrideRegistrationMade ? Settings.OverrideRegistrationMade : 0),
-                FactorySelector, DefaultReuse,
-                _made == Made.Default
-                    ? made
-                    : Made.Create( // todo: @bug @unclear should we replace it with override?
-                        made.FactoryMethodOrSelector ?? _made.FactoryMethodOrSelector,
-                        made.Parameters ?? _made.Parameters,
-                        made.PropertiesAndFields ?? _made.PropertiesAndFields,
-                        made.IsConditionalImplementation || _made.IsConditionalImplementation),
-                DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        public Rules With(Made made, bool overrideRegistrationMade = false)
+        {
+            var rules = Clone();
+            if (overrideRegistrationMade)
+                rules._settings = _settings | Settings.OverrideRegistrationMade;
+            rules._made = _made == Made.Default ? made :
+                Made.Create( // todo: @bug @unclear should we replace it with override?
+                made.FactoryMethodOrSelector ?? _made.FactoryMethodOrSelector,
+                made.Parameters ?? _made.Parameters,
+                made.PropertiesAndFields ?? _made.PropertiesAndFields,
+                made.IsConditionalImplementation || _made.IsConditionalImplementation);
+            return rules;
+        }
 
         /// <summary>Service key to be used instead on `null` in registration.</summary>
-        public object DefaultRegistrationServiceKey { get; }
+        public object DefaultRegistrationServiceKey { get; private set; }
 
         /// <summary>Sets the <see cref="DefaultRegistrationServiceKey"/></summary>
-        public Rules WithDefaultRegistrationServiceKey(object serviceKey) =>
-            serviceKey == null ? this :
-                new Rules(_settings, FactorySelector, DefaultReuse,
-                    _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                    DependencyResolutionCallExprs, ItemToExpressionConverter,
-                    DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, serviceKey);
+        public Rules WithDefaultRegistrationServiceKey(object serviceKey)
+        {
+            if (serviceKey == null)
+                return this;
+            var rules = Clone();
+            rules.DefaultRegistrationServiceKey = serviceKey;
+            return rules;
+        }
 
         /// <summary>Defines single factory selector delegate. 
         /// The only one of the passed parameters `singleDefaultFactory` or `orManyDefaultAndKeyedFactories` is not `null`</summary>
@@ -5409,14 +5409,16 @@ namespace DryIoc
         /// <summary>Rules to select single matched factory default and keyed registered factory/factories.
         /// Selectors applied in specified array order, until first returns not null <see cref="Factory"/>.
         /// Default behavior is to throw on multiple registered default factories, cause it is not obvious what to use.</summary>
-        public FactorySelectorRule FactorySelector => _factorySelector;
+        public FactorySelectorRule FactorySelector { get; private set; }
 
         /// <summary>Sets <see cref="FactorySelector"/></summary>
-        public Rules WithFactorySelector(FactorySelectorRule rule) =>
-            new Rules(rule == SelectLastRegisteredFactory ? (_settings | Settings.SelectLastRegisteredFactory) : (_settings & ~Settings.SelectLastRegisteredFactory),
-                rule, DefaultReuse, _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        public Rules WithFactorySelector(FactorySelectorRule rule)
+        {
+            var rules = Clone();
+            rules.FactorySelector = rule;
+            rules._settings = rule == SelectLastRegisteredFactory ? (_settings | Settings.SelectLastRegisteredFactory) : (_settings & ~Settings.SelectLastRegisteredFactory);
+            return rules;
+        }
 
         /// <summary>Select last registered factory from the multiple default.</summary>
         public static FactorySelectorRule SelectLastRegisteredFactory() => SelectLastRegisteredFactory;
@@ -5537,7 +5539,7 @@ namespace DryIoc
         /// The rules applied only when no normal registrations found!</summary>
         public Rules WithDynamicRegistrations(DynamicRegistrationFlags flags, params DynamicRegistrationProvider[] rules)
         {
-            var newRules = Clone(cloneMade: false);
+            var newRules = Clone();
             newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(rules);
             newRules.DynamicRegistrationFlags = WithDynamicRegistrationProviderFlags(rules?.Length ?? 0, flags);
             return newRules;
@@ -5576,20 +5578,22 @@ namespace DryIoc
         public UnknownServiceResolver[] UnknownServiceResolvers { get; private set; }
 
         /// <summary>Appends resolver to current unknown service resolvers.</summary>
-        public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules) =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs,
-                ItemToExpressionConverter, DynamicRegistrationProviders, DynamicRegistrationFlags,
-                UnknownServiceResolvers.Append(rules), DefaultRegistrationServiceKey);
+        public Rules WithUnknownServiceResolvers(params UnknownServiceResolver[] rules)
+        {
+            var newRules = Clone();
+            newRules.UnknownServiceResolvers = UnknownServiceResolvers.Append(rules);
+            return newRules;
+        }
 
         /// <summary>Removes specified resolver from unknown service resolvers, and returns new Rules.
         /// If no resolver was found then <see cref="UnknownServiceResolvers"/> will stay the same instance,
         /// so it could be check for remove success or fail.</summary>
-        public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule) =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs,
-                ItemToExpressionConverter, DynamicRegistrationProviders, DynamicRegistrationFlags,
-                UnknownServiceResolvers.Remove(rule), DefaultRegistrationServiceKey);
+        public Rules WithoutUnknownServiceResolver(UnknownServiceResolver rule)
+        {
+            var newRules = Clone();
+            newRules.UnknownServiceResolvers = UnknownServiceResolvers.Remove(rule);
+            return newRules;
+        }
 
         /// <summary>Sugar on top of <see cref="WithUnknownServiceResolvers"/> to simplify setting the diagnostic action.
         /// Does not guard you from action throwing an exception. Actually can be used to throw your custom exception
@@ -5662,11 +5666,13 @@ namespace DryIoc
             WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
 
         /// Replaced with `WithConcreteTypeDynamicRegistrations`
-        public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null) =>
-            new Rules(_settings | Settings.AutoConcreteTypeResolution, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs,
-                ItemToExpressionConverter, DynamicRegistrationProviders, DynamicRegistrationFlags,
-                UnknownServiceResolvers.Append(AutoResolveConcreteTypeRule(condition)), DefaultRegistrationServiceKey);
+        public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null)
+        {
+            var newRules = Clone();
+            newRules._settings = _settings | Settings.AutoConcreteTypeResolution;
+            newRules.UnknownServiceResolvers = UnknownServiceResolvers.Append(AutoResolveConcreteTypeRule(condition));
+            return newRules;
+        }
 
         /// <summary>Creates dynamic fallback registrations for the requested service type
         /// with provided <paramref name="getImplementationTypes"/>.
@@ -5743,15 +5749,17 @@ namespace DryIoc
             };
 
         /// <summary>See <see cref="WithDefaultReuse"/></summary>
-        public IReuse DefaultReuse { get; }
+        public IReuse DefaultReuse { get; private set; }
 
         /// <summary>The reuse used in case if reuse is unspecified (null) in Register methods.</summary>
-        public Rules WithDefaultReuse(IReuse reuse) =>
-            reuse == DefaultReuse ? this :
-            new Rules(_settings, FactorySelector, reuse ?? Reuse.Transient,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs,
-                ItemToExpressionConverter, DynamicRegistrationProviders, DynamicRegistrationFlags,
-                UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        public Rules WithDefaultReuse(IReuse reuse)
+        {
+            if (reuse == DefaultReuse)
+                return this;
+            var newRules = Clone();
+            newRules.DefaultReuse = reuse ?? Reuse.Transient;
+            return newRules;
+        }
 
         /// <summary>Given item object and its type should return item "pure" expression presentation,
         /// without side-effects or external dependencies.
@@ -5765,11 +5773,12 @@ namespace DryIoc
         /// <summary>Specifies custom rule to convert non-primitive items to their expression representation.
         /// That may be required because DryIoc by default does not support non-primitive service keys and registration metadata.
         /// To enable non-primitive values support DryIoc need a way to recreate them as expression tree.</summary>
-        public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault) =>
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs,
-                itemToExpressionOrDefault, DynamicRegistrationProviders, DynamicRegistrationFlags,
-                UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        public Rules WithItemToExpressionConverter(ItemToExpressionConverterRule itemToExpressionOrDefault)
+        {
+            var newRules = Clone();
+            newRules.ItemToExpressionConverter = itemToExpressionOrDefault;
+            return newRules;
+        }
 
         /// <summary><see cref="WithoutThrowIfDependencyHasShorterReuseLifespan"/>.</summary>
         public bool ThrowIfDependencyHasShorterReuseLifespan =>
@@ -5851,11 +5860,13 @@ namespace DryIoc
 
         /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
         /// in the-per rules collection.</summary>
-        public Rules WithExpressionGeneration(bool allowRuntimeState = false) =>
-            new Rules(GetSettingsForExpressionGeneration(allowRuntimeState), FactorySelector, DefaultReuse,
-                _made, DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
-                Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty), ItemToExpressionConverter,
-                DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        public Rules WithExpressionGeneration(bool allowRuntimeState = false)
+        {
+            var newRules = Clone();
+            newRules._settings = GetSettingsForExpressionGeneration(allowRuntimeState);
+            newRules.DependencyResolutionCallExprs = Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty);
+            return newRules;
+        }
 
         /// <summary>Indicates that rules are used for the validation, e.g. the rules created in `Validate` method</summary>
         public bool UsedForValidation => (_settings & Settings.UsedForValidation) != 0;
@@ -5867,11 +5878,14 @@ namespace DryIoc
 
         /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
         /// in the-per rules collection.</summary>
-        public Rules ForValidate() =>
-            new Rules(GetSettingsForValidation(),
-                FactorySelector, DefaultReuse, _made, DefaultIfAlreadyRegistered, int.MaxValue, null,
-                ItemToExpressionConverter, DynamicRegistrationProviders, DynamicRegistrationFlags,
-                UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        public Rules ForValidate()
+        {
+            var newRules = Clone();
+            newRules._settings = GetSettingsForValidation();
+            newRules.DependencyCountInLambdaToSplitBigObjectGraph = int.MaxValue;
+            newRules.DependencyResolutionCallExprs = null;
+            return newRules;
+        }
 
         /// <summary><see cref="ImplicitCheckForReuseMatchingScope"/></summary>
         public bool ImplicitCheckForReuseMatchingScope =>
@@ -5918,15 +5932,18 @@ namespace DryIoc
             WithSettings(_settings & ~Settings.VariantGenericTypesInResolve);
 
         /// <summary><see cref="WithDefaultIfAlreadyRegistered"/>.</summary>
-        public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; }
+        public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; private set; }
 
         /// <summary>Specifies default setting for container. By default is <see cref="IfAlreadyRegistered.AppendNotKeyed"/>.
         /// Example of use: specify Keep as a container default, then set AppendNonKeyed for explicit collection registrations.</summary>
-        public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule) =>
-            rule == DefaultIfAlreadyRegistered ? this :
-            new Rules(_settings, FactorySelector, DefaultReuse,
-                _made, rule, DependencyCountInLambdaToSplitBigObjectGraph, DependencyResolutionCallExprs, ItemToExpressionConverter,
-                DynamicRegistrationProviders, DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+        public Rules WithDefaultIfAlreadyRegistered(IfAlreadyRegistered rule)
+        {
+            if (rule == DefaultIfAlreadyRegistered)
+                return this;
+            var newRules = Clone();
+            newRules.DefaultIfAlreadyRegistered = rule;
+            return newRules;
+        }
 
         /// <summary><see cref="WithThrowIfRuntimeStateRequired"/>.</summary>
         public bool ThrowIfRuntimeStateRequired =>
@@ -6059,7 +6076,7 @@ namespace DryIoc
         {
             _settings = settings;
             _made = made;
-            _factorySelector = factorySelector;
+            FactorySelector = factorySelector;
             DefaultReuse = defaultReuse;
             DefaultIfAlreadyRegistered = defaultIfAlreadyRegistered;
             DependencyCountInLambdaToSplitBigObjectGraph = dependencyCountInLambdaToSplitBigObjectGraph;
@@ -6071,7 +6088,7 @@ namespace DryIoc
             DefaultRegistrationServiceKey = defaultRegistrationServiceKey;
         }
 
-        private Rules Clone(bool cloneMade) =>
+        private Rules Clone(bool cloneMade = false) =>
             new Rules(
                 _settings, FactorySelector, DefaultReuse,
                 cloneMade ? _made.Clone() : _made,
@@ -6081,7 +6098,7 @@ namespace DryIoc
 
         private Rules WithSettings(Settings newSettings)
         {
-            var newRules = Clone(false);
+            var newRules = Clone();
             newRules._settings = newSettings;
             return newRules;
         }
@@ -6127,7 +6144,6 @@ namespace DryIoc
             | Settings.UseInterpretationForTheFirstResolution;
 
         private Settings _settings;
-        private FactorySelectorRule _factorySelector;
 
         #endregion
     }
@@ -8497,7 +8513,7 @@ namespace DryIoc
         /// <summary>Creates info out of provided settings</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ServiceInfo Of(Type serviceType, IfUnresolved ifUnresolved) =>
-            ifUnresolved == IfUnresolved.Throw 
+            ifUnresolved == IfUnresolved.Throw
                 ? new Typed(serviceType) :
             ifUnresolved == IfUnresolved.ReturnDefault
                 ? new TypedIfUnresolvedReturnDefault(serviceType)
@@ -8531,7 +8547,7 @@ namespace DryIoc
 
             return serviceKey == null && requiredServiceType == null && metadataKey == null && metadata == null
                 ? (ifUnresolved == IfUnresolved.Throw ? new Typed(serviceType)
-                : ifUnresolved == IfUnresolved.ReturnDefault 
+                : ifUnresolved == IfUnresolved.ReturnDefault
                 ? new TypedIfUnresolvedReturnDefault(serviceType)
                 : new TypedIfUnresolvedReturnDefaultIfNotRegistered(serviceType))
                 : new WithDetails(serviceType, ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
@@ -8549,13 +8565,13 @@ namespace DryIoc
         private sealed class TypedIfUnresolvedReturnDefault : Typed
         {
             public override ServiceDetails Details => ServiceDetails.IfUnresolvedReturnDefault;
-            public TypedIfUnresolvedReturnDefault(Type serviceType) : base(serviceType) {}
+            public TypedIfUnresolvedReturnDefault(Type serviceType) : base(serviceType) { }
         }
 
         private sealed class TypedIfUnresolvedReturnDefaultIfNotRegistered : Typed
         {
             public override ServiceDetails Details => ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered;
-            public TypedIfUnresolvedReturnDefaultIfNotRegistered(Type serviceType) : base(serviceType) {}
+            public TypedIfUnresolvedReturnDefaultIfNotRegistered(Type serviceType) : base(serviceType) { }
         }
 
         /// <summary>Creates service info using typed <typeparamref name="TService"/>.</summary>
