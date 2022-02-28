@@ -407,6 +407,29 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
+        public void Delegate_decorator_with_2_runtime_service_types_RegisterDelegate()
+        {
+            var container = new Container();
+
+            container.Register<D1>();
+            container.Register<IOperation, SomeOperation>(Reuse.Singleton);
+            container.RegisterDelegate(typeof(IOperation), typeof(IOperation), typeof(D1),
+                (op, d1) =>
+                {
+                    Assert.IsInstanceOf<D1>(d1);
+                    return new MeasureExecutionTimeOperationDecorator((IOperation)op);
+                },
+                setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            var operation = container.Resolve<IOperation>();
+
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
+            Assert.AreSame(operation, container.Resolve<IOperation>());
+        }
+
+        class D1 {}
+
+        [Test]
         public void Delegate_decorator_with_the_runtime_service_types_RegisterDelegate_should_throw_on_the_wrong_type()
         {
             var container = new Container();
