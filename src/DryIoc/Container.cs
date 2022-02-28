@@ -7558,7 +7558,7 @@ namespace DryIoc
                 dep1 => factory(dep1).ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType),
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        private static Lazy<MethodInfo>[] _invokeMethods = 
+        private static Lazy<MethodInfo>[] _invokeMethods =
         {
             new Lazy<MethodInfo>(() => typeof(Func<object, object>).GetMethod(InvokeMethodName)),
             new Lazy<MethodInfo>(() => typeof(Func<object, object, object>).GetMethod(InvokeMethodName)),
@@ -7571,7 +7571,7 @@ namespace DryIoc
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
         {
             var factoryMethod = new FactoryMethod.WithFactoryExpression(_invokeMethods[0].Value, ConstantOf(factory));
-            var made = Made.Of(factoryMethod, Parameters.Of.Name("arg", depType)); // todo: @wip use #458
+            var made = Made.Of(factoryMethod, Parameters.Of.Position(0, depType));
             r.Register(ReflectionFactory.Of(default(Type), reuse, made, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
         }
@@ -7592,7 +7592,7 @@ namespace DryIoc
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
         {
             var factoryMethod = new FactoryMethod.WithFactoryExpression(_invokeMethods[1].Value, ConstantOf(factory));
-            var made = Made.Of(factoryMethod, Parameters.Of.Name("arg1", dep1Type).Name("arg2", dep2Type)); // todo: @wip use #458
+            var made = Made.Of(factoryMethod, Parameters.Of.Position(0, dep1Type).Position(1, dep2Type));
             r.Register(ReflectionFactory.Of(default(Type), reuse, made, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
         }
@@ -10564,7 +10564,27 @@ namespace DryIoc
             return source.OverrideWith(request => p => getDetailsOrNull(request, p)?.To(ParameterServiceInfo.Of(p).WithDetails));
         }
 
-        /// <summary>Adds to <paramref name="source"/> selector service info for parameter identified by <paramref name="name"/>.</summary>
+        /// <summary>Adds to <paramref name="source"/> selector a service info for parameter identified by <paramref name="position"/>.</summary>
+        public static ParameterSelector Position(this ParameterSelector source, int position,
+            Type requiredServiceType = null, object serviceKey = null,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object defaultValue = null,
+            string metadataKey = null, object metadata = null) =>
+            source.Details((r, p) => p.Position != position ? null :
+                ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
+
+        /// <summary>Adds to <paramref name="source"/> selector a service info for parameter identified by <paramref name="position"/>
+        /// and apply the specified service details..</summary>
+        public static ParameterSelector Position(this ParameterSelector source,
+            int position, Func<Request, ParameterInfo, ServiceDetails> getServiceDetails) =>
+            source.Details((r, p) => p.Position == position ? getServiceDetails(r, p) : null);
+
+        /// <summary>Adds to <paramref name="source"/> selector a service info for parameter identified by <paramref name="position"/>
+        /// and assign the custom value to it.</summary>
+        public static ParameterSelector Position(this ParameterSelector source,
+            int position, Func<Request, object> getCustomValue) =>
+            source.Position(position, (r, p) => ServiceDetails.Of(getCustomValue(r)));
+
+        /// <summary>Adds to <paramref name="source"/> selector a service info for parameter identified by <paramref name="name"/>.</summary>
         /// <param name="source">Original parameters rules.</param> <param name="name">Name to identify parameter.</param>
         /// <param name="requiredServiceType">(optional)</param> <param name="serviceKey">(optional)</param>
         /// <param name="ifUnresolved">(optional) By default throws exception if unresolved.</param>
@@ -10578,12 +10598,12 @@ namespace DryIoc
             source.Details((r, p) => !p.Name.Equals(name) ? null
                 : ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
 
-        /// <summary>Specify parameter by name and set custom value to it.</summary>
+        /// <summary>Specify parameter by name and apply the specified service details.</summary>
         public static ParameterSelector Name(this ParameterSelector source,
             string name, Func<Request, ParameterInfo, ServiceDetails> getServiceDetails) =>
             source.Details((r, p) => p.Name.Equals(name) ? getServiceDetails(r, p) : null);
 
-        /// <summary>Specify parameter by name and set custom value to it.</summary>
+        /// <summary>Specify parameter by name and assign the custom value to it.</summary>
         public static ParameterSelector Name(this ParameterSelector source,
             string name, Func<Request, object> getCustomValue) =>
              source.Name(name, (r, p) => ServiceDetails.Of(getCustomValue(r)));
