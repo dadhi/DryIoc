@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2021 Maksim Volkau
+Copyright (c) 2013-2022 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -783,6 +783,14 @@ namespace DryIoc.MefAttributedModel
                 {
                     info.OpenResolutionScope = true;
                 }
+                else if (attribute is DisposalOrderAttribute d)
+                {
+                    info.DisposalOrder = d.RelativeValue;
+                }
+                else if (attribute is AvoidResolutionScopeTrackingAttribute)
+                {
+                    info.AvoidResolutionScopeTracking = true;
+                }
                 else if (attribute is AsResolutionCallAttribute)
                 {
                     info.AsResolutionCall = true;
@@ -810,6 +818,10 @@ namespace DryIoc.MefAttributedModel
                 else if (attribute is UseParentReuseAttribute)
                 {
                     info.UseParentReuse = true;
+                }
+                else if (attribute is PreferInSingleServiceResolveAttribute)
+                {
+                    info.PreferInSingleServiceResolve = true;
                 }
                 else if (attribute is AsWrapperAttribute)
                 {
@@ -1346,6 +1358,9 @@ namespace DryIoc.MefAttributedModel
         /// <summary>True if exported type has metadata.</summary>
         public bool HasMetadataAttribute;
 
+        /// <summary>Relative disposal order when defined. Greater number, later dispose.</summary>
+        public int DisposalOrder;
+
         /// <summary>Gets or sets the metadata.</summary>
         public IDictionary<string, object> Metadata;
 
@@ -1450,7 +1465,7 @@ namespace DryIoc.MefAttributedModel
                 OpenResolutionScope, AsResolutionCall, AsResolutionRoot,
                 PreventDisposal, WeaklyReferenced,
                 AllowDisposableTransient, TrackDisposableTransient,
-                UseParentReuse);
+                UseParentReuse, DisposalOrder, PreferInSingleServiceResolve, AvoidResolutionScopeTracking);
         }
 
         private IEnumerable<Attribute> CollectMetadataAttributes(Made made)

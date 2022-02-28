@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2021 Maksim Volkau
+Copyright (c) 2013-2022 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -109,7 +109,7 @@ namespace DryIocAttributes
     {
         /// <summary>Implementation of reuse. Could be null to specify transient or no reuse.</summary>
         public readonly ReuseType ReuseType;
-        
+
         /// <summary>Implementation type for reuse.</summary>
         public readonly Type CustomReuseType;
 
@@ -136,7 +136,7 @@ namespace DryIocAttributes
         /// <summary>Specify the reuse type and the scope name.</summary>
         public ReuseAttribute(ReuseType reuseType, params object[] scopeNames)
         {
-            ReuseType  = reuseType;
+            ReuseType = reuseType;
             ScopeNames = scopeNames;
         }
 
@@ -144,7 +144,7 @@ namespace DryIocAttributes
         public ReuseAttribute(Type customReuseType, params object[] scopeNames)
         {
             CustomReuseType = customReuseType;
-            ScopeNames      = scopeNames;
+            ScopeNames = scopeNames;
         }
     }
 
@@ -445,7 +445,7 @@ namespace DryIocAttributes
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(
             Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
-            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan) => 
+            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan) =>
             new Request(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
                 factoryID, factoryType, implementationType, reuseLifespan, this);
 
@@ -518,7 +518,7 @@ namespace DryIocAttributes
 
         /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
         /// <param name="obj"></param> <returns></returns>
-        public override bool Equals(object obj) => 
+        public override bool Equals(object obj) =>
             Equals(obj as Request);
 
         /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
@@ -686,6 +686,23 @@ namespace DryIocAttributes
         | AttributeTargets.Field)]
     public class OpenResolutionScopeAttribute : Attribute { }
 
+    /// <summary>Does not add the resolution scope into the parent or singleton scope,
+    /// preventing possibly unwanted holding of the scope (and its services) for the lifespan of the container.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field)]
+    public class AvoidResolutionScopeTrackingAttribute : Attribute { }
+
+    /// <summary>When single service is resolved, but multiple candidates found, this setting will be used to prefer this one.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field)]
+    public class PreferInSingleServiceResolveAttribute : Attribute { }
+
     /// <summary>Specifies that export should be imported as dynamic resolution call,
     /// instead of in-lined creation expression.</summary>
     [AttributeUsage(AttributeTargets.Class
@@ -702,4 +719,18 @@ namespace DryIocAttributes
         | AttributeTargets.Property
         | AttributeTargets.Field)]
     public class AsResolutionRootAttribute : Attribute { }
+
+    /// <summary>Relative disposal order when defined. Greater number, later dispose.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field)]
+    public class DisposalOrderAttribute : Attribute
+    {
+        /// <summary>Relative number of disposal</summary>
+        public int RelativeValue { get; set; }
+        /// <summary>Constructor</summary>
+        public DisposalOrderAttribute(int relativeValue) => RelativeValue = relativeValue;
+    }
 }
