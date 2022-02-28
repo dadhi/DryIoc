@@ -56,7 +56,7 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(3, aggregator.Aggregatees.Length);
         }
 
-        [Test][Ignore("todo: fixme")]
+        [Test]
         public void Resolve_new_imports_for_transient_via_ClearCache()
         {
             // registered on application startup
