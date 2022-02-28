@@ -8083,7 +8083,7 @@ namespace DryIoc
                 //       .Resolve(serviceType, serviceKey)
                 //
                 var scopeNameExpr = Expression.New(ResolutionScopeNameCtor, ConstantOf<Type>(request.GetActualServiceType()), serviceKeyExpr);
-                var trackInParent = Constant(true);
+                var trackInParent = Constant(!request.Factory?.Setup.AvoidResolutionScopeTracking ?? true);
                 resolverExpr = Call(ResolverContext.OpenScopeMethod, FactoryDelegateCompiler.ResolverContextParamExpr, scopeNameExpr, trackInParent);
             }
 
@@ -9767,12 +9767,17 @@ namespace DryIoc
         /// <summary>When single service is resolved, but multiple candidates found, this options will be used to prefer this one.</summary>
         public bool PreferInSingleServiceResolve => (_settings & Settings.PreferInSingleServiceResolve) != 0;
 
+        /// <summary>Does not add the resolution scope into the parent or singleton scope,
+        /// preventing possibly unwanted holding of the scope (and its services) for the lifespan of the container.</summary>
+        public bool AvoidResolutionScopeTracking => (_settings & Settings.AvoidResolutionScopeTracking) != 0;
+
         private Setup() { }
 
         private Setup(Func<Request, bool> condition,
             bool openResolutionScope, bool asResolutionCall, bool asResolutionRoot, bool preventDisposal, bool weaklyReferenced,
             bool allowDisposableTransient, bool trackDisposableTransient, bool useParentReuse, int disposalOrder,
-            bool preferOverMultipleResolved = false, bool asResolutionCallForExpressionGeneration = false)
+            bool preferOverMultipleResolved = false, bool asResolutionCallForExpressionGeneration = false,
+            bool avoidResolutionScopeTracking = false)
         {
             Condition = condition;
             DisposalOrder = disposalOrder;
@@ -9783,7 +9788,10 @@ namespace DryIoc
             {
                 _settings |= Settings.OpenResolutionScope;
                 _settings |= Settings.AsResolutionCall;
+                if (avoidResolutionScopeTracking)
+                    _settings |= Settings.AvoidResolutionScopeTracking;
             }
+
             if (preventDisposal)
                 _settings |= Settings.PreventDisposal;
             if (weaklyReferenced)
@@ -9818,7 +9826,8 @@ namespace DryIoc
             AsResolutionRoot = 1 << 7,
             UseParentReuse = 1 << 8,
             PreferInSingleServiceResolve = 1 << 9,
-            AsResolutionCallForExpressionGeneration = 1 << 10
+            AsResolutionCallForExpressionGeneration = 1 << 10,
+            AvoidResolutionScopeTracking = 1 << 11,
         }
 
         private Settings _settings;
@@ -9828,24 +9837,28 @@ namespace DryIoc
 
         /// <summary>Constructs setup object out of specified settings.
         /// If all settings are default then <see cref="Default"/> setup will be returned.
-        /// <paramref name="metadataOrFuncOfMetadata"/> is metadata object or Func returning metadata object.</summary>
+        /// <paramref name="metadataOrFuncOfMetadata"/> is metadata object or Func returning metadata object.
+        /// <paramref name="avoidResolutionScopeTracking"/>Does not add the resolution scope into the parent or singleton scope,
+        /// preventing possibly unwanted holding of the scope (and its services) for the lifespan of the container.</summary>
         public static Setup With(
             object metadataOrFuncOfMetadata = null, Func<Request, bool> condition = null,
             bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false, int disposalOrder = 0, bool preferInSingleServiceResolve = false)
+            bool useParentReuse = false, int disposalOrder = 0, bool preferInSingleServiceResolve = false,
+            bool avoidResolutionScopeTracking = false)
         {
             if (metadataOrFuncOfMetadata == null && condition == null &&
                 !openResolutionScope && !asResolutionRoot &&
                 !preventDisposal && !weaklyReferenced && !allowDisposableTransient && !trackDisposableTransient &&
-                !useParentReuse && disposalOrder == 0 && !preferInSingleServiceResolve)
+                !useParentReuse && disposalOrder == 0 && !preferInSingleServiceResolve && !avoidResolutionScopeTracking)
                 return !asResolutionCall ? Default : AsResolutionCallSetup;
 
             return new ServiceSetup(condition,
                 metadataOrFuncOfMetadata, openResolutionScope, asResolutionCall, asResolutionRoot,
                 preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
-                useParentReuse, disposalOrder, preferInSingleServiceResolve);
+                useParentReuse, disposalOrder, preferInSingleServiceResolve,
+                avoidResolutionScopeTracking: avoidResolutionScopeTracking);
         }
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
@@ -9861,14 +9874,17 @@ namespace DryIoc
             bool openResolutionScope = false, bool asResolutionCall = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            bool useParentReuse = false, Func<Request, bool> condition = null, int disposalOrder = 0) =>
+            bool useParentReuse = false, Func<Request, bool> condition = null, int disposalOrder = 0,
+            bool avoidResolutionScopeTracking = false) =>
                 wrappedServiceTypeArgIndex == -1 && !alwaysWrapsRequiredServiceType && unwrap == null &&
                 !openResolutionScope && !asResolutionCall && !preventDisposal && !weaklyReferenced &&
-                !allowDisposableTransient && !trackDisposableTransient && condition == null && disposalOrder == 0
+                !allowDisposableTransient && !trackDisposableTransient && condition == null && disposalOrder == 0 &&
+                !avoidResolutionScopeTracking
                     ? Wrapper
                     : new WrapperSetup(wrappedServiceTypeArgIndex, alwaysWrapsRequiredServiceType, unwrap,
                         condition, openResolutionScope, asResolutionCall, preventDisposal, weaklyReferenced,
-                        allowDisposableTransient, trackDisposableTransient, useParentReuse, disposalOrder);
+                        allowDisposableTransient, trackDisposableTransient, useParentReuse, disposalOrder,
+                        avoidResolutionScopeTracking);
 
         /// <summary>Default decorator setup: decorator is applied to service type it registered with.</summary>
         public static readonly Setup Decorator = new DecoratorSetup();
@@ -9884,14 +9900,15 @@ namespace DryIoc
             bool openResolutionScope = false, bool asResolutionCall = false,
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-            int disposalOrder = 0) =>
+            int disposalOrder = 0, bool avoidResolutionScopeTracking = false) =>
             condition == null && order == 0 && !useDecorateeReuse &&
             !openResolutionScope && !asResolutionCall &&
             !preventDisposal && !weaklyReferenced && !allowDisposableTransient && !trackDisposableTransient &&
-            disposalOrder == 0
+            disposalOrder == 0 && !avoidResolutionScopeTracking
                 ? Decorator
                 : new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope, asResolutionCall,
-                    preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient, disposalOrder);
+                    preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient, disposalOrder,
+                    avoidResolutionScopeTracking);
 
         /// Creates a condition for both <paramref name="decorateeType"/>, <paramref name="decorateeServiceKey"/> and additional condition
         public static Func<Request, bool> GetDecorateeCondition(Type decorateeType,
@@ -9947,10 +9964,12 @@ namespace DryIoc
                 bool openResolutionScope = false, bool asResolutionCall = false, bool asResolutionRoot = false,
                 bool preventDisposal = false, bool weaklyReferenced = false, bool allowDisposableTransient = false,
                 bool trackDisposableTransient = false, bool useParentReuse = false, int disposalOrder = 0,
-                bool preferOverMultipleResolved = false, bool asResolutionCallForExpressionGeneration = false)
+                bool preferOverMultipleResolved = false, bool asResolutionCallForExpressionGeneration = false,
+                bool avoidResolutionScopeTracking = false)
                 : base(condition, openResolutionScope, asResolutionCall, asResolutionRoot,
                     preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient,
-                    useParentReuse, disposalOrder, preferOverMultipleResolved, asResolutionCallForExpressionGeneration)
+                    useParentReuse, disposalOrder, preferOverMultipleResolved, asResolutionCallForExpressionGeneration,
+                    avoidResolutionScopeTracking)
             {
                 _metadataOrFuncOfMetadata = metadataOrFuncOfMetadata;
             }
@@ -9990,9 +10009,10 @@ namespace DryIoc
                 Func<Request, bool> condition,
                 bool openResolutionScope, bool asResolutionCall,
                 bool preventDisposal, bool weaklyReferenced, bool allowDisposableTransient, bool trackDisposableTransient,
-                bool useParentReuse, int disposalOrder)
+                bool useParentReuse, int disposalOrder, bool avoidResolutionScopeTracking)
                 : base(condition, openResolutionScope, asResolutionCall, false, preventDisposal, weaklyReferenced,
-                    allowDisposableTransient, trackDisposableTransient, useParentReuse, disposalOrder)
+                    allowDisposableTransient, trackDisposableTransient, useParentReuse, disposalOrder,
+                    avoidResolutionScopeTracking: avoidResolutionScopeTracking)
             {
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
                 AlwaysWrapsRequiredServiceType = alwaysWrapsRequiredServiceType;
@@ -10066,9 +10086,10 @@ namespace DryIoc
                 bool openResolutionScope = false, bool asResolutionCall = false,
                 bool preventDisposal = false, bool weaklyReferenced = false,
                 bool allowDisposableTransient = false, bool trackDisposableTransient = false,
-                int disposalOrder = 0)
+                int disposalOrder = 0, bool avoidResolutionScopeTracking = false)
                 : base(condition, openResolutionScope, asResolutionCall, false, preventDisposal, weaklyReferenced,
-                    allowDisposableTransient, trackDisposableTransient, false, disposalOrder)
+                    allowDisposableTransient, trackDisposableTransient, false, disposalOrder,
+                    avoidResolutionScopeTracking: avoidResolutionScopeTracking)
             {
                 Order = order;
                 UseDecorateeReuse = useDecorateeReuse;
