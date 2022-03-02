@@ -26,10 +26,12 @@ namespace DryIoc.IssuesTests
             // if this is removed, the test passes
             var outside = container.Resolve<DataDependentIndirectly>();
 
-            using var scope = container.OpenScope();
-            scope.Use(new Data { Text = "child" });
-            var inScope = scope.Resolve<DataDependentIndirectly>();
-            Assert.AreEqual("child", inScope.Dependent.Data1.Text);
+            using (var scope = container.OpenScope())
+            {
+                scope.Use(new Data { Text = "child" });
+                var inScope = scope.Resolve<DataDependentIndirectly>();
+                Assert.AreEqual("child", inScope.Dependent.Data1.Text);
+            }
         }
 
         [Test]
@@ -43,10 +45,12 @@ namespace DryIoc.IssuesTests
             // if this is removed, the test passes
             var outside = container.Resolve<DataDependentIndirectly>();
 
-            using var scope = container.OpenScope();
-            scope.Use(new Data { Text = "child" });
-            var inScope = scope.Resolve<DataDependentIndirectly>();
-            Assert.AreEqual("child", inScope.Dependent.Data1.Text);
+            using (var scope = container.OpenScope())
+            {
+                scope.Use(new Data { Text = "child" });
+                var inScope = scope.Resolve<DataDependentIndirectly>();
+                Assert.AreEqual("child", inScope.Dependent.Data1.Text);
+            }
         }
 
         public class Data
