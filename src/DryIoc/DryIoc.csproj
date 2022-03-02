@@ -5,7 +5,7 @@
         <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.8.6</VersionPrefix>
+        <VersionPrefix>4.8.7</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -17,6 +17,13 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v4.8.7 Bug-fix release
+
+- fixed: #435 hangfire use dryioc report ContainerIsDisposed
+- fixed: #449 Optional dependency shouldn't treat its own dependencies as optional
+- fixed: #451 Compiler-generated type as a service
+- fixed: #456 One more regression
+
 ## v4.8.6 Bug-fix release
 
 - fixed: #446 Resolving a record without registration causes a StackOverflowException

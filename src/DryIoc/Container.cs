@@ -5312,7 +5312,7 @@ namespace DryIoc
             var lazyType    = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericParamsAndArgs()[0];
             // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
-            var serviceRequest = request.PushServiceType(serviceType, 
+            var serviceRequest = request.PushServiceType(serviceType,
                 RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
 
             var container = request.Container;
@@ -5320,19 +5320,14 @@ namespace DryIoc
             {
                 // Here we need to know if the lazy is resolvable, 
                 // by resolving the factory we are checking that the service itself is registered...
-                var serviceFactory = container.ResolveFactory(serviceRequest);
-                if (serviceFactory == null)
-                    return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
-                serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
-
                 // But what about its dependencies. In order to check on them we need to get the expression,
                 // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
                 // Plus we need to stop on the encountering the root service because lazy permits a circular dependencies.
-                // The dependency check is the open question, see #449
-                // todo: @note keeping the code for illustration
-                // var expr = serviceFactory.GetExpressionOrDefault(serviceRequest);
-                // if (expr == null)
-                //     return request.IfUnresolved == IfUnresolved.Throw ? null : Constant(null, lazyType);
+                // See #449 for additional details
+                var serviceFactory = container.ResolveFactory(serviceRequest);
+                if (serviceFactory == null)
+                    return null;
+                serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
             }
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
@@ -9052,7 +9047,7 @@ namespace DryIoc
         IsGeneratedResolutionDependencyExpression = 1 << 8,
 
         /// <summary>Non inherited. Indicates the root service inside the function.</summary>
-        IsDirectlyWrappedInFunc = 1 << 9,
+        IsDirectlyWrappedInFunc = 1 << 9
     }
 
     /// Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations
@@ -9649,6 +9644,15 @@ namespace DryIoc
                 if (p.FactoryID == factoryID)
                     return true;
             }
+            return false;
+        }
+
+        /// <summary>Check for the parents until very end.</summary>
+        public bool HasRecursiveParentUntilResolutionRoot(int factoryID)
+        {
+            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                if (p.FactoryID == factoryID)
+                    return true;
             return false;
         }
 
@@ -10439,7 +10443,7 @@ namespace DryIoc
                 Caching != FactoryCaching.DoNotCache &&
                 FactoryType == FactoryType.Service &&
                 !request.IsResolutionRoot &&
-                !request.IsDirectlyWrappedInFunc() && 
+                !request.IsDirectlyWrappedInFunc() &&
                 !request.IsWrappedInFuncWithArgs() &&
                 !(request.Reuse.Name is IScopeName) &&
                 !setup.AsResolutionCall && // see #295

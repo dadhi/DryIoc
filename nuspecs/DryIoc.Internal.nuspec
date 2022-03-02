@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>4.8.6</version>
+        <version>4.8.7</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,6 +14,13 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v4.8.7 Bug-fix release
+
+- fixed: #435 hangfire use dryioc report ContainerIsDisposed
+- fixed: #449 Optional dependency shouldn't treat its own dependencies as optional
+- fixed: #451 Compiler-generated type as a service
+- fixed: #456 One more regression
+
 ## v4.8.6 Bug-fix release
 
 - fixed: #446 Resolving a record without registration causes a StackOverflowException
