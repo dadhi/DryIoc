@@ -10,6 +10,7 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
     
+            // new GHIssue460_Getting_instance_from_parent_scope_even_if_replaced_by_Use().Run();
             // new OpenGenericsTests().Run();
             // new GHIssue391_Deadlock_during_Resolve().Run();
             // new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration().Run();
@@ -54,6 +55,7 @@ namespace DryIoc.UnitTests
                 new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration(),
                 new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made(),
                 new GHIssue406_Allow_the_registration_of_the_partially_closed_implementation_type(),
+                new GHIssue460_Getting_instance_from_parent_scope_even_if_replaced_by_Use(),
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added
