@@ -1,5 +1,7 @@
 DryIoc is fast, small, full-featured IoC Container for .NET
 ===========================================================
+![stand with Ukraine](https://badgen.net/badge/stand%20with/UKRAINE/?color=0057B8&labelColor=FFD700)
+
 
 <img src="./logo/logo.svg" alt="logo" width="100px"/>
 
