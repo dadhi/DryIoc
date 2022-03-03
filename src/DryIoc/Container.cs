@@ -11857,7 +11857,7 @@ namespace DryIoc
         /// <inheritdoc />
         public override bool HasRuntimeState => true;
 
-        /// Simplified specially for register instance 
+        /// Simplified specially for register instance
         internal override bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules)
         {
             if (!isStaticallyChecked && (ImplementationType != null && !ImplementationType.IsAssignableTo(serviceType.ThrowIfNull())))
@@ -11996,14 +11996,17 @@ namespace DryIoc
         private readonly FactoryDelegate _factoryDelegate;
     }
 
-    internal sealed class FactoryPlaceholder : Factory
+    /// <summary>The placeholder for thr later resgitration</summary>
+    public sealed class FactoryPlaceholder : Factory
     {
+        /// <summary>May be used in places where placeholder is needed</summary>
         public static readonly Factory Default = new FactoryPlaceholder();
 
-        // Always resolved asResolutionCall, to create a hole in object graph to be filled in later
+        ///<summary> Always resolved asResolutionCall, to create a hole in object graph to be filled in later </summary>
         public override Setup Setup => _setup;
         private static readonly Setup _setup = Setup.With(asResolutionCall: true);
 
+        /// <inheritdoc />
         public override Expression CreateExpressionOrDefault(Request request) =>
             Throw.For<Expression>(Error.NoImplementationForPlaceholder, request);
     }
