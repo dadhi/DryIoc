@@ -12,7 +12,8 @@ namespace DryIoc.IssuesTests
         {
             Should_use_data_from_the_scope_when_resolving_in_scope_with_asResolutionCall();
             Should_use_data_from_the_scope_when_resolving_in_scope_with_original_Use();
-            return 2;
+            Auto_dynamic_registration_for_the_concrete_types_should_work();
+            return 3;
         }
 
         [Test]
@@ -53,6 +54,27 @@ namespace DryIoc.IssuesTests
             }
         }
 
+        [Test]
+        public void Auto_dynamic_registration_for_the_concrete_types_should_work()
+        {
+            var container = new Container(rules => rules
+                .WithConcreteTypeDynamicRegistrations((type, key) => type != typeof(Data)));
+
+            container.Use(new Data { Text = "whatever" });
+
+            container.Register<IDataDependent, DataDependent>();
+            container.Register<DataDependentIndirectly>();
+
+            // if this is removed, the test passes
+            var outside = container.Resolve<DataDependentIndirectly>();
+
+            using (var scope = container.OpenScope())
+            {
+                scope.Use(new Data { Text = "child" });
+                var inScope = scope.Resolve<DataDependentIndirectly>();
+                Assert.AreEqual("child", inScope.Dependent.Data1.Text);
+            }
+        }
         public class Data
         {
             public string Text { get; set; }
