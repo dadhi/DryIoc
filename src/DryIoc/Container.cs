@@ -4695,12 +4695,26 @@ namespace DryIoc
                 ? r.WithCurrentScope(Scope.Of(r.OwnCurrentScope))
                 : r.OpenScope(null);
 
+        /// <summary>Check if the service instance or factory is added to the current or singleton scope</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool IsUsed(this IResolverContext r, Type serviceType)
+        {
+            var f = r.CurrentScope?.GetUsedFactoryOrNull(serviceType)
+                ?? r.SingletonScope.GetUsedFactoryOrNull(serviceType);
+            return f != null;
+        }
+
+        /// <summary>Check if the service instance or factory is added to the current or singleton scope</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool IsUsed<TService>(this IResolverContext r) => r.IsUsed(typeof(TService));
+
         [MethodImpl((MethodImplOptions)256)]
         internal static bool TryGetUsedInstance(this IResolverContext r, int serviceTypeHash, Type serviceType, out object instance)
         {
-            instance = null;
-            return r.CurrentScope?.TryGetUsedInstance(r, serviceTypeHash, serviceType, out instance) == true
-                || r.SingletonScope.TryGetUsedInstance(r, serviceTypeHash, serviceType, out instance);
+            var f = r.CurrentScope?.GetUsedFactoryOrNull(serviceTypeHash, serviceType)
+                ?? r.SingletonScope.GetUsedFactoryOrNull(serviceTypeHash, serviceType);
+            instance = f != null ? f(r) : null;
+            return f != null;
         }
 
         // todo: @perf no need to check for IDisposable in TrackDisposable
@@ -12169,19 +12183,28 @@ namespace DryIoc
         /// Sets (replaces) the factory for specified type.
         void SetUsedInstance(int hash, Type type, FactoryDelegate factory);
 
-        /// <summary>Try retrieve instance from the the scope.</summary>
-        bool TryGetUsedInstance(IResolverContext r, Type type, out object instance);
-
-        /// <summary>Try retrieve instance from the the scope.</summary>
-        bool TryGetUsedInstance(IResolverContext r, int hash, Type type, out object instance);
-
-        // todo: @v5 @api @obsolete switch to the overload below
-        /// <summary>Clones the scope.</summary>
-        IScope Clone();
+        /// <summary>Try to retrieve factory or instance (wrapped in factory) via the Use method.</summary>
+        FactoryDelegate GetUsedFactoryOrNull(int hash, Type type);
 
         /// <summary>The method will clone the scope factories and already created services,
         /// but may or may not drop the disposables thus ensuring that only the new disposables added in clone will be disposed</summary>
         IScope Clone(bool withDisposables);
+    }
+
+    /// <summary>Extension methods for scope</summary>
+    public static class ScopeTools
+    {
+        /// <summary>The method will clone the scope factories and already created services, including the tracked disposables</summary>
+        public static IScope Clone(this IScope s) => s.Clone(true);
+
+        /// <summary>Try retrieve the used factory from the scope.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static FactoryDelegate GetUsedFactoryOrNull(this IScope s, Type type) =>
+            s.GetUsedFactoryOrNull(RuntimeHelpers.GetHashCode(type), type);
+
+        /// <summary>Check if the service instance or factory is added to the scope</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static bool IsUsed(this IScope s, Type serviceType) => s.GetUsedFactoryOrNull(serviceType) != null;
     }
 
     /// <summary>
@@ -12281,9 +12304,6 @@ namespace DryIoc
                 ? new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _factories, ImMap<ImList<IDisposable>>.Empty) // dropping the disposables
                 : new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _factories, _disposables); // Не забыть скопировать папу (коментарий для дочки)
         }
-
-        /// <inheritdoc />
-        public IScope Clone() => Clone(true);
 
         /// <inheritdoc />
         public virtual IScope Clone(bool withDisposables) =>
@@ -12479,28 +12499,20 @@ namespace DryIoc
                 Ref.Swap(ref _factories, hash, type, factory, (x, h, t, fac) => x.AddOrUpdate(h, t, fac));
         }
 
-        /// <summary>Try retrieve instance from the scope.</summary>
-        public bool TryGetUsedInstance(IResolverContext r, Type type, out object instance) =>
-            TryGetUsedInstance(r, RuntimeHelpers.GetHashCode(type), type, out instance);
-
-        /// <summary>Try retrieve instance from the the scope.</summary>
-        public bool TryGetUsedInstance(IResolverContext r, int hash, Type type, out object instance)
+        /// <summary>Try retrieve the used factory from the scope.</summary>
+        public FactoryDelegate GetUsedFactoryOrNull(int hash, Type type)
         {
-            instance = null;
             if (_disposed == 1)
-                return false;
+                return null;
 
             if (!_factories.IsEmpty)
             {
                 var factory = _factories.GetValueOrDefault(hash, type);
                 if (factory != null)
-                {
-                    instance = factory(r);
-                    return true;
-                }
+                    return factory;
             }
 
-            return Parent?.TryGetUsedInstance(r, hash, type, out instance) ?? false; // todo: @perf override with no Parent
+            return Parent?.GetUsedFactoryOrNull(hash, type);
         }
 
         /// <summary>Enumerates all the parent scopes upwards starting from this one.</summary>
