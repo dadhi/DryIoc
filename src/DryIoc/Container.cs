@@ -5149,7 +5149,7 @@ namespace DryIoc
             if (serviceFactory != null)
             {
                 // The check is only relevant to metadata, the higher wrappers know nothing about it.
-                if (!MatchMetadataType(metadataType, serviceFactory))
+                if (!serviceFactory.MatchMetadataType(metadataType))
                     return null;
             }
             else
@@ -5167,7 +5167,7 @@ namespace DryIoc
                 }
 
                 // if the service keys for some reason are not unique
-                factories = factories.Match(metadataType, (mType, f) => MatchMetadataType(mType, f.Value));
+                factories = factories.Match(metadataType, (mType, f) => f.Value.MatchMetadataType(mType));
                 if (factories.Length == 0)
                     return null;
 
@@ -5212,32 +5212,33 @@ namespace DryIoc
             var resultMetadata = serviceFactory.Setup.Metadata;
             if (metadataType != typeof(object) &&
                 resultMetadata is IDictionary<string, object> resultMetadataDict && metadataType != typeof(IDictionary<string, object>))
-                resultMetadata = resultMetadataDict.Values.FirstOrDefault(oldMap => metadataType.IsTypeOf(oldMap));
+                resultMetadata = resultMetadataDict.Values.FirstOrDefault(metadataType.IsTypeOf);
 
             var metadataExpr = container.GetConstantExpression(resultMetadata, metadataType);
             return New(metaCtor, serviceExpr, metadataExpr);
+        }
 
-            bool MatchMetadataType(Type mType, Factory f)
+        /// <summary>Find out if factory metadata is matches the passed metadata type</summary>
+        public static bool MatchMetadataType(this Factory f, Type metadataType)
+        {
+            var metadata = f.Setup.Metadata;
+            if (metadata == null)
+                return false;
+
+            if (metadataType == typeof(object))
+                return true;
+
+            if (metadata is IDictionary<string, object> metadataDict)
             {
-                var metadata = f.Setup.Metadata;
-                if (metadata == null)
-                    return false;
-
-                if (mType == typeof(object))
+                if (metadataType == typeof(IDictionary<string, object>))
                     return true;
-
-                if (metadata is IDictionary<string, object> metadataDict)
-                {
-                    if (mType == typeof(IDictionary<string, object>))
+                foreach (var m in metadataDict.Values)
+                    if (metadataType.IsTypeOf(m))
                         return true;
-                    foreach (var m in metadataDict.Values)
-                        if (mType.IsTypeOf(m))
-                            return true;
-                    return false;
-                }
-
-                return mType.IsTypeOf(metadata);
+                return false;
             }
+
+            return metadataType.IsTypeOf(metadata);
         }
     }
 
@@ -10148,7 +10149,7 @@ namespace DryIoc
             /// <summary>Default setup</summary>
             /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument.
             /// Need to be set for multiple type arguments.</param>
-            public WrapperSetup(int wrappedServiceTypeArgIndex = -1) => 
+            public WrapperSetup(int wrappedServiceTypeArgIndex = -1) =>
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
 
             /// <summary>Returns generic wrapper setup.
@@ -11867,11 +11868,11 @@ namespace DryIoc
         }
 
         /// <inheritdoc/>
-        public override Expression CreateExpressionOrDefault(Request request) => 
+        public override Expression CreateExpressionOrDefault(Request request) =>
             _getServiceExpression(request, null);
 
         /// <inheritdoc/>
-        public override Expression CreateExpressionWithWrappedFactory(Request request, Factory serviceFactory) => 
+        public override Expression CreateExpressionWithWrappedFactory(Request request, Factory serviceFactory) =>
             _getServiceExpression(request, serviceFactory);
     }
 
