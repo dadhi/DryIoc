@@ -12133,14 +12133,17 @@ namespace DryIoc
         internal InvokeFactoryDelegateExpression(Type type, Expression expression) : base(expression) => Type = type;
     }
 
-    internal sealed class FactoryPlaceholder : Factory
+    /// <summary>The placeholder for thr later resgitration</summary>
+    public sealed class FactoryPlaceholder : Factory
     {
+        /// <summary>May be used in places where placeholder is needed</summary>
         public static readonly Factory Default = new FactoryPlaceholder();
 
-        // Always resolved asResolutionCall, to create a hole in object graph to be filled in later
+        ///<summary> Always resolved asResolutionCall, to create a hole in object graph to be filled in later </summary>
         public override Setup Setup => _setup;
         private static readonly Setup _setup = Setup.With(asResolutionCall: true);
 
+        /// <inheritdoc />
         public override Expression CreateExpressionOrDefault(Request request) =>
             Throw.For<Expression>(Error.NoImplementationForPlaceholder, request);
     }
