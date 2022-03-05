@@ -4796,10 +4796,10 @@ namespace DryIoc
                 new ExpressionFactory(r => GetKeyValuePairExpressionOrDefault(r), setup: Setup.WrapperWith(1)));
 
             wrappers = wrappers.AddOrUpdate(typeof(Meta<,>),
-                new WrapperExpressionFactory((r, f) => GetMetaExpressionOrDefault(r, f), setup: Setup.WrapperWith(0)));
+                new WrapperExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
             wrappers = wrappers.AddOrUpdate(typeof(Tuple<,>),
-                new WrapperExpressionFactory((r, f) => GetMetaExpressionOrDefault(r, f), setup: Setup.WrapperWith(0)));
+                new WrapperExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
 
             wrappers = wrappers.AddOrUpdate(typeof(System.Linq.Expressions.LambdaExpression),
                 new ExpressionFactory(r => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper));
@@ -5098,7 +5098,7 @@ namespace DryIoc
             return Constant(expr.CompileToFactoryDelegate(wrapperType, serviceType, rules.UseInterpretation), wrapperType);
         }
 
-        private static Expression GetKeyValuePairExpressionOrDefault(Request request)
+        private static Expression GetKeyValuePairExpressionOrDefault(Request request, Factory serviceFactory = null)
         {
             var keyValueType = request.GetActualServiceType();
             var typeArgs = keyValueType.GetGenericArguments();
@@ -5112,7 +5112,8 @@ namespace DryIoc
             var serviceRequest = serviceKey == null
                 ? request.PushServiceType(serviceType)
                 : request.Push(serviceType, serviceKey);
-            var serviceFactory = request.Container.ResolveFactory(serviceRequest);
+            if (serviceFactory == null) // todo: @wip is not used yet
+                serviceFactory = request.Container.ResolveFactory(serviceRequest);
             var serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
                 return null;
@@ -10461,7 +10462,10 @@ namespace DryIoc
             }
 
             // At last, create the object graph with all of the dependencies created and injected
-            serviceExpr = serviceFactory == null ? CreateExpressionOrDefault(request) : CreateExpressionWithWrappedFactory(request, serviceFactory);
+            serviceExpr = serviceFactory == null 
+                ? CreateExpressionOrDefault(request) 
+                : CreateExpressionWithWrappedFactory(request, serviceFactory);
+
             if (serviceExpr == null)
             {
                 Container.TryThrowUnableToResolve(request);
@@ -11854,7 +11858,8 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request) => _getServiceExpression(request);
     }
 
-    /// <summary>Creates service expression using client provided expression factory delegate.</summary>
+    /// <summary>Creates service expression using client provided expression factory delegate.
+    /// Important! that it may use the already resolved service factory unwrapped by the higher wrapper</summary>
     public sealed class WrapperExpressionFactory : Factory
     {
         /// <inheritdoc/>

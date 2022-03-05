@@ -126,17 +126,15 @@ namespace DryIoc.MefAttributedModel
         /// <returns>The container with registration.</returns>
         public static IContainer WithMefSpecificWrappers(this IContainer container)
         {
+            // todo: @wip optimize to use unwrapped factory
             container.Register(typeof(ExportFactory<>),
                 made: _createExportFactoryMethod,
                 setup: Setup.Wrapper);
 
+            // todo: @wip optimize to use unwrapped factory
             container.Register(typeof(ExportFactory<,>),
                 made: _createExportFactoryWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
-
-            // container.Register(typeof(Lazy<,>),
-            //     made: _createLazyWithMetadataMethod,
-            //     setup: Setup.WrapperWith(0));
 
             container.Register(typeof(Lazy<,>),
                 new WrapperExpressionFactory(GetLazyMetadataExpressionOrDefault, setup: Setup.WrapperWith(0)));
