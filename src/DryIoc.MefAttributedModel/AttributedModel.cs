@@ -169,11 +169,6 @@ namespace DryIoc.MefAttributedModel
 
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
 
-            // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
-            // So that Func<Derived> may be used for Func<Base>
-            if (serviceExpr.Type != serviceType && !serviceType.IsAssignableFrom(serviceExpr.Type))
-                serviceExpr = Expression.Convert(serviceExpr, serviceType);
-
             var lazyValueFactoryType = typeof(Func<>).MakeGenericType(serviceType);
             var wrapperCtor = lazyType.Constructor(lazyValueFactoryType);
 

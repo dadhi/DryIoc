@@ -5009,12 +5009,6 @@ namespace DryIoc
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
-
-            // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
-            // So that Func<Derived> may be used for Func<Base>
-            if (serviceExpr.Type != serviceType && !serviceType.IsAssignableFrom(serviceExpr.Type))
-                serviceExpr = Convert(serviceExpr, serviceType);
-
             var lazyValueFactoryType = typeof(Func<>).MakeGenericType(serviceType);
             var wrapperCtor = lazyType.Constructor(lazyValueFactoryType);
 
