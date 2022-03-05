@@ -219,7 +219,7 @@ namespace DryIoc.MefAttributedModel
             {
                 // Going to resolve the nested wrapper (the usual case when required is different from the service type)
                 factory = container.ResolveFactory(serviceRequest);
-                serviceRequest.SaveWrappedFactory(serviceFactory);
+                serviceRequest.SaveWrappedFactory(serviceFactory); // todo: @wip check do we even need it because we still create the resolution expression?
             }
 
             if (factory == null)
