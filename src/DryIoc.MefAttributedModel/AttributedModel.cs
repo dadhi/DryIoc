@@ -207,22 +207,16 @@ namespace DryIoc.MefAttributedModel
             var serviceRequest = request.Push(ServiceInfo.Of(serviceType, serviceKey),
                 RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
 
-            Factory factory;
-            if (requiredServiceType == serviceType)
-            {
+            var factory = requiredServiceType == serviceType
                 // We at least looking at the unwrapped type, so we may check that type factory condition
-                factory = serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory);
-            }
-            else
-            {
+                ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
                 // Going to resolve the nested wrapper (the usual case when required is different from the service type)
-                factory = container.ResolveFactory(serviceRequest);
-                serviceRequest.SaveWrappedFactory(serviceFactory); // todo: @wip check do we even need it because we still create the resolution expression?
-            }
+                : container.ResolveFactory(serviceRequest);
 
             if (factory == null)
                 return null;
 
+            // we are not setting the unwrapped service factory here because it does not matter for resolution call
             serviceRequest = serviceRequest.WithResolvedFactory(factory, skipRecursiveDependencyCheck: true);
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
 
