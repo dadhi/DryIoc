@@ -150,7 +150,7 @@ namespace DryIoc.MefAttributedModel
             return container;
         }
 
-        internal static Expression GetLazyMetadataExpressionOrDefault(DryIoc.Request request, Factory alreadyResolvedFactory = null)
+        internal static Expression GetLazyMetadataExpressionOrDefault(DryIoc.Request request, Factory serviceFactory = null)
         {
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericArguments()[0];
@@ -161,10 +161,10 @@ namespace DryIoc.MefAttributedModel
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
             {
-                var serviceFactory = alreadyResolvedFactory ?? container.ResolveFactory(serviceRequest);
-                if (serviceFactory == null)
+                var factory = serviceFactory ?? container.ResolveFactory(serviceRequest);
+                if (factory == null)
                     return null;
-                serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
+                serviceRequest = serviceRequest.WithResolvedFactory(factory, skipRecursiveDependencyCheck: true);
             }
 
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);

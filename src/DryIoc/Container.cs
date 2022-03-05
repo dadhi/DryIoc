@@ -4981,9 +4981,9 @@ namespace DryIoc
 
         /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
         /// <param name="request">The resolution request.</param>
-        /// <param name="alreadyResolvedFactory">The already resolved factory by the collection or the higher wrapper.</param>
+        /// <param name="serviceFactory">The already resolved factory by the collection or the higher wrapper.</param>
         /// <returns>Expression: <c><![CDATA[r => new Lazy<TService>(() => r.Resolve{TService}(key, ifUnresolved, requiredType))]]></c></returns>
-        public static Expression GetLazyExpressionOrDefault(Request request, Factory alreadyResolvedFactory = null)
+        public static Expression GetLazyExpressionOrDefault(Request request, Factory serviceFactory = null)
         {
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericArguments()[0];
@@ -5000,10 +5000,10 @@ namespace DryIoc
                 // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
                 // Plus we need to stop on the encountering the root service because lazy permits a circular dependencies.
                 // See #449 for additional details
-                var serviceFactory = alreadyResolvedFactory ?? container.ResolveFactory(serviceRequest);
-                if (serviceFactory == null)
+                var factory = serviceFactory ?? container.ResolveFactory(serviceRequest);
+                if (factory == null)
                     return null;
-                serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
+                serviceRequest = serviceRequest.WithResolvedFactory(factory, skipRecursiveDependencyCheck: true);
             }
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
