@@ -26,13 +26,13 @@ namespace DryIoc.IssuesTests
         public void SuperSlowTest()
         {
             var dynamicRulesTriggered = new List<object>();
-            IEnumerable<DynamicRegistration> CountDynamicRulesTriggered(Type type, object key) 
+            IEnumerable<DynamicRegistration> CollectDynamicRulesTriggered(Type type, object key) 
             { 
                 dynamicRulesTriggered.Add(new { type, key });
                 return null;
             }
 
-            var container = new Container(rules => rules.WithDynamicRegistrations(CountDynamicRulesTriggered)).WithMef();
+            var container = new Container(rules => rules.WithDynamicRegistrations(CollectDynamicRulesTriggered)).WithMef();
 
             container.Register<IService, MyService>(setup: Setup.With(metadataOrFuncOfMetadata: "42"));
 

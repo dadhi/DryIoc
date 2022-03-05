@@ -33,6 +33,7 @@ namespace DryIoc.MefAttributedModel
     using System.Threading;
     using DryIocAttributes;
     using DryIoc.ImTools;
+    using DryIoc.FastExpressionCompiler.LightExpression;
 
     /// <summary>Implements MEF Attributed Programming Model.
     /// Documentation is available at https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/Extensions/MefAttributedModel.md </summary>
@@ -137,11 +138,47 @@ namespace DryIoc.MefAttributedModel
                 made: _createLazyWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
 
+            // container.Register(typeof(Lazy<,>), 
+            //     new WrapperExpressionFactory((r, f) =>
+            //         GetLazyMetadataExpressionOrDefault(r, f),
+            //         setup: Setup.WrapperWith(0)));
+
             var lazyFactory = new WrapperExpressionFactory((r, f) =>
-                WrappersSupport.GetLazyExpressionOrDefault(r, f, nullWrapperForUnresolvedService: true));
+                WrappersSupport.GetLazyExpressionOrDefault(r, f));
             container.Register(typeof(Lazy<>), lazyFactory, IfAlreadyRegistered.Replace);
 
             return container;
+        }
+
+        internal static Expression GetLazyMetadataExpressionOrDefault(DryIoc.Request request, Factory alreadyResolvedFactory = null)
+        {
+            var lazyType = request.GetActualServiceType();
+            var serviceType = lazyType.GetGenericArguments()[0];
+            // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
+            var serviceRequest = request.PushServiceType(serviceType,
+                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
+
+            var container = request.Container;
+            if (!container.Rules.FuncAndLazyWithoutRegistration)
+            {
+                var serviceFactory = alreadyResolvedFactory ?? container.ResolveFactory(serviceRequest);
+                if (serviceFactory == null)
+                    return null;
+                serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
+            }
+
+            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
+
+            // The conversion is required in .NET 3.5 to handle lack of covariance for Func<out T>
+            // So that Func<Derived> may be used for Func<Base>
+            if (serviceExpr.Type != serviceType && !serviceType.IsAssignableFrom(serviceExpr.Type))
+                serviceExpr = Expression.Convert(serviceExpr, serviceType);
+
+            var lazyValueFactoryType = typeof(Func<>).MakeGenericType(serviceType);
+            var wrapperCtor = lazyType.Constructor(lazyValueFactoryType);
+
+            return Expression.New(wrapperCtor, 
+                Expression.Lambda(lazyValueFactoryType, serviceExpr, ArrayTools.Empty<ParameterExpression>(), serviceType));
         }
 
         /// <summary>Proxy for the tuple parameter to <see cref="ExportFactory{T}"/>.

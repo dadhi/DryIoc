@@ -4981,10 +4981,9 @@ namespace DryIoc
 
         /// <summary>Gets the expression for <see cref="Lazy{T}"/> wrapper.</summary>
         /// <param name="request">The resolution request.</param>
-        /// <param name="nullWrapperForUnresolvedService">if set to <c>true</c> then check for service registration before creating resolution expression.</param>
-        /// <param name="factory">The already resolved factory by the collection or the higher wrapper.</param>
+        /// <param name="alreadyResolvedFactory">The already resolved factory by the collection or the higher wrapper.</param>
         /// <returns>Expression: <c><![CDATA[r => new Lazy<TService>(() => r.Resolve{TService}(key, ifUnresolved, requiredType))]]></c></returns>
-        public static Expression GetLazyExpressionOrDefault(Request request, Factory factory = null, bool nullWrapperForUnresolvedService = false)
+        public static Expression GetLazyExpressionOrDefault(Request request, Factory alreadyResolvedFactory = null)
         {
             var lazyType = request.GetActualServiceType();
             var serviceType = lazyType.GetGenericArguments()[0];
@@ -5001,7 +5000,7 @@ namespace DryIoc
                 // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
                 // Plus we need to stop on the encountering the root service because lazy permits a circular dependencies.
                 // See #449 for additional details
-                var serviceFactory = factory ?? container.ResolveFactory(serviceRequest);
+                var serviceFactory = alreadyResolvedFactory ?? container.ResolveFactory(serviceRequest);
                 if (serviceFactory == null)
                     return null;
                 serviceRequest = serviceRequest.WithResolvedFactory(serviceFactory, skipRecursiveDependencyCheck: true);
@@ -8213,7 +8212,8 @@ namespace DryIoc
         internal static readonly ConstructorInfo ResolutionScopeNameCtor =
             typeof(ResolutionScopeName).GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)[0];
 
-        internal static Expression CreateResolutionExpression(Request request,
+        /// <summary>Used for internal purposes to create the expression of Resolve method of the passed `request`</summary>
+        public static Expression CreateResolutionExpression(Request request,
             bool openResolutionScope = false, bool asResolutionCall = false)
         {
             if (request.Rules.DependencyResolutionCallExprs != null &&
@@ -10154,10 +10154,8 @@ namespace DryIoc
             /// <summary>Default setup</summary>
             /// <param name="wrappedServiceTypeArgIndex">Default is -1 for generic wrapper with single type argument.
             /// Need to be set for multiple type arguments.</param>
-            public WrapperSetup(int wrappedServiceTypeArgIndex = -1)
-            {
+            public WrapperSetup(int wrappedServiceTypeArgIndex = -1) => 
                 WrappedServiceTypeArgIndex = wrappedServiceTypeArgIndex;
-            }
 
             /// <summary>Returns generic wrapper setup.
             /// Default for <paramref name="wrappedServiceTypeArgIndex" /> is -1 for generic wrapper with single type argument.
@@ -11875,10 +11873,12 @@ namespace DryIoc
         }
 
         /// <inheritdoc/>
-        public override Expression CreateExpressionOrDefault(Request request) => _getServiceExpression(request, null);
+        public override Expression CreateExpressionOrDefault(Request request) => 
+            _getServiceExpression(request, null);
 
         /// <inheritdoc/>
-        public override Expression CreateExpressionWithWrappedFactory(Request request, Factory serviceFactory) => _getServiceExpression(request, serviceFactory);
+        public override Expression CreateExpressionWithWrappedFactory(Request request, Factory serviceFactory) => 
+            _getServiceExpression(request, serviceFactory);
     }
 
     /// <summary>Wraps the instance in registry</summary>
