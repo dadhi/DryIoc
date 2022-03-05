@@ -134,12 +134,12 @@ namespace DryIoc.MefAttributedModel
                 made: _createExportFactoryWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
 
-            // container.Register(typeof(Lazy<,>),
-            //     made: _createLazyWithMetadataMethod,
-            //     setup: Setup.WrapperWith(0));
-
             container.Register(typeof(Lazy<,>),
-                new WrapperExpressionFactory((r, f) => GetLazyMetadataExpressionOrDefault(r, f), setup: Setup.WrapperWith(0)));
+                made: _createLazyWithMetadataMethod,
+                setup: Setup.WrapperWith(0));
+
+            // container.Register(typeof(Lazy<,>),
+            //     new WrapperExpressionFactory((r, f) => GetLazyMetadataExpressionOrDefault(r, f), setup: Setup.WrapperWith(0)));
 
             var lazyFactory = new WrapperExpressionFactory((r, f) =>
                 WrappersSupport.GetLazyExpressionOrDefault(r, f));
