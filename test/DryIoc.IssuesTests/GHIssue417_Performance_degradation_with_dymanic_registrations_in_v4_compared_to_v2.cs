@@ -26,8 +26,8 @@ namespace DryIoc.IssuesTests
         public void SuperSlowTest()
         {
             var dynamicRulesTriggered = new List<object>();
-            IEnumerable<DynamicRegistration> CollectDynamicRulesTriggered(Type type, object key) 
-            { 
+            IEnumerable<DynamicRegistration> CollectDynamicRulesTriggered(Type type, object key)
+            {
                 dynamicRulesTriggered.Add(new { type, key });
                 return null;
             }
@@ -40,6 +40,9 @@ namespace DryIoc.IssuesTests
             container.InjectPropertiesAndFields(x);
 
             Assert.IsInstanceOf<MyService>(x.ImportedServices[0].Value);
+            // the dynamic registrations are triggered two times:
+            // first when finding the item factories in Array resolver and
+            // second when interpreting the resolution call for the concrete service. todo: @perf may we improve on the second
             Assert.AreEqual(2, dynamicRulesTriggered.Count);
         }
 
