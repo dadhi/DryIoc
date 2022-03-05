@@ -983,7 +983,7 @@ namespace DryIoc
                 return null;
 
             // For multiple matched factories if the single one has a condition, then use it
-            factories = factories.Match(request, (r, x) => r.MatchFactoryConditionAndMetadata(x));
+            factories = factories.Match(request, details, (r, d, x) => r.MatchFactoryConditionAndMetadata(d, x.Value));
 
             // Check the for the reuse matching scopes (for a single the check will be down the road) (BBIssue: #175)
             if (factories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
@@ -1128,8 +1128,7 @@ namespace DryIoc
             if (factories.Length > 1)
                 Array.Sort(factories, _lastFactoryIDWinsComparer);
 
-            var matchedFactories = factories.Match(request, (r, x) => r.MatchFactoryConditionAndMetadata(x));
-
+            var matchedFactories = factories.Match(request, details, (r, d, x) => r.MatchFactoryConditionAndMetadata(d, x.Value));
             if (matchedFactories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
             {
                 // Check for the matching scopes. Only for more than one factory, 
@@ -4791,7 +4790,7 @@ namespace DryIoc
                 new ExpressionFactory(r => GetLazyEnumerableExpressionOrDefault(r), setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
-                new WrapperExpressionFactory((r, f) => GetLazyExpressionOrDefault(r, f)));
+                new WrapperExpressionFactory(GetLazyExpressionOrDefault));
 
             wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
                 new ExpressionFactory(r => GetKeyValuePairExpressionOrDefault(r), setup: Setup.WrapperWith(1)));
@@ -4935,14 +4934,14 @@ namespace DryIoc
                 if (itemType == requiredItemType)
                 {
                     // We at least looking at the unwrapped type, so we may that type factory condition
-                    factory = itemRequest.MatchFactoryOrNull(item.Factory);
+                    factory = itemRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(item.Factory);
                 }
                 else
                 {
                     // We need to resolve the wrapper factory (the usual case with the required service different from the item service type)
                     factory = container.ResolveFactory(itemRequest);
                     // Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all available information
-                    itemRequest._factoryOrImplType = item.Factory;
+                    itemRequest.SaveWrappedFactory(item.Factory);
                 }
 
                 var itemExpr = factory?.GetExpressionOrDefault(itemRequest);
@@ -4985,8 +4984,8 @@ namespace DryIoc
         /// <returns>Expression: <c><![CDATA[r => new Lazy<TService>(() => r.Resolve{TService}(key, ifUnresolved, requiredType))]]></c></returns>
         public static Expression GetLazyExpressionOrDefault(Request request, Factory serviceFactory = null)
         {
-            var lazyType = request.GetActualServiceType();
-            var serviceType = lazyType.GetGenericArguments()[0];
+            var wrapperType = request.GetActualServiceType();
+            var serviceType = wrapperType.GetGenericArguments()[0];
             // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
             var serviceRequest = request.PushServiceType(serviceType,
                 RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
@@ -5009,10 +5008,10 @@ namespace DryIoc
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
-            var lazyValueFactoryType = typeof(Func<>).MakeGenericType(serviceType);
-            var wrapperCtor = lazyType.Constructor(lazyValueFactoryType);
+            var funcType = typeof(Func<>).MakeGenericType(serviceType);
+            var wrapperCtor = wrapperType.Constructor(funcType);
 
-            return New(wrapperCtor, Lambda(lazyValueFactoryType, serviceExpr, Empty<ParameterExpression>(), serviceType));
+            return New(wrapperCtor, Lambda(funcType, serviceExpr, Empty<ParameterExpression>(), serviceType));
         }
 
         /// <summary>Exposing for creation of custom delegates #243</summary>
@@ -5195,25 +5194,21 @@ namespace DryIoc
             if (requiredServiceType == serviceType)
             {
                 // We at least looking at the unwrapped type, so we may check that type factory condition
-                factory = serviceRequest.MatchFactoryOrNull(serviceFactory);
+                factory = serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory);
             }
             else
             {
                 // Going to resolve the nested wrapper (the usual case when required is different from the service type)
                 factory = container.ResolveFactory(serviceRequest);
                 // Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all available information
-                serviceRequest._factoryOrImplType = serviceFactory;
+                serviceRequest.SaveWrappedFactory(serviceFactory);
             }
 
             var serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
                 return null;
 
-            var resultMetadata = serviceFactory.Setup.Metadata;
-            if (metadataType != typeof(object) &&
-                resultMetadata is IDictionary<string, object> resultMetadataDict && metadataType != typeof(IDictionary<string, object>))
-                resultMetadata = resultMetadataDict.Values.FirstOrDefault(metadataType.IsTypeOf);
-
+            var resultMetadata = serviceFactory.Setup.GetMetadataValueMatchedByMetadataType(metadataType);
             var metadataExpr = container.GetConstantExpression(resultMetadata, metadataType);
             return New(metaCtor, serviceExpr, metadataExpr);
         }
@@ -5232,8 +5227,8 @@ namespace DryIoc
             {
                 if (metadataType == typeof(IDictionary<string, object>))
                     return true;
-                foreach (var m in metadataDict.Values)
-                    if (metadataType.IsTypeOf(m))
+                foreach (var kv in metadataDict)
+                    if (metadataType.IsTypeOf(kv.Value))
                         return true;
                 return false;
             }
@@ -8912,9 +8907,10 @@ namespace DryIoc
         IsDirectlyWrappedInFunc = 1 << 7,
     }
 
-    /// Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations
-    internal static class RequestTools
+    /// <summary>Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations</summary>
+    public static class RequestTools
     {
+        /// <summary>Matching things</summary>
         public static bool MatchFactoryConditionAndMetadata(this Request request, ServiceDetails details, Factory factory)
         {
             var setup = factory.Setup;
@@ -8923,21 +8919,15 @@ namespace DryIoc
             return details.MetadataKey == null && details.Metadata == null || setup.MatchesMetadata(details.MetadataKey, details.Metadata);
         }
 
-        public static bool MatchFactoryConditionAndMetadata(this Request request, KV<object, Factory> f)
-        {
-            var setup = f.Value.Setup;
-            if (setup.Condition != null && !setup.Condition(request))
-                return false;
-            var details = request.GetServiceDetails();
-            return details.MetadataKey == null && details.Metadata == null || setup.MatchesMetadata(details.MetadataKey, details.Metadata);
-        }
-
+        /// <summary>Matching things</summary>
         public static bool MatchFactoryReuse(this Request r, Factory f) => f.Reuse?.CanApply(r) ?? true;
 
+        /// <summary>Matching things</summary>
         public static bool MatchGeneratedFactory(this Request r, Factory f) =>
             f.GeneratedFactories == null || f.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true) != null;
 
-        public static Factory MatchFactoryOrNull(this Request r, Factory f)
+        /// <summary>Matching things</summary>
+        public static Factory MatchGeneratedFactoryByReuseAndConditionOrNull(this Request r, Factory f)
         {
             var reuse = f.Reuse;
             if (reuse != null && !reuse.CanApply(r))
@@ -9124,7 +9114,11 @@ namespace DryIoc
 
         /// <summary>Service implementation type if known.</summary>
         public Type ImplementationType => _factoryOrImplType as Type ?? Factory?.ImplementationType;
+
         internal object _factoryOrImplType;
+
+        /// <summary>Sets the service factory already resolved by the wrapper to save for the future factory resolution</summary>
+        public void SaveWrappedFactory(Factory f) => _factoryOrImplType = f;
 
         /// <summary>Service reuse.</summary>
         public IReuse Reuse { get; private set; }
@@ -9864,6 +9858,16 @@ namespace DryIoc
             return Metadata is IDictionary<string, object> metaDict
                 && metaDict.TryGetValue(metadataKey, out var metaValue)
                 && Equals(metaValue, metadata);
+        }
+
+        /// <summary>Retrieve the whole metadata object matched to the type or value from the metadata dictionary matched by the type</summary>
+        public object GetMetadataValueMatchedByMetadataType(Type metadataType)
+        {
+            var metadata = Metadata;
+            if (metadataType != typeof(object) &&
+                metadata is IDictionary<string, object> metadataDict && metadataType != typeof(IDictionary<string, object>))
+                metadata = metadataDict.Values.FirstOrDefault(metadataType.IsTypeOf);
+            return metadata;
         }
 
         /// <summary>Indicates that injected expression should be:

@@ -40,7 +40,7 @@ namespace DryIoc.IssuesTests
             container.InjectPropertiesAndFields(x);
 
             Assert.IsInstanceOf<MyService>(x.ImportedServices[0].Value);
-            Assert.AreEqual(3, dynamicRulesTriggered.Count);
+            Assert.AreEqual(2, dynamicRulesTriggered.Count);
         }
 
         public class Slow

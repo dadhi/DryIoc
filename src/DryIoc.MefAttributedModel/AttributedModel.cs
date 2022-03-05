@@ -134,44 +134,109 @@ namespace DryIoc.MefAttributedModel
                 made: _createExportFactoryWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
 
-            container.Register(typeof(Lazy<,>),
-                made: _createLazyWithMetadataMethod,
-                setup: Setup.WrapperWith(0));
-
             // container.Register(typeof(Lazy<,>),
-            //     new WrapperExpressionFactory((r, f) => GetLazyMetadataExpressionOrDefault(r, f), setup: Setup.WrapperWith(0)));
+            //     made: _createLazyWithMetadataMethod,
+            //     setup: Setup.WrapperWith(0));
 
-            var lazyFactory = new WrapperExpressionFactory((r, f) =>
-                WrappersSupport.GetLazyExpressionOrDefault(r, f));
-            container.Register(typeof(Lazy<>), lazyFactory, IfAlreadyRegistered.Replace);
+            container.Register(typeof(Lazy<,>),
+                new WrapperExpressionFactory(GetLazyMetadataExpressionOrDefault, setup: Setup.WrapperWith(0)));
+
+            container.Register(typeof(Lazy<>),
+                new WrapperExpressionFactory(WrappersSupport.GetLazyExpressionOrDefault),
+                IfAlreadyRegistered.Replace);
 
             return container;
         }
 
         internal static Expression GetLazyMetadataExpressionOrDefault(DryIoc.Request request, Factory serviceFactory = null)
         {
-            var lazyType = request.GetActualServiceType();
-            var serviceType = lazyType.GetGenericArguments()[0];
-            // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
-            var serviceRequest = request.PushServiceType(serviceType,
-                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
+            var wrapperType = request.GetActualServiceType();
+            var typeArgs = wrapperType.GetGenericArguments();
+            var serviceType = typeArgs[0];
+            var metadataType = typeArgs[1];
+
+            var details = request.GetServiceDetails();
+            var serviceKey = details.ServiceKey;
 
             var container = request.Container;
-            if (!container.Rules.FuncAndLazyWithoutRegistration)
+            var requiredServiceType = container.GetWrappedType(serviceType, details.RequiredServiceType);
+
+            // The factory is passed from the higher wrapper (collection or other).
+            // It was already checked by the higher wrapper so no need to repeat the check here.
+            if (serviceFactory != null)
             {
-                var factory = serviceFactory ?? container.ResolveFactory(serviceRequest);
-                if (factory == null)
+                // The check is only relevant to metadata, the higher wrappers know nothing about it.
+                if (!serviceFactory.MatchMetadataType(metadataType))
                     return null;
-                serviceRequest = serviceRequest.WithResolvedFactory(factory, skipRecursiveDependencyCheck: true);
+            }
+            else
+            {
+                // todo: @perf use the GetServiceRegisteredAndDynamicFactories
+                var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true);
+                if (factories.Length == 0)
+                    return null;
+
+                if (serviceKey != null)
+                {
+                    factories = factories.Match(serviceKey, (key, f) => key.Equals(f.Key));
+                    if (factories.Length == 0)
+                        return null;
+                }
+
+                // if the service keys for some reason are not unique
+                factories = factories.Match(metadataType, (mType, f) => f.Value.MatchMetadataType(mType));
+                if (factories.Length == 0)
+                    return null;
+
+                // Prevent non-determinism when more than 1 factory is matching the metadata
+                if (factories.Length > 1)
+                {
+                    if (details.IfUnresolved == DryIoc.IfUnresolved.Throw)
+                        Throw.It(DryIoc.Error.UnableToSelectFromManyRegistrationsWithMatchingMetadata, metadataType, factories, request);
+                    return null;
+                }
+
+                var keyedFactory = factories[0];
+                if (keyedFactory == null)
+                    return null;
+
+                // The key may be different in case of initial serviceKey was null.
+                // It even may be a non-default key, see Should_resolve_any_named_service_with_corresponding_metadata_If_name_is_not_specified_in_resolve
+                serviceKey = keyedFactory.Key;
+                serviceFactory = keyedFactory.Value;
             }
 
+            var serviceRequest = request.Push(ServiceInfo.Of(serviceType, serviceKey),
+                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
+
+            Factory factory;
+            if (requiredServiceType == serviceType)
+            {
+                // We at least looking at the unwrapped type, so we may check that type factory condition
+                factory = serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory);
+            }
+            else
+            {
+                // Going to resolve the nested wrapper (the usual case when required is different from the service type)
+                factory = container.ResolveFactory(serviceRequest);
+                serviceRequest.SaveWrappedFactory(serviceFactory);
+            }
+
+            if (factory == null)
+                return null;
+
+            serviceRequest = serviceRequest.WithResolvedFactory(factory, skipRecursiveDependencyCheck: true);
             var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
 
-            var lazyValueFactoryType = typeof(Func<>).MakeGenericType(serviceType);
-            var wrapperCtor = lazyType.Constructor(lazyValueFactoryType);
+            var funcType = typeof(Func<>).MakeGenericType(serviceType);
+            var wrapperCtor = wrapperType.Constructor(funcType, metadataType);
 
-            return Expression.New(wrapperCtor, 
-                Expression.Lambda(lazyValueFactoryType, serviceExpr, ArrayTools.Empty<ParameterExpression>(), serviceType));
+            var resultMetadata = serviceFactory.Setup.GetMetadataValueMatchedByMetadataType(metadataType);
+            var metadataExpr = container.GetConstantExpression(resultMetadata, metadataType);
+
+            return Expression.New(wrapperCtor,
+                Expression.Lambda(funcType, serviceExpr, ArrayTools.Empty<ParameterExpression>(), serviceType),
+                metadataExpr);
         }
 
         /// <summary>Proxy for the tuple parameter to <see cref="ExportFactory{T}"/>.
