@@ -32,7 +32,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 
 - [Release Notes](https://github.com/dadhi/DryIoc/releases/tag/v4.8.7) :: [Previous Versions](https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/VersionHistory.md)
 - [Extensions and Companions](Extensions.md)
-- [Documentation][WikiHome]
+- [Live Documentation][WikiHome] created with [CsToMd](https://github.com/dadhi/CsToMd)
 - [Contribution guide](CONTRIBUTING.md)
 - Two original parts of the DryIoc are now the separate projects: [FastExpressionCompiler](https://github.com/dadhi/FastExpressionCompiler) and [ImTools](https://github.com/dadhi/ImTools)
 
@@ -48,7 +48,7 @@ The listed *.MsDI* packages are respective [Microsoft.Extensions.DependencyInjec
 
 #### Cold start - Registering services then opening the scope and resolving the root scoped service (e.g. controller) for the first time
 
-DryIoc 5.0.0 (.MsDI 5.0.0), MsDI 5.0.1, Grace 7.2.0 (.MsDI 7.1.0), Autofac 6.2.0 (.MsDI 7.1.0), Lamar 5.0.3
+DryIoc 5.0.0 (.MsDI 5.0.0), MsDI 6.0.0, Grace 7.2.1 (.MsDI 7.1.0), Autofac 6.3.0 (.MsDI 7.2.0), Lamar 8.0.1
 
 ```md
 BenchmarkDotNet=v0.13.0, OS=Windows 10.0.19042.985 (20H2/October2020Update)
