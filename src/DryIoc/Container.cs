@@ -10845,7 +10845,7 @@ namespace DryIoc
             Func<Request, PropertyInfo, bool> isInjectable =
                 withNonPublic && withPrimitive ? ((r, p) => p.IsInjectable(true, true)) :
                 withNonPublic ? ((r, p) => p.IsInjectable(true, false)) :
-                withPrimitive ? ((r, p) => p.IsInjectable(false, true)) : 
+                withPrimitive ? ((r, p) => p.IsInjectable(false, true)) :
                                 ((r, p) => p.IsInjectable(false, false));
 
             return req =>
