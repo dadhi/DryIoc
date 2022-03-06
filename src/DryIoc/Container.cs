@@ -4814,7 +4814,7 @@ namespace DryIoc
                 new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.WrapperWith(0)));
 
             wrappers = wrappers.AddOrUpdate(typeof(Func<>),
-                new ExpressionFactory(r => GetFuncOrActionExpressionOrDefault(r), setup: Setup.Wrapper));
+                new WrapperExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.Wrapper));
 
             // Skip the `i == 0` because `Func<>` type was added above
             for (var i = 1; i < FuncTypes.Length; i++)
@@ -5007,7 +5007,7 @@ namespace DryIoc
         }
 
         /// <summary>Exposing for creation of custom delegates #243</summary>
-        public static Expression GetFuncOrActionExpressionOrDefault(Request request)
+        public static Expression GetFuncOrActionExpressionOrDefault(Request request, Factory serviceFactory = null)
         {
             var wrapperType = request.GetActualServiceType();
             var isAction = wrapperType == typeof(Action);
@@ -5032,7 +5032,9 @@ namespace DryIoc
                 request = request.WithInputArgs(argExprs);
             }
 
-            var serviceRequest = request.PushServiceType(serviceType, RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
+            var serviceRequest = request.PushServiceType(serviceType, 
+                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
+
             var container = request.Container;
             var serviceExpr = !isAction && container.Rules.FuncAndLazyWithoutRegistration
                 ? Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true)
@@ -5040,13 +5042,6 @@ namespace DryIoc
 
             if (serviceExpr == null)
                 return null;
-
-            // The conversion to handle lack of covariance for Func<out T> in .NET 3.5
-            // So that Func<Derived> may be used for Func<Base>
-            if (!isAction &&
-                serviceExpr.Type != serviceType && !serviceType.IsAssignableFrom(serviceExpr.Type))
-                serviceExpr = Convert(serviceExpr, serviceType);
-
             return Lambda(wrapperType, serviceExpr, argExprs, serviceType);
         }
 
