@@ -4793,7 +4793,7 @@ namespace DryIoc
                 new WrapperExpressionFactory(GetLazyExpressionOrDefault));
 
             wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
-                new ExpressionFactory(r => GetKeyValuePairExpressionOrDefault(r), setup: Setup.WrapperWith(1)));
+                new WrapperExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
 
             wrappers = wrappers.AddOrUpdate(typeof(Meta<,>),
                 new WrapperExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
@@ -4930,19 +4930,11 @@ namespace DryIoc
                 var itemInfo = ServiceInfo.Of(itemType, requiredItemType, IfUnresolved.ReturnDefaultIfNotRegistered, item.OptionalServiceKey);
                 var itemRequest = request.Push(itemInfo);
 
-                Factory factory;
-                if (itemType == requiredItemType)
-                {
-                    // We at least looking at the unwrapped type, so we may that type factory condition
-                    factory = itemRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(item.Factory);
-                }
-                else
-                {
-                    // We need to resolve the wrapper factory (the usual case with the required service different from the item service type)
-                    factory = container.ResolveFactory(itemRequest);
-                    // Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all available information
-                    itemRequest.SaveWrappedFactory(item.Factory);
-                }
+                // For the required service type (not a wrapper) we at least looking at the unwrapped type, so we may check that type factory condition,
+                // or going to resolve the nested wrapper and Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all available information
+                var factory = requiredItemType == itemType
+                    ? itemRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(item.Factory)
+                    : container.ResolveFactory(itemRequest.WithWrappedServiceFactory(item.Factory));
 
                 var itemExpr = factory?.GetExpressionOrDefault(itemRequest);
                 if (itemExpr != null)
@@ -5113,9 +5105,11 @@ namespace DryIoc
                 ? request.PushServiceType(serviceType)
                 : request.Push(serviceType, serviceKey);
 
-            if (serviceFactory == null) // todo: @wip is not used yet
-                serviceFactory = request.Container.ResolveFactory(serviceRequest);
-            var serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
+            var factory = serviceRequest.RequiredServiceType == serviceType
+                ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
+                : request.Container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceRequest.Factory));
+
+            var serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
                 return null;
 
@@ -5192,19 +5186,11 @@ namespace DryIoc
 
             var serviceRequest = request.Push(ServiceInfo.Of(serviceType, serviceKey));
 
-            Factory factory;
-            if (requiredServiceType == serviceType)
-            {
-                // We at least looking at the unwrapped type, so we may check that type factory condition
-                factory = serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory);
-            }
-            else
-            {
-                // Going to resolve the nested wrapper (the usual case when required is different from the service type)
-                factory = container.ResolveFactory(serviceRequest);
-                // Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all available information
-                serviceRequest.SaveWrappedFactory(serviceFactory);
-            }
+            // For the required service type (not a wrapper) we at least looking at the unwrapped type, so we may check that type factory condition,
+            // or going to resolve the nested wrapper and Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all available information
+            var factory = requiredServiceType == serviceType
+                ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
+                : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
 
             var serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
@@ -9120,7 +9106,11 @@ namespace DryIoc
         internal object _factoryOrImplType;
 
         /// <summary>Sets the service factory already resolved by the wrapper to save for the future factory resolution</summary>
-        public void SaveWrappedFactory(Factory f) => _factoryOrImplType = f;
+        public Request WithWrappedServiceFactory(Factory f) 
+        {
+            _factoryOrImplType = f;
+            return this;
+        }
 
         /// <summary>Service reuse.</summary>
         public IReuse Reuse { get; private set; }
