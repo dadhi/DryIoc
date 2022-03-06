@@ -5100,12 +5100,12 @@ namespace DryIoc
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request, Factory serviceFactory = null)
         {
-            var keyValueType = request.GetActualServiceType();
-            var typeArgs = keyValueType.GetGenericArguments();
-            var serviceKeyType = typeArgs[0];
+            var wrapperType = request.GetActualServiceType();
+            var typeArgs = wrapperType.GetGenericArguments();
+            var requiredServiceKeyType = typeArgs[0];
             var serviceKey = request.ServiceKey;
-            if (serviceKey == null && serviceKeyType.IsValueType ||
-                serviceKey != null && !serviceKeyType.IsTypeOf(serviceKey))
+            if (serviceKey == null && requiredServiceKeyType.IsValueType ||
+                serviceKey != null && !requiredServiceKeyType.IsAssignableFrom(serviceKey.GetType()))
                 return null;
 
             var serviceType = typeArgs[1];
@@ -5118,8 +5118,8 @@ namespace DryIoc
             if (serviceExpr == null)
                 return null;
 
-            var keyExpr = request.Container.GetConstantExpression(serviceKey, serviceKeyType);
-            return New(keyValueType.GetConstructors()[0], keyExpr, serviceExpr);
+            var keyExpr = request.Container.GetConstantExpression(serviceKey, requiredServiceKeyType);
+            return New(wrapperType.GetConstructors()[0], keyExpr, serviceExpr);
         }
 
         /// <summary>Discovers and combines service with its setup metadata.
@@ -9867,7 +9867,15 @@ namespace DryIoc
             var metadata = Metadata;
             if (metadataType != typeof(object) &&
                 metadata is IDictionary<string, object> metadataDict && metadataType != typeof(IDictionary<string, object>))
-                metadata = metadataDict.Values.FirstOrDefault(metadataType.IsTypeOf);
+            {
+                foreach (var kv in metadataDict)
+                {
+                    metadata = kv.Value;
+                    if (metadataType.IsTypeOf(metadata))
+                        return metadata;
+                }
+                return null;
+            }
             return metadata;
         }
 
@@ -14144,9 +14152,7 @@ namespace DryIoc
 
         /// <summary>Returns true if type of <paramref name="obj"/> is assignable to source <paramref name="type"/>.</summary>
         public static bool IsTypeOf(this Type type, object obj) =>
-            type != null && obj != null && type.IsAssignableFrom(obj.GetType());
-        // instead of using the CGAttribute, see the #451 for more details
-        //type.GetTypeInfo().IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false);
+            obj != null && type.IsAssignableFrom(obj.GetType());
 
         /// <summary>Returns true if provided type IsPrimitive in .Net terms, or enum, or string,
         /// or array of primitives if <paramref name="orArrayOfPrimitives"/> is true.</summary>
