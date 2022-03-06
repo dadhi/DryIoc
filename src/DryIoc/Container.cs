@@ -4790,16 +4790,16 @@ namespace DryIoc
                 new ExpressionFactory(r => GetLazyEnumerableExpressionOrDefault(r), setup: Setup.Wrapper));
 
             wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
-                new WrapperExpressionFactory(GetLazyExpressionOrDefault));
+                WrapperExpressionFactory.Of(GetLazyExpressionOrDefault));
 
             wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
-                new WrapperExpressionFactory(GetKeyValuePairExpressionOrDefault, setup: Setup.WrapperWith(1)));
+                WrapperExpressionFactory.Of(GetKeyValuePairExpressionOrDefault, Setup.WrapperWith(1)));
 
             wrappers = wrappers.AddOrUpdate(typeof(Meta<,>),
-                new WrapperExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
+                WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0)));
 
             wrappers = wrappers.AddOrUpdate(typeof(Tuple<,>),
-                new WrapperExpressionFactory(GetMetaExpressionOrDefault, setup: Setup.WrapperWith(0)));
+                WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0)));
 
             wrappers = wrappers.AddOrUpdate(typeof(System.Linq.Expressions.LambdaExpression),
                 new ExpressionFactory(r => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper));
@@ -4814,17 +4814,16 @@ namespace DryIoc
                 new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.WrapperWith(0)));
 
             wrappers = wrappers.AddOrUpdate(typeof(Func<>),
-                new WrapperExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.Wrapper));
+                WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.Wrapper));
 
             // Skip the `i == 0` because `Func<>` type was added above
             for (var i = 1; i < FuncTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(FuncTypes[i],
-                    new WrapperExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.WrapperWith(i)));
+                    WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.WrapperWith(i)));
 
             for (var i = 0; i < ActionTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(ActionTypes[i],
-                    new WrapperExpressionFactory(GetFuncOrActionExpressionOrDefault,
-                    setup: Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
+                    WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
 
             wrappers = wrappers.AddContainerInterfaces();
             return wrappers;
@@ -11875,20 +11874,45 @@ namespace DryIoc
 
     /// <summary>Creates service expression using client provided expression factory delegate.
     /// Important! that it may use the already resolved service factory unwrapped by the higher wrapper</summary>
-    public sealed class WrapperExpressionFactory : Factory
+    public class WrapperExpressionFactory : Factory
     {
+        /// <summary>Creates the factory out of provided delegate producing the expression based on the request</summary>
+        public static WrapperExpressionFactory Of(Func<Request, Factory, Expression> getServiceExpression) =>
+            new WrapperExpressionFactory(getServiceExpression);
+
+        /// <summary>Creates the factory out of provided delegate producing the expression based on the request, and the setup</summary>
+        public static WrapperExpressionFactory Of(Func<Request, Factory, Expression> getServiceExpression, Setup setup) =>
+            setup == null || setup == Setup.Wrapper
+                ? new WrapperExpressionFactory(getServiceExpression)
+                : new WrapperExpressionFactoryWithSetup(getServiceExpression, setup);
+
+        /// <summary>Creates the factory out of provided delegate producing the expression based on the request, and the setup and/or setup</summary>
+        public static WrapperExpressionFactory Of(Func<Request, Factory, Expression> getServiceExpression, IReuse reuse, Setup setup = null) =>
+            reuse == null
+                ? Of(getServiceExpression, setup)
+                : new WrapperExpressionFactoryWithReuseAndSetup(getServiceExpression, reuse, setup ?? Setup.Wrapper);
+
         /// <inheritdoc/>
-        public override IReuse Reuse { get; } // todo: @perf split
-        /// <inheritdoc/>
-        public override Setup Setup { get; } // todo: @perf split
+        public override Setup Setup => Setup.Wrapper;
+
         private readonly Func<Request, Factory, Expression> _getServiceExpression;
 
         /// <summary>Constructor</summary>
-        public WrapperExpressionFactory(Func<Request, Factory, Expression> getServiceExpression, IReuse reuse = null, Setup setup = null)
-        {
+        private WrapperExpressionFactory(Func<Request, Factory, Expression> getServiceExpression) =>
             _getServiceExpression = getServiceExpression;
-            Reuse = reuse;
-            Setup = setup ?? Setup.Wrapper;
+
+        private class WrapperExpressionFactoryWithSetup : WrapperExpressionFactory
+        {
+            public override Setup Setup { get; }
+            public WrapperExpressionFactoryWithSetup(Func<Request, Factory, Expression> getServiceExpression, Setup setup)
+                : base(getServiceExpression) => Setup = setup;
+        }
+
+        private class WrapperExpressionFactoryWithReuseAndSetup : WrapperExpressionFactoryWithSetup
+        {
+            public override IReuse Reuse { get; }
+            public WrapperExpressionFactoryWithReuseAndSetup(Func<Request, Factory, Expression> getServiceExpression, IReuse reuse, Setup setup)
+                : base(getServiceExpression, setup) => Reuse = reuse;
         }
 
         /// <inheritdoc/>

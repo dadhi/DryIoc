@@ -137,11 +137,10 @@ namespace DryIoc.MefAttributedModel
                 setup: Setup.WrapperWith(0));
 
             container.Register(typeof(Lazy<,>),
-                new WrapperExpressionFactory(GetLazyMetadataExpressionOrDefault, setup: Setup.WrapperWith(0)));
+                WrapperExpressionFactory.Of(GetLazyMetadataExpressionOrDefault, Setup.WrapperWith(0)));
 
             container.Register(typeof(Lazy<>),
-                new WrapperExpressionFactory(WrappersSupport.GetLazyExpressionOrDefault),
-                IfAlreadyRegistered.Replace);
+                WrapperExpressionFactory.Of(WrappersSupport.GetLazyExpressionOrDefault), IfAlreadyRegistered.Replace);
 
             return container;
         }
