@@ -4819,11 +4819,11 @@ namespace DryIoc
             // Skip the `i == 0` because `Func<>` type was added above
             for (var i = 1; i < FuncTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(FuncTypes[i],
-                    new ExpressionFactory(r => GetFuncOrActionExpressionOrDefault(r), setup: Setup.WrapperWith(i)));
+                    new WrapperExpressionFactory(GetFuncOrActionExpressionOrDefault, setup: Setup.WrapperWith(i)));
 
             for (var i = 0; i < ActionTypes.Length; i++)
                 wrappers = wrappers.AddOrUpdate(ActionTypes[i],
-                    new ExpressionFactory(r => GetFuncOrActionExpressionOrDefault(r),
+                    new WrapperExpressionFactory(GetFuncOrActionExpressionOrDefault,
                     setup: Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
 
             wrappers = wrappers.AddContainerInterfaces();
@@ -5032,16 +5032,29 @@ namespace DryIoc
                 request = request.WithInputArgs(argExprs);
             }
 
-            var serviceRequest = request.PushServiceType(serviceType, 
+            var serviceRequest = request.PushServiceType(serviceType,
                 RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
 
             var container = request.Container;
-            var serviceExpr = !isAction && container.Rules.FuncAndLazyWithoutRegistration
-                ? Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true)
-                : container.ResolveFactory(serviceRequest)?.GetExpressionOrDefault(serviceRequest);
-
-            if (serviceExpr == null)
-                return null;
+            Expression serviceExpr;
+            if (!isAction && container.Rules.FuncAndLazyWithoutRegistration)
+                serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
+            else
+            {
+                Factory factory;
+                if (serviceFactory == null)
+                    factory = container.ResolveFactory(serviceRequest);
+                else
+                {
+                    var requiredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
+                    factory = requiredServiceType == serviceType
+                        ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
+                        : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
+                }
+                serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
+                if (serviceExpr == null)
+                    return null;
+            }
             return Lambda(wrapperType, serviceExpr, argExprs, serviceType);
         }
 
@@ -5100,9 +5113,17 @@ namespace DryIoc
                 ? request.PushServiceType(serviceType)
                 : request.Push(serviceType, serviceKey);
 
-            var factory = serviceRequest.RequiredServiceType == serviceType
-                ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
-                : request.Container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceRequest.Factory));
+            var container = request.Container;
+            Factory factory;
+            if (serviceFactory == null)
+                factory = container.ResolveFactory(serviceRequest);
+            else
+            {
+                var requiredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
+                factory = requiredServiceType == serviceType
+                    ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
+                    : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
+            }
 
             var serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
@@ -9101,7 +9122,7 @@ namespace DryIoc
         internal object _factoryOrImplType;
 
         /// <summary>Sets the service factory already resolved by the wrapper to save for the future factory resolution</summary>
-        public Request WithWrappedServiceFactory(Factory f) 
+        public Request WithWrappedServiceFactory(Factory f)
         {
             _factoryOrImplType = f;
             return this;
@@ -10456,8 +10477,8 @@ namespace DryIoc
             }
 
             // At last, create the object graph with all of the dependencies created and injected
-            serviceExpr = serviceFactory == null 
-                ? CreateExpressionOrDefault(request) 
+            serviceExpr = serviceFactory == null
+                ? CreateExpressionOrDefault(request)
                 : CreateExpressionWithWrappedFactory(request, serviceFactory);
 
             if (serviceExpr == null)
@@ -13398,6 +13419,11 @@ namespace DryIoc
         /// <returns>Unwrapped service type in case it corresponds to registered generic wrapper, or input type in all other cases.</returns>
         Type GetWrappedType(Type serviceType, Type requiredServiceType);
 
+        /// <summary>If <paramref name="serviceType"/> is generic type then this method checks if the type registered as generic wrapper,
+        /// and recursively unwraps and returns its type argument. This type argument is the actual service type we want to find.
+        /// Otherwise, method returns the input <paramref name="serviceType"/>.</summary>
+        Type GetWrappedType(Type serviceType);
+
         /// <summary>Converts known items into custom expression or wraps in a constant expression.</summary>
         /// <param name="item">Item to convert.</param>
         /// <param name="itemType">(optional) Type of item, otherwise item <see cref="object.GetType()"/>.</param>
@@ -13405,11 +13431,6 @@ namespace DryIoc
         /// identifying that result expression require run-time state. For compiled expression it means closure in lambda delegate.</param>
         /// <returns>Returns constant or state access expression for added items.</returns>
         Expression GetConstantExpression(object item, Type itemType = null, bool throwIfStateRequired = false);
-
-        /// <summary>If <paramref name="serviceType"/> is generic type then this method checks if the type registered as generic wrapper,
-        /// and recursively unwraps and returns its type argument. This type argument is the actual service type we want to find.
-        /// Otherwise, method returns the input <paramref name="serviceType"/>.</summary>
-        Type GetWrappedType(Type serviceType);
 
         /// <summary>Clears cache for specified service(s). But does not clear instances of already resolved/created singletons and scoped services!</summary>
         /// <param name="serviceType">Target service type.</param>
