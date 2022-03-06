@@ -96,7 +96,9 @@ namespace DryIoc.FastExpressionCompiler
         /// <summary>Goto of the Return kind from the TryCatch is not supported</summary>
         Try_GotoReturnToTheFollowupLabel,
         /// <summary>Not supported assignment target</summary>
-        Assign_Target
+        Assign_Target,
+        /// <summary> ExpressionType.TypeEqual is not supported </summary>
+        TypeEqual
     }
 
     /// <summary>FEC Not Supported exception</summary>
@@ -140,21 +142,30 @@ namespace DryIoc.FastExpressionCompiler
 #endif
                 lambdaExpr.ReturnType, flags) ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys()));
 
-        /// Compiles a static method to the passed IL Generator.
+        /// <summary>Compiles a static method to the passed IL Generator.
         /// Could be used as alternative for `CompileToMethod` like this <code><![CDATA[funcExpr.CompileFastToIL(methodBuilder.GetILGenerator())]]></code>.
-        /// Check `IssueTests.Issue179_Add_something_like_LambdaExpression_CompileToMethod.cs` for example.
-        public static bool CompileFastToIL(this LambdaExpression lambdaExpr, ILGenerator il, bool ifFastFailedReturnNull = false, 
-            CompilerFlags flags = CompilerFlags.Default)
+        /// Check `IssueTests.Issue179_Add_something_like_LambdaExpression_CompileToMethod.cs` for example.</summary>
+        public static bool CompileFastToIL(this LambdaExpression lambdaExpr, ILGenerator il, CompilerFlags flags = CompilerFlags.Default)
         {
-            var closureInfo = new ClosureInfo(ClosureStatus.ShouldBeStaticMethod);
+            if ((flags & CompilerFlags.EnableDelegateDebugInfo) != 0)
+                throw new NotSupportedException("The `CompilerFlags.EnableDelegateDebugInfo` is not supported because the debug info is gathered into the closure object which is not allowed for static lambda to be compiled to method.");
 
-            if (!EmittingVisitor.TryEmit(lambdaExpr.Body, 
 #if LIGHT_EXPRESSION
-                lambdaExpr,
+            var paramExprs = lambdaExpr;
 #else
-                lambdaExpr.Parameters, 
+            var paramExprs = lambdaExpr.Parameters;
 #endif
-                il, ref closureInfo, flags, lambdaExpr.ReturnType == typeof(void) ? ParentFlags.IgnoreResult : ParentFlags.Empty))
+            var bodyExpr = lambdaExpr.Body;
+
+            var closureInfo = new ClosureInfo(ClosureStatus.ShouldBeStaticMethod);
+            if (!TryCollectBoundConstants(ref closureInfo, bodyExpr, paramExprs, false, ref closureInfo, flags))
+                return false;
+
+            if ((closureInfo.Status & ClosureStatus.HasClosure) != 0)
+                return false;
+
+            var parent = lambdaExpr.ReturnType == typeof(void) ? ParentFlags.IgnoreResult : ParentFlags.Empty;
+            if (!EmittingVisitor.TryEmit(bodyExpr, paramExprs, il, ref closureInfo, flags, parent))
                 return false;
 
             il.Emit(OpCodes.Ret);
@@ -1820,7 +1831,7 @@ namespace DryIoc.FastExpressionCompiler
                             }
 
                             return TryEmitConstantOfNotNullValue(closure.ContainsConstantsOrNestedLambdas(),
-                                constExpr.Type, constExpr.Value, il, ref closure);
+                                constExpr.Type, constExpr.Value, il, ref closure, byRefIndex);
 
                         case ExpressionType.Call:
                             return TryEmitMethodCall(expr, paramExprs, il, ref closure, setup, parent);
@@ -1856,8 +1867,7 @@ namespace DryIoc.FastExpressionCompiler
                         case ExpressionType.Equal:
                         case ExpressionType.NotEqual:
                             var binaryExpr = (BinaryExpression)expr;
-                            return TryEmitComparison(binaryExpr.Left, binaryExpr.Right, binaryExpr.NodeType,
-                                paramExprs, il, ref closure, setup, parent);
+                            return TryEmitComparison(binaryExpr.Left, binaryExpr.Right, binaryExpr.NodeType, expr.Type, paramExprs, il, ref closure, setup, parent);
 
                         case ExpressionType.Add:
                         case ExpressionType.AddChecked:
@@ -2694,15 +2704,20 @@ namespace DryIoc.FastExpressionCompiler
                     return false;
 
                 if ((parent & ParentFlags.IgnoreResult) != 0)
-                    il.Emit(OpCodes.Pop);
-                else
+                    return true;
+                else if (expr.NodeType == ExpressionType.TypeIs)
                 {
                     il.Emit(OpCodes.Isinst, expr.TypeOperand);
                     il.Emit(OpCodes.Ldnull);
                     il.Emit(OpCodes.Cgt_Un);
+                    return true;
                 }
-
-                return true;
+                else
+                {
+                    if ((setup & CompilerFlags.ThrowOnNotSupportedExpression) != 0)
+                        throw new NotSupportedExpressionException(NotSupported.TypeEqual);
+                    return false;
+                }
             }
 
 #if LIGHT_EXPRESSION
@@ -2717,15 +2732,13 @@ namespace DryIoc.FastExpressionCompiler
                 if (expr.Operand.NodeType == ExpressionType.Equal) 
                 {
                     var equalExpr = (BinaryExpression)expr.Operand;
-                    if (!TryEmitComparison(equalExpr.Left, equalExpr.Right, ExpressionType.NotEqual,
-                        paramExprs, il, ref closure, setup, parent))
-                        return false;
-                    return true;
+                    return TryEmitComparison(equalExpr.Left, equalExpr.Right, ExpressionType.NotEqual, equalExpr.Type, paramExprs, il, ref closure, setup, parent);
                 }
 
                 if (!TryEmit(expr.Operand, paramExprs, il, ref closure, setup, parent))
                     return false;
-                if ((parent & ParentFlags.IgnoreResult) > 0)
+
+                if ((parent & ParentFlags.IgnoreResult) != 0)
                     il.Emit(OpCodes.Pop);
                 else
                 {
@@ -2765,6 +2778,12 @@ namespace DryIoc.FastExpressionCompiler
                 var sourceTypeIsNullable = sourceType.IsNullable();
                 var underlyingNullableSourceType = Nullable.GetUnderlyingType(sourceType);
                 var targetType = expr.Type;
+
+                if (targetType.IsAssignableFrom(sourceType) && (parent & ParentFlags.IgnoreResult) != 0)
+                {
+                    // quick path for ignored result & conversion which can't cause exception: just do nothing
+                    return TryEmit(opExpr, paramExprs, il, ref closure, setup, parent);
+                }
 
                 if (sourceTypeIsNullable && targetType == underlyingNullableSourceType)
                 {
@@ -2816,9 +2835,7 @@ namespace DryIoc.FastExpressionCompiler
                     if (method != null && method.DeclaringType == targetType && method.GetParameters()[0].ParameterType == sourceType)
                     {
                         il.Emit(OpCodes.Call, method);
-                        if ((parent & ParentFlags.IgnoreResult) != 0)
-                            il.Emit(OpCodes.Pop);
-                        return true;
+                        return il.EmitPopIfIgnoreResult(parent);
                     }
 
                     var actualSourceType = sourceTypeIsNullable ? underlyingNullableSourceType : sourceType;
@@ -2972,7 +2989,7 @@ namespace DryIoc.FastExpressionCompiler
             }
 
             private static bool TryEmitConstantOfNotNullValue(
-                bool considerClosure, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure)
+                bool considerClosure, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1)
             {
                 var constValueType = constantValue.GetType();
                 if (considerClosure && IsClosureBoundConstant(constantValue, constValueType))
@@ -2993,9 +3010,19 @@ namespace DryIoc.FastExpressionCompiler
                         EmitLoadConstantInt(il, constIndex);
                         il.Emit(OpCodes.Ldelem_Ref);
                         if (exprType.IsValueType)
+                        {
                             il.Emit(OpCodes.Unbox_Any, exprType);
-                        else // todo: @perf it is probably required only for Full CLR starting from NET45, e.g. `Test_283_Case6_MappingSchemaTests_CultureInfo_VerificationException`
+                            if (byRefIndex != -1)
+                                EmitStoreAndLoadLocalVariableAddress(il, exprType);
+                        }
+                        else
+                        {
+                            // this is probably required only for Full CLR starting from NET45, e.g. `Test_283_Case6_MappingSchemaTests_CultureInfo_VerificationException`
+                            // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
+#if NETFRAMEWORK
                             il.Emit(OpCodes.Castclass, exprType);
+#endif
+                        }
                     }
                 }
                 else
@@ -3012,10 +3039,6 @@ namespace DryIoc.FastExpressionCompiler
                         il.Emit(OpCodes.Call, _getTypeFromHandleMethod);
                         return true;
                     }
-
-                    // get raw enum type to light
-                    if (constValueType.IsEnum)
-                        constValueType = Enum.GetUnderlyingType(constValueType);
 
                     if (!TryEmitNumberConstant(il, constantValue, constValueType))
                         return false;
@@ -3035,9 +3058,17 @@ namespace DryIoc.FastExpressionCompiler
             // todo: @perf can we do something about boxing?
             private static bool TryEmitNumberConstant(ILGenerator il, object constantValue, Type constValueType)
             {
+                if (constValueType.IsEnum)
+                    constValueType = Enum.GetUnderlyingType(constValueType);
+
+                // more "commonly" used constants are higher in comparison
                 if (constValueType == typeof(int))
                 {
                     EmitLoadConstantInt(il, (int)constantValue);
+                }
+                else if (constValueType == typeof(bool))
+                {
+                    il.Emit((bool)constantValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
                 }
                 else if (constValueType == typeof(char))
                 {
@@ -3084,10 +3115,6 @@ namespace DryIoc.FastExpressionCompiler
                 else if (constValueType == typeof(double))
                 {
                     il.Emit(OpCodes.Ldc_R8, (double)constantValue);
-                }
-                else if (constValueType == typeof(bool))
-                {
-                    il.Emit((bool)constantValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
                 }
                 else if (constValueType == typeof(IntPtr))
                 {
@@ -3175,12 +3202,12 @@ namespace DryIoc.FastExpressionCompiler
                 var nestedLambdas = closure.NestedLambdas;
                 for (var i = 0; i < nestedLambdas.Length; i++)
                 {
-                    var nestedLambda = nestedLambdas[i];
                     il.Emit(OpCodes.Ldloc_0);// SHOULD BE always at 0 locaton; load array field variable on the stack
                     EmitLoadConstantInt(il, constCount + i);
                     il.Emit(OpCodes.Ldelem_Ref);
                     
                     // store the nested lambda in the local variable 
+                    var nestedLambda = nestedLambdas[i];
                     varIndex = il.GetNextLocalVarIndex(nestedLambda.Lambda.GetType());
                     nestedLambda.LambdaVarIndex = varIndex; // save the var index
                     EmitStoreLocalVariable(il, varIndex);
@@ -3243,6 +3270,7 @@ namespace DryIoc.FastExpressionCompiler
                 return null;
             });
 
+            // todo: @perf merge with EmitLoadLocalVariable 
             private static int InitValueTypeVariable(ILGenerator il, Type exprType)
             {
                 var locVarIndex = il.GetNextLocalVarIndex(exprType);
@@ -3332,17 +3360,46 @@ namespace DryIoc.FastExpressionCompiler
                 return true;
             }
 
-            private static bool TryEmitArrayIndex(Type exprType, ILGenerator il, ParentFlags parent, ref ClosureInfo closure)
+            private static bool TryEmitArrayIndex(Type type, ILGenerator il, ParentFlags parent, ref ClosureInfo closure)
             {
-                if (!exprType.IsValueType)
-                    il.Emit(OpCodes.Ldelem_Ref);
-                else if ((parent & (ParentFlags.MemberAccess | ParentFlags.Call)) == 0)
-                    il.Emit(OpCodes.Ldelem, exprType);
-                else
+                if (!type.IsValueType)
                 {
-                    il.Emit(OpCodes.Ldelema, exprType);
-                    closure.LastEmitIsAddress = true;
+                    il.Emit(OpCodes.Ldelem_Ref);
+                    return true;
                 }
+
+                // access the value type by address when it is used later for the member access or as instance in the method call
+                if ((parent & (ParentFlags.MemberAccess | ParentFlags.InstanceAccess)) != 0)
+                {
+                    il.Emit(OpCodes.Ldelema, type);
+                    closure.LastEmitIsAddress = true;
+                    return true;
+                }
+
+                if (type == typeof(Int32))
+                    il.Emit(OpCodes.Ldelem_I4);
+                else if (type == typeof(Int64))
+                    il.Emit(OpCodes.Ldelem_I8);
+                else if (type == typeof(Int16))
+                    il.Emit(OpCodes.Ldelem_I2);
+                else if (type == typeof(SByte))
+                    il.Emit(OpCodes.Ldelem_I1);
+                else if (type == typeof(Single))
+                    il.Emit(OpCodes.Ldelem_R4);
+                else if (type == typeof(Double))
+                    il.Emit(OpCodes.Ldelem_R8);
+                else if (type == typeof(IntPtr))
+                    il.Emit(OpCodes.Ldelem_I);
+                else if (type == typeof(UIntPtr))
+                    il.Emit(OpCodes.Ldelem_I);
+                else if (type == typeof(Byte))
+                    il.Emit(OpCodes.Ldelem_U1);
+                else if (type == typeof(UInt16))
+                    il.Emit(OpCodes.Ldelem_U2);
+                else if (type == typeof(UInt32))
+                    il.Emit(OpCodes.Ldelem_U4);
+                else
+                    il.Emit(OpCodes.Ldelem, type);
                 return true;
             }
 
@@ -3917,10 +3974,30 @@ namespace DryIoc.FastExpressionCompiler
 
                 if (indexExpr.Arguments.Count == 1) // one dimensional array
                 {
-                    if (elementType.IsValueType)
-                        il.Emit(OpCodes.Stelem, elementType);
-                    else
+                    if (!elementType.IsValueType)
+                    {
                         il.Emit(OpCodes.Stelem_Ref);
+                        return true;
+                    }
+
+                    if (elementType == typeof(Int32))
+                        il.Emit(OpCodes.Stelem_I4);
+                    else if (elementType == typeof(Int64))
+                        il.Emit(OpCodes.Stelem_I8);
+                    else if (elementType == typeof(Int16))
+                        il.Emit(OpCodes.Stelem_I2);
+                    else if (elementType == typeof(SByte))
+                        il.Emit(OpCodes.Stelem_I1);
+                    else if (elementType == typeof(Single))
+                        il.Emit(OpCodes.Stelem_R4);
+                    else if (elementType == typeof(Double))
+                        il.Emit(OpCodes.Stelem_R8);
+                    else if (elementType == typeof(IntPtr))
+                        il.Emit(OpCodes.Stelem_I);
+                    else if (elementType == typeof(UIntPtr))
+                        il.Emit(OpCodes.Stelem_I);
+                    else
+                        il.Emit(OpCodes.Stelem, elementType);
                     return true;
                 }
 
@@ -4037,14 +4114,14 @@ namespace DryIoc.FastExpressionCompiler
                         if ((parent & ParentFlags.DupMemberOwner) != 0)
                             il.Emit(OpCodes.Dup);
 
-                        var isByAddress = false;
+                        var isByAddress = byRefIndex != -1;
                         if (field.FieldType.IsValueType) 
                         {
                             if ((parent & ParentFlags.InstanceAccess) != 0 &&
                                 (parent & ParentFlags.IndexAccess)    == 0) // #302 - if the field is used as an index
                                 isByAddress = true;
                             // #248 indicates that expression is argument passed by ref
-                            // todo: Maybe introduce ParentFlags.Argument
+                            // todo: @improve Maybe introduce ParentFlags.Argument
                             else if ((parent & ParentFlags.Call) != 0 && byRefIndex != -1)
                                 isByAddress = true;
                         }
@@ -4188,11 +4265,20 @@ namespace DryIoc.FastExpressionCompiler
                 // - call `Curry` method with nested lambda and array closure to produce a closed lambda with the expected signature
                 var lambdaTypeArgs = nestedLambda.GetType().GetTypeInfo().GenericTypeArguments;
 
-                var closureMethod = nestedLambdaInfo.LambdaExpression.ReturnType == typeof(void)
+                var nestedLambdaExpr = nestedLambdaInfo.LambdaExpression;
+                var closureMethod = nestedLambdaExpr.ReturnType == typeof(void)
                     ? CurryClosureActions.Methods[lambdaTypeArgs.Length - 1].MakeGenericMethod(lambdaTypeArgs)
                     : CurryClosureFuncs  .Methods[lambdaTypeArgs.Length - 2].MakeGenericMethod(lambdaTypeArgs);
 
                 EmitMethodCall(il, closureMethod);
+
+                // converting to the original possibly custom delegate type, see #308
+                if (closureMethod.ReturnType != nestedLambdaExpr.Type)
+                {
+                    il.Emit(OpCodes.Ldftn, closureMethod.ReturnType.FindDelegateInvokeMethod());
+                    il.Emit(OpCodes.Newobj, nestedLambdaExpr.Type.GetConstructors()[0]);
+                }
+
                 return true;
             }
 
@@ -4308,19 +4394,20 @@ namespace DryIoc.FastExpressionCompiler
                 //- if switch SwitchValue is a nullable parameter, we should call getValue only once and store the result.
                 //- use comparison methods (when defined)
 
-                var cases = expr.Cases;
                 var endLabel = il.DefineLabel();
+                var cases = expr.Cases;
                 var labels = new Label[cases.Count];
-                for (var index = 0; index < cases.Count; index++)
+                var dontIgnoreTestResult = parent & ~ParentFlags.IgnoreResult;
+                for (var caseIndex = 0; caseIndex < cases.Count; ++caseIndex)
                 {
-                    var switchCase = cases[index];
-                    labels[index] = il.DefineLabel();
+                    var cs = cases[caseIndex];
+                    labels[caseIndex] = il.DefineLabel();
 
-                    foreach (var switchCaseTestValue in switchCase.TestValues)
+                    foreach (var caseTestValue in cs.TestValues)
                     {
-                        if (!TryEmitComparison(expr.SwitchValue, switchCaseTestValue, ExpressionType.Equal, paramExprs, il, ref closure, setup, parent))
+                        if (!TryEmitComparison(expr.SwitchValue, caseTestValue, ExpressionType.Equal, typeof(bool), paramExprs, il, ref closure, setup, dontIgnoreTestResult))
                             return false;
-                        il.Emit(OpCodes.Brtrue, labels[index]);
+                        il.Emit(OpCodes.Brtrue, labels[caseIndex]);
                     }
                 }
 
@@ -4331,23 +4418,22 @@ namespace DryIoc.FastExpressionCompiler
                     il.Emit(OpCodes.Br, endLabel);
                 }
 
-                for (var index = 0; index < cases.Count; ++index)
+                for (var caseIndex = 0; caseIndex < cases.Count; ++caseIndex)
                 {
-                    var switchCase = cases[index];
-                    il.MarkLabel(labels[index]);
-                    if (!TryEmit(switchCase.Body, paramExprs, il, ref closure, setup, parent))
+                    il.MarkLabel(labels[caseIndex]);
+                    var cs = cases[caseIndex];
+                    if (!TryEmit(cs.Body, paramExprs, il, ref closure, setup, parent))
                         return false;
 
-                    if (index != cases.Count - 1)
+                    if (caseIndex != cases.Count - 1)
                         il.Emit(OpCodes.Br, endLabel);
                 }
 
                 il.MarkLabel(endLabel);
-
                 return true;
             }
 
-            private static bool TryEmitComparison(Expression exprLeft, Expression exprRight, ExpressionType expressionType, 
+            private static bool TryEmitComparison(Expression exprLeft, Expression exprRight, ExpressionType expressionType, Type exprType, 
 #if LIGHT_EXPRESSION
                 IParameterProvider paramExprs,
 #else
@@ -4365,8 +4451,8 @@ namespace DryIoc.FastExpressionCompiler
                 }
 
                 int lVarIndex = -1, rVarIndex = -1;
-                if (!TryEmit(exprLeft, paramExprs, il, ref closure, setup, 
-                    parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess))
+                var operandParent = parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess;
+                if (!TryEmit(exprLeft, paramExprs, il, ref closure, setup, operandParent))
                     return false;
 
                 if (leftIsNullable)
@@ -4376,8 +4462,7 @@ namespace DryIoc.FastExpressionCompiler
                     leftOpType = Nullable.GetUnderlyingType(leftOpType);
                 }
 
-                if (!TryEmit(exprRight, paramExprs, il, ref closure, setup, 
-                    parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess))
+                if (!TryEmit(exprRight, paramExprs, il, ref closure, setup, operandParent))
                     return false;
 
                 if (leftOpType != rightOpType)
@@ -4508,9 +4593,18 @@ namespace DryIoc.FastExpressionCompiler
                     EmitLoadLocalVariableAddress(il, lVarIndex);
                     EmitMethodCall(il, leftNullableHasValueGetterMethod);
 
+                    var isLiftedToNull = exprType == typeof(bool?);
+                    var leftHasValueVar = -1;
+                    if (isLiftedToNull)
+                        EmitStoreAndLoadLocalVariable(il, leftHasValueVar = il.GetNextLocalVarIndex(typeof(bool)));
+
                     // ReSharper disable once AssignNullToNotNullAttribute
                     EmitLoadLocalVariableAddress(il, rVarIndex);
                     EmitMethodCall(il, leftNullableHasValueGetterMethod);
+
+                    var rightHasValueVar = -1;
+                    if (isLiftedToNull)
+                        EmitStoreAndLoadLocalVariable(il, rightHasValueVar = il.GetNextLocalVarIndex(typeof(bool)));
 
                     switch (expressionType)
                     {
@@ -4538,6 +4632,20 @@ namespace DryIoc.FastExpressionCompiler
 
                         default:
                             return false;
+                    }
+
+                    if (isLiftedToNull)
+                    {
+                        var resultLabel = il.DefineLabel();
+                        var isNullLabel = il.DefineLabel();
+                        EmitLoadLocalVariable(il, leftHasValueVar);
+                        il.Emit(OpCodes.Brfalse, isNullLabel);
+                        EmitLoadLocalVariable(il, rightHasValueVar);
+                        il.Emit(OpCodes.Brtrue, resultLabel);
+                        il.MarkLabel(isNullLabel);
+                        il.Emit(OpCodes.Pop);
+                        il.Emit(OpCodes.Ldnull);
+                        il.MarkLabel(resultLabel);
                     }
                 }
 
@@ -4618,7 +4726,7 @@ namespace DryIoc.FastExpressionCompiler
                         EmitLoadLocalVariable(il, InitValueTypeVariable(il, exprType));
                         il.Emit(OpCodes.Br_S, endL);
                         il.MarkLabel(valueLabel);
-                        il.Emit(OpCodes.Newobj, exprType.GetTypeInfo().DeclaredConstructors.GetFirst());
+                        il.Emit(OpCodes.Newobj, exprType.GetConstructors()[0]);
                         il.MarkLabel(endL);
                     }
                     else
@@ -4661,17 +4769,7 @@ namespace DryIoc.FastExpressionCompiler
                         }
                         else
                         {
-                            var methodName
-                                = exprNodeType == ExpressionType.Add ?             "op_Addition"
-                                : exprNodeType == ExpressionType.AddChecked ?      "op_Addition"
-                                : exprNodeType == ExpressionType.Subtract ?        "op_Subtraction"
-                                : exprNodeType == ExpressionType.SubtractChecked ? "op_Subtraction"
-                                : exprNodeType == ExpressionType.Multiply ?        "op_Multiply"
-                                : exprNodeType == ExpressionType.MultiplyChecked ? "op_Multiply"
-                                : exprNodeType == ExpressionType.Divide ?          "op_Division"
-                                : exprNodeType == ExpressionType.Modulo ?          "op_Modulus"
-                                : null;
-
+                            var methodName = exprNodeType.GetArithmeticBinaryOperatorMethodName();
                             if (methodName != null)
                             {
                                 var methods = exprType.GetMethods();
@@ -5090,16 +5188,59 @@ namespace DryIoc.FastExpressionCompiler
             [MethodImpl((MethodImplOptions)256)]
             private static int EmitStoreAndLoadLocalVariableAddress(ILGenerator il, Type type)
             {
+// #if DEBUG
+                // var ilLengthField = typeof(ILGenerator).GetField("m_length", BindingFlags.Instance | BindingFlags.NonPublic);
+                // var ilStreamField = typeof(ILGenerator).GetField("m_ILStream", BindingFlags.Instance | BindingFlags.NonPublic);
+                // var ilLength = (int)ilLengthField.GetValue(il);
+                // var ilStream = (byte[])ilStreamField.GetValue(il);
+
+                // var ilMaxMidStackField    = typeof(ILGenerator).GetField("m_maxMidStack", BindingFlags.Instance | BindingFlags.NonPublic);
+                // var ilMaxMidStackCurField = typeof(ILGenerator).GetField("m_maxMidStackCur", BindingFlags.Instance | BindingFlags.NonPublic);
+                // var ilMaxMidStack    = (int)ilMaxMidStackField.GetValue(il);
+                // var ilMaxMidStackCur = (int)ilMaxMidStackCurField.GetValue(il);
+// #endif
                 var location = il.GetNextLocalVarIndex(type);
                 if (location == 0)
                 {
+                    // todo: @perf
+                    // the indernal code for this is
+                    //
+                    // EnsureCapacity(3);
+                    // InternalEmit(opcode);
+                    // EnsureCapacity(4);
+                    // InternalEmit(opcode);
+                    // m_ILStream[m_length++] = (byte)arg;
+                    //
+                    // which translates to -> 
+                    //
+                    // if (m_length + 7 >= m_ILStream.Length)
+                    //     IncreaseCapacity(7);
+                    // // No stack change here cause 1st op decrease stack by 1 and second increase by 1
+                    // m_ILStream[m_length++] = (byte)OpCodes.Stloc_0.Value;
+                    // m_ILStream[m_length++] = (byte)OpCodes.Ldloca_S.Value;
+                    // m_ILStream[m_length++] = (byte)0; // we may no need it 
+                    //
                     il.Emit(OpCodes.Stloc_0);
                     il.Emit(OpCodes.Ldloca_S, (byte)0);
                 }
                 else if (location == 1)
                 {
+                    // todo: @perf we may intriduce the EmitOne, EmitBatchNonStackModified(OpCode store, OpCode load, byte value), etc. method overloads 
+                    // 
+                    // if (ilLength + 7 < ilStream.Length)
+                    // {
+                    //     ilStream[ilLength++] = (byte)OpCodes.Stloc_1.Value;
+                    //     if (ilMaxMidStackCur + 1 > ilMaxMidStack)
+                    //         ilMaxMidStackField.SetValue(il, ilMaxMidStackCur + 1);
+                    //     ilStream[ilLength++] = (byte)OpCodes.Ldloca_S.Value;
+                    //     ilStream[ilLength++] = (byte)1;
+                    //     ilLengthField.SetValue(il, ilLength);
+                    // }
+                    // else
+                    // {
                     il.Emit(OpCodes.Stloc_1);
                     il.Emit(OpCodes.Ldloca_S, (byte)1);
+                    // }
                 }
                 else if (location == 2)
                 {
@@ -5165,6 +5306,20 @@ namespace DryIoc.FastExpressionCompiler
 
         internal static bool IsNullable(this Type type) =>
             type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+
+        public static string GetArithmeticBinaryOperatorMethodName(this ExpressionType nodeType) =>
+            nodeType switch 
+            {
+                ExpressionType.Add =>             "op_Addition",
+                ExpressionType.AddChecked =>      "op_Addition",
+                ExpressionType.Subtract =>        "op_Subtraction",
+                ExpressionType.SubtractChecked => "op_Subtraction",
+                ExpressionType.Multiply =>        "op_Multiply",
+                ExpressionType.MultiplyChecked => "op_Multiply",
+                ExpressionType.Divide =>          "op_Division",
+                ExpressionType.Modulo =>          "op_Modulus",
+                _ => null
+            };
 
         internal static MethodInfo FindMethod(this Type type, string methodName)
         {
@@ -5532,9 +5687,12 @@ namespace DryIoc.FastExpressionCompiler
             lts = new List<LabelTarget>();
             sb = expr.CreateExpressionString(sb, paramsExprs, uniqueExprs, lts, 2, stripNamespace, printType, identSpaces, tryPrintConstant).Append(';');
             
-            sb.Insert(0, $"var l = new LabelTarget[{lts.Count}]; // the labels {NewLine}");
-            sb.Insert(0, $"var e = new Expression[{uniqueExprs.Count}]; // the unique expressions {NewLine}");
-            sb.Insert(0, $"var p = new ParameterExpression[{paramsExprs.Count}]; // the parameter expressions {NewLine}");
+            if (lts.Count > 0)
+                sb.Insert(0, $"var l = new LabelTarget[{lts.Count}]; // the labels{NewLine}");
+            if (uniqueExprs.Count > 0)
+                sb.Insert(0, $"var e = new Expression[{uniqueExprs.Count}]; // the unique expressions{NewLine}");
+            if (paramsExprs.Count > 0)
+                sb.Insert(0, $"var p = new ParameterExpression[{paramsExprs.Count}]; // the parameter expressions{NewLine}");
 
             return sb.ToString();
         }
@@ -5724,21 +5882,9 @@ namespace DryIoc.FastExpressionCompiler
                         sb.AppendTypeof(t, stripNamespace, printType);
                     else
                     {
-                        // For the closure bound constant let's output `null` or default value with the comment for user to provide the actual value
-                        if (ExpressionCompiler.IsClosureBoundConstant(x.Value, x.Type)) 
-                        {
-                            if (x.Type.IsValueType)
-                                sb.Append("default(").Append(x.Type.ToCode(stripNamespace, printType)).Append(')');
-                            else // specifying the type for the Constant, otherwise we will lost it with the `Constant(default(MyClass))` which is equivalent to `Constant(null)`
-                                sb.Append("null, ").AppendTypeof(x.Type, stripNamespace, printType);
-                            sb.NewLineIdent(lineIdent).Append("// !!! Please provide the non-default value").NewLineIdent(lineIdent);
-                        }
-                        else 
-                        {
-                            sb.Append(x.Value.ToCode(CodePrinter.DefaultConstantValueToCode, stripNamespace, printType));
-                            if (x.Value.GetType() != x.Type)
-                                sb.Append(", ").AppendTypeof(x.Type, stripNamespace, printType);
-                        }
+                        sb.Append(x.Value.ToCode(CodePrinter.DefaultConstantValueToCode, stripNamespace, printType));
+                        if (x.Value.GetType() != x.Type)
+                            sb.Append(", ").AppendTypeof(x.Type, stripNamespace, printType);
                     }
                     return sb.Append(')');
                 }
@@ -6027,7 +6173,18 @@ namespace DryIoc.FastExpressionCompiler
                         sb.Append("MakeBinary(").Append(typeof(ExpressionType).Name).Append('.').Append(name).Append(',');
                         sb.NewLineIdentExpr(b.Left,  paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(',');
                         sb.NewLineIdentExpr(b.Right, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
+                        if (b.IsLiftedToNull || b.Method != null)
+                        {
+                            sb.Append(',').NewLineIdent(lineIdent).Append("liftToNull: ").Append(b.IsLiftedToNull.ToCode());
+                            sb.Append(',').NewLineIdent(lineIdent).AppendMethod(b.Method, stripNamespace, printType);
+                            if (b.Conversion != null)
+                                sb.Append(',').NewLineIdentExpr(b.Conversion, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
+                        }
+
+                        if (b.Conversion != null)
+                            sb.Append(',').NewLineIdentExpr(b.Conversion, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
                     }
+
                     return sb.Append(')');
                 }
             }
@@ -6073,6 +6230,7 @@ namespace DryIoc.FastExpressionCompiler
                     if (x.Value.GetType() != x.Type) // add the cast
                         sb.Append('(').Append(x.Type.ToCode(stripNamespace, printType)).Append(')');
 
+                    // value output may also add the cast for the primitive values
                     return sb.Append(x.Value.ToCode(CodePrinter.DefaultConstantValueToCode, stripNamespace, printType));
                 }
                 case ExpressionType.Parameter:
@@ -6433,30 +6591,28 @@ namespace DryIoc.FastExpressionCompiler
                 {
                     var x = (SwitchExpression)e;
                     sb.Append("switch (");
-                    x.SwitchValue.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
-                    sb.Append(") {");
+                    x.SwitchValue.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(')');
+                    sb.NewLine(lineIdent, identSpaces).Append('{');
 
                     foreach (var cs in x.Cases)
                     {
-                        sb.NewLineIdent(lineIdent);
                         foreach (var tv in cs.TestValues)
                         {
-                            sb.Append("case ");
-                            tv.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
-                            sb.Append(':');
-                            sb.NewLineIdent(lineIdent);
+                            sb.NewLineIdent(lineIdent).Append("case ");
+                            tv.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(':');
                         }
-                        
-                        cs.Body.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
+
+                        sb.NewLineIdent(lineIdent + identSpaces);
+                        cs.Body.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).AddSemicolonIfFits();
                     }
 
                     if (x.DefaultBody != null) 
                     {
-                        sb.NewLineIdent(lineIdent).Append("default:");
-                        x.DefaultBody.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
+                        sb.NewLineIdent(lineIdent).Append("default:").NewLineIdent(lineIdent + identSpaces);
+                        x.DefaultBody.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).AddSemicolonIfFits();
                     }
 
-                    return sb.NewLineIdent(lineIdent).Append("}");
+                    return sb.NewLine(lineIdent, identSpaces).Append("}");
                 }
                 case ExpressionType.Default:
                 {
@@ -6563,27 +6719,28 @@ namespace DryIoc.FastExpressionCompiler
 
                     if (e is BinaryExpression b)
                     {
-                        if (e.NodeType == ExpressionType.ArrayIndex)
+                        var nodeType = e.NodeType;
+                        if (nodeType == ExpressionType.ArrayIndex)
                         {
                             b.Left.ToCSharpString(sb.Append('('), lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(')');
                             return b.Right.ToCSharpString(sb.Append("["), lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append("]");
                         }
 
-                        if (e.NodeType == ExpressionType.Assign ||
-                            e.NodeType == ExpressionType.PowerAssign ||
-                            e.NodeType == ExpressionType.AndAssign ||
-                            e.NodeType == ExpressionType.OrAssign ||
-                            e.NodeType == ExpressionType.AddAssign ||
-                            e.NodeType == ExpressionType.ExclusiveOrAssign ||
-                            e.NodeType == ExpressionType.AddAssignChecked ||
-                            e.NodeType == ExpressionType.SubtractAssign ||
-                            e.NodeType == ExpressionType.SubtractAssignChecked ||
-                            e.NodeType == ExpressionType.MultiplyAssign ||
-                            e.NodeType == ExpressionType.MultiplyAssignChecked ||
-                            e.NodeType == ExpressionType.DivideAssign ||
-                            e.NodeType == ExpressionType.LeftShiftAssign ||
-                            e.NodeType == ExpressionType.RightShiftAssign ||
-                            e.NodeType == ExpressionType.ModuloAssign
+                        if (nodeType == ExpressionType.Assign || 
+                            nodeType == ExpressionType.PowerAssign ||
+                            nodeType == ExpressionType.AndAssign ||
+                            nodeType == ExpressionType.OrAssign ||
+                            nodeType == ExpressionType.AddAssign ||
+                            nodeType == ExpressionType.ExclusiveOrAssign ||
+                            nodeType == ExpressionType.AddAssignChecked ||
+                            nodeType == ExpressionType.SubtractAssign ||
+                            nodeType == ExpressionType.SubtractAssignChecked ||
+                            nodeType == ExpressionType.MultiplyAssign ||
+                            nodeType == ExpressionType.MultiplyAssignChecked ||
+                            nodeType == ExpressionType.DivideAssign ||
+                            nodeType == ExpressionType.LeftShiftAssign ||
+                            nodeType == ExpressionType.RightShiftAssign ||
+                            nodeType == ExpressionType.ModuloAssign
                         )
                         {
                             // todo: @perf handle the right part is condition with the blocks for If and/or Else, e.g. see #261 test `Serialize_the_nullable_struct_array` 
@@ -6597,39 +6754,37 @@ namespace DryIoc.FastExpressionCompiler
                             }
 
                             b.Left.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
-                            if (e.NodeType == ExpressionType.PowerAssign) 
+                            if (nodeType == ExpressionType.PowerAssign) 
                             {
                                 sb.Append(" = System.Math.Pow(");
                                 b.Left.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(", ");
                                 return b.Right.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(")");
                             }
 
-                            sb.Append(OperatorToCSharpString(e.NodeType));
+                            sb.Append(OperatorToCSharpString(nodeType));
 
                             return b.Right.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
                         }
 
-                        
-                        b.Left.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
+                        b.Left.ToCSharpString(sb.Append('('), lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
 
-                        if (e.NodeType == ExpressionType.Equal)
+                        if (nodeType == ExpressionType.Equal)
                         {
                             if (b.Right is ConstantExpression r && r.Value is bool rb && rb)
                                 return sb;
                             sb.Append(" == ");
                         }
-                        else if (e.NodeType == ExpressionType.NotEqual)
+                        else if (nodeType == ExpressionType.NotEqual)
                         {
                             if (b.Right is ConstantExpression r && r.Value is bool rb)
                                 return rb ? sb.Append(" == false") : sb;
                             sb.Append(" != ");
                         }
                         else
-                        {
-                            sb.Append(OperatorToCSharpString(e.NodeType));
-                        }   
+                            sb.Append(OperatorToCSharpString(nodeType));
 
-                        return b.Right.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
+                        return b.Right.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant)
+                            .Append(')');
                     }
 
                     return sb.Append(e.ToString()); // falling back ToString and hoping for the best 
@@ -6982,6 +7137,12 @@ namespace DryIoc.FastExpressionCompiler
                 return !printGenericTypeArgs ? string.Empty
                     : (printType?.Invoke(type, type.Name) ?? type.Name);
 
+            if (Nullable.GetUnderlyingType(type) is Type nullableElementType && !type.IsGenericTypeDefinition)
+            {
+                var result = nullableElementType.ToCode(stripNamespace, printType, printGenericTypeArgs) + "?";
+                return printType?.Invoke(type, result) ?? result;
+            }
+
             Type arrayType = null;
             if (type.IsArray)
             {
@@ -6994,23 +7155,23 @@ namespace DryIoc.FastExpressionCompiler
             string buildInTypeString = null;
             if (type == typeof(void))
                 buildInTypeString = "void";
-            if (type == typeof(object))
+            else if (type == typeof(object))
                 buildInTypeString = "object";
-            if (type == typeof(bool))
+            else if (type == typeof(bool))
                 buildInTypeString = "bool";
-            if (type == typeof(int))
+            else if (type == typeof(int))
                 buildInTypeString = "int";
-            if (type == typeof(short))
+            else if (type == typeof(short))
                 buildInTypeString = "short";
-            if (type == typeof(byte))
+            else if (type == typeof(byte))
                 buildInTypeString = "byte";
-            if (type == typeof(double))
+            else if (type == typeof(double))
                 buildInTypeString = "double";
-            if (type == typeof(float))
+            else if (type == typeof(float))
                 buildInTypeString = "float";
-            if (type == typeof(char))
+            else if (type == typeof(char))
                 buildInTypeString = "char";
-            if (type == typeof(string))
+            else if (type == typeof(string))
                 buildInTypeString = "string";
 
             if (buildInTypeString != null)
@@ -7154,7 +7315,7 @@ namespace DryIoc.FastExpressionCompiler
         private class ConstantValueToCode : CodePrinter.IObjectToCode
         {
             public string ToCode(object x, bool stripNamespace = false, Func<Type, string, string> printType = null) =>
-                "default(" + x.GetType().ToCode(stripNamespace, printType) + ")";
+                "default(" + x.GetType().ToCode(stripNamespace, printType) + ")/* (!) Please provide the non-default value for the constant */";
         }
 
 
@@ -7197,6 +7358,12 @@ namespace DryIoc.FastExpressionCompiler
             if (x is bool b)
                 return b.ToCode();
 
+            if (x is int i)
+                return i.ToString();
+            
+            if (x is double d)
+                return d.ToString();
+
             if (x is string s)
                 return s.ToCode();
 
@@ -7205,6 +7372,15 @@ namespace DryIoc.FastExpressionCompiler
 
             if (x is Type t)
                 return t.ToCode(stripNamespace, printType);
+
+            if (x is Guid guid)
+                return "Guid.Parse(" + guid.ToString().ToCode() + ")";
+
+            if (x is DateTime date)
+                return "DateTime.Parse(" + date.ToString().ToCode() + ")";
+
+            if (x is TimeSpan time)
+                return "TimeSpan.Parse(" + time.ToString().ToCode() + ")";
 
             var xType = x.GetType();
             var xTypeInfo = xType.GetTypeInfo();
