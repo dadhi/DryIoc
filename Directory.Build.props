@@ -1,7 +1,7 @@
 <Project>
     <PropertyGroup>
         <DevMode>true</DevMode>
-        <LangVersion>latest</LangVersion>
+        <LangVersion>10</LangVersion>
 
         <Authors>Maksim Volkau</Authors>
         <Copyright>Copyright © 2013-2022 Maksim Volkau</Copyright>

@@ -1508,6 +1508,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |              Grace | 2.381 us | 0.0410 us | 0.0770 us |  1.21 |    0.06 | 0.5150 | 0.0076 |     - |   3.17 KB |
 
 */
+#pragma warning disable CS0169
             private IServiceProvider _msDi;
             private IContainer _dryIoc;
             private IContainer _dryIocWithoutFEC;

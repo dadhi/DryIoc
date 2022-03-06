@@ -708,7 +708,7 @@ namespace PerformanceTests
                        BmarkDryIoc | 47,340.9 us | 175.076 us | 146.196 us | 368.47 |    3.79 |     90.9091 |           - |           - |            759.4 KB |
                    BmarkDryIocMsDi | 46,669.8 us | 302.005 us | 282.496 us | 363.92 |    4.44 |    181.8182 |     90.9091 |           - |           855.37 KB |
 
-            ## DryIoc v6 and DI.MS.DI v6
+            ## DryIoc v5 and DI.MS.DI v6
 
             BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19043
             Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
@@ -734,7 +734,7 @@ namespace PerformanceTests
             [Benchmark]
             public object BmarkDryIocMsDi() => Measure(PrepareDryIocMsDi());
 
-            //[Benchmark]
+            [Benchmark]
             public object BmarkGrace() => Measure(PrepareGrace());
 
             //[Benchmark]
