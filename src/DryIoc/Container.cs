@@ -10836,19 +10836,31 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.ReturnDefaultIfNotRegistered,
             GetServiceInfo serviceInfo = null)
         {
-            serviceInfo = serviceInfo ?? (GetServiceInfo)((m, r) => PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(ifUnresolved: ifUnresolved)));
+            if (serviceInfo == null)
+            {
+                var details = ServiceDetails.Of(ifUnresolved); // todo: @perf improve memory
+                serviceInfo = (GetServiceInfo)((m, r) => PropertyOrFieldServiceInfo.Of(m).WithDetails(details));
+            }
+
+            Func<Request, PropertyInfo, bool> isInjectable =
+                withNonPublic && withPrimitive ? ((r, p) => p.IsInjectable(true, true)) :
+                withNonPublic ? ((r, p) => p.IsInjectable(true, false)) :
+                withPrimitive ? ((r, p) => p.IsInjectable(false, true)) : 
+                                ((r, p) => p.IsInjectable(false, false));
+
             return req =>
             {
-                var properties = req.ImplementationType
-                    .GetMembers(x => x.DeclaredProperties, includeBase: withBase) // todo: @perf optimize allocations 
-                    .Match(p => p.IsInjectable(withNonPublic, withPrimitive), p => serviceInfo(p, req));
+                var implType = req.ImplementationType;
+                var properties = implType
+                    .GetMembers(x => x.DeclaredProperties, includeBase: withBase).ToArrayOrSelf()
+                    .Match(req, isInjectable, (r, p) => serviceInfo(p, r));
 
                 if (!withFields)
                     return properties;
 
-                var fields = req.ImplementationType // todo: @perf optimize allocations and maybe combine with properties
-                    .GetMembers(x => x.DeclaredFields, includeBase: withBase)
-                    .Match(f => f.IsInjectable(withNonPublic, withPrimitive), f => serviceInfo(f, req));
+                var fields = implType // todo: @perf optimize allocations and maybe combine with properties
+                    .GetMembers(x => x.DeclaredFields, includeBase: withBase).ToArrayOrSelf()
+                    .Match(req, (r, f) => f.IsInjectable(withNonPublic, withPrimitive), (r, f) => serviceInfo(f, r));
 
                 return properties.Append(fields);
             };
