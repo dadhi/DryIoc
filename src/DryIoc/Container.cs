@@ -5060,7 +5060,7 @@ namespace DryIoc
 
         private static Expression GetLambdaExpressionExpressionOrDefault(Request request)
         {
-            request = request.Push(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
+            request = request.PushServiceType(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)
                 return null;
@@ -5069,7 +5069,7 @@ namespace DryIoc
 
         private static Expression GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(Request request)
         {
-            request = request.Push(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
+            request = request.PushServiceType(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)
                 return null;
@@ -5085,7 +5085,7 @@ namespace DryIoc
             else
                 serviceType = request.RequiredServiceType ?? wrapperType.GetGenericArguments()[0];
 
-            request = request.Push(serviceType);
+            request = request.PushServiceType(serviceType);
             var container = request.Container;
             var expr = container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)
@@ -5112,6 +5112,7 @@ namespace DryIoc
             var serviceRequest = serviceKey == null
                 ? request.PushServiceType(serviceType)
                 : request.Push(serviceType, serviceKey);
+
             if (serviceFactory == null) // todo: @wip is not used yet
                 serviceFactory = request.Container.ResolveFactory(serviceRequest);
             var serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
