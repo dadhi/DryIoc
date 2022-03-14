@@ -1154,6 +1154,21 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDIAdapter | 90.41 us | 1.005 us | 0.891 us |  1.11 |    0.09 |  8.7891 | 0.6104 |     - |  54.45 KB |
 |               MsDI | 97.62 us | 1.267 us | 1.123 us |  1.20 |    0.11 | 11.4746 | 2.8076 |     - |  70.54 KB |
 
+## Last results with ImTools V3
+
+BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19042
+Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical cores
+.NET Core SDK=6.0.102
+  [Host]     : .NET Core 6.0.2 (CoreCLR 6.0.222.6406, CoreFX 6.0.222.6406), X64 RyuJIT
+  DefaultJob : .NET Core 6.0.2 (CoreCLR 6.0.222.6406, CoreFX 6.0.222.6406), X64 RyuJIT
+
+
+|             Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------------- |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|             DryIoc |  87.64 us | 1.743 us | 3.052 us |  1.00 |    0.00 | 13.1836 |      - |     - |  40.56 KB |
+| DryIoc_MsDIAdapter | 101.40 us | 1.571 us | 2.537 us |  1.15 |    0.05 | 16.7236 |      - |     - |  51.43 KB |
+|               MsDI | 104.60 us | 2.038 us | 3.348 us |  1.19 |    0.06 | 22.9492 | 0.6104 |     - |  70.04 KB |
+
 */
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
