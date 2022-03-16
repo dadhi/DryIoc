@@ -13,7 +13,9 @@ namespace DryIoc.IssuesTests
             Should_use_data_from_the_scope_when_resolving_in_scope_with_asResolutionCall();
             Should_use_data_from_the_scope_when_resolving_in_scope_with_original_Use();
             Auto_dynamic_registration_for_the_concrete_types_should_work();
-            return 3;
+            Should_use_data_from_the_scope_when_resolving_in_scope();
+            Should_use_data_from_the_scope_when_resolving_in_scope_without_the_first_resolve();
+            return 4;
         }
 
         [Test]
@@ -75,6 +77,42 @@ namespace DryIoc.IssuesTests
                 Assert.AreEqual("child", inScope.Dependent.Data1.Text);
             }
         }
+
+        [Test]
+        public void Should_use_data_from_the_scope_when_resolving_in_scope()
+        {
+            var container = new Container(rules => rules.WithFuncAndLazyWithoutRegistration());
+
+            container.RegisterInstance(new Data { Text = "parent" }, setup: Setup.With(asResolutionCall: true));
+            container.Register<IDataDependent, DataDependent>();
+            container.Register<DataDependentIndirectly2>();
+
+            // now it fails even if this is removed
+            //var outside = container.Resolve<DataDependentIndirectly2>();
+
+            using var scope = container.OpenScope();
+            scope.Use(new Data { Text = "child" });
+
+            var inScope = scope.Resolve<DataDependentIndirectly2>();
+            Assert.AreEqual("child", inScope.Dependent.Data1.Text); // fails, the value is "parent"
+        }
+
+        [Test]
+        public void Should_use_data_from_the_scope_when_resolving_in_scope_without_the_first_resolve()
+        {
+            var container = new Container(rules => rules.WithFuncAndLazyWithoutRegistration());
+
+            container.RegisterInstance(new Data { Text = "parent" }, setup: Setup.With(asResolutionCall: true));
+            container.Register<IDataDependent, DataDependent>();
+            container.Register<DataDependentIndirectly2>();
+
+            using var scope = container.OpenScope();
+            scope.Use(new Data { Text = "child" });
+
+            var inScope = scope.Resolve<DataDependentIndirectly2>();
+            Assert.AreEqual("child", inScope.Dependent.Data1.Text); // fails, the value is "parent"
+        }
+
         public class Data
         {
             public string Text { get; set; }
@@ -102,6 +140,18 @@ namespace DryIoc.IssuesTests
             public DataDependentIndirectly(IDataDependent dataDependent)
             {
                 Dependent = dataDependent;
+            }
+        }
+
+        public class DataDependentIndirectly2
+        {
+            private Lazy<IDataDependent> _lazyDependent;
+
+            public IDataDependent Dependent => _lazyDependent.Value;
+
+            public DataDependentIndirectly2(Lazy<IDataDependent> dataDependent)
+            {
+                _lazyDependent = dataDependent;
             }
         }
     }
