@@ -4937,7 +4937,7 @@ namespace DryIoc
         /// Traverses the parent containers until the root or returns itself if it is already a root.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
             request.Reuse is CurrentScopeReuse == false 
-            && (request.DirectParent.IsSingletonOrDependencyOfSingleton || request.IsDirectlyWrappedInFunc())
+            && request.DirectParent.IsSingletonOrDependencyOfSingleton
             && !request.OpensResolutionScope
             && request.Rules.ThrowIfDependencyHasShorterReuseLifespan // see the #378
                 ? RootOrSelfExpr
