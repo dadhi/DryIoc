@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v4.8.8 Bug-fix release / 2022-03-16
+
+- fixed: #460 Getting instance from parent scope even if replaced by Use
+
 ## v4.8.7 Bug-fix release / 2022-02-27
 
 - fixed: #435 hangfire use dryioc report ContainerIsDisposed
