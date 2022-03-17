@@ -1169,7 +1169,6 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
 | DryIoc_MsDIAdapter | 101.40 us | 1.571 us | 2.537 us |  1.15 |    0.05 | 16.7236 |      - |     - |  51.43 KB |
 |               MsDI | 104.60 us | 2.038 us | 3.348 us |  1.19 |    0.06 | 22.9492 | 0.6104 |     - |  70.04 KB |
 
-
 ## V5 release
 
 |       Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
@@ -1536,6 +1535,19 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |               MsDI | 4.903 us | 0.0974 us | 0.1042 us |  2.47 |    0.07 | 0.7095 | 0.0076 |     - |   4.35 KB |
 |              Grace | 2.381 us | 0.0410 us | 0.0770 us |  1.21 |    0.06 | 0.5150 | 0.0076 |     - |   3.17 KB |
 
+## DryIoc v5
+
+|       Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|       DryIoc |  1.592 us | 0.0303 us | 0.0349 us |  1.00 |    0.00 |  0.4749 | 0.0057 |     - |   2.91 KB |
+|  DryIoc_MsDI |  2.604 us | 0.0210 us | 0.0176 us |  1.63 |    0.04 |  0.4807 | 0.0076 |     - |   2.96 KB |
+|        Grace |  1.801 us | 0.0136 us | 0.0120 us |  1.13 |    0.02 |  0.5169 | 0.0076 |     - |   3.17 KB |
+|   Grace_MsDI |  2.474 us | 0.0458 us | 0.0429 us |  1.55 |    0.04 |  0.5569 | 0.0076 |     - |   3.41 KB |
+|         MsDI |  3.825 us | 0.0572 us | 0.0478 us |  2.39 |    0.06 |  0.7629 | 0.0076 |     - |   4.68 KB |
+|   Lamar_MsDI |  6.637 us | 0.1251 us | 0.1390 us |  4.17 |    0.13 |  0.9689 | 0.4807 |     - |   5.95 KB |
+|      Autofac | 49.074 us | 0.4516 us | 0.4003 us | 30.72 |    0.78 |  8.3618 | 0.6714 |     - |  51.39 KB |
+| Autofac_MsDI | 60.701 us | 0.4713 us | 0.3936 us | 37.96 |    1.09 | 11.3525 | 0.8545 |     - |  69.87 KB |
+
 */
 #pragma warning disable CS0169
             private IServiceProvider _msDi;
@@ -1570,7 +1582,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             public object DryIoc() => Measure(_dryIoc);
 
             [Benchmark]
-            public object DryIoc_MsDIAdapter() => Measure(_dryIocMsDi);
+            public object DryIoc_MsDI() => Measure(_dryIocMsDi);
 
             [Benchmark]
             public object MsDI() => Measure(_msDi);
@@ -1584,17 +1596,17 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             [Benchmark]
             public object Grace() => Measure(_grace);
 
-            // [Benchmark]
-            public object Grace_MsDIAdapter() => Measure(_graceMsDi);
+            [Benchmark]
+            public object Grace_MsDI() => Measure(_graceMsDi);
 
-            // [Benchmark]
+            [Benchmark]
             public object Lamar_MsDI() => Measure(_lamarMsDi);
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            // [Benchmark]
-            public object Autofac_MsDIAdapter() => Measure(_autofacMsDi);
+            [Benchmark]
+            public object Autofac_MsDI() => Measure(_autofacMsDi);
         }
     }
 }
