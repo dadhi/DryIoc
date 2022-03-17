@@ -51,23 +51,23 @@ The listed *.MsDI* packages are respective [Microsoft.Extensions.DependencyInjec
 DryIoc 5.0.0 (.MsDI 5.0.0), MsDI 6.0.0, Grace 7.2.1 (.MsDI 7.1.0), Autofac 6.3.0 (.MsDI 7.2.0), Lamar 8.0.1
 
 ```md
-BenchmarkDotNet=v0.13.0, OS=Windows 10.0.19042.985 (20H2/October2020Update)
+BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19043
 Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
-.NET SDK=5.0.202
-  [Host]     : .NET 5.0.5 (5.0.521.16609), X64 RyuJIT
-  DefaultJob : .NET 5.0.5 (5.0.521.16609), X64 RyuJIT
+.NET Core SDK=6.0.100
+  [Host]     : .NET Core 6.0.0 (CoreCLR 6.0.21.52210, CoreFX 6.0.21.52210), X64 RyuJIT
+  DefaultJob : .NET Core 6.0.0 (CoreCLR 6.0.21.52210, CoreFX 6.0.21.52210), X64 RyuJIT
 
 
-|              Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
-|-------------------- |-------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|-------:|----------:|
-|                MsDI |     95.35 us |   1.626 us |   2.805 us |   1.00 |    0.00 |  11.9629 |  3.1738 |      - |     73 KB |
-|              DryIoc |     85.03 us |   0.868 us |   0.812 us |   0.88 |    0.03 |   8.4229 |  0.6104 |      - |     52 KB |
-|  DryIoc_MsDIAdapter |     92.64 us |   0.807 us |   0.754 us |   0.96 |    0.03 |  10.6201 |  0.7324 |      - |     65 KB |
-|               Grace | 15,516.60 us | 135.363 us | 126.619 us | 160.82 |    6.01 | 109.3750 | 46.8750 |      - |    743 KB |
-|   Grace_MsDIAdapter | 18,376.58 us | 201.534 us | 188.515 us | 190.45 |    6.71 | 125.0000 | 62.5000 |      - |    911 KB |
-|   Lamar_MsDIAdapter |  5,532.70 us |  70.539 us |  62.531 us |  57.31 |    2.16 |  93.7500 | 39.0625 |      - |    611 KB |
-|             Autofac |    553.95 us |  10.116 us |   8.967 us |   5.74 |    0.18 |  51.7578 | 25.3906 | 1.9531 |    318 KB |
-| Autofac_MsDIAdapter |    542.17 us |   4.962 us |   4.143 us |   5.60 |    0.21 |  54.6875 | 27.3438 | 1.9531 |    340 KB |
+|       Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+|------------- |-------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|-------:|----------:|
+|       DryIoc |     83.66 us |   1.027 us |   0.960 us |   1.00 |    0.00 |   6.5918 |  0.4883 |      - |  40.56 KB |
+|  DryIoc_MsDI |     93.74 us |   1.236 us |   0.965 us |   1.12 |    0.02 |   8.3008 |  0.6104 |      - |  51.43 KB |
+|         MsDI |     94.79 us |   1.041 us |   0.813 us |   1.13 |    0.02 |  11.8408 |  4.2725 |      - |  72.58 KB |
+|      Autofac |    549.00 us |   7.843 us |   6.549 us |   6.56 |    0.12 |  51.7578 | 25.3906 | 1.9531 | 317.27 KB |
+| Autofac_MsDI |    545.42 us |  10.800 us |   9.574 us |   6.51 |    0.12 |  54.6875 | 27.3438 | 2.9297 |    340 KB |
+|   Lamar_MsDI |  7,077.45 us | 194.761 us | 565.036 us |  77.31 |    3.31 |        - |       - |      - | 649.71 KB |
+|        Grace | 16,223.23 us | 317.228 us | 264.900 us | 193.90 |    4.16 |  93.7500 | 31.2500 |      - | 735.76 KB |
+|   Grace_MsDI | 19,266.37 us | 336.411 us | 280.919 us | 230.27 |    4.37 | 125.0000 | 62.5000 |      - | 907.39 KB |
 ```
 
 <details>
@@ -85,14 +85,14 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
 
 |       Method |        Mean |     Error |    StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
 |------------- |------------:|----------:|----------:|-------:|--------:|---------:|--------:|-------:|----------:|
-|         MsDI |    150.8 us |   2.83 us |   3.03 us |   1.00 |    0.00 |  18.0664 |  0.2441 |      - |  73.86 KB |
 |       DryIoc |    129.6 us |   1.90 us |   1.68 us |   0.86 |    0.02 |  16.3574 |  0.2441 |      - |  67.52 KB |
 |  DryIoc_MsDI |    161.9 us |   1.74 us |   1.63 us |   1.07 |    0.03 |  21.4844 |  0.2441 |      - |   88.6 KB |
-|        Grace | 21,380.9 us | 375.46 us | 351.21 us | 141.65 |    2.83 | 156.2500 | 62.5000 |      - | 729.12 KB |
-|   Grace_MsDI | 24,102.4 us | 243.21 us | 203.09 us | 159.26 |    3.52 | 187.5000 | 93.7500 |      - | 894.57 KB |
-|   Lamar_MsDI | 10,938.2 us | 308.25 us | 874.46 us |  70.86 |    4.29 |        - |       - |      - | 696.16 KB |
+|         MsDI |    150.8 us |   2.83 us |   3.03 us |   1.00 |    0.00 |  18.0664 |  0.2441 |      - |  73.86 KB |
 |      Autofac |    789.4 us |  19.84 us |  20.38 us |   5.24 |    0.18 |  50.7813 | 25.3906 | 1.9531 | 311.12 KB |
 | Autofac_MsDI |    784.9 us |  15.04 us |  18.47 us |   5.20 |    0.15 |  54.6875 | 27.3438 | 1.9531 | 335.07 KB |
+|   Lamar_MsDI | 10,938.2 us | 308.25 us | 874.46 us |  70.86 |    4.29 |        - |       - |      - | 696.16 KB |
+|        Grace | 21,380.9 us | 375.46 us | 351.21 us | 141.65 |    2.83 | 156.2500 | 62.5000 |      - | 729.12 KB |
+|   Grace_MsDI | 24,102.4 us | 243.21 us | 203.09 us | 159.26 |    3.52 | 187.5000 | 93.7500 |      - | 894.57 KB |
 ```
 </details>
 

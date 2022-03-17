@@ -1169,12 +1169,26 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
 | DryIoc_MsDIAdapter | 101.40 us | 1.571 us | 2.537 us |  1.15 |    0.05 | 16.7236 |      - |     - |  51.43 KB |
 |               MsDI | 104.60 us | 2.038 us | 3.348 us |  1.19 |    0.06 | 22.9492 | 0.6104 |     - |  70.04 KB |
 
+
+## V5 release
+
+|       Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+|------------- |-------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|-------:|----------:|
+|       DryIoc |     83.66 us |   1.027 us |   0.960 us |   1.00 |    0.00 |   6.5918 |  0.4883 |      - |  40.56 KB |
+|  DryIoc_MsDI |     93.74 us |   1.236 us |   0.965 us |   1.12 |    0.02 |   8.3008 |  0.6104 |      - |  51.43 KB |
+|         MsDI |     94.79 us |   1.041 us |   0.813 us |   1.13 |    0.02 |  11.8408 |  4.2725 |      - |  72.58 KB |
+|      Autofac |    549.00 us |   7.843 us |   6.549 us |   6.56 |    0.12 |  51.7578 | 25.3906 | 1.9531 | 317.27 KB |
+| Autofac_MsDI |    545.42 us |  10.800 us |   9.574 us |   6.51 |    0.12 |  54.6875 | 27.3438 | 2.9297 |    340 KB |
+|   Lamar_MsDI |  7,077.45 us | 194.761 us | 565.036 us |  77.31 |    3.31 |        - |       - |      - | 649.71 KB |
+|        Grace | 16,223.23 us | 317.228 us | 264.900 us | 193.90 |    4.16 |  93.7500 | 31.2500 |      - | 735.76 KB |
+|   Grace_MsDI | 19,266.37 us | 336.411 us | 280.919 us | 230.27 |    4.37 | 125.0000 | 62.5000 |      - | 907.39 KB |
+
 */
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
 
             [Benchmark]
-            public object DryIoc_MsDIAdapter() => Measure(PrepareDryIocMsDi());
+            public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
             [Benchmark]
             public object MsDI() => Measure(PrepareMsDi());
 
@@ -1182,20 +1196,20 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
             // [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            // [Benchmark]
-            public object Grace() => Measure(PrepareGrace());
-
-            // [Benchmark]
-            public object Grace_MsDIAdapter() => Measure(PrepareGraceMsDi());
-
-            // [Benchmark]
-            public object Lamar_MsDIAdapter() => Measure(PrepareLamarMsDi());
-
-            // [Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            // [Benchmark]
-            public object Autofac_MsDIAdapter() => Measure(PrepareAutofacMsDi());
+            [Benchmark]
+            public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
+
+            [Benchmark]
+            public object Lamar_MsDI() => Measure(PrepareLamarMsDi());
+
+            [Benchmark]
+            public object Grace() => Measure(PrepareGrace());
+
+            [Benchmark]
+            public object Grace_MsDI() => Measure(PrepareGraceMsDi());
         }
 
         [MemoryDiagnoser()]
