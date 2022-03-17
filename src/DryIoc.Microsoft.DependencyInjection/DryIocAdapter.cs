@@ -236,20 +236,20 @@ namespace DryIoc.Microsoft.DependencyInjection
             var implType = descriptor.ImplementationType;
             if (implType != null)
             {
-                container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType, null, null,
-                    isStaticallyChecked: implType == serviceType);
+                container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType,
+                    null, null, isStaticallyChecked: implType == serviceType);
             }
             else if (descriptor.ImplementationFactory != null)
             {
-                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory.ToFactoryDelegate, descriptor.Lifetime.ToReuse()), serviceType, null, null,
-                    isStaticallyChecked: true);
+                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory.ToFactoryDelegate, descriptor.Lifetime.ToReuse()), serviceType,
+                    null, null, isStaticallyChecked: true);
             }
             else
             {
                 var instance = descriptor.ImplementationInstance;
-                container.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton), serviceType, null, null,
-                    isStaticallyChecked: true);
-                container.TrackDisposableInstance(instance); // todo: @naming rename to TrackSingletonInstance
+                container.Register(InstanceFactory.Of(instance), serviceType,
+                    null, null, isStaticallyChecked: true);
+                container.TrackDisposableInstance(instance);
             }
         }
     }
