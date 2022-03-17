@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2021 Maksim Volkau
+Copyright (c) 2016-2022 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -226,7 +226,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         [MethodImpl((MethodImplOptions)256)]
         public static IReuse ToReuse(this ServiceLifetime lifetime) =>
             lifetime == ServiceLifetime.Singleton ? Reuse.Singleton :
-            lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton : // check that we have Reuse.ScopedOrSingleton here instead of Reuse.Scoped
+            lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton : // see, that we have Reuse.ScopedOrSingleton here instead of Reuse.Scoped
             Reuse.Transient;
 
         /// <summary>Unpacks the service descriptor to register the service in DryIoc container</summary>
