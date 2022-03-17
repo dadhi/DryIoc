@@ -137,11 +137,11 @@ namespace DryIoc.Microsoft.DependencyInjection
                 container = container.With(container.Rules.WithMicrosoftDependencyInjectionRules(),
                     container.ScopeContext, registrySharing, container.SingletonScope);
 
-            container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
-
             var capabilities = new DryIocServiceProviderCapabilities(container);
-            container.Use<IServiceProviderIsService>(capabilities);
-            container.Use<ISupportRequiredService>(capabilities);
+            container.SingletonScope.UseInstance<IServiceProviderIsService>(capabilities);
+            container.SingletonScope.UseInstance<ISupportRequiredService>(capabilities);
+
+            container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
 
             if (descriptors != null)
                 container.Populate(descriptors, registerDescriptor);
@@ -249,7 +249,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 var instance = descriptor.ImplementationInstance;
                 container.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton), serviceType, null, null,
                     isStaticallyChecked: true);
-                container.TrackInstance(instance); // todo: @naming rename to TrackSingletonInstance
+                container.TrackDisposableInstance(instance); // todo: @naming rename to TrackSingletonInstance
             }
         }
     }

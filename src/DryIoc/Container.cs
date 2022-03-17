@@ -7149,12 +7149,12 @@ namespace DryIoc
         {
             registrator.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: isChecked);
-            registrator.TrackInstance(instance, setup);
+            registrator.TrackDisposableInstance(instance, setup);
         }
 
         /// <summary>Tracks the disposable instance in the singleton scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void TrackInstance(this IRegistrator registrator, object instance)
+        public static void TrackDisposableInstance(this IRegistrator registrator, object instance)
         {
             if (instance is IDisposable d)
                 ((IResolverContext)registrator).SingletonScope.TrackDisposable(d);
@@ -7162,7 +7162,7 @@ namespace DryIoc
 
         /// <summary>Tracks the disposable instance in the singleton scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void TrackInstance(this IRegistrator registrator, object instance, Setup setup)
+        public static void TrackDisposableInstance(this IRegistrator registrator, object instance, Setup setup)
         {
             if (instance is IDisposable d && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
                 ((IResolverContext)registrator).SingletonScope.TrackDisposable(d);
@@ -12238,7 +12238,7 @@ namespace DryIoc
         ///<summary>Sets or adds the service item directly to the scope services</summary>
         void SetOrAdd(int id, object item);
 
-        /// Sets (replaces) the factory for specified type.
+        /// <summary>Sets (replaces) the used instance factory for the specified type.</summary>
         void SetUsedInstance(int hash, Type type, FactoryDelegate factory);
 
         /// <summary>Try to retrieve factory or instance (wrapped in factory) via the Use method.</summary>
@@ -12263,6 +12263,16 @@ namespace DryIoc
         /// <summary>Check if the service instance or factory is added to the scope</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static bool IsUsed(this IScope s, Type serviceType) => s.GetUsedFactoryOrNull(serviceType) != null;
+
+        /// <summary>Sets (replaces) instance to the small scope registry via factory</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static void UseInstance(this IScope s, Type type, FactoryDelegate factory) =>
+            s.SetUsedInstance(RuntimeHelpers.GetHashCode(type), type, factory);
+
+        /// <summary>Sets (replaces) instance to the small scope registry via factory</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static void UseInstance<T>(this IScope s, object instance) => 
+            s.UseInstance(typeof(T), instance.ToFactoryDelegate);
     }
 
     /// <summary>
@@ -12542,10 +12552,6 @@ namespace DryIoc
         }
 
         internal static readonly MethodInfo TrackDisposableMethod = typeof(IScope).GetMethod(nameof(IScope.TrackDisposable));
-
-        /// Add instance to the small registry via factory
-        public void SetUsedInstance(Type type, FactoryDelegate factory) =>
-            SetUsedInstance(RuntimeHelpers.GetHashCode(type), type, factory);
 
         /// <inheritdoc />
         public void SetUsedInstance(int hash, Type type, FactoryDelegate factory)
