@@ -72,8 +72,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// </summary>
         public DryIocServiceProviderFactory(
             IContainer container = null,
-            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null) : 
-            this(container, RegistrySharing.CloneAndDropCache, registerDescriptor) {}
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null) :
+            this(container, RegistrySharing.CloneAndDropCache, registerDescriptor)
+        { }
 
         /// <summary>
         /// `container` is the existing container which will be cloned with the MS.DI rules and its cache will be dropped,
@@ -133,7 +134,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             RegistrySharing registrySharing = RegistrySharing.Share)
         {
             if (container.Rules != Rules.MicrosoftDependencyInjectionRules)
-                container = container.With(container.Rules.WithMicrosoftDependencyInjectionRules(), 
+                container = container.With(container.Rules.WithMicrosoftDependencyInjectionRules(),
                     container.ScopeContext, registrySharing, container.SingletonScope);
 
             container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
@@ -149,7 +150,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
 
         /// <summary>Sugar to create the DryIoc container and adapter populated with services</summary>
-        public static IServiceProvider CreateServiceProvider(this IServiceCollection services) => 
+        public static IServiceProvider CreateServiceProvider(this IServiceCollection services) =>
             new Container(DryIoc.Rules.MicrosoftDependencyInjectionRules).WithDependencyInjectionAdapter(services);
 
         /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
@@ -224,7 +225,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <summary>Converts the MS.DI ServiceLifetime into the corresponding `DryIoc.IReuse`</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static IReuse ToReuse(this ServiceLifetime lifetime) =>
-            lifetime == ServiceLifetime.Singleton ? Reuse.Singleton : 
+            lifetime == ServiceLifetime.Singleton ? Reuse.Singleton :
             lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton : // check that we have Reuse.ScopedOrSingleton here instead of Reuse.Scoped
             Reuse.Transient;
 
@@ -235,18 +236,18 @@ namespace DryIoc.Microsoft.DependencyInjection
             var implType = descriptor.ImplementationType;
             if (implType != null)
             {
-                container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType, null, null, 
+                container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType, null, null,
                     isStaticallyChecked: implType == serviceType);
             }
             else if (descriptor.ImplementationFactory != null)
             {
-                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory.ToFactoryDelegate, descriptor.Lifetime.ToReuse()), serviceType, null, null, 
+                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory.ToFactoryDelegate, descriptor.Lifetime.ToReuse()), serviceType, null, null,
                     isStaticallyChecked: true);
             }
             else
             {
                 var instance = descriptor.ImplementationInstance;
-                container.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton), serviceType, null, null, 
+                container.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton), serviceType, null, null,
                     isStaticallyChecked: true);
                 container.TrackInstance(instance); // todo: @naming rename to TrackSingletonInstance
             }
@@ -268,7 +269,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         {
             var r = _scopedResolver;
             var scope = r.ScopeContext == null
-                ? Scope.Of(r.OwnCurrentScope) 
+                ? Scope.Of(r.OwnCurrentScope)
                 : r.ScopeContext.SetCurrent(p => Scope.Of(p));
             return new DryIocServiceScope(r.WithCurrentScope(scope));
         }
@@ -305,14 +306,14 @@ namespace DryIoc.Microsoft.DependencyInjection
                 return false;
 
             if (serviceType == typeof(IServiceProviderIsService) ||
-                serviceType == typeof(ISupportRequiredService)   ||
+                serviceType == typeof(ISupportRequiredService) ||
                 serviceType == typeof(IServiceScopeFactory))
                 return true;
 
             if (_container.IsRegistered(serviceType))
                 return true;
 
-            if (serviceType.IsGenericType && 
+            if (serviceType.IsGenericType &&
                 _container.IsRegistered(serviceType.GetGenericTypeDefinition()))
                 return true;
 
