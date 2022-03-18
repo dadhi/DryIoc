@@ -1452,7 +1452,7 @@ namespace DryIoc
                 return true;
             var r = _registry.Value as Registry;
             var wrappers = r != null ? r.Wrappers : WrappersSupport.Wrappers;
-            return wrappers.GetValueOrDefault(serviceType) != null // todo: @todo reorder things to get faster results for the open-generic wrappers - for the rest perf won't change 
+            return wrappers.GetValueOrDefault(serviceType) != null // todo: @perf reorder things to get faster results for the open-generic wrappers - for the rest perf won't change 
                 || openGenericServiceType != null && wrappers.GetValueOrDefault(openGenericServiceType) != null;
         }
 
@@ -12318,7 +12318,7 @@ namespace DryIoc
             name == null ? new Scope() : new WithParentAndName(null, name);
 
         /// <summary>Creates scope with optional parent and name.</summary>
-        public Scope() : this(_emptySlots.CopyNonEmpty(), ImHashMap<Type, object>.Empty, ImMap.Entry(0, ImList<IDisposable>.Empty)) { }
+        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImMap.Entry(0, ImList<IDisposable>.Empty)) { }
 
         /// <summary>The basic constructor</summary>
         protected Scope(ImMap<object>[] maps, ImHashMap<Type, object> used, ImMap<ImList<IDisposable>> disposables)
