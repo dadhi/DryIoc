@@ -13924,9 +13924,8 @@ namespace DryIoc
         public static T ThrowIfNotInstanceOf<T>(this T arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
             where T : class
         {
-            var arg1ti = arg1.GetTypeInfo();
-            if (arg0 == null && (!arg1ti.IsValueType || arg1ti.IsGenericType && arg1.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
-                arg1ti.IsAssignableFrom(arg0.GetType().GetTypeInfo()))
+            if (arg0 == null && (!arg1.IsValueType || arg1.IsGenericType && arg1.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
+                arg1.IsAssignableFrom(arg0.GetType()))
                 return arg0;
             throw GetMatchedException(ErrorCheck.IsNotOfType, error, arg0, arg1, arg2, arg3, null);
         }
@@ -13934,7 +13933,7 @@ namespace DryIoc
         /// <summary>Throws if <paramref name="arg0"/> is not assignable from <paramref name="arg1"/>.</summary>
         public static Type ThrowIfNotImplementedBy(this Type arg0, Type arg1, int error = -1, object arg2 = null, object arg3 = null)
         {
-            if (arg1.IsAssignableTo(arg0)) return arg0;
+            if (arg0.IsAssignableFrom(arg1)) return arg0;
             throw GetMatchedException(ErrorCheck.TypeIsNotOfType, error, arg0, arg1, arg2, arg3, null);
         }
 
@@ -14362,7 +14361,7 @@ namespace DryIoc
                     return p;
             }
 
-            return !includeBase ? null : type.GetTypeInfo().BaseType?.GetPropertyOrNull(name, includeBase);
+            return !includeBase ? null : type.BaseType?.GetPropertyOrNull(name, includeBase);
         }
 
         /// <summary>Returns field by name, including inherited. Or null if not found.</summary>
@@ -14380,11 +14379,11 @@ namespace DryIoc
                     return f;
             }
 
-            return !includeBase ? null : type.GetTypeInfo().BaseType?.GetFieldOrNull(name, includeBase);
+            return !includeBase ? null : type.BaseType?.GetFieldOrNull(name, includeBase);
         }
 
         /// <summary>Returns type assembly.</summary>
-        public static Assembly GetAssembly(this Type type) => type.GetTypeInfo().Assembly;
+        public static Assembly GetAssembly(this Type type) => type.Assembly;
 
         /// <summary>Is <c>true</c> for interface declared property explicitly implemented, e.g. <c>IInterface.Prop</c></summary>
         public static bool IsExplicitlyImplemented(this PropertyInfo property) => property.Name.Contains(".");
