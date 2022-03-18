@@ -60,10 +60,11 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             var x = new X();
-            
+
             using (var scope = container.OpenScope())
             {
-                scope.UseMany(x, typeof(A), typeof(B));
+                scope.Use(typeof(A), x);
+                scope.Use(typeof(B), x);
                 Assert.IsInstanceOf<X>(scope.Resolve<A>());
                 Assert.IsInstanceOf<X>(scope.Resolve<B>());
 

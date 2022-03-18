@@ -725,11 +725,11 @@ namespace DryIoc
                 }
         }
 
-        /// Adding the factory directly to scope for resolution 
-        public void Use(Type serviceType, FactoryDelegate factory)
+        /// <summary>Setting the factory directly to scope for resolution</summary> 
+        public void Use(Type serviceType, object instance)
         {
             var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
-            (CurrentScope ?? SingletonScope).SetUsedInstance(serviceTypeHash, serviceType, factory);
+            (CurrentScope ?? SingletonScope).SetUsed(serviceTypeHash, serviceType, instance);
 
             // reset the cache if any
             var cacheEntry = Registry.GetCachedDefaultFactoryOrDefault(_registry.Value, serviceTypeHash, serviceType);
@@ -4439,6 +4439,10 @@ namespace DryIoc
         public static bool ClearCache(this IContainer container, Type serviceType,
             FactoryType? factoryType = null, object serviceKey = null) =>
             container.ClearCache(serviceType, factoryType, serviceKey);
+
+        /// <summary>Setting the factory directly to scope for resolution</summary> 
+        public static void Use(this IContainer container, Type serviceType, FactoryDelegate factory) =>
+            container.Use(serviceType, factory);
     }
 
     /// <summary>Interface used to convert reuse instance to expression.</summary>
@@ -4552,7 +4556,7 @@ namespace DryIoc
         IResolverContext WithCurrentScope(IScope scope);
 
         /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
-        void Use(Type serviceType, FactoryDelegate factory);
+        void Use(Type serviceType, object instance);
 
         /// <summary>For given instance resolves and sets properties and fields.</summary>
         void InjectPropertiesAndFields(object instance, string[] propertyAndFieldNames);
@@ -4698,9 +4702,10 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public static bool IsUsed(this IResolverContext r, Type serviceType)
         {
-            var f = r.CurrentScope?.GetUsedFactoryOrNull(serviceType)
-                ?? r.SingletonScope.GetUsedFactoryOrNull(serviceType);
-            return f != null;
+            var hash = RuntimeHelpers.GetHashCode(serviceType);
+            var scope = r.CurrentScope;
+            return scope != null && scope.TryGetUsed(hash, serviceType, out _) 
+                || r.SingletonScope.TryGetUsed(hash, serviceType, out _);
         }
 
         /// <summary>Check if the service instance or factory is added to the current or singleton scope</summary>
@@ -4710,10 +4715,15 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         internal static bool TryGetUsedInstance(this IResolverContext r, int serviceTypeHash, Type serviceType, out object instance)
         {
-            var f = r.CurrentScope?.GetUsedFactoryOrNull(serviceTypeHash, serviceType)
-                ?? r.SingletonScope.GetUsedFactoryOrNull(serviceTypeHash, serviceType);
-            instance = f != null ? f(r) : null;
-            return f != null;
+            var scope = r.CurrentScope;
+            if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
+                r.SingletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
+            {
+                instance = used is FactoryDelegate f ? f(r) : used;
+                return true;
+            }
+            instance = null;
+            return false;
         }
 
         // todo: @perf no need to check for IDisposable in TrackDisposable
@@ -7776,79 +7786,63 @@ namespace DryIoc
 
         /// <summary>Adding the factory directly to scope for resolution</summary> 
         public static void Use<TService>(this IResolverContext r, Func<IResolverContext, TService> factory) =>
-            r.Use(typeof(TService), factory.ToFactoryDelegate);
+            r.Use(typeof(TService), (FactoryDelegate)factory.ToFactoryDelegate);
+
+        /// <summary>Adding the factory directly to the scope for resolution</summary>
+        public static void Use(this IResolverContext r, Type serviceType, FactoryDelegate factory) =>
+            r.Use(serviceType, factory);
+
+        /// <summary>Adding the factory directly to the scope for resolution</summary>
+        public static void Use<TService>(this IResolverContext r, FactoryDelegate factory) =>
+            r.Use(typeof(TService), factory);
 
         /// <summary>Adding the instance directly to the scope for resolution</summary>
         public static void Use(this IResolverContext r, Type serviceType, object instance) =>
-            r.Use(serviceType, instance.ToFactoryDelegate);
+            r.Use(serviceType, instance);
 
         /// <summary>Adding the instance directly to the scope for resolution</summary> 
         public static void Use<TService>(this IResolverContext r, TService instance) =>
-            r.Use(typeof(TService), instance.ToFactoryDelegate);
-
-        /// <summary>Adding the instance directly to the scope for resolution mapped to the multiple services</summary>
-        public static void UseMany(this IResolverContext r, object instance, params Type[] serviceTypes)
-        {
-            FactoryDelegate f = instance.ToFactoryDelegate;
-            foreach (var t in serviceTypes)
-                r.Use(t, f);
-        }
-
-        /// <summary>Adding the instance directly to the scope for resolution mapped to the multiple services</summary>
-        public static void UseMany(this IRegistrator r, object instance, params Type[] serviceTypes)
-        {
-            FactoryDelegate f = instance.ToFactoryDelegate;
-            foreach (var t in serviceTypes)
-                r.Use(t, f);
-        }
-
-        /// <summary>Adding the instance directly to the scope for resolution mapped to the multiple services</summary>
-        public static void UseMany(this IContainer c, object instance, params Type[] serviceTypes) =>
-            ((IResolverContext)c).UseMany(instance, serviceTypes);
-
-        /// <summary>Adding the produced instance directly to the scope for resolution mapped to the multiple services</summary>
-        public static void UseMany(this IResolverContext r, Func<IResolverContext, object> factory, params Type[] serviceTypes)
-        {
-            FactoryDelegate f = factory.ToFactoryDelegate;
-            foreach (var t in serviceTypes)
-                r.Use(t, f);
-        }
-
-        /// <summary>Adding the produced instance directly to the scope for resolution mapped to the multiple services</summary>
-        public static void UseMany(this IRegistrator r, Func<IResolverContext, object> factory, params Type[] serviceTypes)
-        {
-            FactoryDelegate f = factory.ToFactoryDelegate;
-            foreach (var t in serviceTypes)
-                r.Use(t, f);
-        }
-
-        /// <summary>Adding the instance directly to the scope for resolution mapped to the multiple services</summary>
-        public static void UseMany(this IContainer c, Func<IResolverContext, object> factory, params Type[] serviceTypes) =>
-            ((IResolverContext)c).UseMany(factory, serviceTypes);
+            r.Use(typeof(TService), instance);
 
         /// <summary>Adding the factory directly to the scope for resolution</summary>
         public static void Use<TService>(this IRegistrator r, Func<IResolverContext, TService> factory) =>
-            r.Use(typeof(TService), factory.ToFactoryDelegate);
+            r.Use(typeof(TService), (FactoryDelegate)factory.ToFactoryDelegate);
+
+        /// <summary>Adding the factory directly to the scope for resolution</summary>
+        public static void Use<TService>(this IRegistrator r, FactoryDelegate factory) =>
+            r.Use(typeof(TService), factory);
+
+        /// <summary>Adding the factory directly to the scope for resolution</summary>
+        public static void Use(this IRegistrator r, Type serviceType, FactoryDelegate factory) =>
+            r.Use(serviceType, factory);
 
         /// <summary>Adding the instance directly to scope for resolution</summary>
         public static void Use(this IRegistrator r, Type serviceType, object instance) =>
-            r.Use(serviceType, instance.ToFactoryDelegate);
+            r.Use(serviceType, instance);
 
         /// <summary>Adding the instance directly to scope for resolution</summary> 
         public static void Use<TService>(this IRegistrator r, TService instance) =>
-            r.Use(typeof(TService), instance.ToFactoryDelegate);
+            r.Use(typeof(TService), instance);
 
         /// <summary>Adding the factory directly to scope for resolution</summary> 
         public static void Use<TService>(this IContainer c, Func<IResolverContext, TService> factory) =>
-            ((IResolverContext)c).Use(typeof(TService), factory.ToFactoryDelegate);
+            ((IResolverContext)c).Use(typeof(TService), (FactoryDelegate)factory.ToFactoryDelegate);
+
+        /// <summary>Adding the factory directly to scope for resolution</summary> 
+        public static void Use<TService>(this IContainer c, FactoryDelegate factory) =>
+            ((IResolverContext)c).Use(typeof(TService), factory);
+
+        /// <summary>Adding the factory directly to scope for resolution</summary> 
+        public static void Use(this IContainer c, Type serviceType, FactoryDelegate factory) =>
+            ((IResolverContext)c).Use(serviceType, factory);
 
         /// <summary>Adding the instance directly to scope for resolution</summary>
         public static void Use(this IContainer c, Type serviceType, object instance) =>
-            ((IResolverContext)c).Use(serviceType, instance.ToFactoryDelegate);
+            ((IResolverContext)c).Use(serviceType, instance);
 
         /// <summary>Adding the instance directly to scope for resolution</summary>
         public static void Use<TService>(this IContainer c, TService instance) =>
-            ((IResolverContext)c).Use(typeof(TService), instance.ToFactoryDelegate);
+            ((IResolverContext)c).Use(typeof(TService), instance);
 
         /// <summary>
         /// Registers initializing action that will be called after service is resolved 
@@ -12239,10 +12233,10 @@ namespace DryIoc
         void SetOrAdd(int id, object item);
 
         /// <summary>Sets (replaces) the used instance factory for the specified type.</summary>
-        void SetUsedInstance(int hash, Type type, FactoryDelegate factory);
+        void SetUsed(int hash, Type type, object instance);
 
         /// <summary>Try to retrieve factory or instance (wrapped in factory) via the Use method.</summary>
-        FactoryDelegate GetUsedFactoryOrNull(int hash, Type type);
+        bool TryGetUsed(int hash, Type type, out object instance);
 
         /// <summary>The method will clone the scope factories and already created services,
         /// but may or may not drop the disposables thus ensuring that only the new disposables added in clone will be disposed</summary>
@@ -12255,24 +12249,30 @@ namespace DryIoc
         /// <summary>The method will clone the scope factories and already created services, including the tracked disposables</summary>
         public static IScope Clone(this IScope s) => s.Clone(true);
 
-        /// <summary>Try retrieve the used factory from the scope.</summary>
+        /// <summary>Check if the service instance or factory is set to the scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static FactoryDelegate GetUsedFactoryOrNull(this IScope s, Type type) =>
-            s.GetUsedFactoryOrNull(RuntimeHelpers.GetHashCode(type), type);
+        public static bool IsUsed(this IScope s, Type serviceType) =>
+            s.TryGetUsed(RuntimeHelpers.GetHashCode(serviceType), serviceType, out _);
 
-        /// <summary>Check if the service instance or factory is added to the scope</summary>
+        /// <summary>Sets (replaces) instance to the scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static bool IsUsed(this IScope s, Type serviceType) => s.GetUsedFactoryOrNull(serviceType) != null;
+        public static void UseFactory(this IScope s, Type type, FactoryDelegate factory) =>
+            s.SetUsed(RuntimeHelpers.GetHashCode(type), type, factory);
 
-        /// <summary>Sets (replaces) instance to the small scope registry via factory</summary>
+        /// <summary>Sets (replaces) instance to the scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void UseInstance(this IScope s, Type type, FactoryDelegate factory) =>
-            s.SetUsedInstance(RuntimeHelpers.GetHashCode(type), type, factory);
+        public static void UseFactory<T>(this IScope s, FactoryDelegate factory) => 
+            s.UseFactory(typeof(T), factory);
 
-        /// <summary>Sets (replaces) instance to the small scope registry via factory</summary>
+        /// <summary>Sets (replaces) instance in the scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void UseInstance<T>(this IScope s, object instance) => 
-            s.UseInstance(typeof(T), instance.ToFactoryDelegate);
+        public static void Use(this IScope s, Type type, object instance) =>
+            s.SetUsed(RuntimeHelpers.GetHashCode(type), type, instance);
+
+        /// <summary>Sets (replaces) instance in the scope</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static void Use<T>(this IScope s, object instance) => 
+            s.Use(typeof(T), instance);
     }
 
     /// <summary>
@@ -12292,7 +12292,7 @@ namespace DryIoc
         private int _disposed;
 
         private ImMap<ImList<IDisposable>> _disposables;
-        private ImHashMap<Type, FactoryDelegate> _factories;
+        private ImHashMap<Type, object> _used;
 
         internal const int MAP_COUNT = 16;
         internal const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
@@ -12340,13 +12340,13 @@ namespace DryIoc
         }
 
         /// <summary>Creates scope with optional parent and name.</summary>
-        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, FactoryDelegate>.Empty, ImMap<ImList<IDisposable>>.Empty) { }
+        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImMap<ImList<IDisposable>>.Empty) { }
 
         /// <summary>The basic constructor</summary>
-        protected Scope(ImMap<object>[] maps, ImHashMap<Type, FactoryDelegate> factories, ImMap<ImList<IDisposable>> disposables)
+        protected Scope(ImMap<object>[] maps, ImHashMap<Type, object> used, ImMap<ImList<IDisposable>> disposables)
         {
             _disposables = disposables; // todo: @perf can we put the this into unorderedDisposables and save the space
-            _factories = factories;   // todo: @perf can we put the this into unorderedDisposables and save the space
+            _used = used; // todo: @perf can we put the this into unorderedDisposables and save the space
             _maps = maps;
         }
 
@@ -12360,8 +12360,8 @@ namespace DryIoc
                 Name = name;
             }
 
-            internal WithParentAndName(IScope parent, object name, ImMap<object>[] maps, ImHashMap<Type, FactoryDelegate> factories, ImMap<ImList<IDisposable>> disposables)
-                : base(maps, factories, disposables)
+            internal WithParentAndName(IScope parent, object name, ImMap<object>[] maps, ImHashMap<Type, object> used, ImMap<ImList<IDisposable>> disposables)
+                : base(maps, used, disposables)
             {
                 Parent = parent;
                 Name = name;
@@ -12369,15 +12369,15 @@ namespace DryIoc
 
             public override IScope Clone(bool withDisposables) =>
                 !withDisposables
-                ? new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _factories, ImMap<ImList<IDisposable>>.Empty) // dropping the disposables
-                : new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _factories, _disposables); // Не забыть скопировать папу (коментарий для дочки)
+                ? new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, ImMap<ImList<IDisposable>>.Empty) // dropping the disposables
+                : new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, _disposables); // Не забыть скопировать папу (коментарий для дочки)
         }
 
         /// <inheritdoc />
         public virtual IScope Clone(bool withDisposables) =>
             !withDisposables
-            ? new Scope(_maps.CopyNonEmpty(), _factories, ImMap<ImList<IDisposable>>.Empty) // dropping the disposables
-            : new Scope(_maps.CopyNonEmpty(), _factories, _disposables);
+            ? new Scope(_maps.CopyNonEmpty(), _used, ImMap<ImList<IDisposable>>.Empty) // dropping the disposables
+            : new Scope(_maps.CopyNonEmpty(), _used, _disposables);
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
@@ -12554,29 +12554,33 @@ namespace DryIoc
         internal static readonly MethodInfo TrackDisposableMethod = typeof(IScope).GetMethod(nameof(IScope.TrackDisposable));
 
         /// <inheritdoc />
-        public void SetUsedInstance(int hash, Type type, FactoryDelegate factory)
+        public void SetUsed(int hash, Type type, object instance)
         {
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
-            var f = _factories;
-            if (Interlocked.CompareExchange(ref _factories, f.AddOrUpdate(hash, type, factory), f) != f)
-                Ref.Swap(ref _factories, hash, type, factory, (x, h, t, fac) => x.AddOrUpdate(h, t, fac));
+            var u = _used;
+            if (Interlocked.CompareExchange(ref _used, u.AddOrUpdate(hash, type, instance), u) != u)
+                Ref.Swap(ref _used, hash, type, instance, (x, h, t, i) => x.AddOrUpdate(h, t, i));
         }
 
         /// <summary>Try retrieve the used factory from the scope.</summary>
-        public FactoryDelegate GetUsedFactoryOrNull(int hash, Type type)
+        public bool TryGetUsed(int hash, Type type, out object used)
         {
             if (_disposed == 1)
-                return null;
-
-            if (!_factories.IsEmpty)
             {
-                var factory = _factories.GetValueOrDefault(hash, type);
-                if (factory != null)
-                    return factory;
+                used = default;
+                return false;
             }
 
-            return Parent?.GetUsedFactoryOrNull(hash, type);
+            if (!_used.IsEmpty)
+                return _used.TryFind(hash, type, out used);
+            
+            var p = Parent;
+            if (p != null)
+                return p.TryGetUsed(hash, type, out used);
+
+            used = default;
+            return false;
         }
 
         /// <summary>Enumerates all the parent scopes upwards starting from this one.</summary>
@@ -12605,8 +12609,8 @@ namespace DryIoc
             else if (!ds.IsEmpty)
                 SafelyDisposeOrderedDisposables(ds);
 
-            _disposables = ImMap<ImList<IDisposable>>.Empty;
-            _factories = ImHashMap<Type, FactoryDelegate>.Empty;
+            _disposables = ImMap<ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
+            _used = ImHashMap<Type, object>.Empty;
             _maps = _emptySlots;
         }
 
@@ -13359,7 +13363,7 @@ namespace DryIoc
         Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType);
 
         /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
-        void Use(Type serviceType, FactoryDelegate factory);
+        void Use(Type serviceType, object instance);
     }
 
     /// <summary>What to do with registrations when creating the new container from the existent one.</summary>
@@ -13482,7 +13486,7 @@ namespace DryIoc
         bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey);
 
         /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
-        new void Use(Type serviceType, FactoryDelegate factory);
+        new void Use(Type serviceType, object instance);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,

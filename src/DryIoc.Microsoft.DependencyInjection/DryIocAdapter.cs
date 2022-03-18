@@ -138,10 +138,10 @@ namespace DryIoc.Microsoft.DependencyInjection
                     container.ScopeContext, registrySharing, container.SingletonScope);
 
             var capabilities = new DryIocServiceProviderCapabilities(container);
-            container.SingletonScope.UseInstance<IServiceProviderIsService>(capabilities);
-            container.SingletonScope.UseInstance<ISupportRequiredService>(capabilities);
-
-            container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
+            var singletons = container.SingletonScope;
+            singletons.Use<IServiceProviderIsService>(capabilities);
+            singletons.Use<ISupportRequiredService>(capabilities);
+            singletons.UseFactory<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
 
             if (descriptors != null)
                 container.Populate(descriptors, registerDescriptor);
