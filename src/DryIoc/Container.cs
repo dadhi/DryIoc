@@ -12345,8 +12345,8 @@ namespace DryIoc
         /// <summary>The basic constructor</summary>
         protected Scope(ImMap<object>[] maps, ImHashMap<Type, object> used, ImMap<ImList<IDisposable>> disposables)
         {
-            _disposables = disposables; // todo: @perf can we put the this into unorderedDisposables and save the space
-            _used = used; // todo: @perf can we put the this into unorderedDisposables and save the space
+            _disposables = disposables;
+            _used = used;
             _maps = maps;
         }
 
