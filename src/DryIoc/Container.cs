@@ -699,7 +699,7 @@ namespace DryIoc
             {
                 var matchedMembers = instanceType.GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
                     .Match(propertyAndFieldNames,
-                        (p, m) => (m is PropertyInfo || m is FieldInfo) && propertyAndFieldNames.IndexOf(m.Name) != -1,
+                        (p, m) => (m is PropertyInfo || m is FieldInfo) && p.IndexOf(m.Name) != -1,
                         (p, x) => PropertyOrFieldServiceInfo.Of(x));
 
                 propertiesAndFields = matchedMembers.ToFunc<Request, IEnumerable<PropertyOrFieldServiceInfo>>;
