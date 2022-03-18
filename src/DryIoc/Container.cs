@@ -263,11 +263,8 @@ namespace DryIoc
             _registry.Swap(r => Registry.Register(r, factory, serviceType, ifAlreadyRegistered.Value, serviceKey));
 
         /// <inheritdoc />
-        public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
-        {
-            ThrowIfRootContainerDisposed();
-            return Registry.IsRegistered(_registry.Value, serviceType, serviceKey, factoryType, condition);
-        }
+        public bool IsRegistered(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition) =>
+            Registry.IsRegistered(_registry.Value, serviceType, serviceKey, factoryType, condition);
 
         /// <inheritdoc />
         public void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
