@@ -244,30 +244,27 @@ namespace DryIoc.ImTools
             source == null ? Empty<T>() : source as IList<T> ?? source.ToList();
 
         /// <summary>Array copy</summary>
-        public static T[] Copy<T>(this T[] items)
+        public static T[] Copy<T>(this T[] source)
         {
-            if (items == null || items.Length == 0)
-                return items;
-            var count = items.Length;
+            if (source == null || source.Length == 0)
+                return source;
+            var count = source.Length;
             var copy = new T[count];
             if (count < 6)
                 for (var i = 0; i < count; ++i)
-                    copy[i] = items[i];
+                    copy[i] = source[i];
             else
-                Array.Copy(items, 0, copy, 0, count);
+                Array.Copy(source, 0, copy, 0, count);
             return copy;
         }
 
-        /// <summary>Array copy without checking the items for the null or the emptyness</summary>
-        public static T[] CopyNonEmpty<T>(this T[] items)
+        /// <summary>Fast array copy without checking the items for the null or the emptyness</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static T[] CopyNonEmpty<T>(this T[] source)
         {
-            var count = items.Length;
+            var count = source.Length;
             var copy = new T[count];
-            if (count < 6)
-                for (var i = 0; i < count; ++i)
-                    copy[i] = items[i];
-            else
-                Array.Copy(items, 0, copy, 0, count);
+            Array.Copy(source, 0, copy, 0, count);
             return copy;
         }
 

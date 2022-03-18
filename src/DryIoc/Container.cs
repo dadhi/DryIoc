@@ -12291,13 +12291,12 @@ namespace DryIoc
 
         internal static readonly object NoItem = new object();
 
-        // todo: @perf the opportumity to keep it null with the check if it is null, e.g. _maps[index]?.GetValueOrDefault()... will be faster
         private static ImMap<object>[] _emptySlots = CreateEmptyMaps();
 
         private static ImMap<object>[] CreateEmptyMaps()
         {
-            var empty = ImMap<object>.Empty;
             var slots = new ImMap<object>[MAP_COUNT];
+            var empty = ImMap<object>.Empty;
             for (var i = 0; i < MAP_COUNT; ++i)
                 slots[i] = empty;
             return slots;
@@ -12319,7 +12318,7 @@ namespace DryIoc
             name == null ? new Scope() : new WithParentAndName(null, name);
 
         /// <summary>Creates scope with optional parent and name.</summary>
-        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImMap.Entry(0, ImList<IDisposable>.Empty)) { }
+        public Scope() : this(_emptySlots.CopyNonEmpty(), ImHashMap<Type, object>.Empty, ImMap.Entry(0, ImList<IDisposable>.Empty)) { }
 
         /// <summary>The basic constructor</summary>
         protected Scope(ImMap<object>[] maps, ImHashMap<Type, object> used, ImMap<ImList<IDisposable>> disposables)
