@@ -944,7 +944,7 @@ namespace DryIoc
             if (entry is Factory defaultFactory &&
                 (rules.DynamicRegistrationProviders == null ||
                 !rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)))
-                return (serviceKey == null || serviceKey == DefaultKey.Value) 
+                return (serviceKey == null || serviceKey == DefaultKey.Value)
                     && request.MatchFactoryConditionAndMetadata(details, defaultFactory)
                     ? defaultFactory : null;
 
@@ -12331,7 +12331,7 @@ namespace DryIoc
         }
 
         /// <summary>Creates scope with optional parent and name.</summary>
-        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImMap<ImList<IDisposable>>.Empty) { }
+        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImMap.Entry(0, ImList<IDisposable>.Empty)) { }
 
         /// <summary>The basic constructor</summary>
         protected Scope(ImMap<object>[] maps, ImHashMap<Type, object> used, ImMap<ImList<IDisposable>> disposables)
@@ -12360,7 +12360,7 @@ namespace DryIoc
 
             public override IScope Clone(bool withDisposables) =>
                 !withDisposables
-                ? new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, ImMap<ImList<IDisposable>>.Empty) // dropping the disposables
+                ? new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, ImMap.Entry(0, ImList<IDisposable>.Empty)) // dropping the disposables
                 : new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, _disposables); // Не забыть скопировать папу (коментарий для дочки)
         }
 
@@ -12498,22 +12498,27 @@ namespace DryIoc
 
         internal void AddDisposable(IDisposable disposable, int disposalOrder = 0)
         {
-            var e = _disposables.GetEntryOrDefault(disposalOrder) ?? AddDisposableEntry(disposalOrder);
-            var items = e.Value;
-            if (Interlocked.CompareExchange(ref e.Value, items.Push(disposable), items) != items)
-                Ref.Swap(ref e.Value, disposable, (x, d) => x.Push(d));
+            if (disposalOrder == 0)
+                AddUnorderedDisposable(disposable);
+            else
+            {
+                var e = _disposables.GetEntryOrDefault(disposalOrder) ?? AddDisposableEntry(disposalOrder);
+                var items = e.Value;
+                if (Interlocked.CompareExchange(ref e.Value, items.Push(disposable), items) != items)
+                    Ref.Swap(ref e.Value, disposable, (x, d) => x.Push(d));
+            }
         }
 
         [MethodImpl((MethodImplOptions)256)]
         internal void AddUnorderedDisposable(IDisposable disposable)
         {
-            var e = _disposables.GetEntryOrDefault(0) ?? AddDisposableEntry(0);
+            var e = _disposables.GetEntryOrDefault(0);
             var items = e.Value;
             if (Interlocked.CompareExchange(ref e.Value, items.Push(disposable), items) != items)
                 Ref.Swap(ref e.Value, disposable, (x, d) => x.Push(d));
         }
 
-        private ImMapEntry<ImList<IDisposable>> AddDisposableEntry(int disposableOrder = 0)
+        private ImMapEntry<ImList<IDisposable>> AddDisposableEntry(int disposableOrder)
         {
             Ref.Swap(ref _disposables, disposableOrder, (x, o) => x.AddOrKeep(o, ImList<IDisposable>.Empty));
             return _disposables.GetSurePresentEntry(disposableOrder);
