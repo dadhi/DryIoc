@@ -891,11 +891,14 @@ namespace DryIoc
                 }
             }
 
-            if (Rules.FactorySelector != null && serviceKey == null)
-                return GetRuleSelectedServiceFactoryOrDefault(request, details, serviceType);
+            var serviceFactories = _registry.Value;
+            if (serviceFactories is Registry r)
+                serviceFactories = r.Services;
 
-            var registryOrServices = _registry.Value;
-            var serviceFactories = registryOrServices is Registry r ? r.Services : registryOrServices;
+            var rules = Rules;
+            if (rules.FactorySelector != null && serviceKey == null)
+                return GetRuleSelectedServiceFactoryOrDefault(rules, serviceFactories, request, details, serviceType);
+
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             // For closed-generic type, when the entry is not found or the key in entry is not found go for the open-generic services
@@ -908,7 +911,7 @@ namespace DryIoc
                     entry is FactoriesEntry factoriesEntry && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null))
                     entry = serviceFactories.GetValueOrDefault(openGenericServiceType) ?? entry;
 
-                if (entry == null && Rules.VariantGenericTypesInResolve)
+                if (entry == null && rules.VariantGenericTypesInResolve)
                 {
                     foreach (var e in serviceFactories.Enumerate())
                     {
@@ -937,24 +940,19 @@ namespace DryIoc
                 }
             }
 
-            // Most common case when we have a single default factory and no dynamic rules to always apply
+            // Hot path - when we have a single default factory and no dynamic rules to always apply
             if (entry is Factory defaultFactory &&
-                (Rules.DynamicRegistrationProviders == null ||
-                !Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)))
-            {
-                var setup = defaultFactory.Setup;
-                if (serviceKey != null && serviceKey != DefaultKey.Value ||
-                    setup.Condition != null && !setup.Condition(request) ||
-                    (details.MetadataKey != null || details.Metadata != null) && !setup.MatchesMetadata(details.MetadataKey, details.Metadata))
-                    return null;
-                return defaultFactory;
-            }
+                (rules.DynamicRegistrationProviders == null ||
+                !rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)))
+                return (serviceKey == null || serviceKey == DefaultKey.Value) 
+                    && request.MatchFactoryConditionAndMetadata(details, defaultFactory)
+                    ? defaultFactory : null;
 
             var factories = entry == null ? Empty<KV<object, Factory>>()
                 : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
                 : entry.To<FactoriesEntry>().Factories.ToArray(x => KV.Of(x.Key, x.Value)).Match(x => x.Value != null); // filter out the Unregistered factories (see #390)
 
-            if (Rules.DynamicRegistrationProviders != null &&
+            if (rules.DynamicRegistrationProviders != null &&
                 !serviceType.IsExcludedGeneralPurposeServiceType() &&
                 !((IContainer)this).IsWrapper(serviceType, openGenericServiceType))
                 factories = CombineRegisteredServiceWithDynamicFactories(factories, serviceType, openGenericServiceType, serviceKey);
@@ -983,7 +981,7 @@ namespace DryIoc
             factories = factories.Match(request, details, (r, d, x) => r.MatchFactoryConditionAndMetadata(d, x.Value));
 
             // Check the for the reuse matching scopes (for a single the check will be down the road) (BBIssue: #175)
-            if (factories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
+            if (factories.Length > 1 && rules.ImplicitCheckForReuseMatchingScope)
             {
                 KV<object, Factory> singleMatchedFactory = null;
                 var reuseMatchedFactories = factories.Match(request, (r, x) => r.MatchFactoryReuse(x.Value));
@@ -1040,31 +1038,27 @@ namespace DryIoc
             return null;
         }
 
-        private Factory GetRuleSelectedServiceFactoryOrDefault(Request request, ServiceDetails details, Type serviceType)
+        private Factory GetRuleSelectedServiceFactoryOrDefault(Rules rules,
+            ImHashMap<Type, object> serviceFactories, Request request, ServiceDetails details, Type serviceType)
         {
-            var serviceFactories = _registry.Value;
-            if (serviceFactories is Registry r)
-                serviceFactories = r.Services;
-
+            // Hot path - a single factory, no dynamic rules
             var entry = serviceFactories.GetValueOrDefault(serviceType);
+            if (entry is Factory defaultFactory &&
+                (rules.DynamicRegistrationProviders == null ||
+                !rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)))
+                return !request.MatchFactoryConditionAndMetadata(details, defaultFactory) ? null
+                    : rules.IsSelectLastRegisteredFactory ? defaultFactory
+                    : rules.FactorySelector(request, defaultFactory, null);
 
             var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
             KV<object, Factory>[] factories;
-            if (entry is Factory defaultFactory)
+            if (entry is Factory singleFactory)
             {
-                var setup = defaultFactory.Setup;
-                if (Rules.DynamicRegistrationProviders == null ||
-                   !Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback))
-                    return setup.Condition != null && !setup.Condition(request)
-                        || (details.MetadataKey != null || details.Metadata != null) && !setup.MatchesMetadata(details.MetadataKey, details.Metadata)
-                        ? null
-                        : Rules.IsSelectLastRegisteredFactory ? defaultFactory
-                        : Rules.FactorySelector(request, defaultFactory, null);
-
-                factories = new[] { new KV<object, Factory>(DefaultKey.Value, defaultFactory) };
+                factories = new[] { new KV<object, Factory>(DefaultKey.Value, singleFactory) };
             }
             else if (entry is FactoriesEntry e)
             {
+                // todo: @perf combine in one method
                 factories = e.Factories.ToArray(x => KV.Of(x.Key, x.Value)).Match(x => x.Value != null); // filter out the Unregistered factories
             }
             else
@@ -1079,7 +1073,7 @@ namespace DryIoc
                             ? new[] { new KV<object, Factory>(DefaultKey.Value, gf) }
                             : ((FactoriesEntry)openGenericEntry).Factories.ToArray(x => KV.Of(x.Key, x.Value)).Match(x => x.Value != null); // filter out the Unregistered factories
 
-                    if (openGenericEntry == null && Rules.VariantGenericTypesInResolve)
+                    if (openGenericEntry == null && rules.VariantGenericTypesInResolve)
                     {
                         foreach (var sf in serviceFactories.Enumerate())
                         {
@@ -1107,7 +1101,7 @@ namespace DryIoc
                 }
             }
 
-            if (Rules.DynamicRegistrationProviders != null &&
+            if (rules.DynamicRegistrationProviders != null &&
                 !serviceType.IsExcludedGeneralPurposeServiceType() &&
                 !((IContainer)this).IsWrapper(serviceType, openGenericServiceType))
                 factories = CombineRegisteredServiceWithDynamicFactories(factories, serviceType, openGenericServiceType);
@@ -1118,7 +1112,7 @@ namespace DryIoc
             // optimize for the case with the single factory
             if (factories.Length == 1)
                 return request.MatchFactoryConditionAndMetadata(details, factories[0].Value)
-                    ? Rules.FactorySelector(request, factories[0].Value, null)
+                    ? rules.FactorySelector(request, factories[0].Value, null)
                     : null;
 
             // Sort in registration order
@@ -1126,7 +1120,7 @@ namespace DryIoc
                 Array.Sort(factories, _lastFactoryIDWinsComparer);
 
             var matchedFactories = factories.Match(request, details, (r, d, x) => r.MatchFactoryConditionAndMetadata(d, x.Value));
-            if (matchedFactories.Length > 1 && Rules.ImplicitCheckForReuseMatchingScope)
+            if (matchedFactories.Length > 1 && rules.ImplicitCheckForReuseMatchingScope)
             {
                 // Check for the matching scopes. Only for more than one factory, 
                 // for the single factory the check will be down the road (BBIssue #175)
@@ -1145,8 +1139,8 @@ namespace DryIoc
                 return null;
 
             var selectedFactory = matchedFactories.Length == 1
-                ? Rules.FactorySelector(request, matchedFactories[0].Value, null)
-                : Rules.FactorySelector(request, null, matchedFactories);
+                ? rules.FactorySelector(request, matchedFactories[0].Value, null)
+                : rules.FactorySelector(request, null, matchedFactories);
             if (selectedFactory == null)
                 return null;
 
@@ -4701,7 +4695,7 @@ namespace DryIoc
         {
             var hash = RuntimeHelpers.GetHashCode(serviceType);
             var scope = r.CurrentScope;
-            return scope != null && scope.TryGetUsed(hash, serviceType, out _) 
+            return scope != null && scope.TryGetUsed(hash, serviceType, out _)
                 || r.SingletonScope.TryGetUsed(hash, serviceType, out _);
         }
 
@@ -8904,13 +8898,13 @@ namespace DryIoc
     /// <summary>Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations</summary>
     public static class RequestTools
     {
-        /// <summary>Matching things</summary>
+        /// <summary>Matching factory condition if any and the metadata if any</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static bool MatchFactoryConditionAndMetadata(this Request request, ServiceDetails details, Factory factory)
         {
             var setup = factory.Setup;
-            if (setup.Condition != null && !setup.Condition(request))
-                return false;
-            return details.MetadataKey == null && details.Metadata == null || setup.MatchesMetadata(details.MetadataKey, details.Metadata);
+            return (setup.Condition == null || setup.Condition(request))
+                && (details.MetadataKey == null && details.Metadata == null || setup.MatchesMetadata(details.MetadataKey, details.Metadata));
         }
 
         /// <summary>Matching things</summary>
@@ -12258,7 +12252,7 @@ namespace DryIoc
 
         /// <summary>Sets (replaces) instance to the scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void UseFactory<T>(this IScope s, FactoryDelegate factory) => 
+        public static void UseFactory<T>(this IScope s, FactoryDelegate factory) =>
             s.UseFactory(typeof(T), factory);
 
         /// <summary>Sets (replaces) instance in the scope</summary>
@@ -12268,7 +12262,7 @@ namespace DryIoc
 
         /// <summary>Sets (replaces) instance in the scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void Use<T>(this IScope s, object instance) => 
+        public static void Use<T>(this IScope s, object instance) =>
             s.Use(typeof(T), instance);
     }
 
@@ -12571,7 +12565,7 @@ namespace DryIoc
 
             if (!_used.IsEmpty)
                 return _used.TryFind(hash, type, out used);
-            
+
             var p = Parent;
             if (p != null)
                 return p.TryGetUsed(hash, type, out used);
