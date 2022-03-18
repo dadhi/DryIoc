@@ -7159,12 +7159,12 @@ namespace DryIoc
         {
             registrator.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: isChecked);
-            registrator.TrackDisposableInstance(instance, setup);
+            registrator.TrackDisposable(instance, setup);
         }
 
         /// <summary>Tracks the disposable instance in the singleton scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void TrackDisposableInstance(this IRegistrator registrator, object instance)
+        public static void TrackDisposable(this IRegistrator registrator, object instance)
         {
             if (instance is IDisposable d)
                 ((IResolverContext)registrator).SingletonScope.TrackDisposable(d);
@@ -7172,7 +7172,7 @@ namespace DryIoc
 
         /// <summary>Tracks the disposable instance in the singleton scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void TrackDisposableInstance(this IRegistrator registrator, object instance, Setup setup)
+        public static void TrackDisposable(this IRegistrator registrator, object instance, Setup setup)
         {
             if (instance is IDisposable d && (setup == null || (!setup.PreventDisposal && !setup.WeaklyReferenced)))
                 ((IResolverContext)registrator).SingletonScope.TrackDisposable(d);

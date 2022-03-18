@@ -249,7 +249,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 var instance = descriptor.ImplementationInstance;
                 container.Register(InstanceFactory.Of(instance), serviceType,
                     null, null, isStaticallyChecked: true);
-                container.TrackDisposableInstance(instance);
+                container.TrackDisposable(instance);
             }
         }
     }
