@@ -12305,30 +12305,18 @@ namespace DryIoc
 
         ///<summary>Creating</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static IScope Of(IScope parent, object name)
-        {
-            if (parent == null && name == null)
-                return new Scope();
-            return new WithParentAndName(parent, name);
-        }
+        public static IScope Of(IScope parent, object name) =>
+            parent == null && name == null ? new Scope() : new WithParentAndName(parent, name);
 
         ///<summary>Creating</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static IScope Of(IScope parent)
-        {
-            if (parent == null)
-                return new Scope();
-            return new WithParentAndName(parent, null);
-        }
+        public static IScope Of(IScope parent) =>
+            parent == null ? new Scope() : new WithParentAndName(parent, null);
 
         ///<summary>Creating</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static IScope Of(object name)
-        {
-            if (name == null)
-                return new Scope();
-            return new WithParentAndName(null, name);
-        }
+        public static IScope Of(object name) =>
+            name == null ? new Scope() : new WithParentAndName(null, name);
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImMap.Entry(0, ImList<IDisposable>.Empty)) { }
