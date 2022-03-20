@@ -12546,22 +12546,18 @@ namespace DryIoc
                 Ref.Swap(ref _used, hash, type, instance, (x, h, t, i) => x.AddOrUpdate(h, t, i));
         }
 
-        /// <summary>Try retrieve the used factory from the scope.</summary>
+        /// <summary>Try retrieve the used instance from the scope.</summary>
         public bool TryGetUsed(int hash, Type type, out object used)
         {
-            if (_disposed == 1)
+            if (_disposed != 1)
             {
-                used = default;
-                return false;
+                if (!_used.IsEmpty)
+                    return _used.TryFind(hash, type, out used);
+
+                var p = Parent;
+                if (p != null)
+                    return p.TryGetUsed(hash, type, out used);
             }
-
-            if (!_used.IsEmpty)
-                return _used.TryFind(hash, type, out used);
-
-            var p = Parent;
-            if (p != null)
-                return p.TryGetUsed(hash, type, out used);
-
             used = default;
             return false;
         }
