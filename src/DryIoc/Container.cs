@@ -9238,7 +9238,6 @@ namespace DryIoc
         /// factory via `WithResolvedFactory` before pushing info into it.</summary>
         public Request Push(ServiceInfo info, RequestFlags additionalFlags = default)
         {
-            info.ThrowIfNull();
             if (FactoryID == 0)
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
 
@@ -10959,8 +10958,6 @@ namespace DryIoc
     /// creates expression for each reflected dependency, and composes result service expression.</summary>
     public class ReflectionFactory : Factory
     {
-        internal object _implementationTypeOrProviderOrPubCtorOrCtors; // Type or the Func<Type> for the lazy factory initialization
-
         /// <summary>Non-abstract service implementation type. May be open generic.</summary>
         public override Type ImplementationType
         {
@@ -10976,6 +10973,7 @@ namespace DryIoc
                 return null;
             }
         }
+        internal object _implementationTypeOrProviderOrPubCtorOrCtors; // Type or the Func<Type> for the lazy factory initialization
 
         private static Type ValidateImplementationType(Type type)
         {
@@ -11383,9 +11381,10 @@ namespace DryIoc
             for (var i = 0; i < parameters.Length; i++)
             {
                 var param = parameters[i];
+                var paramType = param.ParameterType;
                 if (inputArgs != null)
                 {
-                    var inputArgExpr = TryGetExpressionFromInputArgs(param.ParameterType, inputArgs, ref argsUsedMask);
+                    var inputArgExpr = TryGetExpressionFromInputArgs(paramType, inputArgs, ref argsUsedMask);
                     if (inputArgExpr != null)
                     {
                         if (paramExprs != null)
@@ -11404,7 +11403,7 @@ namespace DryIoc
                     }
                 }
 
-                hasByRefParams = hasByRefParams || param.ParameterType.IsByRef;
+                hasByRefParams = hasByRefParams || paramType.IsByRef;
                 var paramServiceInfo = paramSelector == null ? ParameterServiceInfo.OrNull(param) : paramSelector(param) ?? ParameterServiceInfo.OrNull(param);
                 var paramRequest = paramServiceInfo == null ? request.Push(param) : request.Push(paramServiceInfo);
                 var paramDetails = paramServiceInfo == null ? ServiceDetails.Default : paramServiceInfo.Details;
