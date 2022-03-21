@@ -9022,7 +9022,7 @@ namespace DryIoc
             preResolveParent = preResolveParent ?? Empty;
             if (!preResolveParent.IsEmpty)
             {
-                var parentServiceInfo = preResolveParent._serviceInfo;
+                var parentServiceInfo = preResolveParent.ServiceTypeOrInfo;
                 if (parentServiceInfo is ServiceInfo ps && ps.Details != null && ps.Details != ServiceDetails.Default)
                     serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(ps.ServiceType, ps.Details, container, preResolveParent.FactoryType);
 
@@ -9080,7 +9080,7 @@ namespace DryIoc
 
         // todo: @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
         // The field is mutable so that the ServiceKey or IfUnresolved can be changed in place.
-        internal object _serviceInfo; // the Type or the ServiceInfo
+        internal object ServiceTypeOrInfo; // the Type or the ServiceInfo
 
         /// <summary>Input arguments provided with `Resolve`</summary>
         internal Expression[] InputArgExprs;
@@ -9191,23 +9191,23 @@ namespace DryIoc
         }
 
         /// <summary>Requested service type.</summary>
-        public Type ServiceType => _serviceInfo is ServiceInfo i ? i.ServiceType : _actualServiceType;
+        public Type ServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.ServiceType : _actualServiceType;
 
         /// <summary>Compatible required or service type.</summary>
         public Type GetActualServiceType() => _actualServiceType;
         private Type _actualServiceType;
 
         /// <summary>Get the details</summary>
-        public ServiceDetails GetServiceDetails() => _serviceInfo is ServiceInfo i ? i.Details : ServiceDetails.Default;
+        public ServiceDetails GetServiceDetails() => ServiceTypeOrInfo is ServiceInfo i ? i.Details : ServiceDetails.Default;
 
         /// <summary>Optional service key to identify service of the same type.</summary>
-        public object ServiceKey => _serviceInfo is ServiceInfo i ? i.Details.ServiceKey : null;
+        public object ServiceKey => ServiceTypeOrInfo is ServiceInfo i ? i.Details.ServiceKey : null;
 
         /// <summary>Policy to deal with unresolved service.</summary>
-        public IfUnresolved IfUnresolved => _serviceInfo is ServiceInfo i ? i.Details.IfUnresolved : default;
+        public IfUnresolved IfUnresolved => ServiceTypeOrInfo is ServiceInfo i ? i.Details.IfUnresolved : default;
 
         /// <summary>Required service type if specified.</summary>
-        public Type RequiredServiceType => _serviceInfo is ServiceInfo i ? i.Details.RequiredServiceType : null;
+        public Type RequiredServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.Details.RequiredServiceType : null;
 
         /// <summary>Relative number representing reuse lifespan.</summary>
         public int ReuseLifespan => Reuse?.Lifespan ?? 0;
@@ -9243,7 +9243,7 @@ namespace DryIoc
 
             var flags = Flags & InheritedFlags | additionalFlags;
 
-            if (_serviceInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
+            if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
                 info = info.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
 
             var depDepth = DependencyDepth;
@@ -9265,7 +9265,7 @@ namespace DryIoc
 
             object info = parameter;
             var actualServiceType = parameter.ParameterType;
-            if (_serviceInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
+            if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
             {
                 info = actualServiceType.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
                 if (info is ServiceInfo i)
@@ -9288,7 +9288,7 @@ namespace DryIoc
         public Request PushServiceType(Type serviceType, RequestFlags additionalFlags = default)
         {
             object info;
-            if (_serviceInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
+            if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
             {
                 info = serviceType.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
                 if (info is ServiceInfo i)
@@ -9370,8 +9370,8 @@ namespace DryIoc
             if (newServiceType == oldServiceType)
                 return this;
             object serviceInfo =
-                _serviceInfo is ParameterInfo p ? ParameterServiceInfo.Of(p, newServiceType, ServiceDetails.Default) :
-                _serviceInfo is ServiceInfo i ? i.WithType(newServiceType) :
+                ServiceTypeOrInfo is ParameterInfo p ? ParameterServiceInfo.Of(p, newServiceType, ServiceDetails.Default) :
+                ServiceTypeOrInfo is ServiceInfo i ? i.WithType(newServiceType) :
                 newServiceType;
             var actualServiceType = serviceInfo is Type t ? t : ((ServiceInfo)serviceInfo).GetActualServiceType();
             return new Request(Container, DirectParent, DependencyDepth, DependencyCount,
@@ -9383,7 +9383,7 @@ namespace DryIoc
         public Request WithIfUnresolved(IfUnresolved ifUnresolved)
         {
             ServiceInfo newServiceInfo = null;
-            var oldServiceInfo = _serviceInfo;
+            var oldServiceInfo = ServiceTypeOrInfo;
             if (oldServiceInfo is ServiceInfo i)
             {
                 if (i.Details.IfUnresolved == ifUnresolved ||
@@ -9408,7 +9408,7 @@ namespace DryIoc
         /// <summary>Updates the flags</summary>
         public Request WithFlags(RequestFlags newFlags) =>
             new Request(Container, DirectParent, DependencyDepth, DependencyCount,
-                RequestStack, newFlags, _serviceInfo, _actualServiceType, InputArgExprs,
+                RequestStack, newFlags, ServiceTypeOrInfo, _actualServiceType, InputArgExprs,
                 _factoryOrImplType, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         // note: Mutates the request, required for proper caching
@@ -9416,16 +9416,16 @@ namespace DryIoc
         /// actual <see cref="DefaultKey"/></summary>
         public void ChangeServiceKey(object serviceKey)
         {
-            if (_serviceInfo is ServiceInfo i)
+            if (ServiceTypeOrInfo is ServiceInfo i)
             {
                 var d = i.Details;
-                _serviceInfo = i.Create(i.ServiceType,
+                ServiceTypeOrInfo = i.Create(i.ServiceType,
                     ServiceDetails.Of(d.RequiredServiceType, serviceKey, d.IfUnresolved, d.DefaultValue, d.MetadataKey, d.Metadata)); // todo: @unclear check for the custom _value
             }
-            else if (_serviceInfo is ParameterInfo pi)
-                _serviceInfo = ParameterServiceInfo.Of(pi, _actualServiceType, ServiceDetails.Of(serviceKey: serviceKey));
+            else if (ServiceTypeOrInfo is ParameterInfo pi)
+                ServiceTypeOrInfo = ParameterServiceInfo.Of(pi, _actualServiceType, ServiceDetails.Of(serviceKey: serviceKey));
             else
-                _serviceInfo = ServiceInfo.Of(_actualServiceType, serviceKey: serviceKey);
+                ServiceTypeOrInfo = ServiceInfo.Of(_actualServiceType, serviceKey: serviceKey);
         }
 
         /// <summary>Prepends input arguments to existing arguments in request. It is done because the
@@ -9433,7 +9433,7 @@ namespace DryIoc
         /// The arguments are provided by Func and Action wrappers, or by `args` parameter in Resolve call.</summary>
         public Request WithInputArgs(Expression[] inputArgs) =>
             new Request(Container, DirectParent, DependencyDepth, DependencyCount,
-                RequestStack, Flags, _serviceInfo, _actualServiceType, inputArgs.Append(InputArgExprs),
+                RequestStack, Flags, ServiceTypeOrInfo, _actualServiceType, inputArgs.Append(InputArgExprs),
                 _factoryOrImplType, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
         /// <summary>Returns new request with set implementation details.</summary>
@@ -9565,7 +9565,7 @@ namespace DryIoc
             if (copyRequest)
             {
                 IsolateRequestChain();
-                return new Request(Container, DirectParent, DependencyDepth, DependencyCount, null, flags, _serviceInfo, _actualServiceType, InputArgExprs,
+                return new Request(Container, DirectParent, DependencyDepth, DependencyCount, null, flags, ServiceTypeOrInfo, _actualServiceType, InputArgExprs,
                     factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
             }
 
@@ -9606,7 +9606,7 @@ namespace DryIoc
             Func<PropertyInfo, TResult> property = null,
             Func<FieldInfo, TResult> field = null)
         {
-            var info = _serviceInfo;
+            var info = ServiceTypeOrInfo;
             if (info is ParameterServiceInfo par)
             {
                 if (parameter != null)
@@ -9664,7 +9664,7 @@ namespace DryIoc
                     s.Print(implType).Append(": ");
             }
 
-            s.Append(_serviceInfo is ParameterInfo pi ? ParameterServiceInfo.Of(pi) : _serviceInfo);
+            s.Append(ServiceTypeOrInfo is ParameterInfo pi ? ParameterServiceInfo.Of(pi) : ServiceTypeOrInfo);
 
             if (Factory != null && Factory is ReflectionFactory == false)
                 s.Append(' ').Append(Factory.GetType().Name).Append(' ');
@@ -9747,7 +9747,7 @@ namespace DryIoc
         {
             DirectParent = parent;
             RequestStack = stack;
-            _serviceInfo = serviceInfo;
+            ServiceTypeOrInfo = serviceInfo;
             _actualServiceType = actualServiceType;
             InputArgExprs = inputArgExprs;
             Container = container;
@@ -9787,7 +9787,7 @@ namespace DryIoc
         {
             DirectParent = parent;
             RequestStack = stack;
-            _serviceInfo = serviceTypeOrInfo;
+            ServiceTypeOrInfo = serviceTypeOrInfo;
             _actualServiceType = actualServiceType;
             InputArgExprs = inputArgExprs;
             Container = container;
