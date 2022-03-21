@@ -9241,11 +9241,10 @@ namespace DryIoc
             if (FactoryID == 0)
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
 
-            var flags = Flags & InheritedFlags | additionalFlags;
-
             if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
                 info = info.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
 
+            var flags = Flags & InheritedFlags | additionalFlags;
             var depDepth = DependencyDepth;
             ref var req = ref GetOrPushPooledRequest(RequestStack, depDepth);
             if (req == null)
