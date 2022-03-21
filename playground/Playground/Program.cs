@@ -44,13 +44,13 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
-            // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
+            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
-            var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
-            bm.WarmUp();
+            // var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
+            // bm.WarmUp();
             // Console.WriteLine("WarmUp finished!");
             // Console.ReadKey();
-            bm.DryIoc_MsDI();
+            // bm.DryIoc_MsDI();
             // Console.WriteLine("All is done");
             // Console.ReadKey();
 

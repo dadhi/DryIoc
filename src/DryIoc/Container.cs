@@ -3712,19 +3712,20 @@ namespace DryIoc
             CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression e,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
+            // todo: @perf if possible optimize the call to r.CurrentScope to the top of the method chain and pass the Scope downwards
             var scope = (Scope)(r.CurrentScope ?? r.SingletonScope);
 
             var id = e.FactoryId;
-
+            var noItem = Scope.NoItem;
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef != null && itemRef.Value != Scope.NoItem)
+            if (itemRef != null && itemRef.Value != noItem)
                 return itemRef.Value;
 
             if (scope.IsDisposed)
                 Throw.ScopeIsDisposed(scope, r);
 
-            itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            itemRef = new ImMapEntry<object>(id, noItem);
             var oldMap = map;
             var newMap = oldMap.AddOrKeepEntry(itemRef);
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
@@ -3732,16 +3733,17 @@ namespace DryIoc
                 newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
                 var otherItemRef = newMap.GetSurePresentEntry(id);
                 if (otherItemRef != itemRef)
-                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                    return otherItemRef.Value != noItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
             else if (newMap == oldMap)
             {
                 var otherItemRef = newMap.GetSurePresentEntry(id);
-                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                return otherItemRef.Value != noItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
             var lambda = e.CreateValueExpr;
             object result = null;
+            // todo: @perf @mem optimize this thingy by storing the value inside the the expression instead of the ConstantExpression and the same for FactoryDelegateExpression
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
