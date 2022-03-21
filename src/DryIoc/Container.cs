@@ -3333,7 +3333,7 @@ namespace DryIoc
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, ref object result)
         {
-            if (expr is CurrentScopeReuse.GetScopedViaFactoryDelegatexpression s)
+            if (expr is CurrentScopeReuse.GetScopedViaFactoryDelegatExpression s)
             {
                 result = InterpretGetScopedViaFactoryDelegate(r, s, paramExprs, paramValues, parentArgs);
                 return true;
@@ -3548,7 +3548,7 @@ namespace DryIoc
         }
 
         private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r,
-            CurrentScopeReuse.GetScopedViaFactoryDelegatexpression e,
+            CurrentScopeReuse.GetScopedViaFactoryDelegatExpression e,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
             var scope = (Scope)r.CurrentScope;
@@ -10478,9 +10478,10 @@ namespace DryIoc
 
                     serviceExpr = ApplyReuse(serviceExpr, request); // todo: @perf pass the possibly calculated id to here
 
+                    var serviceExprType = serviceExpr.Type;
                     if (serviceExpr.NodeType != ExprType.Constant &&
-                        serviceExpr.Type != originalServiceExprType &&
-                        !originalServiceExprType.IsAssignableFrom(serviceExpr.Type))
+                        serviceExprType != originalServiceExprType &&
+                        !originalServiceExprType.IsAssignableFrom(serviceExprType))
                         serviceExpr = Convert(serviceExpr, originalServiceExprType);
                 }
             }
@@ -10512,7 +10513,9 @@ namespace DryIoc
             // This optimization eagerly creates singleton during the construction of object graph
             // Singleton is created once and then is stored for the container lifetime (until Сontainer.SingletonScope is disposed).
             // That's why we are always intepreting them even if `Rules.WithoutInterpretationForTheFirstResolution()` is set.
-            if (request.Reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
+            var reuse = request.Reuse;
+            var setup = Setup;
+            if (reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
                 !request.TracksTransientDisposable && !request.IsWrappedInFunc())
             {
                 var container = request.Container;
@@ -10558,13 +10561,13 @@ namespace DryIoc
                     if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, out singleton))
                         singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseInterpretation)(container);
 
-                    if (Setup.WeaklyReferenced)
+                    if (setup.WeaklyReferenced)
                         singleton = new WeakReference(singleton);
-                    else if (Setup.PreventDisposal)
+                    else if (setup.PreventDisposal)
                         singleton = new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
                     itemRef.Value = singleton;
                     if (singleton is IDisposable disp && !ReferenceEquals(disp, scope))
-                        scope.AddDisposable(disp, Setup.DisposalOrder);
+                        scope.AddDisposable(disp, setup.DisposalOrder);
                 }
 
                 Debug.Assert(singleton != Scope.NoItem, "Should not be the case otherwise I am effing failed");
@@ -10575,18 +10578,18 @@ namespace DryIoc
             else
             {
                 // Wrap service expression in WeakReference or HiddenDisposable
-                if (Setup.WeaklyReferenced)
+                if (setup.WeaklyReferenced)
                     serviceExpr = New(ThrowInGeneratedCode.WeakReferenceCtor, serviceExpr);
-                else if (Setup.PreventDisposal)
+                else if (setup.PreventDisposal)
                     serviceExpr = New(HiddenDisposable.Ctor, serviceExpr);
 
-                serviceExpr = request.Reuse.Apply(request, serviceExpr);
+                serviceExpr = reuse.Apply(request, serviceExpr);
             }
 
-            if (Setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
+            if (setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
                 serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
                     Property(Convert<WeakReference>(serviceExpr), ThrowInGeneratedCode.WeakReferenceValueProperty));
-            else if (Setup.PreventDisposal)
+            else if (setup.PreventDisposal)
                 serviceExpr = Field(Convert<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
 
             return serviceExpr;
@@ -12772,12 +12775,14 @@ namespace DryIoc
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
+            var serviceExprType = serviceFactoryExpr.Type;
+
             // strip the conversion as we are operating with object anyway
             if (serviceFactoryExpr.NodeType == ExprType.Convert)
                 serviceFactoryExpr = ((UnaryExpression)serviceFactoryExpr).Operand;
 
             // this is required because we cannot use ValueType for the object
-            if (serviceFactoryExpr.Type.IsValueType)
+            if (serviceExprType.IsValueType)
                 serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
 
             if (request.TracksTransientDisposable)
@@ -12804,11 +12809,11 @@ namespace DryIoc
                 }
                 else
                 {
-                    factoryDelegateExpr = new FactoryDelegateExpression(serviceFactoryExpr);
-
                     // decrease the dependency count when wrapping into lambda
                     if (request.DependencyCount > 0)
                         request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
+
+                    factoryDelegateExpr = new FactoryDelegateExpression(serviceFactoryExpr);
                 }
 
                 var disposalOrder = request.Factory.Setup.DisposalOrder;
@@ -12816,7 +12821,9 @@ namespace DryIoc
                 if (ScopedOrSingleton)
                 {
                     if (disposalOrder == 0)
-                        return new GetScopedOrSingletonViaFactoryDelegateExpression(factoryId, factoryDelegateExpr);
+                        return factoryDelegateExpr is FactoryDelegateExpression
+                            ? new GetScopedOrSingletonViaFactoryDelegateExpression(factoryId, factoryDelegateExpr)
+                            : new GetScopedOrSingletonViaFactoryDelegateConstantExpression(factoryId, factoryDelegateExpr, serviceExprType);
                     return new GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(factoryId, factoryDelegateExpr, disposalOrder);
                 }
 
@@ -12825,7 +12832,7 @@ namespace DryIoc
                 if (Name == null)
                 {
                     if (disposalOrder == 0)
-                        return new GetScopedViaFactoryDelegatexpression(ifNoScopeThrow, factoryId, factoryDelegateExpr);
+                        return new GetScopedViaFactoryDelegatExpression(ifNoScopeThrow, factoryId, factoryDelegateExpr);
                     return Call(GetScopedViaFactoryDelegateWithDisposalOrderMethod,
                         FactoryDelegateCompiler.ResolverContextParamExpr, Constant(ifNoScopeThrow), ConstantInt(factoryId), factoryDelegateExpr, ConstantInt(disposalOrder));
                 }
@@ -12888,8 +12895,9 @@ namespace DryIoc
         internal static readonly MethodInfo GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedOrSingletonViaFactoryDelegateWithDisposalOrder));
 
-        internal sealed class GetScopedOrSingletonViaFactoryDelegateExpression : MethodCallExpression
+        internal class GetScopedOrSingletonViaFactoryDelegateExpression : MethodCallExpression
         {
+            public override Type Type => ((FactoryDelegateExpression)CreateValueExpr).Body.Type;
             public override MethodInfo Method => GetScopedOrSingletonViaFactoryDelegateMethod;
             public readonly int FactoryId;
             public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
@@ -12906,6 +12914,13 @@ namespace DryIoc
                 FactoryId = factoryId;
                 CreateValueExpr = createValueExpr;
             }
+        }
+
+        internal sealed class GetScopedOrSingletonViaFactoryDelegateConstantExpression : GetScopedOrSingletonViaFactoryDelegateExpression
+        {
+            public override Type Type { get; }
+            internal GetScopedOrSingletonViaFactoryDelegateConstantExpression(int factoryId, Expression createValueExpr, Type type)
+                : base(factoryId, createValueExpr) => Type = type;
         }
 
         internal sealed class GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression : MethodCallExpression
@@ -12948,8 +12963,9 @@ namespace DryIoc
         internal static readonly MethodInfo GetScopedViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedViaFactoryDelegate));
 
-        internal sealed class GetScopedViaFactoryDelegatexpression : MethodCallExpression
+        internal sealed class GetScopedViaFactoryDelegatExpression : MethodCallExpression
         {
+            public override Type Type => CreateValueExpr.Type;
             public override MethodInfo Method => GetScopedViaFactoryDelegateMethod;
             public readonly bool ThrowIfNoScope;
             public ConstantExpression ThrowIfNoScopeExpr => Constant(ThrowIfNoScope);
@@ -12964,7 +12980,7 @@ namespace DryIoc
                 i == 1 ? ThrowIfNoScopeExpr :
                 i == 2 ? FactoryIdExpr :
                          CreateValueExpr;
-            internal GetScopedViaFactoryDelegatexpression(bool throwIfNoScope, int factoryId, Expression createValueExpr)
+            internal GetScopedViaFactoryDelegatExpression(bool throwIfNoScope, int factoryId, Expression createValueExpr)
             {
                 ThrowIfNoScope = throwIfNoScope;
                 FactoryId = factoryId;

@@ -2778,31 +2778,26 @@ namespace DryIoc.FastExpressionCompiler
                 CompilerFlags setup, ParentFlags parent)
             {
 #endif
+                // todo: @perf !!! put this whole thing in order to handle the hot path without heavy reflection calls
                 var opExpr = expr.Operand;
                 var method = expr.Method;
                 if (method != null && method.Name != "op_Implicit" && method.Name != "op_Explicit")
-                {
-                    if (!TryEmit(opExpr, paramExprs, il, ref closure, setup,
-                        parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceCall, -1))
-                        return false;
-                    return EmitMethodCallOrVirtualCall(il, method);
-                }
+                    return TryEmit(opExpr, paramExprs, il, ref closure, setup,
+                        parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceCall, -1)
+                        && EmitMethodCallOrVirtualCall(il, method);
 
                 var sourceType = opExpr.Type;
-                var sourceTypeIsNullable = sourceType.IsNullable();
-                var underlyingNullableSourceType = Nullable.GetUnderlyingType(sourceType);
                 var targetType = expr.Type;
 
+                // quick path for ignored result & conversion which can't cause exception: just do nothing
                 if (targetType.IsAssignableFrom(sourceType) && (parent & ParentFlags.IgnoreResult) != 0)
-                {
-                    // quick path for ignored result & conversion which can't cause exception: just do nothing
                     return TryEmit(opExpr, paramExprs, il, ref closure, setup, parent);
-                }
 
+                var sourceTypeIsNullable = sourceType.IsNullable();
+                var underlyingNullableSourceType = Nullable.GetUnderlyingType(sourceType);
                 if (sourceTypeIsNullable && targetType == underlyingNullableSourceType)
                 {
-                    if (!TryEmit(opExpr, paramExprs, il, ref closure, setup,
-                        parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
+                    if (!TryEmit(opExpr, paramExprs, il, ref closure, setup, parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
                         return false;
 
                     if (!closure.LastEmitIsAddress)
