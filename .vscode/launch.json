@@ -5,11 +5,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Playground Benchmarks",
+            "name": "Benchmarks",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build_benchmark",
-            "program": "${workspaceFolder}/playground/Playground/bin/Debug/netcoreapp3.1/Playground.dll",
+            "program": "${workspaceFolder}/playground/Playground/bin/Debug/net6/Playground.dll",
             "args": [],
             "cwd": "${workspaceFolder}/playground/Playground",
             "stopAtEntry": false,
