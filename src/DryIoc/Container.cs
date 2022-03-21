@@ -11478,8 +11478,8 @@ namespace DryIoc
             if (ctor == null)
                 return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMethod);
 
-            var assgnments = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
-            return failedToGetMember ? null : assgnments == null ? serviceExpr : MemberInit((NewExpression)serviceExpr, assgnments);
+            var memberInits = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
+            return failedToGetMember ? null : memberInits == null ? serviceExpr : MemberInit((NewExpression)serviceExpr, memberInits);
         }
 
         private MemberAssignment[] TryGetMemberAssignments(ref bool failedToGet, Request request, IContainer container, Rules rules)
