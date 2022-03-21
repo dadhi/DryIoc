@@ -44,12 +44,16 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
-
-            // var bm = new RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve();
-            // bm.DryIoc();
-            // bm.DryIoc_MsDIAdapter();
-
             BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
+
+            // var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
+            // bm.WarmUp();
+            // Console.WriteLine("WarmUp finished!");
+            // Console.ReadKey();
+            // bm.DryIoc_MsDI();
+            // Console.WriteLine("All is done");
+            // Console.ReadKey();
+
 
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.Measure(
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIocMsDi());

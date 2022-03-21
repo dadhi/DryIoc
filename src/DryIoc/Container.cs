@@ -11368,6 +11368,8 @@ namespace DryIoc
                 return failedToGetMember ? null : assignments == null ? newExpr : (Expression)MemberInit(newExpr, assignments);
             }
 
+            var hasByRefParams = false;
+
             Expression a0 = null, a1 = null, a2 = null, a3 = null, a4 = null, a5 = null, a6 = null;
             var paramExprs = parameters.Length > 7 ? new Expression[parameters.Length] : null;
             var rulesParams = rules._made.Parameters;
@@ -11402,6 +11404,7 @@ namespace DryIoc
                     }
                 }
 
+                hasByRefParams = hasByRefParams || param.ParameterType.IsByRef;
                 var paramServiceInfo = paramSelector == null ? ParameterServiceInfo.OrNull(param) : paramSelector(param) ?? ParameterServiceInfo.OrNull(param);
                 var paramRequest = paramServiceInfo == null ? request.Push(param) : request.Push(paramServiceInfo);
                 var paramDetails = paramServiceInfo == null ? ServiceDetails.Default : paramServiceInfo.Details;
@@ -11458,21 +11461,21 @@ namespace DryIoc
 
             Expression serviceExpr;
             if (a0 == null)
-                serviceExpr = ctor != null ? New(ctor, paramExprs) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, paramExprs);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, paramExprs) : NewNoByRefArgs(ctor, paramExprs) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, paramExprs);
             else if (a1 == null)
-                serviceExpr = ctor != null ? New(ctor, a0) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0) : NewNoByRefArgs(ctor, a0) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0);
             else if (a2 == null)
-                serviceExpr = ctor != null ? New(ctor, a0, a1) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1) : NewNoByRefArgs(ctor, a0, a1) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1);
             else if (a3 == null)
-                serviceExpr = ctor != null ? New(ctor, a0, a1, a2) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2);
             else if (a4 == null)
-                serviceExpr = ctor != null ? New(ctor, a0, a1, a2, a3) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3) : NewNoByRefArgs(ctor, a0, a1, a2, a3) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3);
             else if (a5 == null)
-                serviceExpr = ctor != null ? New(ctor, a0, a1, a2, a3, a4) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4);
             else if (a6 == null)
-                serviceExpr = ctor != null ? New(ctor, a0, a1, a2, a3, a4, a5) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4, a5);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4, a5);
             else
-                serviceExpr = ctor != null ? New(ctor, a0, a1, a2, a3, a4, a5, a6) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4, a5, a6);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5, a6) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5, a6) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4, a5, a6);
 
             if (ctor == null)
                 return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMethod);
@@ -11525,11 +11528,14 @@ namespace DryIoc
         internal static Expression TryGetExpressionFromInputArgs(Type paramType, Expression[] inputArgs, ref int argsUsedMask)
         {
             for (var a = 0; a < inputArgs.Length; ++a)
-                if ((argsUsedMask & 1 << a) == 0 && inputArgs[a].Type.IsAssignableTo(paramType))
+            {
+                var inputArg = inputArgs[a];
+                if ((argsUsedMask & 1 << a) == 0 && paramType.IsAssignableFrom(inputArg.Type))
                 {
                     argsUsedMask |= 1 << a; // mark that argument was used
-                    return inputArgs[a];
+                    return inputArg;
                 }
+            }
             return null;
         }
 

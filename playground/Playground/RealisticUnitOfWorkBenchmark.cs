@@ -1182,32 +1182,38 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
 |        Grace | 16,223.23 us | 317.228 us | 264.900 us | 193.90 |    4.16 |  93.7500 | 31.2500 |      - | 735.76 KB |
 |   Grace_MsDI | 19,266.37 us | 336.411 us | 280.919 us | 230.27 |    4.37 | 125.0000 | 62.5000 |      - | 907.39 KB |
 
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|-------:|-------:|------:|----------:|
+|      DryIoc | 83.37 us | 0.887 us | 0.787 us |  1.00 |    0.00 | 6.5918 | 0.3662 |     - |  40.59 KB |
+| DryIoc_MsDI | 95.03 us | 1.351 us | 1.129 us |  1.14 |    0.02 | 8.3008 | 0.4883 |     - |  51.27 KB |
+
 */
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
 
             [Benchmark]
             public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
-            [Benchmark]
+
+            // [Benchmark]
             public object MsDI() => Measure(PrepareMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark
             // [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
 
-            [Benchmark]
+            // [Benchmark]
             public object Lamar_MsDI() => Measure(PrepareLamarMsDi());
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace_MsDI() => Measure(PrepareGraceMsDi());
         }
 

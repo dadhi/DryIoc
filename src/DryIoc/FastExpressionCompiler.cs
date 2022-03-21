@@ -47,7 +47,7 @@ using PE = DryIoc.FastExpressionCompiler.LightExpression.ParameterExpression;
 namespace DryIoc.FastExpressionCompiler.LightExpression
 #else
 using static System.Linq.Expressions.Expression;
-using PE =   System.Linq.Expressions.ParameterExpression;
+using PE = System.Linq.Expressions.ParameterExpression;
 namespace DryIoc.FastExpressionCompiler
 #endif
 {
@@ -178,7 +178,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
             lambdaExpr, GetClosureTypeToParamTypes(lambdaExpr),
 #else
-            lambdaExpr.Parameters, GetClosureTypeToParamTypes(lambdaExpr.Parameters), 
+            lambdaExpr.Parameters, GetClosureTypeToParamTypes(lambdaExpr.Parameters),
 #endif
             lambdaExpr.ReturnType, flags) ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
 
@@ -210,7 +210,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
                 _closureAsASingleParamType, typeof(R), flags) ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
 
@@ -221,7 +221,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
             new[] { typeof(ArrayClosure), typeof(T1) }, typeof(R), flags) ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
 
@@ -232,7 +232,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
                 new[] { typeof(ArrayClosure), typeof(T1), typeof(T2) },
                 typeof(R), flags) ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
@@ -244,7 +244,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
             new[] { typeof(ArrayClosure), typeof(T1), typeof(T2), typeof(T3) }, typeof(R), flags)
             ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
@@ -256,7 +256,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
                 new[] { typeof(ArrayClosure), typeof(T1), typeof(T2), typeof(T3), typeof(T4) }, typeof(R), flags)
             ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
@@ -268,7 +268,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
                 new[] { typeof(ArrayClosure), typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5) }, typeof(R), flags)
             ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
@@ -280,7 +280,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
                 new[] { typeof(ArrayClosure), typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6) }, typeof(R), flags)
             ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
@@ -291,7 +291,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
             _closureAsASingleParamType, typeof(void), flags) ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
 
@@ -302,7 +302,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
             new[] { typeof(ArrayClosure), typeof(T1) }, typeof(void), flags) ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
 
@@ -313,7 +313,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
             new[] { typeof(ArrayClosure), typeof(T1), typeof(T2) }, typeof(void), flags) ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
 
@@ -324,7 +324,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
                 new[] { typeof(ArrayClosure), typeof(T1), typeof(T2), typeof(T3) }, typeof(void), flags)
             ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
@@ -336,7 +336,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
                 new[] { typeof(ArrayClosure), typeof(T1), typeof(T2), typeof(T3), typeof(T4) }, typeof(void), flags)
             ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
@@ -348,7 +348,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
                 new[] { typeof(ArrayClosure), typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5) }, typeof(void), flags)
             ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
@@ -360,7 +360,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
                 new[] { typeof(ArrayClosure), typeof(T1), typeof(T2), typeof(T3), typeof(T4), typeof(T5), typeof(T6) }, typeof(void), flags)
             ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
@@ -453,7 +453,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr,
 #else
-                lambdaExpr.Parameters, 
+                lambdaExpr.Parameters,
 #endif
                 il, ref closureInfo, flags, lambdaExpr.ReturnType == typeof(void) ? ParentFlags.IgnoreResult : ParentFlags.Empty))
                 return null;
@@ -470,7 +470,7 @@ namespace DryIoc.FastExpressionCompiler
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IParameterProvider paramExprs,
             Type[] closurePlusParamTypes, Type returnType, CompilerFlags flags)
 #else
-        internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IReadOnlyList<PE> paramExprs, 
+        internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IReadOnlyList<PE> paramExprs,
             Type[] closurePlusParamTypes, Type returnType, CompilerFlags flags)
 #endif
         {
@@ -1074,7 +1074,7 @@ namespace DryIoc.FastExpressionCompiler
             ref ClosureInfo rootClosure, CompilerFlags flags)
         {
 #else
-        private static bool TryCollectBoundConstants(ref ClosureInfo closure, Expression expr, IReadOnlyList<PE> paramExprs, bool isNestedLambda, 
+        private static bool TryCollectBoundConstants(ref ClosureInfo closure, Expression expr, IReadOnlyList<PE> paramExprs, bool isNestedLambda,
             ref ClosureInfo rootClosure, CompilerFlags flags)
         {
 #endif
@@ -1106,7 +1106,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                             var paramCount = paramExprs.ParameterCount;
 #else
-                        var paramCount = paramExprs.Count;
+                            var paramCount = paramExprs.Count;
 #endif
                             // if parameter is used BUT is not in passed parameters and not in local variables,
                             // it means parameter is provided by outer lambda and should be put in closure for current lambda
@@ -1129,8 +1129,8 @@ namespace DryIoc.FastExpressionCompiler
                             var callArgs = (IArgumentProvider)callExpr;
                             var argCount = callArgs.ArgumentCount;
 #else
-                        var callArgs = callExpr.Arguments;
-                        var argCount = callArgs.Count;
+                            var callArgs = callExpr.Arguments;
+                            var argCount = callArgs.Count;
 #endif
                             if (argCount == 0)
                             {
@@ -1168,8 +1168,8 @@ namespace DryIoc.FastExpressionCompiler
                             var ctorArgs = (IArgumentProvider)newExpr;
                             var argCount = ctorArgs.ArgumentCount;
 #else
-                        var ctorArgs = newExpr.Arguments;
-                        var argCount = ctorArgs.Count;
+                            var ctorArgs = newExpr.Arguments;
+                            var argCount = ctorArgs.Count;
 #endif
                             if (argCount == 0)
                                 return true;
@@ -1269,8 +1269,8 @@ namespace DryIoc.FastExpressionCompiler
                             var invokeArgs = (IArgumentProvider)invokeExpr;
                             var argCount = invokeArgs.ArgumentCount;
 #else
-                        var invokeArgs = invokeExpr.Arguments;
-                        var argCount = invokeArgs.Count;
+                            var invokeArgs = invokeExpr.Arguments;
+                            var argCount = invokeArgs.Count;
 #endif
                             var invokedExpr = invokeExpr.Expression;
                             if ((flags & CompilerFlags.NoInvocationLambdaInlining) == 0 && invokedExpr is LambdaExpression la)
@@ -1293,8 +1293,8 @@ namespace DryIoc.FastExpressionCompiler
                                 var pars = (IParameterProvider)la;
                                 var paramCount = paramExprs.ParameterCount;
 #else
-                            var pars = la.Parameters;
-                            var paramCount = paramExprs.Count;
+                                var pars = la.Parameters;
+                                var paramCount = paramExprs.Count;
 #endif
                                 var exprs = new Expression[argCount + 1];
                                 List<ParameterExpression> vars = null;
@@ -1490,7 +1490,7 @@ namespace DryIoc.FastExpressionCompiler
             var paramExprCount = paramExprs.ParameterCount;
             var nestedLambdaParamExprCount = nestedLambdaParamExprs.ParameterCount;
 #else
-        private static void PropagateNonPassedParamsToOuterLambda(ref ClosureInfo closure, 
+        private static void PropagateNonPassedParamsToOuterLambda(ref ClosureInfo closure,
             IReadOnlyList<PE> paramExprs, IReadOnlyList<PE> nestedLambdaParamExprs, ParameterExpression[] nestedNonPassedParams)
         {
             var paramExprCount = paramExprs.Count;
@@ -1622,8 +1622,8 @@ namespace DryIoc.FastExpressionCompiler
             IReadOnlyList<PE> paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure, CompilerFlags flags)
         {
             var newExpr = expr.NewExpression;
-            var binds   = expr.Bindings;
-            var count   = binds.Count;
+            var binds = expr.Bindings;
+            var count = binds.Count;
 #endif
             if (!TryCollectBoundConstants(ref closure, newExpr, paramExprs, isNestedLambda, ref rootClosure, flags))
                 return false;
@@ -2071,7 +2071,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitNew(Expression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitNew(Expression expr, IReadOnlyList<PE> paramExprs,  ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitNew(Expression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -2086,11 +2086,25 @@ namespace DryIoc.FastExpressionCompiler
 #endif
                 if (argCount > 0)
                 {
+#if LIGHT_EXPRESSION
+                    var args = newExpr.NoByRefArgs ? null : newExpr.Constructor.GetParameters();
+#else
                     var args = newExpr.Constructor.GetParameters();
-                    for (var i = 0; i < args.Length; ++i)
-                        if (!TryEmit(argExprs.GetArgument(i),
-                            paramExprs, il, ref closure, setup, parent, args[i].ParameterType.IsByRef ? i : -1))
-                            return false;
+#endif
+                    if (args == null)
+                    {
+                        for (var i = 0; i < argCount; ++i)
+                            if (!TryEmit(argExprs.GetArgument(i),
+                                paramExprs, il, ref closure, setup, parent, -1))
+                                return false;
+                    }
+                    else
+                    {
+                        for (var i = 0; i < argCount; ++i)
+                            if (!TryEmit(argExprs.GetArgument(i),
+                                paramExprs, il, ref closure, setup, parent, args[i].ParameterType.IsByRef ? i : -1))
+                                return false;
+                    }
                 }
 
                 // ReSharper disable once ConditionIsAlwaysTrueOrFalse
@@ -2107,7 +2121,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitLoop(LoopExpression loopExpr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitLoop(LoopExpression loopExpr, IReadOnlyList<PE> paramExprs,  ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitLoop(LoopExpression loopExpr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -2134,7 +2148,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitIndex(IndexExpression indexExpr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitIndex(IndexExpression indexExpr, IReadOnlyList<PE>  paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitIndex(IndexExpression indexExpr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -2182,7 +2196,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitLabel(LabelExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitLabel(LabelExpression expr, IReadOnlyList<PE>  paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitLabel(LabelExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -2224,7 +2238,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitGoto(GotoExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitGoto(GotoExpression expr, IReadOnlyList<PE>  paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitGoto(GotoExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -2311,7 +2325,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitCoalesceOperator(BinaryExpression exprObj, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitCoalesceOperator(BinaryExpression exprObj, IReadOnlyList<PE>  paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitCoalesceOperator(BinaryExpression exprObj, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -2409,7 +2423,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitTryCatchFinallyBlock(TryExpression tryExpr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitTryCatchFinallyBlock(TryExpression tryExpr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitTryCatchFinallyBlock(TryExpression tryExpr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -2476,7 +2490,7 @@ namespace DryIoc.FastExpressionCompiler
             {
                 var paramExprCount = paramExprs.ParameterCount;
 #else
-            private static bool TryEmitParameter(ParameterExpression paramExpr, IReadOnlyList<PE> paramExprs, 
+            private static bool TryEmitParameter(ParameterExpression paramExpr, IReadOnlyList<PE> paramExprs,
                 ILGenerator il, ref ClosureInfo closure, ParentFlags parent, int byRefIndex = -1)
             {
                 var paramExprCount = paramExprs.Count;
@@ -2608,7 +2622,7 @@ namespace DryIoc.FastExpressionCompiler
                 ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent)
             {
 #else
-            private static bool TryEmitSimpleUnaryExpression(UnaryExpression expr, IReadOnlyList<PE> paramExprs, 
+            private static bool TryEmitSimpleUnaryExpression(UnaryExpression expr, IReadOnlyList<PE> paramExprs,
                 ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent)
             {
 #endif
@@ -2696,7 +2710,7 @@ namespace DryIoc.FastExpressionCompiler
                 ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent)
             {
 #else
-            private static bool TryEmitTypeIsOrEqual(TypeBinaryExpression expr, IReadOnlyList<PE> paramExprs, 
+            private static bool TryEmitTypeIsOrEqual(TypeBinaryExpression expr, IReadOnlyList<PE> paramExprs,
                 ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent)
             {
 #endif
@@ -2725,7 +2739,7 @@ namespace DryIoc.FastExpressionCompiler
                 CompilerFlags setup, ParentFlags parent)
             {
 #else
-            private static bool TryEmitNot(UnaryExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitNot(UnaryExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
             {
 #endif
@@ -2760,7 +2774,7 @@ namespace DryIoc.FastExpressionCompiler
                 CompilerFlags setup, ParentFlags parent)
             {
 #else
-            private static bool TryEmitConvert(UnaryExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitConvert(UnaryExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
             {
 #endif
@@ -3286,7 +3300,7 @@ namespace DryIoc.FastExpressionCompiler
                 var bounds = (IArgumentProvider)expr;
                 var boundCount = bounds.ArgumentCount;
 #else
-            private static bool EmitNewArrayBounds(NewArrayExpression expr, IReadOnlyList<PE> paramExprs, 
+            private static bool EmitNewArrayBounds(NewArrayExpression expr, IReadOnlyList<PE> paramExprs,
                 ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent)
             {
                 var bounds = expr.Expressions;
@@ -3316,7 +3330,7 @@ namespace DryIoc.FastExpressionCompiler
                 ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent)
             {
 #else
-            private static bool EmitNewArrayInit(NewArrayExpression expr, IReadOnlyList<PE> paramExprs, 
+            private static bool EmitNewArrayInit(NewArrayExpression expr, IReadOnlyList<PE> paramExprs,
                 ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent)
             {
 #endif
@@ -3407,7 +3421,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool EmitMemberInit(MemberInitExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool EmitMemberInit(MemberInitExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool EmitMemberInit(MemberInitExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -3459,7 +3473,7 @@ namespace DryIoc.FastExpressionCompiler
                 var bindings = (IArgumentProvider<MemberBinding>)expr;
                 var bindCount = bindings.ArgumentCount;
 #else
-                var bindings  = expr.Bindings;
+                var bindings = expr.Bindings;
                 var bindCount = bindings.Count;
 #endif
                 for (var i = 0; i < bindCount; i++)
@@ -3503,7 +3517,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitListInit(ListInitExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitListInit(ListInitExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitListInit(ListInitExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -3560,7 +3574,7 @@ namespace DryIoc.FastExpressionCompiler
                     var addArgs = (IArgumentProvider)elemInit;
                     var addArgCount = elemInit.ArgumentCount;
 #else
-                    var addArgs     = elemInit.Arguments;
+                    var addArgs = elemInit.Arguments;
                     var addArgCount = addArgs.Count;
 #endif
                     for (var a = 0; a < addArgCount; ++a)
@@ -3593,7 +3607,7 @@ namespace DryIoc.FastExpressionCompiler
                 CompilerFlags setup, ParentFlags parent)
             {
 #else
-            private static bool TryEmitIncDecAssign(UnaryExpression expr, ExpressionType nodeType, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitIncDecAssign(UnaryExpression expr, ExpressionType nodeType, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
             {
 #endif
@@ -3687,7 +3701,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitAssign(BinaryExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitAssign(BinaryExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitAssign(BinaryExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -4009,7 +4023,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitMethodCall(Expression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitMethodCall(Expression expr, IReadOnlyList<PE>  paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitMethodCall(Expression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -4069,7 +4083,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitMemberAccess(MemberExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent, int byRefIndex = -1)
 #else
-            private static bool TryEmitMemberAccess(MemberExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitMemberAccess(MemberExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent, int byRefIndex = -1)
 #endif
             {
@@ -4153,7 +4167,7 @@ namespace DryIoc.FastExpressionCompiler
             {
                 var outerParamExprCount = outerParamExprs.ParameterCount;
 #else
-            private static bool TryEmitNestedLambda(LambdaExpression lambdaExpr, IReadOnlyList<PE> outerParamExprs,  ILGenerator il, ref ClosureInfo closure)
+            private static bool TryEmitNestedLambda(LambdaExpression lambdaExpr, IReadOnlyList<PE> outerParamExprs, ILGenerator il, ref ClosureInfo closure)
             {
                 var outerParamExprCount = outerParamExprs.Count;
 #endif
@@ -4288,7 +4302,7 @@ namespace DryIoc.FastExpressionCompiler
             {
                 var paramCount = paramExprs.ParameterCount;
 #else
-            private static bool TryEmitInvoke(InvocationExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitInvoke(InvocationExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
             {
                 var paramCount = paramExprs.Count;
@@ -4384,7 +4398,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitSwitch(SwitchExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitSwitch(SwitchExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitSwitch(SwitchExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -4655,7 +4669,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
             private static bool TryEmitArithmetic(BinaryExpression expr, ExpressionType exprNodeType, IParameterProvider paramExprs,
 #else
-            private static bool TryEmitArithmetic(BinaryExpression expr, ExpressionType exprNodeType, IReadOnlyList<PE> paramExprs, 
+            private static bool TryEmitArithmetic(BinaryExpression expr, ExpressionType exprNodeType, IReadOnlyList<PE> paramExprs,
 #endif
                 ILGenerator il, ref ClosureInfo closure, CompilerFlags setup, ParentFlags parent)
             {
@@ -4865,7 +4879,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitLogicalOperator(BinaryExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitLogicalOperator(BinaryExpression expr, IReadOnlyList<PE>  paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitLogicalOperator(BinaryExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
@@ -4892,7 +4906,7 @@ namespace DryIoc.FastExpressionCompiler
             private static bool TryEmitConditional(ConditionalExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #else
-            private static bool TryEmitConditional(ConditionalExpression expr, IReadOnlyList<PE>  paramExprs, ILGenerator il, ref ClosureInfo closure, 
+            private static bool TryEmitConditional(ConditionalExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent)
 #endif
             {
