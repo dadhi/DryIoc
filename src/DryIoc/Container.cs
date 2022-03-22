@@ -3846,6 +3846,7 @@ namespace DryIoc
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
         public static readonly ParameterExpression ResolverContextParamExpr = ParameterOf<IResolverContext>("r");
 
+        /// <summary>The array of a single `ResolverContextParamExpr` for memory optimization</summary>
         public static readonly ParameterExpression[] ResolverContextParamsExpr = { ResolverContextParamExpr };
 
         /// Optimization: the empty lambda with a single IResolverContext parameters
