@@ -19,6 +19,7 @@ using NUnit.Framework;
 using DryIoc;
 using NSubstitute;
 using Moq;
+using static DryIoc.ImTools.ArrayTools;
  ```
 </details>
 
@@ -45,15 +46,24 @@ Let's test a `SomeConsumer` by mocking its `Service` dependency:
 ```cs 
 class NSubstitute_example
 {
-    // Let's define a method to configure our container with auto-mocking of interfaces or abstract classes
-    private IContainer WithAutoMocking(IContainer container) => 
-        container.With(rules => rules.WithUnknownServiceResolvers(request =>
+    readonly ConcurrentDictionary<System.Type, DynamicRegistration> _mockRegistrations =
+        new ConcurrentDictionary<System.Type, DynamicRegistration>();
+
+    // Let's define a method to configure our container with auto-mocking of interfaces or abstract classes.
+    // Optional `reuse` parameter will allow to specify a mock reuse.
+    private IContainer WithAutoMocking(IContainer container, IReuse reuse = null) =>
+        container.With(rules => rules.WithDynamicRegistration((serviceType, serviceKey) =>
         {
-            var serviceType = request.ServiceType;
             if (!serviceType.IsAbstract) // Mock interface or abstract class only.
-                return null; 
-            return ReflectionFactory.Of(made: Made.Of(() => Substitute.For(new[] { serviceType }, null)));
-        }));
+                return null;
+
+            var d = _mockRegistrations.GetOrAdd(serviceType,
+                type => new DynamicRegistration(
+                    DelegateFactory.Of(r => Substitute.For(new[] { serviceType }, Empty<object>()), reuse)));
+
+            return new[] { d };
+        },
+        DynamicRegistrationFlags.Service | DynamicRegistrationFlags.AsFallback));
 
     [Test]
     public void Test()
@@ -80,23 +90,28 @@ public class OtherConsumer
 
 class NSubstitute_example_with_singleton_mocks
 {
-    readonly ConcurrentDictionary<System.Type, ReflectionFactory> _mockFactories = 
-        new ConcurrentDictionary<System.Type, ReflectionFactory>();
+    readonly ConcurrentDictionary<System.Type, DynamicRegistration> _mockRegistrations =
+        new ConcurrentDictionary<System.Type, DynamicRegistration>();
 
     // Let's define a method to configure our container with auto-mocking of interfaces or abstract classes.
     // Optional `reuse` parameter will allow to specify a mock reuse.
     private IContainer WithAutoMocking(IContainer container, IReuse reuse = null) =>
-        container.With(rules => rules.WithUnknownServiceResolvers(request =>
+        container.With(rules => rules.WithDynamicRegistration((serviceType, serviceKey) =>
         {
-            var serviceType = request.ServiceType;
             if (!serviceType.IsAbstract) // Mock interface or abstract class only.
                 return null;
-            return _mockFactories.GetOrAdd(serviceType,
-                type => ReflectionFactory.Of(reuse: reuse, made: Made.Of(() => Substitute.For(new[] { type }, null))));
-        }));
+
+            var d = _mockRegistrations.GetOrAdd(serviceType,
+                type => new DynamicRegistration(
+                    DelegateFactory.Of(r => Substitute.For(new[] { serviceType }, Empty<object>()), reuse)));
+
+            return new[] { d };
+        },
+        DynamicRegistrationFlags.Service | DynamicRegistrationFlags.AsFallback));
 
 
-    [Test] public void Test()
+    [Test]
+    public void Test()
     {
         var container = WithAutoMocking(new Container(), Reuse.Singleton);
 
@@ -123,7 +138,8 @@ container to detach from the production container but provide the access to its 
 ```cs 
 public class Moq_example_with_test_container
 {
-    [Test] public void Test()
+    [Test]
+    public void Test()
     {
         var prodContainer = new Container();
 
@@ -182,7 +198,7 @@ public class Moq_example_with_test_container
                 var concreteTypeFactory = serviceType.ToFactory(Reuse.Singleton, FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic);
 
                 return new[] { new DynamicRegistration(concreteTypeFactory) };
-            }, 
+            },
             DynamicRegistrationFlags.Service | DynamicRegistrationFlags.AsFallback));
 
         c.Register(typeof(Mock<>), Reuse.Singleton, FactoryMethod.DefaultConstructor());
@@ -195,7 +211,7 @@ public class Moq_example_with_test_container
         bool Method();
     }
 
-    public class Dep1 : IDep 
+    public class Dep1 : IDep
     {
         public bool Method() => true;
     }

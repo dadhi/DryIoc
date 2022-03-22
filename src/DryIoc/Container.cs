@@ -12839,7 +12839,9 @@ namespace DryIoc
                         return factoryDelegateExpr is FactoryDelegateExpression
                             ? new GetScopedOrSingletonViaFactoryDelegateExpression(factoryId, factoryDelegateExpr)
                             : new GetScopedOrSingletonViaFactoryDelegateConstantExpression(factoryId, factoryDelegateExpr, serviceExprType);
-                    return new GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(factoryId, factoryDelegateExpr, disposalOrder);
+                    return factoryDelegateExpr is FactoryDelegateExpression 
+                        ? new GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(factoryId, factoryDelegateExpr, disposalOrder)
+                        : new GetScopedOrSingletonViaFactoryDelegateConstantWithDisposalOrderExpression(factoryId, factoryDelegateExpr, disposalOrder, serviceExprType);
                 }
 
                 var ifNoScopeThrow = request.IfUnresolved == IfUnresolved.Throw;
@@ -12940,14 +12942,11 @@ namespace DryIoc
                 : base(factoryId, createValueExpr) => Type = type;
         }
 
-        internal sealed class GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression : MethodCallExpression
+        internal class GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression : GetScopedOrSingletonViaFactoryDelegateExpression
         {
             public override MethodInfo Method => GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderMethod;
-            public readonly int FactoryId;
-            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
             public readonly int DisposalOrder;
             public ConstantExpression DisposalOrderExpr => ConstantInt(DisposalOrder);
-            public readonly Expression CreateValueExpr;
             public override int ArgumentCount => 4;
             public override IReadOnlyList<Expression> Arguments =>
                 new[] { FactoryDelegateCompiler.ResolverContextParamExpr, FactoryIdExpr, CreateValueExpr, DisposalOrderExpr };
@@ -12957,11 +12956,14 @@ namespace DryIoc
                 i == 2 ? CreateValueExpr :
                          DisposalOrderExpr;
             internal GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(int factoryId, Expression createValueExpr, int disposalOrder)
-            {
-                FactoryId = factoryId;
-                CreateValueExpr = createValueExpr;
-                DisposalOrder = disposalOrder;
-            }
+                : base(factoryId, createValueExpr) => DisposalOrder = disposalOrder;
+        }
+
+        internal sealed class GetScopedOrSingletonViaFactoryDelegateConstantWithDisposalOrderExpression : GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression
+        {
+            public override Type Type { get; }
+            internal GetScopedOrSingletonViaFactoryDelegateConstantWithDisposalOrderExpression(int factoryId, Expression createValueExpr, int disposalOrder, Type type)
+                : base(factoryId, createValueExpr, disposalOrder) => Type = type;
         }
 
         // todo: @duplicate of TrackInstance
