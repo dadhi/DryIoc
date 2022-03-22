@@ -683,6 +683,10 @@ namespace DryIoc
             _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
 
         /// <inheritdoc />
+        public IScope CurrentOrSingletonScope =>
+            _scopeContext == null ? _ownCurrentScope ?? _singletonScope : _scopeContext.GetCurrentOrDefault() ?? _singletonScope;
+
+        /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
         public IResolverContext WithCurrentScope(IScope scope)
         {
@@ -3843,7 +3847,7 @@ namespace DryIoc
         public static readonly ParameterExpression ResolverContextParamExpr = Parameter(typeof(IResolverContext), "r");
 
         /// Optimization: singleton array with the parameter expression of IResolverContext
-        public static readonly OneParameterLambdaExpression FactoryDelegateParamExprs = new OneParameterLambdaExpression(null, null, ResolverContextParamExpr);
+        internal static readonly OneParameterLambdaExpression FactoryDelegateParamExprs = new OneParameterLambdaExpression(null, null, ResolverContextParamExpr);
 
         /// <summary>Strips the unnecessary or adds the necessary cast to expression return result</summary>
         public static Expression NormalizeExpression(this Expression expr)
@@ -4542,6 +4546,10 @@ namespace DryIoc
         /// <summary>Current opened scope. May return the current scope from <see cref="ScopeContext"/> if context is not null.</summary>
         IScope CurrentScope { get; }
 
+        /// <summary>This property exist mostly for the performance reasons to have single virtual call instead of 
+        /// `CurrentScope ?? SingletonScope`</summary>
+        IScope CurrentOrSingletonScope { get; }
+
         /// <summary>The current scope belonged to the resolver context and not to the scope context. Maybe null if ScopeContext is not null.</summary>
         IScope OwnCurrentScope { get; }
 
@@ -4561,15 +4569,11 @@ namespace DryIoc
         /// <summary>Just a sugar that allow to get root or self container.</summary>
         public static IResolverContext RootOrSelf(this IResolverContext r) => r.Root ?? r;
 
-        internal static readonly PropertyInfo ParentProperty =
-            typeof(IResolverContext).Property(nameof(IResolverContext.Parent));
-
         internal static readonly MethodInfo OpenScopeMethod = typeof(ResolverContext)
             .GetMethod(nameof(OpenScope), new[] { typeof(IResolverContext), typeof(object), typeof(bool) });
 
-        /// <summary>Used when we need the resolver context in the expression for e.g. resolution calls dependency,
-        /// injecting the resolver context as parameter, opening the resolution scope, etc.
-        /// Traverses the parent containers until the root or returns itself if it is already a root.</summary>
+        /// <summary>Finds the correct resolver context expression for e.g. resolution calls dependency,
+        /// or for the injecting the resolver context as parameter, opening the resolution scope, etc.</summary>
         public static Expression GetRootOrSelfExpr(Request request) =>
             request.Reuse is CurrentScopeReuse == false
             && request.DirectParent.IsSingletonOrDependencyOfSingleton
@@ -4578,23 +4582,31 @@ namespace DryIoc
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
-        /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
+        /// <summary>Parent resolver context.</summary>
         public static readonly Expression ParentExpr =
-            Property(FactoryDelegateCompiler.ResolverContextParamExpr, ParentProperty);
+            new ResolverContextPropertyExpression(typeof(IResolverContext).Property(nameof(IResolverContext.Parent)));
 
-        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        /// <summary>Root or the current resolver context (if it is the root).</summary>
         public static readonly Expression RootOrSelfExpr =
             Call(typeof(ResolverContext).GetMethod(nameof(RootOrSelf)), FactoryDelegateCompiler.ResolverContextParamExpr);
 
-        /// <summary>Resolver parameter expression in FactoryDelegate.</summary>
+        /// <summary>Resolver parameter expression.</summary>
         public static readonly Expression SingletonScopeExpr =
-            Property(FactoryDelegateCompiler.ResolverContextParamExpr,
-                typeof(IResolverContext).Property(nameof(IResolverContext.SingletonScope)));
+            new ResolverContextPropertyExpression(typeof(IResolverContext).Property(nameof(IResolverContext.SingletonScope)));
 
-        /// <summary>Access to scopes in FactoryDelegate.</summary>
+        /// <summary>Access to the current scopes.</summary>
         public static readonly Expression CurrentScopeExpr =
-            Property(FactoryDelegateCompiler.ResolverContextParamExpr,
-                typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
+            new ResolverContextPropertyExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
+
+        /// <summary>Access to the current scope or singletons.</summary>
+        public static readonly Expression CurrentOrSingletonScopeExpr =
+            new ResolverContextPropertyExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentOrSingletonScope)));
+
+        internal sealed class ResolverContextPropertyExpression : PropertyExpression
+        {
+            public override Expression Expression => FactoryDelegateCompiler.ResolverContextParamExpr;
+            internal ResolverContextPropertyExpression(PropertyInfo property) : base(property) { }
+        } 
 
         /// Indicates that context is scoped - that's is only possible if container is not the Root one and has a Parent context
         public static bool IsScoped(this IResolverContext r) => r.Parent != null;
@@ -8221,6 +8233,7 @@ namespace DryIoc
                 //
                 var scopeNameExpr = Expression.New(ResolutionScopeNameCtor, ConstantOf<Type>(request.GetActualServiceType()), serviceKeyExpr);
                 var trackInParent = Constant(!request.Factory?.Setup.AvoidResolutionScopeTracking ?? true);
+                // todo: @perf @mem optimize to specialized expression
                 resolverExpr = Call(ResolverContext.OpenScopeMethod, FactoryDelegateCompiler.ResolverContextParamExpr, scopeNameExpr, trackInParent);
             }
 
@@ -12881,6 +12894,8 @@ namespace DryIoc
 
         /// <summary>Flag indicating that it is a scope or singleton.</summary>
         public readonly bool ScopedOrSingleton;
+
+        // Call(Property)
 
         /// Subject
         public static object GetScopedOrSingletonViaFactoryDelegate(IResolverContext r, int id, FactoryDelegate createValue) =>
