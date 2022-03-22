@@ -12910,8 +12910,8 @@ namespace DryIoc
             public override Expression Object => ResolverContext.CurrentOrSingletonScopeExpr;
             public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateMethod;
             public readonly int FactoryId;
-            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId); // todo: @perf @mem try to avoid the creation the constant at all during the compilation 
-            public readonly Expression CreateValueExpr; // todo: @perf @mem avoid wrapping into the Lamdba expression and use the Body expression direclyy
+            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
+            public readonly Expression CreateValueExpr;
             public override int ArgumentCount => 3;
             public override IReadOnlyList<Expression> Arguments =>
                 new[] { FactoryIdExpr, CreateValueExpr, FactoryDelegateCompiler.ResolverContextParamExpr };
@@ -12926,7 +12926,7 @@ namespace DryIoc
             public override bool IsIntrinsic => true;
 
             public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-                bool isNestedLambda, ref ClosureInfo rootClosure) => // todo: @perf use Body value instead
+                bool isNestedLambda, ref ClosureInfo rootClosure) =>
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, CreateValueExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -12937,6 +12937,7 @@ namespace DryIoc
                     ResolverContext.CurrentOrSingletonScopeExpr, paramExprs, il, ref closure, config, parent))
                     return false;
 
+                // Emitting the arguments:
                 // (int id, FactoryDelegate createValue, IResolverContext r)
                 EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
 
