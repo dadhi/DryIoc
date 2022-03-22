@@ -25,15 +25,6 @@ THE SOFTWARE.
 
 // ReSharper disable CoVariantArrayConversion
 
-/*
-// Lists the target platforms that are Not supported by FEC - simplifies the direct referencing of Expression.cs file
-
-#if !PCL && !NET35 && !NET40 && !NET403 && !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETCOREAPP1_0 && !NETCOREAPP1_1
-#define SUPPORTS_FAST_EXPRESSION_COMPILER
-#endif
-
-#if SUPPORTS_FAST_EXPRESSION_COMPILER
-*/
 #define LIGHT_EXPRESSION
 #if LIGHT_EXPRESSION || !NET45
 #define SUPPORTS_ARGUMENT_PROVIDER
@@ -1721,22 +1712,35 @@ namespace DryIoc.FastExpressionCompiler
 
         #endregion
 
-        // The minimal context-aware flags set by parent
+        /// The minimal context-aware flags set by parent
         [Flags]
-        internal enum ParentFlags : ushort
+        public enum ParentFlags : ushort
         {
+            /// Default is no flags
             Empty = 0,
+            /// The result of expression is ignored and maybe popped out
             IgnoreResult = 1 << 1,
+            /// Some parent is the call expression
             Call = 1 << 2,
-            MemberAccess = 1 << 3, // Any Parent Expression is a MemberExpression
+            /// Any Parent Expression is a MemberExpression
+            MemberAccess = 1 << 3,
+            /// Some arithmetic operation
             Arithmetic = 1 << 4,
+            /// Subject
             Coalesce = 1 << 5,
+            /// Expression with instance object (method call or member access or array access)
             InstanceAccess = 1 << 6,
+            /// Subject
             DupMemberOwner = 1 << 7,
+            /// Subject
             TryCatch = 1 << 8,
+            /// Combination`of InstanceAccess and Call
             InstanceCall = Call | InstanceAccess,
+            /// Constructor call
             CtorCall = Call | (1 << 9),
+            /// Indexer
             IndexAccess = 1 << 10,
+            /// Invoking the inlined lambda (the default System.Expression behavior)
             InlinedLambdaInvoke = 1 << 11
         }
 
