@@ -3716,7 +3716,6 @@ namespace DryIoc
             CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression e,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
-            // todo: @perf if possible optimize the call to r.CurrentScope to the top of the method chain and pass the Scope downwards
             var scope = (Scope)r.CurrentOrSingletonScope;
 
             var id = e.FactoryId;
@@ -3745,8 +3744,8 @@ namespace DryIoc
                 return otherItemRef.Value != noItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            var lambda = e.CreateValueExpr;
             object result = null;
+            var lambda = e.CreateValueExpr;
             // todo: @perf @mem optimize this thingy by storing the value inside the the expression instead of the ConstantExpression and the same for FactoryDelegateExpression
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
@@ -3791,8 +3790,9 @@ namespace DryIoc
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            var lambda = e.CreateValueExpr;
             object result = null;
+            // todo: @perf @mem optimize this thingy by storing the value inside the the expression instead of the ConstantExpression and the same for FactoryDelegateExpression
+            var lambda = e.CreateValueExpr;
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
@@ -4582,31 +4582,27 @@ namespace DryIoc
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
-        /// <summary>Parent resolver context.</summary>
-        public static readonly Expression ParentExpr =
-            new ResolverContextPropertyExpression(typeof(IResolverContext).Property(nameof(IResolverContext.Parent)));
-
         /// <summary>Root or the current resolver context (if it is the root).</summary>
         public static readonly Expression RootOrSelfExpr =
             Call(typeof(ResolverContext).GetMethod(nameof(RootOrSelf)), FactoryDelegateCompiler.ResolverContextParamExpr);
 
         /// <summary>Resolver parameter expression.</summary>
         public static readonly Expression SingletonScopeExpr =
-            new ResolverContextPropertyExpression(typeof(IResolverContext).Property(nameof(IResolverContext.SingletonScope)));
+            new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.SingletonScope)));
 
         /// <summary>Access to the current scopes.</summary>
         public static readonly Expression CurrentScopeExpr =
-            new ResolverContextPropertyExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
+            new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
 
         /// <summary>Access to the current scope or singletons.</summary>
         public static readonly Expression CurrentOrSingletonScopeExpr =
-            new ResolverContextPropertyExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentOrSingletonScope)));
+            new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentOrSingletonScope)));
 
-        internal sealed class ResolverContextPropertyExpression : PropertyExpression
+        internal sealed class ResolverContextPropertyParamExpression : PropertyExpression
         {
             public override Expression Expression => FactoryDelegateCompiler.ResolverContextParamExpr;
-            internal ResolverContextPropertyExpression(PropertyInfo property) : base(property) { }
-        } 
+            internal ResolverContextPropertyParamExpression(PropertyInfo property) : base(property) { }
+        }
 
         /// Indicates that context is scoped - that's is only possible if container is not the Root one and has a Parent context
         public static bool IsScoped(this IResolverContext r) => r.Parent != null;
@@ -12839,7 +12835,7 @@ namespace DryIoc
                         return factoryDelegateExpr is FactoryDelegateExpression
                             ? new GetScopedOrSingletonViaFactoryDelegateExpression(factoryId, factoryDelegateExpr)
                             : new GetScopedOrSingletonViaFactoryDelegateConstantExpression(factoryId, factoryDelegateExpr, serviceExprType);
-                    return factoryDelegateExpr is FactoryDelegateExpression 
+                    return factoryDelegateExpr is FactoryDelegateExpression
                         ? new GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(factoryId, factoryDelegateExpr, disposalOrder)
                         : new GetScopedOrSingletonViaFactoryDelegateConstantWithDisposalOrderExpression(factoryId, factoryDelegateExpr, disposalOrder, serviceExprType);
                 }
@@ -12898,56 +12894,24 @@ namespace DryIoc
         public readonly bool ScopedOrSingleton;
 
         /// Subject
-        public static object GetScopedOrSingletonViaFactoryDelegate(IResolverContext r, int id, FactoryDelegate createValue) =>
-            r.CurrentOrSingletonScope.GetOrAddViaFactoryDelegate(id, createValue, r);
-
-        internal static readonly MethodInfo GetScopedOrSingletonViaFactoryDelegateMethod =
-            typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedOrSingletonViaFactoryDelegate));
-
-        /// Subject
-        public static object GetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(IResolverContext r,
-            int id, FactoryDelegate createValue, int disposalOrder) =>
-            r.CurrentOrSingletonScope.GetOrAddViaFactoryDelegateWithDisposalOrder(id, createValue, r, disposalOrder);
-
-        internal static readonly MethodInfo GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderMethod =
-            typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedOrSingletonViaFactoryDelegateWithDisposalOrder));
-
-        internal class GetScopedOrSingletonViaFactoryDelegateExpression2 : MethodCallExpression
-        {
-            public override Type Type => ((FactoryDelegateExpression)CreateValueExpr).Body.Type;
-            public override Expression Object => ResolverContext.CurrentOrSingletonScopeExpr;
-            public override MethodInfo Method => GetScopedViaFactoryDelegateMethod;
-            public readonly int FactoryId;
-            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
-            public readonly Expression CreateValueExpr;
-            public override int ArgumentCount => 3;
-            public override IReadOnlyList<Expression> Arguments =>
-                new[] { FactoryDelegateCompiler.ResolverContextParamExpr, FactoryIdExpr, CreateValueExpr };
-            public override Expression GetArgument(int i) =>
-                i == 0 ? FactoryDelegateCompiler.ResolverContextParamExpr :
-                i == 1 ? FactoryIdExpr :
-                         CreateValueExpr;
-            internal GetScopedOrSingletonViaFactoryDelegateExpression2(int factoryId, Expression createValueExpr)
-            {
-                FactoryId = factoryId;
-                CreateValueExpr = createValueExpr;
-            }
-        }
+        public static object GetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(IResolverContext r, int id, FactoryDelegate createValue,
+            int disposalOrder = 0) => disposalOrder == 0
+                ? r.CurrentOrSingletonScope.GetOrAddViaFactoryDelegate(id, createValue, r)
+                : r.CurrentOrSingletonScope.GetOrAddViaFactoryDelegateWithDisposalOrder(id, createValue, r, disposalOrder);
 
         internal class GetScopedOrSingletonViaFactoryDelegateExpression : MethodCallExpression
         {
             public override Type Type => ((FactoryDelegateExpression)CreateValueExpr).Body.Type;
-            public override MethodInfo Method => GetScopedOrSingletonViaFactoryDelegateMethod;
+            public override Expression Object => ResolverContext.CurrentOrSingletonScopeExpr;
+            public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateMethod;
             public readonly int FactoryId;
-            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
+            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId); // todo: @perf @mem try to avoid the creation the constant at all during the compilation 
             public readonly Expression CreateValueExpr;
             public override int ArgumentCount => 3;
             public override IReadOnlyList<Expression> Arguments =>
-                new[] { FactoryDelegateCompiler.ResolverContextParamExpr, FactoryIdExpr, CreateValueExpr };
+                new[] { FactoryIdExpr, CreateValueExpr, FactoryDelegateCompiler.ResolverContextParamExpr };
             public override Expression GetArgument(int i) =>
-                i == 0 ? FactoryDelegateCompiler.ResolverContextParamExpr :
-                i == 1 ? FactoryIdExpr :
-                         CreateValueExpr;
+                i == 0 ? FactoryIdExpr : i == 1 ? CreateValueExpr : FactoryDelegateCompiler.ResolverContextParamExpr;
             internal GetScopedOrSingletonViaFactoryDelegateExpression(int factoryId, Expression createValueExpr)
             {
                 FactoryId = factoryId;
@@ -12964,17 +12928,14 @@ namespace DryIoc
 
         internal class GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression : GetScopedOrSingletonViaFactoryDelegateExpression
         {
-            public override MethodInfo Method => GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderMethod;
+            public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateWithDisposalOrderMethod;
             public readonly int DisposalOrder;
             public ConstantExpression DisposalOrderExpr => ConstantInt(DisposalOrder);
             public override int ArgumentCount => 4;
             public override IReadOnlyList<Expression> Arguments =>
-                new[] { FactoryDelegateCompiler.ResolverContextParamExpr, FactoryIdExpr, CreateValueExpr, DisposalOrderExpr };
+                new[] { FactoryIdExpr, CreateValueExpr, FactoryDelegateCompiler.ResolverContextParamExpr, DisposalOrderExpr };
             public override Expression GetArgument(int i) =>
-                i == 0 ? FactoryDelegateCompiler.ResolverContextParamExpr :
-                i == 1 ? FactoryIdExpr :
-                i == 2 ? CreateValueExpr :
-                         DisposalOrderExpr;
+                i == 0 ? FactoryIdExpr : i == 1 ? CreateValueExpr : i == 2 ? FactoryDelegateCompiler.ResolverContextParamExpr : DisposalOrderExpr;
             internal GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(int factoryId, Expression createValueExpr, int disposalOrder)
                 : base(factoryId, createValueExpr) => DisposalOrder = disposalOrder;
         }
