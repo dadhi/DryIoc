@@ -1082,8 +1082,8 @@ namespace DryIoc.FastExpressionCompiler
                     return false;
 
 #if LIGHT_EXPRESSION
-                if (expr.IsIntrinsic && !expr.TryCollectBoundConstants(flags, ref closure, paramExprs, isNestedLambda, ref rootClosure))
-                    return false;
+                if (expr.IsIntrinsic) 
+                    return expr.TryCollectBoundConstants(flags, ref closure, paramExprs, isNestedLambda, ref rootClosure);
 #endif
 
                 switch (expr.NodeType)
@@ -1784,8 +1784,8 @@ namespace DryIoc.FastExpressionCompiler
                 {
                     closure.LastEmitIsAddress = false;
 #if LIGHT_EXPRESSION
-                    if (expr.IsIntrinsic && !expr.TryEmit(setup, ref closure, paramExprs, il, parent, byRefIndex))
-                        return false;
+                    if (expr.IsIntrinsic)
+                        return expr.TryEmit(setup, ref closure, paramExprs, il, parent, byRefIndex);
 #endif
                     switch (expr.NodeType)
                     {
