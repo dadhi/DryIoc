@@ -12926,7 +12926,8 @@ namespace DryIoc
             public override bool IsIntrinsic => true;
 
             public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-                bool isNestedLambda, ref ClosureInfo rootClosure) =>
+                bool isNestedLambda, ref ClosureInfo rootClosure) => 
+                ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config) &&
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, CreateValueExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
