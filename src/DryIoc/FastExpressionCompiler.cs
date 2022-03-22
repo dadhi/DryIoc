@@ -1763,7 +1763,7 @@ namespace DryIoc.FastExpressionCompiler
         /// <summary>Supports emitting of selected expressions, e.g. lambdaExpr are not supported yet.
         /// When emitter find not supported expression it will return false from <see cref="TryEmit"/>, so I could fallback
         /// to normal and slow Expression.Compile.</summary>
-        private static class EmittingVisitor
+        public static class EmittingVisitor
         {
             private static readonly MethodInfo _getTypeFromHandleMethod =
                 ((Func<RuntimeTypeHandle, Type>)Type.GetTypeFromHandle).Method;
@@ -2505,12 +2505,12 @@ namespace DryIoc.FastExpressionCompiler
             }
 
 #if LIGHT_EXPRESSION
-            private static bool TryEmitParameter(ParameterExpression paramExpr, IParameterProvider paramExprs,
-            ILGenerator il, ref ClosureInfo closure, ParentFlags parent, int byRefIndex = -1)
+            public static bool TryEmitParameter(ParameterExpression paramExpr, IParameterProvider paramExprs,
+                ILGenerator il, ref ClosureInfo closure, ParentFlags parent, int byRefIndex = -1)
             {
                 var paramExprCount = paramExprs.ParameterCount;
 #else
-            private static bool TryEmitParameter(ParameterExpression paramExpr, IReadOnlyList<PE> paramExprs,
+            public static bool TryEmitParameter(ParameterExpression paramExpr, IReadOnlyList<PE> paramExprs,
                 ILGenerator il, ref ClosureInfo closure, ParentFlags parent, int byRefIndex = -1)
             {
                 var paramExprCount = paramExprs.Count;
@@ -4055,7 +4055,7 @@ namespace DryIoc.FastExpressionCompiler
                 var callExpr = (MethodCallExpression)expr;
                 var objExpr = callExpr.Object;
                 var method = callExpr.Method;
-                var methodParams = method.GetParameters();
+                var methodParams = method.GetParameters(); // todo: @perf @mem find how to avoid the call, look at `NewNoByRefArgs` expressions as example
 
                 var objIsValueType = false;
                 if (objExpr != null)

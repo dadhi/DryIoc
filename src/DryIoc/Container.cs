@@ -12930,7 +12930,15 @@ namespace DryIoc
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, CreateValueExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, 
-                ILGenerator il, ParentFlags parent, int byRefIndex = -1) => false;
+                ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+            {
+                // todo: @diagnostics interesting to see how many paramExprs do we have here and can we optimize the next call away.
+                if (!EmittingVisitor.TryEmitParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure, parent, -1))
+                    return false;
+                
+                
+                return true;
+            }
         }
 
         internal sealed class GetScopedOrSingletonViaFactoryDelegateConstantExpression : GetScopedOrSingletonViaFactoryDelegateExpression
