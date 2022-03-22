@@ -3844,9 +3844,11 @@ namespace DryIoc
     public static class FactoryDelegateCompiler
     {
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
-        public static readonly ParameterExpression ResolverContextParamExpr = Parameter(typeof(IResolverContext), "r");
+        public static readonly ParameterExpression ResolverContextParamExpr = ParameterOf<IResolverContext>("r");
 
-        /// Optimization: singleton array with the parameter expression of IResolverContext
+        public static readonly ParameterExpression[] ResolverContextParamsExpr = { ResolverContextParamExpr };
+
+        /// Optimization: the empty lambda with a single IResolverContext parameters
         internal static readonly OneParameterLambdaExpression FactoryDelegateParamExprs = new OneParameterLambdaExpression(null, null, ResolverContextParamExpr);
 
         /// <summary>Strips the unnecessary or adds the necessary cast to expression return result</summary>
@@ -3936,7 +3938,7 @@ namespace DryIoc
     {
         public override Type ReturnType => typeof(object);
         public override int ParameterCount => 1;
-        public override IReadOnlyList<ParameterExpression> Parameters => new[] { FactoryDelegateCompiler.ResolverContextParamExpr };
+        public override IReadOnlyList<ParameterExpression> Parameters => FactoryDelegateCompiler.ResolverContextParamsExpr;
         public override ParameterExpression GetParameter(int index) => FactoryDelegateCompiler.ResolverContextParamExpr;
         public FactoryDelegateExpression(Expression body) : base(body) { }
     }
@@ -14647,7 +14649,7 @@ namespace DryIoc
         private static readonly Lazy<Func<Assembly, IEnumerable<Type>>> _getAssemblyTypes = Lazy.Of(GetAssemblyTypesMethod);
         private static Func<Assembly, IEnumerable<Type>> GetAssemblyTypesMethod()
         {
-            var asmExpr = Parameter(typeof(Assembly), "a");
+            var asmExpr = ParameterOf<Assembly>("a");
 
             var definedTypesProperty = typeof(Assembly).GetTypeInfo().GetDeclaredProperty("DefinedTypes");
             if (definedTypesProperty != null)
