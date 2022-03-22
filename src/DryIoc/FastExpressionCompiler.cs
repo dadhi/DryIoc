@@ -4104,10 +4104,10 @@ namespace DryIoc.FastExpressionCompiler
             }
 
 #if LIGHT_EXPRESSION
-            private static bool TryEmitMemberAccess(MemberExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
+            public static bool TryEmitMemberAccess(MemberExpression expr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent, int byRefIndex = -1)
 #else
-            private static bool TryEmitMemberAccess(MemberExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
+            public static bool TryEmitMemberAccess(MemberExpression expr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure,
                 CompilerFlags setup, ParentFlags parent, int byRefIndex = -1)
 #endif
             {

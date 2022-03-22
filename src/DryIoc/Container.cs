@@ -4592,15 +4592,15 @@ namespace DryIoc
             Call(typeof(ResolverContext).GetMethod(nameof(RootOrSelf)), FactoryDelegateCompiler.ResolverContextParamExpr);
 
         /// <summary>Resolver parameter expression.</summary>
-        public static readonly Expression SingletonScopeExpr =
+        public static readonly PropertyExpression SingletonScopeExpr =
             new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.SingletonScope)));
 
         /// <summary>Access to the current scopes.</summary>
-        public static readonly Expression CurrentScopeExpr =
+        public static readonly PropertyExpression CurrentScopeExpr =
             new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
 
         /// <summary>Access to the current scope or singletons.</summary>
-        public static readonly Expression CurrentOrSingletonScopeExpr =
+        public static readonly PropertyExpression CurrentOrSingletonScopeExpr =
             new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentOrSingletonScope)));
 
         internal sealed class ResolverContextPropertyParamExpression : PropertyExpression
@@ -12932,11 +12932,11 @@ namespace DryIoc
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, 
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1)
             {
-                // todo: @diagnostics interesting to see how many paramExprs do we have here and can we optimize the next call away.
-                if (!EmittingVisitor.TryEmitParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure, parent, -1))
+                // todo: @diagnostics interesting to see how many paramExprs do we have here and can we optimize knowing their count.
+                if (!EmittingVisitor.TryEmitMemberAccess(
+                    ResolverContext.CurrentOrSingletonScopeExpr, paramExprs, il, ref closure, config, parent))
                     return false;
-                
-                
+
                 return true;
             }
         }
