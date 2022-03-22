@@ -12911,7 +12911,7 @@ namespace DryIoc
             public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateMethod;
             public readonly int FactoryId;
             public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId); // todo: @perf @mem try to avoid the creation the constant at all during the compilation 
-            public readonly Expression CreateValueExpr;
+            public readonly Expression CreateValueExpr; // todo: @perf @mem avoid wrapping into the Lamdba expression and use the Body expression direclyy
             public override int ArgumentCount => 3;
             public override IReadOnlyList<Expression> Arguments =>
                 new[] { FactoryIdExpr, CreateValueExpr, FactoryDelegateCompiler.ResolverContextParamExpr };
@@ -12923,10 +12923,11 @@ namespace DryIoc
                 CreateValueExpr = createValueExpr;
             }
 
-            public override bool IsIntrinsic => false;
+            public override bool IsIntrinsic => false; // todo: @wip turn On when ready
 
             public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, 
-                bool isNestedLambda, ref ClosureInfo rootClosure) => false;
+                bool isNestedLambda, ref ClosureInfo rootClosure) => // todo: @perf use Body value instead
+                ExpressionCompiler.TryCollectBoundConstants(ref closure, CreateValueExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, 
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1) => false;

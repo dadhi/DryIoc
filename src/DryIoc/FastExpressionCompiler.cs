@@ -1068,11 +1068,11 @@ namespace DryIoc.FastExpressionCompiler
 
         // @paramExprs is required for nested lambda compilation
 #if LIGHT_EXPRESSION
-        private static bool TryCollectBoundConstants(ref ClosureInfo closure, Expression expr, IParameterProvider paramExprs, bool isNestedLambda,
+        public static bool TryCollectBoundConstants(ref ClosureInfo closure, Expression expr, IParameterProvider paramExprs, bool isNestedLambda,
             ref ClosureInfo rootClosure, CompilerFlags flags)
         {
 #else
-        private static bool TryCollectBoundConstants(ref ClosureInfo closure, Expression expr, IReadOnlyList<PE> paramExprs, bool isNestedLambda,
+        public static bool TryCollectBoundConstants(ref ClosureInfo closure, Expression expr, IReadOnlyList<PE> paramExprs, bool isNestedLambda,
             ref ClosureInfo rootClosure, CompilerFlags flags)
         {
 #endif
