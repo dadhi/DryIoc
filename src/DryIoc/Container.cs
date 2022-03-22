@@ -35,22 +35,24 @@ namespace DryIoc
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Diagnostics;              // for StackTrace
+    using System.Diagnostics.CodeAnalysis; // for SuppressMessage
     using System.Linq;
     using System.Reflection;
+    using System.Reflection.Emit;
+    using System.Runtime.CompilerServices; // for MethodImplAttribute
     using System.Text;
     using System.Threading;
-    using System.Diagnostics.CodeAnalysis; // for SuppressMessage
-    using System.Diagnostics;              // for StackTrace
-    using System.Runtime.CompilerServices; // for MethodImplAttribute
 
-    using DryIoc.ImTools;
-    using static DryIoc.ImTools.ArrayTools;
     using static System.Environment;
-
     using ExprType = System.Linq.Expressions.ExpressionType;
 
-    using DryIoc.FastExpressionCompiler.LightExpression;
-    using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
+    using ImTools;
+    using static ImTools.ArrayTools;
+
+    using FastExpressionCompiler.LightExpression;
+    using static FastExpressionCompiler.LightExpression.Expression;
+    using static FastExpressionCompiler.LightExpression.ExpressionCompiler;
 
     /// <summary>Inversion of control container</summary>
     public partial class Container : IContainer
@@ -12920,6 +12922,14 @@ namespace DryIoc
                 FactoryId = factoryId;
                 CreateValueExpr = createValueExpr;
             }
+
+            public override bool IsIntrinsic => false;
+
+            public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, 
+                bool isNestedLambda, ref ClosureInfo rootClosure) => false;
+
+            public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, 
+                ILGenerator il, ParentFlags parent, int byRefIndex = -1) => false;
         }
 
         internal sealed class GetScopedOrSingletonViaFactoryDelegateConstantExpression : GetScopedOrSingletonViaFactoryDelegateExpression

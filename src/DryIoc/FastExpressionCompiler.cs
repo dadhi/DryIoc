@@ -33,15 +33,16 @@ THE SOFTWARE.
 #define SUPPORTS_EMITCALL
 #endif
 #if LIGHT_EXPRESSION
-using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
-using PE = DryIoc.FastExpressionCompiler.LightExpression.ParameterExpression;
 namespace DryIoc.FastExpressionCompiler.LightExpression
-#else
-using static System.Linq.Expressions.Expression;
-using PE = System.Linq.Expressions.ParameterExpression;
-namespace DryIoc.FastExpressionCompiler
-#endif
 {
+    using static FastExpressionCompiler.LightExpression.Expression;
+    using PE = FastExpressionCompiler.LightExpression.ParameterExpression;
+#else
+namespace DryIoc.FastExpressionCompiler
+{
+    using static System.Linq.Expressions.Expression;
+    using PE = System.Linq.Expressions.ParameterExpression;
+#endif
     using System;
     using System.Collections;
     using System.Collections.Generic;
