@@ -1080,6 +1080,11 @@ namespace DryIoc.FastExpressionCompiler
                 if (expr == null)
                     return false;
 
+#if LIGHT_EXPRESSION
+                if (expr.IsIntrinsic && !expr.TryCollectBoundConstants(flags, ref closure, paramExprs, isNestedLambda, ref rootClosure))
+                    return false;
+#endif
+
                 switch (expr.NodeType)
                 {
                     case ExpressionType.Constant:
@@ -1777,7 +1782,10 @@ namespace DryIoc.FastExpressionCompiler
                 while (true)
                 {
                     closure.LastEmitIsAddress = false;
-
+#if LIGHT_EXPRESSION
+                    if (expr.IsIntrinsic && !expr.TryEmit(setup, ref closure, paramExprs, il, parent, byRefIndex))
+                        return false;
+#endif
                     switch (expr.NodeType)
                     {
                         case ExpressionType.Parameter:
