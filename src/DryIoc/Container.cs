@@ -684,7 +684,7 @@ namespace DryIoc
 
         /// <inheritdoc />
         public IScope CurrentOrSingletonScope =>
-            _scopeContext == null ? _ownCurrentScope ?? _singletonScope : _scopeContext.GetCurrentOrDefault() ?? _singletonScope;
+            (_scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault()) ?? _singletonScope;
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
