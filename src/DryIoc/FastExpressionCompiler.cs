@@ -1087,7 +1087,7 @@ namespace DryIoc.FastExpressionCompiler
                 {
                     case ExpressionType.Constant:
 #if LIGHT_EXPRESSION
-                        if (expr is IntConstantExpression n)
+                        if (expr is IntConstantExpression n) // todo: @perf use more generic approach
                             return true;
 #endif
                         var constantExpr = (ConstantExpression)expr;
@@ -2084,12 +2084,13 @@ namespace DryIoc.FastExpressionCompiler
                 var argExprs = newExpr.Arguments;
                 var argCount = argExprs.Count;
 #endif
+                var ctor = newExpr.Constructor;
                 if (argCount > 0)
                 {
 #if LIGHT_EXPRESSION
-                    var args = newExpr.NoByRefArgs ? null : newExpr.Constructor.GetParameters();
+                    var args = newExpr.NoByRefArgs ? null : ctor.GetParameters();
 #else
-                    var args = newExpr.Constructor.GetParameters();
+                    var args = ctor.GetParameters();
 #endif
                     if (args == null)
                     {
@@ -2108,8 +2109,8 @@ namespace DryIoc.FastExpressionCompiler
                 }
 
                 // ReSharper disable once ConditionIsAlwaysTrueOrFalse
-                if (newExpr.Constructor != null)
-                    il.Emit(OpCodes.Newobj, newExpr.Constructor);
+                if (ctor != null)
+                    il.Emit(OpCodes.Newobj, ctor);
                 else if (newExpr.Type.IsValueType)
                     EmitLoadLocalVariable(il, InitValueTypeVariable(il, newExpr.Type));
                 else
@@ -2793,9 +2794,19 @@ namespace DryIoc.FastExpressionCompiler
                 if (targetType.IsAssignableFrom(sourceType) && (parent & ParentFlags.IgnoreResult) != 0)
                     return TryEmit(opExpr, paramExprs, il, ref closure, setup, parent);
 
-                var sourceTypeIsNullable = sourceType.IsNullable();
-                var underlyingNullableSourceType = Nullable.GetUnderlyingType(sourceType);
-                if (sourceTypeIsNullable && targetType == underlyingNullableSourceType)
+                // todo: @wip
+                // another quick path, e.g. DryIoc get from scope methods
+                // var targetIsValueType = targetType.IsValueType;
+                // if (!targetIsValueType && sourceType == typeof(object))
+                // {
+                //     if (!TryEmit(opExpr, paramExprs, il, ref closure, setup, parent))
+                //         return false;
+                //     il.Emit(OpCodes.Castclass, targetType);
+                //     return true;
+                // }
+
+                var underlyingNullableSourceType = sourceType.GetUnderlyingNullableTypeOrNull();
+                if (underlyingNullableSourceType == targetType)
                 {
                     if (!TryEmit(opExpr, paramExprs, il, ref closure, setup, parent & ~ParentFlags.IgnoreResult | ParentFlags.InstanceAccess))
                         return false;
@@ -2810,9 +2821,8 @@ namespace DryIoc.FastExpressionCompiler
                 if (!TryEmit(opExpr, paramExprs, il, ref closure, setup, parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess))
                     return false;
 
-                var targetTypeIsNullable = targetType.IsNullable();
-                var underlyingNullableTargetType = Nullable.GetUnderlyingType(targetType);
-                if (targetTypeIsNullable && sourceType == underlyingNullableTargetType)
+                var underlyingNullableTargetType = targetType.GetUnderlyingNullableTypeOrNull();
+                if (underlyingNullableTargetType == sourceType)
                 {
                     il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
                     return true;
@@ -2827,19 +2837,19 @@ namespace DryIoc.FastExpressionCompiler
 
                 // check implicit / explicit conversion operators on source and target types
                 // for non-primitives and for non-primitive nullable - #73
-                if (!sourceTypeIsNullable && !sourceType.IsPrimitive)
+                if (underlyingNullableSourceType == null && !sourceType.IsPrimitive)
                 {
-                    var actualTargetType = targetTypeIsNullable ? underlyingNullableTargetType : targetType;
+                    var actualTargetType = underlyingNullableTargetType ?? targetType;
                     var convertOpMethod = method ?? sourceType.FindConvertOperator(sourceType, actualTargetType);
                     if (convertOpMethod != null)
                     {
                         il.Emit(OpCodes.Call, convertOpMethod);
-                        if (targetTypeIsNullable)
+                        if (underlyingNullableTargetType != null)
                             il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
                         return il.EmitPopIfIgnoreResult(parent);
                     }
                 }
-                else if (!targetTypeIsNullable)
+                else if (underlyingNullableTargetType == null)
                 {
                     if (method != null && method.DeclaringType == targetType && method.GetParameters()[0].ParameterType == sourceType)
                     {
@@ -2847,11 +2857,11 @@ namespace DryIoc.FastExpressionCompiler
                         return il.EmitPopIfIgnoreResult(parent);
                     }
 
-                    var actualSourceType = sourceTypeIsNullable ? underlyingNullableSourceType : sourceType;
+                    var actualSourceType = underlyingNullableSourceType ?? sourceType;
                     var convertOpMethod = method ?? actualSourceType.FindConvertOperator(actualSourceType, targetType);
                     if (convertOpMethod != null)
                     {
-                        if (sourceTypeIsNullable)
+                        if (underlyingNullableSourceType != null)
                         {
                             EmitStoreAndLoadLocalVariableAddress(il, sourceType);
                             il.Emit(OpCodes.Call, sourceType.FindValueGetterMethod());
@@ -2862,7 +2872,7 @@ namespace DryIoc.FastExpressionCompiler
                     }
                 }
 
-                if (!targetTypeIsNullable && !targetType.IsPrimitive)
+                if (underlyingNullableTargetType == null && !targetType.IsPrimitive)
                 {
                     if (method != null && method.DeclaringType == targetType && method.GetParameters()[0].ParameterType == sourceType)
                     {
@@ -2870,12 +2880,12 @@ namespace DryIoc.FastExpressionCompiler
                         return il.EmitPopIfIgnoreResult(parent);
                     }
 
-                    var actualSourceType = sourceTypeIsNullable ? underlyingNullableSourceType : sourceType;
+                    var actualSourceType = underlyingNullableSourceType ?? sourceType;
                     // ReSharper disable once ConstantNullCoalescingCondition
                     var convertOpMethod = method ?? targetType.FindConvertOperator(actualSourceType, targetType);
                     if (convertOpMethod != null)
                     {
-                        if (sourceTypeIsNullable)
+                        if (underlyingNullableSourceType != null)
                         {
                             EmitStoreAndLoadLocalVariableAddress(il, sourceType);
                             il.Emit(OpCodes.Call, sourceType.FindValueGetterMethod());
@@ -2885,14 +2895,14 @@ namespace DryIoc.FastExpressionCompiler
                         return il.EmitPopIfIgnoreResult(parent);
                     }
                 }
-                else if (!sourceTypeIsNullable)
+                else if (underlyingNullableSourceType == null)
                 {
-                    var actualTargetType = targetTypeIsNullable ? underlyingNullableTargetType : targetType;
+                    var actualTargetType = underlyingNullableTargetType ?? targetType;
                     var convertOpMethod = method ?? actualTargetType.FindConvertOperator(sourceType, actualTargetType);
                     if (convertOpMethod != null)
                     {
                         il.Emit(OpCodes.Call, convertOpMethod);
-                        if (targetTypeIsNullable)
+                        if (underlyingNullableTargetType != null)
                             il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
 
                         return il.EmitPopIfIgnoreResult(parent);
@@ -2903,10 +2913,10 @@ namespace DryIoc.FastExpressionCompiler
                 {
                     il.Emit(OpCodes.Unbox_Any, targetType);
                 }
-                else if (targetTypeIsNullable)
+                else if (underlyingNullableTargetType != null)
                 {
                     // Conversion to Nullable: `new Nullable<T>(T val);`
-                    if (!sourceTypeIsNullable)
+                    if (underlyingNullableSourceType == null)
                     {
                         if (!underlyingNullableTargetType.IsEnum && // todo: @clarify hope the source type is convertible to enum, huh 
                             !TryEmitValueConvert(underlyingNullableTargetType, il, isChecked: false))
@@ -2952,7 +2962,7 @@ namespace DryIoc.FastExpressionCompiler
                         targetType = Enum.GetUnderlyingType(targetType);
 
                     // fixes #159
-                    if (sourceTypeIsNullable)
+                    if (underlyingNullableSourceType != null)
                     {
                         EmitStoreAndLoadLocalVariableAddress(il, sourceType);
                         il.Emit(OpCodes.Call, sourceType.FindValueGetterMethod());
@@ -5313,8 +5323,14 @@ namespace DryIoc.FastExpressionCompiler
             type == typeof(uint) ||
             type == typeof(ulong);
 
+        // todo: @wip @perf replace with GetUnderlyingNullableTypeOrNull because they come together and do the same checks twice
+        [MethodImpl((MethodImplOptions)256)]
         internal static bool IsNullable(this Type type) =>
-            type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+            type.IsValueType && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>);
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal static Type GetUnderlyingNullableTypeOrNull(this Type type) =>
+            type.IsValueType && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>) ? type.GetGenericArguments()[0] : null;
 
         public static string GetArithmeticBinaryOperatorMethodName(this ExpressionType nodeType) =>
             nodeType switch
