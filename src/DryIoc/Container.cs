@@ -12923,13 +12923,13 @@ namespace DryIoc
                 CreateValueExpr = createValueExpr;
             }
 
-            public override bool IsIntrinsic => false; // todo: @wip turn On when ready
+            public override bool IsIntrinsic => true;
 
-            public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, 
+            public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 bool isNestedLambda, ref ClosureInfo rootClosure) => // todo: @perf use Body value instead
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, CreateValueExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
-            public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, 
+            public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1)
             {
                 // todo: @diagnostics interesting to see how many paramExprs do we have here and can we optimize knowing their count.
@@ -12937,12 +12937,22 @@ namespace DryIoc
                     ResolverContext.CurrentOrSingletonScopeExpr, paramExprs, il, ref closure, config, parent))
                     return false;
 
-                return true;
+                // (int id, FactoryDelegate createValue, IResolverContext r)
+                EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
+
+                if (!EmittingVisitor.TryEmit(CreateValueExpr, paramExprs, il, ref closure, config, parent))
+                    return false;
+
+                if (!EmittingVisitor.TryEmitParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure, parent))
+                    return false;
+
+                return EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
             }
         }
 
         internal sealed class GetScopedOrSingletonViaFactoryDelegateConstantExpression : GetScopedOrSingletonViaFactoryDelegateExpression
         {
+            public override bool IsIntrinsic => false;
             public override Type Type { get; }
             internal GetScopedOrSingletonViaFactoryDelegateConstantExpression(int factoryId, Expression createValueExpr, Type type)
                 : base(factoryId, createValueExpr) => Type = type;

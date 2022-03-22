@@ -2515,6 +2515,8 @@ namespace DryIoc.FastExpressionCompiler
             {
                 var paramExprCount = paramExprs.Count;
 #endif
+                // todo: @perf @mem optimize for the non-by-ref parameter, so that it can be easy to use as an Intrinsic 
+
                 // if parameter is passed through, then just load it on stack
                 var paramType = paramExpr.Type;
                 var isParamByRef = paramExpr.IsByRef;
@@ -3617,7 +3619,7 @@ namespace DryIoc.FastExpressionCompiler
                     else
                     {
                         il.Emit(OpCodes.Constrained, exprType); // todo: @check it is a value type so... can we de-virtualize the call?
-                        il.Emit(OpCodes.Callvirt, method);
+                        EmitVirtualMethodCall(il, method);
                     }
                 }
 
@@ -4093,7 +4095,7 @@ namespace DryIoc.FastExpressionCompiler
                 else
                 {
                     il.Emit(OpCodes.Constrained, objExpr.Type);
-                    il.Emit(OpCodes.Callvirt, method);
+                    EmitVirtualMethodCall(il, method);
                 }
 
                 if (parent.IgnoresResult() && method.ReturnType != typeof(void))
@@ -5097,9 +5099,9 @@ namespace DryIoc.FastExpressionCompiler
                 return testExpr;
             }
 
-            // get the advantage of the optimized specialized EmitCall method
+            /// Get the advantage of the optimized specialized EmitCall method
             [MethodImpl((MethodImplOptions)256)]
-            private static bool EmitMethodCallOrVirtualCall(ILGenerator il, MethodInfo method)
+            public static bool EmitMethodCallOrVirtualCall(ILGenerator il, MethodInfo method)
             {
 #if SUPPORTS_EMITCALL
                 il.EmitCall(method.IsVirtual ? OpCodes.Callvirt : OpCodes.Call, method, null);
@@ -5109,9 +5111,21 @@ namespace DryIoc.FastExpressionCompiler
                 return true;
             }
 
-            // get the advantage of the optimized specialized EmitCall method
+            /// Get the advantage of the optimized specialized EmitCall method
             [MethodImpl((MethodImplOptions)256)]
-            private static bool EmitMethodCall(ILGenerator il, MethodInfo method)
+            public static bool EmitVirtualMethodCall(ILGenerator il, MethodInfo method)
+            {
+#if SUPPORTS_EMITCALL
+                il.EmitCall(OpCodes.Callvirt, method, null);
+#else
+                il.Emit(OpCodes.Callvirt, method);
+#endif
+                return true;
+            }
+
+            /// Get the advantage of the optimized specialized EmitCall method
+            [MethodImpl((MethodImplOptions)256)]
+            public static bool EmitMethodCall(ILGenerator il, MethodInfo method)
             {
 #if SUPPORTS_EMITCALL
                 il.EmitCall(OpCodes.Call, method, null);
@@ -5121,8 +5135,9 @@ namespace DryIoc.FastExpressionCompiler
                 return true;
             }
 
+            /// Efficiently emit the int constant
             [MethodImpl((MethodImplOptions)256)]
-            private static void EmitLoadConstantInt(ILGenerator il, int i)
+            public static void EmitLoadConstantInt(ILGenerator il, int i)
             {
                 switch (i)
                 {
@@ -5951,7 +5966,7 @@ namespace DryIoc.FastExpressionCompiler
                             return sb.Append("New(").AppendTypeof(e.Type, stripNamespace, printType).Append(')');
 
                         sb.Append("New( // ").Append(args.Count).Append(" args");
-                        var ctorIndex = x.Constructor.DeclaringType.GetTypeInfo().DeclaredConstructors.ToArray().GetFirstIndex(x.Constructor);
+                        var ctorIndex = x.Constructor.DeclaringType.GetTypeInfo().DeclaredConstructors.ToArray().GetFirstIndexByReferenceEquals(x.Constructor);
                         sb.NewLineIdent(lineIdent).AppendTypeof(x.Type, stripNamespace, printType)
                             .Append(".GetTypeInfo().DeclaredConstructors.ToArray()[").Append(ctorIndex).Append("],");
                         sb.NewLineIdentArgumentExprs(args, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
@@ -7495,7 +7510,7 @@ namespace DryIoc.FastExpressionCompiler
 
     internal static class FecHelpers
     {
-        public static int GetFirstIndex<T>(this IReadOnlyList<T> source, T item)
+        public static int GetFirstIndexByReferenceEquals<T>(this IReadOnlyList<T> source, T item) where T : class
         {
             if (source.Count != 0)
                 for (var i = 0; i < source.Count; ++i)
