@@ -55,6 +55,13 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public abstract ExpressionType NodeType { get; }
         /// <summary>All expressions should have a Type.</summary>
         public abstract Type Type { get; }
+
+        public virtual bool IsIntrinsic => false;
+
+        public virtual bool TryCollectBoundConstants(ref ExpressionCompiler.ClosureInfo closure, 
+            IParameterProvider paramExprs, bool isNestedLambda, ref ExpressionCompiler.ClosureInfo rootClosure, CompilerFlags flags) => false;
+
+
 #if SUPPORTS_VISITOR
         protected internal abstract Expression Accept(ExpressionVisitor visitor);
 #endif

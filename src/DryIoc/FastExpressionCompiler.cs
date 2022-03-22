@@ -568,8 +568,10 @@ namespace DryIoc.FastExpressionCompiler
             public int[] VarIndexes;
         }
 
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+
         [Flags]
-        internal enum ClosureStatus : byte
+        public enum ClosureStatus : byte
         {
             ToBeCollected = 1,
             UserProvided = 1 << 1,
@@ -587,8 +589,9 @@ namespace DryIoc.FastExpressionCompiler
         }
 
         /// Track the info required to build a closure object + some context information not directly related to closure.
-        internal struct ClosureInfo
+        public struct ClosureInfo
         {
+            /// <summary>Tracks that the last emit was an address</summary>
             public bool LastEmitIsAddress;
 
             /// Tracks the stack of blocks where are we in emit phase
@@ -889,8 +892,6 @@ namespace DryIoc.FastExpressionCompiler
             }
         }
 
-#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-
         public static readonly ArrayClosure EmptyArrayClosure = new ArrayClosure(null);
 
         public static FieldInfo ArrayClosureArrayField =
@@ -960,13 +961,18 @@ namespace DryIoc.FastExpressionCompiler
             }
         }
 
-        internal sealed class NestedLambdaInfo
+        /// <summary>Collects the lambda info for the compilation</summary>
+        public sealed class NestedLambdaInfo
         {
+            /// <summary>The lambda expression</summary>
             public readonly LambdaExpression LambdaExpression;
+            /// <summary>The lambda expression closure info</summary>
             public ClosureInfo ClosureInfo;
+            /// <summary>Compiled lambda</summary>
             public object Lambda;
+            /// <summary>Index of the compiled lambda in the parent lambda closure array</summary>
             public int LambdaVarIndex;
-
+            /// <summary>Constructor</summary>
             public NestedLambdaInfo(LambdaExpression lambdaExpression)
             {
                 LambdaExpression = lambdaExpression;
@@ -5648,7 +5654,7 @@ namespace DryIoc.FastExpressionCompiler
         */
     }
 
-    internal struct LiveCountArray<T>
+    public struct LiveCountArray<T>
     {
         public int Count;
         public T[] Items;
