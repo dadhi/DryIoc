@@ -3339,7 +3339,7 @@ namespace DryIoc
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, ref object result)
         {
-            if (expr is CurrentScopeReuse.GetScopedViaFactoryDelegatExpression s)
+            if (expr is CurrentScopeReuse.GetScopedViaFactoryDelegateExpression s)
             {
                 result = InterpretGetScopedViaFactoryDelegate(r, s, paramExprs, paramValues, parentArgs);
                 return true;
@@ -3554,7 +3554,7 @@ namespace DryIoc
         }
 
         private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r,
-            CurrentScopeReuse.GetScopedViaFactoryDelegatExpression e,
+            CurrentScopeReuse.GetScopedViaFactoryDelegateExpression e,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
             var scope = (Scope)r.CurrentScope;
@@ -12850,7 +12850,7 @@ namespace DryIoc
                 if (Name == null)
                 {
                     if (disposalOrder == 0)
-                        return new GetScopedViaFactoryDelegatExpression(ifNoScopeThrow, factoryId, factoryDelegateExpr);
+                        return new GetScopedViaFactoryDelegateExpression(ifNoScopeThrow, factoryId, factoryDelegateExpr);
                     return Call(GetScopedViaFactoryDelegateWithDisposalOrderMethod,
                         FactoryDelegateCompiler.ResolverContextParamExpr, Constant(ifNoScopeThrow), ConstantInt(factoryId), factoryDelegateExpr, ConstantInt(disposalOrder));
                 }
@@ -12944,16 +12944,18 @@ namespace DryIoc
                 if (!EmittingVisitor.TryEmit(CreateValueExpr, paramExprs, il, ref closure, config, parent))
                     return false;
 
-                if (!EmittingVisitor.TryEmitParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure, parent))
+                if (!EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure, parent))
                     return false;
 
-                return EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
+                EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
+                il.Emit(OpCodes.Castclass, Type);
+                return true;
             }
         }
 
         internal sealed class GetScopedOrSingletonViaFactoryDelegateConstantExpression : GetScopedOrSingletonViaFactoryDelegateExpression
         {
-            public override bool IsIntrinsic => false;
+            public override bool IsIntrinsic => true;
             public override Type Type { get; }
             internal GetScopedOrSingletonViaFactoryDelegateConstantExpression(int factoryId, Expression createValueExpr, Type type)
                 : base(factoryId, createValueExpr) => Type = type;
@@ -12996,7 +12998,7 @@ namespace DryIoc
         internal static readonly MethodInfo GetScopedViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedViaFactoryDelegate));
 
-        internal sealed class GetScopedViaFactoryDelegatExpression : MethodCallExpression
+        internal sealed class GetScopedViaFactoryDelegateExpression : MethodCallExpression
         {
             public override Type Type => CreateValueExpr.Type;
             public override MethodInfo Method => GetScopedViaFactoryDelegateMethod;
@@ -13013,7 +13015,7 @@ namespace DryIoc
                 i == 1 ? ThrowIfNoScopeExpr :
                 i == 2 ? FactoryIdExpr :
                          CreateValueExpr;
-            internal GetScopedViaFactoryDelegatExpression(bool throwIfNoScope, int factoryId, Expression createValueExpr)
+            internal GetScopedViaFactoryDelegateExpression(bool throwIfNoScope, int factoryId, Expression createValueExpr)
             {
                 ThrowIfNoScope = throwIfNoScope;
                 FactoryId = factoryId;

@@ -2515,8 +2515,6 @@ namespace DryIoc.FastExpressionCompiler
             {
                 var paramExprCount = paramExprs.Count;
 #endif
-                // todo: @perf @mem optimize for the non-by-ref parameter, so that it can be easy to use as an Intrinsic 
-
                 // if parameter is passed through, then just load it on stack
                 var paramType = paramExpr.Type;
                 var isParamByRef = paramExpr.IsByRef;
@@ -2606,6 +2604,50 @@ namespace DryIoc.FastExpressionCompiler
                 // source type is object, NonPassedParams is object array
                 if (paramType.IsValueType)
                     il.Emit(OpCodes.Unbox_Any, paramType);
+
+                return true;
+            }
+
+#if LIGHT_EXPRESSION
+            public static bool TryEmitNonByRefNonValueTypeParameter(ParameterExpression paramExpr, IParameterProvider paramExprs,
+                ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
+            {
+                var paramExprCount = paramExprs.ParameterCount;
+#else
+            public static bool TryEmitNonByRefNonValueTypeParameter(ParameterExpression paramExpr, IReadOnlyList<PE> paramExprs,
+                ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
+            {
+                var paramExprCount = paramExprs.Count;
+#endif
+                // if parameter is passed through, then just load it on stack
+                var paramType = paramExpr.Type;
+                var paramIndex = paramExprCount - 1;
+                while (paramIndex != -1 && !ReferenceEquals(paramExprs.GetParameter(paramIndex), paramExpr))
+                    --paramIndex;
+                if (paramIndex != -1)
+                {
+                    ++paramIndex; // shift parameter index by one, because the first one will be closure
+                    if (closure.LastEmitIsAddress)
+                        EmitLoadArgAddress(il, paramIndex);
+                    else
+                        EmitLoadArg(il, paramIndex);
+                    return true;
+                }
+
+                // the only possibility that we are here is because we are in the nested lambda,
+                // and it uses the parameter or variable from the outer lambda
+                var nonPassedParams = closure.NonPassedParameters;
+                var nonPassedParamIndex = nonPassedParams.Length - 1;
+                while (nonPassedParamIndex != -1 && !ReferenceEquals(nonPassedParams[nonPassedParamIndex], paramExpr))
+                    --nonPassedParamIndex;
+                if (nonPassedParamIndex == -1)
+                    return false; // what??? no chance
+
+                // Load non-passed argument from Closure - closure object is always a first argument
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldfld, ArrayClosureWithNonPassedParamsField);
+                EmitLoadConstantInt(il, nonPassedParamIndex);
+                il.Emit(OpCodes.Ldelem_Ref);
 
                 return true;
             }
