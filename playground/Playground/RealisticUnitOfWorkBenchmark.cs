@@ -1171,21 +1171,23 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
 
 ## V5 release
 
+BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19043
+Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=6.0.201
+  [Host]     : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
+  DefaultJob : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
+
+
 |       Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
 |------------- |-------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|-------:|----------:|
-|       DryIoc |     83.66 us |   1.027 us |   0.960 us |   1.00 |    0.00 |   6.5918 |  0.4883 |      - |  40.56 KB |
-|  DryIoc_MsDI |     93.74 us |   1.236 us |   0.965 us |   1.12 |    0.02 |   8.3008 |  0.6104 |      - |  51.43 KB |
-|         MsDI |     94.79 us |   1.041 us |   0.813 us |   1.13 |    0.02 |  11.8408 |  4.2725 |      - |  72.58 KB |
-|      Autofac |    549.00 us |   7.843 us |   6.549 us |   6.56 |    0.12 |  51.7578 | 25.3906 | 1.9531 | 317.27 KB |
-| Autofac_MsDI |    545.42 us |  10.800 us |   9.574 us |   6.51 |    0.12 |  54.6875 | 27.3438 | 2.9297 |    340 KB |
-|   Lamar_MsDI |  7,077.45 us | 194.761 us | 565.036 us |  77.31 |    3.31 |        - |       - |      - | 649.71 KB |
-|        Grace | 16,223.23 us | 317.228 us | 264.900 us | 193.90 |    4.16 |  93.7500 | 31.2500 |      - | 735.76 KB |
-|   Grace_MsDI | 19,266.37 us | 336.411 us | 280.919 us | 230.27 |    4.37 | 125.0000 | 62.5000 |      - | 907.39 KB |
-
-|      Method |     Mean |    Error |   StdDev |   Median | Ratio | RatioSD |   Gen 0 | Gen 1 | Gen 2 | Allocated |
-|------------ |---------:|---------:|---------:|---------:|------:|--------:|--------:|------:|------:|----------:|
-|      DryIoc | 90.56 us | 2.575 us | 7.347 us | 87.76 us |  1.00 |    0.00 | 13.1836 |     - |     - |  40.59 KB |
-| DryIoc_MsDI | 97.12 us | 1.918 us | 3.359 us | 95.92 us |  1.12 |    0.07 | 16.3574 |     - |     - |  50.18 KB |
+|       DryIoc |     86.10 us |   1.508 us |   1.411 us |   1.00 |    0.00 |   6.5918 |  0.3662 |      - |  40.59 KB |
+|  DryIoc_MsDI |     93.52 us |   0.385 us |   0.300 us |   1.09 |    0.02 |   8.3008 |  0.4883 |      - |  51.27 KB |
+|         MsDI |     95.85 us |   1.275 us |   1.193 us |   1.11 |    0.02 |  11.8408 |  4.2725 |      - |  72.67 KB |
+|      Autofac |    540.52 us |  10.392 us |  12.371 us |   6.29 |    0.19 |  50.7813 | 25.3906 | 1.9531 | 317.04 KB |
+| Autofac_MsDI |    526.29 us |   4.637 us |   3.872 us |   6.12 |    0.12 |  54.6875 | 27.3438 | 1.9531 |  340.2 KB |
+|   Lamar_MsDI |  7,607.20 us | 182.225 us | 525.760 us |  77.60 |    3.00 |        - |       - |      - | 649.87 KB |
+|        Grace | 15,809.04 us | 224.203 us | 187.220 us | 183.68 |    3.80 |  93.7500 | 31.2500 |      - |  736.2 KB |
+|   Grace_MsDI | 18,707.17 us | 236.977 us | 221.668 us | 217.31 |    3.79 | 125.0000 | 62.5000 |      - | 907.38 KB |
 
 */
             [Benchmark(Baseline = true)]
@@ -1194,26 +1196,26 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
             [Benchmark]
             public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
 
-            // [Benchmark]
+            [Benchmark]
             public object MsDI() => Measure(PrepareMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark
             // [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
 
-            // [Benchmark]
+            [Benchmark]
             public object Lamar_MsDI() => Measure(PrepareLamarMsDi());
 
-            // [Benchmark]
+            [Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            // [Benchmark]
+            [Benchmark]
             public object Grace_MsDI() => Measure(PrepareGraceMsDi());
         }
 
