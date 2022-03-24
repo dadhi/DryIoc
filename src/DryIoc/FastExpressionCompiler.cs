@@ -1751,7 +1751,7 @@ namespace DryIoc.FastExpressionCompiler
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        internal static bool IgnoresResult(this ParentFlags parent) => (parent & ParentFlags.IgnoreResult) != 0;
+        public static bool IgnoresResult(this ParentFlags parent) => (parent & ParentFlags.IgnoreResult) != 0;
 
         internal static bool EmitPopIfIgnoreResult(this ILGenerator il, ParentFlags parent)
         {

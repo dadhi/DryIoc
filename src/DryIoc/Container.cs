@@ -3030,9 +3030,7 @@ namespace DryIoc
                             return false;
 
                         // skip conversion for null and for directly assignable type
-                        if (instance == null)
-                            result = instance;
-                        else if (convertExpr.Type.IsAssignableFrom(instance.GetType()))
+                        if (instance == null || convertExpr.Type.IsAssignableFrom(instance.GetType()))
                             result = instance;
                         else
                             result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
@@ -3339,21 +3337,16 @@ namespace DryIoc
         private static bool TryInterpretMethodCall(IResolverContext r, Expression expr,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, ref object result)
         {
-            if (expr is CurrentScopeReuse.GetScopedViaFactoryDelegateExpression s)
+            // the order of the 2 expressions cases is intentional starting from the subtype to the supertype
+            if (expr is CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression sd)
             {
-                result = InterpretGetScopedViaFactoryDelegate(r, s, paramExprs, paramValues, parentArgs);
+                result = InterpretGetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(r, sd, paramExprs, paramValues, parentArgs);
                 return true;
             }
 
-            if (expr is CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression ss)
+            if (expr is CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression s)
             {
-                result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, ss, paramExprs, paramValues, parentArgs);
-                return true;
-            }
-
-            if (expr is CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression ssd)
-            {
-                result = InterpretGetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(r, ssd, paramExprs, paramValues, parentArgs);
+                result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, s, paramExprs, paramValues, parentArgs);
                 return true;
             }
 
@@ -3363,12 +3356,6 @@ namespace DryIoc
 
             if (methodDeclaringType == typeof(CurrentScopeReuse))
             {
-                if (method == CurrentScopeReuse.GetScopedViaFactoryDelegateWithDisposalOrderMethod)
-                {
-                    result = InterpretGetScopedViaFactoryDelegateWithDisposalOrder(r, callExpr, paramExprs, paramValues, parentArgs);
-                    return true;
-                }
-
                 if (method == CurrentScopeReuse.GetNameScopedViaFactoryDelegateMethod)
                 {
                     result = InterpretGetNameScopedViaFactoryDelegate(r, callExpr, paramExprs, paramValues, parentArgs);
@@ -3553,24 +3540,31 @@ namespace DryIoc
             return true;
         }
 
-        private static object InterpretGetScopedViaFactoryDelegate(IResolverContext r,
-            CurrentScopeReuse.GetScopedViaFactoryDelegateExpression e,
+        private static object InterpretGetScopedOrSingletonViaFactoryDelegate(
+            IResolverContext r, CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression e,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
-            var scope = (Scope)r.CurrentScope;
-            if (scope == null)
-                return e.ThrowIfNoScope ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
+            Scope scope;
+            if (e is CurrentScopeReuse.GetScopedViaFactoryDelegateExpression s)
+            {
+                scope = (Scope)r.CurrentScope;
+                if (scope == null)
+                    return s.ThrowIfNoScope ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
+            }
+            else
+                scope = (Scope)r.CurrentOrSingletonScope;
 
             var id = e.FactoryId;
+            var noItem = Scope.NoItem;
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef != null && itemRef.Value != Scope.NoItem)
+            if (itemRef != null && itemRef.Value != noItem)
                 return itemRef.Value;
 
             if (scope.IsDisposed)
                 Throw.ScopeIsDisposed(scope, r);
 
-            itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            itemRef = new ImMapEntry<object>(id, noItem);
             var oldMap = map;
             var newMap = oldMap.AddOrKeepEntry(itemRef);
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
@@ -3578,17 +3572,16 @@ namespace DryIoc
                 newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
                 var otherItemRef = newMap.GetSurePresentEntry(id);
                 if (otherItemRef != itemRef)
-                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                    return otherItemRef.Value != noItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
             else if (newMap == oldMap)
             {
                 var otherItemRef = newMap.GetSurePresentEntry(id);
-                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                return otherItemRef.Value != noItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            var lambda = e.CreateValueExpr;
-
             object result = null;
+            var lambda = e.ServiceFactoryExpr;
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
@@ -3600,27 +3593,22 @@ namespace DryIoc
             return result;
         }
 
-        private static string Truncate(this string s, int maxLength = 1000, string truncationSuffix = "…") =>
-            s?.Length > maxLength ? s.Substring(0, maxLength) + truncationSuffix : s;
-
-        private static object InterpretGetScopedViaFactoryDelegateWithDisposalOrder(IResolverContext r,
-            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
+        private static object InterpretGetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(
+            IResolverContext r, CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression e,
+            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
-            var args = (FiveArgumentsMethodCallExpression)callExpr;
-            var resolverArg = args.Argument0;
-
-            if (!ReferenceEquals(resolverArg, FactoryDelegateCompiler.ResolverContextParamExpr))
+            Scope scope;
+            if (e is CurrentScopeReuse.GetScopedViaFactoryDelegateWithDisposalOrderExpression s)
             {
-                if (!TryInterpret(r, resolverArg, paramExprs, paramValues, parentArgs, out var resolverObj))
-                    return false;
-                r = (IResolverContext)resolverObj;
+                scope = (Scope)r.CurrentScope;
+                if (scope == null)
+                    return s.ThrowIfNoScope ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
             }
+            else
+                scope = (Scope)r.CurrentOrSingletonScope;
 
-            var scope = (Scope)r.CurrentScope;
-            if (scope == null)
-                return (bool)ConstValue(args.Argument1) ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
+            var id = e.FactoryId;
 
-            var id = TryGetIntConstantValue(args.Argument2);
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
             if (itemRef != null && itemRef.Value != Scope.NoItem)
@@ -3645,24 +3633,22 @@ namespace DryIoc
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
-            var lambda = args.Argument3;
-
             object result = null;
+            var lambda = e.ServiceFactoryExpr;
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
             itemRef.Value = result;
-
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
-                scope.AddDisposable(disp, TryGetIntConstantValue(args.Argument4));
+                scope.AddDisposable(disp, e.DisposalOrder);
 
             return result;
         }
 
-        // todo: @perf create the overload without disposal index so we could use FiveArgumentsMethodCall expression from the FEC, because it is now have a 6 arguments and I see impractical to create a SixArgumentsMethodCall
-        private static object InterpretGetNameScopedViaFactoryDelegate(IResolverContext r,
-            MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
+        // todo: @perf create an overload without disposal index so we could use FiveArgumentsMethodCall expression from the FEC, because it is now have a 6 arguments and I see impractical to create a SixArgumentsMethodCall
+        private static object InterpretGetNameScopedViaFactoryDelegate(
+            IResolverContext r, MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
             var args = (SixArgumentsMethodCallExpression)callExpr;
             if (!ReferenceEquals(args.Argument0, FactoryDelegateCompiler.ResolverContextParamExpr))
@@ -3710,98 +3696,6 @@ namespace DryIoc
 
             if (result is IDisposable disp)
                 scope.AddDisposable(disp, TryGetIntConstantValue(args.Argument5));
-
-            return result;
-        }
-
-        private static object InterpretGetScopedOrSingletonViaFactoryDelegate(IResolverContext r,
-            CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression e,
-            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
-        {
-            var scope = (Scope)r.CurrentOrSingletonScope;
-
-            var id = e.FactoryId;
-            var noItem = Scope.NoItem;
-            ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
-            var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef != null && itemRef.Value != noItem)
-                return itemRef.Value;
-
-            if (scope.IsDisposed)
-                Throw.ScopeIsDisposed(scope, r);
-
-            itemRef = new ImMapEntry<object>(id, noItem);
-            var oldMap = map;
-            var newMap = oldMap.AddOrKeepEntry(itemRef);
-            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
-            {
-                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                    return otherItemRef.Value != noItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            }
-            else if (newMap == oldMap)
-            {
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                return otherItemRef.Value != noItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            }
-
-            object result = null;
-            var lambda = e.CreateValueExpr;
-            // todo: @perf @mem optimize this thingy by storing the value inside the the expression instead of the ConstantExpression and the same for FactoryDelegateExpression
-            if (lambda is ConstantExpression lambdaConstExpr)
-                result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
-            itemRef.Value = result;
-            if (result is IDisposable disp && !ReferenceEquals(disp, scope))
-                scope.AddUnorderedDisposable(disp);
-
-            return result;
-        }
-
-        private static object InterpretGetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(IResolverContext r,
-            CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression e,
-            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
-        {
-            var scope = (Scope)r.CurrentOrSingletonScope;
-
-            var id = e.FactoryId;
-
-            ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
-            var itemRef = map.GetEntryOrDefault(id);
-            if (itemRef != null && itemRef.Value != Scope.NoItem)
-                return itemRef.Value;
-
-            if (scope.IsDisposed)
-                Throw.It(Error.ScopeIsDisposed, scope.ToString());
-
-            itemRef = new ImMapEntry<object>(id, Scope.NoItem);
-            var oldMap = map;
-            var newMap = oldMap.AddOrKeepEntry(itemRef);
-            if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
-            {
-                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                if (otherItemRef != itemRef)
-                    return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            }
-            else if (newMap == oldMap)
-            {
-                var otherItemRef = newMap.GetSurePresentEntry(id);
-                return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-            }
-
-            object result = null;
-            // todo: @perf @mem optimize this thingy by storing the value inside the the expression instead of the ConstantExpression and the same for FactoryDelegateExpression
-            var lambda = e.CreateValueExpr;
-            if (lambda is ConstantExpression lambdaConstExpr)
-                result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
-            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
-            itemRef.Value = result;
-            if (result is IDisposable disp && !ReferenceEquals(disp, scope))
-                scope.AddDisposable(disp, e.DisposalOrder);
 
             return result;
         }
@@ -4595,7 +4489,7 @@ namespace DryIoc
         public static readonly PropertyExpression SingletonScopeExpr =
             new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.SingletonScope)));
 
-        /// <summary>Access to the current scopes.</summary>
+        /// <summary>Access to the current scope.</summary>
         public static readonly PropertyExpression CurrentScopeExpr =
             new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
 
@@ -4609,10 +4503,18 @@ namespace DryIoc
             internal ResolverContextPropertyParamExpression(PropertyInfo property) : base(property) { }
         }
 
-        /// Indicates that context is scoped - that's is only possible if container is not the Root one and has a Parent context
+        /// <summary>Indicates that context is scoped - that's is only possible if container is not the Root one and has a Parent context</summary>
         public static bool IsScoped(this IResolverContext r) => r.Parent != null;
 
-        /// Provides access to the current scope - may return `null` if ambient scope context has it scope changed in-between 
+        /// <summary>Get current scope or throw the exception otherwise.</summary>
+        public static IScope GetCurrentScopeOrThrow(this IResolverContext r) =>
+            r.CurrentScope ?? Throw.For<IScope>(Error.NoCurrentScope, r);
+
+        /// <summary>Get current scope expression or throw the exception otherwise.</summary>
+        public static readonly MethodCallExpression GetCurrentScopeOrThrowExpr =
+            Call(typeof(ResolverContext).GetMethod(nameof(GetCurrentScopeOrThrow)), FactoryDelegateCompiler.ResolverContextParamExpr);
+
+        /// <summary>Provides access to the current scope - may return `null` if ambient scope context has it scope changed in-between</summary>
         public static IScope GetCurrentScope(this IResolverContext r, bool throwIfNotFound) =>
             r.CurrentScope ?? (throwIfNotFound ? Throw.For<IScope>(Error.NoCurrentScope, r) : null);
 
@@ -10492,13 +10394,16 @@ namespace DryIoc
                 {
                     var originalServiceExprType = serviceExpr.Type;
 
-                    serviceExpr = ApplyReuse(serviceExpr, request); // todo: @perf pass the possibly calculated id to here
+                    serviceExpr = ApplyReuse(serviceExpr, request); // todo: @perf pass a possibly calculated id to here
 
                     var serviceExprType = serviceExpr.Type;
                     if (serviceExpr.NodeType != ExprType.Constant &&
-                        serviceExprType != originalServiceExprType &&
-                        !originalServiceExprType.IsAssignableFrom(serviceExprType))
-                        serviceExpr = Convert(serviceExpr, originalServiceExprType);
+                        serviceExprType != originalServiceExprType && !originalServiceExprType.IsAssignableFrom(serviceExprType))
+                    {
+                        serviceExpr = originalServiceExprType.IsValueType
+                            ? Convert(serviceExpr, originalServiceExprType)
+                            : new ConvertViaCastClassIntrinsicExpression(serviceExpr, originalServiceExprType);
+                    }
                 }
             }
             else if (!rules.UsedForValidation &&
@@ -12736,6 +12641,10 @@ namespace DryIoc
         /// <summary>Returns expression call to GetOrAddItem.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
+            // strip the conversion as we are operating with object anyway
+            if (serviceFactoryExpr.NodeType == ExprType.Convert)
+                serviceFactoryExpr = ((UnaryExpression)serviceFactoryExpr).Operand;
+
             // this is required because we cannot use ValueType for the object
             if (serviceFactoryExpr.Type.IsValueType)
                 serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
@@ -12791,14 +12700,12 @@ namespace DryIoc
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            var serviceExprType = serviceFactoryExpr.Type;
-
             // strip the conversion as we are operating with object anyway
             if (serviceFactoryExpr.NodeType == ExprType.Convert)
                 serviceFactoryExpr = ((UnaryExpression)serviceFactoryExpr).Operand;
 
             // this is required because we cannot use ValueType for the object
-            if (serviceExprType.IsValueType)
+            if (serviceFactoryExpr.Type.IsValueType)
                 serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
 
             if (request.TracksTransientDisposable)
@@ -12836,18 +12743,15 @@ namespace DryIoc
 
                 if (ScopedOrSingleton)
                     return disposalOrder == 0
-                        ? new GetScopedOrSingletonViaFactoryDelegateExpression(factoryId, factoryDelegateExpr, serviceExprType)
-                        : new GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(factoryId, factoryDelegateExpr, serviceExprType, disposalOrder);
+                        ? new GetScopedOrSingletonViaFactoryDelegateExpression(factoryId, factoryDelegateExpr)
+                        : new GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(factoryId, factoryDelegateExpr, disposalOrder);
 
                 var ifNoScopeThrow = request.IfUnresolved == IfUnresolved.Throw;
 
                 if (Name == null)
-                {
-                    if (disposalOrder == 0)
-                        return new GetScopedViaFactoryDelegateExpression(ifNoScopeThrow, factoryId, factoryDelegateExpr);
-                    return Call(GetScopedViaFactoryDelegateWithDisposalOrderMethod,
-                        FactoryDelegateCompiler.ResolverContextParamExpr, Constant(ifNoScopeThrow), ConstantInt(factoryId), factoryDelegateExpr, ConstantInt(disposalOrder));
-                }
+                    return disposalOrder == 0
+                        ? new GetScopedViaFactoryDelegateExpression(ifNoScopeThrow, factoryId, factoryDelegateExpr)
+                        : new GetScopedViaFactoryDelegateWithDisposalOrderExpression(ifNoScopeThrow, factoryId, factoryDelegateExpr, disposalOrder);
 
                 return Call(GetNameScopedViaFactoryDelegateMethod, FactoryDelegateCompiler.ResolverContextParamExpr,
                     request.Container.GetConstantExpression(Name, typeof(object)),
@@ -12900,22 +12804,20 @@ namespace DryIoc
 
         internal class GetScopedOrSingletonViaFactoryDelegateExpression : MethodCallExpression
         {
-            public override Type Type { get; }
             public override Expression Object => ResolverContext.CurrentOrSingletonScopeExpr;
             public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateMethod;
             public readonly int FactoryId;
             public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
-            public readonly Expression CreateValueExpr;
+            public readonly Expression ServiceFactoryExpr;
             public override int ArgumentCount => 3;
             public override IReadOnlyList<Expression> Arguments =>
-                new[] { FactoryIdExpr, CreateValueExpr, FactoryDelegateCompiler.ResolverContextParamExpr };
+                new[] { FactoryIdExpr, ServiceFactoryExpr, FactoryDelegateCompiler.ResolverContextParamExpr };
             public override Expression GetArgument(int i) =>
-                i == 0 ? FactoryIdExpr : i == 1 ? CreateValueExpr : FactoryDelegateCompiler.ResolverContextParamExpr;
-            internal GetScopedOrSingletonViaFactoryDelegateExpression(int factoryId, Expression createValueExpr, Type serviceType)
+                i == 0 ? FactoryIdExpr : i == 1 ? ServiceFactoryExpr : FactoryDelegateCompiler.ResolverContextParamExpr;
+            internal GetScopedOrSingletonViaFactoryDelegateExpression(int factoryId, Expression createValueExpr)
             {
                 FactoryId = factoryId;
-                CreateValueExpr = createValueExpr;
-                Type = serviceType;
+                ServiceFactoryExpr = createValueExpr;
             }
 
             public override bool IsIntrinsic => true;
@@ -12923,29 +12825,26 @@ namespace DryIoc
             public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 bool isNestedLambda, ref ClosureInfo rootClosure) =>
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config) &&
-                ExpressionCompiler.TryCollectBoundConstants(ref closure, CreateValueExpr, paramExprs, isNestedLambda, ref rootClosure, config);
+                ExpressionCompiler.TryCollectBoundConstants(ref closure, ServiceFactoryExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1)
             {
-                // todo: @diagnostics interesting to see how many paramExprs do we have here and can we optimize knowing their count.
-                if (!EmittingVisitor.TryEmitMemberAccess(
-                    ResolverContext.CurrentOrSingletonScopeExpr, paramExprs, il, ref closure, config, parent))
+                // todo: @perf may be optimized further
+                if (!EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent))
                     return false;
 
-                // Emitting the arguments:
-                // (int id, FactoryDelegate createValue, IResolverContext r)
+                // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, FactoryDelegate createValue, IResolverContext r)
                 EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
 
-                if (!EmittingVisitor.TryEmit(CreateValueExpr, paramExprs, il, ref closure, config, parent))
+                // todo: @perf more intellegent emit?
+                if (!EmittingVisitor.TryEmit(ServiceFactoryExpr, paramExprs, il, ref closure, config, parent))
                     return false;
 
                 if (!EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure, parent))
                     return false;
 
-                EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
-                il.Emit(OpCodes.Castclass, Type);
-                return true;
+                return EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
             }
         }
 
@@ -12956,55 +12855,18 @@ namespace DryIoc
             public ConstantExpression DisposalOrderExpr => ConstantInt(DisposalOrder);
             public override int ArgumentCount => 4;
             public override IReadOnlyList<Expression> Arguments =>
-                new[] { FactoryIdExpr, CreateValueExpr, FactoryDelegateCompiler.ResolverContextParamExpr, DisposalOrderExpr };
+                new[] { FactoryIdExpr, ServiceFactoryExpr, FactoryDelegateCompiler.ResolverContextParamExpr, DisposalOrderExpr };
             public override Expression GetArgument(int i) =>
-                i == 0 ? FactoryIdExpr : i == 1 ? CreateValueExpr : i == 2 ? FactoryDelegateCompiler.ResolverContextParamExpr : DisposalOrderExpr;
-            // todo: @perf make it true but for now it is a rare case to be so much optizied
+                i == 0 ? FactoryIdExpr : i == 1 ? ServiceFactoryExpr : i == 2 ? FactoryDelegateCompiler.ResolverContextParamExpr : DisposalOrderExpr;
+            // todo: @perf make it true but for now it is a rare case to be so much optimized
             public override bool IsIntrinsic => false;
-            internal GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(int factoryId, Expression createValueExpr, Type serviceType, int disposalOrder)
-                : base(factoryId, createValueExpr, serviceType) => DisposalOrder = disposalOrder;
+            internal GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(
+                int factoryId, Expression createValueExpr, int disposalOrder) : base(factoryId, createValueExpr) => DisposalOrder = disposalOrder;
         }
-
-        // todo: @duplicate of TrackInstance
-        /// <summary>Tracks the Unordered disposal in the current scope or in the singleton as fallback</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static object TrackScopedOrSingleton(IResolverContext r, object item) =>
-            item is IDisposable d ? r.CurrentOrSingletonScope.TrackDisposable(d) : item;
-
-        internal static readonly MethodInfo TrackScopedOrSingletonMethod =
-            typeof(CurrentScopeReuse).GetMethod(nameof(TrackScopedOrSingleton));
 
         /// Subject
         public static object GetScopedViaFactoryDelegate(IResolverContext r, bool throwIfNoScope, int id, FactoryDelegate createValue) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r);
-
-        internal static readonly MethodInfo GetScopedViaFactoryDelegateMethod =
-            typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedViaFactoryDelegate));
-
-        internal sealed class GetScopedViaFactoryDelegateExpression : MethodCallExpression
-        {
-            public override Type Type => CreateValueExpr.Type;
-            public override MethodInfo Method => GetScopedViaFactoryDelegateMethod;
-            public readonly bool ThrowIfNoScope;
-            public ConstantExpression ThrowIfNoScopeExpr => Constant(ThrowIfNoScope);
-            public readonly int FactoryId;
-            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
-            public readonly Expression CreateValueExpr;
-            public override int ArgumentCount => 4;
-            public override IReadOnlyList<Expression> Arguments =>
-                new[] { FactoryDelegateCompiler.ResolverContextParamExpr, ThrowIfNoScopeExpr, FactoryIdExpr, CreateValueExpr };
-            public override Expression GetArgument(int i) =>
-                i == 0 ? FactoryDelegateCompiler.ResolverContextParamExpr :
-                i == 1 ? ThrowIfNoScopeExpr :
-                i == 2 ? FactoryIdExpr :
-                         CreateValueExpr;
-            internal GetScopedViaFactoryDelegateExpression(bool throwIfNoScope, int factoryId, Expression createValueExpr)
-            {
-                ThrowIfNoScope = throwIfNoScope;
-                FactoryId = factoryId;
-                CreateValueExpr = createValueExpr;
-            }
-        }
 
         /// Subject
         public static object GetScopedViaFactoryDelegateWithDisposalOrder(IResolverContext r,
@@ -13014,6 +12876,26 @@ namespace DryIoc
         internal static readonly MethodInfo GetScopedViaFactoryDelegateWithDisposalOrderMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedViaFactoryDelegateWithDisposalOrder));
 
+        internal sealed class GetScopedViaFactoryDelegateExpression : GetScopedOrSingletonViaFactoryDelegateExpression
+        {
+            public override Expression Object => ThrowIfNoScope ? ResolverContext.GetCurrentScopeOrThrowExpr : ResolverContext.CurrentScopeExpr;
+            public readonly bool ThrowIfNoScope;
+            public ConstantExpression ThrowIfNoScopeExpr => Constant(ThrowIfNoScope);
+            internal GetScopedViaFactoryDelegateExpression(
+                bool throwIfNoScope, int factoryId, Expression createValueExpr) :
+                base(factoryId, createValueExpr) => ThrowIfNoScope = throwIfNoScope;
+        }
+
+        internal sealed class GetScopedViaFactoryDelegateWithDisposalOrderExpression : GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression
+        {
+            public override Expression Object => ThrowIfNoScope ? ResolverContext.GetCurrentScopeOrThrowExpr : ResolverContext.CurrentScopeExpr;
+            public readonly bool ThrowIfNoScope;
+            public ConstantExpression ThrowIfNoScopeExpr => Constant(ThrowIfNoScope);
+            internal GetScopedViaFactoryDelegateWithDisposalOrderExpression(
+                bool throwIfNoScope, int factoryId, Expression serviceFactoryExpr, int disposalOrder) :
+                base(factoryId, serviceFactoryExpr, disposalOrder) => ThrowIfNoScope = throwIfNoScope;
+        }
+
         /// Subject
         public static object GetNameScopedViaFactoryDelegate(IResolverContext r,
             object scopeName, bool throwIfNoScope, int id, FactoryDelegate createValue, int disposalOrder) =>
@@ -13021,6 +12903,14 @@ namespace DryIoc
 
         internal static readonly MethodInfo GetNameScopedViaFactoryDelegateMethod =
             typeof(CurrentScopeReuse).GetMethod(nameof(GetNameScopedViaFactoryDelegate));
+
+        /// <summary>Tracks the Unordered disposal in the current scope or in the singleton as fallback</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static object TrackScopedOrSingleton(IResolverContext r, object item) =>
+            item is IDisposable d ? r.CurrentOrSingletonScope.TrackDisposable(d) : item;
+
+        internal static readonly MethodInfo TrackScopedOrSingletonMethod =
+            typeof(CurrentScopeReuse).GetMethod(nameof(TrackScopedOrSingleton));
 
         /// Subject
         public static object TrackScoped(IResolverContext r, bool throwIfNoScope, object item) =>
