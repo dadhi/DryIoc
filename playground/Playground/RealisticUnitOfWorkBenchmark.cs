@@ -1543,17 +1543,23 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 
 ## DryIoc v5
 
-|       Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
-|       DryIoc |  1.592 us | 0.0303 us | 0.0349 us |  1.00 |    0.00 |  0.4749 | 0.0057 |     - |   2.91 KB |
-|  DryIoc_MsDI |  2.604 us | 0.0210 us | 0.0176 us |  1.63 |    0.04 |  0.4807 | 0.0076 |     - |   2.96 KB |
-|        Grace |  1.801 us | 0.0136 us | 0.0120 us |  1.13 |    0.02 |  0.5169 | 0.0076 |     - |   3.17 KB |
-|   Grace_MsDI |  2.474 us | 0.0458 us | 0.0429 us |  1.55 |    0.04 |  0.5569 | 0.0076 |     - |   3.41 KB |
-|         MsDI |  3.825 us | 0.0572 us | 0.0478 us |  2.39 |    0.06 |  0.7629 | 0.0076 |     - |   4.68 KB |
-|   Lamar_MsDI |  6.637 us | 0.1251 us | 0.1390 us |  4.17 |    0.13 |  0.9689 | 0.4807 |     - |   5.95 KB |
-|      Autofac | 49.074 us | 0.4516 us | 0.4003 us | 30.72 |    0.78 |  8.3618 | 0.6714 |     - |  51.39 KB |
-| Autofac_MsDI | 60.701 us | 0.4713 us | 0.3936 us | 37.96 |    1.09 | 11.3525 | 0.8545 |     - |  69.87 KB |
+BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19043
+Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=6.0.201
+  [Host]     : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
+  DefaultJob : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
 
+
+|       Method |      Mean |     Error |    StdDev |    Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------- |----------:|----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|       DryIoc |  1.505 us | 0.0204 us | 0.0171 us |  1.504 us |  1.00 |    0.00 |  0.4749 | 0.0057 |     - |   2.91 KB |
+|  DryIoc_MsDI |  2.477 us | 0.0321 us | 0.0284 us |  2.473 us |  1.65 |    0.01 |  0.4807 | 0.0076 |     - |   2.96 KB |
+|        Grace |  1.703 us | 0.0186 us | 0.0174 us |  1.699 us |  1.13 |    0.02 |  0.5169 | 0.0076 |     - |   3.17 KB |
+|   Grace_MsDI |  2.413 us | 0.0213 us | 0.0189 us |  2.409 us |  1.60 |    0.02 |  0.5569 | 0.0076 |     - |   3.41 KB |
+|         MsDI |  3.601 us | 0.0405 us | 0.0379 us |  3.591 us |  2.40 |    0.03 |  0.7629 | 0.0114 |     - |   4.68 KB |
+|   Lamar_MsDI |  6.323 us | 0.0874 us | 0.0775 us |  6.303 us |  4.19 |    0.04 |  0.9766 | 0.4883 |     - |      6 KB |
+|      Autofac | 50.108 us | 1.4016 us | 3.8604 us | 47.929 us | 35.05 |    2.66 |  7.8125 | 0.6104 |     - |  47.89 KB |
+| Autofac_MsDI | 82.024 us | 1.6313 us | 3.3690 us | 81.889 us | 52.87 |    2.65 | 11.3525 | 0.9766 |     - |   70.2 KB |
 */
 #pragma warning disable CS0169
             private IServiceProvider _msDi;
@@ -1584,35 +1590,35 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
                 Measure(_lamarMsDi = PrepareLamarMsDi());
             }
 
-            // [Benchmark(Baseline = true)]
+            [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(_dryIoc);
 
-            // [Benchmark]
-            [Benchmark(Baseline = true)]
+            [Benchmark]
+            // [Benchmark(Baseline = true)]
             public object DryIoc_MsDI() => Measure(_dryIocMsDi);
 
-            // [Benchmark]
+            [Benchmark]
             public object MsDI() => Measure(_msDi);
 
-            //[Benchmark]
+            // [Benchmark]
             public object DryIoc_WebRequestScoped() => Measure_WebRequestScoped(_dryIocWebRequestScoped);
 
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            // [Benchmark]
+            [Benchmark]
             public object Grace() => Measure(_grace);
 
             [Benchmark]
             public object Grace_MsDI() => Measure(_graceMsDi);
 
-            // [Benchmark]
+            [Benchmark]
             public object Lamar_MsDI() => Measure(_lamarMsDi);
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac_MsDI() => Measure(_autofacMsDi);
         }
     }
