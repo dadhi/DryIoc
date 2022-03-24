@@ -2979,11 +2979,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         {
             var elemType = Type.GetElementType();
             var exprs = ToExpressions(Expressions, ref exprsConverted);
-            foreach (var e in exprs)
-                if (!elemType.IsAssignableFrom(e.Type))
-                {
-                    Console.WriteLine(e);
-                }
             return NodeType == ExpressionType.NewArrayInit
                 // ReSharper disable once AssignNullToNotNullAttribute
                 ? SysExpr.NewArrayInit(Type.GetElementType(), exprs)
