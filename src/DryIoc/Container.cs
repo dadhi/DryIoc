@@ -11469,20 +11469,20 @@ namespace DryIoc
             if (paramDetails.HasCustomValue)
             {
                 var serviceType = paramRequest.ServiceType;
-                var hasConversionOperator = false;
+                MethodInfo conversionOperator = null;
                 var customValue = paramDetails.CustomValue;
                 if (customValue != null)
                 {
                     var customTypeValue = customValue.GetType();
                     if (!customTypeValue.IsArray &&
                         !customTypeValue.IsAssignableTo(serviceType) &&
-                        !(hasConversionOperator = customTypeValue.HasConversionOperatorTo(serviceType)))
+                        null != (conversionOperator = customTypeValue.GetConversionOperatorOrNull(serviceType)))
                         return Throw.For<Expression>(paramRequest.IfUnresolved != IfUnresolved.ReturnDefault,
                             Error.InjectedCustomValueIsOfDifferentType, customValue, serviceType, paramRequest);
                 }
 
-                return hasConversionOperator
-                    ? Convert(request.Container.GetConstantExpression(customValue), serviceType)
+                return conversionOperator != null
+                    ? Convert(request.Container.GetConstantExpression(customValue), serviceType, conversionOperator)
                     : request.Container.GetConstantExpression(customValue, serviceType);
             }
 
