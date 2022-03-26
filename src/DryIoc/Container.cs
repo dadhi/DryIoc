@@ -4754,14 +4754,18 @@ namespace DryIoc
                 Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
 
             var containerExpr = new ExpressionFactory(
-                r => Convert(ResolverContext.GetRootOrSelfExpr(r), r.ServiceType),
+                r => ConvertViaCastClassIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)),
+                Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
+
+            var registratorExpr = new ExpressionFactory(
+                r => ConvertViaCastClassIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)),
                 Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
 
             wrappers = wrappers
+                .AddOrUpdate(typeof(IContainer), containerExpr)
+                .AddOrUpdate(typeof(IRegistrator), registratorExpr)
                 .AddOrUpdate(typeof(IResolverContext), resolverContextExpr)
                 .AddOrUpdate(typeof(IResolver), resolverContextExpr)
-                .AddOrUpdate(typeof(IContainer), containerExpr)
-                .AddOrUpdate(typeof(IRegistrator), containerExpr)
                 .AddOrUpdate(typeof(IServiceProvider), resolverContextExpr);
 
             return wrappers;
@@ -8155,8 +8159,7 @@ namespace DryIoc
 
             if (serviceType == typeof(object))
                 return resolveCallExpr;
-
-            return Convert(resolveCallExpr, serviceType);
+            return serviceType.Cast(resolveCallExpr);
         }
 
         private static void PopulateDependencyResolutionCallExpressions(Request request)
@@ -10399,11 +10402,7 @@ namespace DryIoc
                     var serviceExprType = serviceExpr.Type;
                     if (serviceExpr.NodeType != ExprType.Constant &&
                         serviceExprType != originalServiceExprType && !originalServiceExprType.IsAssignableFrom(serviceExprType))
-                    {
-                        serviceExpr = originalServiceExprType.IsValueType
-                            ? Convert(serviceExpr, originalServiceExprType)
-                            : new ConvertViaCastClassIntrinsicExpression(serviceExpr, originalServiceExprType);
-                    }
+                        serviceExpr = originalServiceExprType.Cast(serviceExpr);
                 }
             }
             else if (!rules.UsedForValidation &&
@@ -11439,10 +11438,14 @@ namespace DryIoc
         {
             var actualServiceType = request.GetActualServiceType();
             var serviceExprType = serviceExpr.Type;
-            return serviceExprType == actualServiceType || actualServiceType.IsAssignableFrom(serviceExprType) ? serviceExpr
-                 : serviceExprType == typeof(object) ? Convert(serviceExpr, actualServiceType)
-                 : serviceExprType.HasConversionOperatorTo(actualServiceType) ? Convert(serviceExpr, actualServiceType)
-                 : request.IfUnresolved != IfUnresolved.Throw ? null
+            if (serviceExprType == actualServiceType || actualServiceType.IsAssignableFrom(serviceExprType))
+                return serviceExpr;
+            if (serviceExprType == typeof(object))
+                return actualServiceType.Cast(serviceExpr);
+            var conversionMethod = serviceExprType.GetConversionOperatorOrNull(actualServiceType);
+            if (conversionMethod != null)
+                return Convert(serviceExpr, actualServiceType, conversionMethod);
+            return request.IfUnresolved != IfUnresolved.Throw ? null
                  : Throw.For<Expression>(Error.ServiceIsNotAssignableFromFactoryMethod, actualServiceType, ctorOrMember, request);
         }
 
@@ -14066,8 +14069,12 @@ namespace DryIoc
 
         /// <summary>Returns true if type can be casted with conversion operators.</summary>
         public static bool HasConversionOperatorTo(this Type sourceType, Type targetType) =>
-            (sourceType.FindConvertOperator(sourceType, targetType) ??
-             targetType.FindConvertOperator(sourceType, targetType)) != null;
+            sourceType.GetConversionOperatorOrNull(targetType) != null;
+
+        /// <summary>Finds the conversion operator or returns null</summary>
+        public static MethodInfo GetConversionOperatorOrNull(this Type sourceType, Type targetType) =>
+            sourceType.FindConvertOperator(sourceType, targetType) ??
+            targetType.FindConvertOperator(sourceType, targetType);
 
         /// Returns `target source.op_(Explicit|Implicit)(source)` or null if not found
         public static MethodInfo GetSourceConversionOperatorToTarget(this Type sourceType, Type targetType) =>
@@ -14431,8 +14438,17 @@ namespace DryIoc
             typeof(ReflectionTools).SingleMethod(nameof(GetDefault), true);
 
         /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static Expression GetDefaultValueExpression(this Type type) =>
-            !type.IsValueType ? ContainerTools.NullTypeConstant : (Expression)Call(GetDefaultMethod.MakeGenericMethod(type), Empty<Expression>());
+            !type.IsValueType 
+                ? ContainerTools.NullTypeConstant 
+                : Call(GetDefaultMethod.MakeGenericMethod(type));
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal static Expression Cast(this Type type, Expression source) =>
+            !type.IsValueType
+                ? ConvertViaCastClassIntrinsic(source, type)
+                : Convert(source, type);
 
         /// <summary>Optimized version of the map GetValueOrDefault for the Type key and object value</summary>
         [MethodImpl((MethodImplOptions)256)]
