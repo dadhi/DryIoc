@@ -21,9 +21,9 @@ namespace Playground
             // var x = new InvokeVsInvokeUnsafeBenchmark().InvokeUnsafe();
             // BenchmarkRunner.Run<InvokeVsInvokeUnsafeBenchmark>();
 
-            //var bm = new ManualInserttionSortVsOrderBy();
+            //var bm = new ManualInsertionSortVsOrderBy();
             //bm.SortViaInsertion();
-            //BenchmarkRunner.Run<ManualInserttionSortVsOrderBy>();
+            //BenchmarkRunner.Run<ManualInsertionSortVsOrderBy>();
 
             //BenchmarkRunner.Run<MatchCaseOrder>();
 
@@ -47,6 +47,7 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
             // var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
@@ -67,7 +68,7 @@ namespace Playground
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.SecondOpenScopeResolve>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientScopedDeps.ThirdOpenScopeResolve>();
 
-            //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.CreateContainerRegister_FirstTimeOpenScopeResolve>();
+            // BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.CreateContainerRegister_FirstTimeOpenScopeResolve>();
             //BenchmarkRunner.Run<OpenScopeAndResolveScopedWithSingletonTransientDeps.FirstTimeOpenScopeResolve>();
 
             //BenchmarkRunner.Run<OpenNamedScopeAndResolveNamedScopedWithTransientNamedScopedDeps.BenchmarkRegistrationAndResolution>();

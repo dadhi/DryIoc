@@ -9,6 +9,7 @@ using Grace.DependencyInjection.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using RealisticUnitOfWork;
 using IContainer = DryIoc.IContainer;
+using DryIoc.FastExpressionCompiler.LightExpression;
 
 namespace PerformanceTests
 {
@@ -213,6 +214,12 @@ namespace PerformanceTests
         {
             using (var scope = container.OpenScope())
                 return scope.Resolve<R>();
+        }
+
+        public static LambdaExpression ResolveExpression(IContainer container)
+        {
+            using (var scope = container.OpenScope())
+                return scope.Resolve<LambdaExpression>(typeof(R));
         }
 
         public static object Measure_WebRequestScoped(IContainer container)
@@ -754,6 +761,44 @@ namespace PerformanceTests
 
         public static IServiceProvider PrepareLamarMsDi() => 
             new Lamar.Container(AddServices());
+
+
+        [MemoryDiagnoser]
+        public class CompileResolutionExpression
+        {
+/*
+
+## Baseline 27.03.2022
+
+BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19043
+Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=6.0.201
+  [Host]     : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
+  DefaultJob : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
+
+
+|                  Method |       Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 |  Gen 2 | Allocated |
+|------------------------ |-----------:|---------:|---------:|------:|--------:|--------:|-------:|-------:|----------:|
+|  CompileLightExpression |   430.1 us |  8.42 us | 16.62 us |  1.00 |    0.00 | 18.5547 | 9.2773 | 3.4180 | 115.17 KB |
+| CompileSystemExpression | 1,072.8 us | 14.31 us | 13.38 us |  2.55 |    0.17 | 35.1563 | 9.7656 |      - | 216.11 KB |
+
+*/
+            LambdaExpression _lightExpr;
+            System.Linq.Expressions.LambdaExpression _sysExpr;
+
+            [GlobalSetup]
+            public void Setup()
+            {
+                _lightExpr = ResolveExpression(PrepareDryIoc());
+                _sysExpr = _lightExpr.ToLambdaExpression();
+            }
+
+            [Benchmark(Baseline = true)]
+            public object CompileLightExpression() => _lightExpr.CompileFast();
+
+            [Benchmark]
+            public object CompileSystemExpression() => _sysExpr.Compile();
+        }
 
         [MemoryDiagnoser]
         public class CreateContainerAndRegisterServices
