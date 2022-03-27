@@ -18,6 +18,8 @@ namespace Playground
     {
         public static void Main()
         {
+            BenchmarkRunner.Run<InvokeVsInvokeUnsafeBenchmark>();
+
             //var bm = new ManualInserttionSortVsOrderBy();
             //bm.SortViaInsertion();
             //BenchmarkRunner.Run<ManualInserttionSortVsOrderBy>();
@@ -43,7 +45,7 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
-            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+            // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
             // var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
