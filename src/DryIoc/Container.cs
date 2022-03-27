@@ -3030,10 +3030,10 @@ namespace DryIoc
                             return false;
 
                         // skip conversion for null and for directly assignable type
-                        if (instance == null || convertExpr.Type.IsAssignableFrom(instance.GetType()))
+                        if (instance == null || convertExpr.Method == null && convertExpr.Type.IsAssignableFrom(instance.GetType()))
                             result = instance;
                         else
-                            result = Converter.ConvertWithOperator(instance, convertExpr.Type, expr);
+                            result = Converter.ConvertWithOperator(instance, expr, convertExpr.Type, convertExpr.Method);
                         return true;
                     }
                 case ExprType.MemberAccess:
@@ -3706,8 +3706,11 @@ namespace DryIoc
 
     internal static class Converter
     {
-        public static object ConvertWithOperator(object source, Type targetType, Expression expr)
+        public static object ConvertWithOperator(object source, Expression expr, Type targetType, MethodInfo convertMethod = null)
         {
+            if (convertMethod != null)
+                return convertMethod.Invoke(null, new[] { source });
+
             var sourceType = source.GetType();
             var sourceConvertOp = sourceType.FindConvertOperator(sourceType, targetType);
             if (sourceConvertOp != null)
@@ -10499,9 +10502,9 @@ namespace DryIoc
             {
                 // Wrap service expression in WeakReference or HiddenDisposable
                 if (setup.WeaklyReferenced)
-                    serviceExpr = New(ThrowInGeneratedCode.WeakReferenceCtor, serviceExpr);
+                    serviceExpr = NewNoByRefArgs(ThrowInGeneratedCode.WeakReferenceCtor, serviceExpr);
                 else if (setup.PreventDisposal)
-                    serviceExpr = New(HiddenDisposable.Ctor, serviceExpr);
+                    serviceExpr = NewNoByRefArgs(HiddenDisposable.Ctor, serviceExpr);
 
                 serviceExpr = reuse.Apply(request, serviceExpr);
             }
@@ -11284,8 +11287,8 @@ namespace DryIoc
                 if (ctor == null)
                     return ConvertExpressionIfNeeded(Call(factoryExpr, (MethodInfo)ctorOrMethod), request, ctorOrMethod);
                 var assignments = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
-                var newExpr = New(ctor, Empty<Expression>());
-                return failedToGetMember ? null : assignments == null ? newExpr : (Expression)MemberInit(newExpr, assignments);
+                var newExpr = New(ctor);
+                return failedToGetMember ? null : assignments == null ? newExpr : MemberInit(newExpr, assignments);
             }
 
             var hasByRefParams = false;
@@ -11937,7 +11940,7 @@ namespace DryIoc
             var serviceType = request.GetActualServiceType();
             if (serviceType.IsAssignableFrom(ImplementationType))
                 return instanceExpr;
-            return Convert(instanceExpr, serviceType); // todo: @perf make it fast
+            return serviceType.Cast(instanceExpr);
         }
 
         /// <summary>Simplified path for the registered instance</summary>
