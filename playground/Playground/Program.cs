@@ -18,7 +18,8 @@ namespace Playground
     {
         public static void Main()
         {
-            BenchmarkRunner.Run<InvokeVsInvokeUnsafeBenchmark>();
+            // var x = new InvokeVsInvokeUnsafeBenchmark().InvokeUnsafe();
+            // BenchmarkRunner.Run<InvokeVsInvokeUnsafeBenchmark>();
 
             //var bm = new ManualInserttionSortVsOrderBy();
             //bm.SortViaInsertion();
