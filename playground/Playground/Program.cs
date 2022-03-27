@@ -1,3 +1,4 @@
+using DryIoc;
 using PerformanceTests;
 using DryIoc.FastExpressionCompiler.LightExpression;
 
@@ -39,9 +40,11 @@ namespace Playground
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
-            //var di = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
-            //var expr = RealisticUnitOfWorkBenchmark.ResolveExpression(di);
-            //var s = expr.ToCSharpString();
+            // var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
+            // var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
+            // var f = (FactoryDelegate)e.CompileFast();
+            // var r = f(di.OpenScope());
+            // var s = e.ToCSharpString();
 
             // var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
             // bm.WarmUp();
@@ -50,8 +53,7 @@ namespace Playground
             // bm.DryIoc_MsDI();
             // Console.WriteLine("All is done");
             // Console.ReadKey();
-
-
+            
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.Measure(
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIocMsDi());
 
