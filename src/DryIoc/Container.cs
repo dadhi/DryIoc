@@ -11476,7 +11476,7 @@ namespace DryIoc
                     var customTypeValue = customValue.GetType();
                     if (!customTypeValue.IsArray &&
                         !customTypeValue.IsAssignableTo(serviceType) &&
-                        null != (conversionOperator = customTypeValue.GetConversionOperatorOrNull(serviceType)))
+                        null == (conversionOperator = customTypeValue.GetConversionOperatorOrNull(serviceType)))
                         return Throw.For<Expression>(paramRequest.IfUnresolved != IfUnresolved.ReturnDefault,
                             Error.InjectedCustomValueIsOfDifferentType, customValue, serviceType, paramRequest);
                 }
@@ -11937,7 +11937,7 @@ namespace DryIoc
             var serviceType = request.GetActualServiceType();
             if (serviceType.IsAssignableFrom(ImplementationType))
                 return instanceExpr;
-            return Convert(instanceExpr, serviceType);
+            return Convert(instanceExpr, serviceType); // todo: @perf make it fast
         }
 
         /// <summary>Simplified path for the registered instance</summary>
