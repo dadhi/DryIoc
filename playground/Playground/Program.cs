@@ -40,12 +40,16 @@ namespace Playground
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
-            // var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
-            // var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
+            var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
+            var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
+            var s = e.ToCSharpString();
+            
+            var dms = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
+            var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);
+            var sms = ems.ToCSharpString();
             // var f = (FactoryDelegate)e.CompileFast();
             // var r = f(di.OpenScope());
-            // var s = e.ToCSharpString();
-
+            
             // var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
             // bm.WarmUp();
             // Console.WriteLine("WarmUp finished!");
