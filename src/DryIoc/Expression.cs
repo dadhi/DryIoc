@@ -52,10 +52,8 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public abstract Type Type { get; }
 
         public virtual bool IsIntrinsic => false;
-
         public virtual bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) => false;
-
         public virtual bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) => false;
 
@@ -2833,6 +2831,17 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     {
         public override bool NoByRefArgs => true;
         internal NoByRefOneArgumentNewExpression(ConstructorInfo constructor, Expression argument) : base(constructor, argument) { }
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument, paramExprs, isNestedLambda, ref rootClosure, config);
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var ok = EmittingVisitor.TryEmit(Argument, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            il.Emit(OpCodes.Newobj, Constructor);
+            return ok;
+        }
     }
 
     public class TwoArgumentsNewExpression : NewExpression
@@ -2851,6 +2860,19 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     {
         public override bool NoByRefArgs => true;
         internal NoByRefTwoArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1) : base(constructor, a0, a1) { }
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config);
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            il.Emit(OpCodes.Newobj, Constructor);
+            return ok;
+        }
     }
 
     public class ThreeArgumentsNewExpression : NewExpression
@@ -2872,6 +2894,21 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool NoByRefArgs => true;
         internal NoByRefThreeArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2)
             : base(constructor, a0, a1, a2) { }
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config);
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            il.Emit(OpCodes.Newobj, Constructor);
+            return ok;
+        }
     }
 
     public class FourArgumentsNewExpression : NewExpression
@@ -2893,6 +2930,23 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool NoByRefArgs => true;
         internal NoByRefFourArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3)
             : base(constructor, a0, a1, a2, a3) { }
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config);
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            il.Emit(OpCodes.Newobj, Constructor);
+            return ok;
+        }
     }
 
     public class FiveArgumentsNewExpression : NewExpression
@@ -2914,6 +2968,25 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool NoByRefArgs => true;
         internal NoByRefFiveArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4)
             : base(constructor, a0, a1, a2, a3, a4) { }
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config);
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            il.Emit(OpCodes.Newobj, Constructor);
+            return ok;
+        }
     }
 
     public class SixArgumentsNewExpression : NewExpression
@@ -2936,6 +3009,27 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool NoByRefArgs => true;
         internal NoByRefSixArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5)
             : base(constructor, a0, a1, a2, a3, a4, a5) { }
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config);
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            il.Emit(OpCodes.Newobj, Constructor);
+            return ok;
+        }
     }
 
     public class SevenArgumentsNewExpression : NewExpression
@@ -2958,6 +3052,29 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool NoByRefArgs => true;
         internal NoByRefSevenArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6)
             : base(constructor, a0, a1, a2, a3, a4, a5, a6) { }
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument6, paramExprs, isNestedLambda, ref rootClosure, config);
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
+                &&   EmittingVisitor.TryEmit(Argument6, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            il.Emit(OpCodes.Newobj, Constructor);
+            return ok;
+        }
     }
 
     public class ManyArgumentsNewExpression : NewExpression
