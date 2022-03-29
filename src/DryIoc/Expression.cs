@@ -218,14 +218,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
             foreach (var x in type.GetConstructors())
                 if (x.GetParameters().Length == 0)
-                    return new NewExpression(x);
+                    return new NoArgsNewClassIntrinsicExpression(x);
 
             throw new ArgumentException($"The type {type} is missing the default constructor");
         }
 
         public static NewExpression New(ConstructorInfo ctor, IReadOnlyList<Expression> arguments) =>
             arguments == null || arguments.Count == 0
-            ? new NewExpression(ctor)
+            ? new NoArgsNewClassIntrinsicExpression(ctor)
             : new ManyArgumentsNewExpression(ctor, arguments);
 
         public static NewExpression New(ConstructorInfo ctor, params Expression[] arguments) =>
@@ -236,7 +236,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
         public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, IReadOnlyList<Expression> arguments) =>
             arguments == null || arguments.Count == 0
-            ? new NewExpression(ctor)
+            ? new NoArgsNewClassIntrinsicExpression(ctor)
             : new NoByRefManyArgumentsNewExpression(ctor, arguments);
 
         public static NewExpression New(ConstructorInfo ctor) => new NewExpression(ctor);
@@ -2798,7 +2798,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public virtual int ArgumentCount => 0;
         public virtual Expression GetArgument(int i) => throw new NotImplementedException();
 
-        /// <summary>Ensures that there no by-ref (in, our, ref) parameters in the constructor.
+        /// <summary>Ensures that there is no by-ref (in, our, ref) parameters in the constructor.
         /// Which allows some optimizations when compiling the expression to the delegate</summary>
         public virtual bool NoByRefArgs => false;
         internal NewExpression(ConstructorInfo constructor) => Constructor = constructor;
@@ -2815,6 +2815,21 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         internal NewValueTypeExpression(Type type) : base(null) => Type = type;
 
         internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) => SysExpr.New(Type);
+    }
+
+
+    public sealed class NoArgsNewClassIntrinsicExpression : NewExpression
+    {
+        internal NoArgsNewClassIntrinsicExpression(ConstructorInfo constructor) : base(constructor) {}
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure) => true;
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            il.Emit(OpCodes.Newobj, Constructor);
+            return true;
+        }
     }
 
     public class OneArgumentNewExpression : NewExpression
