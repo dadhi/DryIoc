@@ -42,13 +42,13 @@ namespace Playground
 
             var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
             var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
+            var f = (FactoryDelegate)e.CompileFast();
+            var r = f(d.OpenScope());
             var s = e.ToCSharpString();
             
-            var dms = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
-            var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);
-            var sms = ems.ToCSharpString();
-            // var f = (FactoryDelegate)e.CompileFast();
-            // var r = f(di.OpenScope());
+            // var dms = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
+            // var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);
+            // var sms = ems.ToCSharpString();
             
             // var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
             // bm.WarmUp();

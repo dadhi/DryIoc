@@ -151,7 +151,7 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
 
 ## Reliability
 
-* 1500+ of acceptance tests.
+* ~2300 tests.
 * Thread-safe and lock-free registrations and resolutions. 
 * Detects recursive dependencies (cycles) in object graph.
 * Throws exceptions as early as possible with a lot of details.

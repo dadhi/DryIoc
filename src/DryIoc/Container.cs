@@ -1542,7 +1542,7 @@ namespace DryIoc
             if (arrayElemType != null && arrayElemType != typeof(object) &&
                (arrayElemType.IsPrimitive() || typeof(Type).IsAssignableFrom(actualItemType)))
                 return NewArrayInit(arrayElemType,
-                    ((object[])item).Map(x => GetConstantExpression(x, arrayElemType, throwIfStateRequired)));
+                    ((object[])item).Map(this, (c, x) => c.GetConstantExpression(x, arrayElemType, throwIfStateRequired)));
 
             var itemExpr = Rules.ItemToExpressionConverter?.Invoke(item, itemType);
             if (itemExpr != null)
