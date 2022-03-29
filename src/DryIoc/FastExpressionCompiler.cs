@@ -495,10 +495,10 @@ namespace DryIoc.FastExpressionCompiler
                     : new DebugArrayClosure(closureInfo.GetArrayOfConstantsAndNestedLambdas(), debugExpr);
             }
 
-            var method = new DynamicMethod(string.Empty,
-                returnType, closurePlusParamTypes, typeof(ArrayClosure), true);
+            var method = new DynamicMethod(string.Empty, returnType, closurePlusParamTypes, typeof(ArrayClosure), true);
 
-            var il = method.GetILGenerator();
+            // todo: @perf @mem the default stream capacity is 64, consider to decrease it to 16 for a member, no argument constructor or method
+            var il = method.GetILGenerator(/*???*/);
 
             if (closure.ConstantsAndNestedLambdas != null)
                 EmittingVisitor.EmitLoadConstantsAndNestedLambdasIntoVars(il, ref closureInfo);
@@ -3121,6 +3121,7 @@ namespace DryIoc.FastExpressionCompiler
 #if NETFRAMEWORK
                             il.Emit(OpCodes.Castclass, exprType);
 #endif
+                            
                         }
                     }
                 }
@@ -3143,12 +3144,14 @@ namespace DryIoc.FastExpressionCompiler
                         return false;
                 }
 
-                var underlyingNullableType = Nullable.GetUnderlyingType(exprType);
-                if (underlyingNullableType != null)
-                    il.Emit(OpCodes.Newobj, exprType.GetConstructors().GetFirst());
-
-                // boxing the value type, otherwise we can get a strange result when 0 is treated as Null.
+                if (exprType.IsValueType)
+                {
+                    var underlyingNullableType = Nullable.GetUnderlyingType(exprType);
+                    if (underlyingNullableType != null)
+                        il.Emit(OpCodes.Newobj, exprType.GetConstructors().GetFirst());
+                }
                 else if (exprType == typeof(object) && constValueType.IsValueType)
+                    // boxing the value type, otherwise we can get a strange result when 0 is treated as Null.
                     il.Emit(OpCodes.Box, constantValue.GetType()); // using normal type for Enum instead of underlying type
 
                 return true;
