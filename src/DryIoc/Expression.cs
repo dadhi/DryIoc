@@ -2309,8 +2309,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         {
             if (!EmittingVisitor.TryEmit(Operand, paramExprs, il, ref closure, config, parent, byRefIndex))
                 return false;
-            if (!parent.IgnoresResult())
-                il.Emit(OpCodes.Castclass, Type);
+            il.Emit(OpCodes.Castclass, Type);
             return true;
         }
     }
