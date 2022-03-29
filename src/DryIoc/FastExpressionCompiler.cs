@@ -497,8 +497,13 @@ namespace DryIoc.FastExpressionCompiler
 
             var method = new DynamicMethod(string.Empty, returnType, closurePlusParamTypes, typeof(ArrayClosure), true);
 
-            // todo: @perf @mem the default stream capacity is 64, consider to decrease it to 16 for a member, no argument constructor or method
-            var il = method.GetILGenerator(/*???*/);
+            // todo: @perf @mem the default stream capacity is 64, consider to decrease it to 16 for a member or no argument method
+#if LIGHT_EXPRESSION
+            var streamSize = bodyExpr is NoArgsNewClassIntrinsicExpression ? 16 : 64;
+#else
+            var streamSize = 64; // the default system value
+#endif
+            var il = method.GetILGenerator(streamSize);
 
             if (closure.ConstantsAndNestedLambdas != null)
                 EmittingVisitor.EmitLoadConstantsAndNestedLambdasIntoVars(il, ref closureInfo);
