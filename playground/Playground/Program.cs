@@ -1,6 +1,7 @@
 using DryIoc;
 using PerformanceTests;
 using DryIoc.FastExpressionCompiler.LightExpression;
+using BenchmarkDotNet.Running;
 
 namespace Playground
 {
@@ -37,14 +38,14 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
-            // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
+            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
-            var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
-            var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
-            var f = (FactoryDelegate)e.CompileFast();
-            var r = f(d.OpenScope());
-            var s = e.ToCSharpString();
+            // var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
+            // var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
+            // var f = (FactoryDelegate)e.CompileFast();
+            // var r = f(d.OpenScope());
+            // var s = e.ToCSharpString();
             
             // var dms = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
             // var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);

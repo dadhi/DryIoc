@@ -782,6 +782,13 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |  CompileLightExpression |   430.1 us |  8.42 us | 16.62 us |  1.00 |    0.00 | 18.5547 | 9.2773 | 3.4180 | 115.17 KB |
 | CompileSystemExpression | 1,072.8 us | 14.31 us | 13.38 us |  2.55 |    0.17 | 35.1563 | 9.7656 |      - | 216.11 KB |
 
+## Intrinsic, no array, single lambda, no GetParameters for GetCurrentScopeOrThrow
+
+|                  Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+|------------------------ |---------:|--------:|--------:|------:|--------:|--------:|--------:|-------:|----------:|
+|  CompileLightExpression | 369.1 us | 3.39 us | 2.83 us |  1.00 |    0.00 | 18.0664 |  8.7891 | 3.4180 | 112.88 KB |
+| CompileSystemExpression | 712.7 us | 8.17 us | 6.82 us |  1.93 |    0.03 | 35.1563 | 10.7422 |      - |  216.1 KB |
+
 */
             LambdaExpression _lightExpr;
             System.Linq.Expressions.LambdaExpression _sysExpr;
