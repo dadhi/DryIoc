@@ -3746,7 +3746,7 @@ namespace DryIoc
         public static readonly ParameterExpression ResolverContextParamExpr = ParameterOf<IResolverContext>("r");
 
         /// <summary>The array of a single `ResolverContextParamExpr` for memory optimization</summary>
-        public static readonly ParameterExpression[] ResolverContextParamsExpr = { ResolverContextParamExpr };
+        public static readonly ParameterExpression[] ResolverContextParamExprs = { ResolverContextParamExpr };
 
         /// Optimization: the empty lambda with a single IResolverContext parameters
         internal static readonly OneParameterLambdaExpression FactoryDelegateParamExprs = new OneParameterLambdaExpression(null, null, ResolverContextParamExpr);
@@ -3838,7 +3838,7 @@ namespace DryIoc
     {
         public override Type ReturnType => typeof(object);
         public override int ParameterCount => 1;
-        public override IReadOnlyList<ParameterExpression> Parameters => FactoryDelegateCompiler.ResolverContextParamsExpr;
+        public override IReadOnlyList<ParameterExpression> Parameters => FactoryDelegateCompiler.ResolverContextParamExprs;
         public override ParameterExpression GetParameter(int index) => FactoryDelegateCompiler.ResolverContextParamExpr;
         public FactoryDelegateExpression(Expression body) : base(body) { }
     }
@@ -4485,8 +4485,8 @@ namespace DryIoc
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
         /// <summary>Root or the current resolver context (if it is the root).</summary>
-        public static readonly Expression RootOrSelfExpr =
-            Call(typeof(ResolverContext).GetMethod(nameof(RootOrSelf)), FactoryDelegateCompiler.ResolverContextParamExpr);
+        public static readonly Expression RootOrSelfExpr = 
+            new ResolverContextArgMethodCallExpression(typeof(ResolverContext).GetMethod(nameof(RootOrSelf)));
 
         /// <summary>Resolver parameter expression.</summary>
         public static readonly PropertyExpression SingletonScopeExpr =
@@ -4515,7 +4515,26 @@ namespace DryIoc
 
         /// <summary>Get current scope expression or throw the exception otherwise.</summary>
         public static readonly MethodCallExpression GetCurrentScopeOrThrowExpr =
-            Call(typeof(ResolverContext).GetMethod(nameof(GetCurrentScopeOrThrow)), FactoryDelegateCompiler.ResolverContextParamExpr);
+            new ResolverContextArgMethodCallExpression(typeof(ResolverContext).GetMethod(nameof(GetCurrentScopeOrThrow)));
+
+        internal sealed class ResolverContextArgMethodCallExpression : MethodCallExpression
+        {
+            public override MethodInfo Method { get; }
+            public override int ArgumentCount => 1;
+            public override IReadOnlyList<Expression> Arguments => FactoryDelegateCompiler.ResolverContextParamExprs;
+            public override Expression GetArgument(int i) => FactoryDelegateCompiler.ResolverContextParamExpr;
+            public ResolverContextArgMethodCallExpression(MethodInfo method) => Method = method;
+            public override bool IsIntrinsic => true;
+            public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+                bool isNestedLambda, ref ClosureInfo rootClosure) => true;
+            public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+                ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+            {
+                EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
+                EmittingVisitor.EmitMethodCall(il, Method);
+                return true;
+            }
+        }
 
         /// <summary>Provides access to the current scope - may return `null` if ambient scope context has it scope changed in-between</summary>
         public static IScope GetCurrentScope(this IResolverContext r, bool throwIfNotFound) =>
@@ -12833,23 +12852,18 @@ namespace DryIoc
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config) &&
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, ServiceFactoryExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
+            // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, FactoryDelegate createValue, IResolverContext r)
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1)
             {
-                // todo: @perf may be optimized further
-                if (!EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent))
-                    return false;
+                EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent);
+                EmittingVisitor.EmitLoadConstantInt(il, FactoryId); 
 
-                // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, FactoryDelegate createValue, IResolverContext r)
-                EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
-
-                // todo: @perf more intellegent emit?
+                // todo: @perf more intelligent emit?
                 if (!EmittingVisitor.TryEmit(ServiceFactoryExpr, paramExprs, il, ref closure, config, parent))
                     return false;
 
-                if (!EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure, parent))
-                    return false;
-
+                EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
                 return EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
             }
         }

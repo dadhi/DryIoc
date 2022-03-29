@@ -2639,13 +2639,11 @@ namespace DryIoc.FastExpressionCompiler
             }
 
 #if LIGHT_EXPRESSION
-            public static bool TryEmitNonByRefNonValueTypeParameter(ParameterExpression paramExpr, IParameterProvider paramExprs,
-                ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
+            public static bool TryEmitNonByRefNonValueTypeParameter(ParameterExpression paramExpr, IParameterProvider paramExprs, ILGenerator il, ref ClosureInfo closure)
             {
                 var paramExprCount = paramExprs.ParameterCount;
 #else
-            public static bool TryEmitNonByRefNonValueTypeParameter(ParameterExpression paramExpr, IReadOnlyList<PE> paramExprs,
-                ILGenerator il, ref ClosureInfo closure, ParentFlags parent)
+            public static bool TryEmitNonByRefNonValueTypeParameter(ParameterExpression paramExpr, IReadOnlyList<PE> paramExprs, ILGenerator il, ref ClosureInfo closure)
             {
                 var paramExprCount = paramExprs.Count;
 #endif
@@ -2678,7 +2676,6 @@ namespace DryIoc.FastExpressionCompiler
                 il.Emit(OpCodes.Ldfld, ArrayClosureWithNonPassedParamsField);
                 EmitLoadConstantInt(il, nonPassedParamIndex);
                 il.Emit(OpCodes.Ldelem_Ref);
-
                 return true;
             }
 
