@@ -4490,15 +4490,15 @@ namespace DryIoc
 
         /// <summary>Resolver parameter expression.</summary>
         public static readonly PropertyExpression SingletonScopeExpr =
-            new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.SingletonScope)));
+            new ResolverContextPropertyParamExpression(typeof(IResolverContext).GetProperty(nameof(IResolverContext.SingletonScope)));
 
         /// <summary>Access to the current scope.</summary>
         public static readonly PropertyExpression CurrentScopeExpr =
-            new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentScope)));
+            new ResolverContextPropertyParamExpression(typeof(IResolverContext).GetProperty(nameof(IResolverContext.CurrentScope)));
 
         /// <summary>Access to the current scope or singletons.</summary>
         public static readonly PropertyExpression CurrentOrSingletonScopeExpr =
-            new ResolverContextPropertyParamExpression(typeof(IResolverContext).Property(nameof(IResolverContext.CurrentOrSingletonScope)));
+            new ResolverContextPropertyParamExpression(typeof(IResolverContext).GetProperty(nameof(IResolverContext.CurrentOrSingletonScope)));
 
         internal sealed class ResolverContextPropertyParamExpression : PropertyExpression
         {
@@ -8931,14 +8931,14 @@ namespace DryIoc
             new Request(null, null, 0, 0, null, default, null, null, null);
 
         internal static readonly Expression EmptyRequestExpr =
-            Field(null, typeof(Request).Field(nameof(Empty)));
+            Field(typeof(Request).GetField(nameof(Empty)));
 
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
             new Request(null, null, 0, 0, null, RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, null, null, null);
 
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
-            Field(null, typeof(Request).Field(nameof(EmptyOpensResolutionScope)));
+            Field(typeof(Request).GetField(nameof(EmptyOpensResolutionScope)));
 
         internal static Request CreateForValidation(IContainer container, ServiceInfo serviceInfo, RequestStack stack)
         {
@@ -10392,9 +10392,9 @@ namespace DryIoc
 
                         if (Setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
                             serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
-                                Property(Convert<WeakReference>(serviceExpr), ThrowInGeneratedCode.WeakReferenceValueProperty));
+                                Property(ConvertViaCastClassIntrinsic<WeakReference>(serviceExpr), ReflectionTools.WeakReferenceValueProperty));
                         else if (Setup.PreventDisposal)
-                            serviceExpr = Field(Convert<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
+                            serviceExpr = Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
 
                         return serviceExpr;
                     }
@@ -10521,7 +10521,7 @@ namespace DryIoc
             {
                 // Wrap service expression in WeakReference or HiddenDisposable
                 if (setup.WeaklyReferenced)
-                    serviceExpr = NewNoByRefArgs(ThrowInGeneratedCode.WeakReferenceCtor, serviceExpr);
+                    serviceExpr = NewNoByRefArgs(ReflectionTools.WeakReferenceCtor, serviceExpr);
                 else if (setup.PreventDisposal)
                     serviceExpr = NewNoByRefArgs(HiddenDisposable.Ctor, serviceExpr);
 
@@ -10530,9 +10530,9 @@ namespace DryIoc
 
             if (setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
                 serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
-                    Property(Convert<WeakReference>(serviceExpr), ThrowInGeneratedCode.WeakReferenceValueProperty));
+                    Property(ConvertViaCastClassIntrinsic<WeakReference>(serviceExpr), ReflectionTools.WeakReferenceValueProperty));
             else if (setup.PreventDisposal)
-                serviceExpr = Field(Convert<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
+                serviceExpr = Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
 
             return serviceExpr;
         }
@@ -11952,7 +11952,7 @@ namespace DryIoc
             // unpacks the weak-reference
             if (Setup.WeaklyReferenced)
                 return Call(typeof(ThrowInGeneratedCode).GetMethod(nameof(ThrowInGeneratedCode.WeakRefReuseWrapperGCed)),
-                    Property(ConstantOf((WeakReference)Instance), typeof(WeakReference).Property(nameof(WeakReference.Target))));
+                    Property(ConstantOf((WeakReference)Instance), typeof(WeakReference).GetProperty(nameof(WeakReference.Target))));
 
             // otherwise just return a constant
             var instanceExpr = request.Container.GetConstantExpression(Instance);
@@ -12697,7 +12697,7 @@ namespace DryIoc
         }
 
         private static readonly Lazy<Expression> _singletonReuseExpr = Lazy.Of<Expression>(() =>
-            Field(null, typeof(Reuse).Field(nameof(Reuse.Singleton))));
+            Field(typeof(Reuse).GetField(nameof(Reuse.Singleton))));
 
         /// <inheritdoc />
         public Expression ToExpression(Func<object, Expression> fallbackConverter) => _singletonReuseExpr.Value;
@@ -13123,7 +13123,7 @@ namespace DryIoc
             public bool CanApply(Request request) => true;
 
             private readonly Lazy<Expression> _transientReuseExpr = Lazy.Of<Expression>(() =>
-                Field(null, typeof(Reuse).Field(nameof(Transient))));
+                Field(null, typeof(Reuse).GetField(nameof(Transient))));
 
             public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
                 _transientReuseExpr.Value;
@@ -13936,15 +13936,16 @@ namespace DryIoc
 
         internal static readonly MethodInfo WeakRefReuseWrapperGCedMethod =
             typeof(ThrowInGeneratedCode).GetMethod(nameof(WeakRefReuseWrapperGCed));
-        internal static readonly PropertyInfo WeakReferenceValueProperty =
-            typeof(WeakReference).Property(nameof(WeakReference.Target));
-        internal static readonly ConstructorInfo WeakReferenceCtor =
-            typeof(WeakReference).Constructor(typeof(object));
     }
 
     /// <summary>Contains helper methods to work with Type: for instance to find Type implemented base types and interfaces, etc.</summary>
     public static class ReflectionTools
     {
+        internal static readonly PropertyInfo WeakReferenceValueProperty =
+            typeof(WeakReference).GetProperty(nameof(WeakReference.Target));
+        internal static readonly ConstructorInfo WeakReferenceCtor =
+            typeof(WeakReference).GetConstructor(new[] { typeof(object) });
+
         private static Lazy<Action<Exception>> _preserveExceptionStackTraceAction = new Lazy<Action<Exception>>(() =>
             typeof(Exception).GetSingleMethodOrNull("InternalPreserveStackTrace", true)
             ?.To(x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));

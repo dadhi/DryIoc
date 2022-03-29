@@ -66,6 +66,24 @@ namespace Playground
         }
     }
 
+    [MemoryDiagnoser]
+    public class GetFuncInvokeMethodBenchmark
+    {
+        private const string InvokeMethodName = "Invoke";
+        private static Type _funcType = typeof(Func<int, string, bool, object>);
+        private static Type _funcOpenType = typeof(Func<,,,>).GetGenericTypeDefinition();
+        private static MethodInfo _funcOpenInvokeMethod = _funcOpenType.GetMethod(InvokeMethodName);
+
+
+        [Benchmark(Baseline = true)]
+        public object GetFuncInvokeMethod() =>
+            _funcType.GetMethod(InvokeMethodName);
+
+        [Benchmark]
+        public object GetFuncInvokeMethodFast() =>
+            _funcOpenInvokeMethod.MakeGenericMethod(_funcType.GetGenericArguments());
+    }
+
     public static class InvokeUnsafeTools
     {
 

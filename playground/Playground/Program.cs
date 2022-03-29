@@ -2,6 +2,7 @@ using DryIoc;
 using PerformanceTests;
 using DryIoc.FastExpressionCompiler.LightExpression;
 using BenchmarkDotNet.Running;
+using System;
 
 namespace Playground
 {
@@ -11,6 +12,8 @@ namespace Playground
         {
             // var x = new InvokeVsInvokeUnsafeBenchmark().InvokeUnsafe();
             // BenchmarkRunner.Run<InvokeVsInvokeUnsafeBenchmark>();
+
+            // BenchmarkRunner.Run<GetFuncInvokeMethodBenchmark>();
 
             //var bm = new ManualInsertionSortVsOrderBy();
             //bm.SortViaInsertion();
@@ -38,19 +41,21 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
-            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
+            // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
             // var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
             // var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
+            // Console.WriteLine("Press any key");
+            // Console.ReadKey();
             // var f = (FactoryDelegate)e.CompileFast();
             // var r = f(d.OpenScope());
             // var s = e.ToCSharpString();
-            
+
             // var dms = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
             // var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);
             // var sms = ems.ToCSharpString();
-            
+
             // var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
             // bm.WarmUp();
             // Console.WriteLine("WarmUp finished!");
@@ -58,7 +63,7 @@ namespace Playground
             // bm.DryIoc_MsDI();
             // Console.WriteLine("All is done");
             // Console.ReadKey();
-            
+
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.Measure(
             //CloseToRealLifeUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIocMsDi());
 
