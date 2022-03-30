@@ -3101,17 +3101,28 @@ namespace DryIoc
                     {
                         var invokeExpr = (InvocationExpression)expr;
                         var delegateExpr = invokeExpr.Expression;
-                        if (delegateExpr is ConstantExpression dc && dc.Value is FactoryDelegate facDel)
+                        if (delegateExpr is ConstantExpression dc)
                         {
-                            var rArg = invokeExpr.GetArgument(0);
-                            if (rArg == FactoryDelegateCompiler.ResolverContextParamExpr)
-                                result = facDel(r);
-                            else if (rArg == ResolverContext.RootOrSelfExpr)
-                                result = facDel(r.Root ?? r);
-                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, out var resolver))
-                                result = facDel((IResolverContext)resolver);
-                            else return false;
-                            return true;
+                            var func = dc.Value;
+                            if (func is FactoryDelegate facDel)
+                            {
+                                var rArg = invokeExpr.GetArgument(0);
+                                if (rArg == FactoryDelegateCompiler.ResolverContextParamExpr)
+                                    result = facDel(r);
+                                else if (rArg == ResolverContext.RootOrSelfExpr)
+                                    result = facDel(r.Root ?? r);
+                                else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, out var resolver))
+                                    result = facDel((IResolverContext)resolver);
+                                else return false;
+                                return true;
+                            }
+                            else if (func is Func<object, object> f1)
+                            {
+                                var a0 = invokeExpr.GetArgument(0);
+                                if (TryInterpret(r, a0, paramExprs, paramValues, parentArgs, out var a0Obj))
+                                    result = f1(a0Obj);
+                                return true;
+                            }
                         }
 
                         // The Invocation of Func is used for splitting the big object graphs
@@ -3502,8 +3513,7 @@ namespace DryIoc
                     return true;
                 }
             }
-
-            if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
+            else if (ReferenceEquals(expr, ResolverContext.RootOrSelfExpr))
             {
                 result = r.Root ?? r;
                 return true;
@@ -4485,7 +4495,7 @@ namespace DryIoc
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
         /// <summary>Root or the current resolver context (if it is the root).</summary>
-        public static readonly Expression RootOrSelfExpr = 
+        public static readonly Expression RootOrSelfExpr =
             new ResolverContextArgMethodCallExpression(typeof(ResolverContext).GetMethod(nameof(RootOrSelf)));
 
         /// <summary>Resolver parameter expression.</summary>
@@ -6122,6 +6132,13 @@ namespace DryIoc
                 FactoryExpression = factoryExpression;
         }
 
+        internal sealed class WithInvokeExpression : FactoryMethod
+        {
+            public override Expression FactoryExpression { get; }
+            internal WithInvokeExpression(MethodInfo invokeMethod, ConstantExpression funcExpr) : base(invokeMethod) =>
+                FactoryExpression = funcExpr;
+        }
+
         internal sealed class WithFactoryServiceInfo : FactoryMethod
         {
             public override ServiceInfo FactoryServiceInfo { get; }
@@ -6167,6 +6184,9 @@ namespace DryIoc
 
         internal static FactoryMethod OfFactory<F>(MemberInfo methodOrMember, F factory) =>
             new WithFactoryExpression(methodOrMember, ConstantOf<F>(factory));
+
+        internal static FactoryMethod OfInvoke<F>(F func, int argCount) =>
+            new WithInvokeExpression(Registrator.InvokeMethods.Value[argCount - 1].Value, ConstantOf<F>(func));
 
         /// <summary>Discovers the static factory method or member by name in <typeparamref name="TFactory"/>.
         /// Should play nice with C# <see langword="nameof"/> operator.</summary>
@@ -7500,8 +7520,17 @@ namespace DryIoc
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TService>(
             this IRegistrator r, Func<TDep1, TService> factory,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
+        {
+            // todo: @wip tbd
+            // RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+
+            r.Register(ReflectionFactory.Of(default(Type), reuse,
+                Made.Of(FactoryMethod.OfInvoke<Func<object, object>>(factory.ToFac, 1), Parameters.Of.Position<TDep1>(0)), setup),
+                typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true); // true because we could not check types inside lambda before its actually invoked
+        }
+
+        private static object ToFac<T1, R>(this Func<T1, R> f, object t1) => f((T1)t1);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
         public static void RegisterDelegate<TDep1>(
@@ -7515,7 +7544,7 @@ namespace DryIoc
             this IRegistrator r, Type serviceType, Type depType, Func<object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.Register(ReflectionFactory.Of(default(Type), reuse,
-                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[0].Value, factory), Parameters.Of.Position(0, depType)),
+                Made.Of(FactoryMethod.OfFactory(InvokeMethods.Value[0].Value, factory), Parameters.Of.Position(0, depType)),
                 setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true); // true because we could not check types inside lambda before its actually invoked
 
@@ -7538,7 +7567,7 @@ namespace DryIoc
             Func<object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.Register(ReflectionFactory.Of(default(Type), reuse,
-                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[1].Value, factory),
+                Made.Of(FactoryMethod.OfFactory(InvokeMethods.Value[1].Value, factory),
                 Parameters.Of.Position(0, dep1Type).Position(1, dep2Type)), setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
@@ -7561,7 +7590,7 @@ namespace DryIoc
             Func<object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.Register(ReflectionFactory.Of(default(Type), reuse,
-                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[2].Value, factory),
+                Made.Of(FactoryMethod.OfFactory(InvokeMethods.Value[2].Value, factory),
                 Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type)), setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
@@ -7584,7 +7613,7 @@ namespace DryIoc
             Func<object, object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.Register(ReflectionFactory.Of(default(Type), reuse,
-                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[3].Value, factory),
+                Made.Of(FactoryMethod.OfFactory(InvokeMethods.Value[3].Value, factory),
                 Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type).Position(3, dep4Type)), setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
@@ -7607,7 +7636,7 @@ namespace DryIoc
             Func<object, object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.Register(ReflectionFactory.Of(default(Type), reuse,
-                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[4].Value, factory),
+                Made.Of(FactoryMethod.OfFactory(InvokeMethods.Value[4].Value, factory),
                 Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type).Position(3, dep4Type).Position(4, dep5Type)), setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
@@ -7630,7 +7659,7 @@ namespace DryIoc
             Func<object, object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.Register(ReflectionFactory.Of(default(Type), reuse,
-                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[5].Value, factory),
+                Made.Of(FactoryMethod.OfFactory(InvokeMethods.Value[5].Value, factory),
                 Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type).Position(3, dep4Type).Position(4, dep5Type).Position(5, dep6Type)), setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
@@ -7653,12 +7682,12 @@ namespace DryIoc
             Func<object, object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.Register(ReflectionFactory.Of(default(Type), reuse,
-                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[6].Value, factory),
+                Made.Of(FactoryMethod.OfFactory(InvokeMethods.Value[6].Value, factory),
                 Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type).Position(3, dep4Type).Position(4, dep5Type).Position(5, dep6Type).Position(6, dep7Type)), setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
-        private const string InvokeMethodName = "Invoke";
-        private static Lazy<Lazy<MethodInfo>[]> _invokeMethods = new Lazy<Lazy<MethodInfo>[]>(() => new[]
+        internal const string InvokeMethodName = "Invoke";
+        internal static Lazy<Lazy<MethodInfo>[]> InvokeMethods = new Lazy<Lazy<MethodInfo>[]>(() => new[]
         {
             new Lazy<MethodInfo>(() => typeof(Func<object, object>).GetMethod(InvokeMethodName)),
             new Lazy<MethodInfo>(() => typeof(Func<object, object, object>).GetMethod(InvokeMethodName)),
@@ -10654,6 +10683,10 @@ namespace DryIoc
             source.Details((r, p) => p.Position != position ? null :
                 ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, defaultValue, metadataKey, metadata));
 
+        /// <summary>Adds to <paramref name="source"/> selector a service info for parameter identified by <paramref name="position"/>.</summary>
+        public static ParameterSelector Position<TRequiredServiceType>(this ParameterSelector source, int position) =>
+            source.Details((r, p) => p.Position != position ? null : ServiceDetails.Of(typeof(TRequiredServiceType)));
+
         /// <summary>Adds to <paramref name="source"/> selector a service info for parameter identified by <paramref name="position"/>
         /// and apply the specified service details..</summary>
         public static ParameterSelector Position(this ParameterSelector source,
@@ -11252,14 +11285,18 @@ namespace DryIoc
             }
 
             MethodBase ctorOrMethod;
+            MethodInfo method = null;
             Expression factoryExpr = null;
             var failedToGetMember = false;
+            var isInvoke = false;
             if (factoryMethod == null)
             {
                 ctorOrMethod = ctor = ctor ?? request.ImplementationType.SingleConstructor();
             }
             else
             {
+                isInvoke = factoryMethod is FactoryMethod.WithInvokeExpression;
+
                 // If factory method is the method of some registered service, then resolve factory service first.
                 factoryExpr = factoryMethod.FactoryExpression;
                 if (factoryExpr == null && factoryMethod.FactoryServiceInfo != null)
@@ -11287,13 +11324,15 @@ namespace DryIoc
 
                 ctorOrMethod = ctorOrMember as MethodBase;
                 if (ctorOrMethod == null) // return earlier when factory is Property or Field
-                    return ConvertExpressionIfNeeded(ctorOrMember is PropertyInfo p ? Property(factoryExpr, p)
-                        : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember), request, ctorOrMember);
+                    return ConvertExpressionIfNeeded(
+                        ctorOrMember is PropertyInfo p ? Property(factoryExpr, p) : Field(factoryExpr, (FieldInfo)ctorOrMember),
+                        request, ctorOrMember);
 
                 ctor = ctorOrMember as ConstructorInfo;
+                method = ctorOrMember as MethodInfo;
             }
 
-            var parameters = ctorOrMethod.GetParameters();
+            var parameters = ctorOrMethod.GetParameters(); // todo: @perf try do not repeat this call
             if (parameters.Length == 0)
             {
                 if (rules.UsedForValidation)
@@ -11304,18 +11343,16 @@ namespace DryIoc
                 }
 
                 if (ctor == null)
-                    return ConvertExpressionIfNeeded(Call(factoryExpr, (MethodInfo)ctorOrMethod), request, ctorOrMethod);
+                    return ConvertExpressionIfNeeded(Call(factoryExpr, method), request, ctorOrMethod);
                 var assignments = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
-                var newExpr = New(ctor);
-                return failedToGetMember ? null : assignments == null ? newExpr : MemberInit(newExpr, assignments);
+                return failedToGetMember ? null : assignments == null ? New(ctor) : MemberInit(New(ctor), assignments);
             }
-
-            var hasByRefParams = false;
 
             Expression a0 = null, a1 = null, a2 = null, a3 = null, a4 = null, a5 = null, a6 = null;
             var paramExprs = parameters.Length > 7 ? new Expression[parameters.Length] : null;
             var rulesParams = rules._made.Parameters;
             var madeParams = Made.Parameters;
+            var hasByRefParams = false;
             Func<ParameterInfo, ParameterServiceInfo> paramSelector = null;
             if (rulesParams != null || madeParams != null)
                 paramSelector = (rules.OverrideRegistrationMade ? madeParams.OverrideWith(rulesParams) : rulesParams.OverrideWith(madeParams))(request);
@@ -11404,21 +11441,23 @@ namespace DryIoc
 
             Expression serviceExpr;
             if (a0 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, paramExprs) : NewNoByRefArgs(ctor, paramExprs) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, paramExprs);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, paramExprs) : NewNoByRefArgs(ctor, paramExprs)
+                : isInvoke ? Invoke(typeof(object), factoryExpr, paramExprs) : Call(factoryExpr, method, paramExprs);
             else if (a1 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0) : NewNoByRefArgs(ctor, a0) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0) : NewNoByRefArgs(ctor, a0)
+                : isInvoke ? Invoke(typeof(object), factoryExpr, a0) : Call(factoryExpr, method, a0);
             else if (a2 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1) : NewNoByRefArgs(ctor, a0, a1) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1) : NewNoByRefArgs(ctor, a0, a1) : (Expression)Call(factoryExpr, method, a0, a1);
             else if (a3 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2) : (Expression)Call(factoryExpr, method, a0, a1, a2);
             else if (a4 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3) : NewNoByRefArgs(ctor, a0, a1, a2, a3) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3) : NewNoByRefArgs(ctor, a0, a1, a2, a3) : (Expression)Call(factoryExpr, method, a0, a1, a2, a3);
             else if (a5 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4) : (Expression)Call(factoryExpr, method, a0, a1, a2, a3, a4);
             else if (a6 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4, a5);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5) : (Expression)Call(factoryExpr, method, a0, a1, a2, a3, a4, a5);
             else
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5, a6) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5, a6) : (Expression)Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4, a5, a6);
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5, a6) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5, a6) : (Expression)Call(factoryExpr, method, a0, a1, a2, a3, a4, a5, a6);
 
             if (ctor == null)
                 return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMethod);
@@ -12857,7 +12896,7 @@ namespace DryIoc
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1)
             {
                 EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent);
-                EmittingVisitor.EmitLoadConstantInt(il, FactoryId); 
+                EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
 
                 // todo: @perf more intelligent emit?
                 if (!EmittingVisitor.TryEmit(ServiceFactoryExpr, paramExprs, il, ref closure, config, parent))
@@ -13123,7 +13162,7 @@ namespace DryIoc
             public bool CanApply(Request request) => true;
 
             private readonly Lazy<Expression> _transientReuseExpr = Lazy.Of<Expression>(() =>
-                Field(null, typeof(Reuse).GetField(nameof(Transient))));
+                Field(typeof(Reuse).GetField(nameof(Transient))));
 
             public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
                 _transientReuseExpr.Value;
@@ -14458,8 +14497,8 @@ namespace DryIoc
         /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static Expression GetDefaultValueExpression(this Type type) =>
-            !type.IsValueType 
-                ? ContainerTools.NullTypeConstant 
+            !type.IsValueType
+                ? ContainerTools.NullTypeConstant
                 : Call(GetDefaultMethod.MakeGenericMethod(type));
 
         [MethodImpl((MethodImplOptions)256)]
