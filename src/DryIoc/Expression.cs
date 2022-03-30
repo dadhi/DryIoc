@@ -239,7 +239,8 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             ? new NoArgsNewClassIntrinsicExpression(ctor)
             : new NoByRefManyArgumentsNewExpression(ctor, arguments);
 
-        public static NewExpression New(ConstructorInfo ctor) => new NewExpression(ctor);
+        public static NewExpression New(ConstructorInfo ctor) => 
+            new NoArgsNewClassIntrinsicExpression(ctor);
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg) =>
             new OneArgumentNewExpression(ctor, arg);
