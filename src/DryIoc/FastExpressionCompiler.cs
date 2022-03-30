@@ -4307,7 +4307,6 @@ namespace DryIoc.FastExpressionCompiler
                         return false;
                 }
 
-                var nestedLambda = nestedLambdaInfo.Lambda;
                 EmitLoadLocalVariable(il, nestedLambdaInfo.LambdaVarIndex);
 
                 // If lambda does not use any outer parameters to be set in closure, then we're done
@@ -4348,15 +4347,7 @@ namespace DryIoc.FastExpressionCompiler
                     if (outerParamIndex != -1) // load parameter from input outer params
                     {
                         // Add `+1` to index because the `0` index is for the closure argument
-                        if (outerParamIndex == 0)
-                            il.Emit(OpCodes.Ldarg_1);
-                        else if (outerParamIndex == 1)
-                            il.Emit(OpCodes.Ldarg_2);
-                        else if (outerParamIndex == 2)
-                            il.Emit(OpCodes.Ldarg_3);
-                        else
-                            il.Emit(OpCodes.Ldarg_S, (byte)(1 + outerParamIndex));
-
+                        EmitLoadArg(il, outerParamIndex + 1);
                         if (nestedParam.Type.IsValueType)
                             il.Emit(OpCodes.Box, nestedParam.Type);
                     }
@@ -4392,14 +4383,12 @@ namespace DryIoc.FastExpressionCompiler
                     il.Emit(OpCodes.Stelem_Ref);
                 }
 
-                // - create `ArrayClosureWithNonPassedParams` out of the both above
-                if (containsConstants)
-                    il.Emit(OpCodes.Newobj, ArrayClosureWithNonPassedParamsConstructor);
-                else
-                    il.Emit(OpCodes.Newobj, ArrayClosureWithNonPassedParamsConstructorWithoutConstants);
+                // - emit the closure creation
+                var closureCtor = containsConstants ? ArrayClosureWithNonPassedParamsConstructor : ArrayClosureWithNonPassedParamsConstructorWithoutConstants;
+                il.Emit(OpCodes.Newobj, closureCtor);
 
                 // - call `Curry` method with nested lambda and array closure to produce a closed lambda with the expected signature
-                var lambdaTypeArgs = nestedLambda.GetType().GetTypeInfo().GenericTypeArguments;
+                var lambdaTypeArgs = nestedLambdaInfo.Lambda.GetType().GetGenericArguments();
 
                 var nestedLambdaExpr = nestedLambdaInfo.LambdaExpression;
                 var closureMethod = nestedLambdaExpr.ReturnType == typeof(void)
