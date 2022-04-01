@@ -4485,7 +4485,7 @@ namespace DryIoc
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
 
         /// <summary>Root or the current resolver context (if it is the root).</summary>
-        public static readonly Expression RootOrSelfExpr = 
+        public static readonly Expression RootOrSelfExpr =
             new ResolverContextArgMethodCallExpression(typeof(ResolverContext).GetMethod(nameof(RootOrSelf)));
 
         /// <summary>Resolver parameter expression.</summary>
@@ -7796,6 +7796,7 @@ namespace DryIoc
         /// for all services and use <paramref name="condition"/> to specify the target services.
         /// Note: You may specify a <paramref name="reuse"/> different from the initiliazed object enabling the
         /// <paramref name="initialize"/> action to run once (Singleton), run once-per-scope (Scoped), run always (Transient).
+        /// Note2: By convention the initializer is not applied for wrappers (collections, Func, Lazy, etc.). If you need this you may directly use the decorator.
         /// </summary>
         public static void RegisterInitializer<TTarget>(this IRegistrator registrator,
             Action<TTarget, IResolverContext> initialize,
@@ -7808,12 +7809,11 @@ namespace DryIoc
                 reuse: reuse,
                 made: Made.Of(
                     r => _initializerMethod.MakeGenericMethod(typeof(TTarget), r.ServiceType),
-                    // specify ResolverContext as a parameter to prevent applying initializer for injected resolver too
-                    parameters: Parameters.Of
-                        .Type<IResolverContext>(r => r.IsSingletonOrDependencyOfSingleton && !r.OpensResolutionScope ? r.Container.RootOrSelf() : r.Container)
-                        .Type(initialize.ToFunc<Request, Action<TTarget, IResolverContext>>)),
+                    parameters: Parameters.Of.Type(initialize.ToFunc<Request, Action<TTarget, IResolverContext>>)),
                 setup: Setup.DecoratorWith(
-                    r => typeof(TTarget).IsAssignableFrom(r.ServiceType) && (condition == null || condition(r)),
+                    r => r.FactoryType != FactoryType.Wrapper
+                        && typeof(TTarget).IsAssignableFrom(r.ServiceType)
+                        && (condition == null || condition(r)),
                     useDecorateeReuse: true, // issue BitBucket #230 - ensures the initialization to happen once on construction 
                     preventDisposal: true)); // issue #215 - ensures that the initialized / decorated object does not added for the disposal twice
         }
@@ -12857,7 +12857,7 @@ namespace DryIoc
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1)
             {
                 EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent);
-                EmittingVisitor.EmitLoadConstantInt(il, FactoryId); 
+                EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
 
                 // todo: @perf more intelligent emit?
                 if (!EmittingVisitor.TryEmit(ServiceFactoryExpr, paramExprs, il, ref closure, config, parent))
@@ -14458,8 +14458,8 @@ namespace DryIoc
         /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static Expression GetDefaultValueExpression(this Type type) =>
-            !type.IsValueType 
-                ? ContainerTools.NullTypeConstant 
+            !type.IsValueType
+                ? ContainerTools.NullTypeConstant
                 : Call(GetDefaultMethod.MakeGenericMethod(type));
 
         [MethodImpl((MethodImplOptions)256)]
