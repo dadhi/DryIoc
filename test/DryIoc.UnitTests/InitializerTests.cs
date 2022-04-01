@@ -261,7 +261,7 @@ namespace DryIoc.UnitTests
             }
         }
 
-        [Test]//[Ignore("todo:fixme")]
+        [Test]
         public void Issue_466_with_initializer()
         {
             Container container = new Container();
