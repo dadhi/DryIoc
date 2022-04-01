@@ -260,5 +260,38 @@ namespace DryIoc.UnitTests
                 Service = service;
             }
         }
+
+        [Test][Ignore("todo:fixme")]
+        public void Test_issue_466()
+        {
+            Container container = new Container();
+
+            container.Register<Session>(reuse: Reuse.Scoped);
+            container.RegisterInitializer<Session>(
+                initialize: (session, context) =>
+                {
+                    var scope = context.CurrentScope;
+                    Assert.IsFalse(scope.IsDisposed);
+                });
+
+            {
+                using var scope01 = ScopeSession(container, "S1");
+            }
+
+            var scope02 = ScopeSession(container, "S2");
+        }
+
+        static IResolverContext ScopeSession(IResolverContext container, string id)
+        {
+            var scope = container.OpenScope();
+            var session = scope.Resolve<Session>();
+            return scope;
+        }
+
+        internal class Session : IDisposable
+        {
+            public bool IsDisposed;
+            public void Dispose() => IsDisposed = true;
+        }
     }
 }
