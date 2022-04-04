@@ -6106,6 +6106,7 @@ namespace DryIoc
         /// <summary>Identifies factory service if factory method is instance member.</summary>
         public virtual ServiceInfo FactoryServiceInfo => null;
 
+        // todo: @perf memory - keep it an object so it can be converted to constant if needed
         /// Alternatively you may just provide an expression for factory
         public virtual Expression FactoryExpression => null;
 
