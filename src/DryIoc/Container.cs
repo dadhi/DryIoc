@@ -7669,6 +7669,7 @@ namespace DryIoc
             new Lazy<MethodInfo>(() => typeof(Func<object, object, object, object, object, object, object, object>).GetMethod(InvokeMethodName))
         });
 
+        // todo: @perf try to utilize _invokeMethods and call the func directly as Func of object(s)
         private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
             TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey) =>
             r.Register(ReflectionFactory.Of(serviceType, reuse,
