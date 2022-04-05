@@ -11034,11 +11034,12 @@ namespace DryIoc
             if (IsFactoryGenerator(validatedImplType ?? implementationType, made))
                 return new WithAllDetails(validatedImplType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
 
-            return made == Made.Default && setup == Setup.Default
-                ? OfReuse(validatedImplType, reuse)
-                : reuse == null && setup == Setup.Default ? new WithMade(validatedImplType, made)
-                : setup == Setup.Default ? new WithMadeAndReuse(validatedImplType, reuse, made)
-                : new WithAllDetails(validatedImplType, reuse, made, setup);
+            if (setup == Setup.Default)
+                return made == Made.Default ? OfReuse(validatedImplType, reuse)
+                    : reuse == null ? new WithMade(validatedImplType, made)
+                    : new WithMadeAndReuse(validatedImplType, reuse, made);
+
+            return new WithAllDetails(validatedImplType, reuse, made, setup);
         }
 
         /// <summary>Creates the factory based on arguments</summary>
