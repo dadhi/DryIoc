@@ -6123,6 +6123,12 @@ namespace DryIoc
                 FactoryExpression = factoryExpression;
         }
 
+        internal sealed class WithFunc : FactoryMethod
+        {
+            public object Func { get; }
+            internal WithFunc(MethodInfo invokeMethod, object func) : base(invokeMethod) => Func = func;
+        }
+
         internal sealed class WithFactoryServiceInfo : FactoryMethod
         {
             public override ServiceInfo FactoryServiceInfo { get; }
@@ -7501,8 +7507,17 @@ namespace DryIoc
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TService>(
             this IRegistrator r, Func<TDep1, TService> factory,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
+        {
+            // Func<object, object> f = factory.ToFunc;
+            // var m = new Made(new FactoryMethod.WithFunc(typeof(Func<TDep1, TService>).GetMethod(InvokeMethodName), f));
+            // r.Register(ReflectionFactory.Of(typeof(TService), reuse, m, setup),
+            //     serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+
             RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+        }
+
+        // private static object ToFunc<TDep1, TService>(this Func<TDep1, TService> f, object d1) => f((TDep1)d1);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
         public static void RegisterDelegate<TDep1>(
@@ -11014,11 +11029,15 @@ namespace DryIoc
         {
             if (made == null) made = Made.Default;
             if (setup == null) setup = Setup.Default;
+
             var validatedImplType = ValidateImplementationType(implementationType, made);
             if (IsFactoryGenerator(validatedImplType ?? implementationType, made))
                 return new WithAllDetails(validatedImplType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
+
             return made == Made.Default && setup == Setup.Default
                 ? OfReuse(validatedImplType, reuse)
+                : reuse == null && setup == Setup.Default ? new WithMade(validatedImplType, made)
+                : setup == Setup.Default ? new WithMadeAndReuse(validatedImplType, reuse, made)
                 : new WithAllDetails(validatedImplType, reuse, made, setup);
         }
 
@@ -11060,6 +11079,23 @@ namespace DryIoc
         {
             public override IReuse Reuse { get; }
             public WithReuse(Type implementationType, IReuse reuse) : base(implementationType) => Reuse = reuse;
+        }
+
+        internal sealed class WithMade : ReflectionFactory
+        {
+            public override Made Made { get; }
+            public WithMade(Type implementationType, Made made) : base(implementationType) => Made = made;
+        }
+
+        internal sealed class WithMadeAndReuse : ReflectionFactory
+        {
+            public override IReuse Reuse { get; }
+            public override Made Made { get; }
+            public WithMadeAndReuse(Type implementationType, IReuse reuse, Made made) : base(implementationType)
+            {
+                Reuse = reuse;
+                Made  = made;
+            }
         }
 
         internal class WithAllDetails : ReflectionFactory

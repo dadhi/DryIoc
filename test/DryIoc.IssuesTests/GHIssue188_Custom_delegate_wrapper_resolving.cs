@@ -82,8 +82,7 @@ namespace DryIoc.IssuesTests
             //container.RegisterDelegate<SimpleFactory>(r => s => r.Resolve<Func<string, Simple>>()(s));
 
             // DryIoc v4.1 - preferable, because it does not call Resolve (the Func<..> is injected) - so avoiding all problems with service locator
-            container.RegisterDelegate<Func<string, Simple>, SimpleFactory>(
-                f => s => f(s));
+            container.RegisterDelegate<Func<string, Simple>, SimpleFactory>(f => s => f(s));
 
             container.Register<Countable>();
             container.Register<Complex>();
