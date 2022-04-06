@@ -403,7 +403,8 @@ namespace DryIoc.UnitTests
             var operation = container.Resolve<IOperation>();
 
             Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
-            Assert.AreSame(operation, container.Resolve<IOperation>());
+            var op = container.Resolve<IOperation>();
+            Assert.AreSame(operation, op);
         }
 
         [Test]

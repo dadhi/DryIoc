@@ -7548,12 +7548,16 @@ namespace DryIoc
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TService>(
             this IRegistrator r, Func<TDep1, TService> factory,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
+            RegisterFunc(r, typeof(TService), factory, (Func<object, object>)factory.ToFuncEraseTypes, 
+                reuse, setup, ifAlreadyRegistered, serviceKey);
+
+        private static void RegisterFunc<TFunc>(IRegistrator r, Type serviceType, TFunc factory,
+            Delegate func, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
         {
-            Func<object, object> func = factory.ToFuncEraseTypes;
-            var m = new Made(new FactoryMethod.WithFunc(factory.GetType().GetMethod(InvokeMethodName), func));
-            var f = ReflectionFactory.OfTypeAndMadeNoValidation(typeof(TService), m, reuse, setup);
-            r.Register(f, typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+            var m = new Made(new FactoryMethod.WithFunc(typeof(TFunc).GetMethod(InvokeMethodName), func));
+            var f = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, m, reuse, setup);
+            r.Register(f, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
 
         private static object ToFuncEraseTypes<TDep1, TService>(this Func<TDep1, TService> f, object d1) => f((TDep1)d1);
@@ -7562,17 +7566,28 @@ namespace DryIoc
         public static void RegisterDelegate<TDep1>(
             this IRegistrator r, Type serviceType, Func<TDep1, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            RegisterDelegateFunc<Func<TDep1, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+            RegisterFunc(r, serviceType, factory, (Func<object, object>)factory.ToFuncEraseTypes, 
+                reuse, setup, ifAlreadyRegistered, serviceKey); 
+
+            // RegisterDelegateFunc<Func<TDep1, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container.
         /// The delegate accepts the object parameters with the runtime known types</summary>
         public static void RegisterDelegate(
             this IRegistrator r, Type serviceType, Type depType, Func<object, object> factory,
-            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.Register(ReflectionFactory.Of(default(Type), reuse,
-                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[0].Value, factory), Parameters.Of.Position(0, depType)),
-                setup),
-                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true); // true because we could not check types inside lambda before its actually invoked
+            IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
+        {
+            var funcType = typeof(Func<,>).MakeGenericType(depType, serviceType);
+            Func<object, object> func = factory.ToFuncEraseTypes;
+            var m = new Made(new FactoryMethod.WithFunc(funcType.GetMethod(InvokeMethodName), func));
+            var f = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, m, reuse, setup);
+            r.Register(f, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+
+            // r.Register(ReflectionFactory.Of(default(Type), reuse,
+            //     Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[0].Value, factory), Parameters.Of.Position(0, depType)),
+            //     setup),
+            //     serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true); // true because we could not check types inside lambda before its actually invoked
+        }
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TService>(
