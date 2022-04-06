@@ -7577,7 +7577,7 @@ namespace DryIoc
             this IRegistrator r, Type serviceType, Type depType, Func<object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
         {
-            var funcType = typeof(Func<,>).MakeGenericType(depType, serviceType);
+            var funcType = typeof(Func<,>).MakeGenericType(depType, typeof(object));
             Func<object, object> func = factory.ToFuncEraseTypes;
             var m = new Made(new FactoryMethod.WithFunc(funcType.GetMethod(InvokeMethodName), func));
             var f = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, m, reuse, setup);

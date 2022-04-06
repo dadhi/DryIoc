@@ -430,7 +430,7 @@ namespace DryIoc.UnitTests
 
         class D1 {}
 
-        [Test, Ignore("todo: fixme")]
+        [Test]
         public void Delegate_decorator_with_the_runtime_service_types_RegisterDelegate_should_throw_on_the_wrong_type()
         {
             var container = new Container();
