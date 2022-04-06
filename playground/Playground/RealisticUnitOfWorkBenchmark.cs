@@ -789,6 +789,13 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |  CompileLightExpression | 369.1 us | 3.39 us | 2.83 us |  1.00 |    0.00 | 18.0664 |  8.7891 | 3.4180 | 112.88 KB |
 | CompileSystemExpression | 712.7 us | 8.17 us | 6.82 us |  1.93 |    0.03 | 35.1563 | 10.7422 |      - |  216.1 KB |
 
+## RegisterDelegate wins
+
+|                  Method |     Mean |   Error |  StdDev | Ratio | RatioSD |   Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+|------------------------ |---------:|--------:|--------:|------:|--------:|--------:|--------:|-------:|----------:|
+|  CompileLightExpression | 363.1 us | 6.89 us | 6.11 us |  1.00 |    0.00 | 18.0664 |  8.7891 | 2.9297 | 111.51 KB |
+| CompileSystemExpression | 702.9 us | 2.52 us | 2.10 us |  1.94 |    0.03 | 35.1563 | 10.7422 |      - |  216.1 KB |
+
 */
             LambdaExpression _lightExpr;
             System.Linq.Expressions.LambdaExpression _sysExpr;
@@ -1240,6 +1247,13 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |   Lamar_MsDI |  7,607.20 us | 182.225 us | 525.760 us |  77.60 |    3.00 |        - |       - |      - | 649.87 KB |
 |        Grace | 15,809.04 us | 224.203 us | 187.220 us | 183.68 |    3.80 |  93.7500 | 31.2500 |      - |  736.2 KB |
 |   Grace_MsDI | 18,707.17 us | 236.977 us | 221.668 us | 217.31 |    3.79 | 125.0000 | 62.5000 |      - | 907.38 KB |
+
+## Faster RegisterDelegate interpretation
+
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|-------:|-------:|------:|----------:|
+|      DryIoc | 82.75 us | 0.636 us | 0.564 us |  1.00 |    0.00 | 6.5918 | 0.4883 |     - |  40.47 KB |
+| DryIoc_MsDI | 94.79 us | 1.889 us | 1.855 us |  1.15 |    0.02 | 8.3008 | 0.4883 |     - |  51.27 KB |
 
 */
             [Benchmark(Baseline = true)]

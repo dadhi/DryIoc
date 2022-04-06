@@ -119,8 +119,7 @@ namespace DryIoc.IssuesTests
 
                     return decorateeFactory(scopeEntry.Value).Invoke(address);
                 },
-
-                setup: Setup.Decorator);
+                setup: Setup.DecoratorWith(allowDisposableTransient: true));
 
 
             using (var scope = c.OpenScope())

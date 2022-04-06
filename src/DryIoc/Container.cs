@@ -3350,7 +3350,7 @@ namespace DryIoc
                 return true;
             }
 
-            if (expr.Tag == FactoryDelegateCompiler.FuncInvokeExpressionTag)
+            if (expr is IFuncInvokeExpression)
                 return TryInterpretFuncInvoke(r, expr, paramExprs, paramValues, parentArgs, ref result);
 
             var callExpr = (MethodCallExpression)expr;
@@ -3552,12 +3552,20 @@ namespace DryIoc
                     return false;
                 result = ((Func<object, object>)f1.Func)(a0);
             }
-            if (e is FuncInvoke2Expression f2)
+            else if (e is FuncInvoke2Expression f2)
             {
                 if (!TryInterpret(r, f2.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
                     !TryInterpret(r, f2.Argument1, paramExprs, paramValues, parentArgs, out var a1))
                     return false;
                 result = ((Func<object, object, object>)f2.Func)(a0, a1);
+            }
+            else if (e is FuncInvoke3Expression f3)
+            {
+                if (!TryInterpret(r, f3.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
+                    !TryInterpret(r, f3.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
+                    !TryInterpret(r, f3.Argument2, paramExprs, paramValues, parentArgs, out var a2))
+                    return false;
+                result = ((Func<object, object, object, object>)f3.Func)(a0, a1, a2);
             }
             return true;
         }
@@ -3853,8 +3861,6 @@ namespace DryIoc
 #endif
                 );
         }
-
-        internal static readonly object FuncInvokeExpressionTag = new object();
     }
 
     internal sealed class FactoryDelegateExpression : Expression<FactoryDelegate>
@@ -6121,9 +6127,10 @@ namespace DryIoc
         #endregion
     }
 
-    sealed class FuncInvoke1Expression : OneArgumentMethodCallExpression
+    internal interface IFuncInvokeExpression {}
+
+    sealed class FuncInvoke1Expression : OneArgumentMethodCallExpression, IFuncInvokeExpression
     {
-        public override object Tag => FactoryDelegateCompiler.FuncInvokeExpressionTag;
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
         internal FuncInvoke1Expression(Delegate f, MethodInfo m, Expression a0) : base(m, a0) => Func = f;
@@ -6144,9 +6151,8 @@ namespace DryIoc
         }
     }
 
-    sealed class FuncInvoke2Expression : TwoArgumentsMethodCallExpression
+    sealed class FuncInvoke2Expression : TwoArgumentsMethodCallExpression, IFuncInvokeExpression
     {
-        public override object Tag => FactoryDelegateCompiler.FuncInvokeExpressionTag;
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
         internal FuncInvoke2Expression(Delegate f, MethodInfo m, Expression a0, Expression a1) : base(m, a0, a1) => Func = f;
@@ -6165,6 +6171,33 @@ namespace DryIoc
             return EmittingVisitor.TryEmitConstantOfNotNullValue(true, f.GetType(), f, il, ref closure)
                 && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
+                && EmittingVisitor.EmitMethodCall(il, Method);
+        }
+    }
+
+    sealed class FuncInvoke3Expression : ThreeArgumentsMethodCallExpression, IFuncInvokeExpression
+    {
+        public override Expression Object => Constant(Func.Target);
+        public readonly Delegate Func;
+        internal FuncInvoke3Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2)
+            : base(m, a0, a1, a2) => Func = f;
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(
+            CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure)
+        {
+            closure.AddConstantOrIncrementUsageCount(Func.Target);
+            return ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
+                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
+                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config);
+        }
+        public override bool TryEmit(
+            CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var f = Func.Target;
+            return EmittingVisitor.TryEmitConstantOfNotNullValue(true, f.GetType(), f, il, ref closure)
+                && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
+                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
+                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.EmitMethodCall(il, Method);
         }
     }
@@ -7556,6 +7589,29 @@ namespace DryIoc
             registrator.RegisterMany<TMadeResult>(reuse, made.ThrowIfNull(), setup,
                 ifAlreadyRegistered, serviceTypeCondition, nonPublicServiceTypes, serviceKey);
 
+        private static void RegisterFunc(this IRegistrator r, 
+            Type serviceType, Type sourceFuncType, Delegate funcWithObjParams,
+            IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
+        {
+            var m = new Made(new FactoryMethod.WithFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams));
+            var f = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, m, reuse, setup);
+            r.Register(f, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+        }
+
+        private static object ToFuncWithObjParams<D1, TService>(this Func<D1, TService> f, object d1) => f((D1)d1);
+        private static object ToFuncWithObjParams<D1, D2, TService>(this Func<D1, D2, TService> f,
+            object d1, object d2) => f((D1)d1, (D2)d2);
+        private static object ToFuncWithObjParams<D1, D2, D3, TService>(this Func<D1, D2, D3, TService> f,
+            object d1, object d2, object d3) => f((D1)d1, (D2)d2, (D3)d3);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, TService>(this Func<D1, D2, D3, D4, TService> f,
+            object d1, object d2, object d3, object d4) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, TService>(this Func<D1, D2, D3, D4, D5, TService> f,
+            object d1, object d2, object d3, object d4, object d5) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, TService>(this Func<D1, D2, D3, D4, D5, D6, TService> f,
+            object d1, object d2, object d3, object d4, object d5, object d6) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7, TService>(this Func<D1, D2, D3, D4, D5, D6, D7, TService> f,
+            object d1, object d2, object d3, object d4, object d5, object d6, object d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7);
+
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
         /// Delegate can use resolver context parameter to resolve any required dependencies, e.g.:
         /// <code lang="cs"><![CDATA[container.RegisterDelegate<ICar>(r => new Car(r.Resolve<IEngine>()))]]></code></summary>
@@ -7582,35 +7638,12 @@ namespace DryIoc
             r.RegisterFunc(typeof(TService), typeof(Func<TDep1, TService>), (Func<object, object>)factory.ToFuncWithObjParams,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
-        private static void RegisterFunc(this IRegistrator r, 
-            Type serviceType, Type sourceFuncType, Delegate funcWithObjParams,
-            IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
-        {
-            var m = new Made(new FactoryMethod.WithFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams));
-            var f = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, m, reuse, setup);
-            r.Register(f, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-        }
-
-        private static object ToFuncWithObjParams<D1, TService>(this Func<D1, TService> f, object d1) => f((D1)d1);
-        private static object ToFuncWithObjParams<D1, D2, TService>(this Func<D1, D2, TService> f,
-            object d1, object d2) => f((D1)d1, (D2)d2);
-        private static object ToFuncWithObjParams<D1, D2, D3, TService>(this Func<D1, D2, D3, TService> f,
-            object d1, object d2, object d3) => f((D1)d1, (D2)d2, (D3)d3);
-        private static object ToFuncWithObjParams<D1, D2, D3, D4, TService>(this Func<D1, D2, D3, D4, TService> f,
-            object d1, object d2, object d3, object d4) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4);
-        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, TService>(this Func<D1, D2, D3, D4, D5, TService> f,
-            object d1, object d2, object d3, object d4, object d5) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5);
-        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, TService>(this Func<D1, D2, D3, D4, D5, D6, TService> f,
-            object d1, object d2, object d3, object d4, object d5, object d6) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6);
-        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7, TService>(this Func<D1, D2, D3, D4, D5, D6, D7, TService> f,
-            object d1, object d2, object d3, object d4, object d5, object d6, object d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7);
-
         /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
         public static void RegisterDelegate<TDep1>(
             this IRegistrator r, Type serviceType, Func<TDep1, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.RegisterFunc(serviceType, typeof(Func<TDep1, object>), (Func<object, object>)factory.ToFuncWithObjParams, 
-                reuse, setup, ifAlreadyRegistered, serviceKey); 
+                reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container.
         /// The delegate accepts the object parameters with the runtime known types</summary>
@@ -7631,7 +7664,8 @@ namespace DryIoc
         public static void RegisterDelegate<TDep1, TDep2>(
             this IRegistrator r, Type serviceType, Func<TDep1, TDep2, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            RegisterDelegateFunc<Func<TDep1, TDep2, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+            r.RegisterFunc(serviceType, typeof(Func<TDep1, TDep2, object>), (Func<object, object, object>)factory.ToFuncWithObjParams,
+                reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container.
         /// The delegate accepts the object parameters with the runtime known types</summary>
@@ -7639,22 +7673,22 @@ namespace DryIoc
             this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type,
             Func<object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.Register(ReflectionFactory.Of(default(Type), reuse,
-                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[1].Value, factory),
-                Parameters.Of.Position(0, dep1Type).Position(1, dep2Type)), setup),
-                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+            r.RegisterFunc(serviceType, typeof(Func<,,>).MakeGenericType(dep1Type, dep2Type, typeof(object)), (Func<object, object, object>)factory.ToFuncWithObjParams,
+                reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TDep3, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+            r.RegisterFunc(typeof(TService), typeof(Func<TDep1, TDep2, TDep3, TService>), (Func<object, object, object, object>)factory.ToFuncWithObjParams,
+                reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3>(
             this IRegistrator r, Type serviceType, Func<TDep1, TDep2, TDep3, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            RegisterDelegateFunc<Func<TDep1, TDep2, TDep3, object>>(r, serviceType, factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+            r.RegisterFunc(serviceType, typeof(Func<TDep1, TDep2, TDep3, object>), (Func<object, object, object, object>)factory.ToFuncWithObjParams,
+                reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container.
         /// The delegate accepts the object parameters with the runtime known types</summary>
@@ -7662,10 +7696,8 @@ namespace DryIoc
             this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type, Type dep3Type,
             Func<object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.Register(ReflectionFactory.Of(default(Type), reuse,
-                Made.Of(FactoryMethod.OfFactory(_invokeMethods.Value[2].Value, factory),
-                Parameters.Of.Position(0, dep1Type).Position(1, dep2Type).Position(2, dep3Type)), setup),
-                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+            r.RegisterFunc(serviceType, typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, typeof(object)), (Func<object, object, object, object>)factory.ToFuncWithObjParams,
+                reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TDep2, TDep3, TDep4, TService>(
@@ -11544,7 +11576,7 @@ namespace DryIoc
                     : factoryFunc == null ? Call(factoryExpr, method, a0, a1) : new FuncInvoke2Expression(factoryFunc, method, a0, a1);
             else if (a3 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2) 
-                    : Call(factoryExpr, method, a0, a1, a2);
+                    : factoryFunc == null ? Call(factoryExpr, method, a0, a1, a2) : new FuncInvoke3Expression(factoryFunc, method, a0, a1, a2);
             else if (a4 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3) : NewNoByRefArgs(ctor, a0, a1, a2, a3) 
                     : Call(factoryExpr, method, a0, a1, a2, a3);
