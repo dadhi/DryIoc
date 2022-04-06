@@ -51,9 +51,21 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         /// <summary>All expressions should have a Type.</summary>
         public abstract Type Type { get; }
 
+        /// <summary>You may use it whatever you like overloading for the specific value in your custom expression.</summary>
+        public virtual object Tag => null;
+
+        /// <summary>Allows to overwrite the FEC stages to customize and optimize 
+        /// the expression constant(label, blocks, tries) collection and il emitting phase</summary>
         public virtual bool IsIntrinsic => false;
+        /// <summary>The first FEC stage of expression traversal where closure information is collected including the 
+        /// constant and the nested lambdas. Beside that the labels, block and try-catch information is also collected
+        /// for the next IL-emitting stage. The information regarding the currently traversed lambda expression
+        /// is accumulated in the `closure` structure. The `rootClosure` hold the first lambda expression info
+        /// for any nested lambda expression, which is indicated by `isNestedLambda`.</summary>
         public virtual bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) => false;
+        /// <summary>The second FEC state to emit the actual IL op-codes based on the information collected by the first traversal
+        /// and available in the `closure` structure. Find the expression examples below by searching `IsIntrinsic => true`.</summary>
         public virtual bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) => false;
 

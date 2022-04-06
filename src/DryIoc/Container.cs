@@ -3350,6 +3350,9 @@ namespace DryIoc
                 return true;
             }
 
+            if (expr.Tag == FactoryDelegateCompiler.FuncInvokeExpressionTag)
+                return InterpretFuncInvoke(r, expr, paramExprs, paramValues, parentArgs, ref result);
+
             var callExpr = (MethodCallExpression)expr;
             var method = callExpr.Method;
             var methodDeclaringType = method.DeclaringType;
@@ -3537,6 +3540,17 @@ namespace DryIoc
                 result = method.Invoke(instance, args);
             }
 
+            return true;
+        }
+
+        private static bool InterpretFuncInvoke(IResolverContext r, Expression e,
+            IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, ref object result)
+        {
+            if (e is FuncInvokeOneArgExpression f1)
+            {
+                if (!TryInterpret(r, f1.Argument, paramExprs, paramValues, parentArgs, out var a0)) return false;
+                result = ((Func<object, object>)f1.Func)(a0);
+            }
             return true;
         }
 
@@ -3832,6 +3846,8 @@ namespace DryIoc
 #endif
                 );
         }
+
+        internal static readonly object FuncInvokeExpressionTag = new object();
     }
 
     internal sealed class FactoryDelegateExpression : Expression<FactoryDelegate>
@@ -6098,6 +6114,29 @@ namespace DryIoc
         #endregion
     }
 
+    sealed class FuncInvokeOneArgExpression : OneArgumentMethodCallExpression
+    {
+        public override object Tag => FactoryDelegateCompiler.FuncInvokeExpressionTag;
+        public override Expression Object => Constant(Func.Target);
+        public readonly Delegate Func;
+        internal FuncInvokeOneArgExpression(Delegate f, MethodInfo m, Expression a0) : base(m, a0) => Func = f;
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(
+            CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure)
+        {
+            closure.AddConstantOrIncrementUsageCount(Func.Target);
+            return ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument, paramExprs, isNestedLambda, ref rootClosure, config);
+        }
+        public override bool TryEmit(
+            CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var f = Func.Target;
+            EmittingVisitor.TryEmitConstantOfNotNullValue(true, f.GetType(), f, il, ref closure);
+            return EmittingVisitor.TryEmit(Argument, paramExprs, il, ref closure, config, parent)
+                && EmittingVisitor.EmitMethodCall(il, Method);
+        }
+    }
+
     /// <summary>Wraps constructor or factory method optionally with factory instance to create service.</summary>
     public class FactoryMethod
     {
@@ -6106,9 +6145,10 @@ namespace DryIoc
         /// <summary>Identifies factory service if factory method is instance member.</summary>
         public virtual ServiceInfo FactoryServiceInfo => null;
 
-        // todo: @perf memory - keep it an object so it can be converted to constant if needed
         /// Alternatively you may just provide an expression for factory
         public virtual Expression FactoryExpression => null;
+
+        internal virtual Delegate FactoryFunc => null;
 
         ///<summary> Contains resolved parameter expressions found when looking for most resolvable constructor</summary> 
         internal virtual Expression[] ResolvedParameterExpressions => null;
@@ -6125,8 +6165,9 @@ namespace DryIoc
 
         internal sealed class WithFunc : FactoryMethod
         {
-            public object Func { get; }
-            internal WithFunc(MethodInfo invokeMethod, object func) : base(invokeMethod) => Func = func;
+            internal override Delegate FactoryFunc { get; }
+            internal WithFunc(MethodInfo invokeMethod, Delegate factoryFunc) : base(invokeMethod) =>
+                FactoryFunc = factoryFunc;
         }
 
         internal sealed class WithFactoryServiceInfo : FactoryMethod
@@ -7509,15 +7550,13 @@ namespace DryIoc
             this IRegistrator r, Func<TDep1, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
         {
-            // Func<object, object> f = factory.ToFunc;
-            // var m = new Made(new FactoryMethod.WithFunc(typeof(Func<TDep1, TService>).GetMethod(InvokeMethodName), f));
-            // r.Register(ReflectionFactory.Of(typeof(TService), reuse, m, setup),
-            //     serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-
-            RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+            Func<object, object> func = factory.ToFuncEraseTypes;
+            var m = new Made(new FactoryMethod.WithFunc(factory.GetType().GetMethod(InvokeMethodName), func));
+            var f = ReflectionFactory.OfTypeAndMadeNoValidation(typeof(TService), m, reuse, setup);
+            r.Register(f, typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
 
-        // private static object ToFunc<TDep1, TService>(this Func<TDep1, TService> f, object d1) => f((TDep1)d1);
+        private static object ToFuncEraseTypes<TDep1, TService>(this Func<TDep1, TService> f, object d1) => f((TDep1)d1);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
         public static void RegisterDelegate<TDep1>(
@@ -11042,6 +11081,11 @@ namespace DryIoc
             return new WithAllDetails(validatedImplType, reuse, made, setup);
         }
 
+        internal static ReflectionFactory OfTypeAndMadeNoValidation(Type implementationType, Made made, IReuse reuse = null, Setup setup = null) =>
+            setup == null || setup == Setup.Default
+                ? (reuse == null ? new WithMade(implementationType, made) : new WithMadeAndReuse(implementationType, reuse, made))
+                : new WithAllDetails(implementationType, reuse, made, setup ?? Setup.Default);
+
         /// <summary>Creates the factory based on arguments</summary>
         public static ReflectionFactory Of(Func<Type> implementationTypeProvider, IReuse reuse = null, Made made = null, Setup setup = null) =>
             new WithTypeProvider(implementationTypeProvider, reuse, made ?? Made.Default, setup ?? Setup.Default);
@@ -11291,7 +11335,9 @@ namespace DryIoc
             }
 
             MethodBase ctorOrMethod;
+            MethodInfo method = null;
             Expression factoryExpr = null;
+            Delegate factoryFunc = null;
             var failedToGetMember = false;
             if (factoryMethod == null)
             {
@@ -11326,10 +11372,12 @@ namespace DryIoc
 
                 ctorOrMethod = ctorOrMember as MethodBase;
                 if (ctorOrMethod == null) // return earlier when factory is Property or Field
-                    return ConvertExpressionIfNeeded(ctorOrMember is PropertyInfo p ? Property(factoryExpr, p)
-                        : (Expression)Field(factoryExpr, (FieldInfo)ctorOrMember), request, ctorOrMember);
+                    return ConvertExpressionIfNeeded(
+                        ctorOrMember is PropertyInfo p ? Property(factoryExpr, p) : Field(factoryExpr, (FieldInfo)ctorOrMember), request, ctorOrMember);
 
                 ctor = ctorOrMember as ConstructorInfo;
+                method = ctorOrMember as MethodInfo;
+                factoryFunc = factoryMethod.FactoryFunc;
             }
 
             var parameters = ctorOrMethod.GetParameters();
@@ -11345,12 +11393,10 @@ namespace DryIoc
                 if (ctor == null)
                     return ConvertExpressionIfNeeded(Call(factoryExpr, (MethodInfo)ctorOrMethod), request, ctorOrMethod);
                 var assignments = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
-                var newExpr = New(ctor);
-                return failedToGetMember ? null : assignments == null ? newExpr : MemberInit(newExpr, assignments);
+                return failedToGetMember ? null : assignments == null ? New(ctor) : MemberInit(New(ctor), assignments);
             }
 
             var hasByRefParams = false;
-
             Expression a0 = null, a1 = null, a2 = null, a3 = null, a4 = null, a5 = null, a6 = null;
             var paramExprs = parameters.Length > 7 ? new Expression[parameters.Length] : null;
             var rulesParams = rules._made.Parameters;
@@ -11444,28 +11490,28 @@ namespace DryIoc
             Expression serviceExpr;
             if (a0 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, paramExprs) : NewNoByRefArgs(ctor, paramExprs) 
-                    : Call(factoryExpr, (MethodInfo)ctorOrMethod, paramExprs);
+                    : Call(factoryExpr, method, paramExprs);
             else if (a1 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0) : NewNoByRefArgs(ctor, a0) 
-                    : Call(factoryExpr, (MethodInfo)ctorOrMethod, a0);
+                    : factoryFunc == null ? Call(factoryExpr, method, a0) : new FuncInvokeOneArgExpression(factoryFunc, method, a0);
             else if (a2 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1) : NewNoByRefArgs(ctor, a0, a1) 
-                    : Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1);
+                    : Call(factoryExpr, method, a0, a1);
             else if (a3 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2) 
-                    : Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2);
+                    : Call(factoryExpr, method, a0, a1, a2);
             else if (a4 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3) : NewNoByRefArgs(ctor, a0, a1, a2, a3) 
-                    : Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3);
+                    : Call(factoryExpr, method, a0, a1, a2, a3);
             else if (a5 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4) 
-                    : Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4);
+                    : Call(factoryExpr, method, a0, a1, a2, a3, a4);
             else if (a6 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5) 
-                    : Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4, a5);
+                    : Call(factoryExpr, method, a0, a1, a2, a3, a4, a5);
             else
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5, a6) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5, a6) 
-                    : Call(factoryExpr, (MethodInfo)ctorOrMethod, a0, a1, a2, a3, a4, a5, a6);
+                    : Call(factoryExpr, method, a0, a1, a2, a3, a4, a5, a6);
 
             if (ctor == null)
                 return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMethod);
@@ -11844,7 +11890,7 @@ namespace DryIoc
             var factoryInstance = factoryMethod.FactoryExpression;
             return factoryInstance != null
                 ? new FactoryMethod.WithFactoryExpression(factoryMember, factoryInstance)
-                : (FactoryMethod)new FactoryMethod.WithFactoryServiceInfo(factoryMember, factoryInfo);
+                : new FactoryMethod.WithFactoryServiceInfo(factoryMember, factoryInfo);
         }
     }
 

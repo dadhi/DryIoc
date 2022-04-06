@@ -407,7 +407,8 @@ namespace DryIoc.FastExpressionCompiler
 
             var il = method.GetILGenerator();
 
-            EmittingVisitor.EmitLoadConstantsAndNestedLambdasIntoVars(il, ref closureInfo);
+            EmittingVisitor.EmitLoadConstantsAndNestedLambdasIntoVars(
+                il, closureInfo.NestedLambdaOrLambdas, ref closureInfo);
 
             var parent = lambdaExpr.ReturnType == typeof(void) ? ParentFlags.IgnoreResult : ParentFlags.Empty;
             if (!EmittingVisitor.TryEmit(lambdaExpr.Body,
@@ -458,34 +459,48 @@ namespace DryIoc.FastExpressionCompiler
             return @delegate;
         }
 
+        private static Delegate CompileNoArgsNew(ConstructorInfo ctor, Type delegateType, Type[] closurePlusParamTypes, Type returnType)
+        {
+            var method = new DynamicMethod(string.Empty, returnType, closurePlusParamTypes, typeof(ArrayClosure), true);
+            var il = method.GetILGenerator(16); // 16 is enough for maximum of 3 possible ops
+            il.Emit(OpCodes.Newobj, ctor);
+            if (returnType == typeof(void))
+                il.Emit(OpCodes.Pop);
+            il.Emit(OpCodes.Ret);
+            return method.CreateDelegate(delegateType, EmptyArrayClosure);
+        }
+
 #if LIGHT_EXPRESSION
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IParameterProvider paramExprs,
             Type[] closurePlusParamTypes, Type returnType, CompilerFlags flags)
+        {
+            if (bodyExpr is NoArgsNewClassIntrinsicExpression newNoArgs)
+                return CompileNoArgsNew(newNoArgs.Constructor, delegateType, closurePlusParamTypes, returnType);
 #else
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IReadOnlyList<PE> paramExprs,
             Type[] closurePlusParamTypes, Type returnType, CompilerFlags flags)
-#endif
         {
+#endif
             var closureInfo = new ClosureInfo(ClosureStatus.ToBeCollected);
             if (!TryCollectBoundConstants(ref closureInfo, bodyExpr, paramExprs, false, ref closureInfo, flags))
                 return null;
 
             var nestedLambdaOrLambdas = closureInfo.NestedLambdaOrLambdas;
-            if (nestedLambdaOrLambdas is NestedLambdaInfo nestedLambda)
-            {
-                if (!TryCompileNestedLambda(ref closureInfo, 0, flags))
+            if (nestedLambdaOrLambdas != null)
+                if (nestedLambdaOrLambdas is NestedLambdaInfo[] nestedLambdas)
+                {
+                    foreach (var nestedLambda in nestedLambdas)
+                        if (nestedLambda.Lambda == null && !TryCompileNestedLambda(nestedLambda, flags))
+                            return null;
+                }
+                else if (((NestedLambdaInfo)nestedLambdaOrLambdas).Lambda == null &&
+                    !TryCompileNestedLambda((NestedLambdaInfo)nestedLambdaOrLambdas, flags))
                     return null;
-            }
-            else if (nestedLambdaOrLambdas is NestedLambdaInfo[] nestedLambdas)
-            {
-                for (var i = 0; i < nestedLambdas.Length; ++i)
-                    if (!TryCompileNestedLambda(ref closureInfo, i, flags))
-                        return null;
-            }
 
             ArrayClosure closure;
             if ((flags & CompilerFlags.EnableDelegateDebugInfo) == 0)
-                closure = (closureInfo.Status & ClosureStatus.HasClosure) == 0 ? EmptyArrayClosure
+                closure = (closureInfo.Status & ClosureStatus.HasClosure) == 0 
+                    ? EmptyArrayClosure
                     : new ArrayClosure(closureInfo.GetArrayOfConstantsAndNestedLambdas());
             else
             {
@@ -498,15 +513,10 @@ namespace DryIoc.FastExpressionCompiler
             var method = new DynamicMethod(string.Empty, returnType, closurePlusParamTypes, typeof(ArrayClosure), true);
 
             // todo: @perf @mem the default stream capacity is 64, consider to decrease it to 16 for a member or no argument method
-#if LIGHT_EXPRESSION
-            var streamSize = bodyExpr is NoArgsNewClassIntrinsicExpression ? 16 : 64;
-#else
-            var streamSize = 64; // the default system value
-#endif
-            var il = method.GetILGenerator(streamSize);
+            var il = method.GetILGenerator(64);
 
             if (closure.ConstantsAndNestedLambdas != null)
-                EmittingVisitor.EmitLoadConstantsAndNestedLambdasIntoVars(il, ref closureInfo);
+                EmittingVisitor.EmitLoadConstantsAndNestedLambdasIntoVars(il, nestedLambdaOrLambdas, ref closureInfo);
 
             var parent = returnType == typeof(void) ? ParentFlags.IgnoreResult : ParentFlags.Empty;
             if (!EmittingVisitor.TryEmit(bodyExpr, paramExprs, il, ref closureInfo, flags, parent))
@@ -559,6 +569,7 @@ namespace DryIoc.FastExpressionCompiler
             return closureAndParamTypes;
         }
 
+        [MethodImpl((MethodImplOptions)256)]
         private static void ReturnClosureTypeToParamTypesToPool(Type[] closurePlusParamTypes)
         {
             var paramCount = closurePlusParamTypes.Length - 1;
@@ -609,9 +620,10 @@ namespace DryIoc.FastExpressionCompiler
 
             /// Constant expressions to find an index (by reference) of constant expression from compiled expression.
             public LiveCountArray<object> Constants;
-            // todo: @perf combine Constants and Usage to save the memory
-            /// Constant usage count and variable index
-            public LiveCountArray<int> ConstantUsageThenVarIndex;
+
+            /// Constant usage count and variable index.
+            /// It is a separate collection from the Constants because we directly convert later into the closure array
+            public LiveCountArray<short> ConstantUsageThenVarIndex;
 
             /// Parameters not passed through lambda parameter list But used inside lambda body.
             /// The top expression should Not contain not passed parameters. 
@@ -621,15 +633,16 @@ namespace DryIoc.FastExpressionCompiler
             public object NestedLambdaOrLambdas;
 
             /// <summary>Populates info directly with provided closure object and constants.
-            /// If provided, the <paramref name="constUsage"/> should be the size of <paramref name="constValues"/>
+            /// If provided, the <paramref name="constUsage"/> is the const variable indexes,
+            /// should be the size of <paramref name="constValues"/>
             /// </summary>
-            public ClosureInfo(ClosureStatus status, object[] constValues = null, int[] constUsage = null)
+            public ClosureInfo(ClosureStatus status, object[] constValues = null, short[] constUsage = null)
             {
                 Status = status;
 
                 Constants = new LiveCountArray<object>(constValues ?? Tools.Empty<object>()); //todo: @perf combine constValues != null conditions
-                ConstantUsageThenVarIndex = new LiveCountArray<int>(
-                    constValues == null ? Tools.Empty<int>() : constUsage ?? new int[constValues.Length]);
+                ConstantUsageThenVarIndex = new LiveCountArray<short>(
+                    constValues == null ? Tools.Empty<short>() : constUsage ?? new short[constValues.Length]);
 
                 NonPassedParameters = Tools.Empty<ParameterExpression>();
                 NestedLambdaOrLambdas = null;
@@ -642,7 +655,7 @@ namespace DryIoc.FastExpressionCompiler
 
             public bool ContainsConstantsOrNestedLambdas() => Constants.Count > 0 || NestedLambdaOrLambdas != null;
 
-            public void AddConstantOrIncrementUsageCount(object value, Type type)
+            public void AddConstantOrIncrementUsageCount(object value)
             {
                 Status |= ClosureStatus.HasClosure;
 
@@ -672,22 +685,14 @@ namespace DryIoc.FastExpressionCompiler
                     return;
                 }
 
-                var count = NonPassedParameters.Length;
+                var nonPassedParams = NonPassedParameters;
+                var count = nonPassedParams.Length;
                 for (var i = 0; i < count; ++i)
-                    if (ReferenceEquals(NonPassedParameters[i], expr))
+                    if (ReferenceEquals(nonPassedParams[i], expr))
                         return;
 
-                if (NonPassedParameters.Length == 1)
-                    NonPassedParameters = new[] { NonPassedParameters[0], expr };
-                else if (NonPassedParameters.Length == 2)
-                    NonPassedParameters = new[] { NonPassedParameters[0], NonPassedParameters[1], expr };
-                else
-                {
-                    var newItems = new ParameterExpression[count + 1];
-                    Array.Copy(NonPassedParameters, 0, newItems, 0, count);
-                    newItems[count] = expr;
-                    NonPassedParameters = newItems;
-                }
+                Array.Resize(ref NonPassedParameters, count + 1);
+                NonPassedParameters[count] = expr;
             }
 
             public void AddNestedLambda(NestedLambdaInfo nestedLambdaInfo)
@@ -703,10 +708,9 @@ namespace DryIoc.FastExpressionCompiler
                 {
                     var nestedLambdas = (NestedLambdaInfo[])nestedLambdaOrLambdas;
                     var count = nestedLambdas.Length;
-                    var newNestedLambdas = new NestedLambdaInfo[count + 1];
-                    Array.Copy(nestedLambdas, 0, newNestedLambdas, 0, count);
-                    newNestedLambdas[count] = nestedLambdaInfo;
-                    NestedLambdaOrLambdas = newNestedLambdas;
+                    Array.Resize(ref nestedLambdas, count + 1);
+                    nestedLambdas[count] = nestedLambdaInfo;
+                    NestedLambdaOrLambdas = nestedLambdas;
                 }
             }
 
@@ -795,33 +799,24 @@ namespace DryIoc.FastExpressionCompiler
                 var constItems = Constants.Items;
                 if (nestedLambdaOrLambdas == null)
                 {
-                    Array.Resize(ref constItems, constCount);
+                    if (constItems.Length != constCount)
+                        Array.Resize(ref constItems, constCount);
                     return constItems;
                 }
 
                 var nestedLambdas = nestedLambdaOrLambdas as NestedLambdaInfo[];
                 var lambdaCount = nestedLambdas != null ? nestedLambdas.Length : 1;
-                var itemCount = constCount + lambdaCount;
+                var constPlusLambdaCount = constCount + lambdaCount;
 
-                var closureItems = constItems;
-                if (itemCount > constItems.Length)
-                {
-                    closureItems = new object[itemCount];
-                    for (var i = 0; i < constCount; ++i)
-                        closureItems[i] = constItems[i];
-                }
-                else
-                {
-                    // shrink the items to the actual item count
-                    Array.Resize(ref constItems, itemCount);
-                }
+                if (constItems.Length != constPlusLambdaCount)
+                    Array.Resize(ref constItems, constPlusLambdaCount);
 
                 if (nestedLambdas == null)
-                    closureItems[constCount] = GetLambdaObject((NestedLambdaInfo)nestedLambdaOrLambdas);
+                    constItems[constCount] = GetLambdaObject((NestedLambdaInfo)nestedLambdaOrLambdas);
                 else for (var i = 0; i < nestedLambdas.Length; ++i)
-                    closureItems[constCount + i] = GetLambdaObject(nestedLambdas[i]);
+                    constItems[constCount + i] = GetLambdaObject(nestedLambdas[i]);
 
-                return closureItems;
+                return constItems;
             }
 
             /// LocalVar maybe a `null` in a collecting phase when we only need to decide if ParameterExpression is an actual parameter or variable
@@ -1104,13 +1099,8 @@ namespace DryIoc.FastExpressionCompiler
 #endif
                         var constantExpr = (ConstantExpression)expr;
                         var value = constantExpr.Value;
-                        if (value != null)
-                        {
-                            // todo: @perf find the way to speed-up this
-                            var valueType = value.GetType();
-                            if (IsClosureBoundConstant(value, valueType))
-                                closure.AddConstantOrIncrementUsageCount(value, valueType);
-                        }
+                        if (value != null && IsClosureBoundConstant(value, value.GetType()))
+                            closure.AddConstantOrIncrementUsageCount(value);
                         return true;
 
                     case ExpressionType.Parameter:
@@ -1569,65 +1559,57 @@ namespace DryIoc.FastExpressionCompiler
             return null;
         }
 
-        private static bool TryCompileNestedLambda(ref ClosureInfo outerClosureInfo, int nestedLambdaIndex, CompilerFlags setup)
+        private static bool TryCompileNestedLambda(NestedLambdaInfo nestedLambdaInfo, CompilerFlags setup)
         {
             // 1. Try to compile nested lambda in place
             // 2. Check that parameters used in compiled lambda are passed or closed by outer lambda
             // 3. Add the compiled lambda to closure of outer lambda for later invocation
-            var nestedLambdaOrLambdas = outerClosureInfo.NestedLambdaOrLambdas;
-            var nestedLambdaInfo = nestedLambdaOrLambdas as NestedLambdaInfo ?? ((NestedLambdaInfo[])nestedLambdaOrLambdas)[nestedLambdaIndex];
-            if (nestedLambdaInfo.Lambda != null)
-                return true;
-
             var nestedLambdaExpr = nestedLambdaInfo.LambdaExpression;
-            ref var nestedClosureInfo = ref nestedLambdaInfo.ClosureInfo;
-
+            var nestedReturnType = nestedLambdaExpr.ReturnType;
+            var nestedLambdaBody = nestedLambdaExpr.Body;
 #if LIGHT_EXPRESSION
             var nestedLambdaParamExprs = (IParameterProvider)nestedLambdaExpr;
+
+            if (nestedLambdaBody is NoArgsNewClassIntrinsicExpression newNoArgs)
+            {
+                var paramTypes = GetClosureTypeToParamTypes(nestedLambdaParamExprs);
+                nestedLambdaInfo.Lambda = CompileNoArgsNew(newNoArgs.Constructor, nestedLambdaExpr.Type, paramTypes, nestedReturnType);
+                ReturnClosureTypeToParamTypesToPool(paramTypes);
+                return true;
+            }
 #else
             var nestedLambdaParamExprs = nestedLambdaExpr.Parameters;
 #endif
-
+            ref var nestedClosureInfo = ref nestedLambdaInfo.ClosureInfo;
             var nestedLambdaNestedLambdaOrLambdas = nestedClosureInfo.NestedLambdaOrLambdas;
             if (nestedLambdaNestedLambdaOrLambdas != null)
-            {
-                if (nestedLambdaNestedLambdaOrLambdas is NestedLambdaInfo)
+                if (nestedLambdaNestedLambdaOrLambdas is NestedLambdaInfo[] nestedLambdaNestedLambdas)
                 {
-                    if (!TryCompileNestedLambda(ref nestedClosureInfo, 0, setup))
-                        return false;
-                }
-                else 
-                {
-                    var nestedLambdaNestedLambdas = (NestedLambdaInfo[])nestedLambdaNestedLambdaOrLambdas;
-                    for (var i = 0; i < nestedLambdaNestedLambdas.Length; ++i)
-                        if (!TryCompileNestedLambda(ref nestedClosureInfo, i, setup))
+                    foreach (var nestedLambdaNestedLambda in nestedLambdaNestedLambdas)
+                        if (nestedLambdaInfo.Lambda == null &&!TryCompileNestedLambda(nestedLambdaNestedLambda, setup))
                             return false;
                 }
-            }
+                else if (((NestedLambdaInfo)nestedLambdaNestedLambdaOrLambdas).Lambda == null &&
+                    !TryCompileNestedLambda((NestedLambdaInfo)nestedLambdaNestedLambdaOrLambdas, setup))
+                    return false;
 
             ArrayClosure nestedLambdaClosure = null;
             if (nestedClosureInfo.NonPassedParameters.Length == 0)
-            {
-                if ((nestedClosureInfo.Status & ClosureStatus.HasClosure) == 0)
-                    nestedLambdaClosure = EmptyArrayClosure;
-                else
-                    nestedLambdaClosure = new ArrayClosure(nestedClosureInfo.GetArrayOfConstantsAndNestedLambdas());
-            }
+                nestedLambdaClosure = (nestedClosureInfo.Status & ClosureStatus.HasClosure) == 0
+                    ? EmptyArrayClosure
+                    : new ArrayClosure(nestedClosureInfo.GetArrayOfConstantsAndNestedLambdas());
 
-            var nestedReturnType = nestedLambdaExpr.ReturnType;
             var closurePlusParamTypes = GetClosureTypeToParamTypes(nestedLambdaParamExprs);
 
-            var method = new DynamicMethod(string.Empty,
-                nestedReturnType, closurePlusParamTypes, typeof(ArrayClosure), true);
-
+            var method = new DynamicMethod(string.Empty, nestedReturnType, closurePlusParamTypes, typeof(ArrayClosure), true);
             var il = method.GetILGenerator();
 
             if ((nestedClosureInfo.Status & ClosureStatus.HasClosure) != 0 &&
                 nestedClosureInfo.ContainsConstantsOrNestedLambdas())
-                EmittingVisitor.EmitLoadConstantsAndNestedLambdasIntoVars(il, ref nestedClosureInfo);
+                EmittingVisitor.EmitLoadConstantsAndNestedLambdasIntoVars(il, nestedLambdaNestedLambdaOrLambdas, ref nestedClosureInfo);
 
             var parent = nestedReturnType == typeof(void) ? ParentFlags.IgnoreResult : ParentFlags.Empty;
-            if (!EmittingVisitor.TryEmit(nestedLambdaExpr.Body, nestedLambdaParamExprs, il, ref nestedClosureInfo, setup, parent))
+            if (!EmittingVisitor.TryEmit(nestedLambdaBody, nestedLambdaParamExprs, il, ref nestedClosureInfo, setup, parent))
                 return false;
             il.Emit(OpCodes.Ret);
 
@@ -3094,7 +3076,7 @@ namespace DryIoc.FastExpressionCompiler
                 return true;
             }
 
-            private static bool TryEmitConstantOfNotNullValue(
+            public static bool TryEmitConstantOfNotNullValue(
                 bool considerClosure, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1)
             {
                 var constValueType = constantValue.GetType();
@@ -3151,14 +3133,12 @@ namespace DryIoc.FastExpressionCompiler
 
                 if (exprType.IsValueType)
                 {
-                    var underlyingNullableType = Nullable.GetUnderlyingType(exprType);
-                    if (underlyingNullableType != null)
+                    if (exprType.IsNullable())
                         il.Emit(OpCodes.Newobj, exprType.GetConstructors().GetFirst());
                 }
+                // boxing the value type, otherwise we can get a strange result when 0 is treated as Null.
                 else if (exprType == typeof(object) && constValueType.IsValueType)
-                    // boxing the value type, otherwise we can get a strange result when 0 is treated as Null.
-                    il.Emit(OpCodes.Box, constantValue.GetType()); // using normal type for Enum instead of underlying type
-
+                    il.Emit(OpCodes.Box, constValueType); // using normal type for Enum instead of underlying type
                 return true;
             }
 
@@ -3283,7 +3263,8 @@ namespace DryIoc.FastExpressionCompiler
                 il.Emit(OpCodes.Ldelem_Ref);
             }
 
-            internal static void EmitLoadConstantsAndNestedLambdasIntoVars(ILGenerator il, ref ClosureInfo closure)
+            internal static void EmitLoadConstantsAndNestedLambdasIntoVars(
+                ILGenerator il, object nestedLambdaOrLambdas, ref ClosureInfo closure)
             {
                 // todo: @perf load the field to `var` only if the constants are more than 1
                 // Load constants array field from Closure and store it into the variable
@@ -3295,7 +3276,7 @@ namespace DryIoc.FastExpressionCompiler
                 var constCount = closure.Constants.Count;
                 var constUsage = closure.ConstantUsageThenVarIndex.Items;
 
-                int varIndex;
+                short varIndex;
                 for (var i = 0; i < constCount; i++)
                 {
                     if (constUsage[i] > 1) // todo: @perf should we proceed to do this or simplify and remove the usages for the closure info?
@@ -3305,20 +3286,19 @@ namespace DryIoc.FastExpressionCompiler
                         if (varType.IsValueType)
                             il.Emit(OpCodes.Unbox_Any, varType);
 
-                        varIndex = il.GetNextLocalVarIndex(varType);
-                        constUsage[i] = varIndex + 1; // to distinguish from the default 1
+                        varIndex = (short)il.GetNextLocalVarIndex(varType);
+                        constUsage[i] = (short)(varIndex + 1); // to distinguish from the default 1
                         EmitStoreLocalVariable(il, varIndex);
                     }
                 }
 
-                var nestedLambdaOrLambdas = closure.NestedLambdaOrLambdas;
                 if (nestedLambdaOrLambdas != null)
                 {
                     if (nestedLambdaOrLambdas is NestedLambdaInfo nestedLambda)
                     {
                         EmitLoadClosureArrayItem(il, constCount);
                         // store the nested lambda in the local variable and save the var index
-                        nestedLambda.LambdaVarIndex = varIndex = il.GetNextLocalVarIndex(nestedLambda.Lambda.GetType());
+                        nestedLambda.LambdaVarIndex = varIndex = (short)il.GetNextLocalVarIndex(nestedLambda.Lambda.GetType());
                         EmitStoreLocalVariable(il, varIndex);
                     }
                     else 
@@ -3329,7 +3309,7 @@ namespace DryIoc.FastExpressionCompiler
                             EmitLoadClosureArrayItem(il, constCount + i);
                             // store the nested lambda in the local variable and save the var index
                             var lambdaInfo = nestedLambdas[i];
-                            lambdaInfo.LambdaVarIndex = varIndex = il.GetNextLocalVarIndex(lambdaInfo.Lambda.GetType());
+                            lambdaInfo.LambdaVarIndex = varIndex = (short)il.GetNextLocalVarIndex(lambdaInfo.Lambda.GetType());
                             EmitStoreLocalVariable(il, varIndex);
                         }
                     }
@@ -3378,9 +3358,7 @@ namespace DryIoc.FastExpressionCompiler
 
                 il.Emit(sign ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
                 EmitLoadConstantInt(il, scale);
-
                 il.Emit(OpCodes.Conv_U1);
-
                 il.Emit(OpCodes.Newobj, _decimalCtor.Value);
             }
 
@@ -4485,11 +4463,15 @@ namespace DryIoc.FastExpressionCompiler
                 if (!TryEmit(lambda, paramExprs, il, ref closure, setup, parent & ~ParentFlags.IgnoreResult)) // removing the IgnoreResult temporary because we need "full" lambda emit and we will re-apply the IgnoreResult later at the end of the method
                     return false;
 
-                var delegateInvokeMethod = lambda.Type.FindDelegateInvokeMethod();
+                MethodInfo delegateInvokeMethod;
+                //if (lambda is ConstantExpression lambdaConst) // todo: @perf opportunity to optimize
+                //    delegateInvokeMethod = ((Delegate)lambdaConst.Value).GetMethodInfo();
+                //else 
+                delegateInvokeMethod = lambda.Type.FindDelegateInvokeMethod(); // todo: @perf bad thingy
                 if (argCount > 0)
                 {
                     var useResult = parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess;
-                    var args = delegateInvokeMethod.GetParameters();
+                    var args = delegateInvokeMethod.GetParameters(); // todo: @perf avoid this if possible
                     for (var i = 0; i < args.Length; ++i)
                     {
                         var argExpr = argExprs.GetArgument(i);
@@ -5341,7 +5323,7 @@ namespace DryIoc.FastExpressionCompiler
                 if (location == 0)
                 {
                     // todo: @perf
-                    // the indernal code for this is
+                    // the internal code for this is
                     //
                     // EnsureCapacity(3);
                     // InternalEmit(opcode);
@@ -5363,7 +5345,7 @@ namespace DryIoc.FastExpressionCompiler
                 }
                 else if (location == 1)
                 {
-                    // todo: @perf we may intriduce the EmitOne, EmitBatchNonStackModified(OpCode store, OpCode load, byte value), etc. method overloads 
+                    // todo: @perf we may introduce the EmitOne, EmitBatchNonStackModified(OpCode store, OpCode load, byte value), etc. method overloads 
                     // 
                     // if (ilLength + 7 < ilStream.Length)
                     // {
@@ -5498,7 +5480,8 @@ namespace DryIoc.FastExpressionCompiler
 
         internal static MethodInfo FindConvertOperator(this Type type, Type sourceType, Type targetType)
         {
-            var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            // conversion operators should be declared as static and public 
+            var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public);
             for (var i = 0; i < methods.Length; i++)
             {
                 var m = methods[i];

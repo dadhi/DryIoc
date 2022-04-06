@@ -75,6 +75,27 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Resolve_only_one_dependency_instance_with_RegisterDelegate_of_func_with_args()
         {
+            var container = new Container();
+            container.Register<Simple>();
+
+            // DryIoc v4.0.5
+            //container.RegisterDelegate<SimpleFactory>(r => s => r.Resolve<Func<string, Simple>>()(s));
+
+            // DryIoc v4.1 - preferable, because it does not call Resolve (the Func<..> is injected) - so avoiding all problems with service locator
+            container.RegisterDelegate<Func<string, Simple>, SimpleFactory>(f => s => f(s));
+
+            container.Register<Countable>();
+            container.Register<Complex>();
+
+            Countable.Counter = 0;
+            container.Resolve<Complex>();
+            container.Resolve<Complex>(); // get ths compiled version
+            Assert.AreEqual(2, Countable.Counter, "The container resolved more than one instance of Countable.");
+        }
+
+        [Test]
+        public void Resolve_only_one_dependency_instance_with_RegisterDelegate_of_func_with_args_compilation_only()
+        {
             var container = new Container(rules => rules.WithoutInterpretationForTheFirstResolution());
             container.Register<Simple>();
 
@@ -89,7 +110,8 @@ namespace DryIoc.IssuesTests
 
             Countable.Counter = 0;
             container.Resolve<Complex>();
-            Assert.AreEqual(1, Countable.Counter, "The container resolved more than one instance of Countable.");
+            container.Resolve<Complex>(); // get ths compiled version
+            Assert.AreEqual(2, Countable.Counter, "The container resolved more than one instance of Countable.");
         }
 
         /// <summary>
