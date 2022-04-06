@@ -3108,7 +3108,6 @@ namespace DryIoc.FastExpressionCompiler
 #if NETFRAMEWORK
                             il.Emit(OpCodes.Castclass, exprType);
 #endif
-                            
                         }
                     }
                 }

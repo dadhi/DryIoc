@@ -3351,7 +3351,7 @@ namespace DryIoc
             }
 
             if (expr.Tag == FactoryDelegateCompiler.FuncInvokeExpressionTag)
-                return InterpretFuncInvoke(r, expr, paramExprs, paramValues, parentArgs, ref result);
+                return TryInterpretFuncInvoke(r, expr, paramExprs, paramValues, parentArgs, ref result);
 
             var callExpr = (MethodCallExpression)expr;
             var method = callExpr.Method;
@@ -3543,13 +3543,21 @@ namespace DryIoc
             return true;
         }
 
-        private static bool InterpretFuncInvoke(IResolverContext r, Expression e,
+        private static bool TryInterpretFuncInvoke(IResolverContext r, Expression e,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, ref object result)
         {
-            if (e is FuncInvokeOneArgExpression f1)
+            if (e is FuncInvoke1Expression f1)
             {
-                if (!TryInterpret(r, f1.Argument, paramExprs, paramValues, parentArgs, out var a0)) return false;
+                if (!TryInterpret(r, f1.Argument, paramExprs, paramValues, parentArgs, out var a0))
+                    return false;
                 result = ((Func<object, object>)f1.Func)(a0);
+            }
+            if (e is FuncInvoke2Expression f2)
+            {
+                if (!TryInterpret(r, f2.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
+                    !TryInterpret(r, f2.Argument1, paramExprs, paramValues, parentArgs, out var a1))
+                    return false;
+                result = ((Func<object, object, object>)f2.Func)(a0, a1);
             }
             return true;
         }
@@ -3768,8 +3776,7 @@ namespace DryIoc
         /// <summary>Strips the unnecessary or adds the necessary cast to expression return result</summary>
         public static Expression NormalizeExpression(this Expression expr)
         {
-            // System.Linq.Expressions.ExpressionType is used by FEC as well 
-            if (expr.NodeType == System.Linq.Expressions.ExpressionType.Convert)
+            if (expr.NodeType == ExprType.Convert)
             {
                 var operandExpr = ((UnaryExpression)expr).Operand;
                 if (operandExpr.Type == typeof(object))
@@ -6114,12 +6121,12 @@ namespace DryIoc
         #endregion
     }
 
-    sealed class FuncInvokeOneArgExpression : OneArgumentMethodCallExpression
+    sealed class FuncInvoke1Expression : OneArgumentMethodCallExpression
     {
         public override object Tag => FactoryDelegateCompiler.FuncInvokeExpressionTag;
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvokeOneArgExpression(Delegate f, MethodInfo m, Expression a0) : base(m, a0) => Func = f;
+        internal FuncInvoke1Expression(Delegate f, MethodInfo m, Expression a0) : base(m, a0) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure)
@@ -6133,6 +6140,31 @@ namespace DryIoc
             var f = Func.Target;
             EmittingVisitor.TryEmitConstantOfNotNullValue(true, f.GetType(), f, il, ref closure);
             return EmittingVisitor.TryEmit(Argument, paramExprs, il, ref closure, config, parent)
+                && EmittingVisitor.EmitMethodCall(il, Method);
+        }
+    }
+
+    sealed class FuncInvoke2Expression : TwoArgumentsMethodCallExpression
+    {
+        public override object Tag => FactoryDelegateCompiler.FuncInvokeExpressionTag;
+        public override Expression Object => Constant(Func.Target);
+        public readonly Delegate Func;
+        internal FuncInvoke2Expression(Delegate f, MethodInfo m, Expression a0, Expression a1) : base(m, a0, a1) => Func = f;
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(
+            CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure)
+        {
+            closure.AddConstantOrIncrementUsageCount(Func.Target);
+            return ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
+                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config);
+        }
+        public override bool TryEmit(
+            CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var f = Func.Target;
+            return EmittingVisitor.TryEmitConstantOfNotNullValue(true, f.GetType(), f, il, ref closure)
+                && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
+                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.EmitMethodCall(il, Method);
         }
     }
@@ -6424,9 +6456,7 @@ namespace DryIoc
                     var injectedExpr = request.Container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
                     if (injectedExpr == null ||
                         // When param is an empty array / collection, then we may use a default value instead (#581)
-                        paramDetails.DefaultValue != null &&
-                        injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
-                        ((NewArrayExpression)injectedExpr).Expressions.Count == 0)
+                        paramDetails.DefaultValue != null && injectedExpr.NodeType == ExprType.NewArrayInit && ((NewArrayExpression)injectedExpr).ArgumentCount == 0)
                     {
                         // Check if parameter dependency itself (without propagated parent details)
                         // does not allow default, then stop checking the rest of parameters.
@@ -6740,7 +6770,7 @@ namespace DryIoc
             System.Linq.Expressions.LambdaExpression serviceReturningExpr, params Func<Request, object>[] argValues)
         {
             var callExpr = serviceReturningExpr.ThrowIfNull().Body;
-            if (callExpr.NodeType == System.Linq.Expressions.ExpressionType.Convert) // proceed without Cast expression.
+            if (callExpr.NodeType == ExprType.Convert) // proceed without Cast expression.
                 return FromExpression<TService>(getFactoryMethodSelector,
                     System.Linq.Expressions.Expression.Lambda(((System.Linq.Expressions.UnaryExpression)callExpr).Operand,
                         Empty<System.Linq.Expressions.ParameterExpression>()),
@@ -6751,8 +6781,8 @@ namespace DryIoc
             IList<System.Linq.Expressions.MemberBinding> memberBindingExprs = null;
             ParameterInfo[] parameters = null;
 
-            if (callExpr.NodeType == System.Linq.Expressions.ExpressionType.New ||
-                callExpr.NodeType == System.Linq.Expressions.ExpressionType.MemberInit)
+            if (callExpr.NodeType == ExprType.New ||
+                callExpr.NodeType == ExprType.MemberInit)
             {
                 var newExpr = callExpr as System.Linq.Expressions.NewExpression ?? ((System.Linq.Expressions.MemberInitExpression)callExpr).NewExpression;
                 ctorOrMethodOrMember = newExpr.Constructor;
@@ -6761,7 +6791,7 @@ namespace DryIoc
                 if (callExpr is System.Linq.Expressions.MemberInitExpression)
                     memberBindingExprs = ((System.Linq.Expressions.MemberInitExpression)callExpr).Bindings;
             }
-            else if (callExpr.NodeType == System.Linq.Expressions.ExpressionType.Call)
+            else if (callExpr.NodeType == ExprType.Call)
             {
                 var methodCallExpr = (System.Linq.Expressions.MethodCallExpression)callExpr;
                 ctorOrMethodOrMember = methodCallExpr.Method;
@@ -6778,7 +6808,7 @@ namespace DryIoc
                 argExprs = invokeExpr.Arguments;
             }
 
-            else if (callExpr.NodeType == System.Linq.Expressions.ExpressionType.MemberAccess)
+            else if (callExpr.NodeType == ExprType.MemberAccess)
             {
                 var member = ((System.Linq.Expressions.MemberExpression)callExpr).Member;
                 Throw.If(!(member is PropertyInfo) && !(member is FieldInfo),
@@ -7561,7 +7591,19 @@ namespace DryIoc
             r.Register(f, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
 
-        private static object ToFuncWithObjParams<TDep1, TService>(this Func<TDep1, TService> f, object d1) => f((TDep1)d1);
+        private static object ToFuncWithObjParams<D1, TService>(this Func<D1, TService> f, object d1) => f((D1)d1);
+        private static object ToFuncWithObjParams<D1, D2, TService>(this Func<D1, D2, TService> f,
+            object d1, object d2) => f((D1)d1, (D2)d2);
+        private static object ToFuncWithObjParams<D1, D2, D3, TService>(this Func<D1, D2, D3, TService> f,
+            object d1, object d2, object d3) => f((D1)d1, (D2)d2, (D3)d3);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, TService>(this Func<D1, D2, D3, D4, TService> f,
+            object d1, object d2, object d3, object d4) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, TService>(this Func<D1, D2, D3, D4, D5, TService> f,
+            object d1, object d2, object d3, object d4, object d5) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, TService>(this Func<D1, D2, D3, D4, D5, D6, TService> f,
+            object d1, object d2, object d3, object d4, object d5, object d6) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7, TService>(this Func<D1, D2, D3, D4, D5, D6, D7, TService> f,
+            object d1, object d2, object d3, object d4, object d5, object d6, object d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
         public static void RegisterDelegate<TDep1>(
@@ -7582,9 +7624,8 @@ namespace DryIoc
         public static void RegisterDelegate<TDep1, TDep2, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
-            // r.RegisterFunc(serviceType, typeof(Func<,>).MakeGenericType(depType, typeof(object)), (Func<object, object>)factory.ToFuncWithObjParams,
-            //     reuse, setup, ifAlreadyRegistered, serviceKey);
+            r.RegisterFunc(typeof(TService), typeof(Func<TDep1, TDep2, TService>), (Func<object, object, object>)factory.ToFuncWithObjParams,
+                reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
         public static void RegisterDelegate<TDep1, TDep2>(
@@ -11463,9 +11504,7 @@ namespace DryIoc
                 var injectedExpr = container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
                 if (injectedExpr == null ||
                     // When param is an empty array / collection, then we may use a default value instead (#581)
-                    paramDetails.DefaultValue != null &&
-                    injectedExpr.NodeType == System.Linq.Expressions.ExpressionType.NewArrayInit &&
-                    ((NewArrayExpression)injectedExpr).Expressions.Count == 0)
+                    paramDetails.DefaultValue != null && injectedExpr.NodeType == ExprType.NewArrayInit && ((NewArrayExpression)injectedExpr).ArgumentCount == 0)
                 {
                     // Check if parameter dependency itself (without propagated parent details)
                     // does not allow default, then stop checking the rest of parameters.
@@ -11479,15 +11518,15 @@ namespace DryIoc
                 if (paramExprs != null)
                     paramExprs[i] = injectedExpr;
                 else switch (i)
-                    {
-                        case 0: a0 = injectedExpr; break;
-                        case 1: a1 = injectedExpr; break;
-                        case 2: a2 = injectedExpr; break;
-                        case 3: a3 = injectedExpr; break;
-                        case 4: a4 = injectedExpr; break;
-                        case 5: a5 = injectedExpr; break;
-                        case 6: a6 = injectedExpr; break;
-                    }
+                {
+                    case 0: a0 = injectedExpr; break;
+                    case 1: a1 = injectedExpr; break;
+                    case 2: a2 = injectedExpr; break;
+                    case 3: a3 = injectedExpr; break;
+                    case 4: a4 = injectedExpr; break;
+                    case 5: a5 = injectedExpr; break;
+                    case 6: a6 = injectedExpr; break;
+                }
             }
 
             if (rules.UsedForValidation)
@@ -11499,10 +11538,10 @@ namespace DryIoc
                     : Call(factoryExpr, method, paramExprs);
             else if (a1 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0) : NewNoByRefArgs(ctor, a0) 
-                    : factoryFunc == null ? Call(factoryExpr, method, a0) : new FuncInvokeOneArgExpression(factoryFunc, method, a0);
+                    : factoryFunc == null ? Call(factoryExpr, method, a0) : new FuncInvoke1Expression(factoryFunc, method, a0);
             else if (a2 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1) : NewNoByRefArgs(ctor, a0, a1) 
-                    : Call(factoryExpr, method, a0, a1);
+                    : factoryFunc == null ? Call(factoryExpr, method, a0, a1) : new FuncInvoke2Expression(factoryFunc, method, a0, a1);
             else if (a3 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2) 
                     : Call(factoryExpr, method, a0, a1, a2);
