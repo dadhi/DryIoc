@@ -69,15 +69,10 @@ namespace DryIoc.IssuesTests
             container.RegisterDelegate(typeof(C), (A a, B b) => new C(a, b));
             container.Register<D>();
 
-            // call multiple times to trigger interpretation and compilation
-            // var d1 = container.Resolve<D>();
-            // Assert.IsNotNull(d1.C);
+            var ex = Assert.Throws<ContainerException>(() =>
+                container.Resolve<LambdaExpression>(typeof(D)));
 
-            // var d2 = container.Resolve<D>();
-            // Assert.IsNotNull(d2.C);
-
-            var expr = container.Resolve<LambdaExpression>(typeof(D));
-            var s = expr.ToCSharpString().Replace(GetType().Name + ".", "");
+            Assert.AreEqual(Error.NameOf(Error.StateIsRequiredToUseItem), ex.ErrorName);
         }
 
         class D

@@ -11470,9 +11470,7 @@ namespace DryIoc
                 factoryFunc = factoryMethod.FactoryFunc;
                 if (factoryFunc != null)
                 {
-                    if (rules.UsedForExpressionGeneration)
-                        factoryExpr = GetFactoryFuncResolutionExpression(request, ref factoryFunc);
-                    else if (rules.ThrowIfRuntimeStateRequired)
+                    if (rules.ThrowIfRuntimeStateRequired)
                         Throw.It(Error.StateIsRequiredToUseItem, factoryFunc.Target);
                 }
                 else
