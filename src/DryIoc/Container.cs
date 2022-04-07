@@ -2999,6 +2999,7 @@ namespace DryIoc
                             return true;
                         }
 
+                        // todo: @perf optimize the args creation by pooling it as a TryInterepret parameter and separately handling the New with respective number of parameters 
                         var args = new object[argCount];
                         for (var i = 0; i < args.Length; ++i)
                         {
