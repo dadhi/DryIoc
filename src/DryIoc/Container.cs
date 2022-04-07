@@ -7767,30 +7767,11 @@ namespace DryIoc
             registrator.RegisterMany<TMadeResult>(reuse, made.ThrowIfNull(), setup,
                 ifAlreadyRegistered, serviceTypeCondition, nonPublicServiceTypes, serviceKey);
 
-        private const string InvokeMethodName = "Invoke";
+        /// Minimizes the number of allocations when converting from Func to named delegate
+        public static object ToFactoryDelegate<TService>(this Func<IResolverContext, TService> f, IResolverContext r) => f(r);
 
-        private static void RegisterFunc(this IRegistrator r, 
-            Type serviceType, Type sourceFuncType, Delegate funcWithObjParams,
-            IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
-        {
-            var m = new Made(new FactoryMethod.WithFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams));
-            var f = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, m, reuse, setup);
-            r.Register(f, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-        }
-
-        private static object ToFuncWithObjParams<D1, TService>(this Func<D1, TService> f, object d1) => f((D1)d1);
-        private static object ToFuncWithObjParams<D1, D2, TService>(this Func<D1, D2, TService> f,
-            object d1, object d2) => f((D1)d1, (D2)d2);
-        private static object ToFuncWithObjParams<D1, D2, D3, TService>(this Func<D1, D2, D3, TService> f,
-            object d1, object d2, object d3) => f((D1)d1, (D2)d2, (D3)d3);
-        private static object ToFuncWithObjParams<D1, D2, D3, D4, TService>(this Func<D1, D2, D3, D4, TService> f,
-            object d1, object d2, object d3, object d4) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4);
-        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, TService>(this Func<D1, D2, D3, D4, D5, TService> f,
-            object d1, object d2, object d3, object d4, object d5) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5);
-        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, TService>(this Func<D1, D2, D3, D4, D5, D6, TService> f,
-            object d1, object d2, object d3, object d4, object d5, object d6) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6);
-        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7, TService>(this Func<D1, D2, D3, D4, D5, D6, D7, TService> f,
-            object d1, object d2, object d3, object d4, object d5, object d6, object d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7);
+        /// Lifts the result to the factory delegate without allocations on capturing value in lambda closure
+        public static object ToFactoryDelegate(this object result, IResolverContext _) => result;
 
         /// <summary>Registers a factory delegate for creating an instance of <typeparamref name="TService"/>.
         /// Delegate can use resolver context parameter to resolve any required dependencies, e.g.:
@@ -7805,11 +7786,39 @@ namespace DryIoc
             registrator.Register(DelegateFactory.Of(factoryDelegate.ToFactoryDelegate, reuse, setup),
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
+        private const string InvokeMethodName = "Invoke";
+
+        private static object ToFuncWithObjResult<TService>(this Func<TService> f) => f();
+        private static object ToFuncWithObjParams<D1, TService>(this Func<D1, TService> f, object d1) => f((D1)d1);
+        private static object ToFuncWithObjParams<D1, D2, TService>(this Func<D1, D2, TService> f,
+            object d1, object d2) => f((D1)d1, (D2)d2);
+        private static object ToFuncWithObjParams<D1, D2, D3, TService>(this Func<D1, D2, D3, TService> f,
+            object d1, object d2, object d3) => f((D1)d1, (D2)d2, (D3)d3);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, TService>(this Func<D1, D2, D3, D4, TService> f,
+            object d1, object d2, object d3, object d4) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, TService>(this Func<D1, D2, D3, D4, D5, TService> f,
+            object d1, object d2, object d3, object d4, object d5) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, TService>(this Func<D1, D2, D3, D4, D5, D6, TService> f,
+            object d1, object d2, object d3, object d4, object d5, object d6) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6);
+        private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7, TService>(this Func<D1, D2, D3, D4, D5, D6, D7, TService> f,
+            object d1, object d2, object d3, object d4, object d5, object d6, object d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7);
+
+
+        private static void RegisterFunc(this IRegistrator r, 
+            Type serviceType, Type sourceFuncType, Delegate funcWithObjParams,
+            IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
+        {
+            var m = new Made(new FactoryMethod.WithFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams));
+            var f = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, m, reuse, setup);
+            r.Register(f, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+        }
+
         /// <summary>Registers delegate to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TService>(
             this IRegistrator r, Func<TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            RegisterDelegateFunc(r, typeof(TService), factory, reuse, setup, ifAlreadyRegistered, serviceKey);
+            r.RegisterFunc(typeof(TService), typeof(Func<TService>), (Func<object>)factory.ToFuncWithObjResult,
+                reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
         public static void RegisterDelegate<TDep1, TService>(
@@ -7986,19 +7995,6 @@ namespace DryIoc
                 typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, dep6Type, dep7Type, typeof(object)),
                 (Func<object, object, object, object, object, object, object, object>)factory.ToFuncWithObjParams,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
-
-        // todo: @perf try to utilize _invokeMethods and call the func directly as Func of object(s)
-        private static void RegisterDelegateFunc<TFunc>(IRegistrator r, Type serviceType,
-            TFunc factory, IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey) =>
-            r.Register(ReflectionFactory.Of(serviceType, reuse,
-                new Made(new FactoryMethod.WithFactoryExpression(typeof(TFunc).GetMethod(InvokeMethodName), Constant(factory))), setup), // todo: @perf optimize Made to be the FactoryMethod in the simple case 
-                serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-
-        /// Minimizes the number of allocations when converting from Func to named delegate
-        public static object ToFactoryDelegate<TService>(this Func<IResolverContext, TService> f, IResolverContext r) => f(r);
-
-        /// Lifts the result to the factory delegate without allocations on capturing value in lambda closure
-        public static object ToFactoryDelegate(this object result, IResolverContext _) => result;
 
         /// <summary>Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
         /// Delegate can use resolver context parameter to resolve any required dependencies, e.g.:
@@ -11664,9 +11660,11 @@ namespace DryIoc
                         TryGetMemberAssignments(ref failedToGetMember, request, container, rules); // ignore the results for validation
                     return request.GetActualServiceType().GetDefaultValueExpression();
                 }
-
-                if (ctor == null)
-                    return ConvertExpressionIfNeeded(Call(factoryExpr, (MethodInfo)ctorOrMethod), request, ctorOrMethod);
+                if (method != null)
+                {
+                    var callExpr = Call(factoryExpr, method);
+                    return ConvertExpressionIfNeeded(callExpr, request, method);
+                }
                 var assignments = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
                 return failedToGetMember ? null : assignments == null ? New(ctor) : MemberInit(New(ctor), assignments);
             }
