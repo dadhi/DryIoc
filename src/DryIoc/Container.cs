@@ -8791,6 +8791,7 @@ namespace DryIoc
                 : new WithDetails(serviceType, ServiceDetails.IfUnresolvedReturnDefaultIfNotRegistered))
                 : new WithDetails(serviceType, ServiceDetails.Of(null, serviceKey, ifUnresolved, null, null, null));
 
+        // todo: @perf @mem optimize for the `serviceType` and `requiredServiceType` only
         /// <summary>Creates info out of provided settings</summary>
         public static ServiceInfo Of(Type serviceType, Type requiredServiceType,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null, string metadataKey = null, object metadata = null)
@@ -11466,14 +11467,29 @@ namespace DryIoc
             }
             else
             {
-                // If factory method is the method of some registered service, then resolve factory service first.
-                factoryExpr = factoryMethod.FactoryExpression;
-                if (factoryExpr == null && factoryMethod.FactoryServiceInfo != null)
+                factoryFunc = factoryMethod.FactoryFunc;
+                if (factoryFunc != null)
                 {
-                    var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
-                    factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
+                    if (rules.UsedForExpressionGeneration)
+                        factoryExpr = GetFactoryFuncResolutionExpression(request, ref factoryFunc);
+                    else if (rules.ThrowIfRuntimeStateRequired)
+                        Throw.It(Error.StateIsRequiredToUseItem, factoryFunc.Target);
+                }
+                else
+                {
+                    // here we are not handling the UsedForExpressionGeneration
+                    factoryExpr = factoryMethod.FactoryExpression;
                     if (factoryExpr == null)
-                        return null; // todo: @check should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
+                    {
+                        // If factory method is the method of some registered service, then resolve factory service first.
+                        if (factoryMethod.FactoryServiceInfo != null)
+                        {
+                            var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
+                            factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
+                            if (factoryExpr == null)
+                                return null; // todo: @check should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
+                        }
+                    }
                 }
 
                 // return earlier if already have the parameters resolved, e.g. when using `ConstructorWithResolvableArguments`
@@ -11498,7 +11514,6 @@ namespace DryIoc
 
                 ctor = ctorOrMember as ConstructorInfo;
                 method = ctorOrMember as MethodInfo;
-                factoryFunc = factoryMethod.FactoryFunc;
             }
 
             var parameters = ctorOrMethod.GetParameters();
@@ -11612,16 +11627,16 @@ namespace DryIoc
                     : Call(factoryExpr, method, paramExprs);
             else if (a1 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0) : NewNoByRefArgs(ctor, a0) 
-                    : factoryFunc == null ? Call(factoryExpr, method, a0) : new FuncInvoke1Expression(factoryFunc, method, a0);
+                    : factoryFunc != null ? new FuncInvoke1Expression(factoryFunc, method, a0) : Call(factoryExpr, method, a0);
             else if (a2 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1) : NewNoByRefArgs(ctor, a0, a1) 
-                    : factoryFunc == null ? Call(factoryExpr, method, a0, a1) : new FuncInvoke2Expression(factoryFunc, method, a0, a1);
+                    : factoryFunc != null ? new FuncInvoke2Expression(factoryFunc, method, a0, a1) : Call(factoryExpr, method, a0, a1);
             else if (a3 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2) 
-                    : factoryFunc == null ? Call(factoryExpr, method, a0, a1, a2) : new FuncInvoke3Expression(factoryFunc, method, a0, a1, a2);
+                    : factoryFunc != null ? new FuncInvoke3Expression(factoryFunc, method, a0, a1, a2) : Call(factoryExpr, method, a0, a1, a2);
             else if (a4 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3) : NewNoByRefArgs(ctor, a0, a1, a2, a3) 
-                    : factoryFunc == null ? Call(factoryExpr, method, a0, a1, a2, a3) : new FuncInvoke4Expression(factoryFunc, method, a0, a1, a2, a3);
+                    : factoryFunc != null ? new FuncInvoke4Expression(factoryFunc, method, a0, a1, a2, a3) : Call(factoryExpr, method, a0, a1, a2, a3);
             else if (a5 == null)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4) 
                     : Call(factoryExpr, method, a0, a1, a2, a3, a4);
@@ -11637,6 +11652,17 @@ namespace DryIoc
 
             var memberInits = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
             return failedToGetMember ? null : memberInits == null ? serviceExpr : MemberInit((NewExpression)serviceExpr, memberInits);
+        }
+
+        private static Expression GetFactoryFuncResolutionExpression(Request request, ref Delegate factoryFunc)
+        {
+            var func = (Delegate)factoryFunc.Target;
+            var funcReturnType = func.Method.ReturnType;
+            var factoryRequest = funcReturnType == typeof(object)
+                ? request.Push(ServiceInfo.Of(func.GetType(), request.GetActualServiceType()))
+                : request.PushServiceType(func.GetType());
+            factoryFunc = null;
+            return Resolver.CreateResolutionExpression(factoryRequest, false, true);
         }
 
         private MemberAssignment[] TryGetMemberAssignments(ref bool failedToGet, Request request, IContainer container, Rules rules)

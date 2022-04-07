@@ -1,3 +1,5 @@
+using System;
+using DryIoc.FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -55,6 +57,33 @@ namespace DryIoc.IssuesTests
             var x2 = container.Resolve<C>();
             Assert.IsInstanceOf<C>(x1);
             Assert.IsInstanceOf<C>(x2);
+        }
+
+        [Test]
+        public void For_expression_generation_Should_be_able_to_register_delegate_with_runtime_service_type_with_two_arguments_returning_object()
+        {
+            var container = new Container(Rules.Default.ForExpressionGeneration());
+
+            container.Register<A>();
+            container.Register<B>();
+            container.RegisterDelegate(typeof(C), (A a, B b) => new C(a, b));
+            container.Register<D>();
+
+            // call multiple times to trigger interpretation and compilation
+            // var d1 = container.Resolve<D>();
+            // Assert.IsNotNull(d1.C);
+
+            // var d2 = container.Resolve<D>();
+            // Assert.IsNotNull(d2.C);
+
+            var expr = container.Resolve<LambdaExpression>(typeof(D));
+            var s = expr.ToCSharpString().Replace(GetType().Name + ".", "");
+        }
+
+        class D
+        {
+            public C C;
+            public D(C c) => C = c;
         }
 
         class A { }
