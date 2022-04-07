@@ -9183,9 +9183,8 @@ namespace DryIoc
             Request preResolveParent = null, RequestFlags flags = default, object[] inputArgs = null) =>
             Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey), preResolveParent, flags, inputArgs);
 
-        // todo: Make a property in v5.0
         /// <summary>Available in runtime only, provides access to container initiated the request.</summary>
-        public IContainer Container;
+        public IContainer Container { get; private set; }
 
         /// <summary>Request immediate parent.</summary>
         public Request DirectParent;
@@ -12238,13 +12237,13 @@ namespace DryIoc
                 : reuse == DryIoc.Reuse.Scoped ? new WithScopedReuse(factoryDelegate)
                 : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(factoryDelegate)
                 : reuse == DryIoc.Reuse.ScopedOrSingleton ? new WithScopedOrSingletonReuse(factoryDelegate)
-                : (DelegateFactory)new WithReuse(factoryDelegate, reuse);
+                : new WithReuse(factoryDelegate, reuse);
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
         public static DelegateFactory Of(FactoryDelegate factoryDelegate, Setup setup) =>
             setup == null || setup == Setup.Default
                 ? new DelegateFactory(factoryDelegate)
-                : (DelegateFactory)new WithAllDetails(factoryDelegate, null, setup ?? Setup.Default);
+                : new WithAllDetails(factoryDelegate, null, setup ?? Setup.Default);
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
         public static DelegateFactory Of(FactoryDelegate factoryDelegate, IReuse reuse, Setup setup) =>
@@ -12300,11 +12299,15 @@ namespace DryIoc
         public override Expression CreateExpressionOrDefault(Request request)
         {
             // GetConstant here is needed to check the runtime state rule
-            var delegateExpr = request.Container.GetConstantExpression(_factoryDelegate); // todo: @perf avoid the call and go directly to InvokeFactoryDelegateExpression for the common case
+            var container = request.Container;
+            var delegateExpr = container.Rules.ConstantExpressionIsFine
+                ? ConstantOf(_factoryDelegate) : container.GetConstantExpression(_factoryDelegate);
+
             // Here we are using the simplified GetRootOrSelfExpr - if we injecting resolver in the singleton it should be the root container
             var resolverExpr = request.Reuse is SingletonReuse ? ResolverContext.RootOrSelfExpr : FactoryDelegateCompiler.ResolverContextParamExpr;
             if (resolverExpr == FactoryDelegateCompiler.ResolverContextParamExpr)
                 return new InvokeFactoryDelegateExpression(request.GetActualServiceType(), delegateExpr); // todo: @perf use the delegate directly instead of wrapping it into the Constant
+
             return Invoke(request.GetActualServiceType(), delegateExpr, resolverExpr);
         }
 
@@ -12327,6 +12330,7 @@ namespace DryIoc
         }
     }
 
+    // todo: @perf Make intrinsic
     internal sealed class InvokeFactoryDelegateExpression : InvocationExpression
     {
         public override Type Type { get; }
