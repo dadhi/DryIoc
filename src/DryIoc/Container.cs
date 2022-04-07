@@ -9991,8 +9991,8 @@ namespace DryIoc
         /// instead of: <c><![CDATA[new Dependency(...)]]></c></summary>
         public bool AsResolutionCall => (_settings & Settings.AsResolutionCall) != 0;
 
-        /// Setup with the only setting: `AsResolutionCall` 
-        internal static readonly Setup AsResolutionCallSetup =
+        /// <summary>Setup with the only setting of `AsResolutionCall</summary>` 
+        public static readonly Setup AsResolutionCallSetup =
             new ServiceSetup { _settings = Settings.AsResolutionCall };
 
         /// <summary>Works as `AsResolutionCall` but only with `Rules.UsedForExpressionGeneration`</summary>
@@ -10475,7 +10475,7 @@ namespace DryIoc
         public virtual Expression GetExpressionOrDefault(Request request)
         {
             // The factory usually is null unleast it is provided by the collection or other higher wrapper.
-            // We are storing it in the local variable here because the WithResolvedFactory on the next line will override it with "this" factory.
+            // Note, that we are storing it in the local variable Here because the follow-up WithResolvedFactorywill override it with "this" factory.
             var serviceFactory = request.FactoryID == 0 ? request.Factory : null;
 
             request = request.WithResolvedFactory(this);
@@ -12331,7 +12331,7 @@ namespace DryIoc
         }
     }
 
-    // todo: @perf Make intrinsic
+    // todo: @perf Make intrinsic, and may be convert to MethodCall altogether
     internal sealed class InvokeFactoryDelegateExpression : InvocationExpression
     {
         public override Type Type { get; }
@@ -12349,7 +12349,7 @@ namespace DryIoc
 
         ///<summary> Always resolved asResolutionCall, to create a hole in object graph to be filled in later </summary>
         public override Setup Setup => _setup;
-        private static readonly Setup _setup = Setup.With(asResolutionCall: true);
+        private static readonly Setup _setup = Setup.AsResolutionCallSetup;
 
         /// <inheritdoc />
         public override Expression CreateExpressionOrDefault(Request request) =>
