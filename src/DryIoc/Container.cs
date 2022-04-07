@@ -1516,13 +1516,10 @@ namespace DryIoc
                 return itemType == null ? Constant(item) : Constant(item, itemType);
 
             if (item == null)
-                return itemType == null || itemType == typeof(object) ? NullConstant : Constant(null, itemType);
+                return ConstantNull(itemType);
 
-            var convertible = item as IConvertibleToExpression;
-            if (convertible != null)
-                return throwIfStateRequired
-                    ? convertible.ToExpression(it => GetConstantExpression(it, null, true))
-                    : convertible.ToExpression(it => GetConstantExpression(it, null, false));
+            if (item is IConvertibleToExpression convertible)
+                return ConvertConstantToExpression(convertible, throwIfStateRequired);
 
             var actualItemType = item.GetType();
             if (actualItemType.GetGenericDefinitionOrNull() == typeof(KV<,>))
@@ -1542,17 +1539,22 @@ namespace DryIoc
             if (arrayElemType != null && arrayElemType != typeof(object) &&
                (arrayElemType.IsPrimitive() || typeof(Type).IsAssignableFrom(actualItemType)))
                 return NewArrayInit(arrayElemType,
-                    ((object[])item).Map(this, (c, x) => c.GetConstantExpression(x, arrayElemType, throwIfStateRequired)));
+                    throwIfStateRequired 
+                        ? ((object[])item).Map(this, arrayElemType, (c, t, x) => c.GetConstantExpression(x, t, true))
+                        : ((object[])item).Map(this, arrayElemType, (c, t, x) => c.GetConstantExpression(x, t, false)));
 
             var itemExpr = Rules.ItemToExpressionConverter?.Invoke(item, itemType);
             if (itemExpr != null)
                 return itemExpr;
 
-            Throw.If(throwIfStateRequired || Rules.ThrowIfRuntimeStateRequired,
-                Error.StateIsRequiredToUseItem, item);
-
+            Throw.If(throwIfStateRequired || Rules.ThrowIfRuntimeStateRequired, Error.StateIsRequiredToUseItem, item);
             return itemType == null ? Constant(item) : Constant(item, itemType);
         }
+
+        private Expression ConvertConstantToExpression(IConvertibleToExpression convertible, bool throwIfStateRequired) =>
+            throwIfStateRequired
+                ? convertible.ToExpression(it => GetConstantExpression(it, null, true))
+                : convertible.ToExpression(it => GetConstantExpression(it, null, false));
 
         private static readonly MethodInfo _kvOfMethod = typeof(KV).GetMethod(nameof(KV.Of));
 
@@ -12209,10 +12211,9 @@ namespace DryIoc
 
             return Setup.WeaklyReferenced
                 ? (FactoryDelegate)UnpackWeakRefFactory
-                : IdentityFactory;
+                : (FactoryDelegate)Instance.ToFactoryDelegate;
         }
 
-        private object IdentityFactory(IResolverContext _) => Instance;
         private object UnpackWeakRefFactory(IResolverContext _) => (Instance as WeakReference)?.Target.WeakRefReuseWrapperGCed();
     }
 

@@ -196,11 +196,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static ConstantExpression Constant(object value, Type type)
         {
             if (value == null)
-            {
-                if (type == typeof(object))
-                    return NullConstant;
-                return new TypedNullConstantExpression(type);
-            }
+                return ConstantNull(type);
 
             if (type == typeof(bool))
                 return (bool)value ? TrueConstant : FalseConstant;
@@ -210,6 +206,10 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
             return new TypedValueConstantExpression(value, type);
         }
+
+        [MethodImpl((MethodImplOptions)256)]
+        public static ConstantExpression ConstantNull(Type type = null) => 
+            type == null || type == typeof(object) ? NullConstant : new TypedNullConstantExpression(type);
 
         [MethodImpl((MethodImplOptions)256)]
         public static ConstantExpression ConstantNull<T>() => new NullConstantExpression<T>();
