@@ -1250,10 +1250,10 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 
 ## Faster RegisterDelegate interpretation
 
-|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------ |---------:|---------:|---------:|------:|--------:|-------:|-------:|------:|----------:|
-|      DryIoc | 82.75 us | 0.636 us | 0.564 us |  1.00 |    0.00 | 6.5918 | 0.4883 |     - |  40.47 KB |
-| DryIoc_MsDI | 94.79 us | 1.889 us | 1.855 us |  1.15 |    0.02 | 8.3008 | 0.4883 |     - |  51.27 KB |
+|      Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 | Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|---------:|------:|--------:|--------:|------:|------:|----------:|
+|      DryIoc |  86.31 us | 1.705 us | 2.704 us |  1.00 |    0.00 | 13.0615 |     - |     - |  40.36 KB |
+| DryIoc_MsDI | 100.75 us | 1.907 us | 2.674 us |  1.17 |    0.05 | 16.6016 |     - |     - |  50.96 KB |
 
 */
             [Benchmark(Baseline = true)]
