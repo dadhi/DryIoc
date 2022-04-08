@@ -11766,7 +11766,7 @@ namespace DryIoc
                 return request.GetActualServiceType().GetDefaultValueExpression();
 
             Expression serviceExpr;
-            if (a0 == null) // todo: @remove ???
+            if (a0 == null) // thus handling multiple arguments (more than 7 currently)
                 serviceExpr = ctor != null ? hasByRefParams ? New(ctor, paramExprs) : NewNoByRefArgs(ctor, paramExprs) 
                     : Call(factoryExpr, method, paramExprs);
             else if (a1 == null)
