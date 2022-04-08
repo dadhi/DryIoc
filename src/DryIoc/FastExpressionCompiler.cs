@@ -655,7 +655,7 @@ namespace DryIoc.FastExpressionCompiler
 
             public bool ContainsConstantsOrNestedLambdas() => Constants.Count > 0 || NestedLambdaOrLambdas != null;
 
-            public void AddConstantOrIncrementUsageCount(object value)
+            public bool AddConstantOrIncrementUsageCount(object value)
             {
                 Status |= ClosureStatus.HasClosure;
 
@@ -673,6 +673,7 @@ namespace DryIoc.FastExpressionCompiler
                 {
                     ++ConstantUsageThenVarIndex.Items[constIndex];
                 }
+                return true; // don't ask, just for fluency
             }
 
             public void AddNonPassedParam(ParameterExpression expr)
@@ -3080,6 +3081,8 @@ namespace DryIoc.FastExpressionCompiler
                 bool considerClosure, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1)
             {
                 var constValueType = constantValue.GetType();
+                if (exprType == null)
+                    exprType = constValueType;
                 if (considerClosure && IsClosureBoundConstant(constantValue, constValueType))
                 {
                     var constItems = closure.Constants.Items;
@@ -3130,6 +3133,7 @@ namespace DryIoc.FastExpressionCompiler
                         return false;
                 }
 
+                // todo: @simplify optimize this together with closure bound constant handling above
                 if (exprType.IsValueType)
                 {
                     if (exprType.IsNullable())
