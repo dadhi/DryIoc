@@ -3106,9 +3106,10 @@ namespace DryIoc.FastExpressionCompiler
                         }
                         else
                         {
-                            // this is probably required only for Full CLR starting from NET45, e.g. `Test_283_Case6_MappingSchemaTests_CultureInfo_VerificationException`
-                            // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
 #if NETFRAMEWORK
+                            // The cast probably required only for Full CLR starting from NET45, 
+                            // e.g. `Test_283_Case6_MappingSchemaTests_CultureInfo_VerificationException`.
+                            // .NET Core does not seem to care about verifiability and it's faster without the explicit cast.
                             il.Emit(OpCodes.Castclass, exprType);
 #endif
                         }

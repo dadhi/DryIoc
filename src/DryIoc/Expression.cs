@@ -2320,7 +2320,11 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         {
             if (!EmittingVisitor.TryEmit(Operand, paramExprs, il, ref closure, config, parent, byRefIndex))
                 return false;
+#if NETFRAMEWORK
+            // The cast is required only for Full CLR starting from NET45, e.g.
+            // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
             il.Emit(OpCodes.Castclass, Type);
+#endif
             return true;
         }
     }

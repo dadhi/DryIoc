@@ -12504,10 +12504,14 @@ namespace DryIoc
         internal static bool EmitConvertObjectTo(ILGenerator il, Type t)
         {
             if (t != typeof(object))
-                if (!t.IsValueType)
-                    il.Emit(OpCodes.Castclass, t);
-                else
+                if (t.IsValueType)
                     il.Emit(OpCodes.Unbox_Any, t);
+#if NETFRAMEWORK
+                // The cast is required only for Full CLR starting from NET45, e.g.
+                // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
+                else
+                    il.Emit(OpCodes.Castclass, t);
+#endif
             return true;
         }
 
