@@ -2859,7 +2859,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             Argument = argument;
     }
 
-    public class NoByRefOneArgumentNewExpression : OneArgumentNewExpression
+    public sealed class NoByRefOneArgumentNewExpression : OneArgumentNewExpression
     {
         public override bool NoByRefArgs => true;
         internal NoByRefOneArgumentNewExpression(ConstructorInfo constructor, Expression argument) : base(constructor, argument) { }
@@ -2888,7 +2888,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         }
     }
 
-    public class NoByRefTwoArgumentsNewExpression : TwoArgumentsNewExpression
+    public sealed class NoByRefTwoArgumentsNewExpression : TwoArgumentsNewExpression
     {
         public override bool NoByRefArgs => true;
         internal NoByRefTwoArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1) : base(constructor, a0, a1) { }

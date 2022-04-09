@@ -3001,7 +3001,33 @@ namespace DryIoc
                             return true;
                         }
 
-                        // todo: @perf optimize the args creation by pooling it as a TryInterepret parameter and separately handling the New with respective number of parameters 
+                        if (newExpr is OneArgumentNewExpression n1)
+                        {
+                            if (!TryInterpret(r, n1.Argument, paramExprs, paramValues, parentArgs, out var a0))
+                                return false;
+                            result = newExpr.Constructor.Invoke(new[] { a0 });
+                            return true;
+                        }
+
+                        if (newExpr is TwoArgumentsNewExpression n2)
+                        {
+                            if (!TryInterpret(r, n2.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
+                                !TryInterpret(r, n2.Argument1, paramExprs, paramValues, parentArgs, out var a1))
+                                return false;
+                            result = newExpr.Constructor.Invoke(new[] { a0, a1 });
+                            return true;
+                        }
+
+                        if (newExpr is ThreeArgumentsNewExpression n3)
+                        {
+                            if (!TryInterpret(r, n3.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
+                                !TryInterpret(r, n3.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
+                                !TryInterpret(r, n3.Argument2, paramExprs, paramValues, parentArgs, out var a2))
+                                return false;
+                            result = newExpr.Constructor.Invoke(new[] { a0, a1, a2 });
+                            return true;
+                        }
+
                         var args = new object[argCount];
                         for (var i = 0; i < args.Length; ++i)
                         {
@@ -3011,8 +3037,8 @@ namespace DryIoc
                             else if (!TryInterpret(r, argExpr, paramExprs, paramValues, parentArgs, out args[i]))
                                 return false;
                         }
-
                         result = newExpr.Constructor.Invoke(args);
+
                         return true;
                     }
                 case ExprType.Call:
