@@ -1094,7 +1094,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             new ManyArgumentsElementInit(addMethod, arguments.AsReadOnlyList());
 
         public static InvocationExpression Invoke(LambdaExpression expression) =>
-            new InvocationExpression(expression);
+            new NotNullExpressionInvocationExpression(expression);
 
         public static InvocationExpression Invoke(LambdaExpression expression, Expression a0) =>
             new OneArgumentInvocationExpression(expression, a0);
@@ -3548,11 +3548,10 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     {
         public sealed override ExpressionType NodeType => ExpressionType.Invoke;
         public override Type Type => ((LambdaExpression)Expression).ReturnType;
-        public readonly Expression Expression;
+        public virtual Expression Expression => null;
         public virtual IReadOnlyList<Expression> Arguments => Tools.Empty<Expression>();
         public virtual int ArgumentCount => 0;
         public virtual Expression GetArgument(int index) => throw new NotImplementedException();
-        internal InvocationExpression(Expression expression) => Expression = expression;
 #if SUPPORTS_VISITOR
         protected internal override Expression Accept(ExpressionVisitor visitor) => visitor.VisitInvocation(this);
 #endif
@@ -3560,14 +3559,20 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             SysExpr.Invoke(Expression.ToExpression(ref exprsConverted), ToExpressions(Arguments, ref exprsConverted));
     }
 
-    public sealed class TypedInvocationExpression : InvocationExpression
+    public class NotNullExpressionInvocationExpression : InvocationExpression
+    {
+        public sealed override Expression Expression { get; }
+        internal NotNullExpressionInvocationExpression(Expression expression) => Expression = expression;
+    }
+
+    public sealed class TypedInvocationExpression : NotNullExpressionInvocationExpression
     {
         public override Type Type { get; }
         internal TypedInvocationExpression(Expression expression, Type type) : base(expression) =>
             Type = type;
     }
 
-    public class OneArgumentInvocationExpression : InvocationExpression
+    public class OneArgumentInvocationExpression : NotNullExpressionInvocationExpression
     {
         public readonly Expression Argument;
         public sealed override IReadOnlyList<Expression> Arguments => new[] { Argument };
@@ -3584,7 +3589,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             : base(expression, argument) => Type = type;
     }
 
-    public class TwoArgumentsInvocationExpression : InvocationExpression
+    public class TwoArgumentsInvocationExpression : NotNullExpressionInvocationExpression
     {
         public readonly Expression Argument0, Argument1;
         public sealed override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1 };
@@ -3602,7 +3607,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             : base(expression, a0, a1) => Type = type;
     }
 
-    public class ThreeArgumentsInvocationExpression : InvocationExpression
+    public class ThreeArgumentsInvocationExpression : NotNullExpressionInvocationExpression
     {
         public readonly Expression Argument0, Argument1, Argument2;
         public sealed override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2 };
@@ -3620,7 +3625,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             : base(expression, a0, a1, a2) => Type = type;
     }
 
-    public class FourArgumentsInvocationExpression : InvocationExpression
+    public class FourArgumentsInvocationExpression : NotNullExpressionInvocationExpression
     {
         public readonly Expression Argument0, Argument1, Argument2, Argument3;
         public sealed override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3 };
@@ -3640,7 +3645,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             : base(expression, a0, a1, a2, a3) => Type = type;
     }
 
-    public class FiveArgumentsInvocationExpression : InvocationExpression
+    public class FiveArgumentsInvocationExpression : NotNullExpressionInvocationExpression
     {
         public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4;
         public sealed override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4 };
@@ -3660,7 +3665,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             : base(expression, a0, a1, a2, a3, a4) => Type = type;
     }
 
-    public class SixArgumentsInvocationExpression : InvocationExpression
+    public class SixArgumentsInvocationExpression : NotNullExpressionInvocationExpression
     {
         public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5;
         public sealed override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5 };
@@ -3680,7 +3685,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             : base(expression, a0, a1, a2, a3, a4, a5) => Type = type;
     }
 
-    public class ManyArgumentsInvocationExpression : InvocationExpression
+    public class ManyArgumentsInvocationExpression : NotNullExpressionInvocationExpression
     {
         public sealed override IReadOnlyList<Expression> Arguments { get; }
         public sealed override int ArgumentCount => Arguments.Count;

@@ -796,14 +796,12 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |  CompileLightExpression | 363.1 us | 6.89 us | 6.11 us |  1.00 |    0.00 | 18.0664 |  8.7891 | 2.9297 | 111.51 KB |
 | CompileSystemExpression | 702.9 us | 2.52 us | 2.10 us |  1.94 |    0.03 | 35.1563 | 10.7422 |      - |  216.1 KB |
 
-## Changing invoke to method call
+## Optimizing Invoke
 
-|                  Method |     Mean |    Error |   StdDev |   Median | Ratio | RatioSD |   Gen 0 |   Gen 1 |  Gen 2 | Allocated |
-|------------------------ |---------:|---------:|---------:|---------:|------:|--------:|--------:|--------:|-------:|----------:|
-|  CompileLightExpression | 456.1 us |  9.12 us | 24.66 us | 448.7 us |  1.00 |    0.00 | 34.1797 | 15.6250 | 5.8594 | 118.59 KB |
-| CompileSystemExpression | 850.0 us | 15.77 us | 37.78 us | 835.6 us |  1.87 |    0.13 | 71.2891 | 22.4609 |      - | 233.51 KB |
-
-
+|                  Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |   Gen 1 |  Gen 2 | Allocated |
+|------------------------ |---------:|---------:|---------:|------:|--------:|--------:|--------:|-------:|----------:|
+|  CompileLightExpression | 445.2 us |  8.81 us | 20.07 us |  1.00 |    0.00 | 33.2031 | 15.6250 | 3.9063 | 111.36 KB |
+| CompileSystemExpression | 842.9 us | 16.06 us | 25.00 us |  1.91 |    0.11 | 69.3359 | 17.5781 |      - | 216.18 KB |
 */
             LambdaExpression _lightExpr;
             System.Linq.Expressions.LambdaExpression _sysExpr;

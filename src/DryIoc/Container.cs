@@ -3103,6 +3103,12 @@ namespace DryIoc
                 case ExprType.Invoke:
                     {
                         var invokeExpr = (InvocationExpression)expr;
+                        if (invokeExpr is InvokeFactoryDelegateExpression fd)
+                        {
+                            result = fd.FactoryDelegate(fd is InvokeFactoryDelegateOfRootOrSelfExpression ? r.Root ?? r : r);
+                            return true;
+                        }
+
                         var delegateExpr = invokeExpr.Expression;
                         if (delegateExpr is ConstantExpression dc && dc.Value is FactoryDelegate facDel)
                         {
@@ -3345,12 +3351,6 @@ namespace DryIoc
             if (callExpr is CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression s)
             {
                 result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, s, paramExprs, paramValues, parentArgs);
-                return true;
-            }
-
-            if (callExpr is InvokeFactoryDelegateExpression fd)
-            {
-                result = fd.FactoryDelegate(fd is InvokeFactoryDelegateOfRootOrSelfExpression ? r.Root ?? r : r);
                 return true;
             }
 
@@ -12453,11 +12453,12 @@ namespace DryIoc
             if (container.Rules.ThrowIfRuntimeStateRequired)
                 Throw.It(Error.StateIsRequiredToUseItem, _factoryDelegate);
 
+            var serviceType = request.GetActualServiceType();
+
             // We are checking just for SingletonReuse here - if we injecting resolver in the singleton it should be the root container
-            var expr = request.Reuse is SingletonReuse
-                ? new InvokeFactoryDelegateOfRootOrSelfExpression(_factoryDelegate)
-                : new InvokeFactoryDelegateExpression(_factoryDelegate);
-            return request.GetActualServiceType().Cast(expr);
+            return request.Reuse is SingletonReuse
+                ? new InvokeFactoryDelegateOfRootOrSelfExpression(serviceType, _factoryDelegate)
+                : new InvokeFactoryDelegateExpression(serviceType, _factoryDelegate);
         }
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
@@ -12479,15 +12480,20 @@ namespace DryIoc
         }
     }
 
-    internal class InvokeFactoryDelegateExpression : MethodCallExpression
+    internal class InvokeFactoryDelegateExpression : InvocationExpression
     {
+        public sealed override Type Type { get; }
         public readonly FactoryDelegate FactoryDelegate;
-        public sealed override Expression Object => ConstantOf(FactoryDelegate);
-        public sealed override MethodInfo Method => FactoryDelegateCompiler.InvokeMethod;
+        public sealed override Expression Expression => ConstantOf(FactoryDelegate);
         public sealed override int ArgumentCount => 1;
         public override IReadOnlyList<Expression> Arguments => FactoryDelegateCompiler.ResolverContextParamExprs;
         public override Expression GetArgument(int index) => FactoryDelegateCompiler.ResolverContextParamExpr;
-        public InvokeFactoryDelegateExpression(FactoryDelegate f)  => FactoryDelegate = f;
+        public InvokeFactoryDelegateExpression(Type type, FactoryDelegate f)
+        {
+            Type = type;
+            FactoryDelegate = f;
+        }
+
         public sealed override bool IsIntrinsic => true;
 
         public sealed override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -12495,24 +12501,36 @@ namespace DryIoc
             closure.AddConstantOrIncrementUsageCount(FactoryDelegate) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
+        internal static bool EmitConvertObjectTo(ILGenerator il, Type t)
+        {
+            if (t != typeof(object))
+                if (!t.IsValueType)
+                    il.Emit(OpCodes.Castclass, t);
+                else
+                    il.Emit(OpCodes.Unbox_Any, t);
+            return true;
+        }
+
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
             EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) && 
-            EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
-            EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod);
+            EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) && 
+            EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
+            EmitConvertObjectTo(il, Type);
     }
 
     internal sealed class InvokeFactoryDelegateOfRootOrSelfExpression : InvokeFactoryDelegateExpression 
     {
         public override IReadOnlyList<Expression> Arguments => new[] { ResolverContext.RootOrSelfExpr };
         public override Expression GetArgument(int index) => ResolverContext.RootOrSelfExpr;
-        public InvokeFactoryDelegateOfRootOrSelfExpression(FactoryDelegate f) : base(f) {}
+        public InvokeFactoryDelegateOfRootOrSelfExpression(Type type, FactoryDelegate f) : base(type, f) {}
 
         public sealed override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
             EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
             ResolverContext.RootOrSelfExpr.TryEmit(config, ref closure, paramExprs, il, parent, byRefIndex) &&
-            EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod);
+            EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
+            EmitConvertObjectTo(il, Type);
     }
 
     /// <summary>The placeholder for thr later resgitration</summary>
