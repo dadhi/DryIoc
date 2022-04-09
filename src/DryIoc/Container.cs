@@ -3106,14 +3106,9 @@ namespace DryIoc
                         var delegateExpr = invokeExpr.Expression;
                         if (delegateExpr is ConstantExpression dc && dc.Value is FactoryDelegate facDel)
                         {
-                            var rArg = invokeExpr.GetArgument(0);
-                            if (rArg == FactoryDelegateCompiler.ResolverContextParamExpr)
-                                result = facDel(r);
-                            else if (rArg == ResolverContext.RootOrSelfExpr)
-                                result = facDel(r.Root ?? r);
-                            else if (TryInterpret(r, rArg, paramExprs, paramValues, parentArgs, out var resolver))
-                                result = facDel((IResolverContext)resolver);
-                            else return false;
+                            if (!TryInterpret(r, invokeExpr.GetArgument(0), paramExprs, paramValues, parentArgs, out var resolver))
+                                return false;
+                            result = facDel((IResolverContext)resolver);
                             return true;
                         }
 
@@ -3350,6 +3345,12 @@ namespace DryIoc
             if (callExpr is CurrentScopeReuse.GetScopedOrSingletonViaFactoryDelegateExpression s)
             {
                 result = InterpretGetScopedOrSingletonViaFactoryDelegate(r, s, paramExprs, paramValues, parentArgs);
+                return true;
+            }
+
+            if (callExpr is InvokeFactoryDelegateExpression fd)
+            {
+                result = fd.FactoryDelegate(fd is InvokeFactoryDelegateOfRootOrSelfExpression ? r.Root ?? r : r);
                 return true;
             }
 
@@ -3831,6 +3832,9 @@ namespace DryIoc
 
         /// <summary>The array of a single `ResolverContextParamExpr` for memory optimization</summary>
         public static readonly ParameterExpression[] ResolverContextParamExprs = { ResolverContextParamExpr };
+
+        /// <summary>FactoryDelegate.Invoke method info for calling from Reflection</summary>
+        public static MethodInfo InvokeMethod = typeof(FactoryDelegate).GetMethod("Invoke");
 
         /// Optimization: the empty lambda with a single IResolverContext parameters
         internal static readonly OneParameterLambdaExpression FactoryDelegateParamExprs = new OneParameterLambdaExpression(null, null, ResolverContextParamExpr);
@@ -4608,15 +4612,15 @@ namespace DryIoc
             public override Expression GetArgument(int i) => FactoryDelegateCompiler.ResolverContextParamExpr;
             public ResolverContextArgMethodCallExpression(MethodInfo method) => Method = method;
             public override bool IsIntrinsic => true;
+
             public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-                bool isNestedLambda, ref ClosureInfo rootClosure) => true;
+                bool isNestedLambda, ref ClosureInfo rootClosure) =>
+                ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config);
+
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-                ILGenerator il, ParentFlags parent, int byRefIndex = -1)
-            {
-                EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
+                ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
+                EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
                 EmittingVisitor.EmitMethodCall(il, Method);
-                return true;
-            }
         }
 
         /// <summary>Provides access to the current scope - may return `null` if ambient scope context has it scope changed in-between</summary>
@@ -7769,7 +7773,6 @@ namespace DryIoc
                 typeof(TService), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         private const string InvokeMethodName = "Invoke";
-
         private static object ToFuncWithObjResult<TService>(this Func<TService> f) => f();
         private static object ToFuncWithObjParams<D1, TService>(this Func<D1, TService> f, object d1) => f((D1)d1);
         private static object ToFuncWithObjParams<D1, D2, TService>(this Func<D1, D2, TService> f,
@@ -12447,15 +12450,14 @@ namespace DryIoc
         {
             // GetConstant here is needed to check the runtime state rule
             var container = request.Container;
-            var delegateExpr = container.Rules.ConstantExpressionIsFine
-                ? ConstantOf(_factoryDelegate) : container.GetConstantExpression(_factoryDelegate);
+            if (container.Rules.ThrowIfRuntimeStateRequired)
+                Throw.It(Error.StateIsRequiredToUseItem, _factoryDelegate);
 
-            // Here we are using the simplified GetRootOrSelfExpr - if we injecting resolver in the singleton it should be the root container
-            var resolverExpr = request.Reuse is SingletonReuse ? ResolverContext.RootOrSelfExpr : FactoryDelegateCompiler.ResolverContextParamExpr;
-            if (resolverExpr == FactoryDelegateCompiler.ResolverContextParamExpr)
-                return new InvokeFactoryDelegateExpression(request.GetActualServiceType(), delegateExpr); // todo: @perf use the delegate directly instead of wrapping it into the Constant
-
-            return Invoke(request.GetActualServiceType(), delegateExpr, resolverExpr);
+            // We are checking just for SingletonReuse here - if we injecting resolver in the singleton it should be the root container
+            var expr = request.Reuse is SingletonReuse
+                ? new InvokeFactoryDelegateOfRootOrSelfExpression(_factoryDelegate)
+                : new InvokeFactoryDelegateExpression(_factoryDelegate);
+            return request.GetActualServiceType().Cast(expr);
         }
 
         /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
@@ -12477,14 +12479,40 @@ namespace DryIoc
         }
     }
 
-    // todo: @perf Make intrinsic, and may be convert to MethodCall altogether
-    internal sealed class InvokeFactoryDelegateExpression : InvocationExpression
+    internal class InvokeFactoryDelegateExpression : MethodCallExpression
     {
-        public override Type Type { get; }
+        public readonly FactoryDelegate FactoryDelegate;
+        public sealed override Expression Object => ConstantOf(FactoryDelegate);
+        public sealed override MethodInfo Method => FactoryDelegateCompiler.InvokeMethod;
         public sealed override int ArgumentCount => 1;
-        public sealed override IReadOnlyList<Expression> Arguments => new[] { FactoryDelegateCompiler.ResolverContextParamExpr };
-        public sealed override Expression GetArgument(int index) => FactoryDelegateCompiler.ResolverContextParamExpr;
-        internal InvokeFactoryDelegateExpression(Type type, Expression expression) : base(expression) => Type = type;
+        public override IReadOnlyList<Expression> Arguments => FactoryDelegateCompiler.ResolverContextParamExprs;
+        public override Expression GetArgument(int index) => FactoryDelegateCompiler.ResolverContextParamExpr;
+        public InvokeFactoryDelegateExpression(FactoryDelegate f)  => FactoryDelegate = f;
+        public sealed override bool IsIntrinsic => true;
+
+        public sealed override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure) =>
+            closure.AddConstantOrIncrementUsageCount(FactoryDelegate) &&
+            ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config);
+
+        public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
+            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) && 
+            EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
+            EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod);
+    }
+
+    internal sealed class InvokeFactoryDelegateOfRootOrSelfExpression : InvokeFactoryDelegateExpression 
+    {
+        public override IReadOnlyList<Expression> Arguments => new[] { ResolverContext.RootOrSelfExpr };
+        public override Expression GetArgument(int index) => ResolverContext.RootOrSelfExpr;
+        public InvokeFactoryDelegateOfRootOrSelfExpression(FactoryDelegate f) : base(f) {}
+
+        public sealed override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
+            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
+            ResolverContext.RootOrSelfExpr.TryEmit(config, ref closure, paramExprs, il, parent, byRefIndex) &&
+            EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod);
     }
 
     /// <summary>The placeholder for thr later resgitration</summary>
