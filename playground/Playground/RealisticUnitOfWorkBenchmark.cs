@@ -1242,27 +1242,16 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
   [Host]     : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
   DefaultJob : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
 
-
 |       Method |         Mean |      Error |     StdDev |  Ratio | RatioSD |    Gen 0 |   Gen 1 |  Gen 2 | Allocated |
 |------------- |-------------:|-----------:|-----------:|-------:|--------:|---------:|--------:|-------:|----------:|
-|       DryIoc |     86.10 us |   1.508 us |   1.411 us |   1.00 |    0.00 |   6.5918 |  0.3662 |      - |  40.59 KB |
-|  DryIoc_MsDI |     93.52 us |   0.385 us |   0.300 us |   1.09 |    0.02 |   8.3008 |  0.4883 |      - |  51.27 KB |
-|         MsDI |     95.85 us |   1.275 us |   1.193 us |   1.11 |    0.02 |  11.8408 |  4.2725 |      - |  72.67 KB |
-|      Autofac |    540.52 us |  10.392 us |  12.371 us |   6.29 |    0.19 |  50.7813 | 25.3906 | 1.9531 | 317.04 KB |
-| Autofac_MsDI |    526.29 us |   4.637 us |   3.872 us |   6.12 |    0.12 |  54.6875 | 27.3438 | 1.9531 |  340.2 KB |
-|   Lamar_MsDI |  7,607.20 us | 182.225 us | 525.760 us |  77.60 |    3.00 |        - |       - |      - | 649.87 KB |
-|        Grace | 15,809.04 us | 224.203 us | 187.220 us | 183.68 |    3.80 |  93.7500 | 31.2500 |      - |  736.2 KB |
-|   Grace_MsDI | 18,707.17 us | 236.977 us | 221.668 us | 217.31 |    3.79 | 125.0000 | 62.5000 |      - | 907.38 KB |
-
-
-## Faster RegisterDelegate interpretation
-
-|      Method |     Mean |    Error |   StdDev |   Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------ |---------:|---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|      DryIoc | 77.69 us | 1.536 us | 3.994 us | 78.92 us |  1.00 |    0.00 |  6.3477 | 0.3662 |     - |  39.42 KB |
-| DryIoc_MsDI | 90.14 us | 0.628 us | 0.557 us | 90.07 us |  1.28 |    0.10 |  8.0566 | 0.6104 |     - |  49.87 KB |
-|        MsDI | 93.01 us | 1.378 us | 1.222 us | 92.83 us |  1.32 |    0.10 | 11.8408 | 4.2725 |     - |   72.6 KB |
-
+|       DryIoc |     82.22 us |   1.209 us |   1.072 us |   1.00 |    0.00 |   6.3477 |  0.3662 |      - |  39.42 KB |
+|  DryIoc_MsDI |     94.18 us |   1.207 us |   1.070 us |   1.15 |    0.02 |   8.0566 |  0.6104 |      - |  49.87 KB |
+|         MsDI |     94.60 us |   0.715 us |   0.597 us |   1.15 |    0.01 |  11.8408 |  4.2725 |      - |  72.59 KB |
+|      Autofac |    543.45 us |   4.570 us |   3.568 us |   6.60 |    0.10 |  51.7578 | 25.3906 | 1.9531 | 317.19 KB |
+| Autofac_MsDI |    534.64 us |   5.919 us |   5.247 us |   6.50 |    0.10 |  54.6875 | 27.3438 | 1.9531 | 340.17 KB |
+|   Lamar_MsDI |  7,053.46 us | 140.273 us | 402.469 us |  77.97 |    2.84 |        - |       - |      - | 649.68 KB |
+|        Grace | 15,990.58 us | 123.798 us | 109.744 us | 194.52 |    2.21 |  93.7500 | 31.2500 |      - | 736.12 KB |
+|   Grace_MsDI | 18,884.30 us | 321.388 us | 268.373 us | 229.50 |    4.25 | 125.0000 | 62.5000 |      - |  904.7 KB |
 */
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
@@ -1277,19 +1266,19 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             // [Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(PrepareDryIocInterpretationOnly());
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac() => Measure(PrepareAutofac());
 
-            // [Benchmark]
+            [Benchmark]
             public object Autofac_MsDI() => Measure(PrepareAutofacMsDi());
 
-            // [Benchmark]
+            [Benchmark]
             public object Lamar_MsDI() => Measure(PrepareLamarMsDi());
 
-            // [Benchmark]
+            [Benchmark]
             public object Grace() => Measure(PrepareGrace());
 
-            // [Benchmark]
+            [Benchmark]
             public object Grace_MsDI() => Measure(PrepareGraceMsDi());
         }
 
