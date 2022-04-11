@@ -2,9 +2,9 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.Microsoft.DependencyInjection.src</id>
-    <version>6.0.0-preview-02</version>
+    <version>6.0.0</version>
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
+    <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
     <license type="expression">MIT</license>
     <icon>logo.png</icon>
@@ -17,29 +17,16 @@
 ## v6.0.0
 
 - Depends on the DryIoc v5
-- Depends on the Microsoft.Extensions.DependencyInjection.Abstractions 6.0.0-preview.7.21377.19
+- Depends on the Microsoft.Extensions.DependencyInjection.Abstractions 6.0.0
 - Provides the implementation of IServiceProviderIsService
 - Provides the implementation of ISupportRequiredService
-
-
-## v5.1.0
-
-- #364: [MS.DI] Allow to provide RegistrySharing parameter to DryIocServiceProviderFactory to avoid cache dropping
-- Updated DryIoc to v4.7.0
-
-## v5.0.0
-
-Updated DryIoc to v4.5.0 with the performance improvements and the new features
-
-- added: 328 - Now you may use `Rules.WithVariantGenericTypesInResolvedCollection()`
-- added: 331 - [MS.DI] Add the Rules.WithServiceProviderGetServiceShouldThrowIfUnresolved
 
 ]]>
     </releaseNotes>
     <dependencies>
       <group>
         <dependency id="DryIoc" version="4.7.0" />
-        <dependency id="Microsoft.Extensions.DependencyInjection.Abstractions" version="3.1.8" />
+        <dependency id="Microsoft.Extensions.DependencyInjection.Abstractions" version="6.0.0" />
       </group>
     </dependencies>
     <contentFiles>
