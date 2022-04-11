@@ -1,6 +1,24 @@
 Version History
 ---------------
 
+## v5.0.0 Major feature release with the breaking changes / 2022-04-11
+
+Main achievements:
+
+- Performance speed-up and the less memory allocations (check README for the benchmarks)
+- More consistent and full API (highlight is on the RegisterDelegate overloads)
+
+Main breaking changes:
+
+- Removing PCL and .NET 3.5, .NET 4.0 and .NET Standard 1.0 - 1.3 targets
+- Moving ImTools and FastExpressionCompiler sources to the `DryIoc.ImTools` and `DryIoc.FastExpressionCompiler` namespaces
+- Removing `UseInstance` in favour of `Use` and `RegisterInstance` methods
+
+Main "until the next version":
+
+- Improving compile-time capabilities from the current T4 bound solution
+
+
 ## v4.8.8 Bug-fix release / 2022-03-16
 
 - fixed: #460 Getting instance from parent scope even if replaced by Use
