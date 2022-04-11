@@ -4,16 +4,13 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using NUnit.Framework;
 
 namespace DryIoc.Messages.MediatRLikeExample
 {
-    [TestFixture]
     public class Program
     {
         public static Task Main() => new Program().Run();
 
-        [Test]
         public Task Run()
         {
             var container = new Container(rules => rules.WithTrackingDisposableTransients());

@@ -1,12 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk" ToolsVersion="15.0">
     <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
-        <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>net45;netstandard2.0</TargetFrameworks>
 
         <Product>DryIocAttributes</Product>
-        <VersionPrefix>6.1.0</VersionPrefix>
-        <VersionSuffix></VersionSuffix>
+        <VersionPrefix>7.0.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -17,25 +15,16 @@
         <PackageTags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
             <![CDATA[
-## v6.1.0
 
-- fixed: #349 ReuseAttribute treats ScopeName as string instead of object type
-- added: ReuseAttribute supports multiple scope names
+## v7.0.0
 
-## v6.0.1
-
-- fixed: #335 Why doesn't DryIocAttribute with a target of net45 use the System.ComponentModel.Composition NuGet package
-
-## v6.0.0
-
-- Using the System.ComponentModel.Composition (netstandard2.0+ and netcoreapp2.0+) NuGet package instead of framework assembly reference
-- fixed: #306 Update DryIocAttributes for the .Net Core v3.1
+- Keep the .NET 4.5 and .NET Standard 2.0 targets only
 
         ]]>
         </PackageReleaseNotes>
     </PropertyGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0' or '$(TargetFramework)' == 'net45'">
+    <ItemGroup>
         <PackageReference Include="System.ComponentModel.Composition" Version="4.7.0" />
     </ItemGroup>
 </Project>

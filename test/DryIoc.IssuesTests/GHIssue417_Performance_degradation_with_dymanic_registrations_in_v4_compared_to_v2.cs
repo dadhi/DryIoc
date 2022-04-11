@@ -1,6 +1,7 @@
 using System;
-using NUnit.Framework;
+using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using NUnit.Framework;
 using DryIoc.MefAttributedModel;
 
 namespace DryIoc.IssuesTests
@@ -24,7 +25,14 @@ namespace DryIoc.IssuesTests
         [Test]
         public void SuperSlowTest()
         {
-            var container = new Container().WithMef();
+            var dynamicRulesTriggered = new List<object>();
+            IEnumerable<DynamicRegistration> CollectDynamicRulesTriggered(Type type, object key)
+            {
+                dynamicRulesTriggered.Add(new { type, key });
+                return null;
+            }
+
+            var container = new Container(rules => rules.WithDynamicRegistrations(CollectDynamicRulesTriggered)).WithMef();
 
             container.Register<IService, MyService>(setup: Setup.With(metadataOrFuncOfMetadata: "42"));
 
@@ -32,6 +40,10 @@ namespace DryIoc.IssuesTests
             container.InjectPropertiesAndFields(x);
 
             Assert.IsInstanceOf<MyService>(x.ImportedServices[0].Value);
+            // the dynamic registrations are triggered two times:
+            // first when finding the item factories in Array resolver and
+            // second when interpreting the resolution call for the concrete service. todo: @perf may we improve on the second
+            Assert.AreEqual(2, dynamicRulesTriggered.Count);
         }
 
         public class Slow

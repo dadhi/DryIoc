@@ -1,7 +1,7 @@
-using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 using System.ComponentModel.Composition;
 using System.ComponentModel.Composition.Hosting;
+using DryIoc.MefAttributedModel;
 
 namespace DryIoc.IssuesTests
 {

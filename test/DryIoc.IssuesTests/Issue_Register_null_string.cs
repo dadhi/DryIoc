@@ -13,7 +13,6 @@ namespace DryIoc.IssuesTests
                 .WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Replace)
                 .WithFuncAndLazyWithoutRegistration()
                 .WithTrackingDisposableTransients()
-                .WithoutFastExpressionCompiler()
                 .WithFactorySelector(Rules.SelectLastRegisteredFactory());
 
             var c = new Container(rules);

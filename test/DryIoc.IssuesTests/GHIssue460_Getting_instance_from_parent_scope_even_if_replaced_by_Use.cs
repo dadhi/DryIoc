@@ -88,14 +88,13 @@ namespace DryIoc.IssuesTests
             container.Register<DataDependentIndirectly2>();
 
             // now it fails even if this is removed
-            var outside = container.Resolve<DataDependentIndirectly2>();
+            //var outside = container.Resolve<DataDependentIndirectly2>();
 
-            using (var scope = container.OpenScope())
-            {
-                scope.Use(new Data { Text = "child" });
-                var inScope = scope.Resolve<DataDependentIndirectly2>();
-                Assert.AreEqual("child", inScope.Dependent.Data1.Text); // fails, the value is "parent"
-            }
+            using var scope = container.OpenScope();
+            scope.Use(new Data { Text = "child" });
+
+            var inScope = scope.Resolve<DataDependentIndirectly2>();
+            Assert.AreEqual("child", inScope.Dependent.Data1.Text); // fails, the value is "parent"
         }
 
         [Test]
@@ -107,12 +106,11 @@ namespace DryIoc.IssuesTests
             container.Register<IDataDependent, DataDependent>();
             container.Register<DataDependentIndirectly2>();
 
-            using (var scope = container.OpenScope())
-            {
-                scope.Use(new Data { Text = "child" });
-                var inScope = scope.Resolve<DataDependentIndirectly2>();
-                Assert.AreEqual("child", inScope.Dependent.Data1.Text); // fails, the value is "parent"
-            }
+            using var scope = container.OpenScope();
+            scope.Use(new Data { Text = "child" });
+
+            var inScope = scope.Resolve<DataDependentIndirectly2>();
+            Assert.AreEqual("child", inScope.Dependent.Data1.Text); // fails, the value is "parent"
         }
 
         public class Data

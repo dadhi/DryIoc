@@ -66,7 +66,7 @@ namespace DryIoc.Web
         void OnEndRequest(object sender, EventArgs eventArgs);
     }
 
-    /// <summary>Hooks up <see cref="ResolverContext.OpenScope"/> on request beginning and scope dispose on request end.</summary>
+    /// <summary>Hooks up `ResolverContext.OpenScope` on request beginning and scope dispose on request end.</summary>
     public class DryIocHttpModule : IHttpModule
     {
         /// Defaults to HttpContextScopeContext
@@ -111,7 +111,7 @@ namespace DryIoc.Web
         private static IScope SetOrKeepCurrentRequestScope(IScope current) => 
             current != null && Reuse.WebRequestScopeName.Equals(current.Name)
                 ? current
-                : new Scope(current, Reuse.WebRequestScopeName);
+                : Scope.Of(current, Reuse.WebRequestScopeName);
     }
 
     /// <summary>Stores current scope in <see cref="HttpContext.Items"/>.</summary>

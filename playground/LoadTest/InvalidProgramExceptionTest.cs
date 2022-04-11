@@ -11,7 +11,6 @@ namespace LoadTest
         public static IContainer GetContainerForTest()
         {
             var container = new Container(rules => rules
-                .WithoutFastExpressionCompiler()
                 .WithoutInterpretationForTheFirstResolution()
                 .WithoutUseInterpretation()
                 .With(FactoryMethod.ConstructorWithResolvableArguments))

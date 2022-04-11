@@ -184,7 +184,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterDelegate(typeof (IService), _ => new Service());
+            container.RegisterDelegate(typeof(IService), _ => new Service());
 
             var service = container.Resolve<IService>();
             Assert.That(service, Is.InstanceOf<Service>());
@@ -195,29 +195,73 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.RegisterDelegate(typeof (IService), _ => "blah");
+            container.RegisterDelegate(typeof(IService), _ => "blah");
 
             Assert.Throws<ContainerException>(() =>
                 container.Resolve<IService>());
         }
-
+        
         internal class MyClass
         {
             public IService MyService { get; set; }
         }
 
         [Test]
+        public void Possible_to_Register_delegate_with_runtime_type_of_dependency_and_service()
+        {
+            var container = new Container();
+
+            container.Register<IService, Foo>();
+            container.Register<MyValue>();
+            container.RegisterDelegate(typeof(MyJazz), typeof(MyValue), v => new MyJazz((MyValue)v));
+
+            var j = container.Resolve<IService>();
+            Assert.IsNotNull(j);
+            var j2 = container.Resolve<IService>();
+            Assert.IsNotNull(j2);
+        }
+
+        [Test]
+        public void Possible_to_Register_delegate_with_value_type_dependency_and_service()
+        {
+            var container = new Container();
+
+            container.Register<IService, Foo>();
+            container.Register<MyValue>();
+            container.RegisterDelegate<MyValue>(typeof(MyJazz), v => new MyJazz(v));
+
+            var j = container.Resolve<IService>();
+            Assert.IsNotNull(j);
+            var j2 = container.Resolve<IService>();
+            Assert.IsNotNull(j2);
+        }
+
+        internal class MyJazz
+        {
+            public readonly MyValue MyValue;
+            public MyJazz(MyValue mv) => MyValue = mv;
+        }
+
+        internal struct MyValue 
+        {
+            public IService Service;
+            public MyValue(IService service) => Service = service;
+        }
+
+        public class Foo : IService { }
+
+        [Test]
         public void Cannot_register_delegate_for_open_generic_service_type()
         {
             var container = new Container();
-            
-            var ex = Assert.Throws<ContainerException>(() => 
+
+            var ex = Assert.Throws<ContainerException>(() =>
             container.RegisterDelegate(typeof(OpenGenericFriend<>), resolver => "nah"));
 
             Assert.AreEqual(Error.ImpossibleToRegisterOpenGenericWithRegisterDelegate, ex.Error);
         }
 
-        public class OpenGenericFriend<T> {}
+        public class OpenGenericFriend<T> { }
     }
 }
 

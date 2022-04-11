@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>netcoreapp2.1;net472</TargetFrameworks>
+        <TargetFrameworks>netcoreapp3.1;net472</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
@@ -12,6 +12,7 @@
         <PackageReference Include="NSubstitute" Version="3.1.0" />
         <PackageReference Include="Moq" Version="4.15.2" />
         <PackageReference Include="log4net" Version="2.0.12" />
+        <PackageReference Include="JetBrains.Lifetimes" Version="2022.1.4" />
     </ItemGroup>
 
     <ItemGroup>

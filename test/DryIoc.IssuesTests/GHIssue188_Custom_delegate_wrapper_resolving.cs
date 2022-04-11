@@ -1,6 +1,5 @@
 using System;
-using System.Linq;
-using FastExpressionCompiler.LightExpression;
+using DryIoc.FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -76,6 +75,27 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Resolve_only_one_dependency_instance_with_RegisterDelegate_of_func_with_args()
         {
+            var container = new Container();
+            container.Register<Simple>();
+
+            // DryIoc v4.0.5
+            //container.RegisterDelegate<SimpleFactory>(r => s => r.Resolve<Func<string, Simple>>()(s));
+
+            // DryIoc v4.1 - preferable, because it does not call Resolve (the Func<..> is injected) - so avoiding all problems with service locator
+            container.RegisterDelegate<Func<string, Simple>, SimpleFactory>(f => s => f(s));
+
+            container.Register<Countable>();
+            container.Register<Complex>();
+
+            Countable.Counter = 0;
+            container.Resolve<Complex>();
+            container.Resolve<Complex>(); // get ths compiled version
+            Assert.AreEqual(2, Countable.Counter, "The container resolved more than one instance of Countable.");
+        }
+
+        [Test]
+        public void Resolve_only_one_dependency_instance_with_RegisterDelegate_of_func_with_args_compilation_only()
+        {
             var container = new Container(rules => rules.WithoutInterpretationForTheFirstResolution());
             container.Register<Simple>();
 
@@ -83,15 +103,15 @@ namespace DryIoc.IssuesTests
             //container.RegisterDelegate<SimpleFactory>(r => s => r.Resolve<Func<string, Simple>>()(s));
 
             // DryIoc v4.1 - preferable, because it does not call Resolve (the Func<..> is injected) - so avoiding all problems with service locator
-            container.RegisterDelegate<Func<string, Simple>, SimpleFactory>(
-                f => s => f(s));
+            container.RegisterDelegate<Func<string, Simple>, SimpleFactory>(f => s => f(s));
 
             container.Register<Countable>();
             container.Register<Complex>();
 
             Countable.Counter = 0;
             container.Resolve<Complex>();
-            Assert.AreEqual(1, Countable.Counter, "The container resolved more than one instance of Countable.");
+            container.Resolve<Complex>(); // get ths compiled version
+            Assert.AreEqual(2, Countable.Counter, "The container resolved more than one instance of Countable.");
         }
 
         /// <summary>
@@ -127,8 +147,6 @@ namespace DryIoc.IssuesTests
         }
     }
 
-    #region Registration Helper Code
-
     internal static class ContainerExtension
     {
         /// <summary>
@@ -137,42 +155,26 @@ namespace DryIoc.IssuesTests
         /// </summary>
         /// <typeparam name="TDelegate">The custom delegate type to register.</typeparam>
         public static void RegisterFactoryDelegateType<TDelegate>(this IContainer container, IfAlreadyRegistered? ifAlreadyRegistered = null,
-            object serviceKey = null)
+            object serviceKey = null) where TDelegate : System.Delegate
         {
             container.Register(typeof(TDelegate), new CustomDelegateWrapper<TDelegate>(), ifAlreadyRegistered, serviceKey);
         }
     }
 
-    internal class CustomDelegateWrapper<TDelegate> : Factory
+    internal class CustomDelegateWrapper<TDelegate> : Factory where TDelegate : System.Delegate
     {
-        #region Constructors
-
-        public CustomDelegateWrapper(IReuse reuse = null, Setup setup = null)
-            : base(reuse, setup)
-        {
-        }
-
-        #endregion
-
-        #region Public Methods
-
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var originalFactoryType = GetOriginalFactoryType();
             var originalFactoryRequest = Request.Create(request.Container, originalFactoryType, request.ServiceKey);
             var originalFactory = originalFactoryRequest.Container.ResolveFactory(originalFactoryRequest);
 
-            var originalFactoryExpression =
-                (LambdaExpression) originalFactory.GetExpressionOrDefault(originalFactoryRequest);
-            var convertedFactoryExpression =
-                Expression.Lambda<TDelegate>(originalFactoryExpression.Body,
-                    originalFactoryExpression.Parameters.ToArray());
+            var originalFactoryExpression = (LambdaExpression)originalFactory.GetExpressionOrDefault(originalFactoryRequest);
+
+            var convertedFactoryExpression = Expression.Lambda<TDelegate>(originalFactoryExpression.Body, originalFactoryExpression.Parameters);
+
             return convertedFactoryExpression;
         }
-
-        #endregion
-
-        #region Non-Public Methods
 
         private static Type GetOriginalFactoryType()
         {
@@ -224,9 +226,5 @@ namespace DryIoc.IssuesTests
                         "Factory delegates with more than 8 parameters are not supported.");
             }
         }
-
-        #endregion
     }
-
-    #endregion
 }

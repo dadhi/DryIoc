@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using FastExpressionCompiler.LightExpression;
+using DryIoc.FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -22,7 +22,7 @@ namespace DryIoc.IssuesTests
             using (var scope = c.OpenScope())
             {
                 var rootExpr = scope.Resolve<LambdaExpression>(typeof(Root));
-                var rootCode = rootExpr.CodeString;
+                var rootCode = rootExpr.ToCSharpString();
                 var nestedLambdas = rootCode.Count(ch => ch == '$');
                 Assert.AreEqual(2603, nestedLambdas);
             }

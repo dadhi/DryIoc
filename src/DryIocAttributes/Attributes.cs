@@ -2,7 +2,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2021 Maksim Volkau
+Copyright (c) 2013-2022 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,14 +22,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-
-#if NET35 || NET40 || NET402 || PCL || NETSTANDARD1_0 || NETSTANDARD1_1 || NETSTANDARD1_2 || NETSTANDARD1_3 || NETSTANDARD1_4 || NETSTANDARD1_5 || NETSTANDARD1_6 || NETCOREAPP1_0 || NETCOREAPP1_1
-#define NO_SYSTEM_COMPONENTMODEL_COMPOSITION_PACKAGE
-#endif
-
-#if PCL328 || NET35 || NET40
-#define NO_LAZY_WITH_METADATA
-#endif
 
 using System;
 using System.Collections.Generic;
@@ -71,8 +63,6 @@ namespace DryIocAttributes
     }
 
     /// <summary>Provides whole set of possible/supported export options.</summary>
-    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
-        Justification = "Not available in PCL.")]
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Method
         | AttributeTargets.Property
@@ -119,7 +109,7 @@ namespace DryIocAttributes
     {
         /// <summary>Implementation of reuse. Could be null to specify transient or no reuse.</summary>
         public readonly ReuseType ReuseType;
-        
+
         /// <summary>Implementation type for reuse.</summary>
         public readonly Type CustomReuseType;
 
@@ -146,7 +136,7 @@ namespace DryIocAttributes
         /// <summary>Specify the reuse type and the scope name.</summary>
         public ReuseAttribute(ReuseType reuseType, params object[] scopeNames)
         {
-            ReuseType  = reuseType;
+            ReuseType = reuseType;
             ScopeNames = scopeNames;
         }
 
@@ -154,7 +144,7 @@ namespace DryIocAttributes
         public ReuseAttribute(Type customReuseType, params object[] scopeNames)
         {
             CustomReuseType = customReuseType;
-            ScopeNames      = scopeNames;
+            ScopeNames = scopeNames;
         }
     }
 
@@ -236,9 +226,7 @@ namespace DryIocAttributes
     public class TrackDisposableTransientAttribute : Attribute { }
 
     /// <summary>OBSOLETE: Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.</summary>
-    //[Obsolete("Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.")]
-    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
-        Justification = "Not available in PCL.")]
+    [Obsolete("Please use ExportExAttribute instead. ExportEx adds IfAlreadyExported option, plus may be extended with other options in future.")]
     [AttributeUsage(AttributeTargets.Class
         | AttributeTargets.Method
         | AttributeTargets.Property
@@ -393,7 +381,7 @@ namespace DryIocAttributes
         ReturnDefaultIfNotRegistered,
     }
 
-    // todo: @incomplete we are repeating the DryIoc.Request here, but we need just a little functionality of it
+    // todo: @wip we are repeating the DryIoc.Request here, but we need just a little functionality of it
     /// <summary>Dependency request path information.</summary>
     public sealed class Request
     {
@@ -457,7 +445,7 @@ namespace DryIocAttributes
         /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
         public Request Push(
             Type serviceType, Type requiredServiceType, object serviceKey, string metadataKey, object metadata, IfUnresolved ifUnresolved,
-            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan) => 
+            int factoryID, FactoryType factoryType, Type implementationType, int reuseLifespan) =>
             new Request(serviceType, requiredServiceType, serviceKey, metadataKey, metadata, ifUnresolved,
                 factoryID, factoryType, implementationType, reuseLifespan, this);
 
@@ -530,7 +518,7 @@ namespace DryIocAttributes
 
         /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
         /// <param name="obj"></param> <returns></returns>
-        public override bool Equals(object obj) => 
+        public override bool Equals(object obj) =>
             Equals(obj as Request);
 
         /// <summary>Returns true if request info and passed info are equal, and their parents recursively are equal.</summary>
@@ -592,8 +580,6 @@ namespace DryIocAttributes
     }
 
     /// <summary>Please use ImportExAttribute instead. ImportEx adds ContractKey of arbitrary type, plus may be extended with other options in future.</summary>
-    [SuppressMessage("Microsoft.Interoperability", "CA1405:ComVisibleTypeBaseTypesShouldBeComVisible",
-        Justification = "Not available in PCL.")]
     [AttributeUsage(AttributeTargets.Parameter
         | AttributeTargets.Field
         | AttributeTargets.Property)]
@@ -700,6 +686,23 @@ namespace DryIocAttributes
         | AttributeTargets.Field)]
     public class OpenResolutionScopeAttribute : Attribute { }
 
+    /// <summary>Does not add the resolution scope into the parent or singleton scope,
+    /// preventing possibly unwanted holding of the scope (and its services) for the lifespan of the container.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field)]
+    public class AvoidResolutionScopeTrackingAttribute : Attribute { }
+
+    /// <summary>When single service is resolved, but multiple candidates found, this setting will be used to prefer this one.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field)]
+    public class PreferInSingleServiceResolveAttribute : Attribute { }
+
     /// <summary>Specifies that export should be imported as dynamic resolution call,
     /// instead of in-lined creation expression.</summary>
     [AttributeUsage(AttributeTargets.Class
@@ -716,352 +719,18 @@ namespace DryIocAttributes
         | AttributeTargets.Property
         | AttributeTargets.Field)]
     public class AsResolutionRootAttribute : Attribute { }
-}
 
-#if NO_LAZY_WITH_METADATA
-namespace System
-{
-    /// <summary>Provides a lazy indirect reference to an object and its associated metadata for use by the Managed Extensibility Framework.</summary>
-    /// <typeparam name="T">The type of the service</typeparam>
-    /// <typeparam name="TMetadata">The type of the metadata.</typeparam>
-    public class Lazy<T, TMetadata> // : Lazy<T> is defined in DryIoc
+    /// <summary>Relative disposal order when defined. Greater number, later dispose.</summary>
+    [AttributeUsage(AttributeTargets.Class
+        | AttributeTargets.Interface
+        | AttributeTargets.Method
+        | AttributeTargets.Property
+        | AttributeTargets.Field)]
+    public class DisposalOrderAttribute : Attribute
     {
-        /// <summary>Initializes a new instance of the <see cref="Lazy{T, TMetadata}"/> class.</summary>
-        /// <param name="valueFactory">The value factory.</param>
-        /// <param name="metadata">The metadata.</param>
-        /// <exception cref="ArgumentNullException">valueFactory</exception>
-        public Lazy(Func<T> valueFactory, TMetadata metadata)
-        {
-            if (valueFactory == null) throw new ArgumentNullException("valueFactory");
-            _valueFactory = valueFactory;
-            Metadata = metadata;
-        }
-
-        /// <summary>Gets the metadata associated with the referenced object.</summary>
-        public TMetadata Metadata { get; private set; }
-
-        /// <summary>Indicates if value is computed already, or not.</summary>
-        public bool IsValueCreated { get; private set; }
-
-        /// <summary>Computes value if it was not before, and returns it.
-        /// Value is guaranteed to be computed only once despite possible thread contention.</summary>
-        /// <exception cref="InvalidOperationException">Throws if value computation is recursive.</exception>
-        public T Value => IsValueCreated ? _createdValue : CreateValue();
-
-        private Func<T> _valueFactory;
-
-        private T _createdValue;
-
-        private readonly object _valueCreationLock = new object();
-
-        private T CreateValue()
-        {
-            lock (_valueCreationLock)
-            {
-                if (!IsValueCreated)
-                {
-                    if (_valueFactory == null)
-                        throw new InvalidOperationException("The initialization function tries to access Value on this instance.");
-
-                    var factory = _valueFactory;
-                    _valueFactory = null;
-                    _createdValue = factory();
-                    IsValueCreated = true;
-                }
-            }
-
-            return _createdValue;
-        }
+        /// <summary>Relative number of disposal</summary>
+        public int RelativeValue { get; set; }
+        /// <summary>Constructor</summary>
+        public DisposalOrderAttribute(int relativeValue) => RelativeValue = relativeValue;
     }
 }
-#endif
-
-#if NO_SYSTEM_COMPONENTMODEL_COMPOSITION_PACKAGE
-namespace System.ComponentModel.Composition
-{
-    /// <summary>Specifies to register annotated type in container.
-    /// Or you could annotate Method with this attribute, and the method will be used as Factory Method for registration.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field,
-        AllowMultiple = true, Inherited = false)]
-    public class ExportAttribute : Attribute
-    {
-        /// <summary>Optional contract name to identify registered service when you are importing it.</summary>
-        public string ContractName { get; private set; }
-
-        /// <summary>Optional service type to register with, if omitted then annotated implementation type will be used as service type.
-        /// If specified it should be assignable from annotated type.</summary>
-        public Type ContractType { get; private set; }
-
-        /// <summary>Creates default attribute without <see cref="ContractName"/> and with annotated type as <see cref="ContractType"/>.</summary>
-        public ExportAttribute() { }
-
-        /// <summary>Creates Export with specified <see cref="ContractType"/>, which should be assignable from annotated type.</summary>
-        /// <param name="contractType">Contract type.</param>
-        public ExportAttribute(Type contractType)
-            : this(null, contractType) { }
-
-        /// <summary>Creates Export with specified <see cref="ContractName"/> to identify service when imported.</summary>
-        /// <param name="contractName">Contract name.</param>
-        public ExportAttribute(string contractName)
-            : this(contractName, null) { }
-
-        /// <summary>Creates Export with both <see cref="ContractName"/> and <see cref="ContractType"/> specified.</summary>
-        /// <param name="contractName"><see cref="ContractName"/></param>
-        /// <param name="contractType"><see cref="ContractType"/></param>
-        public ExportAttribute(string contractName, Type contractType)
-        {
-            ContractType = contractType;
-            ContractName = contractName;
-        }
-    }
-
-    /// <summary>Specifies that all types inherited from annotated type should be exported (see <see cref="ExportAttribute"/>)
-    /// with these settings.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = true)]
-    public class InheritedExportAttribute : ExportAttribute
-    {
-        /// <summary>Create default attribute without <see cref="ExportAttribute.ContractName"/>
-        /// and with annotated type as <see cref="ExportAttribute.ContractType"/>.</summary>
-        public InheritedExportAttribute() { }
-
-        /// <summary>Creates Export with specified <see cref="ExportAttribute.ContractType"/>, which should be assignable from annotated type.</summary>
-        /// <param name="contractType">Contract type.</param>
-        public InheritedExportAttribute(Type contractType)
-            : base(contractType) { }
-
-        /// <summary>Creates Export with specified <see cref="ExportAttribute.ContractName"/> to identify service when imported.</summary>
-        /// <param name="contractName">Contract name.</param>
-        public InheritedExportAttribute(string contractName)
-            : base(contractName) { }
-
-        /// <summary>Creates Export with both <see cref="ExportAttribute.ContractName"/> and <see cref="ExportAttribute.ContractType"/> specified.</summary>
-        /// <param name="contractName"><see cref="ExportAttribute.ContractName"/></param>
-        /// <param name="contractType"><see cref="ExportAttribute.ContractType"/></param>
-        public InheritedExportAttribute(string contractName, Type contractType)
-            : base(contractName, contractType) { }
-    }
-
-    /// <summary>Prevents annotated type from being exported, if its base type was marked with <see cref="InheritedExportAttribute"/>.</summary>
-    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-    public sealed class PartNotDiscoverableAttribute : Attribute { }
-
-    /// <summary>Specifies that exported type instance should be NonShared (created in each Import - aka Transient)
-    /// or Shared (created once and then reused in each Import - aka Singleton).</summary>
-    public enum CreationPolicy
-    {
-        /// <summary>Default for compatibility with MEF .NET 4.5, in DryIoc means the same as <see cref="Shared"/>.</summary>
-        Any,
-        /// <summary>(default) Exported type instance will be created once and then reused in each Import - aka Singleton</summary>
-        Shared,
-        /// <summary>Exported type instance will be created in each Import - aka Transient.</summary>
-        NonShared
-    }
-
-    /// <summary>Specifies <see cref="CreationPolicy"/> fro Exported type.</summary>
-    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
-    public sealed class PartCreationPolicyAttribute : Attribute
-    {
-        /// <summary>Creation policy, Shared by default.</summary>
-        public CreationPolicy CreationPolicy { get; private set; }
-
-        /// <summary>Creates attribute.</summary> <param name="policy"><see cref="CreationPolicy"/></param>
-        public PartCreationPolicyAttribute(CreationPolicy policy)
-        {
-            CreationPolicy = policy;
-        }
-    }
-
-    /// <summary>Specifies that annotated constructor should be used for creating Exported type.</summary>
-    [AttributeUsage(AttributeTargets.Constructor)]
-    public class ImportingConstructorAttribute : Attribute { }
-
-    /// <summary>Specifies that for parameter, property or field should be injected with service instance identified by
-    /// attribute settings. Import is not required for constructor parameters in Exported type: it is needed only
-    /// if you want specify <see cref="ContractType"/> type different from parameter type.
-    /// For properties and fields attribute is required, otherwise they won't be injected.</summary>
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
-    public class ImportAttribute : Attribute
-    {
-        /// <summary>Optional, identifies Exported service with equal <see cref="ExportAttribute.ContractName"/> to be injected.</summary>
-        public string ContractName { get; set; }
-
-        /// <summary>Optional, identifies Exported service with equal <see cref="ExportAttribute.ContractType"/> to be injected.
-        /// The specified type should be assignable to annotated parameter, property or field type.</summary>
-        public Type ContractType { get; set; }
-
-        /// <summary>Allow default value for the member if corresponding Exported service was found.
-        /// If not specified, then instead of default value Exception will be thrown.</summary>
-        public bool AllowDefault { get; set; }
-
-        /// <summary>Creates default attribute. Required for property or field to be imported. May be omitted for parameters.</summary>
-        public ImportAttribute() { }
-
-        /// <summary>Import with matched <see cref="ExportAttribute.ContractType"/>. Type should assignable to annotated member.</summary>
-        /// <param name="contractType"></param>
-        public ImportAttribute(Type contractType)
-            : this(null, contractType)
-        {
-        }
-
-        /// <summary>Import with matched <see cref="ExportAttribute.ContractName"/>.</summary>
-        /// <param name="contractName"></param>
-        public ImportAttribute(string contractName)
-            : this(contractName, null)
-        {
-        }
-
-        /// <summary>Import with both matched <see cref="ExportAttribute.ContractName"/> and <see cref="ExportAttribute.ContractType"/>.</summary>
-        /// <param name="contractName"></param> <param name="contractType"></param>
-        public ImportAttribute(string contractName, Type contractType)
-        {
-            ContractName = contractName;
-            ContractType = contractType;
-        }
-    }
-
-    /// <summary>Specifies that a property, field, or parameter should be populated with all
-    /// matching exports by the <see cref="T:System.ComponentModel.Composition.Hosting.CompositionContainer" /> object.</summary>
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
-    public class ImportManyAttribute : Attribute
-    {
-        /// <summary>Gets the contract name of the exports to import.</summary>
-        /// <returns>The contract name of the exports to import. The default value is an empty string ("").</returns>
-        public string ContractName { get; private set; }
-
-        /// <summary>Gets the contract type of the export to import.</summary>
-        /// <returns>The type of the export that this import is expecting. The default value is null, which means that the type will be obtained by looking at the type on the member that this import is attached to. If the type is <see cref="T:System.Object" />, the import will match any exported type.</returns>
-        public Type ContractType { get; private set; }
-
-        /// <summary>Initializes a new instance of the <see cref="T:System.ComponentModel.Composition.ImportManyAttribute" /> class, importing the set of exports with the default contract name.</summary>
-        public ImportManyAttribute()
-          : this((string)null)
-        {
-        }
-
-        /// <summary>Initializes a new instance of the <see cref="T:System.ComponentModel.Composition.ImportManyAttribute" /> class, importing the set of exports with the contract name derived from the specified type.</summary>
-        /// <param name="contractType">The type to derive the contract name of the exports to import, or null to use the default contract name.</param>
-        public ImportManyAttribute(Type contractType)
-          : this(null, contractType)
-        {
-        }
-
-        /// <summary>Initializes a new instance of the <see cref="T:System.ComponentModel.Composition.ImportManyAttribute" /> class, importing the set of exports with the specified contract name.</summary>
-        /// <param name="contractName">The contract name of the exports to import, or null or an empty string ("") to use the default contract name.</param>
-        public ImportManyAttribute(string contractName)
-          : this(contractName, null)
-        {
-        }
-
-        /// <summary>Initializes a new instance of the <see cref="T:System.ComponentModel.Composition.ImportManyAttribute" /> class, importing the set of exports with the specified contract name and contract type.</summary>
-        /// <param name="contractName">The contract name of the exports to import, or null or an empty string ("") to use the default contract name.</param>
-        /// <param name="contractType">The type of the export to import.</param>
-        public ImportManyAttribute(string contractName, Type contractType)
-        {
-            ContractName = contractName;
-            ContractType = contractType;
-        }
-    }
-
-    /// <summary>Specifies that annotated attribute should be used as metadata object associated with Export.
-    /// You can create your won custom Export attribute with metadata by deriving from <see cref="ExportAttribute"/> and
-    /// annotating new attribute with <see cref="MetadataAttributeAttribute"/>.</summary>
-    [AttributeUsage(AttributeTargets.Class)]
-    public class MetadataAttributeAttribute : Attribute { }
-
-    /// <summary>Specifies metadata for a type, property, field, or method marked with the <see cref="ExportAttribute"/>.</summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method | AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Interface, AllowMultiple = true, Inherited = false)]
-    public sealed class ExportMetadataAttribute : Attribute
-    {
-        /// <summary>Initializes a new instance of the <see cref="ExportMetadataAttribute"/> class.</summary>
-        /// <param name="name">The name.</param>
-        /// <param name="value">The value.</param>
-        public ExportMetadataAttribute(string name, object value)
-        {
-            Name = name;
-            Value = value;
-        }
-
-        /// <summary>Gets or sets a value that indicates whether this item is marked with this attribute more than once.</summary>
-        public bool IsMultiple { get; set; }
-
-        /// <summary>Gets the name of the metadata value.</summary>
-        public string Name { get; }
-
-        /// <summary>Gets the metadata value.</summary>
-        public object Value { get; }
-    }
-
-    /// <summary>Notifies a part when its imports have been satisfied.</summary>
-    public interface IPartImportsSatisfiedNotification
-    {
-        /// <summary>Called when a part's imports have been satisfied and it is safe to use.</summary>
-        void OnImportsSatisfied();
-    }
-
-    /// <summary>Can be imported by parts that wish to dynamically create instances of other parts.</summary>
-    /// <typeparam name="T">The contract type of the created parts.</typeparam>
-    public class ExportFactory<T>
-    {
-        /// <summary>Initializes a new instance of the <see cref="ExportFactory{T}"/> class.</summary>
-        /// <param name="exportCreator">Action invoked upon calls to the Create() method.</param>
-        public ExportFactory(Func<KeyValuePair<T, Action>> exportCreator)
-        {
-            if (exportCreator == null)
-                throw new ArgumentNullException(nameof(exportCreator));
-            _exportLifetimeContextCreator = exportCreator;
-        }
-
-        /// <summary>Create an instance of the exported part.</summary>
-        /// <returns>A handle allowing the created part to be accessed then released.</returns>
-        public ExportLifetimeContext<T> CreateExport()
-        {
-            var partAndDisposeAction = _exportLifetimeContextCreator();
-            return new ExportLifetimeContext<T>(partAndDisposeAction.Key, partAndDisposeAction.Value);
-        }
-
-        private readonly Func<KeyValuePair<T, Action>> _exportLifetimeContextCreator;
-    }
-
-    /// <summary>An ExportFactory that provides metadata describing the created exports.</summary>
-    /// <typeparam name="T">The contract type being created.</typeparam>
-    /// <typeparam name="TMetadata">The metadata required from the export.</typeparam>
-    public class ExportFactory<T, TMetadata> : ExportFactory<T>
-    {
-        /// <summary>
-        /// Construct an ExportFactory.
-        /// </summary>
-        /// <param name="exportCreator">Action invoked upon calls to the Create() method.</param>
-        /// <param name="metadata">The metadata associated with the export.</param>
-        public ExportFactory(Func<KeyValuePair<T, Action>> exportCreator, TMetadata metadata)
-            : base(exportCreator)
-        {
-            Metadata = metadata;
-        }
-
-        /// <summary>The metadata associated with the export.</summary>
-        public TMetadata Metadata { get; }
-    }
-
-    /// <summary>A handle allowing the graph of parts associated with an exported instance to be released.</summary>
-    /// <typeparam name="T"></typeparam>
-    public sealed class ExportLifetimeContext<T> : IDisposable
-    {
-        /// <summary>Initializes a new instance of the <see cref="ExportLifetimeContext{T}"/> class.</summary>
-        /// <param name="value">The value of the export.</param>
-        /// <param name="disposeAction">An action that releases resources associated with the export.</param>
-        public ExportLifetimeContext(T value, Action disposeAction)
-        {
-            Value = value;
-            _disposeAction = disposeAction;
-        }
-
-        /// <summary>The exported value.</summary>
-        public T Value { get; }
-
-        /// <summary>Release the parts associated with the exported value.</summary>
-        public void Dispose() => _disposeAction?.Invoke();
-
-        private readonly Action _disposeAction;
-    }
-}
-#endif

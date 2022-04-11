@@ -14,7 +14,7 @@ namespace DryIoc.IssuesTests
             container.Register(typeof(ISomeService<>), typeof(SomeService<>), Reuse.Transient,
                 made: Parameters.Of.Details((req, p) => 
                     p.ParameterType.GetGenericDefinitionOrNull() == typeof(IStrategy<>) && 
-                    p.ParameterType.GetGenericParamsAndArgs().Any(x => x.IsAssignableTo<IFoo>())
+                    p.ParameterType.GetGenericArguments().Any(x => x.IsAssignableTo<IFoo>())
                     ? null                              // the default behavior 
                     : ServiceDetails.Of(value: null))   // otherwise return the `null` value
                 );

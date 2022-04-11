@@ -16,9 +16,9 @@ namespace DryIoc.IssuesTests.Samples
                 if (!serviceType.IsAbstract)
                     return null; // Mock interface or abstract class only.
 
-                return new ReflectionFactory(made: Made.Of(
+                return ReflectionFactory.Of(made: Made.Of(
                     serviceReturningExpr: () => Substitute.For(Arg.Index<Type[]>(0), Arg.Index<object[]>(1)),
-                    _ => new[] { serviceType }, _ => (object[])null));
+                    _  => new[] { serviceType }, _ => (object[])null));
             }));
 
             var sub = container.Resolve<INotImplementedService>();
@@ -35,9 +35,9 @@ namespace DryIoc.IssuesTests.Samples
                 if (!serviceType.IsAbstract)
                     return null; // Mock interface or abstract class only.
                 
-                return new ReflectionFactory(made: Made.Of(
+                return ReflectionFactory.Of(made: Made.Of(
                     serviceReturningExpr: () => Substitute.For(Arg.Index<Type[]>(0), Arg.Index<object[]>(1)),
-                    _ => new[] { serviceType }, _ => (object[])null));
+                    _  => new[] { serviceType }, _ => (object[])null));
             }));
 
             container.Register<TestClient>();

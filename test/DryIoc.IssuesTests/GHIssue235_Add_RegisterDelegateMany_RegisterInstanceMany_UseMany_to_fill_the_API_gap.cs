@@ -54,6 +54,25 @@ namespace DryIoc.IssuesTests
             Assert.IsTrue(container.IsRegistered<X>());
         }
 
+        [Test]
+        public void Should_use_the_same_instance_for_multiple_interfaces()
+        {
+            var container = new Container();
+
+            var x = new X();
+
+            using (var scope = container.OpenScope())
+            {
+                scope.Use(typeof(A), x);
+                scope.Use(typeof(B), x);
+                Assert.IsInstanceOf<X>(scope.Resolve<A>());
+                Assert.IsInstanceOf<X>(scope.Resolve<B>());
+
+                Assert.IsTrue(scope.IsUsed<A>());
+                // Assert.IsTrue(container.IsRegisteredOrUsed<A>());
+            }
+        }
+
         internal interface A { }
         public interface B { }
         public class X : A, B { }

@@ -1,6 +1,6 @@
 using System;
 using Castle.DynamicProxy;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace DryIoc.Interception
 {
@@ -19,10 +19,10 @@ namespace DryIoc.Interception
             Type serviceType, ParameterSelector interceptorsParameterSelector, object serviceKey = null)
         {
             Type proxyType;
-            if (serviceType.IsInterface())
+            if (serviceType.IsInterface)
                 proxyType = ProxyBuilder.CreateInterfaceProxyTypeWithTargetInterface(
                     serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
-            else if (serviceType.IsClass())
+            else if (serviceType.IsClass)
                 proxyType = ProxyBuilder.CreateClassProxyTypeWithTarget(
                     serviceType, ArrayTools.Empty<Type>(), ProxyGenerationOptions.Default);
             else

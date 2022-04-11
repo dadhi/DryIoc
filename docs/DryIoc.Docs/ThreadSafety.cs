@@ -7,6 +7,8 @@
 - [Thread Safety](#thread-safety)
   - [DryIoc is Thread-Safe](#dryioc-is-thread-safe)
   - [Locking is only used for reused service creation](#locking-is-only-used-for-reused-service-creation)
+    - [Update: Since DryIoc v4.5 `lock` is no longer used for creation of scoped and singleton services (except for the older platforms)](#update-since-dryioc-v45-lock-is-no-longer-used-for-creation-of-scoped-and-singleton-services-except-for-the-older-platforms)
+    - [Outdated: Locking is used for creation of scoped and singleton services](#outdated-locking-is-used-for-creation-of-scoped-and-singleton-services)
 
 
 ## DryIoc is Thread-Safe
@@ -27,8 +29,8 @@ using System;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 using NUnit.Framework;
-using ImTools;
 using DryIoc;
+using DryIoc.ImTools;
 #pragma warning disable CS0649
 // ReSharper disable UnusedVariable
 //md```
@@ -66,6 +68,16 @@ __Note:__ In addition to providing thread-safety the described Container structu
 
 
 ## Locking is only used for reused service creation
+
+
+### Update: Since DryIoc v4.5 `lock` is no longer used for creation of scoped and singleton services (except for the older platforms)
+
+DryIoc now uses the spin-wait based approach to ensure that service creation happens once. 
+
+__Note:__ Until the DryIoc v5 the `lock` is still used for the older platforms (< .NET Standard 2.0, < NET 4.5). So the DryIoc v5 is fully lock-free. 
+
+
+### Outdated: Locking is used for creation of scoped and singleton services
 
 Lock is required to ensure that creation of reused service happens only once. For instance for singleton service A:
 ```cs md*/

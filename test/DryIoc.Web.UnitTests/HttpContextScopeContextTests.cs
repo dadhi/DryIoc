@@ -15,12 +15,12 @@ namespace DryIoc.Web.UnitTests
             c.Register<Blah>(Reuse.InWebRequest);
 
             var contextProxy = new HttpContextScopeContext(() => fakeContextItems);
-            using (contextProxy.SetCurrent(current => new Scope(current, Reuse.WebRequestScopeName)))
+            using (contextProxy.SetCurrent(current => Scope.Of(current, Reuse.WebRequestScopeName)))
             {
                 var expected = c.Resolve<Blah>();
                 Assert.AreSame(expected, c.Resolve<Blah>());
 
-                using (contextProxy.SetCurrent(current => new Scope(current, null)))
+                using (contextProxy.SetCurrent(current => Scope.Of(current, null)))
                 {
                     Assert.AreSame(expected, c.Resolve<Blah>());
                 }

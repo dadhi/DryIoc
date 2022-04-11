@@ -167,7 +167,7 @@ class One_level_deep_registration_API
     {
         var container = new Container();
 
-        container.Register(typeof(IA), new ReflectionFactory(typeof(A), Reuse.Singleton));
+        container.Register(typeof(IA), ReflectionFactory.Of(typeof(A), Reuse.Singleton));
 
         var a = container.Resolve<IA>();
         Assert.IsInstanceOf<A>(a);
@@ -611,9 +611,9 @@ public class RegisterMany_examples
         // Provides full control to you
         container.RegisterMany(new[] { typeof(A).Assembly },
             getServiceTypes: implType => implType.GetImplementedServiceTypes(),
-            getImplFactory: implType => new ReflectionFactory(implType,
-                reuse: implType.IsAssignableTo<IDisposable>() ? Reuse.Scoped : Reuse.Transient,
-                made: FactoryMethod.ConstructorWithResolvableArguments));
+            getImplFactory:  implType => ReflectionFactory.Of(implType,
+                implType.IsAssignableTo<IDisposable>() ? Reuse.Scoped : Reuse.Transient,
+                FactoryMethod.ConstructorWithResolvableArguments));
     }
 } /*md
 ```

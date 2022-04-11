@@ -4,8 +4,8 @@ using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 using DryIocAttributes;
 
-using FastExpressionCompiler.LightExpression;
-using static FastExpressionCompiler.LightExpression.Expression;
+using DryIoc.FastExpressionCompiler.LightExpression;
+using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 
 namespace DryIoc.IssuesTests
 {

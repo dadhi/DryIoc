@@ -1,12 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net45;netstandard2.0;netstandard1.0</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net35;net40;net45;netstandard1.0;netstandard1.3;netstandard2.0;portable-net45+win8+wpa81+wp8;portable-net40+win8+wpa81+wp8+sl5</TargetFrameworks>
-        <TargetFrameworks Condition="'$(NoLegacy)' == 'true'">net45;netstandard1.0;netstandard1.3;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>net45;netstandard2.0;netstandard2.1</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>4.8.8</VersionPrefix>
-        <VersionSuffix></VersionSuffix>
+        <VersionPrefix>5.0.0</VersionPrefix>
+        <VersionSuffix>preview-01</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -17,55 +15,17 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-## v4.8.8 Bug-fix release
+## v5.0.0 
 
-- fixed: #460 Getting instance from parent scope even if replaced by Use
+Breaking:
 
-## v4.8.7 Bug-fix release
+- Removing PCL and .NET 3.5, .NET 4.0 targets
 
-- fixed: #435 hangfire use dryioc report ContainerIsDisposed
-- fixed: #449 Optional dependency shouldn't treat its own dependencies as optional
-- fixed: #451 Compiler-generated type as a service
-- fixed: #456 One more regression
-
-## v4.8.6 Bug-fix release
-
-- fixed: #446 Resolving a record without registration causes a StackOverflowException
-
-## v4.8.5 Bug-fix release
-
-- fixed: NY bug of RegisterInstance of null string
-
-## v4.8.4 Bug-fix release
-
-- fixed: #434 ReturnDefaultIfNotRegistered is not respected between scopes
-- fixed: #435 hangfire use dryioc report ContainerIsDisposed
-
-## v4.8.3 Bug-fix release
-
-- fixed: #418 Resolving interfaces with covariant type parameter fails when using RegisterMapping
-- fixed: #432 Resolving interfaces with contravariant type parameter fails with RegisteringImplementationNotAssignableToServiceType error
-
-
-## v4.8.2 Improvement release
-
-- fixed: #429 Memory leak on MS DI with Disposable Transient
-
-## v4.8.1 Bug-fix release
-
-- fixed: #412 ResolveMany not work with generics after any Unregister
-
-## v4.8.0 Small feature release
-
-- added: #406 Allow the registration of the partially closed implementation type
+Performance speedup and the memory footprint reduced
 
 ]]>
     </PackageReleaseNotes>
     </PropertyGroup>
-
-    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard1.3'">
-        <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.3.0" />
-    </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.3.0" />

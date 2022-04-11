@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using DryIoc.IssuesTests;
 
@@ -13,14 +13,15 @@ namespace DryIoc.UnitTests
             // new GHIssue460_Getting_instance_from_parent_scope_even_if_replaced_by_Use().Run();
             // new OpenGenericsTests().Run();
             // new GHIssue391_Deadlock_during_Resolve().Run();
+
+            //new DynamicRegistrationsTests().Run();
             // new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration().Run();
-            // new GHIssue380_ExportFactory_throws_Container_disposed_exception().Run();
-            // new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made().Run();
-            // new GHIssue406_Allow_the_registration_of_the_partially_closed_implementation_type().Run();
+            // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
         }
 
         public static void RunAllTests()
         {
+            Scope.WaitForScopedServiceIsCreatedTimeoutTicks = 50; // @important
             var failed = false;
             var totalTestPassed = 0;
             void Run(Func<int> run, string name = null)
@@ -42,13 +43,15 @@ namespace DryIoc.UnitTests
             var sw = Stopwatch.StartNew();
 
             Console.WriteLine();
-            Console.WriteLine("NETCOREAPP2.1: Running UnitTests and IssueTests...");
+            Console.WriteLine("Running UnitTests and IssueTests (.NET Core) ...");
             Console.WriteLine();
 
             var tests = new ITest[] 
             {
+                new ContainerTests(),
                 new OpenGenericsTests(),
                 new DynamicRegistrationsTests(),
+                new SelectConstructorWithAllResolvableArgumentTests(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
                 new GHIssue391_Deadlock_during_Resolve(),
@@ -56,6 +59,7 @@ namespace DryIoc.UnitTests
                 new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made(),
                 new GHIssue406_Allow_the_registration_of_the_partially_closed_implementation_type(),
                 new GHIssue460_Getting_instance_from_parent_scope_even_if_replaced_by_Use(),
+                new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added

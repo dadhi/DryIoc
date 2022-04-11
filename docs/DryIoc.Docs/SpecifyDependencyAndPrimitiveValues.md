@@ -480,7 +480,7 @@ class Full_spec_with_reflection
         var container = new Container();
 
         container.Register<IFoo, Foo>(made: Made.Of(
-            factoryMethod: r => FactoryMethod.Of(typeof(Foo).GetConstructorOrNull(args: new[] { typeof(IDependency) })),
+            r => FactoryMethod.Of(typeof(Foo).GetConstructorOrNull(args: new[] { typeof(IDependency) })),
             parameters: Parameters.Of.Type<IDependency>(requiredServiceType: typeof(TestDependency)),
             propertiesAndFields: PropertiesAndFields.Auto));
     }

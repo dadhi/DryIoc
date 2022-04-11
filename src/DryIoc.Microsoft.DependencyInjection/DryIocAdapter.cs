@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2016-2021 Maksim Volkau
+Copyright (c) 2016-2022 Maksim Volkau
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,7 @@ THE SOFTWARE.
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;  // for MethodImplAttribute
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DryIoc.Microsoft.DependencyInjection
@@ -71,8 +72,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// </summary>
         public DryIocServiceProviderFactory(
             IContainer container = null,
-            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null) : 
-            this(container, RegistrySharing.CloneAndDropCache, registerDescriptor) {}
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null) :
+            this(container, RegistrySharing.CloneAndDropCache, registerDescriptor)
+        { }
 
         /// <summary>
         /// `container` is the existing container which will be cloned with the MS.DI rules and its cache will be dropped,
@@ -88,22 +90,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
 
         /// <inheritdoc />
-        public IContainer CreateBuilder(IServiceCollection services)
-        {
-            var container = _container;
-            if (container == null)
-                container = new Container(Rules.MicrosoftDependencyInjectionRules);
-            else if (container.Rules != Rules.MicrosoftDependencyInjectionRules)
-                container = container.With(container.Rules.WithMicrosoftDependencyInjectionRules(), 
-                    container.ScopeContext, _registrySharing, container.SingletonScope);
-
-            container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
-
-            if (services != null)
-                container.Populate(services, _registerDescriptor);
-
-            return container;
-        }
+        public IContainer CreateBuilder(IServiceCollection services) =>
+            (_container ?? new Container(Rules.MicrosoftDependencyInjectionRules))
+                .WithDependencyInjectionAdapter(services, _registerDescriptor, _registrySharing);
 
         /// <inheritdoc />
         public IServiceProvider CreateServiceProvider(IContainer container) =>
@@ -114,20 +103,6 @@ namespace DryIoc.Microsoft.DependencyInjection
     /// to simplify work with adapted container.</summary>
     public static class DryIocAdapter
     {
-        /// <summary>Creates the container and the `IServiceProvider` because its implemented by `IContainer` -
-        /// you get simply the best of both worlds.</summary>
-        public static IContainer Create(
-            IEnumerable<ServiceDescriptor> services,
-            Func<IRegistrator, ServiceDescriptor, bool> registerService = null)
-        {
-            var container = new Container(Rules.MicrosoftDependencyInjectionRules);
-
-            container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
-            container.Populate(services, registerService);
-
-            return container;
-        }
-
         /// <summary>Adapts passed <paramref name="container"/> to Microsoft.DependencyInjection conventions,
         /// registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>,
         /// and returns NEW container.
@@ -135,6 +110,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <param name="container">Source container to adapt.</param>
         /// <param name="descriptors">(optional) Specify service descriptors or use <see cref="Populate"/> later.</param>
         /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
+        /// <param name="registrySharing">(optional) Use DryIoc <see cref="RegistrySharing"/> capability.</param>
         /// <example>
         /// <code><![CDATA[
         /// 
@@ -143,27 +119,39 @@ namespace DryIoc.Microsoft.DependencyInjection
         ///     // you may register the services here:
         ///     container.Register<IMyService, MyService>(Reuse.Scoped)
         /// 
-        ///     var adaptedContainer = container.WithDependencyInjectionAdapter(services);
-        ///     IServiceProvider serviceProvider = adaptedContainer; // the container implements IServiceProvider
+        ///     // applies the MS.DI rules and registers the infrastructure helpers and service collection to the container
+        ///     var adaptedContainer = container.WithDependencyInjectionAdapter(services); 
+        ///
+        ///     // the container implements IServiceProvider
+        ///     IServiceProvider serviceProvider = adaptedContainer;
         ///
         ///]]></code>
         /// </example>
         /// <remarks>You still need to Dispose adapted container at the end / application shutdown.</remarks>
         public static IContainer WithDependencyInjectionAdapter(this IContainer container,
             IEnumerable<ServiceDescriptor> descriptors = null,
-            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
+            RegistrySharing registrySharing = RegistrySharing.Share)
         {
             if (container.Rules != Rules.MicrosoftDependencyInjectionRules)
-                container = container.With(rules => rules.WithMicrosoftDependencyInjectionRules());
+                container = container.With(container.Rules.WithMicrosoftDependencyInjectionRules(),
+                    container.ScopeContext, registrySharing, container.SingletonScope);
 
-            container.Use<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
+            var capabilities = new DryIocServiceProviderCapabilities(container);
+            var singletons = container.SingletonScope;
+            singletons.Use<IServiceProviderIsService>(capabilities);
+            singletons.Use<ISupportRequiredService>(capabilities);
+            singletons.UseFactory<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
 
-            // Registers service collection
             if (descriptors != null)
                 container.Populate(descriptors, registerDescriptor);
 
             return container;
         }
+
+        /// <summary>Sugar to create the DryIoc container and adapter populated with services</summary>
+        public static IServiceProvider CreateServiceProvider(this IServiceCollection services) =>
+            new Container(DryIoc.Rules.MicrosoftDependencyInjectionRules).WithDependencyInjectionAdapter(services);
 
         /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
         public static IContainer WithCompositionRoot(this IContainer container, Type compositionRootType)
@@ -234,34 +222,34 @@ namespace DryIoc.Microsoft.DependencyInjection
                         container.RegisterDescriptor(descriptor);
         }
 
-        /// <summary>Uses passed descriptor to register service in container: 
-        /// maps DI Lifetime to DryIoc Reuse,
-        /// and DI registration type to corresponding DryIoc Register, RegisterDelegate or RegisterInstance.</summary>
-        /// <param name="container">The container.</param>
-        /// <param name="descriptor">Service descriptor.</param>
+        /// <summary>Converts the MS.DI ServiceLifetime into the corresponding `DryIoc.IReuse`</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static IReuse ToReuse(this ServiceLifetime lifetime) =>
+            lifetime == ServiceLifetime.Singleton ? Reuse.Singleton :
+            lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton : // see, that we have Reuse.ScopedOrSingleton here instead of Reuse.Scoped
+            Reuse.Transient;
+
+        /// <summary>Unpacks the service descriptor to register the service in DryIoc container</summary>
         public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor)
         {
-            if (descriptor.ImplementationType != null)
+            var serviceType = descriptor.ServiceType;
+            var implType = descriptor.ImplementationType;
+            if (implType != null)
             {
-                var reuse = descriptor.Lifetime == ServiceLifetime.Singleton ? Reuse.Singleton
-                    : descriptor.Lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton
-                    : Reuse.Transient;
-
-                container.Register(descriptor.ServiceType, descriptor.ImplementationType, reuse);
+                container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType,
+                    null, null, isStaticallyChecked: implType == serviceType);
             }
             else if (descriptor.ImplementationFactory != null)
             {
-                var reuse = descriptor.Lifetime == ServiceLifetime.Singleton ? Reuse.Singleton
-                    : descriptor.Lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton
-                    : Reuse.Transient;
-
-                container.RegisterDelegate(true, descriptor.ServiceType,
-                    descriptor.ImplementationFactory,
-                    reuse);
+                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory.ToFactoryDelegate, descriptor.Lifetime.ToReuse()), serviceType,
+                    null, null, isStaticallyChecked: true);
             }
             else
             {
-                container.RegisterInstance(true, descriptor.ServiceType, descriptor.ImplementationInstance);
+                var instance = descriptor.ImplementationInstance;
+                container.Register(InstanceFactory.Of(instance), serviceType,
+                    null, null, isStaticallyChecked: true);
+                container.TrackDisposable(instance);
             }
         }
     }
@@ -280,7 +268,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         public IServiceScope CreateScope()
         {
             var r = _scopedResolver;
-            var scope = r.ScopeContext == null ? new Scope(r.CurrentScope) : r.ScopeContext.SetCurrent(p => new Scope(p));
+            var scope = r.ScopeContext == null
+                ? Scope.Of(r.OwnCurrentScope)
+                : r.ScopeContext.SetCurrent(p => Scope.Of(p));
             return new DryIocServiceScope(r.WithCurrentScope(scope));
         }
     }
@@ -297,5 +287,40 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Disposes the underlying resolver context</summary>
         public void Dispose() => _resolverContext.Dispose();
+    }
+
+    /// <summary>Wrapper of DryIoc `IsRegistered` and `Resolve` throwing the exception on unresolved type capabilities.</summary>
+    public sealed class DryIocServiceProviderCapabilities : IServiceProviderIsService, ISupportRequiredService
+    {
+        private readonly IContainer _container;
+        /// <summary>Statefully wraps the passed <paramref name="container"/></summary>
+        public DryIocServiceProviderCapabilities(IContainer container) => _container = container;
+
+        /// <inheritdoc />
+        public bool IsService(Type serviceType)
+        {
+            // I am not fully comprehend but MS.DI considers asking for the open-generic type even if it is registered to return `false`
+            // Probably mixing here the fact that open type cannot be instantiated without providing the concrete type argument.
+            // But I think it is conflating two things and making the reasoning harder.
+            if (serviceType.IsGenericTypeDefinition)
+                return false;
+
+            if (serviceType == typeof(IServiceProviderIsService) ||
+                serviceType == typeof(ISupportRequiredService) ||
+                serviceType == typeof(IServiceScopeFactory))
+                return true;
+
+            if (_container.IsRegistered(serviceType))
+                return true;
+
+            if (serviceType.IsGenericType &&
+                _container.IsRegistered(serviceType.GetGenericTypeDefinition()))
+                return true;
+
+            return _container.IsRegistered(serviceType, factoryType: FactoryType.Wrapper);
+        }
+
+        /// <inheritdoc />
+        public object GetRequiredService(Type serviceType) => _container.Resolve(serviceType);
     }
 }

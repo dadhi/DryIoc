@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace DryIoc.UnitTests
 {
@@ -13,11 +13,12 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<InitializableService>();
-            container.RegisterDelegateDecorator<InitializableService>(r => (x =>
-            {
-                x.Initialize("blah");
-                return x;
-            }));
+            container.RegisterDelegate<InitializableService, InitializableService>(x =>
+                {
+                    x.Initialize("blah");
+                    return x;
+                },
+                setup: Setup.Decorator);
 
             var service = container.Resolve<InitializableService>();
 
@@ -29,8 +30,8 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             container.Register<IInitializable<InitializableService>, InitializableService>();
-            container.RegisterDelegateDecorator<IInitializable<InitializableService>>(
-                r => x => x.Initialize("blah"));
+            container.RegisterDelegate<IInitializable<InitializableService>, IInitializable<InitializableService>>(
+                x => x.Initialize("blah"), setup: Setup.DecoratorWith(useDecorateeReuse: true));
 
             var service = (InitializableService)container.Resolve<IInitializable<InitializableService>>();
 
@@ -258,6 +259,84 @@ namespace DryIoc.UnitTests
             {
                 Service = service;
             }
+        }
+
+        [Test]
+        public void Issue_466_with_initializer()
+        {
+            Container container = new Container();
+
+            int initCount = 0;
+
+            container.Register<Session>(reuse: Reuse.Scoped);
+            container.RegisterInitializer<Session>(
+                initialize: (session, context) =>
+                {
+                    ++initCount;
+                    var scope = context.CurrentScope;
+                    Assert.IsFalse(scope.IsDisposed);
+                });
+
+            {
+                using var scope01 = ScopeSession(container, "S1");
+                Assert.AreEqual(1, initCount);
+
+                scope01.Resolve<Session>();
+                Assert.AreEqual(1, initCount); // should not change
+            }
+
+            using var scope02 = ScopeSession(container, "S2");
+            Assert.AreEqual(2, initCount);
+
+            scope02.Resolve<Session>();
+            Assert.AreEqual(2, initCount); // should not change
+        }
+
+
+        [Test]
+        public void Issue_466_with_decorator()
+        {
+            Container container = new Container();
+
+            int initCount = 0;
+
+            container.Register<Session>(reuse: Reuse.Scoped);
+            container.RegisterDelegate<Session, IResolverContext, Session>(
+                (session, context) =>
+                {
+                    ++initCount;
+                    var scope = context.CurrentScope;
+                    Assert.IsFalse(scope.IsDisposed);
+                    return session;
+                },
+                setup: Setup.DecoratorWith(useDecorateeReuse: true, preventDisposal: true));
+
+            {
+                using var scope01 = ScopeSession(container, "S1");
+                Assert.AreEqual(1, initCount);
+
+                scope01.Resolve<Session>();
+                Assert.AreEqual(1, initCount); // should not change
+            }
+
+            using var scope02 = ScopeSession(container, "S2");
+            Assert.AreEqual(2, initCount);
+
+            scope02.Resolve<Session>();
+            Assert.AreEqual(2, initCount); // should not change
+        }
+
+        static IResolverContext ScopeSession(IResolverContext container, string id)
+        {
+            var scope = container.OpenScope();
+            var session = scope.Resolve<Session>();
+            return scope;
+        }
+
+        internal class Session : IDisposable
+        {
+            public bool IsDisposed;
+            public void Dispose() => IsDisposed = true;
         }
     }
 }

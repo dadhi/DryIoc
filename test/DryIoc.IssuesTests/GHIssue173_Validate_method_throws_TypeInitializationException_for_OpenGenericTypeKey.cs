@@ -1,4 +1,4 @@
-using FastExpressionCompiler.LightExpression;
+using DryIoc.FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
