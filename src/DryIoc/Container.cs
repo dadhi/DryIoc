@@ -1992,7 +1992,7 @@ namespace DryIoc
             {
                 // copy to local `cache` will prevent NRE if cache is set to null from outside
                 var cache = (rs as Registry)?.DefaultFactoryCache;
-                return cache == null ? null : cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
+                return cache == null ? null : cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
             }
 
             internal sealed class KeyedFactoryCacheEntry
@@ -2016,7 +2016,7 @@ namespace DryIoc
                 var cache = (rs as Registry)?.KeyedFactoryCache;
                 if (cache != null)
                 {
-                    var entry = cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(serviceTypeHash, serviceType);
+                    var entry = cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
                     if (entry != null)
                         for (var x = (KeyedFactoryCacheEntry)entry.Value; x != null && result == null; x = x.Rest)
                             if (ReferenceEquals(x.Key, key))
@@ -2172,7 +2172,7 @@ namespace DryIoc
                     if (map == null)
                         Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
 
-                    var entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
+                    var entry = map.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
                     if (entry == null)
                     {
                         entry = new ImHashMapEntry<Type, object>(serviceTypeHash, serviceType);
@@ -2181,10 +2181,10 @@ namespace DryIoc
                         if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
                         {
                             if (newMap == oldMap)
-                                entry = map.GetEntryOrDefault(serviceTypeHash, serviceType);
+                                entry = map.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
                         }
                         else
-                            entry = Ref.SwapAndGetNewValue(ref map, entry, (x, en) => x.AddOrKeepEntry(en)).GetEntryOrDefault(serviceTypeHash, serviceType);
+                            entry = Ref.SwapAndGetNewValue(ref map, entry, (x, en) => x.AddOrKeepEntry(en)).GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
                     }
 
                     var e = entry.Value;

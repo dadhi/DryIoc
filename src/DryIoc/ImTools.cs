@@ -5094,18 +5094,37 @@ namespace DryIoc.ImTools
             map == ImHashMap<K, V>.Empty ? new Dictionary<K, V>(0) :
                 map.ForEach(new Dictionary<K, V>(), (e, _, d) => d.Add(e.Key, e.Value));
 
-        /// <summary>Get the key value entry if the hash and key is in the map or the default `null` value otherwise.</summary>
+        /// <summary>Get the key-value entry if the hash and key is in the map or the default `null` value otherwise.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMapEntry<K, V> GetEntryOrDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
         {
             var e = map.GetEntryOrNull(hash);
-
             if (e is ImHashMapEntry<K, V> kv)
                 return kv.Key.Equals(key) ? kv : null;
 
             if (e is HashConflictingEntry<K, V> hc)
                 foreach (var x in hc.Conflicts)
                     if (x.Key.Equals(key))
+                        return x;
+
+            return null;
+        }
+
+        /// <summary>Get the key-value entry if the hash and key is in the map or the default `null` value otherwise.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMapEntry<K, V> GetEntryOrDefaultByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key) where K : class
+        {
+            var e = map.GetEntryOrNull(hash);
+            return e is ImHashMapEntry<K, V> kv
+                ? ReferenceEquals(kv.Key, key) ? kv : null
+                : GetEntryOrDefaultFromConflictingEntryByReferenceEquals(e, key);
+        }
+
+        private static ImHashMapEntry<K, V> GetEntryOrDefaultFromConflictingEntryByReferenceEquals<K, V>(ImHashMap<K, V>.Entry e, K key) where K : class
+        {
+            if (e is HashConflictingEntry<K, V> hc)
+                foreach (var x in hc.Conflicts)
+                    if (ReferenceEquals(x.Key, key))
                         return x;
 
             return null;
