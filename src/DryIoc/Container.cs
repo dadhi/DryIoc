@@ -285,9 +285,58 @@ namespace DryIoc
         /// For diagnostics reasons, you may globally set the rule <see cref="DryIoc.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved"/> to alter the behavior. 
         /// It may help to highlight the issues by throwing the original rich <see cref="ContainerException"/> instead of just returning the `null`.
         /// </summary>
-        object IServiceProvider.GetService(Type serviceType) =>
-            ((IResolver)this).Resolve(serviceType,
-                Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered);
+        object IServiceProvider.GetService(Type serviceType)
+        {
+            // Note: The method body is inlined from the Resolve below, 
+            // avoiding the need for greedy calculation of
+            // `Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered`
+            object service = null;
+            ResolveGenerated(ref service, serviceType);
+            if (service != null)
+                return service;
+
+            var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
+
+            // inlined GetCachedDefaultFactoryOrDefault
+            var entry = (_registry.Value as Registry)
+                ?.DefaultFactoryCache?[serviceTypeHash & Registry.CACHE_SLOT_COUNT_MASK]
+                ?.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
+
+            if (entry != null)
+            {
+                if (entry.Value is FactoryDelegate cachedDelegate)
+                    return cachedDelegate(this);
+
+                if (ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var usedInstance))
+                {
+                    entry.Value = null; // reset the cache
+                    return usedInstance;
+                }
+
+                var rules = Rules;
+                while (entry.Value is Expression expr)
+                {
+                    if (rules.UseInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var result))
+                        return result;
+
+                    // set to Compiling to notify other threads to use the interpretation until the service is compiled
+                    if (Interlocked.CompareExchange(ref entry.Value, new Registry.Compiling(expr), expr) == expr)
+                    {
+                        var compiledFactory = expr.CompileToFactoryDelegate(rules.UseInterpretation);
+                        entry.Value = compiledFactory; // todo: @unclear should we instead cache only after invoking the factory delegate
+                        return compiledFactory(this);
+                    }
+                }
+
+                if (entry.Value is Registry.Compiling compiling)
+                    return Interpreter.TryInterpretAndUnwrapContainerException(this, compiling.Expression, out var result) ? result
+                         : compiling.Expression.CompileToFactoryDelegate(rules.UseInterpretation)(this);
+            }
+
+            var ifUnresolved = Rules.ServiceProviderGetServiceShouldThrowIfUnresolved 
+                ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
+            return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
+        }
 
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
@@ -297,7 +346,12 @@ namespace DryIoc
                 return service;
 
             var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
-            var entry = Registry.GetCachedDefaultFactoryOrDefault(_registry.Value, serviceTypeHash, serviceType);
+
+            // inlined GetCachedDefaultFactoryOrDefault
+            var entry = (_registry.Value as Registry)
+                ?.DefaultFactoryCache?[serviceTypeHash & Registry.CACHE_SLOT_COUNT_MASK]
+                ?.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
+
             if (entry != null)
             {
                 if (entry.Value is FactoryDelegate cachedDelegate)
@@ -1990,9 +2044,7 @@ namespace DryIoc
             [MethodImpl((MethodImplOptions)256)]
             public static ImHashMapEntry<Type, object> GetCachedDefaultFactoryOrDefault(ImHashMap<Type, object> rs, int serviceTypeHash, Type serviceType)
             {
-                // copy to local `cache` will prevent NRE if cache is set to null from outside
-                var cache = (rs as Registry)?.DefaultFactoryCache;
-                return cache == null ? null : cache[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
+                return (rs as Registry)?.DefaultFactoryCache?[serviceTypeHash & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
             }
 
             internal sealed class KeyedFactoryCacheEntry
