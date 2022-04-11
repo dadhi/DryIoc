@@ -1625,7 +1625,6 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
   [Host]     : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
   DefaultJob : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
 
-
 |       Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
 |       DryIoc |  1.535 us | 0.0143 us | 0.0111 us |  1.00 |    0.00 |  0.4749 | 0.0076 |     - |   2.91 KB |

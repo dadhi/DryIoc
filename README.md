@@ -99,6 +99,30 @@ Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical 
 
 #### Hot run - Opening the scope and resolving the root scoped service for the Nth time
 
+DryIoc 5.0.0 (.MsDI 5.0.0), MsDI 6.0.0, Grace 7.2.1 (.MsDI 7.1.0), Autofac 6.3.0 (.MsDI 7.2.0), Lamar 8.0.1
+
+```md
+BenchmarkDotNet=v0.12.1, OS=Windows 10.0.19043
+Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical cores
+.NET Core SDK=6.0.201
+  [Host]     : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
+  DefaultJob : .NET Core 6.0.3 (CoreCLR 6.0.322.12309, CoreFX 6.0.322.12309), X64 RyuJIT
+
+|       Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|       DryIoc |  1.535 us | 0.0143 us | 0.0111 us |  1.00 |    0.00 |  0.4749 | 0.0076 |     - |   2.91 KB |
+|  DryIoc_MsDI |  2.405 us | 0.0277 us | 0.0246 us |  1.57 |    0.02 |  0.4807 | 0.0076 |     - |   2.96 KB |
+|         MsDI |  3.655 us | 0.0726 us | 0.0807 us |  2.40 |    0.05 |  0.7629 | 0.0114 |     - |   4.68 KB |
+|        Grace |  1.807 us | 0.0241 us | 0.0213 us |  1.18 |    0.02 |  0.5169 | 0.0076 |     - |   3.17 KB |
+|   Grace_MsDI |  2.576 us | 0.0421 us | 0.0394 us |  1.68 |    0.03 |  0.5569 | 0.0076 |     - |   3.41 KB |
+|   Lamar_MsDI |  6.673 us | 0.0876 us | 0.0732 us |  4.35 |    0.06 |  0.9995 | 0.4959 |     - |   6.16 KB |
+|      Autofac | 47.040 us | 0.7367 us | 0.6531 us | 30.65 |    0.48 |  7.7515 | 0.6104 |     - |  47.73 KB |
+| Autofac_MsDI | 59.566 us | 0.8734 us | 0.7742 us | 38.76 |    0.61 | 11.3525 | 0.9155 |     - |  69.59 KB |
+```
+
+<details>
+<summary>Older versions for the comparison</summary>
+
 DryIoc 5.0.0 (.MsDI 5.0.0), MsDI 5.0.1, Grace 7.2.0 (.MsDI 7.1.0), Autofac 6.1.0 (.MsDI 7.1.0), Lamar 5.0.3
 
 ```md
@@ -118,32 +142,6 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |   Lamar_MsDIAdapter |  6.802 us | 0.0675 us | 0.0563 us |  6.800 us |  1.85 |    0.06 |  1.5335 | 0.7629 |     - |   9.44 KB |
 |             Autofac | 50.699 us | 0.9995 us | 2.3947 us | 49.903 us | 14.13 |    0.81 |  7.7515 | 0.6104 |     - |  47.84 KB |
 | Autofac_MsDIAdapter | 60.233 us | 1.1734 us | 1.2050 us | 60.089 us | 16.38 |    0.46 | 10.7422 | 0.8545 |     - |  66.26 KB |
-
-```
-
-<details>
-<summary>Older versions for the comparison</summary>
-
-DryIoc 4.5.0 (.MsDI 5.0.0), MsDI 3.1.8, Grace 7.1.1 (.MsDI 7.0.1), Autofac 6.0.0 (.MsDI 7.0.2), Lamar 4.3.1
-
-```md
-BenchmarkDotNet=v0.12.0, OS=Windows 10.0.19041
-Intel Core i7-8565U CPU 1.80GHz (Whiskey Lake), 1 CPU, 8 logical and 4 physical cores
-.NET Core SDK=3.1.402
-  [Host]     : .NET Core 3.1.8 (CoreCLR 4.700.20.41105, CoreFX 4.700.20.41903), X64 RyuJIT
-  DefaultJob : .NET Core 3.1.8 (CoreCLR 4.700.20.41105, CoreFX 4.700.20.41903), X64 RyuJIT
-
-
-|       Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------- |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
-|       DryIoc |  1.653 us | 0.0118 us | 0.0104 us |  0.37 |    0.00 |  0.7229 |      - |     - |   2.96 KB |
-|  DryIoc_MsDI |  2.629 us | 0.0524 us | 0.0644 us |  0.58 |    0.01 |  0.7286 |      - |     - |   2.98 KB |
-|        Grace |  2.229 us | 0.0432 us | 0.0546 us |  0.49 |    0.02 |  0.7744 |      - |     - |   3.17 KB |
-|   Grace_MsDI |  3.007 us | 0.0586 us | 0.0675 us |  0.67 |    0.02 |  0.8354 |      - |     - |   3.41 KB |
-|         MsDI |  4.530 us | 0.0437 us | 0.0388 us |  1.00 |    0.00 |  1.0605 |      - |     - |   4.35 KB |
-|   Lamar_MsDI |  9.270 us | 0.0788 us | 0.0737 us |  2.05 |    0.03 |  0.9308 | 0.4578 |     - |    5.7 KB |
-|      Autofac | 60.151 us | 0.5309 us | 0.4707 us | 13.28 |    0.15 | 11.4746 |      - |     - |  47.28 KB |
-| Autofac_MsDI | 74.027 us | 0.5597 us | 0.4370 us | 16.36 |    0.21 | 16.1133 |      - |     - |  66.09 KB |
 ```
 
 </details>
