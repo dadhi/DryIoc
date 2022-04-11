@@ -2,9 +2,9 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.MefAttributedModel</id>
-    <version>7.0.0-preview-01</version>
+    <version>7.0.0</version>
     <authors>Maksim Volkau</authors>
-    <copyright>Copyright © 2013-2021 Maksim Volkau</copyright>
+    <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
     <license type="expression">MIT</license>
     <icon>logo.png</icon>
@@ -15,9 +15,14 @@
         <![CDATA[
 ## v7.0.0 
 
+Improving:
+
+- Depending on DryIoc v5.0.0 and all its goodies
+- Better performance and less memory allocations
+
 Breaking:
 
-- Removing PCL and .NET 3.5, .NET 4.0 targets
+- Removing old PCL and .NET 3.5, .NET 4.0, NET Standard 1.0-1.3 targets
 
 ]]>
     </releaseNotes>

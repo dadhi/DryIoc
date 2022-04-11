@@ -4,7 +4,7 @@
 
         <Product>DryIocAttributes</Product>
         <VersionPrefix>7.0.0</VersionPrefix>
-        <VersionSuffix>preview-01</VersionSuffix>
+        <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -15,10 +15,11 @@
         <PackageTags>MEF Attributes Attributed-Model Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
             <![CDATA[
-
 ## v7.0.0
 
-- Keep the .NET 4.5 and .NET Standard 2.0 targets only
+Breaking:
+
+- Removing old PCL and .NET 3.5, .NET 4.0, NET Standard 1.0-1.3 targets
 
         ]]>
         </PackageReleaseNotes>

@@ -4,7 +4,7 @@
 
         <Product>DryIoc.MefAttributedModel</Product>
         <VersionPrefix>7.0.0</VersionPrefix>
-        <VersionSuffix>preview-01</VersionSuffix>
+        <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -17,7 +17,14 @@
 <![CDATA[
 v7.0.0:
 
-- Keeping net45;netstandard2.0 targets only
+Improving:
+
+- Depending on DryIoc v5.0.0 and all its goodies
+- Better performance and less memory allocations
+
+Breaking:
+
+- Removing old PCL and .NET 3.5, .NET 4.0, NET Standard 1.0-1.3 targets
 
 ]]>
         </PackageReleaseNotes>
