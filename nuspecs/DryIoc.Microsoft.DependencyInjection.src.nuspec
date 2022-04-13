@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.Microsoft.DependencyInjection.src</id>
-    <version>6.0.0</version>
+    <version>6.0.1</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,11 @@
     <tags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</tags>
     <releaseNotes>
 <![CDATA[
+
+## v6.0.1
+
+- Fixed the dependencies versions in the source package
+
 
 ## v6.0.0
 
@@ -25,7 +30,7 @@
     </releaseNotes>
     <dependencies>
       <group>
-        <dependency id="DryIoc" version="4.7.0" />
+        <dependency id="DryIoc" version="5.0.0" />
         <dependency id="Microsoft.Extensions.DependencyInjection.Abstractions" version="6.0.0" />
       </group>
     </dependencies>
