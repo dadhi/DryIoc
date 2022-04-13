@@ -23,8 +23,7 @@ for:
         - image: Visual Studio 2022
 
     build_script:
-      - dotnet build -c:Release -v:m -p:DevMode=false
-      - dotnet test --no-build -c:Release -p:DevMode=false
+      - build_with_packaging.bat
 
     artifacts:
       - path: .\.dist\packages\*.nupkg
