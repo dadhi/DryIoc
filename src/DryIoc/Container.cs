@@ -2013,7 +2013,8 @@ namespace DryIoc
             }
         }
 
-        internal class Registry : ImHashMapEntry<Type, object> // todo: @perf make use out Value, Hash, Type
+        // the registry is derived from the empty ImHashMap in order to slightly improve type information to represent both Services ImHashMap and the Registry with Services, cache, etc.
+        internal class Registry : ImHashMap<Type, object>
         {
             public static readonly ImHashMap<Type, object> Default = ImHashMap<Type, object>.Empty;
 
@@ -2114,7 +2115,8 @@ namespace DryIoc
                 return null; // could be `expr == null` when the cache is reset by Unregister and IfAlreadyRegistered.Replace
             }
 
-            internal Registry(ImHashMap<Type, object> services) : base(0, typeof(Registry)) => Services = services;
+            internal Registry(ImHashMap<Type, object> services) //: base(0, typeof(Registry)) 
+                => Services = services;
 
             internal sealed class AndWrappersAndDecorators : Registry
             {
