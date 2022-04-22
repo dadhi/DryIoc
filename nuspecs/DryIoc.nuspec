@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>5.0.0</version>
+        <version>5.0.1</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,6 +14,12 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v5.0.1 Bug-fix release
+
+- fixed: #470 Regression in 5.0.0 when resolving `Func<IEnumerable<IService>>` with Parameter
+- fixed: #471 Regression in 5.0 when using `Rules.SelectKeyedOverDefaultFactory`
+- fixed: #472 Func with 4 and more arguments is broken in the Interpreter
+
 ## v5.0.0 Major feature release with the breaking changes
 
 Main achievements:

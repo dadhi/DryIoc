@@ -1,6 +1,12 @@
 Version History
 ---------------
 
+## v5.0.1 Bug-fix release / 2022-04-22
+
+- fixed: #470 Regression in 5.0.0 when resolving `Func<IEnumerable<IService>>` with Parameter
+- fixed: #471 Regression in 5.0 when using `Rules.SelectKeyedOverDefaultFactory`
+- fixed: #472 Func with 4 and more arguments is broken in the Interpreter
+
 ## v5.0.0 Major feature release with the breaking changes / 2022-04-11
 
 Main achievements:
