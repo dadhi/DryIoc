@@ -16,7 +16,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test()
         {
-            var c = new Container();
+            var c = new Container(Rules.Default.WithUseInterpretation());
 
             c.Register<IServiceB, ServiceB>();
             c.Register<IDep, Dep>();
@@ -32,9 +32,9 @@ namespace DryIoc.IssuesTests
         class ServiceA
         {
             public IEnumerable<IServiceB> Services;
-            public ServiceA(Func<ServiceA, IEnumerable<IServiceB>> onStart)
+            public ServiceA(Func<ServiceA, string, int, bool, IEnumerable<IServiceB>> onStart)
             {
-                Services = onStart(this);
+                Services = onStart(this, "!", 42, true);
             }
         }
 

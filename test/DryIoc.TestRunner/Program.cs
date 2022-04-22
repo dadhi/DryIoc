@@ -10,12 +10,8 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
     
-            // new GHIssue460_Getting_instance_from_parent_scope_even_if_replaced_by_Use().Run();
-            // new OpenGenericsTests().Run();
-            // new GHIssue391_Deadlock_during_Resolve().Run();
+            // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
 
-            //new DynamicRegistrationsTests().Run();
-            // new GHIssue399_Func_dependency_on_Singleton_resolved_under_scope_breaks_after_disposing_scope_when_WithFuncAndLazyWithoutRegistration().Run();
             // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
         }
 
@@ -60,6 +56,8 @@ namespace DryIoc.UnitTests
                 new GHIssue406_Allow_the_registration_of_the_partially_closed_implementation_type(),
                 new GHIssue460_Getting_instance_from_parent_scope_even_if_replaced_by_Use(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
+                new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter(),
+                new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added

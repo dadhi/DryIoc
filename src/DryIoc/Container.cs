@@ -3287,40 +3287,46 @@ namespace DryIoc
             }
             else if (paramCount == 2)
             {
-                var paramExpr0 = lambdaExpr.GetParameter(0);
-                var paramExpr1 = lambdaExpr.GetParameter(1);
+                var p0 = lambdaExpr.GetParameter(0);
+                var p1 = lambdaExpr.GetParameter(1);
                 if (returnType != typeof(void))
                 {
-                    result = new Func<object, object, object>((arg0, arg1) =>
-                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, new[] { arg0, arg1 }, parentArgs));
+                    result = new Func<object, object, object>((a0, a1) =>
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, new[] { a0, a1 }, parentArgs));
 
-                    if (paramExpr0.Type != typeof(object) || paramExpr1.Type != typeof(object) || returnType != typeof(object))
-                        result = _convertTwoArgFuncMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type, returnType).Invoke(null, new[] { result });
+                    if (p0.Type != typeof(object) || p1.Type != typeof(object) || returnType != typeof(object))
+                        result = _convertTwoArgFuncMethod.MakeGenericMethod(p0.Type, p1.Type, returnType).Invoke(null, new[] { result });
                 }
                 else
                 {
-                    result = new Action<object, object>((arg0, arg1) =>
-                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, new[] { arg0, arg1 }, parentArgs));
+                    result = new Action<object, object>((a0, a1) =>
+                        TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, new[] { a0, a1 }, parentArgs));
 
-                    if (paramExpr0.Type != typeof(object) || paramExpr1.Type != typeof(object))
-                        result = _convertTwoArgActionMethod.MakeGenericMethod(paramExpr0.Type, paramExpr1.Type).Invoke(null, new[] { result });
+                    if (p0.Type != typeof(object) || p1.Type != typeof(object))
+                        result = _convertTwoArgActionMethod.MakeGenericMethod(p0.Type, p1.Type).Invoke(null, new[] { result });
                 }
             }
-            else
+            else 
             {
+                // todo: @feature support interpretation of the lambdas with 5+ parameters
+                if (paramCount > 4)
+                    return false;
+
                 if (returnType != typeof(void))
                 {
                     result = new Func<object[], object>(args =>
                         TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, args, parentArgs));
-                    result = _convertThreeArgFuncMethod.MakeGenericMethod(GetParamsAndReturnType(lambdaExpr, returnType))
-                        .Invoke(null, new[] { result });
+
+                    var convertMethod = paramCount == 3 ? _convertThreeArgFuncMethod : _convertFourArgFuncMethod;
+                    result = convertMethod.MakeGenericMethod(GetParamsAndReturnType(lambdaExpr, returnType)).Invoke(null, new[] { result });
                 }
                 else
                 {
                     result = new Action<object[]>(args =>
                         TryInterpretNestedLambdaBodyAndUnwrapException(r, bodyExpr, lambdaExpr, args, parentArgs));
-                    result = _convertThreeArgActionMethod.MakeGenericMethod(GetParamTypes(lambdaExpr))
-                        .Invoke(null, new[] { result });
+
+                    var convertMethod = paramCount == 3 ? _convertThreeArgActionMethod : _convertFourArgActionMethod;
+                    result = convertMethod.MakeGenericMethod(GetParamTypes(lambdaExpr)).Invoke(null, new[] { result });
                 }
             }
 
@@ -3344,7 +3350,7 @@ namespace DryIoc
         {
             var count = ps.ParameterCount;
             var ts = new Type[count + 1];
-            for (var i = 0; i < ts.Length; ++i)
+            for (var i = 0; i < count; ++i)
                 ts[i] = ps.GetParameter(i).Type;
             ts[count] = returnType;
             return ts;
