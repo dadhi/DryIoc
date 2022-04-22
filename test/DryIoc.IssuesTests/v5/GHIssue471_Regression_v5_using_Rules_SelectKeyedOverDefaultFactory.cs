@@ -20,6 +20,7 @@ namespace DryIoc.IssuesTests
             var serviceKey = ServiceKey.AnotherKey;
 
             container.Register<IDependency, Dependency>(Reuse.Singleton, serviceKey: DependencyKey.SomeKey);
+            container.Register<IDependency, Dependency2>(Reuse.Singleton);
             container.Register<IService, Service>(Reuse.Scoped, serviceKey: ServiceKey.AnotherKey);
 
             var myScope = container
@@ -35,6 +36,7 @@ namespace DryIoc.IssuesTests
 
         interface IDependency { }
         class Dependency : IDependency { }
+        class Dependency2 : IDependency { }
         interface IService { }
         class Service : IService
         {
