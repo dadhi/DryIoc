@@ -18,11 +18,15 @@ namespace DryIoc.IssuesTests
         {
             var c = new Container();
 
+            c.Register<IServiceB, ServiceB>();
+            c.Register<IDep, Dep>();
             c.Register<ServiceA>();
-            c.Register<IServiceB, ServiceB1>();
 
             var a = c.Resolve<ServiceA>();
-            Assert.IsInstanceOf<ServiceB1>(((IServiceB[])a.Services)[0]);
+            var b = ((IServiceB[])a.Services)[0] as ServiceB;
+            Assert.IsNotNull(b);
+            Assert.AreSame(c, b.R);
+            Assert.IsInstanceOf<Dep>(b.D);
         }
 
         class ServiceA
@@ -34,7 +38,19 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        interface IServiceB {}
-        class ServiceB1 : IServiceB {}
+        interface IDep { }
+        class Dep : IDep { }
+
+        interface IServiceB { }
+        class ServiceB : IServiceB
+        {
+            public IResolver R;
+            public IDep D;
+            public ServiceB(IResolver r, IDep d)
+            {
+                R = r;
+                D = d;
+            }
+        }
     }
 }

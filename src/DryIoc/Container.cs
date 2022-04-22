@@ -406,7 +406,7 @@ namespace DryIoc
             if (factory == null)
                 return null;
 
-            var rules = Rules; // todo: @perf inline
+            var rules = Rules;
             FactoryDelegate factoryDelegate;
 
             if (!rules.UseInterpretationForTheFirstResolution)
@@ -429,13 +429,14 @@ namespace DryIoc
                     return value;
                 }
 
-                // Important to cache expression first before tying to interpret, so that parallel resolutions may already use it.
+                // Important to cache expression first before trying to interpret, so that parallel resolutions may already use it.
                 if (factory.CanCache)
                     TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
 
                 // 1) First try to interpret
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
                     return instance;
+
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
             }
@@ -3055,7 +3056,6 @@ namespace DryIoc
                             return true;
                         }
 
-                        // todo: @perf optimize the args creation by pooling it as a TryInterepret parameter and separately handling the New with respective number of parameters 
                         var args = new object[argCount];
                         for (var i = 0; i < args.Length; ++i)
                         {
@@ -3150,7 +3150,7 @@ namespace DryIoc
                             else if (!TryInterpret(r, arg, paramExprs, paramValues, parentArgs, out items[i]))
                                 return false;
                         }
-
+                        // todo: @perf check if using Array.CreateInstance(Type, Int32) is faster
                         result = Converter.ConvertMany(items, newArray.Type.GetElementType());
                         return true;
                     }
@@ -3208,16 +3208,16 @@ namespace DryIoc
                                 result = paramValues; // contains a single arg object
                                 return true;
                             }
-
-                            var args = (object[])paramValues;
-                            for (var i = 0; i < args.Length; ++i)
-                                if (expr == paramExprs.GetParameter(i))
-                                {
-                                    result = args[i];
-                                    return true;
-                                }
+                            if (paramValues is object[] args) // also check that args are not null, see #470
+                            {
+                                for (var i = 0; i < args.Length; ++i)
+                                    if (expr == paramExprs.GetParameter(i))
+                                    {
+                                        result = args[i];
+                                        return true;
+                                    }
+                            }
                         }
-
                         for (var p = parentArgs; p != null; p = p.ParentWithArgs)
                         {
                             if ((paramExprs = p.ParamExprs) == null)
@@ -3228,16 +3228,16 @@ namespace DryIoc
                                 result = p.ParamValues; // contains a single arg object
                                 return true;
                             }
-
-                            var args = (object[])p.ParamValues;
-                            for (var i = 0; i < args.Length; ++i)
-                                if (expr == paramExprs.GetParameter(i))
-                                {
-                                    result = args[i];
-                                    return true;
-                                }
+                            if (p.ParamValues is object[] args) // also check that args are not null, see #470
+                            {
+                                for (var i = 0; i < args.Length; ++i)
+                                    if (expr == paramExprs.GetParameter(i))
+                                    {
+                                        result = args[i];
+                                        return true;
+                                    }
+                            }
                         }
-
                         return false;
                     }
                 case ExprType.Lambda:
