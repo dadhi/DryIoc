@@ -1,0 +1,14 @@
+{
+    "FormattingOptions": {
+        "EnableEditorConfigSupport": false,
+        "OrganizeImports": true
+    },
+    "RoslynExtensionsOptions": {
+        "EnableAnalyzersSupport": false,
+        "EnableDecompilationSupport": false
+    },
+    "script": {
+        "enableScriptNuGetReferences": true,
+        "defaultTargetFramework": "net5.0"
+    }
+}
