@@ -1,4 +1,4 @@
-using System.ComponentModel.Composition;
+// using System.ComponentModel.Composition;
 
 namespace DryIoc.AspNetCore.Sample.Services
 {

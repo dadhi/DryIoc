@@ -1,6 +1,7 @@
 using DryIoc.AspNetCore.Sample.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using static System.Environment;
 
 namespace DryIoc.AspNetCore.Sample.Controllers
 {
@@ -19,8 +20,9 @@ namespace DryIoc.AspNetCore.Sample.Controllers
         [Route("logging")]
         public IActionResult Index()
         {
-            _logger.LogInformation("Hello from logging.");
-            return Ok($"Everything is fine: Transient property is injected == {Transient != null}");
+            _logger.LogInformation("Hello from the Logging.");
+            return Ok($"Everything is fine." + NewLine +
+                "Transient property is injected: {Transient != null}");
         }
     }
 }

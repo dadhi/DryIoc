@@ -3,6 +3,7 @@
 using Microsoft.AspNetCore.Mvc;
 using DryIoc.AspNetCore.Sample.Models.Home;
 using DryIoc.AspNetCore.Sample.Services;
+using static System.Environment;
 
 namespace DryIoc.AspNetCore.Sample.Controllers
 {
@@ -25,8 +26,8 @@ namespace DryIoc.AspNetCore.Sample.Controllers
         {
             var model = new HomeModel
             {
-                Message = $"Transient services are different: {Transient != Scoped.Transient}, "
-                        + $"Singletons are the same: {Transient.Singleton == Scoped.Singleton}, "
+                Message = $"Transient services are different: {Transient != Scoped.Transient}." + NewLine
+                        + $"Singletons are the same: {Transient.Singleton == Scoped.Singleton}." + NewLine
                         + $"Exported service is successfully imported: {Imported != null}"
             };
 

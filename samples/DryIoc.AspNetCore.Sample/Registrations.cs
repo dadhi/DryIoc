@@ -3,10 +3,11 @@ using DryIoc.AspNetCore.Sample.Services;
 
 namespace DryIoc.AspNetCore.Sample
 {
-    public class MyCompositionRoot
+    // Possible organization of registrations by the specifics
+    public static class Registrations
     {
         // If you need the whole container then change the parameter type from IRegistrator to IContainer
-        public MyCompositionRoot(IRegistrator r)
+        public static void RegisterMyBusinessLogic(this IRegistrator r)
         {
             r.Register<ISingletonService, SingletonService>(Reuse.Singleton);
             r.Register<ITransientService, TransientService>(Reuse.Transient);
