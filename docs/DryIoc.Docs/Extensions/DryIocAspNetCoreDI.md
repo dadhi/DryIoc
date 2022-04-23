@@ -13,11 +13,15 @@ dotnet add package DryIoc.Microsoft.DependencyInjection.src
 ```
 
 
-The [package](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection) provides the implementation and the replacement of [Microsoft.Extensions.DependencyInjection](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection?view=aspnetcore-3.1) container with the DryIoc library.
+The [package](https://www.nuget.org/packages/DryIoc.Microsoft.DependencyInjection) provides the implementation and the replacement of [Microsoft.Extensions.DependencyInjection](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection) container with the DryIoc library.
 
-**Ultimately you will get an access to the power and speed of DryIoc in the same time conforming to the MS.DI contract.**
+Ultimately you will get an access to the [power](https://github.com/dadhi/DryIoc#features) and [speed](https://github.com/dadhi/DryIoc#realistic-scenario-with-the-unit-of-work-scope-and-object-graph-of-40-dependencies-4-levels-deep) of the DryIoc at the same time conforming to the MS.DI contract.
 
-The best way to learn it is to look into the [ASP .NET Core application example](https://github.com/dadhi/DryIoc/tree/master/samples/DryIoc.AspNetCore31.WebApi.Sample) in the DryIoc examples folder. There are [a lot of comments](https://github.com/dadhi/DryIoc/blob/01ee04017efb8e3cea5d666e6d92689fc5f7504e/samples/DryIoc.AspNetCore31.WebApi.Sample/Startup.cs#L28) in the example explaining how to use the DryIoc.MS.DI features.
+The best way to learn is to play with the samples in the *samples* folder:
+
+- [ASP .NET Core 6.0 application](https://github.com/dadhi/DryIoc/blob/master/samples/DryIoc.AspNetCore.Sample/Program.cs#L25)
+- [Minimal API application](https://github.com/dadhi/DryIoc/blob/master/samples/MinimalWeb/Program.cs)
+- [older ASP .NET Core 3.1 WebAPI application](https://github.com/dadhi/DryIoc/tree/master/samples/DryIoc.AspNetCore31.WebApi.Sample)
 
 
 ## Conforming to the rules
@@ -25,12 +29,12 @@ The best way to learn it is to look into the [ASP .NET Core application example]
 To conform to the behavior of Microsoft.DependencyInjection the DryIoc applies a set of rules to the new or the **existing** container 
 via `WithMicrosoftDependencyInjectionRules` method.
 
-Those rules include the following:
+Comparing to the default rules of DryIoc those rules are the following:
 
-- adding rule of TrackingDisposableTransients 
-- adding rule of SelectLastRegisteredFactory
-- adding rule of selecting ConstructorWithResolvableArguments
+- adding rule of `TrackingDisposableTransients` 
+- adding rule of `SelectLastRegisteredFactory`
+- adding rule of selecting `ConstructorWithResolvableArguments`
 
-- removing rule of VariantGenericTypesInResolvedCollection
+- removing rule of `VariantGenericTypesInResolvedCollection`
 
-You may decide to add or remove other rules but be aware that the consumer may be surprised when the conventions are not in place.
+You may decide to add or remove other rules but be aware that the consumer side may be surprised when the conventions are not in place.
