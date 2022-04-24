@@ -10,7 +10,7 @@
 //
 #>
 <#@ import Namespace="DryIoc" #>
-<#@ import Namespace="ImTools" #>
+<#@ import Namespace="DryIoc.ImTools" #>
 <#// TODO: Insert the assemblies and namespaces of your services to be registered in container #>
 <#@ import Namespace="Example" #>
 <#+
