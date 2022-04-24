@@ -7432,8 +7432,12 @@ namespace DryIoc.FastExpressionCompiler
 
         /// <summary>Prints valid C# Enum literal</summary>
         public static string ToEnumValueCode(this Type enumType, object x,
-            bool stripNamespace = false, Func<Type, string, string> printType = null) =>
-            $"{enumType.ToCode(stripNamespace, printType)}.{Enum.GetName(enumType, x)}";
+            bool stripNamespace = false, Func<Type, string, string> printType = null)
+        {
+            // x.ToString().Split(',')
+            // todo: @wip
+            return $"{enumType.ToCode(stripNamespace, printType)}.{x}";
+        }
 
         private static Type[] GetGenericTypeParametersOrArguments(this TypeInfo typeInfo) =>
             typeInfo.IsGenericTypeDefinition ? typeInfo.GenericTypeParameters : typeInfo.GenericTypeArguments;

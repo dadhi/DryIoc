@@ -1573,6 +1573,9 @@ namespace DryIoc
             if (item == null)
                 return ConstantNull(itemType);
 
+            if (item is Type t)
+                return ConstantOf(t);
+
             if (item is IConvertibleToExpression convertible)
                 return ConvertConstantToExpression(convertible, throwIfStateRequired);
 
@@ -1602,7 +1605,8 @@ namespace DryIoc
             if (itemExpr != null)
                 return itemExpr;
 
-            Throw.If(throwIfStateRequired || Rules.ThrowIfRuntimeStateRequired, Error.StateIsRequiredToUseItem, item);
+            if (throwIfStateRequired || Rules.ThrowIfRuntimeStateRequired)
+                Throw.StateIsRequiredToUseItem(item, itemType);
             return itemType == null ? Constant(item) : Constant(item, itemType);
         }
 
@@ -4274,12 +4278,12 @@ namespace DryIoc
         public class GeneratedExpressions
         {
             /// <summary>Resolutions roots</summary>
-            public readonly List<KeyValuePair<ServiceInfo, System.Linq.Expressions.Expression<FactoryDelegate>>>
-                Roots = new List<KeyValuePair<ServiceInfo, System.Linq.Expressions.Expression<FactoryDelegate>>>();
+            public readonly List<KeyValuePair<ServiceInfo, Expression<FactoryDelegate>>>
+                Roots = new List<KeyValuePair<ServiceInfo, Expression<FactoryDelegate>>>();
 
             /// <summary>Dependency of Resolve calls</summary>
-            public readonly List<KeyValuePair<Request, System.Linq.Expressions.Expression>>
-                ResolveDependencies = new List<KeyValuePair<Request, System.Linq.Expressions.Expression>>();
+            public readonly List<KeyValuePair<Request, Expression>>
+                ResolveDependencies = new List<KeyValuePair<Request, Expression>>();
 
             /// <summary>Errors</summary>
             public readonly List<KeyValuePair<ServiceInfo, ContainerException>>
@@ -4305,7 +4309,7 @@ namespace DryIoc
                     var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                     if (expr == null)
                         continue;
-                    result.Roots.Add(root.Pair(expr.WrapInFactoryExpression().ToLambdaExpression()));
+                    result.Roots.Add(root.Pair(expr.WrapInFactoryExpression()));
                 }
                 catch (ContainerException ex)
                 {
@@ -4421,21 +4425,20 @@ namespace DryIoc
             var decoratedFactoryID = r.DecoratedFactoryID;
 
             var serviceTypeExpr = Constant(serviceType);
-            var factoryIdExpr = Constant(factoryID); // todo: @perf remove boxing
-            var implTypeExpr = Constant(implementationType);
-            var reuseExpr = r.Reuse == null ? Constant(null, typeof(IReuse))
+            var factoryIdExpr = ConstantInt(factoryID);
+            var implTypeExpr = ConstantOf(implementationType);
+            var reuseExpr = r.Reuse == null ? ConstantNull<IReuse>()
                 : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
 
-            // todo: @perf replace with the comparison to ServiceDetails.Default 
             if (d.IfUnresolved == IfUnresolved.Throw && d.RequiredServiceType == null && d.ServiceKey == null && d.MetadataKey == null && d.Metadata == null &&
                 factoryType == FactoryType.Service && flags == default(RequestFlags) && decoratedFactoryID == 0)
                 return Call(parentExpr, Request.PushMethodWith4Args.Value,
                     serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr);
 
-            var requiredServiceTypeExpr = Constant(d.RequiredServiceType);
+            var requiredServiceTypeExpr = ConstantOf(d.RequiredServiceType);
             var serviceKeyExpr = container.GetConstantExpression(d.ServiceKey, typeof(object));
-            var factoryTypeExpr = Constant(factoryType); // todo: @perf all types to the singleton constants
-            var flagsExpr = Constant(flags);// todo: @perf remove boxing
+            var factoryTypeExpr = ConstantOf(factoryType); // todo: @perf all types to the singleton constants same as IfUnresolved below
+            var flagsExpr = ConstantOf(flags);
 
             if (d.IfUnresolved == IfUnresolved.Throw && d.MetadataKey == null && d.Metadata == null && decoratedFactoryID == 0)
                 return Call(parentExpr, Request.PushMethodWith8Args.Value,
@@ -4443,7 +4446,7 @@ namespace DryIoc
                     factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr, flagsExpr);
 
             var ifUnresolvedExpr = d.IfUnresolved.ToConstant();
-            var decoratedFactoryIDExpr = Constant(decoratedFactoryID);
+            var decoratedFactoryIDExpr = ConstantOf(decoratedFactoryID);
 
             if (d.MetadataKey == null && d.Metadata == null)
                 return Call(parentExpr, Request.PushMethodWith10Args.Value,
@@ -5942,7 +5945,7 @@ namespace DryIoc
             WithSettings(_settings & ~Settings.EagerCachingSingletonForFasterAccess);
 
         /// <summary><see cref="WithExpressionGeneration"/>.</summary>
-        public Ref<ImHashMap<Request, System.Linq.Expressions.Expression>> DependencyResolutionCallExprs { get; private set; }
+        public Ref<ImHashMap<Request, Expression>> DependencyResolutionCallExprs { get; private set; }
 
         /// <summary>Indicates that container is used for generation purposes, so it should use less runtime state</summary>
         public bool UsedForExpressionGeneration => (_settings & Settings.UsedForExpressionGeneration) != 0;
@@ -5961,7 +5964,7 @@ namespace DryIoc
         {
             var newRules = Clone();
             newRules._settings = GetSettingsForExpressionGeneration(allowRuntimeState);
-            newRules.DependencyResolutionCallExprs = Ref.Of(ImHashMap<Request, System.Linq.Expressions.Expression>.Empty);
+            newRules.DependencyResolutionCallExprs = Ref.Of(ImHashMap<Request, Expression>.Empty);
             return newRules;
         }
 
@@ -6165,7 +6168,7 @@ namespace DryIoc
             Made made,
             IfAlreadyRegistered defaultIfAlreadyRegistered,
             int dependencyCountInLambdaToSplitBigObjectGraph,
-            Ref<ImHashMap<Request, System.Linq.Expressions.Expression>> dependencyResolutionCallExprs,
+            Ref<ImHashMap<Request, Expression>> dependencyResolutionCallExprs,
             ItemToExpressionConverterRule itemToExpressionConverter,
             DynamicRegistrationProvider[] dynamicRegistrationProviders, DynamicRegistrationFlags[] dynamicRegistrationProvidersFlags,
             UnknownServiceResolver[] unknownServiceResolvers,
@@ -8567,8 +8570,8 @@ namespace DryIoc
             if (factoryExpr == null)
                 return;
 
-            request.Container.Rules.DependencyResolutionCallExprs.Swap(request, factoryExpr,
-                (x, req, facExpr) => x.AddOrUpdate(req, facExpr.ToExpression()));
+            request.Container.Rules.DependencyResolutionCallExprs.Swap(
+                request, factoryExpr, (x, req, facExpr) => x.AddOrUpdate(req, facExpr));
         }
     }
 
@@ -8934,11 +8937,14 @@ namespace DryIoc
             string metadataKey = null, object metadata = null) =>
             new WithDetails(serviceType, new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata, null, false));
 
-        /// <summary>Type of service to create. Indicates registered service in registry.</summary>
+        /// <summary>Type of service, identifies the registered service in registry.</summary>
         public abstract Type ServiceType { get; }
 
         /// <summary>Additional settings. If not specified uses <see cref="ServiceDetails.Default"/>.</summary>
         public virtual ServiceDetails Details => ServiceDetails.Default;
+
+        /// <summary>Service key provided with registration.</summary>
+        public object ServiceKey => Details.ServiceKey;
 
         /// <summary>Creates info from service type and details.</summary>
         public virtual ServiceInfo Create(Type serviceType, ServiceDetails details) =>
@@ -11653,7 +11659,7 @@ namespace DryIoc
                 if (factoryFunc != null)
                 {
                     if (rules.ThrowIfRuntimeStateRequired)
-                        Throw.It(Error.StateIsRequiredToUseItem, factoryFunc.Target);
+                        Throw.StateIsRequiredToUseItem(factoryFunc.Target);
                 }
                 else
                 {
@@ -12511,7 +12517,7 @@ namespace DryIoc
             // GetConstant here is needed to check the runtime state rule
             var container = request.Container;
             if (container.Rules.ThrowIfRuntimeStateRequired)
-                Throw.It(Error.StateIsRequiredToUseItem, _factoryDelegate);
+                Throw.StateIsRequiredToUseItem(_factoryDelegate);
 
             var serviceType = request.GetActualServiceType();
 
@@ -14139,7 +14145,7 @@ namespace DryIoc
             NoConversionOperatorFoundWhenInterpretingTheConvertExpression = Of(
                 "There is no explicit or implicit conversion operator found when interpreting {0} to {1} in expression: {2}"),
             StateIsRequiredToUseItem = Of(
-                "Runtime state is required to inject (or use) the: {0}. " + NewLine +
+                "Runtime state is required to inject (or use) the object of type `{0}` and value: `{1}`. " + NewLine +
                 "The reason is using RegisterDelegate, Use, RegisterInitializer/Disposer, or registering with non-primitive service key, or metadata." + NewLine +
                 "You can convert run-time value to expression via container.With(rules => rules.WithItemToExpressionConverter(YOUR_ITEM_TO_EXPRESSION_CONVERTER))."),
             ArgValueIndexIsProvidedButNoArgValues = Of(
@@ -14393,6 +14399,11 @@ namespace DryIoc
         /// the dispose stack trace if it is supported by resolver context.</summary>
         public static void ScopeIsDisposed(IScope scope, IResolverContext r) =>
             It(Error.ScopeIsDisposed, scope.ToString(), r?.DisposeInfo ?? "<not available>");
+
+        /// <summary>Print the d*mn exception</summary>
+        public static void StateIsRequiredToUseItem(object item, Type itemType = null) =>
+            It(Error.StateIsRequiredToUseItem, (itemType ?? item.GetType()).ToCode(printGenericTypeArgs: true), item);
+
     }
 
     /// <summary>Called from the generated code to check if WeakReference.Value is GCed.</summary>

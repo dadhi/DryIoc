@@ -26,9 +26,10 @@ THE SOFTWARE.
 <#@ output extension=".cs" #>
 <#@ assembly Name="DryIoc.dll" #>
 <#@ import Namespace="System.Linq" #>
+<#@ import Namespace="System.Text" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.ImTools" #>
-<#@ import Namespace="DryIoc.FastExpressionCompiler.LigthExpression" #>
+<#@ import Namespace="DryIoc.FastExpressionCompiler.LightExpression" #>
 <#@ include File="CompileTimeRegistrations.ttinclude" #>
 <#
 var container = GetContainerWithRegistrations().With(rules => rules.ForExpressionGeneration());
@@ -47,9 +48,9 @@ string RemoveUsings(string source)
 
 string Code(object x) =>
     x == null ? "null" :
-    x is Expression e ? RemoveUsings(e.ToCSharpString()) :
-    x is Request r ? Code(container.GetRequestExpression(r.ToExpression()) :
-    Code(container.GetConstantExpression(x, x.GetType(), true).ToExpression());
+    x is Expression e ? RemoveUsings(e.ToCSharpString(new StringBuilder(), identSpaces: 4).ToString()) :
+    x is Request r ? Code(container.GetRequestExpression(r)) :
+    Code(container.GetConstantExpression(x, x.GetType(), true));
 
 string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.').Last();
 
@@ -217,11 +218,11 @@ namespace DryIoc
 <#
                 }
 
-                if (includeVariants && rootGroup.Key.IsGeneric())
+                if (includeVariants && rootGroup.Key.IsGenericType)
                 {
                     var sourceType = rootGroup.Key;
                     var variants = rootCodes
-                        .Where(x => x.ServiceType.IsGeneric() &&
+                        .Where(x => x.ServiceType.IsGenericType &&
                             x.ServiceType.GetGenericTypeDefinition() == sourceType.GetGenericTypeDefinition() &&
                             x.ServiceType != sourceType && x.ServiceType.IsAssignableTo(sourceType));
                     foreach (var variant in variants)
