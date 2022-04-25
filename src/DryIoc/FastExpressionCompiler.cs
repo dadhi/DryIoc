@@ -6430,6 +6430,8 @@ namespace DryIoc.FastExpressionCompiler
                                 if (p.ParameterType.IsByRef)
                                     sb.Append(p.IsOut ? "out " : p.IsIn ? "in " : "ref ");
 
+                                // @debug
+                                // sb.Append($"[lineIdent:{lineIdent}]");
                                 args[i].ToCSharpString(sb, lineIdent + identSpaces, stripNamespace, printType, identSpaces, tryPrintConstant);
                             }
                         }

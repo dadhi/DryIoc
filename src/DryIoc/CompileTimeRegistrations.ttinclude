@@ -26,9 +26,11 @@
         // for example:
         container.Register<IService, MyService>();
         container.Register<IDependencyA, DependencyA>();
-        container.Register(typeof(DependencyB<>));
+
+        container.Register(typeof(DependencyB<>), setup: Setup.With(asResolutionCall: true));
+
         container.RegisterPlaceholder<RuntimeDependencyC>();
-        
+
         // or from the assembly:
         // container.RegisterMany(new[] { MyAssembly });
 
@@ -44,7 +46,6 @@
     // TODO: Explicitly specified roots to generate ...
     ServiceInfo[] CustomResolutionRoots =
     {
-        // for example:
         ServiceInfo.Of<Example.IService>(), 
     };
 

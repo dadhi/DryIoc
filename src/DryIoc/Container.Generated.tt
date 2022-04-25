@@ -41,36 +41,45 @@ var result = container.GenerateResolutionExpressions(x => x.SelectMany(r =>
 
 string RemoveUsings(string source)
 {
+    source = source.Replace("DryIoc.", "");
     foreach (var x in NamespaceUsings)
         source = source.Replace(x + ".", "");
     return source;
 }
 
-string Code(object x) =>
+string Code(object x, int lineIdent = 0) =>
     x == null ? "null" :
-    x is Expression e ? RemoveUsings(e.ToCSharpString(new StringBuilder(), identSpaces: 4).ToString()) :
-    x is Request r ? Code(container.GetRequestExpression(r)) :
-    Code(container.GetConstantExpression(x, x.GetType(), true));
+    x is Expression e ? RemoveUsings(e.ToCSharpString(new StringBuilder(), lineIdent, identSpaces: 4).ToString()) :
+    x is Request r ? Code(container.GetRequestExpression(r), lineIdent) :
+    Code(container.GetConstantExpression(x, x.GetType(), true), lineIdent);
+
+// without `typeof`
+string TypeOnlyCode(Type type) => RemoveUsings(type.ToCode(printGenericTypeArgs: true));
 
 string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.').Last();
 
 string OptArg(string arg) => arg == "null" ? "" : ", " + arg;
 
-var rootCodes = result.Roots.Select((r, i) => 
+int getServiceBodyLineIdent = 16;
+
+var rootCodes = result.Roots.Select((r, i) =>
     new { ServiceType = r.Key.ServiceType,
           ServiceTypeCode = Code(r.Key.ServiceType),
+          ServiceTypeOnlyCode = TypeOnlyCode(r.Key.ServiceType),
           ServiceKeyCode = Code(r.Key.ServiceKey),
           RequiredServiceTypeCode = Code(r.Key.Details.RequiredServiceType),
-          ExpressionCode = Code(r.Value.Body),
-          CreateMethodName = "Get_" + i + "_" + GetTypeNameOnly(r.Key.ServiceType.Name) });
+          ExpressionCode = Code(r.Value.Body, getServiceBodyLineIdent),
+          CreateMethodName = "Get_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i });
 
-var depCodes = result.ResolveDependencies.Select((r, i) => 
+var depCodes = result.ResolveDependencies.Select((r, i) =>
     new { ServiceType = Code(r.Key.ServiceType),
-          ServiceKey = Code(r.Key.ServiceKey), ServiceKeyObject = r.Key.ServiceKey,
-          Expression = Code(r.Value),
+          ServiceTypeOnly = TypeOnlyCode(r.Key.ServiceType),
+          ServiceKey = Code(r.Key.ServiceKey),
+          ServiceKeyObject = r.Key.ServiceKey,
+          Expression = Code(r.Value, getServiceBodyLineIdent),
           RequiredServiceType = Code(r.Key.RequiredServiceType),
-          PreResolveParent = Code(r.Key.Parent),
-          CreateMethodName = "GetDep_" + i + "_" + GetTypeNameOnly(r.Key.ServiceType.Name) });
+          PreResolveParent = Code(r.Key.Parent, getServiceBodyLineIdent + 8),
+          CreateMethodName = "GetDependency_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i });
 #>
 /*
 ========================================================================================================
@@ -82,7 +91,7 @@ Generation is completed successfully.
 <# } else { #>
 There are <#=errCount#> generation issues (may be not an error dependent on context):
 
-The issues with run-time registrations may be solved by `container.RegisterPlaceholder<T>()` 
+The issues with run-time registrations may be solved by `container.RegisterPlaceholder<T>()`
 in Registrations.ttinclude. Then you can replace placeholders using `Container.Register`
 at runtime.
 
@@ -112,7 +121,7 @@ namespace DryIoc
     {
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID)
         {
-            lastFactoryID = <#=Factory.GetNextID()#>; // generated: equals to the last used Factory.FactoryID 
+            lastFactoryID = <#=Factory.GetNextID()#>; // generated: equals to the last used Factory.FactoryID
         }
 
         partial void ResolveGenerated(ref object service, Type serviceType)
@@ -136,12 +145,12 @@ namespace DryIoc
         {
 <#
         index = 0;
-        foreach (var rootGroup in rootCodes.Where(x => x.ServiceKeyCode != "null").GroupBy(x => x.ServiceTypeCode))
+        foreach (var rootGroup in rootCodes.Where(x => x.ServiceKeyCode != "null").GroupBy(x => x.ServiceType))
         {
             if (index++ > 0) WriteLine(@"
             else");
 #>
-            if (serviceType == <#=rootGroup.Key#>) 
+            if (serviceType == <#=rootGroup.Key#>)
             {
 <#
             var innerIndex = 0;
@@ -165,7 +174,7 @@ namespace DryIoc
             if (index++ > 0) WriteLine(@"
             else");
 #>
-            if (serviceType == <#=depGroup.Key#>) 
+            if (serviceType == <#=depGroup.Key#>)
             {
 <#
             var innerIndex = 0;
@@ -178,7 +187,7 @@ namespace DryIoc
                      : dep.ServiceKeyObject is DefaultKey ? "(serviceKey == null || " + dep.ServiceKey + ".Equals(serviceKey))"
                      : dep.ServiceKey + ".Equals(serviceKey)"#> &&
                     requiredServiceType == <#= dep.RequiredServiceType #> &&
-                    Equals(preRequestParent, <#= dep.PreResolveParent #>)) 
+                    Equals(preRequestParent, <#= dep.PreResolveParent #>))
                     service = <#=dep.CreateMethodName#>(this);
 <#
             }
@@ -189,7 +198,7 @@ namespace DryIoc
 #>
         }
 
-        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType) 
+        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType)
         {
             services = ResolveManyGenerated(serviceType);
         }
@@ -203,20 +212,18 @@ namespace DryIoc
             yield break;
 <#
         }
-        else 
+        else
         {
             foreach (var rootGroup in rootCodes.GroupBy(x => x.ServiceType))
             {
 #>
             if (serviceType == <#=rootGroup.First().ServiceTypeCode#>)
-            {
 <#
                 foreach (var root in rootGroup)
                 {
 #>
                 yield return ResolveManyResult.Of(<#=root.CreateMethodName#><#=OptArg(root.ServiceKeyCode)#><#=OptArg(root.RequiredServiceTypeCode)#>);
-<#
-                }
+<#                }
 
                 if (includeVariants && rootGroup.Key.IsGenericType)
                 {
@@ -232,11 +239,7 @@ namespace DryIoc
 <#
                     }
                 }
-#>
             }
-
-<#
-        }
         }
 #>
         }
@@ -245,24 +248,20 @@ namespace DryIoc
     foreach (var root in rootCodes)
     {
 #>
-        // <#=root.ServiceTypeCode#>
-        internal static object <#=root.CreateMethodName#>(IResolverContext r)
-        {
-            return <#=root.ExpressionCode#>;
-        }
+        // <#=root.ServiceTypeOnlyCode#>
+        internal static object <#=root.CreateMethodName#>(IResolverContext r) =>
+            <#=root.ExpressionCode#>;
 
-<#        
+<#
     }
 #>
 <#
     foreach (var dep in depCodes)
     {
 #>
-        // <#=dep.ServiceType#>
-        internal static object <#=dep.CreateMethodName#>(IResolverContext r)
-        {
-            return <#=dep.Expression#>;
-        }
+        // <#=dep.ServiceTypeOnly#>
+        internal static object <#=dep.CreateMethodName#>(IResolverContext r) =>
+            <#=dep.Expression#>;
 
 <#
     }
