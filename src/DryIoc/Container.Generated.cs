@@ -45,7 +45,7 @@ namespace DryIoc
     {
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID)
         {
-            lastFactoryID = 149; // generated: equals to the last used Factory.FactoryID
+            lastFactoryID = 170; // generated: equals to the last used Factory.FactoryID
         }
 
         partial void ResolveGenerated(ref object service, Type serviceType)
@@ -57,7 +57,7 @@ namespace DryIoc
         partial void ResolveGenerated(ref object service,
             Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
         {
-            if (serviceType == typeof(RuntimeDependencyC))
+            if (serviceType == typeof(DependencyB<string>))
             {
                 if (serviceKey == null &&
                     requiredServiceType == null &&
@@ -65,12 +65,12 @@ namespace DryIoc
                         typeof(IService),
                         null,
                         null,
-                        144,
+                        165,
                         FactoryType.Service,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall)))
-                    service = GetDependency_RuntimeDependencyC_0(this);
+                    service = GetDependency_DependencyB_0(this);
             }
         }
 
@@ -98,7 +98,7 @@ namespace DryIoc
                         typeof(IService),
                         null,
                         null,
-                        144,
+                        165,
                         FactoryType.Service,
                         typeof(MyService),
                         Reuse.Transient,
@@ -113,15 +113,15 @@ namespace DryIoc
                         typeof(IService),
                         null,
                         null,
-                        144,
+                        165,
                         FactoryType.Service,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck),
                     null)));
 
-        // RuntimeDependencyC
-        internal static object GetDependency_RuntimeDependencyC_0(IResolverContext r) =>
+        // DependencyB<string>
+        internal static object GetDependency_DependencyB_0(IResolverContext r) =>
             new DependencyB<string>();
 
     }

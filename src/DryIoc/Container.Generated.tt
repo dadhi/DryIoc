@@ -32,9 +32,9 @@ THE SOFTWARE.
 <#@ import Namespace="DryIoc.FastExpressionCompiler.LightExpression" #>
 <#@ include File="CompileTimeRegistrations.ttinclude" #>
 <#
+// The rules for `ForExpressionGeneration` are required` here because later the `container` will be used for `GetRequestExpression` and `GetConstantExpression`,
+// otherwise we would need to get the container adjusted inside the `GenerateResolutionExpressions`
 var container = GetContainerWithRegistrations().With(rules => rules.ForExpressionGeneration());
-
-var includeVariants = container.Rules.VariantGenericTypesInResolvedCollection;
 
 var result = container.GenerateResolutionExpressions(x => x.SelectMany(r =>
     SpecifyResolutionRoots(r).EmptyIfNull()).Concat(CustomResolutionRoots.EmptyIfNull()));
@@ -80,6 +80,8 @@ var depCodes = result.ResolveDependencies.Select((r, i) =>
           RequiredServiceType = Code(r.Key.RequiredServiceType),
           PreResolveParent = Code(r.Key.Parent, getServiceBodyLineIdent + 8),
           CreateMethodName = "GetDependency_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i });
+
+var includeVariants = container.Rules.VariantGenericTypesInResolvedCollection;
 #>
 /*
 ========================================================================================================

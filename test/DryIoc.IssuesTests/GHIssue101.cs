@@ -29,8 +29,14 @@ namespace DryIoc.IssuesTests
 
             container.RegisterPlaceholder<RuntimeDependencyC>();
 
-            container.Register<Example.RuntimeDependencyC>();
+            var exprs = container.GenerateResolutionExpressions(ServiceInfo.Of<IService>());
+            Assert.AreEqual(0, exprs.Errors.Count);
+            Assert.AreEqual(1, exprs.Roots.Count);
+            Assert.AreEqual(typeof(IService), exprs.Roots[0].Key.ServiceType);
+            Assert.AreEqual(1, exprs.ResolveDependencies.Count);
+            Assert.AreEqual(typeof(DependencyB<string>), exprs.ResolveDependencies[0].Key.ServiceType);
 
+            container.Register<Example.RuntimeDependencyC>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
             var x = container.Resolve<Example.IService>();
 
             Assert.IsNotNull(x);
