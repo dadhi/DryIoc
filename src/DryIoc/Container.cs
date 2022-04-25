@@ -4278,16 +4278,13 @@ namespace DryIoc
         public class GeneratedExpressions
         {
             /// <summary>Resolutions roots</summary>
-            public readonly List<KeyValuePair<ServiceInfo, Expression<FactoryDelegate>>>
-                Roots = new List<KeyValuePair<ServiceInfo, Expression<FactoryDelegate>>>();
+            public readonly List<KeyValuePair<ServiceInfo, Expression<FactoryDelegate>>> Roots = new();
 
             /// <summary>Dependency of Resolve calls</summary>
-            public readonly List<KeyValuePair<Request, Expression>>
-                ResolveDependencies = new List<KeyValuePair<Request, Expression>>();
+            public readonly List<KeyValuePair<Request, Expression>> ResolveDependencies = new();
 
             /// <summary>Errors</summary>
-            public readonly List<KeyValuePair<ServiceInfo, ContainerException>>
-                Errors = new List<KeyValuePair<ServiceInfo, ContainerException>>();
+            public readonly List<KeyValuePair<ServiceInfo, ContainerException>> Errors = new();
         }
 
         /// <summary>Generates expressions for specified roots and their "Resolve-call" dependencies.
@@ -5968,6 +5965,10 @@ namespace DryIoc
             return newRules;
         }
 
+        /// <summary>Removes runtime optimizations preventing an expression generation.</summary>
+        public Rules ForExpressionGeneration(bool allowRuntimeState = false) => 
+            WithSettings(GetSettingsForExpressionGeneration(allowRuntimeState));
+
         /// <summary>Indicates that rules are used for the validation, e.g. the rules created in `Validate` method</summary>
         public bool UsedForValidation => (_settings & Settings.UsedForValidation) != 0;
 
@@ -5995,9 +5996,6 @@ namespace DryIoc
         /// The Condition filters out factory without matching scope.</summary>
         public Rules WithoutImplicitCheckForReuseMatchingScope() =>
             WithSettings(_settings & ~Settings.ImplicitCheckForReuseMatchingScope);
-
-        /// <summary>Removes runtime optimizations preventing an expression generation.</summary>
-        public Rules ForExpressionGeneration(bool allowRuntimeState = false) => WithSettings(GetSettingsForExpressionGeneration());
 
         /// <summary><see cref="WithResolveIEnumerableAsLazyEnumerable"/>.</summary>
         public bool ResolveIEnumerableAsLazyEnumerable =>
@@ -8570,8 +8568,11 @@ namespace DryIoc
             if (factoryExpr == null)
                 return;
 
+            // we need to isolate request when stored in the key, 
+            // otherwise it maybe reused and the key content will be overriden with the new request, leading to the soup pure! see GHIssue101
+            var requestCopy = request.IsolateRequestChain();
             request.Container.Rules.DependencyResolutionCallExprs.Swap(
-                request, factoryExpr, (x, req, facExpr) => x.AddOrUpdate(req, facExpr));
+                requestCopy, factoryExpr, (x, req, facExpr) => x.AddOrUpdate(req, facExpr));
         }
     }
 
