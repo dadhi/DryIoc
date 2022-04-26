@@ -45,7 +45,7 @@ namespace DryIoc
     {
         partial void GetLastGeneratedFactoryID(ref int lastFactoryID)
         {
-            lastFactoryID = 170; // generated: equals to the last used Factory.FactoryID
+            lastFactoryID = 177; // generated: equals to the last used Factory.FactoryID
         }
 
         partial void ResolveGenerated(ref object service, Type serviceType)
@@ -63,10 +63,7 @@ namespace DryIoc
                     requiredServiceType == null &&
                     Equals(preRequestParent, Request.Empty.Push(
                         typeof(IService),
-                        null,
-                        null,
-                        165,
-                        FactoryType.Service,
+                        172,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall)))
@@ -96,10 +93,7 @@ namespace DryIoc
                     null,
                     Request.Empty.Push(
                         typeof(IService),
-                        null,
-                        null,
-                        165,
-                        FactoryType.Service,
+                        172,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck),
@@ -111,10 +105,7 @@ namespace DryIoc
                     null,
                     Request.Empty.Push(
                         typeof(IService),
-                        null,
-                        null,
-                        165,
-                        FactoryType.Service,
+                        172,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck),

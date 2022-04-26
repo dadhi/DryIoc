@@ -4428,9 +4428,14 @@ namespace DryIoc
                 : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
 
             if (d.IfUnresolved == IfUnresolved.Throw && d.RequiredServiceType == null && d.ServiceKey == null && d.MetadataKey == null && d.Metadata == null &&
-                factoryType == FactoryType.Service && flags == default(RequestFlags) && decoratedFactoryID == 0)
-                return Call(parentExpr, Request.PushMethodWith4Args.Value,
-                    serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr);
+                factoryType == FactoryType.Service && decoratedFactoryID == 0)
+            {
+                if (flags == default(RequestFlags))
+                    return Call(parentExpr, Request.PushMethodWith4Args.Value,
+                        serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr);
+                return Call(parentExpr, Request.PushMethodWith5Args.Value,
+                    serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr, ConstantOf(flags));
+            }
 
             var requiredServiceTypeExpr = ConstantOf(d.RequiredServiceType);
             var serviceKeyExpr = container.GetConstantExpression(d.ServiceKey, typeof(object));
@@ -9624,7 +9629,7 @@ namespace DryIoc
 
         #region Used in generated expression
 
-        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        /// <summary>Creates info by supplying the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse) =>
             Push(serviceType, null, null, null, null, IfUnresolved.Throw,
                 factoryID, FactoryType.Service, implementationType, reuse, default, 0);
@@ -9632,7 +9637,15 @@ namespace DryIoc
         internal static readonly Lazy<MethodInfo> PushMethodWith4Args = Lazy.Of(() =>
             typeof(Request).Method(nameof(Push), typeof(Type), typeof(int), typeof(Type), typeof(IReuse)));
 
-        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        /// <summary>Creates info by supplying the properties and chaining it with current (parent) info.</summary>
+        public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse, RequestFlags flags) =>
+            Push(serviceType, null, null, null, null, IfUnresolved.Throw,
+                factoryID, FactoryType.Service, implementationType, reuse, flags, 0);
+
+        internal static readonly Lazy<MethodInfo> PushMethodWith5Args = Lazy.Of(() =>
+            typeof(Request).Method(nameof(Push), typeof(Type), typeof(int), typeof(Type), typeof(IReuse), typeof(RequestFlags)));
+
+        /// <summary>Creates info by supplying the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags) =>
             Push(serviceType, requiredServiceType, serviceKey, null, null, IfUnresolved.Throw,
@@ -9642,7 +9655,7 @@ namespace DryIoc
             typeof(Request).Method(nameof(Push), typeof(Type), typeof(Type), typeof(object),
                 typeof(int), typeof(FactoryType), typeof(Type), typeof(IReuse), typeof(RequestFlags)));
 
-        /// <summary>Creates info by supplying all the properties and chaining it with current (parent) info.</summary>
+        /// <summary>Creates info by supplying the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey, IfUnresolved ifUnresolved,
             int factoryID, FactoryType factoryType, Type implementationType, IReuse reuse, RequestFlags flags,
             int decoratedFactoryID) =>
