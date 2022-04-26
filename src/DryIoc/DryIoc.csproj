@@ -47,10 +47,6 @@ Main "until the next version":
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="..\..\nuspecs\DryIoc\readme.txt" Pack="true" PackagePath="readme.txt" Visible="false" />
-    </ItemGroup>
-
-    <ItemGroup>
       <Compile Update="Container.Generated.cs">
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>

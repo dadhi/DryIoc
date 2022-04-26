@@ -12,6 +12,7 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
+        <readme>readme.md</readme>
         <releaseNotes>
 <![CDATA[
 ## v5.0.1 Bug-fix release
@@ -54,7 +55,7 @@ Main "until the next version":
     <files>
         <file src="..\LICENSE.txt" />
         <file src="..\DryIoc.snk" />
-        <file src="..\nuspecs\DryIoc\readme.txt" />
+        <file src="..\nuspecs\DryIoc\readme.md" />
         <file src="..\logo\logo128.png" target="logo.png" />
 
         <!--Compile-time dependencies-->

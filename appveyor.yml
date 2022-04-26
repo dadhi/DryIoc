@@ -3,7 +3,7 @@ image:
   - Ubuntu
   - macOS
 
-version: 5.0.1-build-{build}
+version: 5.1.0-build-{build}
 
 test: off
 
