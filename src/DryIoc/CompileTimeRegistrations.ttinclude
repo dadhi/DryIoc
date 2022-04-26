@@ -18,39 +18,39 @@
     IContainer GetContainerWithRegistrations()
     {
         var container = new Container();
-
-        // NOTE: `RegisterDelegate`, `RegisterInstance` and `Use` methods are not supported because of runtime state usage. 
-        // Instead you can use `RegisterPlaceholder` to put a hole in the generated object graph, then you fill it in with the runtime registration.
-
-        // TODO: Add the registrations to generate factories for them in compile-time...
-        // for example:
+        
+        // TODO: Register compile-time resolved services with the same DryIoc API
+        // or move them here from the "normal" runtime DI configuration.
+        
+        // These are example registrations to build the IService resolution root and its dependencies
         container.Register<IService, MyService>();
         container.Register<IDependencyA, DependencyA>();
-
         container.Register(typeof(DependencyB<>), setup: Setup.With(asResolutionCall: true));
 
+        // Note that `RegisterDelegate`, `RegisterInstance` and `Use` methods are not supported because
+        // they using the run-time state.
+        // Instead you may use `RegisterPlaceholder` to put a hole in the generated object graph,
+        // then you fill it in with the run-time registration, e.g. `container.Register<RuntimeDependency>();`
         container.RegisterPlaceholder<RuntimeDependencyC>();
 
-        // or from the assembly:
+        // You may batch register assemblies as well
         // container.RegisterMany(new[] { MyAssembly });
 
         return container;
     }
 
     // TODO: For each passed registration specify what resolution roots it provides, null if none
-    ServiceInfo[] SpecifyResolutionRoots(ServiceRegistrationInfo reg)
-    {
-        return reg.AsResolutionRoot ? reg.ToServiceInfo().One() : null;
-    }
+    ServiceInfo[] SpecifyResolutionRoots(ServiceRegistrationInfo reg) =>
+        reg.AsResolutionRoot ? reg.ToServiceInfo().One() : null;
 
-    // TODO: Explicitly specified roots to generate ...
+    // TODO: Specify the resolution roots explicitly
     ServiceInfo[] CustomResolutionRoots =
     {
         ServiceInfo.Of<Example.IService>(), 
     };
 
-    // TODO: Specify the namespace to go into `using` instead of qualify the type all the times, 
-    // You may generate the Container.Generated.cs first, then look what you want to move to using
+    // TODO: Specify the namespace to go into `using` instead of qualifying its types all the times
+    // You may generate the Container.Generated.cs first, then look what you want to move to `using`
     string[] NamespaceUsings =
     {
         "Example",
