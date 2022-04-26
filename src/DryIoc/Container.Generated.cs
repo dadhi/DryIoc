@@ -31,7 +31,6 @@ Generation is completed successfully.
 */
 
 using System;
-using System.Linq; // for Enumerable.Cast method required by LazyEnumerable<T>
 using System.Collections.Generic;
 using System.Threading;
 using DryIoc.ImTools;
