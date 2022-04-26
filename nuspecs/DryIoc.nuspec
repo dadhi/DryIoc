@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>5.0.1</version>
+        <version>5.1.0-preview-01</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -15,28 +15,9 @@
         <readme>readme.md</readme>
         <releaseNotes>
 <![CDATA[
-## v5.0.1 Bug-fix release
+## v5.1.0 Feature release
 
-- fixed: #470 Regression in 5.0.0 when resolving `Func<IEnumerable<IService>>` with Parameter
-- fixed: #471 Regression in 5.0 when using `Rules.SelectKeyedOverDefaultFactory`
-- fixed: #472 Func with 4 and more arguments is broken in the Interpreter
-
-## v5.0.0 Major feature release with the breaking changes
-
-Main achievements:
-
-- Performance speed-up and the less memory allocations (check README for the benchmarks)
-- More consistent and full API (highlight is on the RegisterDelegate overloads)
-
-Main breaking changes:
-
-- Removing PCL and .NET 3.5, .NET 4.0 and .NET Standard 1.0 - 1.3 targets
-- Moving ImTools and FastExpressionCompiler sources to the `DryIoc.ImTools` and `DryIoc.FastExpressionCompiler` namespaces
-- Removing `UseInstance` in favour of `Use` and `RegisterInstance` methods
-
-Main "until the next version":
-
-- Improving compile-time capabilities from the current T4 bound solution
+- Compile-time Dependency Injection
 
 ]]>
         </releaseNotes>
@@ -47,8 +28,9 @@ Main "until the next version":
         </contentFiles>
         <dependencies>
             <group targetFramework="net45" />
+            <group targetFramework="netstandard2.1" />
             <group targetFramework="netstandard2.0">
-                <dependency id="System.Reflection.Emit.Lightweight" version="4.3.0" />
+                <dependency id="System.Reflection.Emit.Lightweight" version="4.7.0" />
             </group>
         </dependencies>
     </metadata>
@@ -58,12 +40,9 @@ Main "until the next version":
         <file src="..\nuspecs\DryIoc\readme.md" />
         <file src="..\logo\logo128.png" target="logo.png" />
 
-        <!--Compile-time dependencies-->
-        <file src="..\nuspecs\DryIoc\tools\ExpressionToCodeLib.2.6.0\ExpressionToCodeLib.dll" target="tools\ExpressionToCodeLib.2.6.0" />
-        
         <!--"build" is the special folder where you can put your .props or .targets files 
         named after the NuGet package to be INCLUDED by NuGet into the target project-->
-        <file src="..\nuspecs\DryIoc\build\DryIoc.props"              target="build" />
+        <!-- <file src="..\nuspecs\DryIoc\build\DryIoc.props"              target="build" /> -->
         <file src="..\src\DryIoc\Container.Generated.tt"              target="CompileTimeDI" />
         <file src="..\src\DryIoc\CompileTimeRegistrations.ttinclude"  target="CompileTimeDI" />
         <file src="..\src\DryIoc\CompileTimeRegistrations.Example.cs" target="CompileTimeDI" />
@@ -84,5 +63,11 @@ Main "until the next version":
         <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\netstandard2.0\DryIoc" />
         <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard2.0\DryIoc" />
         <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\netstandard2.0\DryIoc" />
+
+        <!-- .netstandard 2.1 -->
+        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\netstandard2.1\DryIoc" />
+        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\netstandard2.1\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard2.1\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\netstandard2.1\DryIoc" />
     </files>
 </package>
