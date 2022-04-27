@@ -52,8 +52,10 @@ Main "until the next version":
 
     <Target Name="CompileTimeGenerate" BeforeTargets="BeforeBuild"
         Condition=" '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
+
         <Message Text="Generating the compile-time registrations graphs..." Importance="high"/>
         <Message Text="[TargetDir=$(TargetDir)]" Importance="high"/>
+
         <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet tool restore" />
         <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) %(T4File.Identity)" />
     </Target>

@@ -19,8 +19,8 @@
     {
         var container = new Container();
         
-        // TODO: Register compile-time resolved services with the same DryIoc API
-        // or move them here from the "normal" runtime DI configuration.
+        // TODO: Register compile-time resolved services using the same DryIoc API
+        // or move part (or all) of the existing registrations here from your current DI configuration.
         
         // These are example registrations to build the IService resolution root and its dependencies
         container.Register<IService, MyService>();
