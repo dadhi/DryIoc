@@ -876,7 +876,7 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<object> slot)
+        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImHashMapEntry<int, object> slot)
         {
             if (_registry.Value is Registry r)
                 return r.GetCachedFactoryExpression(factoryId, reuse, out slot);
@@ -1988,7 +1988,7 @@ namespace DryIoc
             withCache.TryCacheKeyedFactory(serviceTypeHash, serviceType, key, factory);
         }
 
-        internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<object> entry = null)
+        internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImHashMapEntry<int, object> entry)
         {
             var withCache = _registry.Value as Registry.AndCache ??
                 (Registry.AndCache)_registry.SwapAndGetNewValue(0, (r, _) => (r as Registry ?? new Registry(r)).WithFactoryExpressionCache()); // todo: @perf optimize
@@ -2037,7 +2037,7 @@ namespace DryIoc
             public virtual ImHashMap<Type, object>[] KeyedFactoryCache => null;
 
             ///<summary>The int key is the `FactoryID`</summary>
-            public virtual ImMap<object>[] FactoryExpressionCache => null;
+            public virtual ImHashMap<int, object>[] FactoryExpressionCache => null;
 
             internal virtual IsRegistryChangePermitted IsChangePermitted => default;
 
@@ -2101,7 +2101,7 @@ namespace DryIoc
             }
 
 
-            internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<object> entry)
+            internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImHashMapEntry<int, object> entry)
             {
                 entry = FactoryExpressionCache?[factoryId & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(factoryId);
                 if (entry == null)
@@ -2143,7 +2143,7 @@ namespace DryIoc
                     new AndCache.CacheAndWrappersAndDecorators(Services, _wrappers, _decorators, null, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, default);
 
                 public override Registry WithFactoryExpressionCache() =>
-                    new AndCache.CacheAndWrappersAndDecorators(Services, _wrappers, _decorators, null, null, new ImMap<object>[CACHE_SLOT_COUNT], IsChangePermitted);
+                    new AndCache.CacheAndWrappersAndDecorators(Services, _wrappers, _decorators, null, null, new ImHashMap<int, object>[CACHE_SLOT_COUNT], IsChangePermitted);
 
                 public override Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
                     new AndCache.CacheAndWrappersAndDecorators(Services, _wrappers, _decorators, null, null, null, isChangePermitted);
@@ -2167,8 +2167,8 @@ namespace DryIoc
                 protected ImHashMap<Type, object>[] _defaultFactoryCache;
                 public sealed override ImHashMap<Type, object>[] KeyedFactoryCache => _keyedFactoryCache;
                 protected ImHashMap<Type, object>[] _keyedFactoryCache;
-                public sealed override ImMap<object>[] FactoryExpressionCache => _factoryExpressionCache;
-                protected ImMap<object>[] _factoryExpressionCache;
+                public sealed override ImHashMap<int, object>[] FactoryExpressionCache => _factoryExpressionCache;
+                protected ImHashMap<int, object>[] _factoryExpressionCache;
                 internal sealed override IsRegistryChangePermitted IsChangePermitted => _isChangePermitted;
                 protected IsRegistryChangePermitted _isChangePermitted;
 
@@ -2179,7 +2179,7 @@ namespace DryIoc
                     ImHashMap<Type, object> services,
                     ImHashMap<Type, object>[] defaultFactoryCache,
                     ImHashMap<Type, object>[] keyedFactoryCache,
-                    ImMap<object>[] factoryExpressionCache,
+                    ImHashMap<int, object>[] factoryExpressionCache,
                     IsRegistryChangePermitted isChangePermitted) : base(services)
                 {
                     _defaultFactoryCache = defaultFactoryCache;
@@ -2234,7 +2234,7 @@ namespace DryIoc
                     var entry = map.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
                     if (entry == null)
                     {
-                        entry = new ImHashMapEntry<Type, object>(serviceTypeHash, serviceType);
+                        entry = ImHashMap.EntryWithDefaultValue<Type, object>(serviceTypeHash, serviceType);
                         var oldMap = map;
                         var newMap = oldMap.AddOrKeepEntry(entry);
                         if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
@@ -2251,21 +2251,21 @@ namespace DryIoc
                         Ref.Swap(ref entry.Value, key, factory, SetOrAddKeyedCacheFactory);
                 }
 
-                internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<object> entry)
+                internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImHashMapEntry<int, object> entry)
                 {
                     if (entry == null)
                     {
                         if (_factoryExpressionCache == null)
-                            Interlocked.CompareExchange(ref _factoryExpressionCache, new ImMap<object>[CACHE_SLOT_COUNT], null);
+                            Interlocked.CompareExchange(ref _factoryExpressionCache, new ImHashMap<int, object>[CACHE_SLOT_COUNT], null);
 
                         ref var map = ref _factoryExpressionCache[factoryId & CACHE_SLOT_COUNT_MASK];
                         if (map == null)
-                            Interlocked.CompareExchange(ref map, ImMap<object>.Empty, null);
+                            Interlocked.CompareExchange(ref map, ImHashMap<int, object>.Empty, null);
 
                         entry = map.GetEntryOrDefault(factoryId);
                         if (entry == null)
                         {
-                            entry = new ImMapEntry<object>(factoryId);
+                            entry = ImHashMap.EntryWithDefaultEntry<object>(factoryId);
                             var oldMap = map;
                             var newMap = oldMap.AddOrKeepEntry(entry);
                             if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
@@ -2322,7 +2322,7 @@ namespace DryIoc
                         {
                             var factoryId = factory.FactoryID;
                             Ref.Swap(ref exprCache[factoryId & CACHE_SLOT_COUNT_MASK],
-                                factoryId, (x, i) => (x ?? ImMap<object>.Empty).UpdateToDefault(i));
+                                factoryId, (x, i) => (x ?? ImHashMap<int, object>.Empty).UpdateToDefault(i));
                         }
                     }
                 }
@@ -2339,7 +2339,7 @@ namespace DryIoc
                         ImHashMap<Type, object> decorators,
                         ImHashMap<Type, object>[] defaultFactoryCache,
                         ImHashMap<Type, object>[] keyedFactoryCache,
-                        ImMap<object>[] factoryExpressionCache,
+                        ImHashMap<int, object>[] factoryExpressionCache,
                         IsRegistryChangePermitted isChangePermitted) :
                         base(services, defaultFactoryCache, keyedFactoryCache, factoryExpressionCache, isChangePermitted)
                     {
@@ -2384,7 +2384,7 @@ namespace DryIoc
                 new AndCache(Services, null, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, default);
 
             public virtual Registry WithFactoryExpressionCache() =>
-                new AndCache(Services, null, null, new ImMap<object>[CACHE_SLOT_COUNT], IsChangePermitted);
+                new AndCache(Services, null, null, new ImHashMap<int, object>[CACHE_SLOT_COUNT], IsChangePermitted);
 
             internal virtual Registry WithServices(ImHashMap<Type, object> services) =>
                 services == Services ? this : new Registry(services);
@@ -2617,7 +2617,7 @@ namespace DryIoc
                 if (oldEntry == null)
                     return r == null ? mapOrOldEntry : r.WithServices(mapOrOldEntry);
 
-                var updatedEntry = oldEntry.UpdateOrKeep(ifAlreadyRegistered, newEntry, (i, o, n) =>
+                var updatedEntry = oldEntry.AppendOrUpdateInPlaceOrKeep(ifAlreadyRegistered, newEntry, (i, o, n) =>
                 {
                     var factory = (Factory)n.Value;
                     switch (i)
@@ -2682,14 +2682,14 @@ namespace DryIoc
                 if (updatedEntry == oldEntry)
                     return registryOrServices;
 
-                var newServices = services.ReplaceEntry(serviceTypeHash, oldEntry, updatedEntry);
+                var newServices = services.ReplaceEntry(oldEntry, updatedEntry);
                 if (r == null)
                     return newServices;
 
                 r = r.WithServices(newServices);
 
                 // Don't forget the drop cache for the old value if any
-                var oldValue = oldEntry.GetEntryOrNull(serviceTypeHash, serviceType)?.Value;
+                var oldValue = oldEntry.GetValueOrDefaultByReferenceEqualsWithTheSameHash(serviceType);
                 if (oldValue is Factory oldFactory)
                     r.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
                 else if (oldValue is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
@@ -3713,7 +3713,7 @@ namespace DryIoc
             if (scope.IsDisposed)
                 Throw.ScopeIsDisposed(scope, r);
 
-            itemRef = new ImMapEntry<object>(id, noItem);
+            itemRef = ImHashMap.Entry(id, noItem);
             var oldMap = map;
             var newMap = oldMap.AddOrKeepEntry(itemRef);
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
@@ -3766,7 +3766,7 @@ namespace DryIoc
             if (scope.IsDisposed)
                 Throw.ScopeIsDisposed(scope, r);
 
-            itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            itemRef = ImHashMap.Entry(id, Scope.NoItem);
             var oldMap = map;
             var newMap = oldMap.AddOrKeepEntry(itemRef);
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
@@ -3819,7 +3819,7 @@ namespace DryIoc
             if (itemRef != null && itemRef.Value != Scope.NoItem)
                 return itemRef.Value;
 
-            itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+            itemRef = ImHashMap.Entry(id, Scope.NoItem);
             var oldMap = map;
             var newMap = oldMap.AddOrKeepEntry(itemRef);
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
@@ -10721,7 +10721,7 @@ namespace DryIoc
                 !Made.IsConditional;
 
             // First, lookup in the expression cache
-            ImMapEntry<object> cacheEntry = null;
+            ImHashMapEntry<int, object> cacheEntry = null;
             if (cacheExpression)
             {
                 var cachedExpr = ((Container)container).GetCachedFactoryExpression(request.FactoryID, reuse, out cacheEntry);
@@ -10852,7 +10852,7 @@ namespace DryIoc
                 var singleton = Scope.NoItem; // NoItem is a marker for the value is not created yet
 
                 // Creating a new local item with the id and the marker for not yet created item
-                var itemRef = new ImMapEntry<object>(id, Scope.NoItem);
+                var itemRef = ImHashMap.Entry(id, Scope.NoItem);
                 ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK]; // got a live reference to the map where value can be queried and stored
 
                 var oldMap = map; // get a reference to the map available now as an oldMap
@@ -11565,7 +11565,7 @@ namespace DryIoc
                     (x, genFacKey, closedGenFac) =>
                     {
 
-                        var newEntry = ImHashMap.Entry(genFacKey, closedGenFac);
+                        var newEntry = ImHashMap.Entry(genFacKey.GetHashCode(), genFacKey, closedGenFac);
                         var mapOrOldEntry = ((ImHashMap<KV<Type, object>, ReflectionFactory>)x).AddOrGetEntry(newEntry);
                         if (mapOrOldEntry is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
                         {
@@ -12726,21 +12726,21 @@ namespace DryIoc
         public bool IsDisposed => _disposed == 1;
         private int _disposed;
 
-        private ImMap<ImList<IDisposable>> _disposables;
+        private ImHashMap<int, ImList<IDisposable>> _disposables;
         private ImHashMap<Type, object> _used;
 
         internal const int MAP_COUNT = 16;
         internal const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
-        internal ImMap<object>[] _maps;
+        internal ImHashMap<int, object>[] _maps;
 
         internal static readonly object NoItem = new object();
 
-        private static ImMap<object>[] _emptySlots = CreateEmptyMaps();
+        private static ImHashMap<int, object>[] _emptySlots = CreateEmptyMaps();
 
-        private static ImMap<object>[] CreateEmptyMaps()
+        private static ImHashMap<int, object>[] CreateEmptyMaps()
         {
-            var slots = new ImMap<object>[MAP_COUNT];
-            var empty = ImMap<object>.Empty;
+            var slots = new ImHashMap<int, object>[MAP_COUNT];
+            var empty = ImHashMap<int, object>.Empty;
             for (var i = 0; i < MAP_COUNT; ++i)
                 slots[i] = empty;
             return slots;
@@ -12762,10 +12762,11 @@ namespace DryIoc
             name == null ? new Scope() : new WithParentAndName(null, name);
 
         /// <summary>Creates scope with optional parent and name.</summary>
-        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImMap.Entry(0, ImList<IDisposable>.Empty)) { }
+        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImHashMap.Entry(0, ImList<IDisposable>.Empty)) // todo: @question ты забыл барашка такая зачем ты это сделал, проверь нужно ли нам создавать entry здесь?
+        {} 
 
         /// <summary>The basic constructor</summary>
-        protected Scope(ImMap<object>[] maps, ImHashMap<Type, object> used, ImMap<ImList<IDisposable>> disposables)
+        protected Scope(ImHashMap<int, object>[] maps, ImHashMap<Type, object> used, ImHashMap<int, ImList<IDisposable>> disposables)
         {
             _disposables = disposables;
             _used = used;
@@ -12782,7 +12783,7 @@ namespace DryIoc
                 Name = name;
             }
 
-            internal WithParentAndName(IScope parent, object name, ImMap<object>[] maps, ImHashMap<Type, object> used, ImMap<ImList<IDisposable>> disposables)
+            internal WithParentAndName(IScope parent, object name, ImHashMap<int, object>[] maps, ImHashMap<Type, object> used, ImHashMap<int, ImList<IDisposable>> disposables)
                 : base(maps, used, disposables)
             {
                 Parent = parent;
@@ -12791,14 +12792,14 @@ namespace DryIoc
 
             public override IScope Clone(bool withDisposables) =>
                 !withDisposables
-                ? new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, ImMap.Entry(0, ImList<IDisposable>.Empty)) // dropping the disposables
+                ? new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, ImHashMap.Entry(0, ImList<IDisposable>.Empty)) // dropping the disposables
                 : new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, _disposables); // Не забыть скопировать папу (коментарий для дочки)
         }
 
         /// <inheritdoc />
         public virtual IScope Clone(bool withDisposables) =>
             !withDisposables
-            ? new Scope(_maps.CopyNonEmpty(), _used, ImMap<ImList<IDisposable>>.Empty) // dropping the disposables
+            ? new Scope(_maps.CopyNonEmpty(), _used, ImHashMap<int, ImList<IDisposable>>.Empty) // dropping the disposables
             : new Scope(_maps.CopyNonEmpty(), _used, _disposables);
 
         /// <inheritdoc />
@@ -12832,11 +12833,11 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.ScopeIsDisposed(this, r);
 
-            var itemRef = new ImMapEntry<object>(id, NoItem);
+            var itemRef = ImHashMap.Entry(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var oldMap = map;
             var oldRefOrNewMap = oldMap.AddOrGetEntry(itemRef);
-            if (oldRefOrNewMap is ImMapEntry<object> oldRef && oldRef != itemRef)
+            if (oldRefOrNewMap is ImHashMapEntry<int, object> oldRef && oldRef != itemRef)
                 return oldRef.Value != NoItem ? oldRef.Value : WaitForItemIsSet(oldRef);
             if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
             {
@@ -12858,7 +12859,7 @@ namespace DryIoc
         /// <summary>The amount of time to wait for the other party to create the scoped (or singleton) service.</summary>
         public static uint WaitForScopedServiceIsCreatedTimeoutTicks = 3000;
 
-        internal static object WaitForItemIsSet(ImMapEntry<object> itemRef)
+        internal static object WaitForItemIsSet(ImHashMapEntry<int, object> itemRef)
         {
             var tickCount = (uint)Environment.TickCount;
             var tickStart = tickCount;
@@ -12884,7 +12885,7 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.ScopeIsDisposed(this, resolveContext); // todo: @spell resolve -> resolver
 
-            var itemRef = new ImMapEntry<object>(id, NoItem);
+            var itemRef = ImHashMap.Entry(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var oldMap = map;
             var newMap = oldMap.AddOrKeepEntry(itemRef);
@@ -12916,7 +12917,7 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.ScopeIsDisposed(this, null);
 
-            var itemRef = new ImMapEntry<object>(id, item);
+            var itemRef = ImHashMap.Entry(id, item);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var oldMap = map;
             var newMap = oldMap.AddOrUpdateEntry(itemRef);
@@ -12949,7 +12950,7 @@ namespace DryIoc
                 Ref.Swap(ref e.Value, disposable, (x, d) => x.Push(d));
         }
 
-        private ImMapEntry<ImList<IDisposable>> AddDisposableEntry(int disposableOrder)
+        private ImHashMapEntry<int, ImList<IDisposable>> AddDisposableEntry(int disposableOrder)
         {
             Ref.Swap(ref _disposables, disposableOrder, (x, o) => x.AddOrKeep(o, ImList<IDisposable>.Empty));
             return _disposables.GetSurePresentEntry(disposableOrder);
@@ -13026,18 +13027,18 @@ namespace DryIoc
                 return;
 
             var ds = _disposables;
-            if (ds is ImMapEntry<ImList<IDisposable>> e)
+            if (ds is ImHashMapEntry<int, ImList<IDisposable>> e)
                 for (var d = e.Value; d.Tail != null; d = d.Tail)
                     d.Head.Dispose();
             else if (!ds.IsEmpty)
                 SafelyDisposeOrderedDisposables(ds);
 
-            _disposables = ImMap<ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
+            _disposables = ImHashMap<int, ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
             _used = ImHashMap<Type, object>.Empty;
             _maps = _emptySlots;
         }
 
-        private static void SafelyDisposeOrderedDisposables(ImMap<ImList<IDisposable>> disposables)
+        private static void SafelyDisposeOrderedDisposables(ImHashMap<int, ImList<IDisposable>> disposables)
         {
             disposables.ForEach((e, _) =>
             {
