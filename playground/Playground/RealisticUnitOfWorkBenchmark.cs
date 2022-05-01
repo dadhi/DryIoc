@@ -1224,20 +1224,30 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |        Grace | 15,990.58 us | 123.798 us | 109.744 us | 194.52 |    2.21 |  93.7500 | 31.2500 |      - | 736.12 KB |
 |   Grace_MsDI | 18,884.30 us | 321.388 us | 268.373 us | 229.50 |    4.25 | 125.0000 | 62.5000 |      - |  904.7 KB |
 
+
 ## v5.0.1
 
 |      Method |      Mean |    Error |   StdDev |    Median | Ratio | RatioSD |   Gen 0 | Gen 1 | Gen 2 | Allocated |
 |------------ |----------:|---------:|---------:|----------:|------:|--------:|--------:|------:|------:|----------:|
 |      DryIoc |  93.89 us | 2.847 us | 8.167 us |  91.64 us |  1.00 |    0.00 | 12.8174 |     - |     - |  39.37 KB |
 | DryIoc_MsDI | 110.50 us | 2.545 us | 7.262 us | 109.15 us |  1.19 |    0.13 | 16.2354 |     - |     - |  49.82 KB |
+
+
+## v5.5.0
+
+|      Method |      Mean |    Error |   StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|---------:|------:|--------:|-------:|-------:|------:|----------:|
+|      DryIoc |  90.99 us | 1.773 us | 1.481 us |  1.00 |    0.00 | 6.1035 | 0.3662 |     - |  37.39 KB |
+| DryIoc_MsDI | 102.39 us | 1.385 us | 1.296 us |  1.13 |    0.02 | 7.6904 | 0.4883 |     - |  47.79 KB |
 */
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
 
+            // [Benchmark(Baseline = true)]
             [Benchmark]
             public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
 
-            // [Benchmark]
+            [Benchmark]
             public object MsDI() => Measure(PrepareMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark

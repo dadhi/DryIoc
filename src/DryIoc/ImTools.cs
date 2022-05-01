@@ -1314,20 +1314,24 @@ namespace DryIoc.ImTools
         /// <summary>Rent the existing static array or create a new array if it is already rented or its size is outside of the supported bounds.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static T[] RentOrNewOfLength(int requiredLength) =>
-            requiredLength <= MaxArrayLength
-                ? Interlocked.Exchange(ref Arrays[requiredLength - 1], null) ?? new T[requiredLength]
-                : new T[requiredLength];
+            // requiredLength <= MaxArrayLength
+            //     ? 
+                Interlocked.Exchange(ref Arrays[requiredLength - 1], null) ?? new T[requiredLength];
+                // : new T[requiredLength];
 
         /// <summary>Returns the array back. If array length is greater than `MaxArrayLength` then we will do nothing.
         /// Also to avoid memory leaks the passed array will be cleared before returning to the pool.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static void TryReturn(T[] arr)
         {
-            var length = arr.Length;
-            if (length > MaxArrayLength)
-                return;
-            Array.Clear(arr, 0, length);
-            Interlocked.Exchange(ref Arrays[length - 1], arr);
+            // var length = arr.Length;
+            // if (length > MaxArrayLength)
+            //     return;
+            for (var i = 0; (uint)i < arr.Length; ++i)
+                arr[i] = default;
+            // Array.Clear(arr, 0, arr.Length);
+            Arrays[arr.Length - 1] = arr;
+            // Interlocked.Exchange(ref Arrays[length - 1], arr);
         }
     }
 
