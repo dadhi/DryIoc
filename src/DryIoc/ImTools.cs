@@ -1315,7 +1315,7 @@ namespace DryIoc.ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static T[] RentOrNew(int requiredLength) =>
             requiredLength <= MaxArrayLength
-                ? Interlocked.Exchange(ref Arrays[requiredLength], null) ?? new T[requiredLength]
+                ? Interlocked.Exchange(ref Arrays[requiredLength - 1], null) ?? new T[requiredLength]
                 : new T[requiredLength];
 
         /// <summary>Returns the array back. If array length is greater than `MaxArrayLength` then we will do nothing.
@@ -1327,7 +1327,7 @@ namespace DryIoc.ImTools
             if (length > MaxArrayLength)
                 return;
             Array.Clear(arr, 0, length);
-            Interlocked.Exchange(ref Arrays[length], arr);
+            Interlocked.Exchange(ref Arrays[length - 1], arr);
         }
     }
 
