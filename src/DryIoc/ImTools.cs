@@ -1293,6 +1293,43 @@ namespace DryIoc.ImTools
         }
     }
 
+    /// <summary>A pool of small arrays of increasing length from 1 to `MaxArrayLength`.
+    /// It may be useful to store types or objects for reflection calls.</summary>
+    public struct SmallArrayPool<T>
+    {
+        /// <summary>The max length of array and the number of arrays that can be rented from the pool</summary>
+        public const byte MaxArrayLength = 7;
+
+        private readonly static T[][] Arrays = new T[MaxArrayLength][]
+        {
+            new T[1],
+            new T[2],
+            new T[3],
+            new T[4],
+            new T[5],
+            new T[6],
+            new T[7],
+        };
+
+        /// <summary>Rent the existing static array or create a new</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static T[] RentOrNew(int requiredLength) =>
+            requiredLength <= MaxArrayLength
+                ? Interlocked.Exchange(ref Arrays[requiredLength], null) ?? new T[requiredLength]
+                : new T[requiredLength];
+
+        /// <summary>Returns the array back. Ensure that the length of array is in bounds of `MaxArrayLength`, 
+        /// because the method won't check that for performance reasons.
+        /// Also to avoid memory leaks the passed array will be cleared.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static void Return(T[] arr)
+        {
+            var length = arr.Length;
+            Array.Clear(arr, 0, length);
+            Interlocked.Exchange(ref Arrays[length], arr);
+        }
+    }
+
     /// <summary>Immutable Key-Value pair. It is reference type (could be check for null), 
     /// which is different from System value type <see cref="KeyValuePair{TKey,TValue}"/>.
     /// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
