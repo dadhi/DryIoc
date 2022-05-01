@@ -1313,7 +1313,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Rent the existing static array or create a new array if it is already rented or its size is outside of the supported bounds.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static T[] RentOrNew(int requiredLength) =>
+        public static T[] RentOrNewOfLength(int requiredLength) =>
             requiredLength <= MaxArrayLength
                 ? Interlocked.Exchange(ref Arrays[requiredLength - 1], null) ?? new T[requiredLength]
                 : new T[requiredLength];
