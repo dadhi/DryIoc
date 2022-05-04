@@ -11564,7 +11564,6 @@ namespace DryIoc
                 Ref.Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryKey, closedGenericFactory,
                     (x, genFacKey, closedGenFac) =>
                     {
-
                         var newEntry = ImHashMap.Entry(genFacKey.GetHashCode(), genFacKey, closedGenFac);
                         var mapOrOldEntry = ((ImHashMap<KV<Type, object>, ReflectionFactory>)x).AddOrGetEntry(newEntry);
                         if (mapOrOldEntry is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
@@ -12836,7 +12835,7 @@ namespace DryIoc
             var itemRef = ImHashMap.Entry(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var oldMap = map;
-            var oldRefOrNewMap = oldMap.AddOrGetEntry(itemRef);
+            var oldRefOrNewMap = oldMap.AddOrGetEntry(id, itemRef);
             if (oldRefOrNewMap is ImHashMapEntry<int, object> oldRef && oldRef != itemRef)
                 return oldRef.Value != NoItem ? oldRef.Value : WaitForItemIsSet(oldRef);
             if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
