@@ -14023,7 +14023,7 @@ namespace DryIoc
                 var factoryId = (int)Details;
                 var reg = container.GetServiceRegistrations().FirstOrDefault(r => r.Factory.FactoryID == factoryId);
                 if (reg.Factory == null)
-                    return "Unable to get the service registration for the problematic FactoryID=" + factoryId;
+                    return "Unable to get the service registration for the problematic factory with FactoryID=" + factoryId;
                 return "The service registration related to the problem is " + reg;
             }
             return string.Empty;
@@ -14239,7 +14239,7 @@ namespace DryIoc
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(
-                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {1} ticks without the completion. " + NewLine +
+                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {0} ticks without the completion. " + NewLine +
                 "You may call `exception.TryGetDetails(container)` to get the details of the problematic service registration." + NewLine +
                 "The error means that either the \"other party\" is the parallel thread which has started but is unable to finish the creation of the service in the provided amount of time. " + NewLine +
                 "Or more likely the \"other party\"  is the same thread and there is an undetected recursive dependency or " + NewLine +
