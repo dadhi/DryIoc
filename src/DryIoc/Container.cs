@@ -12836,7 +12836,7 @@ namespace DryIoc
             var itemRef = ImHashMap.Entry(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var oldMap = map;
-            var oldRefOrNewMap = oldMap.AddOrGetEntry(itemRef);
+            var oldRefOrNewMap = oldMap.AddOrGetEntry(id, itemRef);
             if (oldRefOrNewMap is ImHashMapEntry<int, object> oldRef && oldRef != itemRef)
                 return oldRef.Value != NoItem ? oldRef.Value : WaitForItemIsSet(oldRef);
             if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
@@ -14973,7 +14973,7 @@ namespace DryIoc
         /// <summary>Optimized version of the map AddOrUpdate for the Type key and object value</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<Type, object> AddOrUpdate(this ImHashMap<Type, object> map, Type t, object value) =>
-            map.AddOrUpdate(RuntimeHelpers.GetHashCode(t), t, value);
+            map.AddOrUpdateByReferenceEquals(RuntimeHelpers.GetHashCode(t), t, value);
     }
 
     /// <summary>Provides pretty printing/debug view for number of types.</summary>

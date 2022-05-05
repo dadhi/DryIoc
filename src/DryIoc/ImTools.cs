@@ -5570,10 +5570,22 @@ namespace DryIoc.ImTools
         public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) =>
             map.AddOrUpdateEntry(Entry(hash, key, value));
 
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!
+        /// Keys are compared by ReferenceEquals</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key, V value) =>
+            map.AddOrUpdateEntryByReferenceEquals(Entry(hash, key, value));
+
         /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, K key, V value) =>
             map.AddOrUpdateEntry(Entry(key.GetHashCode(), key, value));
+
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!
+        /// Keys are compared by ReferenceEquals</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key, V value) =>
+            map.AddOrUpdateEntryByReferenceEquals(Entry(key.GetHashCode(), key, value));
 
         /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added key is unique</summary>
         [MethodImpl((MethodImplOptions)256)]
