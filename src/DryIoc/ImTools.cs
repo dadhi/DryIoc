@@ -5359,7 +5359,7 @@ namespace DryIoc.ImTools
         public static bool TryFindByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key, out V value) where K : class =>
             map.TryFindByReferenceEquals(key.GetHashCode(), key, out value);
 
-        /// <summary>Creates the entry with the `int` key (which will be used as the key)</summary>
+        /// <summary>Creates the entry with the `int` key (which will be used as the hash)</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMapEntry<int, V> Entry<V>(int key, V value) => new VEntry<V>(key, value);
 
@@ -5371,11 +5371,11 @@ namespace DryIoc.ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMapEntry<int, V> WithDefaultValue<V>(this ImHashMapEntry<int, V> e) => new VEntry<V>(e.Hash);
 
-        /// <summary>Creates the entry with the custom provided hash</summary>
+        /// <summary>Creates the entry with the user provided hash</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMapEntry<K, V> Entry<K, V>(int hash, K key, V value) => new KVEntry<K, V>(hash, key, value);
 
-        /// <summary>Creates the entry with the custom provided hash</summary>
+        /// <summary>Creates the entry with the key, value and hash of `key.GetHashCode()`</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMapEntry<K, V> EntryWithHash<K, V>(K key, V value) => new KVEntry<K, V>(key.GetHashCode(), key, value);
 
@@ -5396,7 +5396,7 @@ namespace DryIoc.ImTools
         }
 
         /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildUnchecked<K, V>(
+        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
             ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1)
         {
             Debug.Assert(!Equals(e0.Key, e1.Key));
@@ -5406,19 +5406,19 @@ namespace DryIoc.ImTools
         }
 
         /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildUnchecked<K, V>(
+        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
             ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2)
         {
             Debug.Assert(!Equals(e2.Key, e0.Key) && !Equals(e2.Key, e1.Key));
-            return new ImHashMap<K, V>.Leaf2Plus(e2, (ImHashMap<K, V>.Leaf2)BuildUnchecked(e0, e1));
+            return new ImHashMap<K, V>.Leaf2Plus(e2, (ImHashMap<K, V>.Leaf2)BuildFromDifferent(e0, e1));
         }
 
         /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildUnchecked<K, V>(
+        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
             ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3)
         {
             Debug.Assert(!Equals(e3.Key, e0.Key) && !Equals(e3.Key, e1.Key) && !Equals(e3.Key, e2.Key));
-            return new ImHashMap<K, V>.Leaf2PlusPlus(e3, (ImHashMap<K, V>.Leaf2Plus)BuildUnchecked(e0, e1, e2));
+            return new ImHashMap<K, V>.Leaf2PlusPlus(e3, (ImHashMap<K, V>.Leaf2Plus)BuildFromDifferent(e0, e1, e2));
         }
 
         /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
@@ -5435,19 +5435,19 @@ namespace DryIoc.ImTools
         }
 
         /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildUnchecked<K, V>(
+        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
             ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
             ImHashMapEntry<K, V> e5) =>
             new ImHashMap<K, V>.Leaf5Plus(e5, (ImHashMap<K, V>.Leaf5)BuildUnchecked(e0, e1, e2, e3, e4));
 
         /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildUnchecked<K, V>(
+        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
             ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
             ImHashMapEntry<K, V> e5, ImHashMapEntry<K, V> e6) =>
-            new ImHashMap<K, V>.Leaf5PlusPlus(e6, (ImHashMap<K, V>.Leaf5Plus)BuildUnchecked(e0, e1, e2, e3, e4, e5));
+            new ImHashMap<K, V>.Leaf5PlusPlus(e6, (ImHashMap<K, V>.Leaf5Plus)BuildFromDifferent(e0, e1, e2, e3, e4, e5));
 
         /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
-        public static ImHashMap<K, V> BuildUnchecked<K, V>(
+        public static ImHashMap<K, V> BuildFromDifferent<K, V>(
             ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
             ImHashMapEntry<K, V> e5, ImHashMapEntry<K, V> e6, ImHashMapEntry<K, V> e7)
         {
@@ -5496,24 +5496,24 @@ namespace DryIoc.ImTools
                 return e0;
             var e1 = Entry(en.Current);
             if (!en.MoveNext())
-                return BuildUnchecked(e0, e1);
+                return BuildFromDifferent(e0, e1);
             var e2 = Entry(en.Current);
             if (!en.MoveNext())
-                return BuildUnchecked(e0, e1, e2);
+                return BuildFromDifferent(e0, e1, e2);
             var e3 = Entry(en.Current);
             if (!en.MoveNext())
-                return BuildUnchecked(e0, e1, e2, e3);
+                return BuildFromDifferent(e0, e1, e2, e3);
             var e4 = Entry(en.Current);
             if (!en.MoveNext())
                 return BuildUnchecked(e0, e1, e2, e3, e4);
             var e5 = Entry(en.Current);
             if (!en.MoveNext())
-                return BuildUnchecked(e0, e1, e2, e3, e4, e5);
+                return BuildFromDifferent(e0, e1, e2, e3, e4, e5);
             var e6 = Entry(en.Current);
             if (!en.MoveNext())
-                return BuildUnchecked(e0, e1, e2, e3, e4, e5, e6);
+                return BuildFromDifferent(e0, e1, e2, e3, e4, e5, e6);
             var e7 = Entry(en.Current);
-            var map = BuildUnchecked(e0, e1, e2, e3, e4, e5, e6, e7);
+            var map = BuildFromDifferent(e0, e1, e2, e3, e4, e5, e6, e7);
             while (en.MoveNext())
             {
                 var it = en.Current;

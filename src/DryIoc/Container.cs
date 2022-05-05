@@ -4869,7 +4869,19 @@ namespace DryIoc
 
         private static ImHashMap<Type, object> BuildSupportedWrappers()
         {
-            var wrappers = ImHashMap<Type, object>.Empty;
+            var wrappers = ImHashMap.BuildFromDifferent(
+                typeof(LazyEnumerable<>).Entry(new ExpressionFactory(r => GetLazyEnumerableExpressionOrDefault(r), setup: Setup.Wrapper)),
+                typeof(Lazy<>)          .Entry(WrapperExpressionFactory.Of(GetLazyExpressionOrDefault)),
+                typeof(KeyValuePair<,>) .Entry(WrapperExpressionFactory.Of(GetKeyValuePairExpressionOrDefault, Setup.WrapperWith(1))),
+                typeof(Meta<,>)         .Entry(WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0))),
+                typeof(Tuple<,>)        .Entry(WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0))),
+                typeof(System.Linq.Expressions.LambdaExpression).Entry(new ExpressionFactory(r => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
+                typeof(LambdaExpression).Entry(new ExpressionFactory(r => GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
+                typeof(FactoryDelegate) .Entry(new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.Wrapper))
+            );
+            wrappers = wrappers
+                .AddSureNotPresentEntry(typeof(FactoryDelegate<>).Entry(new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.WrapperWith(0))))
+                .AddSureNotPresentEntry(typeof(Func<>).Entry(WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.Wrapper)));
 
             var arrayExpr = new ExpressionFactory(r => GetArrayExpression(r), setup: Setup.Wrapper);
             CollectionWrapperID = arrayExpr.FactoryID;
@@ -4877,36 +4889,6 @@ namespace DryIoc
             var arrayInterfaces = SupportedCollectionTypes;
             for (var i = 0; i < arrayInterfaces.Length; i++)
                 wrappers = wrappers.AddOrUpdate(arrayInterfaces[i], arrayExpr);
-
-            wrappers = wrappers.AddOrUpdate(typeof(LazyEnumerable<>),
-                new ExpressionFactory(r => GetLazyEnumerableExpressionOrDefault(r), setup: Setup.Wrapper));
-
-            wrappers = wrappers.AddOrUpdate(typeof(Lazy<>),
-                WrapperExpressionFactory.Of(GetLazyExpressionOrDefault));
-
-            wrappers = wrappers.AddOrUpdate(typeof(KeyValuePair<,>),
-                WrapperExpressionFactory.Of(GetKeyValuePairExpressionOrDefault, Setup.WrapperWith(1)));
-
-            wrappers = wrappers.AddOrUpdate(typeof(Meta<,>),
-                WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0)));
-
-            wrappers = wrappers.AddOrUpdate(typeof(Tuple<,>),
-                WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0)));
-
-            wrappers = wrappers.AddOrUpdate(typeof(System.Linq.Expressions.LambdaExpression),
-                new ExpressionFactory(r => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper));
-
-            wrappers = wrappers.AddOrUpdate(typeof(FastExpressionCompiler.LightExpression.LambdaExpression),
-                new ExpressionFactory(r => GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper));
-
-            wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate),
-                new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.Wrapper));
-
-            wrappers = wrappers.AddOrUpdate(typeof(FactoryDelegate<>),
-                new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.WrapperWith(0)));
-
-            wrappers = wrappers.AddOrUpdate(typeof(Func<>),
-                WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.Wrapper));
 
             // Skip the `i == 0` because `Func<>` type was added above
             for (var i = 1; i < FuncTypes.Length; i++)
@@ -14974,6 +14956,10 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<Type, object> AddOrUpdate(this ImHashMap<Type, object> map, Type t, object value) =>
             map.AddOrUpdateByReferenceEquals(RuntimeHelpers.GetHashCode(t), t, value);
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal static ImHashMapEntry<Type, object> Entry(this Type t, object value) =>
+            ImHashMap.Entry(RuntimeHelpers.GetHashCode(t), t, value);
     }
 
     /// <summary>Provides pretty printing/debug view for number of types.</summary>
