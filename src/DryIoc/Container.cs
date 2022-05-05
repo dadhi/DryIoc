@@ -2218,8 +2218,8 @@ namespace DryIoc
                         Interlocked.CompareExchange(ref map, ImHashMap<Type, object>.Empty, null);
 
                     var m = map;
-                    if (Interlocked.CompareExchange(ref map, m.AddOrUpdate(serviceTypeHash, serviceType, factory), m) != m)
-                        Ref.Swap(ref map, serviceTypeHash, serviceType, factory, (x, h, t, f) => x.AddOrUpdate(h, t, f));
+                    if (Interlocked.CompareExchange(ref map, m.AddOrUpdateByReferenceEquals(serviceTypeHash, serviceType, factory), m) != m)
+                        Ref.Swap(ref map, serviceTypeHash, serviceType, factory, (x, h, t, f) => x.AddOrUpdateByReferenceEquals(h, t, f));
                 }
 
                 public void TryCacheKeyedFactory(int serviceTypeHash, Type serviceType, object key, object factory)
@@ -2456,9 +2456,9 @@ namespace DryIoc
 
                 r = r ?? new Registry(registryOrServices); // todo: @perf remove the temporary new Registry allocation
                 return factory.FactoryType == FactoryType.Decorator
-                    ? r.WithDecorators(r.Decorators.AddOrUpdate(serviceTypeHash, serviceType, factory.One(),
+                    ? r.WithDecorators(r.Decorators.AddOrUpdateByReferenceEquals(serviceTypeHash, serviceType, factory.One(),
                         (_, older, newer) => Container.MergeSortedByLatestOrderOrRegistration((Factory[])older, (Factory[])newer)))
-                    : r.WithWrappers(r.Wrappers.AddOrUpdate(serviceTypeHash, serviceType, factory));
+                    : r.WithWrappers(r.Wrappers.AddOrUpdateByReferenceEquals(serviceTypeHash, serviceType, factory));
             }
 
             public static Factory[] GetRegisteredFactories(ImHashMap<Type, object> registryOrServices,
