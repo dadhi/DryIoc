@@ -1639,15 +1639,15 @@ namespace DryIoc
             public FactoriesEntry With(Factory factory)
             {
                 var lastDefaultKey = LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next();
-                return new FactoriesEntry(lastDefaultKey, Factories.AddOrUpdate(lastDefaultKey, factory));
+                return new FactoriesEntry(lastDefaultKey, Factories.AddSureNotPresent(lastDefaultKey, factory));
             }
 
             public FactoriesEntry WithTwo(Factory oldFactory, Factory newFactory)
             {
                 var lastDefaultKey = LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next();
                 var factories = Factories
-                    .AddOrUpdate(lastDefaultKey, oldFactory)
-                    .AddOrUpdate(lastDefaultKey = lastDefaultKey.Next(), newFactory);
+                    .AddSureNotPresent(lastDefaultKey, oldFactory)
+                    .AddSureNotPresent(lastDefaultKey = lastDefaultKey.Next(), newFactory);
                 return new FactoriesEntry(lastDefaultKey, factories);
             }
 

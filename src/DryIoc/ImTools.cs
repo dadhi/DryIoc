@@ -5375,6 +5375,10 @@ namespace DryIoc.ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMapEntry<K, V> Entry<K, V>(int hash, K key, V value) => new KVEntry<K, V>(hash, key, value);
 
+        /// <summary>Creates the entry with the custom provided hash</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMapEntry<K, V> EntryWithHash<K, V>(K key, V value) => new KVEntry<K, V>(key.GetHashCode(), key, value);
+
         /// <summary>Creates the entry but without assigning its value yet</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMapEntry<K, V> EntryWithDefaultValue<K, V>(int hash, K key) => new KVEntry<K, V>(hash, key);
@@ -5579,13 +5583,13 @@ namespace DryIoc.ImTools
         /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, K key, V value) =>
-            map.AddOrUpdateEntry(Entry(key.GetHashCode(), key, value));
+            map.AddOrUpdateEntry(EntryWithHash(key, value));
 
         /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!
         /// Keys are compared by ReferenceEquals</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key, V value) =>
-            map.AddOrUpdateEntryByReferenceEquals(Entry(key.GetHashCode(), key, value));
+            map.AddOrUpdateEntryByReferenceEquals(EntryWithHash(key, value));
 
         /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added key is unique</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -5600,7 +5604,7 @@ namespace DryIoc.ImTools
         /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added key is unique</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> AddSureNotPresent<K, V>(this ImHashMap<K, V> map, K key, V value) =>
-            map.AddSureNotPresentEntry(Entry(key.GetHashCode(), key, value));
+            map.AddSureNotPresentEntry(EntryWithHash(key, value));
 
         /// <summary>Adds or updates (no in-place mutation) the map with value by the passed hash and key, always returning the NEW map!</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -5677,7 +5681,7 @@ namespace DryIoc.ImTools
         /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> AddOrKeep<K, V>(this ImHashMap<K, V> map, K key, V value) =>
-            map.AddOrKeepEntry(Entry(key.GetHashCode(), key, value));
+            map.AddOrKeepEntry(EntryWithHash(key, value));
 
         /// <summary>Updates the map with the new value if the hash is found otherwise returns the same unchanged map.</summary>
         [MethodImpl((MethodImplOptions)256)]
