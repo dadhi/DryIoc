@@ -2265,7 +2265,7 @@ namespace DryIoc
                         entry = map.GetEntryOrDefault(factoryId);
                         if (entry == null)
                         {
-                            entry = ImHashMap.EntryWithDefaultEntry<object>(factoryId);
+                            entry = ImHashMap.EntryWithDefaultValue<object>(factoryId);
                             var oldMap = map;
                             var newMap = oldMap.AddOrKeepEntry(entry);
                             if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
@@ -2689,7 +2689,7 @@ namespace DryIoc
                 r = r.WithServices(newServices);
 
                 // Don't forget the drop cache for the old value if any
-                var oldValue = oldEntry.GetValueOrDefaultByReferenceEqualsWithTheSameHash(serviceType);
+                var oldValue = oldEntry.GetValueOrDefaultWithTheSameHashByReferenceEquals(serviceType);
                 if (oldValue is Factory oldFactory)
                     r.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
                 else if (oldValue is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
@@ -3719,13 +3719,13 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
             {
                 newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = newMap.GetSurePresentEntry(id);
+                var otherItemRef = newMap.GetSurePresent(id);
                 if (otherItemRef != itemRef)
                     return otherItemRef.Value != noItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
             else if (newMap == oldMap)
             {
-                var otherItemRef = newMap.GetSurePresentEntry(id);
+                var otherItemRef = newMap.GetSurePresent(id);
                 return otherItemRef.Value != noItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
@@ -3772,13 +3772,13 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
             {
                 newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = newMap.GetSurePresentEntry(id);
+                var otherItemRef = newMap.GetSurePresent(id);
                 if (otherItemRef != itemRef)
                     return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
             else if (newMap == oldMap)
             {
-                var otherItemRef = newMap.GetSurePresentEntry(id);
+                var otherItemRef = newMap.GetSurePresent(id);
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
@@ -3825,13 +3825,13 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
             {
                 newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = newMap.GetSurePresentEntry(id);
+                var otherItemRef = newMap.GetSurePresent(id);
                 if (otherItemRef != itemRef)
                     return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
             else if (newMap == oldMap)
             {
-                var otherItemRef = newMap.GetSurePresentEntry(id);
+                var otherItemRef = newMap.GetSurePresent(id);
                 return otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
             }
 
@@ -10866,14 +10866,14 @@ namespace DryIoc
                 if (newMap == oldMap)
                 {
                     // It does not matter if the live `map` changed because the item can only be added and not removed ever
-                    var otherItemRef = newMap.GetSurePresentEntry(id);
+                    var otherItemRef = newMap.GetSurePresent(id);
                     singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
                 }
                 else if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap) // set map to newMap if the map did no change since getting oldMap
                 {
                     // if the map was changed in parallel, let's retry using the Swap
                     newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                    var otherItemRef = newMap.GetSurePresentEntry(id);
+                    var otherItemRef = newMap.GetSurePresent(id);
                     if (otherItemRef != itemRef)
                         singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
                 }
@@ -11564,6 +11564,7 @@ namespace DryIoc
                 Ref.Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryKey, closedGenericFactory,
                     (x, genFacKey, closedGenFac) =>
                     {
+
                         var newEntry = ImHashMap.Entry(genFacKey.GetHashCode(), genFacKey, closedGenFac);
                         var mapOrOldEntry = ((ImHashMap<KV<Type, object>, ReflectionFactory>)x).AddOrGetEntry(newEntry);
                         if (mapOrOldEntry is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
@@ -12835,13 +12836,13 @@ namespace DryIoc
             var itemRef = ImHashMap.Entry(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
             var oldMap = map;
-            var oldRefOrNewMap = oldMap.AddOrGetEntry(id, itemRef);
+            var oldRefOrNewMap = oldMap.AddOrGetEntry(itemRef);
             if (oldRefOrNewMap is ImHashMapEntry<int, object> oldRef && oldRef != itemRef)
                 return oldRef.Value != NoItem ? oldRef.Value : WaitForItemIsSet(oldRef);
             if (Interlocked.CompareExchange(ref map, oldRefOrNewMap, oldMap) != oldMap)
             {
                 oldRefOrNewMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = oldRefOrNewMap.GetSurePresentEntry(id);
+                var otherItemRef = oldRefOrNewMap.GetSurePresent(id);
                 if (otherItemRef != itemRef)
                     return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
             }
@@ -12891,13 +12892,13 @@ namespace DryIoc
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
             {
                 newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                var otherItemRef = newMap.GetSurePresentEntry(id);
+                var otherItemRef = newMap.GetSurePresent(id);
                 if (otherItemRef != itemRef)
                     return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
             }
             else if (newMap == oldMap)
             {
-                var otherItemRef = newMap.GetSurePresentEntry(id);
+                var otherItemRef = newMap.GetSurePresent(id);
                 return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
             }
 
@@ -12952,7 +12953,7 @@ namespace DryIoc
         private ImHashMapEntry<int, ImList<IDisposable>> AddDisposableEntry(int disposableOrder)
         {
             Ref.Swap(ref _disposables, disposableOrder, (x, o) => x.AddOrKeep(o, ImList<IDisposable>.Empty));
-            return _disposables.GetSurePresentEntry(disposableOrder);
+            return _disposables.GetSurePresent(disposableOrder);
         }
 
         /// <inheritdoc />
@@ -14023,7 +14024,7 @@ namespace DryIoc
                 var factoryId = (int)Details;
                 var reg = container.GetServiceRegistrations().FirstOrDefault(r => r.Factory.FactoryID == factoryId);
                 if (reg.Factory == null)
-                    return "Unable to get the service registration for the problematic factory with FactoryID=" + factoryId;
+                    return "Unable to get the service registration for the problematic FactoryID=" + factoryId;
                 return "The service registration related to the problem is " + reg;
             }
             return string.Empty;
@@ -14239,7 +14240,7 @@ namespace DryIoc
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(
-                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {0} ticks without the completion. " + NewLine +
+                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {1} ticks without the completion. " + NewLine +
                 "You may call `exception.TryGetDetails(container)` to get the details of the problematic service registration." + NewLine +
                 "The error means that either the \"other party\" is the parallel thread which has started but is unable to finish the creation of the service in the provided amount of time. " + NewLine +
                 "Or more likely the \"other party\"  is the same thread and there is an undetected recursive dependency or " + NewLine +
