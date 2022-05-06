@@ -5449,7 +5449,8 @@ namespace DryIoc.ImTools
         /// <summary>Creates the map of N unique entries without wasting the memory. The entries Keys should be different</summary>
         public static ImHashMap<K, V> BuildFromDifferent<K, V>(
             ImHashMapEntry<K, V> e0, ImHashMapEntry<K, V> e1, ImHashMapEntry<K, V> e2, ImHashMapEntry<K, V> e3, ImHashMapEntry<K, V> e4,
-            ImHashMapEntry<K, V> e5, ImHashMapEntry<K, V> e6, ImHashMapEntry<K, V> e7)
+            ImHashMapEntry<K, V> e5, ImHashMapEntry<K, V> e6, ImHashMapEntry<K, V> e7,
+            ImHashMapEntry<K, V> e8 = null, ImHashMapEntry<K, V> e9 = null)
         {
             if (e0.Hash > e1.Hash)
                 Fun.Swap(ref e0, ref e1);
@@ -5460,7 +5461,27 @@ namespace DryIoc.ImTools
             InsertInOrder(kv5.Hash, ref kv5, ref kv0, ref kv1, ref kv2, ref kv3, ref kv4);
             InsertInOrder(kv6.Hash, ref kv6, ref kv0, ref kv1, ref kv2, ref kv3, ref kv4, ref kv5);
             InsertInOrder(kv7.Hash, ref kv7, ref kv0, ref kv1, ref kv2, ref kv3, ref kv4, ref kv5, ref kv6);
-            return new ImHashMap<K, V>.Branch2(new ImHashMap<K, V>.Leaf2(kv0, kv1), kv2, new ImHashMap<K, V>.Leaf5(kv3, kv4, kv5, kv6, kv7));
+
+            ImHashMap<K, V> l = new ImHashMap<K, V>.Leaf2(kv0, kv1);
+            ImHashMap<K, V> r = new ImHashMap<K, V>.Leaf5(kv3, kv4, kv5, kv6, kv7);
+            if (e8 != null || e9 != null)
+            {
+                if (e8 != null)
+                {
+                    if (e8.Hash > kv2.Hash)
+                        r = r.AddSureNotPresentEntry(e8);
+                    else
+                        l = l.AddSureNotPresentEntry(e8);
+                }
+                if (e9 != null)
+                {
+                    if (e9.Hash > kv2.Hash)
+                        r = r.AddSureNotPresentEntry(e9);
+                    else
+                        l = l.AddSureNotPresentEntry(e9);
+                }
+            }
+            return new ImHashMap<K, V>.Branch2(l, kv2, r);
         }
 
         /// <summary>Wrapper structure for the hash-key-value</summary>

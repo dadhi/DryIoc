@@ -333,7 +333,7 @@ namespace DryIoc
                          : compiling.Expression.CompileToFactoryDelegate(rules.UseInterpretation)(this);
             }
 
-            var ifUnresolved = Rules.ServiceProviderGetServiceShouldThrowIfUnresolved 
+            var ifUnresolved = Rules.ServiceProviderGetServiceShouldThrowIfUnresolved
                 ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
             return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
         }
@@ -1597,7 +1597,7 @@ namespace DryIoc
             if (arrayElemType != null && arrayElemType != typeof(object) &&
                (arrayElemType.IsPrimitive() || typeof(Type).IsAssignableFrom(actualItemType)))
                 return NewArrayInit(arrayElemType,
-                    throwIfStateRequired 
+                    throwIfStateRequired
                         ? ((object[])item).Map(this, arrayElemType, (c, t, x) => c.GetConstantExpression(x, t, true))
                         : ((object[])item).Map(this, arrayElemType, (c, t, x) => c.GetConstantExpression(x, t, false)));
 
@@ -3310,7 +3310,7 @@ namespace DryIoc
                         result = _convertTwoArgActionMethod.MakeGenericMethod(p0.Type, p1.Type).Invoke(null, new[] { result });
                 }
             }
-            else 
+            else
             {
                 // todo: @feature support interpretation of the lambdas with 5+ parameters
                 if (paramCount > 4)
@@ -4871,32 +4871,31 @@ namespace DryIoc
         {
             var wrappers = ImHashMap.BuildFromDifferent(
                 typeof(LazyEnumerable<>).Entry(new ExpressionFactory(r => GetLazyEnumerableExpressionOrDefault(r), setup: Setup.Wrapper)),
-                typeof(Lazy<>)          .Entry(WrapperExpressionFactory.Of(GetLazyExpressionOrDefault)),
-                typeof(KeyValuePair<,>) .Entry(WrapperExpressionFactory.Of(GetKeyValuePairExpressionOrDefault, Setup.WrapperWith(1))),
-                typeof(Meta<,>)         .Entry(WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0))),
-                typeof(Tuple<,>)        .Entry(WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0))),
+                typeof(Lazy<>).Entry(WrapperExpressionFactory.Of(GetLazyExpressionOrDefault)),
+                typeof(KeyValuePair<,>).Entry(WrapperExpressionFactory.Of(GetKeyValuePairExpressionOrDefault, Setup.WrapperWith(1))),
+                typeof(Meta<,>).Entry(WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0))),
+                typeof(Tuple<,>).Entry(WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0))),
                 typeof(System.Linq.Expressions.LambdaExpression).Entry(new ExpressionFactory(r => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
                 typeof(LambdaExpression).Entry(new ExpressionFactory(r => GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
-                typeof(FactoryDelegate) .Entry(new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.Wrapper))
+                typeof(FactoryDelegate).Entry(new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.Wrapper)),
+                typeof(FactoryDelegate<>).Entry(new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.WrapperWith(0))),
+                typeof(Func<>).Entry(WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.Wrapper))
             );
-            wrappers = wrappers
-                .AddSureNotPresentEntry(typeof(FactoryDelegate<>).Entry(new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.WrapperWith(0))))
-                .AddSureNotPresentEntry(typeof(Func<>).Entry(WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.Wrapper)));
 
             var arrayExpr = new ExpressionFactory(r => GetArrayExpression(r), setup: Setup.Wrapper);
             CollectionWrapperID = arrayExpr.FactoryID;
 
             var arrayInterfaces = SupportedCollectionTypes;
             for (var i = 0; i < arrayInterfaces.Length; i++)
-                wrappers = wrappers.AddOrUpdate(arrayInterfaces[i], arrayExpr);
+                wrappers = wrappers.AddSureNotPresent(arrayInterfaces[i], arrayExpr);
 
             // Skip the `i == 0` because `Func<>` type was added above
             for (var i = 1; i < FuncTypes.Length; i++)
-                wrappers = wrappers.AddOrUpdate(FuncTypes[i],
+                wrappers = wrappers.AddSureNotPresent(FuncTypes[i],
                     WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.WrapperWith(i)));
 
             for (var i = 0; i < ActionTypes.Length; i++)
-                wrappers = wrappers.AddOrUpdate(ActionTypes[i],
+                wrappers = wrappers.AddSureNotPresent(ActionTypes[i],
                     WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
 
             wrappers = wrappers.AddContainerInterfaces();
@@ -4917,14 +4916,12 @@ namespace DryIoc
                 r => ConvertViaCastClassIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)),
                 Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
 
-            wrappers = wrappers
-                .AddOrUpdate(typeof(IContainer), containerExpr)
-                .AddOrUpdate(typeof(IRegistrator), registratorExpr)
-                .AddOrUpdate(typeof(IResolverContext), resolverContextExpr)
-                .AddOrUpdate(typeof(IResolver), resolverContextExpr)
-                .AddOrUpdate(typeof(IServiceProvider), resolverContextExpr);
-
-            return wrappers;
+            return wrappers
+                .AddSureNotPresent(typeof(IContainer), containerExpr)
+                .AddSureNotPresent(typeof(IRegistrator), registratorExpr)
+                .AddSureNotPresent(typeof(IResolverContext), resolverContextExpr)
+                .AddSureNotPresent(typeof(IResolver), resolverContextExpr)
+                .AddSureNotPresent(typeof(IServiceProvider), resolverContextExpr);
         }
 
         internal static readonly MethodInfo ToArrayMethod = typeof(ArrayTools).GetMethod(nameof(ArrayTools.ToArrayOrSelf));
@@ -5953,7 +5950,7 @@ namespace DryIoc
         }
 
         /// <summary>Removes runtime optimizations preventing an expression generation.</summary>
-        public Rules ForExpressionGeneration(bool allowRuntimeState = false) => 
+        public Rules ForExpressionGeneration(bool allowRuntimeState = false) =>
             WithSettings(GetSettingsForExpressionGeneration(allowRuntimeState));
 
         /// <summary>Indicates that rules are used for the validation, e.g. the rules created in `Validate` method</summary>
@@ -6233,7 +6230,7 @@ namespace DryIoc
         #endregion
     }
 
-    internal interface IFuncInvokeExpression {}
+    internal interface IFuncInvokeExpression { }
 
     sealed class FuncInvoke0Expression : NotNullMethodCallExpression, IFuncInvokeExpression
     {
@@ -6246,7 +6243,7 @@ namespace DryIoc
             closure.AddConstantOrIncrementUsageCount(Func.Target);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) && 
+                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
                 EmittingVisitor.EmitMethodCall(il, Method);
     }
 
@@ -6280,9 +6277,9 @@ namespace DryIoc
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) && 
-            EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent) && 
-            EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent) && 
+            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
+            EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent) &&
+            EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent) &&
             EmittingVisitor.EmitMethodCall(il, Method);
     }
 
@@ -6365,7 +6362,7 @@ namespace DryIoc
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-                closure.AddConstantOrIncrementUsageCount(Func.Target) 
+                closure.AddConstantOrIncrementUsageCount(Func.Target)
                 && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
                 && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
                 && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
@@ -7837,7 +7834,7 @@ namespace DryIoc
             object d1, object d2, object d3, object d4, object d5, object d6, object d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7);
 
 
-        private static void RegisterFunc(this IRegistrator r, 
+        private static void RegisterFunc(this IRegistrator r,
             Type serviceType, Type sourceFuncType, Delegate funcWithObjParams,
             IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
         {
@@ -7864,7 +7861,7 @@ namespace DryIoc
         public static void RegisterDelegate<TDep1>(
             this IRegistrator r, Type serviceType, Func<TDep1, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.RegisterFunc(serviceType, typeof(Func<TDep1, object>), (Func<object, object>)factory.ToFuncWithObjParams, 
+            r.RegisterFunc(serviceType, typeof(Func<TDep1, object>), (Func<object, object>)factory.ToFuncWithObjParams,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container.
@@ -7944,7 +7941,7 @@ namespace DryIoc
             Func<object, object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.RegisterFunc(serviceType,
-                typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, typeof(object)), 
+                typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, typeof(object)),
                 (Func<object, object, object, object, object>)factory.ToFuncWithObjParams,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
@@ -11445,7 +11442,7 @@ namespace DryIoc
             public WithMadeAndReuse(Type implementationType, IReuse reuse, Made made) : base(implementationType)
             {
                 Reuse = reuse;
-                Made  = made;
+                Made = made;
             }
         }
 
@@ -11791,15 +11788,15 @@ namespace DryIoc
                 if (paramExprs != null)
                     paramExprs[i] = injectedExpr;
                 else switch (i)
-                {
-                    case 0: a0 = injectedExpr; break;
-                    case 1: a1 = injectedExpr; break;
-                    case 2: a2 = injectedExpr; break;
-                    case 3: a3 = injectedExpr; break;
-                    case 4: a4 = injectedExpr; break;
-                    case 5: a5 = injectedExpr; break;
-                    case 6: a6 = injectedExpr; break;
-                }
+                    {
+                        case 0: a0 = injectedExpr; break;
+                        case 1: a1 = injectedExpr; break;
+                        case 2: a2 = injectedExpr; break;
+                        case 3: a3 = injectedExpr; break;
+                        case 4: a4 = injectedExpr; break;
+                        case 5: a5 = injectedExpr; break;
+                        case 6: a6 = injectedExpr; break;
+                    }
             }
 
             if (rules.UsedForValidation)
@@ -11807,28 +11804,28 @@ namespace DryIoc
 
             Expression serviceExpr;
             if (a0 == null) // thus handling multiple arguments (more than 7 currently)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, paramExprs) : NewNoByRefArgs(ctor, paramExprs) 
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, paramExprs) : NewNoByRefArgs(ctor, paramExprs)
                     : Call(factoryExpr, method, paramExprs);
             else if (a1 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0) : NewNoByRefArgs(ctor, a0) 
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0) : NewNoByRefArgs(ctor, a0)
                     : factoryFunc != null ? new FuncInvoke1Expression(factoryFunc, method, a0) : Call(factoryExpr, method, a0);
             else if (a2 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1) : NewNoByRefArgs(ctor, a0, a1) 
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1) : NewNoByRefArgs(ctor, a0, a1)
                     : factoryFunc != null ? new FuncInvoke2Expression(factoryFunc, method, a0, a1) : Call(factoryExpr, method, a0, a1);
             else if (a3 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2) 
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2)
                     : factoryFunc != null ? new FuncInvoke3Expression(factoryFunc, method, a0, a1, a2) : Call(factoryExpr, method, a0, a1, a2);
             else if (a4 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3) : NewNoByRefArgs(ctor, a0, a1, a2, a3) 
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3) : NewNoByRefArgs(ctor, a0, a1, a2, a3)
                     : factoryFunc != null ? new FuncInvoke4Expression(factoryFunc, method, a0, a1, a2, a3) : Call(factoryExpr, method, a0, a1, a2, a3);
             else if (a5 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4) 
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4)
                     : factoryFunc != null ? new FuncInvoke5Expression(factoryFunc, method, a0, a1, a2, a3, a4) : Call(factoryExpr, method, a0, a1, a2, a3, a4);
             else if (a6 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5) 
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5)
                     : factoryFunc != null ? new FuncInvoke6Expression(factoryFunc, method, a0, a1, a2, a3, a4, a5) : Call(factoryExpr, method, a0, a1, a2, a3, a4, a5);
             else
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5, a6) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5, a6) 
+                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5, a6) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5, a6)
                     : factoryFunc != null ? new FuncInvoke7Expression(factoryFunc, method, a0, a1, a2, a3, a4, a5, a6) : Call(factoryExpr, method, a0, a1, a2, a3, a4, a5, a6);
 
             if (ctor == null)
@@ -12579,17 +12576,17 @@ namespace DryIoc
 
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) && 
-            EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) && 
+            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
+            EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
             EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
             EmitConvertObjectTo(il, Type);
     }
 
-    internal sealed class InvokeFactoryDelegateOfRootOrSelfExpression : InvokeFactoryDelegateExpression 
+    internal sealed class InvokeFactoryDelegateOfRootOrSelfExpression : InvokeFactoryDelegateExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { ResolverContext.RootOrSelfExpr };
         public override Expression GetArgument(int index) => ResolverContext.RootOrSelfExpr;
-        public InvokeFactoryDelegateOfRootOrSelfExpression(Type type, FactoryDelegate f) : base(type, f) {}
+        public InvokeFactoryDelegateOfRootOrSelfExpression(Type type, FactoryDelegate f) : base(type, f) { }
 
         public sealed override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
@@ -12745,7 +12742,7 @@ namespace DryIoc
 
         /// <summary>Creates scope with optional parent and name.</summary>
         public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImHashMap.Entry(0, ImList<IDisposable>.Empty)) // todo: @question ты забыл барашка такая зачем ты это сделал, проверь нужно ли нам создавать entry здесь?
-        {} 
+        { }
 
         /// <summary>The basic constructor</summary>
         protected Scope(ImHashMap<int, object>[] maps, ImHashMap<Type, object> used, ImHashMap<int, ImList<IDisposable>> disposables)
