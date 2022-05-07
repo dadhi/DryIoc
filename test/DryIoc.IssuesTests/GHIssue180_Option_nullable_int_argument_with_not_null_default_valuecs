@@ -1,8 +1,4 @@
-using System;
 using NUnit.Framework;
-
-#nullable enable
-using JetBrains.Lifetimes;
 
 namespace DryIoc.IssuesTests
 {
@@ -15,7 +11,7 @@ namespace DryIoc.IssuesTests
             return 1;
         }
 
-        // [Test]
+        [Test]
         public void Test()
         {
             using var c = new Container();

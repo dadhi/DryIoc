@@ -6709,7 +6709,7 @@ namespace DryIoc
                         }
 
                         injectedExpr = paramDetails.DefaultValue != null
-                            ? request.Container.GetConstantExpression(paramDetails.DefaultValue)
+                            ? request.Container.GetConstantExpression(paramDetails.DefaultValue, paramRequest.ServiceType)
                             : paramRequest.ServiceType.GetDefaultValueExpression();
                     }
 
@@ -11781,7 +11781,7 @@ namespace DryIoc
                     if (paramDetails.IfUnresolved == IfUnresolved.Throw)
                         return null;
                     injectedExpr = paramDetails.DefaultValue != null
-                        ? container.GetConstantExpression(paramDetails.DefaultValue)
+                        ? container.GetConstantExpression(paramDetails.DefaultValue, paramRequest.ServiceType)
                         : paramRequest.ServiceType.GetDefaultValueExpression();
                 }
 
