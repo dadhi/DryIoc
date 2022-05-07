@@ -1969,6 +1969,9 @@ namespace DryIoc.ImTools
         internal override ImHashMap<K, V> AddOrKeepWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) =>
             this == newEntry ? this : _key.Equals(newEntry.Key) ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, this, newEntry));
 
+        internal override ImHashMap<K, V> AddOrKeepWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) =>
+            this == newEntry ? this : ReferenceEquals(_key, newEntry.Key) ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, this, newEntry));
+
         internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry, Update<K, V> update)
         {
             var key = _key;
@@ -2060,6 +2063,7 @@ namespace DryIoc.ImTools
         internal virtual ImHashMap<K, V> GetMapOrReplaceWithEntry(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
         internal virtual ImHashMap<K, V> GetMapOrReplaceWithEntryByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
         internal virtual ImHashMap<K, V> AddOrKeepWithTheSameHash(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
+        internal virtual ImHashMap<K, V> AddOrKeepWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry) => this;
 
         /// <summary>The delegate is supposed to return entry different from the oldEntry to update, and return the oldEntry to keep it.</summary>
         public delegate ImHashMapEntry<K, V> UpdaterInPlaceOrKeeper<S>(S state, ImHashMapEntry<K, V> oldEntry, ImHashMapEntry<K, V> newEntry);
@@ -2236,6 +2240,15 @@ namespace DryIoc.ImTools
                 var cs = Conflicts;
                 var i = cs.Length - 1;
                 while (i != -1 && !cs[i].Key.Equals(key)) --i;
+                return i != -1 ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, cs.AppendToNonEmpty(newEntry)));
+            }
+
+            internal override ImHashMap<K, V> AddOrKeepWithTheSameHashByReferenceEquals(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
+            {
+                var key = newEntry.Key;
+                var cs = Conflicts;
+                var i = cs.Length - 1;
+                while (i != -1 && !ReferenceEquals(cs[i].Key, key)) --i;
                 return i != -1 ? oldMap : oldMap.ReplaceEntry(this, new HashConflictingEntry(Hash, cs.AppendToNonEmpty(newEntry)));
             }
 
@@ -5671,6 +5684,11 @@ namespace DryIoc.ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> AddOrKeepEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
             map.AddOrGetEntry(newEntry.Hash, newEntry).AddOrKeepWithTheSameHash(map, newEntry);
+
+        /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrKeepEntryByReferenceEquals<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>
+            map.AddOrGetEntry(newEntry.Hash, newEntry).AddOrKeepWithTheSameHashByReferenceEquals(map, newEntry);
 
         /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the key is already present</summary>
         [MethodImpl((MethodImplOptions)256)]
