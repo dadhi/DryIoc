@@ -3795,7 +3795,6 @@ namespace DryIoc
             return result;
         }
 
-        // todo: @perf create an overload without disposal index so we could use FiveArgumentsMethodCall expression from the FEC, because it is now have a 6 arguments and I see impractical to create a SixArgumentsMethodCall
         private static object InterpretGetNameScopedViaFactoryDelegate(
             IResolverContext r, MethodCallExpression callExpr, IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs)
         {
@@ -4808,7 +4807,6 @@ namespace DryIoc
             return false;
         }
 
-        // todo: @perf no need to check for IDisposable in TrackDisposable
         /// <summary>A bit if sugar to track disposable in the current scope or in the singleton scope as a fallback</summary>
         public static T TrackDisposable<T>(this IResolverContext r, T instance, int disposalOrder = 0) where T : IDisposable =>
             (T)r.CurrentOrSingletonScope.TrackDisposable(instance, disposalOrder);
@@ -9396,7 +9394,6 @@ namespace DryIoc
 
         /// <summary>Service implementation type if known.</summary>
         public Type ImplementationType => _factoryOrImplType as Type ?? Factory?.ImplementationType;
-
         internal object _factoryOrImplType;
 
         /// <summary>Sets the service factory already resolved by the wrapper to save for the future factory resolution</summary>
