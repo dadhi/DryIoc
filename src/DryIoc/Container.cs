@@ -10580,6 +10580,7 @@ namespace DryIoc
     {
         /// <summary>Get next factory ID in a atomic way.</summary><returns>The ID.</returns>
         public static int GetNextID() => Interlocked.Increment(ref _lastFactoryID);
+        internal static int _lastFactoryID;
 
         /// <summary>Unique factory id generated from static seed.</summary>
         public int FactoryID { get; internal set; } = GetNextID();
@@ -10605,8 +10606,6 @@ namespace DryIoc
         }
 
         internal void SetAsResolutionCall() => Flags |= FactoryFlags.AsResolutionCall;
-
-        internal static int _lastFactoryID;
 
         /// <summary>Checks that condition is met for request or there is no condition setup.</summary>
         public bool CheckCondition(Request request)
@@ -12224,9 +12223,9 @@ namespace DryIoc
     public sealed class ExpressionFactory : Factory
     {
         /// <inheritdoc/>
-        public override IReuse Reuse { get; } // todo: @perf split
+        public override IReuse Reuse { get; } // todo: @perf @vNext split
         /// <inheritdoc/>
-        public override Setup Setup { get; } // todo: @perf split
+        public override Setup Setup { get; } // todo: @perf @vNext split
         private readonly Func<Request, Expression> _getServiceExpression;
 
         /// <summary>Constructor</summary>
