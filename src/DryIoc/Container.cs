@@ -12962,8 +12962,8 @@ namespace DryIoc
             if (_disposed == 1)
                 Throw.It(Error.ScopeIsDisposed, ToString());
             var u = _used;
-            if (Interlocked.CompareExchange(ref _used, u.AddOrUpdate(hash, type, instance), u) != u)
-                Ref.Swap(ref _used, hash, type, instance, (x, h, t, i) => x.AddOrUpdate(h, t, i));
+            if (Interlocked.CompareExchange(ref _used, u.AddOrUpdateByReferenceEquals(hash, type, instance), u) != u)
+                Ref.Swap(ref _used, hash, type, instance, (x, h, t, i) => x.AddOrUpdateByReferenceEquals(h, t, i));
         }
 
         /// <summary>Try retrieve the used instance from the scope.</summary>
@@ -12972,7 +12972,7 @@ namespace DryIoc
             if (_disposed != 1)
             {
                 if (!_used.IsEmpty)
-                    return _used.TryFind(hash, type, out used);
+                    return _used.TryFindByReferenceEquals(hash, type, out used);
 
                 var p = Parent;
                 if (p != null)
