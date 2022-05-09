@@ -2617,7 +2617,7 @@ namespace DryIoc
                 if (oldEntry == null)
                     return r == null ? mapOrOldEntry : r.WithServices(mapOrOldEntry);
 
-                var updatedEntry = oldEntry.AppendOrUpdateInPlaceOrKeep(ifAlreadyRegistered, newEntry, (i, o, n) =>
+                var updatedEntry = oldEntry.AppendOrUpdateInPlaceOrKeepByReferenceEquals(ifAlreadyRegistered, newEntry, (i, o, n) =>
                 {
                     var factory = (Factory)n.Value;
                     switch (i)
