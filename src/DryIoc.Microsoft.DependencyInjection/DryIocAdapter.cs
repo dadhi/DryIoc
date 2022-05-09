@@ -237,7 +237,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             if (implType != null)
             {
                 container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType,
-                    null, null, isStaticallyChecked: implType == serviceType);
+                    null, null, isStaticallyChecked: implType == serviceType || serviceType.IsAssignableFrom(implType));
             }
             else if (descriptor.ImplementationFactory != null)
             {
