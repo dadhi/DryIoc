@@ -297,7 +297,7 @@ namespace DryIoc
 
             var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
 
-            // inlined GetCachedDefaultFactoryOrDefault
+            // manually inlined GetCachedDefaultFactoryOrDefault
             var entry = (_registry.Value as Registry)
                 ?.DefaultFactoryCache?[serviceTypeHash & Registry.CACHE_SLOT_COUNT_MASK]
                 ?.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
@@ -307,22 +307,24 @@ namespace DryIoc
                 if (entry.Value is FactoryDelegate cachedDelegate)
                     return cachedDelegate(this);
 
-                if (ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var usedInstance))
+                // manually inlined ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var instance)
+                var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
+                if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
+                    SingletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
                 {
                     entry.Value = null; // reset the cache
-                    return usedInstance;
+                    return used is FactoryDelegate f ? f(this) : used;
                 }
 
-                var rules = Rules;
                 while (entry.Value is Expression expr)
                 {
-                    if (rules.UseInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var result))
+                    if (Rules.UseInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var result))
                         return result;
 
                     // set to Compiling to notify other threads to use the interpretation until the service is compiled
                     if (Interlocked.CompareExchange(ref entry.Value, new Registry.Compiling(expr), expr) == expr)
                     {
-                        var compiledFactory = expr.CompileToFactoryDelegate(rules.UseInterpretation);
+                        var compiledFactory = expr.CompileToFactoryDelegate(Rules.UseInterpretation);
                         entry.Value = compiledFactory; // todo: @unclear should we instead cache only after invoking the factory delegate
                         return compiledFactory(this);
                     }
@@ -330,11 +332,10 @@ namespace DryIoc
 
                 if (entry.Value is Registry.Compiling compiling)
                     return Interpreter.TryInterpretAndUnwrapContainerException(this, compiling.Expression, out var result) ? result
-                         : compiling.Expression.CompileToFactoryDelegate(rules.UseInterpretation)(this);
+                         : compiling.Expression.CompileToFactoryDelegate(Rules.UseInterpretation)(this);
             }
-
-            var ifUnresolved = Rules.ServiceProviderGetServiceShouldThrowIfUnresolved
-                ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
+            // todo: @perf push this down to ResolveAndCache?
+            var ifUnresolved = Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
             return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
         }
 
@@ -357,10 +358,13 @@ namespace DryIoc
                 if (entry.Value is FactoryDelegate cachedDelegate)
                     return cachedDelegate(this);
 
-                if (ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var usedInstance))
+                // manually inlined ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var instance)
+                var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
+                if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
+                    SingletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
                 {
                     entry.Value = null; // reset the cache
-                    return usedInstance;
+                    return used is FactoryDelegate f ? f(this) : used;
                 }
 
                 var rules = Rules;
@@ -389,9 +393,12 @@ namespace DryIoc
         private object ResolveAndCache(int serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved)
         {
             ThrowIfRootContainerDisposed();
-
-            if (ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var usedInstance))
-                return usedInstance;
+            // todo: @perf move it out to the calling site?
+            // manually inlined ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var instance)
+            var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
+            if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
+                SingletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
+                return used is FactoryDelegate f ? f(this) : used;
 
             // todo: @perf Should we in the first place create the request here, or later in CreateExpression because it may be faster for the root service without dependency or with the delegate factory? 
             var request = Request.CreateResolutionRoot(this, serviceType, ifUnresolved);
@@ -399,7 +406,7 @@ namespace DryIoc
 
             // Delegate to full blown Resolve aware of service key, open scope, etc.
             var serviceKey = request.ServiceKey;
-            var scopeName = CurrentScope?.Name;
+            var scopeName = scope?.Name;
             if (serviceKey != null || scopeName != null)
                 return ResolveAndCacheKeyed(serviceTypeHash, serviceType, serviceKey, ifUnresolved, scopeName, null, Request.Empty, null);
 
@@ -8602,6 +8609,11 @@ namespace DryIoc
             ifUnresolved == IfUnresolved.ReturnDefault ? IfUnresolvedReturnDefault :
                 IfUnresolvedReturnDefaultIfNotRegistered;
 
+        /// <summary>Creates new details out of provided settings and not null `serviceKey`.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ServiceDetails OfServiceKey(ServiceDetails d, object serviceKey) =>
+            new ServiceDetails(d.RequiredServiceType, d.IfUnresolved, serviceKey, d.MetadataKey, d.Metadata, d.DefaultValue, hasCustomValue: false);
+
         /// <summary>Creates new details out of provided settings, or returns default if all settings have default value.</summary>
         public static ServiceDetails Of(Type requiredServiceType = null,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw,
@@ -9340,7 +9352,7 @@ namespace DryIoc
             if (serviceType != null && serviceType.IsOpenGeneric())
                 Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
 
-            var serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : (object)ServiceInfo.Of(serviceType, ifUnresolved);
+            object serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : ServiceInfo.Of(serviceType, ifUnresolved);
 
             // we are re-starting the dependency depth count from `1`
             var stack = RequestStack.Create();
@@ -9702,29 +9714,22 @@ namespace DryIoc
                 _factoryOrImplType, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
-        // todo: in place mutation?
+        // todo: @perf use in place mutation?
         /// <summary>Updates the flags</summary>
         public Request WithFlags(RequestFlags newFlags) =>
             new Request(Container, DirectParent, DependencyDepth, DependencyCount,
                 RequestStack, newFlags, ServiceTypeOrInfo, _actualServiceType, InputArgExprs,
                 _factoryOrImplType, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
 
-        // note: Mutates the request, required for proper caching
-        /// <summary>Sets service key to passed value. Required for multiple default services to change null key to
+        // note: Mutates the request, required for the proper caching
+        /// <summary>Sets service key to the passed value. Required for multiple default services to change null key to
         /// actual <see cref="DefaultKey"/></summary>
-        public void ChangeServiceKey(object serviceKey)
-        {
-            if (ServiceTypeOrInfo is ServiceInfo i)
-            {
-                var d = i.Details;
-                ServiceTypeOrInfo = i.Create(i.ServiceType,
-                    ServiceDetails.Of(d.RequiredServiceType, serviceKey, d.IfUnresolved, d.DefaultValue, d.MetadataKey, d.Metadata)); // todo: @unclear check for the custom _value
-            }
-            else if (ServiceTypeOrInfo is ParameterInfo pi)
-                ServiceTypeOrInfo = ParameterServiceInfo.Of(pi, _actualServiceType, ServiceDetails.Of(serviceKey: serviceKey));
-            else
-                ServiceTypeOrInfo = ServiceInfo.Of(_actualServiceType, serviceKey: serviceKey);
-        }
+        public void ChangeServiceKey(object serviceKey) =>
+            ServiceTypeOrInfo = ServiceTypeOrInfo is ServiceInfo i
+                ? i.Create(i.ServiceType, ServiceDetails.OfServiceKey(i.Details, serviceKey)) // todo: @unclear check for the custom _value
+                : ServiceTypeOrInfo is ParameterInfo pi
+                ? ParameterServiceInfo.Of(pi, _actualServiceType, ServiceDetails.OfServiceKey(ServiceDetails.Default, serviceKey)) 
+                : ServiceTypeOrInfo = ServiceInfo.Of(_actualServiceType, serviceKey);
 
         /// <summary>Prepends input arguments to existing arguments in request. It is done because the
         /// nested Func/Action input argument has a priority over outer argument.
