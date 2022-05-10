@@ -2236,14 +2236,15 @@ namespace DryIoc
                     {
                         entry = ImHashMap.EntryWithDefaultValue<Type, object>(serviceTypeHash, serviceType);
                         var oldMap = map;
-                        var newMap = oldMap.AddOrKeepEntry(entry);
+                        var newMap = oldMap.AddOrKeepEntryByReferenceEquals(entry);
                         if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
                         {
                             if (newMap == oldMap)
-                                entry = map.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
+                                entry = map.GetSurePresentByReferenceEquals(serviceTypeHash, serviceType);
                         }
                         else
-                            entry = Ref.SwapAndGetNewValue(ref map, entry, (x, en) => x.AddOrKeepEntry(en)).GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
+                            entry = Ref.SwapAndGetNewValue(ref map, entry, (x, en) => x.AddOrKeepEntryByReferenceEquals(en))
+                                .GetSurePresentByReferenceEquals(serviceTypeHash, serviceType);
                     }
 
                     var e = entry.Value;
@@ -2271,11 +2272,10 @@ namespace DryIoc
                             if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
                             {
                                 if (newMap == oldMap)
-                                    entry = map.GetEntryOrDefault(factoryId);
+                                    entry = map.GetSurePresent(factoryId);
                             }
                             else
-                                entry = Ref.SwapAndGetNewValue(ref map, entry, (x, e) => x.AddOrKeepEntry(e))
-                                    .GetEntryOrDefault(factoryId);
+                                entry = Ref.SwapAndGetNewValue(ref map, entry, (x, e) => x.AddOrKeepEntry(e)).GetSurePresent(factoryId);
                         }
                     }
 
