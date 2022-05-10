@@ -1,6 +1,12 @@
 Version History
 ---------------
 
+## v5.0.2 Bug-fix release / 2022-05-10
+
+- fixed: #180 Azure Function DI issue - Anonymously Hosted DynamicMethods Assembly. Object reference not set. (Nullable int optional argument with default int value is set to null)
+- fixed: #475 Exception message for WaitForScopedServiceIsCreatedTimeoutExpired misses the tick number output 
+
+
 ## v5.0.1 Bug-fix release / 2022-04-22
 
 - fixed: #470 Regression in 5.0.0 when resolving `Func<IEnumerable<IService>>` with Parameter
