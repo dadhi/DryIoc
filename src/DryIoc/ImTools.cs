@@ -1250,7 +1250,7 @@ namespace DryIoc.ImTools
         }
     }
 
-    /// Simple unbounded object pool
+    ///<summary>Simple unbounded object pool</summary>
     public sealed class StackPool<T> where T : class
     {
         /// <summary>Give me an object</summary>
@@ -1261,7 +1261,7 @@ namespace DryIoc.ImTools
         /// <summary>Give it back</summary>
         [MethodImpl((MethodImplOptions)256)]
         public void Return(T x) =>
-            Interlocked.Exchange(ref _s, new Stack(x, _s));
+            _s = new Stack(x, _s); // we don't need to interlocked here because it is fine to abandon the one Stack item
 
         private Stack _s;
 
