@@ -3,7 +3,7 @@
         <TargetFrameworks>netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
-        <VersionPrefix>6.0.1</VersionPrefix>
+        <VersionPrefix>6.0.2</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -15,6 +15,11 @@
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v6.0.2
+
+- fixed: #479 IServiceScopeFactory should be a singleton; service scopes should not be nested
+- updated to DryIoc v5.0.2
+
 ## v6.0.1
 
 - Fixed the dependencies versions in the source package, but upping the version here to be consistent
