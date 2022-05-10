@@ -120,7 +120,7 @@ namespace DryIoc
 {
     partial class Container
     {
-        partial void HasCompileTimeGeneratedContainer(ref bool hasIt) => hastIt = true;
+        partial void HasCompileTimeGeneratedContainer(ref bool hasIt) => hasIt = true;
 
         partial void ResolveGenerated(ref object service, Type serviceType)
         {

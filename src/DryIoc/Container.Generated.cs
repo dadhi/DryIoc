@@ -59,7 +59,7 @@ namespace DryIoc
                     requiredServiceType == null &&
                     Equals(preRequestParent, Request.Empty.Push(
                         typeof(IService),
-                        179,
+                        20001,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall)))
@@ -89,7 +89,7 @@ namespace DryIoc
                     null,
                     Request.Empty.Push(
                         typeof(IService),
-                        179,
+                        20001,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck),
@@ -101,7 +101,7 @@ namespace DryIoc
                     null,
                     Request.Empty.Push(
                         typeof(IService),
-                        179,
+                        20001,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck),
