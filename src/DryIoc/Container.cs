@@ -152,7 +152,7 @@ namespace DryIoc
 
         #region Compile-time generated parts
 
-        partial void GetLastGeneratedFactoryID(ref int lastFactoryID);
+        partial void HasCompileTimeGeneratedContainer(ref bool hasIt);
 
         partial void ResolveGenerated(ref object service, Type serviceType);
 
@@ -2217,6 +2217,7 @@ namespace DryIoc
 
                 public void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
                 {
+                    // todo: @perf should we avoid using Interlocked at least in some places? 
                     if (_defaultFactoryCache == null)
                         Interlocked.CompareExchange(ref _defaultFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
 
@@ -2949,10 +2950,10 @@ namespace DryIoc
 
         private void SetInitialFactoryID()
         {
-            var lastGeneratedId = 0;
-            GetLastGeneratedFactoryID(ref lastGeneratedId);
-            if (lastGeneratedId > Factory._lastFactoryID)
-                Factory._lastFactoryID = lastGeneratedId + 1;
+            var hasIt = false;
+            HasCompileTimeGeneratedContainer(ref hasIt);
+            if (hasIt && Factory._lastFactoryID <= 10_000)
+                Factory._lastFactoryID = 20_000; // todo: wtf is this logic, please explain it bro!
         }
     }
 

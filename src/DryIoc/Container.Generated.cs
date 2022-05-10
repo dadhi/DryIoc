@@ -42,10 +42,7 @@ namespace DryIoc
 {
     partial class Container
     {
-        partial void GetLastGeneratedFactoryID(ref int lastFactoryID)
-        {
-            lastFactoryID = 184; // generated: equals to the last used Factory.FactoryID
-        }
+        partial void HasCompileTimeGeneratedContainer(ref bool hasIt) => hasIt = true;
 
         partial void ResolveGenerated(ref object service, Type serviceType)
         {
