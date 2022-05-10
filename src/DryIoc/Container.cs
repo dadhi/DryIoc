@@ -751,11 +751,22 @@ namespace DryIoc
             (_scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault()) ?? _singletonScope;
 
         /// <inheritdoc />
-        [MethodImpl((MethodImplOptions)256)]
         public IResolverContext WithCurrentScope(IScope scope)
         {
-            ThrowIfRootContainerDisposed();
+            if (_singletonScope.IsDisposed)
+                Throw.It(Error.ContainerIsDisposed, ToString());
             return new Container(Rules, _registry, _singletonScope, _scopeContext, scope, 0, null, parent: this);
+        }
+
+        /// <inheritdoc />
+        public IResolverContext WithNewOpenScope()
+        {
+            if (_singletonScope.IsDisposed)
+                Throw.It(Error.ContainerIsDisposed, ToString());
+            if (_scopeContext == null)
+                return new Container(Rules, _registry, _singletonScope, _scopeContext, Scope.Of(_ownCurrentScope), 0, null, parent: this);
+            _scopeContext.SetNewOpen();
+            return new Container(Rules, _registry, _singletonScope, _scopeContext, null, 0, null, parent: this);
         }
 
         void IResolverContext.InjectPropertiesAndFields(object instance, string[] propertyAndFieldNames)
@@ -4617,6 +4628,9 @@ namespace DryIoc
         /// <summary>Creates the resolver context with specified current Container-OWN scope</summary>
         IResolverContext WithCurrentScope(IScope scope);
 
+        /// <summary>Combines `WithCurrentScope` and `OwnCurrentScope` for the hot-path case to avoid two virtual calls</summary>
+        IResolverContext WithNewOpenScope();
+
         /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
         void Use(Type serviceType, object instance);
 
@@ -4756,7 +4770,8 @@ namespace DryIoc
         /// ]]></code></example>
         public static IResolverContext OpenScope(this IResolverContext r, object name, bool trackInParent = false)
         {
-            if (r.ScopeContext == null)
+            var scopeContext = r.ScopeContext;
+            if (scopeContext == null)
             {
                 var parentScope = r.OwnCurrentScope;
                 var newOwnScope = Scope.Of(parentScope, name);
@@ -4765,13 +4780,17 @@ namespace DryIoc
                 return r.WithCurrentScope(newOwnScope);
             }
 
-            var newContextScope = name == null
-                ? r.ScopeContext.SetCurrent(parent => Scope.Of(parent))
-                : r.ScopeContext.SetCurrent(parent => Scope.Of(parent, name));
+            var newContextScope = name == null ? scopeContext.SetNewOpen() : scopeContext.SetNewOpenWithName(name);
             if (trackInParent)
                 (newContextScope.Parent ?? r.SingletonScope).TrackDisposable(newContextScope);
             return r.WithCurrentScope(null);
         }
+
+        /// <summary>Set scope context with the new scope with current scope as parent</summary>
+        public static IScope SetNewOpen(this IScopeContext ctx) => ctx.SetCurrent(parent => Scope.Of(parent));
+
+        /// <summary>Set scope context with the new scope with current scope as parent and name</summary>
+        public static IScope SetNewOpenWithName(this IScopeContext ctx, object name) => ctx.SetCurrent(parent => Scope.Of(parent, name));
 
         /// <summary>Opens scope with optional name and optional tracking of new scope in a parent scope.</summary>
         /// <example><code lang="cs"><![CDATA[
@@ -4782,10 +4801,7 @@ namespace DryIoc
         /// }
         /// ]]></code></example>
         [MethodImpl((MethodImplOptions)256)]
-        public static IResolverContext OpenScope(this IResolverContext r) =>
-            r.ScopeContext == null
-                ? r.WithCurrentScope(Scope.Of(r.OwnCurrentScope))
-                : r.OpenScope(null);
+        public static IResolverContext OpenScope(this IResolverContext r) => r.WithNewOpenScope();
 
         /// <summary>Check if the service instance or factory is added to the current or singleton scope</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -9729,7 +9745,7 @@ namespace DryIoc
             ServiceTypeOrInfo = ServiceTypeOrInfo is ServiceInfo i
                 ? i.Create(i.ServiceType, ServiceDetails.OfServiceKey(i.Details, serviceKey)) // todo: @unclear check for the custom _value
                 : ServiceTypeOrInfo is ParameterInfo pi
-                ? ParameterServiceInfo.Of(pi, _actualServiceType, ServiceDetails.OfServiceKey(ServiceDetails.Default, serviceKey)) 
+                ? ParameterServiceInfo.Of(pi, _actualServiceType, ServiceDetails.OfServiceKey(ServiceDetails.Default, serviceKey))
                 : ServiceTypeOrInfo = ServiceInfo.Of(_actualServiceType, serviceKey);
 
         /// <summary>Prepends input arguments to existing arguments in request. It is done because the
@@ -12715,7 +12731,6 @@ namespace DryIoc
         internal ImHashMap<int, object>[] _maps;
 
         internal static readonly object NoItem = new object();
-
         private static ImHashMap<int, object>[] _emptySlots = CreateEmptyMaps();
 
         private static ImHashMap<int, object>[] CreateEmptyMaps()
@@ -12727,17 +12742,17 @@ namespace DryIoc
             return slots;
         }
 
-        ///<summary>Creating</summary>
+        ///<summary>Creating scope with parent and name</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static IScope Of(IScope parent, object name) =>
             parent == null && name == null ? new Scope() : new WithParentAndName(parent, name);
 
-        ///<summary>Creating</summary>
+        ///<summary>Creating scope with parent</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static IScope Of(IScope parent) =>
             parent == null ? new Scope() : new WithParentAndName(parent, null);
 
-        ///<summary>Creating</summary>
+        ///<summary>Creating the root scope with name</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static IScope Of(object name) =>
             name == null ? new Scope() : new WithParentAndName(null, name);
@@ -13084,7 +13099,7 @@ namespace DryIoc
 
         /// <summary>Change current scope for the calling Thread.</summary>
         public IScope SetCurrent(SetCurrentScopeHandler setCurrentScope) =>
-            _scope.Value = setCurrentScope(GetCurrentOrDefault());
+            _scope.Value = setCurrentScope(_scope.Value);
 
         /// <summary>Disposes the scopes and empties internal scope storage.</summary>
         public void Dispose()
@@ -13101,6 +13116,7 @@ namespace DryIoc
                 }
             }
         }
+
     }
 
     /// <summary>Simplified scope agnostic reuse abstraction. More easy to implement,
@@ -15164,7 +15180,7 @@ namespace DryIoc
         /// Make it predictable by removing any side effects.</remarks>
         /// <returns>New current scope. It is convenient to use method in "using (var newScope = ctx.SetCurrent(...))".</returns>
         public IScope SetCurrent(SetCurrentScopeHandler changeCurrentScope) =>
-            _ambientScope.Value = changeCurrentScope(GetCurrentOrDefault());
+            _ambientScope.Value = changeCurrentScope(_ambientScope.Value);
 
         /// <summary>Nothing to dispose.</summary>
         public void Dispose() { }

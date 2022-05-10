@@ -266,14 +266,7 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Opens scope and wraps it into DI <see cref="IServiceScope"/> interface.</summary>
         /// <returns>DI wrapper of opened scope.</returns>
-        public IServiceScope CreateScope()
-        {
-            var r = _scopedResolver;
-            var scope = r.ScopeContext == null
-                ? Scope.Of(r.OwnCurrentScope)
-                : r.ScopeContext.SetCurrent(p => Scope.Of(p));
-            return new DryIocServiceScope(r.WithCurrentScope(scope));
-        }
+        public IServiceScope CreateScope() => new DryIocServiceScope(_scopedResolver.WithNewOpenScope());
     }
 
     /// <summary>Bare-bones IServiceScope implementations</summary>
@@ -325,13 +318,6 @@ namespace DryIoc.Microsoft.DependencyInjection
         public object GetRequiredService(Type serviceType) => _container.Resolve(serviceType);
 
         /// <inheritdoc />
-        public IServiceScope CreateScope() 
-        {
-            var r = _container;
-            var scope = r.ScopeContext == null
-                ? Scope.Of(r.OwnCurrentScope)
-                : r.ScopeContext.SetCurrent(p => Scope.Of(p));
-            return new DryIocServiceScope(r.WithCurrentScope(scope));
-        }
+        public IServiceScope CreateScope() => new DryIocServiceScope(_container.WithNewOpenScope());
     }
 }
