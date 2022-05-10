@@ -1233,12 +1233,20 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDI | 110.50 us | 2.545 us | 7.262 us | 109.15 us |  1.19 |    0.13 | 16.2354 |     - |     - |  49.82 KB |
 
 
-## v5.5.0
+## v6 - SmallArrayPool (stashed)
 
 |      Method |      Mean |    Error |   StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------ |----------:|---------:|---------:|------:|--------:|-------:|-------:|------:|----------:|
 |      DryIoc |  90.99 us | 1.773 us | 1.481 us |  1.00 |    0.00 | 6.1035 | 0.3662 |     - |  37.39 KB |
 | DryIoc_MsDI | 102.39 us | 1.385 us | 1.296 us |  1.13 |    0.02 | 7.6904 | 0.4883 |     - |  47.79 KB |
+
+## v6 - ImTools v4
+
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 86.96 us | 1.477 us | 1.758 us |  1.00 |    0.00 |  6.2256 | 0.3662 |     - |  38.57 KB |
+| DryIoc_MsDI | 99.10 us | 1.255 us | 1.112 us |  1.13 |    0.02 |  7.9346 | 0.6104 |     - |  48.91 KB |
+|        MsDI | 93.91 us | 1.228 us | 1.026 us |  1.07 |    0.02 | 11.8408 | 4.2725 |     - |   72.6 KB |
 */
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
