@@ -2229,11 +2229,11 @@ namespace DryIoc
 
                 internal override Registry WithWrappers(ImHashMap<Type, object> wrappers) =>
                     wrappers == ImHashMap<Type, object>.Empty ? this :
-                    (AndCache)new CacheAndWrappersAndDecorators(Services, wrappers, Decorators, _defaultFactoryCache?.CopyNonEmpty(), _keyedFactoryCache?.CopyNonEmpty(), _factoryExpressionCache?.CopyNonEmpty(), _isChangePermitted);
+                    new CacheAndWrappersAndDecorators(Services, wrappers, Decorators, _defaultFactoryCache?.CopyNonEmpty(), _keyedFactoryCache?.CopyNonEmpty(), _factoryExpressionCache?.CopyNonEmpty(), _isChangePermitted);
 
                 internal override Registry WithDecorators(ImHashMap<Type, object> decorators) =>
                     decorators == ImHashMap<Type, object>.Empty ? this :
-                    (AndCache)new CacheAndWrappersAndDecorators(Services, Wrappers, decorators, _defaultFactoryCache?.CopyNonEmpty(), _keyedFactoryCache?.CopyNonEmpty(), _factoryExpressionCache?.CopyNonEmpty(), _isChangePermitted);
+                    new CacheAndWrappersAndDecorators(Services, Wrappers, decorators, _defaultFactoryCache?.CopyNonEmpty(), _keyedFactoryCache?.CopyNonEmpty(), _factoryExpressionCache?.CopyNonEmpty(), _isChangePermitted);
 
                 public override Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
                     isChangePermitted == _isChangePermitted ? this :
