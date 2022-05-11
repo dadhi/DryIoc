@@ -147,7 +147,7 @@ namespace DryIoc.MefAttributedModel
 
         internal static Expression GetLazyMetadataExpressionOrDefault(DryIoc.Request request, Factory serviceFactory = null)
         {
-            var wrapperType = request.GetActualServiceType();
+            var wrapperType = request.ActualServiceType;
             var typeArgs = wrapperType.GetGenericArguments();
             var serviceType = typeArgs[0];
             var metadataType = typeArgs[1];
