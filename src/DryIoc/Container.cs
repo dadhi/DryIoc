@@ -911,30 +911,28 @@ namespace DryIoc
             if (factory?.GeneratedFactories != null)
                 factory = factory.GetGeneratedFactoryOrDefault(request);
 
-            if (factory == null)
-                TryThrowUnableToResolve(request);
-
-            return factory;
+            return factory == null ? ThrowUnableToResolveOrGetDefault(request, factory) : factory;
         }
 
-        internal static void TryThrowUnableToResolve(Request request)
+        internal static T ThrowUnableToResolveOrGetDefault<T>(Request request, T defaultResult)
         {
-            if (request.IfUnresolved != IfUnresolved.Throw)
-                return;
+            if (request.IfUnresolved == IfUnresolved.Throw)
+            {
+                var str = new StringBuilder();
+                str = request.Container
+                    .GetAllServiceFactories(request.ServiceType, bothClosedAndOpenGenerics: true)
+                    .Aggregate(str, (s, x) => s
+                        .Append((x.Value.Reuse?.CanApply(request) ?? true) ? "  " : "  without matching scope ")
+                        .Print(x));
 
-            var str = new StringBuilder();
-            str = request.Container
-                .GetAllServiceFactories(request.ServiceType, bothClosedAndOpenGenerics: true)
-                .Aggregate(str, (s, x) => s
-                    .Append((x.Value.Reuse?.CanApply(request) ?? true) ? "  " : "  without matching scope ")
-                    .Print(x));
-
-            if (str.Length != 0)
-                Throw.It(Error.UnableToResolveFromRegisteredServices, request, str);
-            else
-                Throw.It(Error.UnableToResolveUnknownService, request,
-                    request.Rules.DynamicRegistrationProviders.EmptyIfNull().Length,
-                    request.Rules.UnknownServiceResolvers.EmptyIfNull().Length);
+                if (str.Length != 0)
+                    Throw.It(Error.UnableToResolveFromRegisteredServices, request, str);
+                else
+                    Throw.It(Error.UnableToResolveUnknownService, request,
+                        request.Rules.DynamicRegistrationProviders.EmptyIfNull().Length,
+                        request.Rules.UnknownServiceResolvers.EmptyIfNull().Length);
+            }
+            return defaultResult;
         }
 
         Factory IContainer.GetServiceFactoryOrDefault(Request request)
@@ -9504,7 +9502,7 @@ namespace DryIoc
 
         /// <summary>Compatible required or service type.</summary>
         public Type GetActualServiceType() => _actualServiceType;
-        private Type _actualServiceType;
+        internal Type _actualServiceType; // todo: @perf using it directly instead of calling the method, at least internally
 
         /// <summary>Get the details</summary>
         public ServiceDetails GetServiceDetails() => ServiceTypeOrInfo is ServiceInfo i ? i.Details : ServiceDetails.Default;
@@ -10744,7 +10742,7 @@ namespace DryIoc
                 {
                     // Note: (for details check the test for #340 and the `For_singleton_can_use_func_without_args_or_just_resolve_after_func_with_args`)
                     //
-                    // Now we are in the danger zone if try to get the singleton wrapped in Func as a dependency of the same singleton, e.g.
+                    // Now we are in a danger zone if we try to get a singleton wrapped in a Func as a dependency of the same singleton, e.g.
                     //
                     // `class Singleton { public Singleton(Func<Singleton> fs) {} }`
                     //
@@ -10752,22 +10750,11 @@ namespace DryIoc
                     // So the way-out here is to abondon the attempt to wait for the item if we are not in the Func
                     // and proceed to the normal Expression creation.
                     //
-                    if (itemRef.Value == Scope.NoItem)
-                    {
-                        if (!request.TracksTransientDisposable && !request.IsWrappedInFunc())
-                            Scope.WaitForItemIsSet(itemRef);
-                    }
-
-                    if (itemRef.Value != Scope.NoItem) // get the item if and only if it is already created
-                    {
-                        var singleton = itemRef.Value;
-                        serviceExpr = singleton != null ? Constant(singleton) : Constant(null, request.GetActualServiceType()); // fixes #258
-                        return Setup.WeaklyReferenced // Unwrap WeakReference or HiddenDisposable in that order!
-                                ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(serviceExpr), ReflectionTools.WeakReferenceValueProperty))
-                            : Setup.PreventDisposal 
-                                ? Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField)
-                            : serviceExpr;
-                    }
+                    var singleton = itemRef.Value;
+                    if (singleton != Scope.NoItem)
+                        return GetSingletonExpression(singleton, setup, request);
+                    if (!request.TracksTransientDisposable && !request.IsWrappedInFunc())
+                        return GetSingletonExpression(Scope.WaitForItemIsSet(itemRef), setup, request);
                 }
             }
 
@@ -10777,10 +10764,7 @@ namespace DryIoc
                 : CreateExpressionWithWrappedFactory(request, serviceFactory);
 
             if (serviceExpr == null)
-            {
-                Container.TryThrowUnableToResolve(request);
-                return null;
-            }
+                return Container.ThrowUnableToResolveOrGetDefault(request, serviceExpr);
 
             if (reuse != DryIoc.Reuse.Transient)
             {
@@ -10817,6 +10801,16 @@ namespace DryIoc
                     serviceExpr;
 
             return serviceExpr;
+        }
+        
+        private static Expression GetSingletonExpression(object instance, Setup setup, Request req)
+        {
+            var e = instance != null ? Constant(instance) : Constant(null, req._actualServiceType); // fixes #258
+            return setup.WeaklyReferenced // Unwrap WeakReference or HiddenDisposable in that order!
+                    ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(e), ReflectionTools.WeakReferenceValueProperty))
+                : setup.PreventDisposal 
+                    ? Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(e), HiddenDisposable.ValueField)
+                : e;
         }
 
         /// <summary>Applies reuse to created expression, by wrapping passed expression into scoped access
