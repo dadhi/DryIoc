@@ -893,15 +893,6 @@ namespace DryIoc
             return clearedServices || clearedWrapper || clearedDecorator;
         }
 
-        [MethodImpl((MethodImplOptions)256)]
-        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImHashMapEntry<int, object> slot)
-        {
-            if (_registry.Value is Registry r)
-                return r.GetCachedFactoryExpression(factoryId, reuse, out slot);
-            slot = null;
-            return null;
-        }
-
         Factory IContainer.ResolveFactory(Request request)
         {
             var factory = ((IContainer)this).GetServiceFactoryOrDefault(request);
@@ -2113,7 +2104,6 @@ namespace DryIoc
                             else if (x.Key.Equals(key))
                                 result = x;
                 }
-
                 return result != null;
             }
 
@@ -2126,19 +2116,6 @@ namespace DryIoc
                         return x;
                     }
                 return new KeyedFactoryCacheEntry((KeyedFactoryCacheEntry)x, k, f);
-            }
-
-            internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImHashMapEntry<int, object> entry)
-            {
-                entry = FactoryExpressionCache?[factoryId & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(factoryId);
-                if (entry == null)
-                    return null;
-                var expr = entry.Value;
-                return 
-                    expr is Expression e ? (reuse is SingletonReuse || reuse is CurrentScopeReuse sr && sr.Name == null ? e : null) :
-                    expr is ExprCacheOfTransientWithDepCount t ? (reuse == Reuse.Transient ? t.Expr : null) :
-                    expr is ExprCacheOfScopedWithName s ? (reuse.Name != null && reuse.Name.Equals(s.Name) ? s.Expr : null) :
-                    null; // could be `expr == null` when the cache is reset by Unregister and IfAlreadyRegistered.Replace
             }
 
             internal Registry(ImHashMap<Type, object> services) => Services = services;
@@ -9456,6 +9433,11 @@ namespace DryIoc
             for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
                 p.DependencyCount -= dependencyCount;
         }
+        internal void IncreaseTrackedDependencyCountForParents(int dependencyCount)
+        {
+            for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
+                p.DependencyCount += dependencyCount;
+        }
 
         /// <summary>Indicates that request is empty initial request.</summary>
         public bool IsEmpty => DirectParent == null;
@@ -9793,7 +9775,7 @@ namespace DryIoc
 
             var setup = factory.Setup;
 
-            var reuse = 
+            var reuse =
                 InputArgExprs != null && Rules.IgnoringReuseForFuncWithArgs ? DryIoc.Reuse.Transient :
                 factory.Reuse != null ? factory.Reuse :
                 setup.UseParentReuse ? (DirectParent.IsEmpty ? Rules.DefaultReuse : null) : // the `null` here signals to find the parent reuse
@@ -10722,15 +10704,29 @@ namespace DryIoc
             ImHashMapEntry<int, object> cacheEntry = null;
             if (cacheExpression)
             {
-                var cachedExpr = ((Container)container).GetCachedFactoryExpression(request.FactoryID, reuse, out cacheEntry);
-                if (cachedExpr != null)
+                if (((Container)container)._registry.Value is Container.Registry r)
                 {
-                    if (reuse == DryIoc.Reuse.Transient &&
-                        cacheEntry.Value is Container.ExprCacheOfTransientWithDepCount t && t.Count > 0 &&
-                        !rules.UsedForValidation && !rules.UsedForExpressionGeneration)
-                        for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
-                            p.DependencyCount += t.Count;
-                    return cachedExpr;
+                    var factoryId = request.FactoryID;
+                    cacheEntry = r.FactoryExpressionCache?[factoryId & Container.Registry.CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(factoryId);
+                    if (cacheEntry?.Value is object entry)
+                    {
+                        if (entry is Expression expr)
+                        {
+                            if (reuse is SingletonReuse || reuse is CurrentScopeReuse sr && sr.Name == null)
+                                return expr;
+                        }
+                        else if (entry is Container.ExprCacheOfTransientWithDepCount t)
+                        {
+                            if (reuse == DryIoc.Reuse.Transient)
+                            {
+                                if (t.Count > 0 && !rules.UsedForValidation && !rules.UsedForExpressionGeneration)
+                                    request.IncreaseTrackedDependencyCountForParents(t.Count);
+                                return t.Expr;
+                            }
+                        }
+                        else if (entry is Container.ExprCacheOfScopedWithName s && reuse.Name?.Equals(s.Name) == true)
+                            return s.Expr;
+                    }
                 }
             }
 
@@ -10765,16 +10761,12 @@ namespace DryIoc
                     if (itemRef.Value != Scope.NoItem) // get the item if and only if it is already created
                     {
                         var singleton = itemRef.Value;
-                        serviceExpr = singleton != null ? Constant(singleton)
-                            : Constant(null, request.GetActualServiceType()); // fixes #258
-
-                        if (Setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
-                            serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
-                                Property(ConvertViaCastClassIntrinsic<WeakReference>(serviceExpr), ReflectionTools.WeakReferenceValueProperty));
-                        else if (Setup.PreventDisposal)
-                            serviceExpr = Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
-
-                        return serviceExpr;
+                        serviceExpr = singleton != null ? Constant(singleton) : Constant(null, request.GetActualServiceType()); // fixes #258
+                        return Setup.WeaklyReferenced // Unwrap WeakReference or HiddenDisposable in that order!
+                                ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(serviceExpr), ReflectionTools.WeakReferenceValueProperty))
+                            : Setup.PreventDisposal 
+                                ? Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField)
+                            : serviceExpr;
                     }
                 }
             }
@@ -10819,7 +10811,7 @@ namespace DryIoc
             }
 
             if (cacheExpression)
-                (cacheEntry ?? ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr)).Value = 
+                (cacheEntry ?? ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr)).Value =
                     reuse == DryIoc.Reuse.Transient ? new Container.ExprCacheOfTransientWithDepCount(serviceExpr, request.DependencyCount) :
                     reuse is CurrentScopeReuse scoped && scoped.Name != null ? new Container.ExprCacheOfScopedWithName(serviceExpr, scoped.Name) :
                     serviceExpr;

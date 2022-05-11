@@ -37,6 +37,11 @@ namespace Playground
             //    RealisticUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIoc());
             //Debug.Assert(x != null);
 
+            // var x = RealisticUnitOfWorkBenchmark.Measure(RealisticUnitOfWorkBenchmark.PrepareDryIoc());
+            // Console.ReadKey();
+
+            // Debug.Assert(x != null);
+
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
