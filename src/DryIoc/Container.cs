@@ -9400,8 +9400,8 @@ namespace DryIoc
         /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
         public FactoryType FactoryType { get; private set; }
 
-        /// <summary>Combines decorator and <see cref="DecoratedFactoryID"/></summary>
-        public int CombineDecoratorWithDecoratedFactoryID() => FactoryID | (DecoratedFactoryID << 16);
+        internal int GetCombinedDecoratorAndFactoryID() => 
+            FactoryType == FactoryType.Decorator ? (FactoryID | (DecoratedFactoryID << 16)) : FactoryID;
 
         /// <summary>Service implementation type if known.</summary>
         public Type ImplementationType => _factoryOrImplType as Type ?? Factory?.ImplementationType;
@@ -10733,10 +10733,7 @@ namespace DryIoc
             if (reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess)
             {
                 // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
-                var id = request.FactoryType == FactoryType.Decorator
-                    ? request.CombineDecoratorWithDecoratedFactoryID()
-                    : request.FactoryID;
-
+                var id = request.GetCombinedDecoratorAndFactoryID();
                 var itemRef = ((Scope)container.SingletonScope)._maps[id & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
                 if (itemRef != null)
                 {
@@ -10830,12 +10827,8 @@ namespace DryIoc
                 if (scope.IsDisposed)
                     Throw.ScopeIsDisposed(scope, container);
 
-                var id = request.FactoryType == FactoryType.Decorator
-                    ? request.CombineDecoratorWithDecoratedFactoryID()
-                    : request.FactoryID;
-
+                var id = request.GetCombinedDecoratorAndFactoryID();
                 var singleton = Scope.NoItem; // NoItem is a marker for the value is not created yet
-
                 // Creating a new local item with the id and the marker for not yet created item
                 var itemRef = ImHashMap.Entry(id, Scope.NoItem);
                 ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK]; // got a live reference to the map where value can be queried and stored
@@ -13167,14 +13160,11 @@ namespace DryIoc
                 return Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
                     serviceFactoryExpr, ConstantInt(disposalOrder));
 
-            var factoryId = request.FactoryType == FactoryType.Decorator
-                ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
-
-            var lambdaExpr = new FactoryDelegateExpression(serviceFactoryExpr);
-
             if (request.DependencyCount > 0)
                 request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
 
+            var factoryId = request.GetCombinedDecoratorAndFactoryID();
+            var lambdaExpr = new FactoryDelegateExpression(serviceFactoryExpr);
             if (disposalOrder == 0)
                 return Call(ResolverContext.SingletonScopeExpr, Scope.GetOrAddViaFactoryDelegateMethod,
                     ConstantInt(factoryId), lambdaExpr, FactoryDelegateCompiler.ResolverContextParamExpr);
@@ -13234,8 +13224,6 @@ namespace DryIoc
             }
             else
             {
-                var factoryId = request.FactoryType == FactoryType.Decorator ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
-
                 Expression factoryDelegateExpr;
                 if (serviceFactoryExpr is InvocationExpression ie && ie.Expression is ConstantExpression registeredDelegateExpr &&
                     registeredDelegateExpr.Type == typeof(FactoryDelegate))
@@ -13247,12 +13235,11 @@ namespace DryIoc
                     // decrease the dependency count when wrapping into lambda
                     if (request.DependencyCount > 0)
                         request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
-
                     factoryDelegateExpr = new FactoryDelegateExpression(serviceFactoryExpr);
                 }
 
                 var disposalOrder = request.Factory.Setup.DisposalOrder;
-
+                var factoryId = request.GetCombinedDecoratorAndFactoryID();
                 if (ScopedOrSingleton)
                     return disposalOrder == 0
                         ? new GetScopedOrSingletonViaFactoryDelegateExpression(factoryId, factoryDelegateExpr)
