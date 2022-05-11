@@ -13055,7 +13055,7 @@ namespace DryIoc
         }
 
         /// <summary>Try retrieve the used instance from the scope.</summary>
-        public bool TryGetUsed(int hash, Type type, out object used)
+        public bool TryGetUsed(int hash, Type type, out object used) // todo: @perf maybe pass the SingletonScope as Parent here?
         {
             if (!_used.IsEmpty)
             {
