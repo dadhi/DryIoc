@@ -1255,25 +1255,18 @@ namespace DryIoc.ImTools
     {
         /// <summary>Give me an object</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public T RentOrDefault() =>
-            Interlocked.Exchange(ref _s, _s?.Tail)?.Head;
+        public T RentOrNull() => Interlocked.Exchange(ref _s, _s?.Tail)?.Head;
 
         /// <summary>Give it back</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public void Return(T x) =>
-            _s = new Stack(x, _s); // we don't need to interlocked here because it is fine to abandon the one Stack item
+        public void Return(T x) => _s = new Stack(x, _s); // we don't need to interlocked here because it is fine to abandon the one Stack item
 
         private Stack _s;
-
         private sealed class Stack
         {
             public readonly T Head;
             public readonly Stack Tail;
-            public Stack(T h, Stack t)
-            {
-                Head = h;
-                Tail = t;
-            }
+            public Stack(T h, Stack t) { Head = h; Tail = t; }
         }
     }
 
@@ -1298,14 +1291,14 @@ namespace DryIoc.ImTools
         /// <summary>Rent the existing static array or create a new array if it is already rented.
         /// The method does not check the `requiredLength` is in the pool bounds to avoid performance cost.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static T[] RentOrNewOfLength(int requiredLength) =>
+        public static T[] RentOrNew(int requiredLength) =>
             Interlocked.Exchange(ref Arrays[requiredLength - 1], null) ?? new T[requiredLength];
 
         /// <summary>Returns the array back. If array length is greater than `MaxArrayLength` then we will do nothing.
         /// Also to avoid memory leaks the passed array will be cleared before returning to the pool.
         /// The method does not check the `arr.Length` is in the pool bounds to avoid performance cost.</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void TryReturn(T[] arr)
+        public static void Return(T[] arr)
         {
             for (var i = 0; (uint)i < arr.Length; ++i)
                 arr[i] = default;

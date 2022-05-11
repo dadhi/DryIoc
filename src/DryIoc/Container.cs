@@ -12730,16 +12730,27 @@ namespace DryIoc
         internal const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
         internal ImHashMap<int, object>[] _maps;
 
+
         internal static readonly object NoItem = new object();
         private static ImHashMap<int, object>[] _emptySlots = CreateEmptyMaps();
 
         private static ImHashMap<int, object>[] CreateEmptyMaps()
         {
-            var slots = new ImHashMap<int, object>[MAP_COUNT];
+            var maps = new ImHashMap<int, object>[MAP_COUNT];
             var empty = ImHashMap<int, object>.Empty;
             for (var i = 0; i < MAP_COUNT; ++i)
-                slots[i] = empty;
-            return slots;
+                maps[i] = empty;
+            return maps;
+        }
+
+        private static StackPool<ImHashMap<int, object>[]> _mapsPool = new(); 
+        private static ImHashMap<int, object>[] PoolOrCreateEmptyMaps()
+        {
+            var maps = _mapsPool.RentOrNull() ?? new ImHashMap<int, object>[MAP_COUNT];
+            var empty = ImHashMap<int, object>.Empty;
+            for (var i = 0; i < MAP_COUNT; ++i)
+                maps[i] = empty;
+            return maps;
         }
 
         ///<summary>Creating scope with parent and name</summary>
@@ -12758,7 +12769,7 @@ namespace DryIoc
             name == null ? new Scope() : new WithParentAndName(null, name);
 
         /// <summary>Creates scope with optional parent and name.</summary>
-        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImHashMap.Entry(0, ImList<IDisposable>.Empty)) // todo: @question ты забыл барашка такая зачем ты это сделал, проверь нужно ли нам создавать entry здесь?
+        public Scope() : this(PoolOrCreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImHashMap.Entry(0, ImList<IDisposable>.Empty)) // todo: @question ты забыл барашка такая зачем ты это сделал, проверь нужно ли нам создавать entry здесь?
         { }
 
         /// <summary>The basic constructor</summary>
@@ -13031,7 +13042,10 @@ namespace DryIoc
 
             _disposables = ImHashMap<int, ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
             _used = ImHashMap<Type, object>.Empty;
+            var maps = _maps;
             _maps = _emptySlots;
+            Array.Clear(maps, 0, MAP_COUNT);
+            _mapsPool.Return(maps);
         }
 
         private static void SafelyDisposeOrderedDisposables(ImHashMap<int, ImList<IDisposable>> disposables)

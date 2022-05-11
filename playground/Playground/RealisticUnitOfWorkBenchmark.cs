@@ -1247,6 +1247,14 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |      DryIoc | 86.96 us | 1.477 us | 1.758 us |  1.00 |    0.00 |  6.2256 | 0.3662 |     - |  38.57 KB |
 | DryIoc_MsDI | 99.10 us | 1.255 us | 1.112 us |  1.13 |    0.02 |  7.9346 | 0.6104 |     - |  48.91 KB |
 |        MsDI | 93.91 us | 1.228 us | 1.026 us |  1.07 |    0.02 | 11.8408 | 4.2725 |     - |   72.6 KB |
+
+## v6 - Scope maps pool
+
+|      Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc |  87.44 us | 0.807 us | 0.715 us |  1.00 |    0.00 | 12.4512 |      - |     - |  38.33 KB |
+| DryIoc_MsDI | 103.81 us | 1.137 us | 0.888 us |  1.19 |    0.01 | 15.8691 |      - |     - |  48.68 KB |
+|        MsDI | 102.05 us | 1.973 us | 2.829 us |  1.16 |    0.05 | 22.9492 | 0.4883 |     - |  70.04 KB |
 */
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
