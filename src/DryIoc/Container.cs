@@ -2134,13 +2134,11 @@ namespace DryIoc
                 if (entry == null)
                     return null;
                 var expr = entry.Value;
-                if (expr is Expression e)
-                    return reuse is SingletonReuse || reuse is CurrentScopeReuse sr && sr.Name == null ? e : null;
-                if (expr is ExprCacheOfTransientWithDepCount t)
-                    return reuse == Reuse.Transient ? t.Expr : null;
-                if (expr is ExprCacheOfScopedWithName s)
-                    return reuse.Name != null && reuse.Name.Equals(s.Name) ? s.Expr : null;
-                return null; // could be `expr == null` when the cache is reset by Unregister and IfAlreadyRegistered.Replace
+                return 
+                    expr is Expression e ? (reuse is SingletonReuse || reuse is CurrentScopeReuse sr && sr.Name == null ? e : null) :
+                    expr is ExprCacheOfTransientWithDepCount t ? (reuse == Reuse.Transient ? t.Expr : null) :
+                    expr is ExprCacheOfScopedWithName s ? (reuse.Name != null && reuse.Name.Equals(s.Name) ? s.Expr : null) :
+                    null; // could be `expr == null` when the cache is reset by Unregister and IfAlreadyRegistered.Replace
             }
 
             internal Registry(ImHashMap<Type, object> services) => Services = services;
