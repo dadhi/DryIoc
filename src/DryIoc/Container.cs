@@ -13057,15 +13057,18 @@ namespace DryIoc
         /// <summary>Try retrieve the used instance from the scope.</summary>
         public bool TryGetUsed(int hash, Type type, out object used)
         {
-            if (_disposed != 1)
+            if (!_used.IsEmpty)
             {
-                if (!_used.IsEmpty)
-                    return _used.TryFindByReferenceEquals(hash, type, out used);
-
-                var p = Parent;
-                if (p != null)
-                    return p.TryGetUsed(hash, type, out used);
+                var e = _used.GetEntryOrDefaultByReferenceEquals(hash, type);
+                if (e != null)
+                {
+                    used = e.Value;
+                    return true;
+                }
             }
+            var p = Parent;
+            if (p != null)
+                return p.TryGetUsed(hash, type, out used);
             used = default;
             return false;
         }
