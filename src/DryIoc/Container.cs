@@ -1987,7 +1987,7 @@ namespace DryIoc
                 return;
 
             var withCache = registry as Registry.AndCache ??
-                (Registry.AndCache)_registry.SwapAndGetNewValue(r => r is Registry reg ? reg.WithDefaultFactoryCache() : Registry.NewWithDefaultCache(r));
+                (Registry.AndCache)_registry.SwapAndGetNewValue(r => r is Registry reg ? reg.WithDefaultFactoryCache() : Registry.NewWithDefaultFactoryCache(r));
 
             withCache.TryCacheDefaultFactory(serviceTypeHash, serviceType, factory);
         }
@@ -2006,12 +2006,33 @@ namespace DryIoc
             withCache.TryCacheKeyedFactory(serviceTypeHash, serviceType, key, factory);
         }
 
-        internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImHashMapEntry<int, object> entry)
+        internal ImHashMapEntry<int, object> CacheFactoryExpression(int factoryId, Expression expr)
         {
-            var withCache = _registry.Value as Registry.AndCache ??
-                (Registry.AndCache)_registry.SwapAndGetNewValue(r => (r as Registry ?? new Registry(r)).WithFactoryExpressionCache()); // todo: @perf optimize
+            var registry = _registry.Value as Registry.AndCache ??
+                (Registry.AndCache)_registry.SwapAndGetNewValue(r => r is Registry reg ? reg.WithFactoryExpressionCache() : Registry.NewWithFactoryExpressionCache(r));
 
-            withCache.CacheFactoryExpression(factoryId, expr, reuse, dependencyCount, entry);
+            if (registry._factoryExpressionCache == null)
+                Interlocked.CompareExchange(ref registry._factoryExpressionCache, new ImHashMap<int, object>[Registry.CACHE_SLOT_COUNT], null);
+
+            ref var map = ref registry._factoryExpressionCache[factoryId & Registry.CACHE_SLOT_COUNT_MASK];
+            if (map == null)
+                Interlocked.CompareExchange(ref map, ImHashMap<int, object>.Empty, null);
+
+            var entry = map.GetEntryOrDefault(factoryId);
+            if (entry == null)
+            {
+                entry = ImHashMap.EntryWithDefaultValue<object>(factoryId);
+                var oldMap = map;
+                var newMap = oldMap.AddOrKeepEntry(entry);
+                if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
+                {
+                    if (newMap == oldMap)
+                        entry = map.GetSurePresent(factoryId);
+                }
+                else
+                    entry = Ref.SwapAndGetNewValue(ref map, entry, (x, e) => x.AddOrKeepEntry(e)).GetSurePresent(factoryId);
+            }
+            return entry;
         }
 
         internal sealed class ExprCacheOfTransientWithDepCount
@@ -2133,8 +2154,12 @@ namespace DryIoc
             internal Registry(ImHashMap<Type, object> services) => Services = services;
 
             [MethodImpl((MethodImplOptions)256)]
-            internal static Registry NewWithDefaultCache(ImHashMap<Type, object> services) =>
+            internal static Registry NewWithDefaultFactoryCache(ImHashMap<Type, object> services) =>
                 new AndCache(services, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, null, default);
+
+            [MethodImpl((MethodImplOptions)256)]
+            internal static Registry NewWithFactoryExpressionCache(ImHashMap<Type, object> services) =>
+                new AndCache(services, null, null, new ImHashMap<int, object>[CACHE_SLOT_COUNT], default);
 
             internal sealed class AndWrappersAndDecorators : Registry
             {
@@ -2182,7 +2207,7 @@ namespace DryIoc
                 public sealed override ImHashMap<Type, object>[] KeyedFactoryCache => _keyedFactoryCache;
                 protected ImHashMap<Type, object>[] _keyedFactoryCache;
                 public sealed override ImHashMap<int, object>[] FactoryExpressionCache => _factoryExpressionCache;
-                protected ImHashMap<int, object>[] _factoryExpressionCache;
+                internal ImHashMap<int, object>[] _factoryExpressionCache;
                 internal sealed override IsRegistryChangePermitted IsChangePermitted => _isChangePermitted;
                 protected IsRegistryChangePermitted _isChangePermitted;
 
@@ -10810,9 +10835,10 @@ namespace DryIoc
             }
 
             if (cacheExpression)
-                ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr, reuse,
-                    reuse == DryIoc.Reuse.Transient ? request.DependencyCount : 0,
-                    cacheEntry);
+                (cacheEntry ?? ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr)).Value = 
+                    reuse == DryIoc.Reuse.Transient ? new Container.ExprCacheOfTransientWithDepCount(serviceExpr, request.DependencyCount) :
+                    reuse is CurrentScopeReuse scoped ? (scoped.Name == null ? serviceExpr : new Container.ExprCacheOfScopedWithName(serviceExpr, scoped.Name)) :
+                    serviceExpr;
 
             return serviceExpr;
         }
