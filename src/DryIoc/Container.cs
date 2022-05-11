@@ -1967,16 +1967,14 @@ namespace DryIoc
 
         internal void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
         {
-            // Disable caching when no services registered, not to cache an empty collection wrapper or alike.
-            var registryOrServices = _registry.Value;
-            var registry = registryOrServices as Registry;
-            if (registry == null ? registryOrServices.IsEmpty : registry.Services.IsEmpty)
-                return;
-
-            var withCache = registry as Registry.AndCache ??
-                (Registry.AndCache)_registry.SwapAndGetNewValue(r => r is Registry reg ? reg.WithDefaultFactoryCache() : Registry.NewWithDefaultFactoryCache(r));
-
-            withCache.TryCacheDefaultFactory(serviceTypeHash, serviceType, factory);
+            if (_registry.Value is Registry.AndCache andCache)
+                andCache.TryCacheDefaultFactory(serviceTypeHash, serviceType, factory);
+            else if (_registry.Value is Registry r && r.Services.IsEmpty || _registry.Value.IsEmpty)
+                return; // disable caching when no services registered, not to cache an empty collection wrapper or alike.
+            else
+                ((Registry.AndCache)_registry.SwapAndGetNewValue(r => 
+                    r is Registry reg ? reg.WithDefaultFactoryCache() : Registry.NewWithDefaultFactoryCache(r)))
+                    .TryCacheDefaultFactory(serviceTypeHash, serviceType, factory);
         }
 
         internal void TryCacheKeyedFactory(int serviceTypeHash, Type serviceType, object key, object factory)
@@ -3045,21 +3043,109 @@ namespace DryIoc
             switch (expr.NodeType)
             {
                 case ExprType.Constant:
-                    {
-                        result = ((ConstantExpression)expr).Value;
-                        return true;
-                    }
+                    result = ((ConstantExpression)expr).Value;
+                    return true;
                 case ExprType.New:
                     {
-                        var newExpr = (NewExpression)expr;
-                        var argCount = newExpr.ArgumentCount;
-                        if (argCount == 0)
+                        if (expr is NoArgsNewClassIntrinsicExpression defaultCtorExpr)
                         {
-                            result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
+                            result = defaultCtorExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                             return true;
                         }
-
-                        var args = new object[argCount];
+                        var newExpr = (NewExpression)expr;
+                        object[] args = null;
+                        var ok = false;
+                        var argCount = newExpr.ArgumentCount;
+                        switch (argCount)
+                        {
+                            case 0:
+                                result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
+                                return true;
+                            case 1:
+                                if (newExpr is OneArgumentNewExpression e1)
+                                {
+                                    ok = TryInterpret(r, e1.Argument, paramExprs, paramValues, parentArgs, out result);
+                                    args = SmallArrayPool<object>.RentOrNew(1);
+                                    args[0] = result;
+                                }
+                                break;
+                            case 2:
+                                if (newExpr is TwoArgumentsNewExpression e2)
+                                {
+                                    ok = TryInterpret(r, e2.Argument0, paramExprs, paramValues, parentArgs, out result)
+                                        &TryInterpret(r, e2.Argument1, paramExprs, paramValues, parentArgs, out var a1);
+                                    args = SmallArrayPool<object>.RentOrNew(2);
+                                    args[0] = result; args[1] = a1;
+                                }
+                                break;
+                            case 3:
+                                if (newExpr is ThreeArgumentsNewExpression e3)
+                                {
+                                    ok = TryInterpret(r, e3.Argument0, paramExprs, paramValues, parentArgs, out result)
+                                        &TryInterpret(r, e3.Argument1, paramExprs, paramValues, parentArgs, out var a1)
+                                        &TryInterpret(r, e3.Argument2, paramExprs, paramValues, parentArgs, out var a2);
+                                    args = SmallArrayPool<object>.RentOrNew(3);
+                                    args[0] = result; args[1] = a1; args[2] = a2;
+                                }
+                                break;
+                            case 4:
+                                if (newExpr is FourArgumentsNewExpression e4)
+                                {
+                                    ok =TryInterpret(r, e4.Argument0, paramExprs, paramValues, parentArgs, out result)
+                                        &TryInterpret(r, e4.Argument1, paramExprs, paramValues, parentArgs, out var a1)
+                                        &TryInterpret(r, e4.Argument2, paramExprs, paramValues, parentArgs, out var a2)
+                                        &TryInterpret(r, e4.Argument3, paramExprs, paramValues, parentArgs, out var a3);
+                                    args = SmallArrayPool<object>.RentOrNew(4);
+                                    args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3;
+                                }
+                                break;
+                            case 5:
+                                if (newExpr is FiveArgumentsNewExpression e5)
+                                {
+                                    ok = TryInterpret(r, e5.Argument0, paramExprs, paramValues, parentArgs, out result)
+                                        &TryInterpret(r, e5.Argument1, paramExprs, paramValues, parentArgs, out var a1)
+                                        &TryInterpret(r, e5.Argument2, paramExprs, paramValues, parentArgs, out var a2)
+                                        &TryInterpret(r, e5.Argument3, paramExprs, paramValues, parentArgs, out var a3)
+                                        &TryInterpret(r, e5.Argument4, paramExprs, paramValues, parentArgs, out var a4);
+                                    args = SmallArrayPool<object>.RentOrNew(5);
+                                    args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4;
+                                }
+                                break;
+                            case 6:
+                                if (newExpr is SixArgumentsNewExpression e6)
+                                {
+                                    ok = TryInterpret(r, e6.Argument0, paramExprs, paramValues, parentArgs, out result)
+                                        &TryInterpret(r, e6.Argument1, paramExprs, paramValues, parentArgs, out var a1)
+                                        &TryInterpret(r, e6.Argument2, paramExprs, paramValues, parentArgs, out var a2)
+                                        &TryInterpret(r, e6.Argument3, paramExprs, paramValues, parentArgs, out var a3)
+                                        &TryInterpret(r, e6.Argument4, paramExprs, paramValues, parentArgs, out var a4)
+                                        &TryInterpret(r, e6.Argument5, paramExprs, paramValues, parentArgs, out var a5);
+                                    args = SmallArrayPool<object>.RentOrNew(6);
+                                    args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5;
+                                }
+                                break;
+                            case 7:
+                                if (newExpr is SevenArgumentsNewExpression e7)
+                                {
+                                    ok = TryInterpret(r, e7.Argument0, paramExprs, paramValues, parentArgs, out result)
+                                        &TryInterpret(r, e7.Argument1, paramExprs, paramValues, parentArgs, out var a1)
+                                        &TryInterpret(r, e7.Argument2, paramExprs, paramValues, parentArgs, out var a2)
+                                        &TryInterpret(r, e7.Argument3, paramExprs, paramValues, parentArgs, out var a3)
+                                        &TryInterpret(r, e7.Argument4, paramExprs, paramValues, parentArgs, out var a4)
+                                        &TryInterpret(r, e7.Argument5, paramExprs, paramValues, parentArgs, out var a5)
+                                        &TryInterpret(r, e7.Argument6, paramExprs, paramValues, parentArgs, out var a6);
+                                    args = SmallArrayPool<object>.RentOrNew(7);
+                                    args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5; args[6] = a6;
+                                }
+                                break;
+                        }
+                        if (args != null) 
+                        {
+                            if (ok) result = newExpr.Constructor.Invoke(args);
+                            SmallArrayPool<object>.Return(args);
+                            return ok;
+                        }
+                        args = new object[argCount];
                         for (var i = 0; i < args.Length; ++i)
                         {
                             var argExpr = newExpr.GetArgument(i);
@@ -3080,21 +3166,17 @@ namespace DryIoc
                     {
                         object instance = null;
                         var convertExpr = (UnaryExpression)expr;
-                        var operandExpr = convertExpr.Operand;
-                        if (operandExpr is MethodCallExpression m)
-                        {
-                            if (!TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, ref instance))
-                                return false;
-                        }
-                        else if (!TryInterpret(r, operandExpr, paramExprs, paramValues, parentArgs, out instance))
-                            return false;
+                        var ok = convertExpr.Operand is MethodCallExpression m
+                            ? TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, ref instance)
+                            : TryInterpret(r, convertExpr.Operand, paramExprs, paramValues, parentArgs, out instance);
 
                         // skip conversion for null and for directly assignable type
-                        if (instance == null || convertExpr.Method == null && convertExpr.Type.IsAssignableFrom(instance.GetType()))
-                            result = instance;
-                        else
-                            result = Converter.ConvertWithOperator(instance, expr, convertExpr.Type, convertExpr.Method);
-                        return true;
+                        if (ok) 
+                            result = instance == null || convertExpr.Type == instance.GetType()
+                                || convertExpr.Method == null && convertExpr.Type.IsAssignableFrom(instance.GetType())
+                                ? instance
+                                : Converter.ConvertWithOperator(instance, expr, convertExpr.Type, convertExpr.Method);
+                        return ok;
                     }
                 case ExprType.MemberAccess:
                     {
@@ -3461,7 +3543,6 @@ namespace DryIoc
                             return false;
                         result = service is IDisposable d ? scope.TrackDisposable(d) : service;
                     }
-
                     return true;
                 }
 
@@ -3477,7 +3558,6 @@ namespace DryIoc
                             return false;
                         result = service is IDisposable d ? scope.TrackDisposable(d) : service;
                     }
-
                     return true;
                 }
             }

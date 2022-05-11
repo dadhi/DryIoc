@@ -85,7 +85,7 @@ var includeVariants = container.Rules.VariantGenericTypesInResolvedCollection;
 #>
 /*
 ========================================================================================================
-NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
+The code below is generated automatically at compile-time and changes to it will be lost on the next gen.
 ========================================================================================================
 <#  var errCount = result.Errors.Count;
     if (errCount == 0) { #>

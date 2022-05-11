@@ -1233,13 +1233,6 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDI | 110.50 us | 2.545 us | 7.262 us | 109.15 us |  1.19 |    0.13 | 16.2354 |     - |     - |  49.82 KB |
 
 
-## v6 - SmallArrayPool (stashed)
-
-|      Method |      Mean |    Error |   StdDev | Ratio | RatioSD |  Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------ |----------:|---------:|---------:|------:|--------:|-------:|-------:|------:|----------:|
-|      DryIoc |  90.99 us | 1.773 us | 1.481 us |  1.00 |    0.00 | 6.1035 | 0.3662 |     - |  37.39 KB |
-| DryIoc_MsDI | 102.39 us | 1.385 us | 1.296 us |  1.13 |    0.02 | 7.6904 | 0.4883 |     - |  47.79 KB |
-
 ## v6 - ImTools v4
 
 |      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
@@ -1248,13 +1241,21 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDI | 99.10 us | 1.255 us | 1.112 us |  1.13 |    0.02 |  7.9346 | 0.6104 |     - |  48.91 KB |
 |        MsDI | 93.91 us | 1.228 us | 1.026 us |  1.07 |    0.02 | 11.8408 | 4.2725 |     - |   72.6 KB |
 
-## v6 - Optimizing the Factory Expression Cache
+## v6 - Optimizing the Factory Expression Cache and more!
+
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 84.44 us | 1.621 us | 1.516 us |  1.00 |    0.00 |  6.2256 | 0.3662 |     - |  38.54 KB |
+| DryIoc_MsDI | 98.39 us | 1.011 us | 0.946 us |  1.17 |    0.02 |  7.9346 | 0.6104 |     - |  48.89 KB |
+|        MsDI | 92.17 us | 0.421 us | 0.352 us |  1.09 |    0.02 | 11.8408 | 4.2725 |     - |   72.6 KB |
+
+## v6 - SmallArrayPool (stashed)
 
 |      Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------ |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
-|      DryIoc |  93.03 us | 1.640 us | 2.694 us |  1.00 |    0.00 | 12.4512 |      - |     - |  38.55 KB |
-| DryIoc_MsDI | 107.69 us | 2.118 us | 3.420 us |  1.16 |    0.04 | 15.8691 |      - |     - |  48.89 KB |
-|        MsDI | 104.34 us | 1.716 us | 1.521 us |  1.11 |    0.04 | 22.9492 | 0.6104 |     - |  70.05 KB |
+|      DryIoc |  87.82 us | 1.493 us | 1.397 us |  1.00 |    0.00 |  5.9814 | 0.3662 |     - |  37.38 KB |
+| DryIoc_MsDI | 100.88 us | 1.175 us | 1.099 us |  1.15 |    0.02 |  7.6904 | 0.4883 |     - |  47.71 KB |
+|        MsDI |  91.39 us | 0.972 us | 0.811 us |  1.04 |    0.02 | 11.8408 | 4.2725 |     - |  72.58 KB |
 
 */
             [Benchmark(Baseline = true)]
