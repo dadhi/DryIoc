@@ -1035,8 +1035,11 @@ namespace DryIoc.ImTools
         public T Swap<A, B>(A a, B b, Func<T, A, B, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
              Ref.Swap(ref _value, a, b, getNewValue, retryCountUntilThrow);
 
-        /// <summary>Swap with the additional state <paramref name="a"/> required for the delegate <paramref name="getNewValue"/>.
-        /// May prevent closure creation for the delegate</summary>
+        /// <summary>Swap returning the last created value</summary>
+        public T SwapAndGetNewValue(Func<T, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
+             Ref.SwapAndGetNewValue(ref _value, getNewValue, retryCountUntilThrow);
+
+        /// <summary>Swap returning the last created value with additional state `A` parameter</summary>
         public T SwapAndGetNewValue<A>(A a, Func<T, A, T> getNewValue, int retryCountUntilThrow = Ref.RETRY_COUNT_UNTIL_THROW) =>
              Ref.SwapAndGetNewValue(ref _value, a, getNewValue, retryCountUntilThrow);
 
@@ -1132,8 +1135,27 @@ namespace DryIoc.ImTools
             }
         }
 
-        /// <summary>Swap with the additional state a required for the delegate.
-        /// Helps to avoid closure creation for the delegate</summary>
+        /// <summary>Swap returning the last created value</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static T SwapAndGetNewValue<T>(ref T value, Func<T, T> getNewValue,
+            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+            where T : class
+        {
+            var spinWait = new SpinWait();
+            var retryCount = 0;
+            while (true)
+            {
+                var oldValue = value;
+                var newValue = getNewValue(oldValue);
+                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                    return newValue;
+                if (++retryCount > retryCountUntilThrow)
+                    ThrowRetryCountExceeded(retryCountUntilThrow);
+                spinWait.SpinOnce();
+            }
+        }
+
+        /// <summary>Swap returning the last created value with additional state `A` parameter</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static T SwapAndGetNewValue<T, A>(ref T value, A a, Func<T, A, T> getNewValue,
             int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
