@@ -2039,22 +2039,14 @@ namespace DryIoc
         {
             public Expression Expr;
             public int Count;
-            public ExprCacheOfTransientWithDepCount(Expression e, int n)
-            {
-                Expr = e;
-                Count = n;
-            }
+            public ExprCacheOfTransientWithDepCount(Expression e, int n) { Expr = e; Count = n; }
         }
 
         internal sealed class ExprCacheOfScopedWithName
         {
             public Expression Expr;
             public object Name;
-            public ExprCacheOfScopedWithName(Expression e, object n)
-            {
-                Expr = e;
-                Name = n;
-            }
+            public ExprCacheOfScopedWithName(Expression e, object n) { Expr = e; Name = n; }
         }
 
         // the registry is derived from the empty ImHashMap in order to slightly improve type information to represent both Services ImHashMap and the Registry with Services, cache, etc.
@@ -9803,20 +9795,14 @@ namespace DryIoc
 
             var setup = factory.Setup;
 
-            IReuse reuse = null;
-            if (InputArgExprs != null && Rules.IgnoringReuseForFuncWithArgs)
-                reuse = DryIoc.Reuse.Transient;
-            else if (factory.Reuse != null)
-                reuse = factory.Reuse;
-            else if (setup.UseParentReuse)
-                reuse = DirectParent.IsEmpty ? Rules.DefaultReuse : null; // the `null` here signals to find the parent reuse
-            else if (factory.FactoryType == FactoryType.Decorator &&
-                     (setup.To<Setup.DecoratorSetup>().UseDecorateeReuse || Rules.UseDecorateeReuseForDecorators))
-                reuse = Reuse; // already resolved decoratee reuse
-            else if (factory.FactoryType == FactoryType.Wrapper)
-                reuse = DryIoc.Reuse.Transient;
-            else
-                reuse = Rules.DefaultReuse;
+            var reuse = 
+                InputArgExprs != null && Rules.IgnoringReuseForFuncWithArgs ? DryIoc.Reuse.Transient :
+                factory.Reuse != null ? factory.Reuse :
+                setup.UseParentReuse ? (DirectParent.IsEmpty ? Rules.DefaultReuse : null) : // the `null` here signals to find the parent reuse
+                factory.FactoryType == FactoryType.Decorator &&
+                (setup.To<Setup.DecoratorSetup>().UseDecorateeReuse || Rules.UseDecorateeReuseForDecorators) ? Reuse : // already resolved decoratee reuse
+                factory.FactoryType == FactoryType.Wrapper ? DryIoc.Reuse.Transient :
+                Rules.DefaultReuse;
 
             IReuse firstParentNonTransientReuseOrNull = null;
             if (!DirectParent.IsEmpty)
@@ -10837,7 +10823,7 @@ namespace DryIoc
             if (cacheExpression)
                 (cacheEntry ?? ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr)).Value = 
                     reuse == DryIoc.Reuse.Transient ? new Container.ExprCacheOfTransientWithDepCount(serviceExpr, request.DependencyCount) :
-                    reuse is CurrentScopeReuse scoped ? (scoped.Name == null ? serviceExpr : new Container.ExprCacheOfScopedWithName(serviceExpr, scoped.Name)) :
+                    reuse is CurrentScopeReuse scoped && scoped.Name != null ? new Container.ExprCacheOfScopedWithName(serviceExpr, scoped.Name) :
                     serviceExpr;
 
             return serviceExpr;
