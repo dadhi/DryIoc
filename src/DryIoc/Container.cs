@@ -311,7 +311,7 @@ namespace DryIoc
                 // manually inlined ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var instance)
                 var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
                 if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
-                    SingletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
+                    _singletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
                 {
                     entry.Value = null; // reset the cache
                     return used is FactoryDelegate f ? f(this) : used;
@@ -340,6 +340,29 @@ namespace DryIoc
             return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
         }
 
+        // todo: @wip
+        // todo: @unsafe assuming that the IScope is Scope
+        internal static bool TryGetUsed(IResolverContext r, Scope current, Scope singletons, int serviceTypeHash, Type serviceType, out object used)
+        {
+            ImHashMapEntry<Type, object> e = null;
+            if (current != null && !current._used.IsEmpty)
+                e = current._used.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
+            if (e == null)
+            {
+                var p = current.Parent;
+                if (p != null)
+                    return TryGetUsed(r, (Scope)p, singletons, serviceTypeHash, serviceType, out used); // todo @unsafe @perf remove cast to Scope
+                e = singletons._used.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
+            }
+            if (e != null)
+            {
+                used = e.Value is FactoryDelegate f ? f(r) : e.Value;
+                return true;
+            }
+            used = default;
+            return false;
+        }
+
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
             object service = null;
@@ -362,7 +385,7 @@ namespace DryIoc
                 // manually inlined ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var instance)
                 var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
                 if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
-                    SingletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
+                    _singletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
                 {
                     entry.Value = null; // reset the cache
                     return used is FactoryDelegate f ? f(this) : used;
@@ -393,12 +416,13 @@ namespace DryIoc
 
         private object ResolveAndCache(int serviceTypeHash, Type serviceType, IfUnresolved ifUnresolved)
         {
-            ThrowIfRootContainerDisposed();
-            // todo: @perf move it out to the calling site?
+            if (_singletonScope.IsDisposed)
+                Throw.It(Error.ContainerIsDisposed, ToString());
+
             // manually inlined ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var instance)
             var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
             if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
-                SingletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
+                _singletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
                 return used is FactoryDelegate f ? f(this) : used;
 
             // todo: @perf Should we in the first place create the request here, or later in CreateExpression because it may be faster for the root service without dependency or with the delegate factory? 
@@ -3780,12 +3804,12 @@ namespace DryIoc
             Scope scope;
             if (e is CurrentScopeReuse.GetScopedViaFactoryDelegateExpression s)
             {
-                scope = (Scope)r.CurrentScope;
+                scope = (Scope)r.CurrentScope; // todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope
                 if (scope == null)
                     return s.ThrowIfNoScope ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
             }
             else
-                scope = (Scope)r.CurrentOrSingletonScope;
+                scope = (Scope)r.CurrentOrSingletonScope; // todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope
 
             var id = e.FactoryId;
             var noItem = Scope.NoItem;
@@ -3833,12 +3857,12 @@ namespace DryIoc
             Scope scope;
             if (e is CurrentScopeReuse.GetScopedViaFactoryDelegateWithDisposalOrderExpression s)
             {
-                scope = (Scope)r.CurrentScope;
+                scope = (Scope)r.CurrentScope;// todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope,
                 if (scope == null)
                     return s.ThrowIfNoScope ? Throw.For<IScope>(Error.NoCurrentScope, r) : null;
             }
             else
-                scope = (Scope)r.CurrentOrSingletonScope;
+                scope = (Scope)r.CurrentOrSingletonScope;// todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope,
 
             var id = e.FactoryId;
 
@@ -3890,7 +3914,7 @@ namespace DryIoc
                 r = (IResolverContext)resolverObj;
             }
 
-            var scope = (Scope)r.GetNamedScope(ConstValue(args.Argument1), (bool)ConstValue(args.Argument2));
+            var scope = (Scope)r.GetNamedScope(ConstValue(args.Argument1), (bool)ConstValue(args.Argument2));// todo: @unsafe cast to Scope,
             if (scope == null)
                 return null; // result is null in this case
 
@@ -9453,7 +9477,7 @@ namespace DryIoc
             Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey), preResolveParent, flags, inputArgs);
 
         /// <summary>Available in runtime only, provides access to container initiated the request.</summary>
-        public IContainer Container { get; private set; }
+        public IContainer Container { get; private set; } // todo: @breaking @perf make it a field and the Concrete Container type
 
         /// <summary>Request immediate parent.</summary>
         public Request DirectParent;
@@ -10818,7 +10842,7 @@ namespace DryIoc
             {
                 // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
                 var id = request.GetCombinedDecoratorAndFactoryID();
-                var itemRef = ((Scope)container.SingletonScope)._maps[id & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
+                var itemRef = ((Scope)container.SingletonScope)._maps[id & Scope.MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id); // todo: @unsafe @perf cast to scope
                 if (itemRef != null)
                 {
                     // Note: (for details check the test for #340 and the `For_singleton_can_use_func_without_args_or_just_resolve_after_func_with_args`)
@@ -10906,7 +10930,7 @@ namespace DryIoc
                 !request.TracksTransientDisposable && !request.IsWrappedInFunc())
             {
                 var container = request.Container;
-                var scope = (Scope)container.SingletonScope;
+                var scope = (Scope)container.SingletonScope; // todo: @unsafe @perf remove cast and virtual property call
                 if (scope.IsDisposed)
                     Throw.ScopeIsDisposed(scope, container);
 
@@ -12786,7 +12810,7 @@ namespace DryIoc
         private int _disposed;
 
         private ImHashMap<int, ImList<IDisposable>> _disposables;
-        private ImHashMap<Type, object> _used;
+        internal ImHashMap<Type, object> _used;
 
         internal const int MAP_COUNT = 16;
         internal const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;

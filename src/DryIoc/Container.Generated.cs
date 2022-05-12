@@ -24,7 +24,7 @@ THE SOFTWARE.
 */
 /*
 ========================================================================================================
-NOTE: The code below is generated automatically at compile-time and not supposed to be changed by hand.
+The code below is generated automatically at compile-time and changes to it will be lost on the next gen.
 ========================================================================================================
 Generation is completed successfully.
 --------------------------------------------------------------------------------------------------------
