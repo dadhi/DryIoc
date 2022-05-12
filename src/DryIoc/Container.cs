@@ -302,6 +302,7 @@ namespace DryIoc
                 ?.DefaultFactoryCache?[serviceTypeHash & Registry.CACHE_SLOT_COUNT_MASK]
                 ?.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
 
+            var rules = Rules;
             if (entry != null)
             {
                 if (entry.Value is FactoryDelegate cachedDelegate)
@@ -318,13 +319,13 @@ namespace DryIoc
 
                 while (entry.Value is Expression expr)
                 {
-                    if (Rules.UseInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var result))
+                    if (rules.UseInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var result))
                         return result;
 
                     // set to Compiling to notify other threads to use the interpretation until the service is compiled
                     if (Interlocked.CompareExchange(ref entry.Value, new Registry.Compiling(expr), expr) == expr)
                     {
-                        var compiledFactory = expr.CompileToFactoryDelegate(Rules.UseInterpretation);
+                        var compiledFactory = expr.CompileToFactoryDelegate(rules.UseInterpretation);
                         entry.Value = compiledFactory; // todo: @unclear should we instead cache only after invoking the factory delegate
                         return compiledFactory(this);
                     }
@@ -332,10 +333,10 @@ namespace DryIoc
 
                 if (entry.Value is Registry.Compiling compiling)
                     return Interpreter.TryInterpretAndUnwrapContainerException(this, compiling.Expression, out var result) ? result
-                         : compiling.Expression.CompileToFactoryDelegate(Rules.UseInterpretation)(this);
+                         : compiling.Expression.CompileToFactoryDelegate(rules.UseInterpretation)(this);
             }
             // todo: @perf push this down to ResolveAndCache?
-            var ifUnresolved = Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
+            var ifUnresolved = rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
             return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
         }
 
