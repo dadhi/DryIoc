@@ -5799,6 +5799,7 @@ namespace DryIoc.ImTools
         public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, K key, V value) =>
             map.Update(key.GetHashCode(), key, value);
 
+        // todo: @wip add ByReferenceEquals
         /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
         public static ImHashMap<K, V> UpdateToDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
         {

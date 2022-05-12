@@ -2687,18 +2687,22 @@ namespace DryIoc
 
                 // Don't forget the drop cache for the old value if any
                 var oldValue = oldEntry.GetValueOrDefaultWithTheSameHashByReferenceEquals(serviceType);
-                if (oldValue is Factory oldFactory)
-                    r.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
-                else if (oldValue is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
-                    oldFactoriesEntry.Factories.ForEach(
-                        new { r, serviceTypeHash, serviceType },
-                        (x, _, s) =>
-                        {
-                            if (x.Key is DefaultKey)
-                                s.r.DropFactoryCache(x.Value, s.serviceTypeHash, s.serviceType);
-                        });
+                if (oldValue != null)
+                    DropFactoryCache(r, serviceTypeHash, serviceType, oldValue);
 
                 return r;
+            }
+
+            private static void DropFactoryCache(Registry r, int serviceTypeHash, Type serviceType, object entryValue)
+            {
+                if (entryValue is Factory oldFactory)
+                    r.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
+                else if (entryValue is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
+                    oldFactoriesEntry.Factories.ForEach(new { r, serviceTypeHash, serviceType }, (x, _, s) =>
+                    {
+                        if (x.Key is DefaultKey)
+                            s.r.DropFactoryCache(x.Value, s.serviceTypeHash, s.serviceType);
+                    });
             }
 
             private static ImHashMap<Type, object> WithKeyedService(Registry r, ImHashMap<Type, object> registryOrServices,
@@ -2706,7 +2710,7 @@ namespace DryIoc
             {
                 var services = r == null ? registryOrServices : r.Services;
                 object newEntry = null;
-                var oldEntry = services.GetValueOrDefault(serviceTypeHash, serviceType);
+                var oldEntry = services.GetValueOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
                 if (oldEntry != null)
                 {
                     switch (ifAlreadyRegistered)
