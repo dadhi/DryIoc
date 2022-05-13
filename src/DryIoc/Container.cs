@@ -340,29 +340,6 @@ namespace DryIoc
             return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
         }
 
-        // todo: @wip
-        // todo: @unsafe assuming that the IScope is Scope
-        internal static bool TryGetUsed(IResolverContext r, Scope current, Scope singletons, int serviceTypeHash, Type serviceType, out object used)
-        {
-            ImHashMapEntry<Type, object> e = null;
-            if (current != null && !current._used.IsEmpty)
-                e = current._used.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
-            if (e == null)
-            {
-                var p = current.Parent;
-                if (p != null)
-                    return TryGetUsed(r, (Scope)p, singletons, serviceTypeHash, serviceType, out used); // todo @unsafe @perf remove cast to Scope
-                e = singletons._used.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
-            }
-            if (e != null)
-            {
-                used = e.Value is FactoryDelegate f ? f(r) : e.Value;
-                return true;
-            }
-            used = default;
-            return false;
-        }
-
         object IResolver.Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
             object service = null;
@@ -4907,17 +4884,24 @@ namespace DryIoc
         public static bool IsUsed<TService>(this IResolverContext r) => r.IsUsed(typeof(TService));
 
         [MethodImpl((MethodImplOptions)256)]
-        internal static bool TryGetUsedInstance(this IResolverContext r, int serviceTypeHash, Type serviceType, out object instance)
+        internal static bool TryGetUsedInstance(this IResolverContext r, int serviceTypeHash, Type serviceType, out object instance) =>
+            r.TryGetUsedInstance((Scope)r.CurrentScope, (Scope)r.SingletonScope, serviceTypeHash, serviceType, out instance); // todo @unsafe @perf remove cast to Scope
+
+        // todo: @unsafe assuming that the IScope is Scope
+        internal static bool TryGetUsedInstance(this IResolverContext r, Scope scope, Scope singletons, int serviceTypeHash, Type serviceType, out object instance)
         {
-            var scope = r.CurrentScope;
-            if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
-                r.SingletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
+            ImHashMapEntry<Type, object> e = null;
+            while (scope != null)
             {
-                instance = used is FactoryDelegate f ? f(r) : used;
-                return true;
+                if (scope._disposed != 1 && !scope._used.IsEmpty &&
+                    null != (e = scope._used.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType)))
+                    break;
+                scope = (Scope)scope.Parent;
             }
-            instance = null;
-            return false;
+            if (e == null)
+                e = singletons._used.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
+            instance = e == null ? default : e.Value is FactoryDelegate f ? f(r) : e.Value;
+            return e != null;
         }
 
         /// <summary>A bit if sugar to track disposable in the current scope or in the singleton scope as a fallback</summary>
@@ -12807,7 +12791,7 @@ namespace DryIoc
 
         /// <summary>True if scope is disposed.</summary>
         public bool IsDisposed => _disposed == 1;
-        private int _disposed;
+        internal int _disposed;
 
         private ImHashMap<int, ImList<IDisposable>> _disposables;
         internal ImHashMap<Type, object> _used;
