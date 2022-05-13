@@ -308,13 +308,11 @@ namespace DryIoc
                 if (entry.Value is FactoryDelegate cachedDelegate)
                     return cachedDelegate(this);
 
-                // manually inlined ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var instance)
                 var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
-                if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
-                    _singletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
+                if (this.TryGetUsedInstance((Scope)scope, (Scope)_singletonScope, serviceTypeHash, serviceType, out var used))
                 {
                     entry.Value = null; // reset the cache
-                    return used is FactoryDelegate f ? f(this) : used;
+                    return used;
                 }
 
                 while (entry.Value is Expression expr)
@@ -359,13 +357,11 @@ namespace DryIoc
                 if (entry.Value is FactoryDelegate cachedDelegate)
                     return cachedDelegate(this);
 
-                // manually inlined ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var instance)
                 var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
-                if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
-                    _singletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
+                if (this.TryGetUsedInstance((Scope)scope, (Scope)_singletonScope, serviceTypeHash, serviceType, out var used))
                 {
                     entry.Value = null; // reset the cache
-                    return used is FactoryDelegate f ? f(this) : used;
+                    return used;
                 }
 
                 var rules = Rules;
@@ -396,11 +392,9 @@ namespace DryIoc
             if (_singletonScope.IsDisposed)
                 Throw.It(Error.ContainerIsDisposed, ToString());
 
-            // manually inlined ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var instance)
             var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
-            if (scope != null && scope.TryGetUsed(serviceTypeHash, serviceType, out var used) ||
-                _singletonScope.TryGetUsed(serviceTypeHash, serviceType, out used))
-                return used is FactoryDelegate f ? f(this) : used;
+            if (this.TryGetUsedInstance((Scope)scope, (Scope)_singletonScope, serviceTypeHash, serviceType, out var used))
+                return used;
 
             // todo: @perf Should we in the first place create the request here, or later in CreateExpression because it may be faster for the root service without dependency or with the delegate factory? 
             var request = Request.CreateResolutionRoot(this, serviceType, ifUnresolved);
