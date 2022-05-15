@@ -13,7 +13,7 @@ namespace DryIoc.IssuesTests
             c.Register<Parent>(Reuse.Scoped);
 
             c.Register(Made.Of(() => ChildFactory()), Reuse.Scoped);
-            var childFactory = ((IContainer)c).ResolveFactory(Request.Create(c, ServiceInfo.Of<Child>()));
+            var childFactory = c.ResolveFactory(Request.Create(c, ServiceInfo.Of<Child>()));
 
             // instance is resolved in outer scope
             using (var _ = c.OpenScope())
