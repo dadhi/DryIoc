@@ -1992,7 +1992,7 @@ namespace DryIoc
             else if (_registry.Value is Registry r && r.Services.IsEmpty || _registry.Value.IsEmpty)
                 return; // disable caching when no services registered, not to cache an empty collection wrapper or alike.
             else
-                ((Registry.AndCache)_registry.SwapAndGetNewValue(r => 
+                ((Registry.AndCache)_registry.SwapAndGetNewValue(r =>
                     r is Registry reg ? reg.WithDefaultFactoryCache() : Registry.NewWithDefaultFactoryCache(r)))
                     .TryCacheDefaultFactory(serviceTypeHash, serviceType, factory);
         }
@@ -3097,7 +3097,7 @@ namespace DryIoc
                                 if (newExpr is TwoArgumentsNewExpression e2)
                                 {
                                     ok = TryInterpret(r, e2.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        &TryInterpret(r, e2.Argument1, paramExprs, paramValues, parentArgs, out var a1);
+                                        & TryInterpret(r, e2.Argument1, paramExprs, paramValues, parentArgs, out var a1);
                                     args = SmallArrayPool<object>.RentOrNew(2);
                                     args[0] = result; args[1] = a1;
                                 }
@@ -3106,8 +3106,8 @@ namespace DryIoc
                                 if (newExpr is ThreeArgumentsNewExpression e3)
                                 {
                                     ok = TryInterpret(r, e3.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        &TryInterpret(r, e3.Argument1, paramExprs, paramValues, parentArgs, out var a1)
-                                        &TryInterpret(r, e3.Argument2, paramExprs, paramValues, parentArgs, out var a2);
+                                        & TryInterpret(r, e3.Argument1, paramExprs, paramValues, parentArgs, out var a1)
+                                        & TryInterpret(r, e3.Argument2, paramExprs, paramValues, parentArgs, out var a2);
                                     args = SmallArrayPool<object>.RentOrNew(3);
                                     args[0] = result; args[1] = a1; args[2] = a2;
                                 }
@@ -3115,10 +3115,10 @@ namespace DryIoc
                             case 4:
                                 if (newExpr is FourArgumentsNewExpression e4)
                                 {
-                                    ok =TryInterpret(r, e4.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        &TryInterpret(r, e4.Argument1, paramExprs, paramValues, parentArgs, out var a1)
-                                        &TryInterpret(r, e4.Argument2, paramExprs, paramValues, parentArgs, out var a2)
-                                        &TryInterpret(r, e4.Argument3, paramExprs, paramValues, parentArgs, out var a3);
+                                    ok = TryInterpret(r, e4.Argument0, paramExprs, paramValues, parentArgs, out result)
+                                        & TryInterpret(r, e4.Argument1, paramExprs, paramValues, parentArgs, out var a1)
+                                        & TryInterpret(r, e4.Argument2, paramExprs, paramValues, parentArgs, out var a2)
+                                        & TryInterpret(r, e4.Argument3, paramExprs, paramValues, parentArgs, out var a3);
                                     args = SmallArrayPool<object>.RentOrNew(4);
                                     args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3;
                                 }
@@ -3127,10 +3127,10 @@ namespace DryIoc
                                 if (newExpr is FiveArgumentsNewExpression e5)
                                 {
                                     ok = TryInterpret(r, e5.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        &TryInterpret(r, e5.Argument1, paramExprs, paramValues, parentArgs, out var a1)
-                                        &TryInterpret(r, e5.Argument2, paramExprs, paramValues, parentArgs, out var a2)
-                                        &TryInterpret(r, e5.Argument3, paramExprs, paramValues, parentArgs, out var a3)
-                                        &TryInterpret(r, e5.Argument4, paramExprs, paramValues, parentArgs, out var a4);
+                                        & TryInterpret(r, e5.Argument1, paramExprs, paramValues, parentArgs, out var a1)
+                                        & TryInterpret(r, e5.Argument2, paramExprs, paramValues, parentArgs, out var a2)
+                                        & TryInterpret(r, e5.Argument3, paramExprs, paramValues, parentArgs, out var a3)
+                                        & TryInterpret(r, e5.Argument4, paramExprs, paramValues, parentArgs, out var a4);
                                     args = SmallArrayPool<object>.RentOrNew(5);
                                     args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4;
                                 }
@@ -3139,11 +3139,11 @@ namespace DryIoc
                                 if (newExpr is SixArgumentsNewExpression e6)
                                 {
                                     ok = TryInterpret(r, e6.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        &TryInterpret(r, e6.Argument1, paramExprs, paramValues, parentArgs, out var a1)
-                                        &TryInterpret(r, e6.Argument2, paramExprs, paramValues, parentArgs, out var a2)
-                                        &TryInterpret(r, e6.Argument3, paramExprs, paramValues, parentArgs, out var a3)
-                                        &TryInterpret(r, e6.Argument4, paramExprs, paramValues, parentArgs, out var a4)
-                                        &TryInterpret(r, e6.Argument5, paramExprs, paramValues, parentArgs, out var a5);
+                                        & TryInterpret(r, e6.Argument1, paramExprs, paramValues, parentArgs, out var a1)
+                                        & TryInterpret(r, e6.Argument2, paramExprs, paramValues, parentArgs, out var a2)
+                                        & TryInterpret(r, e6.Argument3, paramExprs, paramValues, parentArgs, out var a3)
+                                        & TryInterpret(r, e6.Argument4, paramExprs, paramValues, parentArgs, out var a4)
+                                        & TryInterpret(r, e6.Argument5, paramExprs, paramValues, parentArgs, out var a5);
                                     args = SmallArrayPool<object>.RentOrNew(6);
                                     args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5;
                                 }
@@ -3152,18 +3152,18 @@ namespace DryIoc
                                 if (newExpr is SevenArgumentsNewExpression e7)
                                 {
                                     ok = TryInterpret(r, e7.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        &TryInterpret(r, e7.Argument1, paramExprs, paramValues, parentArgs, out var a1)
-                                        &TryInterpret(r, e7.Argument2, paramExprs, paramValues, parentArgs, out var a2)
-                                        &TryInterpret(r, e7.Argument3, paramExprs, paramValues, parentArgs, out var a3)
-                                        &TryInterpret(r, e7.Argument4, paramExprs, paramValues, parentArgs, out var a4)
-                                        &TryInterpret(r, e7.Argument5, paramExprs, paramValues, parentArgs, out var a5)
-                                        &TryInterpret(r, e7.Argument6, paramExprs, paramValues, parentArgs, out var a6);
+                                        & TryInterpret(r, e7.Argument1, paramExprs, paramValues, parentArgs, out var a1)
+                                        & TryInterpret(r, e7.Argument2, paramExprs, paramValues, parentArgs, out var a2)
+                                        & TryInterpret(r, e7.Argument3, paramExprs, paramValues, parentArgs, out var a3)
+                                        & TryInterpret(r, e7.Argument4, paramExprs, paramValues, parentArgs, out var a4)
+                                        & TryInterpret(r, e7.Argument5, paramExprs, paramValues, parentArgs, out var a5)
+                                        & TryInterpret(r, e7.Argument6, paramExprs, paramValues, parentArgs, out var a6);
                                     args = SmallArrayPool<object>.RentOrNew(7);
                                     args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5; args[6] = a6;
                                 }
                                 break;
                         }
-                        if (args != null) 
+                        if (args != null)
                         {
                             if (ok) result = newExpr.Constructor.Invoke(args);
                             SmallArrayPool<object>.Return(args);
@@ -3195,7 +3195,7 @@ namespace DryIoc
                             : TryInterpret(r, convertExpr.Operand, paramExprs, paramValues, parentArgs, out instance);
 
                         // skip conversion for null and for directly assignable type
-                        if (ok) 
+                        if (ok)
                             result = instance == null || convertExpr.Type == instance.GetType()
                                 || convertExpr.Method == null && convertExpr.Type.IsAssignableFrom(instance.GetType())
                                 ? instance
@@ -3599,7 +3599,7 @@ namespace DryIoc
                             {
                                 if (TryInterpret(rc, e, paramExprs, paramValues, parentArgs, out var value))
                                     return value;
-                                return e.CompileToFactoryDelegate(((IContainer)rc).Rules.UseInterpretation)(rc);
+                                return e.CompileToFactoryDelegate(rc.Rules.UseInterpretation)(rc);
                             });
                     }
                     return true;
@@ -3618,7 +3618,7 @@ namespace DryIoc
                             {
                                 if (TryInterpret(rc, e, paramExprs, paramValues, parentArgs, out var value))
                                     return value;
-                                return e.CompileToFactoryDelegate(((IContainer)rc).Rules.UseInterpretation)(rc);
+                                return e.CompileToFactoryDelegate(rc.Rules.UseInterpretation)(rc);
                             },
                             TryGetIntConstantValue(args.Argument3));
                     }
@@ -3837,7 +3837,7 @@ namespace DryIoc
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
+                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
             itemRef.Value = result;
 
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
@@ -3890,7 +3890,7 @@ namespace DryIoc
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
+                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
             itemRef.Value = result;
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
                 scope.AddDisposable(disp, e.DisposalOrder);
@@ -3942,7 +3942,7 @@ namespace DryIoc
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
+                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
             itemRef.Value = result;
 
             if (result is IDisposable disp)
@@ -4157,8 +4157,8 @@ namespace DryIoc
         /// Child can be disposed without affecting the parent, disposing the child will dispose only the scoped services and singletons created in the child and not in the parent (can be opt-out)</summary>
         public static T CreateChild<T>(this T container,
             IfAlreadyRegistered? ifAlreadyRegistered = null, Rules newRules = null, bool withDisposables = false) where T : IContainer
-        // todo: api should we add the DropSingletons or DropScope as an options? see #259
         {
+            // todo: api should we add the DropSingletons or DropScope as an options? see #259
             var rules = newRules != null && newRules != container.Rules ? newRules : container.Rules;
             return (T)container.With(
                 container.Parent,
@@ -4458,7 +4458,7 @@ namespace DryIoc
         /// otherwise container will try to resolve all registrations, which usually is not realistic case to validate.</summary>
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, Func<ServiceRegistrationInfo, bool> condition = null)
         {
-            var theCondition = condition == null || condition == DefaultValidateCondition 
+            var theCondition = condition == null || condition == DefaultValidateCondition
                 ? DefaultValidateCondition
                 : (Func<ServiceRegistrationInfo, bool>)(r => condition(r) && DefaultValidateCondition(r));
             var roots = container.GetServiceRegistrations().Where(theCondition).Select(r => r.ToServiceInfo()).ToArray();
@@ -4667,6 +4667,9 @@ namespace DryIoc
     /// <summary>Extends IResolver to provide an access to scope hierarchy.</summary>
     public interface IResolverContext : IResolver, IDisposable
     {
+        /// <summary>The rules object defines policies per container for registration and resolution.</summary>
+        Rules Rules { get; }
+
         /// <summary>True if container is disposed.</summary>
         bool IsDisposed { get; }
 
@@ -9496,7 +9499,7 @@ namespace DryIoc
         /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
         public FactoryType FactoryType { get; private set; }
 
-        internal int GetCombinedDecoratorAndFactoryID() => 
+        internal int GetCombinedDecoratorAndFactoryID() =>
             FactoryType == FactoryType.Decorator ? (FactoryID | (DecoratedFactoryID << 16)) : FactoryID;
 
         /// <summary>Service implementation type if known.</summary>
@@ -10896,13 +10899,13 @@ namespace DryIoc
 
             return serviceExpr;
         }
-        
+
         private static Expression GetSingletonExpression(object instance, Setup setup, Request req)
         {
             var e = instance != null ? Constant(instance) : Constant(null, req.ActualServiceType); // fixes #258
             return setup.WeaklyReferenced // Unwrap WeakReference or HiddenDisposable in that order!
                     ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(e), ReflectionTools.WeakReferenceValueProperty))
-                : setup.PreventDisposal 
+                : setup.PreventDisposal
                     ? Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(e), HiddenDisposable.ValueField)
                 : e;
         }
@@ -13827,7 +13830,6 @@ namespace DryIoc
     /// <summary>Defines operations that for changing registry, and checking if something exist in registry.</summary>
     public interface IRegistrator
     {
-        // todo: @api move to `IResolverContext` as well
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
 
@@ -13882,6 +13884,9 @@ namespace DryIoc
     /// <summary>Combines registrator and resolver roles, plus rules and scope management.</summary>
     public interface IContainer : IRegistrator, IResolverContext
     {
+        /// <summary>The rules object defines policies per container for registration and resolution.</summary>
+        new Rules Rules { get; }
+
         /// <summary>Creates new container from the current one by specifying the listed parameters.
         /// If the null or default values are provided then the default or new values will be applied.
         /// Nothing will be inherited from the current container. If you want to inherit something you need to provide it as parameter.</summary>
