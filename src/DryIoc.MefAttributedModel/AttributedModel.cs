@@ -1122,23 +1122,24 @@ namespace DryIoc.MefAttributedModel
         /// otherwise (for single or nu types) returns passed key as-is..</returns>
         public object EnsureUniqueServiceKey(Type serviceType, object serviceKey)
         {
-            _store.Swap(x => x.AddOrUpdate(serviceKey, new[] { KV.Of(serviceType, 1) }, (sk, types, newTypes) =>
-                   {
-                       var newType = newTypes[0].Key;
-                       var typeAndCountIndex = types.IndexOf(newType, (n, t) => t.Key == n);
-                       if (typeAndCountIndex != -1)
-                       {
-                           var typeAndCount = types[typeAndCountIndex];
+            _store.Swap(serviceType, (x, t) => x.AddOrUpdate(serviceKey, new[] { KV.Of(t, 1) }, 
+                (sk, types, newTypes) =>
+                {
+                    var newType = newTypes[0].Key;
+                    var typeAndCountIndex = types.IndexOf(newType, (n, t) => t.Key == n);
+                    if (typeAndCountIndex != -1)
+                    {
+                        var typeAndCount = types[typeAndCountIndex];
 
-                           // Change the serviceKey only when multiple same types are registered with the same key
-                           serviceKey = KV.Of(serviceKey, typeAndCount.Value);
+                        // Change the serviceKey only when multiple same types are registered with the same key
+                        serviceKey = KV.Of(serviceKey, typeAndCount.Value);
 
-                           typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
-                           return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
-                       }
+                        typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
+                        return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
+                    }
 
-                       return types.Append(newTypes);
-                   }));
+                    return types.Append(newTypes);
+                }));
             return serviceKey;
         }
 
