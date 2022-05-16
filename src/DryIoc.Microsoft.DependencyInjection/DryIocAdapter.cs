@@ -301,7 +301,8 @@ namespace DryIoc.Microsoft.DependencyInjection
 
             if (serviceType == typeof(IServiceProviderIsService) ||
                 serviceType == typeof(ISupportRequiredService) ||
-                serviceType == typeof(IServiceScopeFactory))
+                serviceType == typeof(IServiceScopeFactory) ||
+                serviceType == typeof(IServiceProvider))
                 return true;
 
             if (_container.IsRegistered(serviceType))
