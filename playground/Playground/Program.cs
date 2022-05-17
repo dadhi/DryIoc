@@ -32,16 +32,16 @@ namespace Playground
 
             // BenchmarkRunner.Run<FindMethodInClass>();
             // BenchmarkRunner.Run<GetConstructor>();
-            var cs = new GetConstructor().GetAll();
-            Console.WriteLine(cs.Length);
+            // var cs = new GetConstructor().GetAll();
+            // Console.WriteLine(cs.Length);
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
 
             //var x = RealisticUnitOfWorkWithBigObjectGraphBenchmark.Measure(
             //    RealisticUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIoc());
             //Debug.Assert(x != null);
 
-            // var x = RealisticUnitOfWorkBenchmark.Measure(RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi());
-            // Console.ReadKey();
+            var x = RealisticUnitOfWorkBenchmark.Measure(RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi());
+            Console.ReadKey();
 
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
