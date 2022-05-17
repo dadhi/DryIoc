@@ -1016,7 +1016,7 @@ namespace DryIoc
 
                 // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServiceType, ServiceKey }
                 // presumes that required service type is closed generic
-                if (serviceKey is OpenGenericTypeKey openGenericTypeKey && serviceType.IsClosedGeneric() &&
+                if (serviceKey != null && serviceKey is OpenGenericTypeKey openGenericTypeKey && serviceType.IsClosedGeneric() &&
                     openGenericTypeKey.RequiredServiceType == serviceType.GetGenericTypeDefinition())
                 {
                     serviceType = openGenericTypeKey.RequiredServiceType;
@@ -10928,7 +10928,7 @@ namespace DryIoc
                     serviceExpr = ApplyReuse(serviceExpr, request); // todo: @perf pass a possibly calculated id to here
 
                     var serviceExprType = serviceExpr.Type;
-                    if (serviceExpr.NodeType != ExprType.Constant &&
+                    if (serviceExpr.NodeType != ExprType.Constant && // todo: @perf just check that 
                         serviceExprType != originalServiceExprType && !originalServiceExprType.IsAssignableFrom(serviceExprType))
                         serviceExpr = originalServiceExprType.Cast(serviceExpr);
                 }
@@ -11033,7 +11033,7 @@ namespace DryIoc
             else
             {
                 // Wrap service expression in WeakReference or HiddenDisposable
-                if (setup.WeaklyReferenced)
+                if (setup.WeaklyReferenced) // todo: @perf wrap the result of the check into the bool variable to prevent doing it below.
                     serviceExpr = NewNoByRefArgs(ReflectionTools.WeakReferenceCtor, serviceExpr);
                 else if (setup.PreventDisposal)
                     serviceExpr = NewNoByRefArgs(HiddenDisposable.Ctor, serviceExpr);
@@ -13442,7 +13442,7 @@ namespace DryIoc
 
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
-        {
+        {   // todo: @perf start wioth checking for hot-path first - just check that expression is NewExpression here to short-circuit the apply logic
             // strip the conversion as we are operating with object anyway
             if (serviceFactoryExpr.NodeType == ExprType.Convert)
                 serviceFactoryExpr = ((UnaryExpression)serviceFactoryExpr).Operand;
@@ -13476,7 +13476,7 @@ namespace DryIoc
                     // decrease the dependency count when wrapping into lambda
                     if (request.DependencyCount > 0)
                         request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
-                    factoryDelegateExpr = new FactoryDelegateExpression(serviceFactoryExpr);
+                    factoryDelegateExpr = new FactoryDelegateExpression(serviceFactoryExpr); // todo: @perf do we need to do it for a simple constructor expression?
                 }
 
                 var disposalOrder = request.Factory.Setup.DisposalOrder;
