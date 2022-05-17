@@ -10376,6 +10376,8 @@ namespace DryIoc
         /// <summary>Prevents disposal of reused instance if it is disposable.</summary>
         public bool PreventDisposal => (_settings & Settings.PreventDisposal) != 0;
 
+        internal bool WeaklyReferencedOrPreventDisposal => (_settings & (Settings.WeaklyReferenced | Settings.PreventDisposal)) != 0;
+
         /// <summary>When single service is resolved, but multiple candidates found, this setting will be used to prefer this one.</summary>
         public bool PreferInSingleServiceResolve => (_settings & Settings.PreferInSingleServiceResolve) != 0;
 
@@ -10974,6 +10976,7 @@ namespace DryIoc
             // That's why we are always intepreting them even if `Rules.WithoutInterpretationForTheFirstResolution()` is set.
             var reuse = request.Reuse;
             var setup = Setup;
+            var weaklyReferencedOrPreventDisposal = setup.WeaklyReferencedOrPreventDisposal;
             if (reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
                 !request.TracksTransientDisposable && !request.IsWrappedInFunc())
             {
@@ -11016,10 +11019,9 @@ namespace DryIoc
                     if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, out singleton))
                         singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseInterpretation)(container);
 
-                    if (setup.WeaklyReferenced)
-                        singleton = new WeakReference(singleton);
-                    else if (setup.PreventDisposal)
-                        singleton = new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
+                    if (weaklyReferencedOrPreventDisposal)
+                        singleton = setup.WeaklyReferenced ? new WeakReference(singleton) : new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
+
                     itemRef.Value = singleton;
                     if (singleton is IDisposable disp && !ReferenceEquals(disp, scope))
                         scope.AddDisposable(disp, setup.DisposalOrder);
@@ -11032,20 +11034,18 @@ namespace DryIoc
             }
             else
             {
-                // Wrap service expression in WeakReference or HiddenDisposable
-                if (setup.WeaklyReferenced) // todo: @perf wrap the result of the check into the bool variable to prevent doing it below.
-                    serviceExpr = NewNoByRefArgs(ReflectionTools.WeakReferenceCtor, serviceExpr);
-                else if (setup.PreventDisposal)
-                    serviceExpr = NewNoByRefArgs(HiddenDisposable.Ctor, serviceExpr);
+                if (weaklyReferencedOrPreventDisposal)
+                    serviceExpr = setup.WeaklyReferenced
+                        ? NewNoByRefArgs(ReflectionTools.WeakReferenceCtor, serviceExpr)
+                        : NewNoByRefArgs(HiddenDisposable.Ctor, serviceExpr);
 
                 serviceExpr = reuse.Apply(request, serviceExpr);
             }
 
-            if (setup.WeaklyReferenced) // Unwrap WeakReference or HiddenDisposable in that order!
-                serviceExpr = Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod,
-                    Property(ConvertViaCastClassIntrinsic<WeakReference>(serviceExpr), ReflectionTools.WeakReferenceValueProperty));
-            else if (setup.PreventDisposal)
-                serviceExpr = Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
+            if (weaklyReferencedOrPreventDisposal)
+                serviceExpr = setup.WeaklyReferenced
+                    ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(serviceExpr), ReflectionTools.WeakReferenceValueProperty))
+                    : Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
 
             return serviceExpr;
         }
