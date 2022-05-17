@@ -11438,6 +11438,7 @@ namespace DryIoc
         {
             get
             {
+                // todo: @perf it may be make sense to split Type and constructors into 2 fields
                 var x = _implementationTypeOrProviderOrPubCtorOrCtors;
                 if (x is Type t)
                     return t;
@@ -12123,7 +12124,7 @@ namespace DryIoc
             var factoryMethod = Made.FactoryMethodOrSelector ?? rules.FactoryMethodOrSelector;
             if (factoryMethod == null || ReferenceEquals(factoryMethod, FactoryMethod.ConstructorWithResolvableArguments)) // optimizing for one of the common cases with the ConstructorWithResolvableArguments
             {
-                var ctors = implType.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+                var ctors = implType.GetConstructors(); // getting all public instance constructors with particular order
                 var ctorCount = ctors.Length;
                 if (ctorCount == 1)
                 {

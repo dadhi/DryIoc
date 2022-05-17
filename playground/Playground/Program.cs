@@ -30,15 +30,18 @@ namespace Playground
             //BenchmarkRunner.Run<StructEnumerableTest>();
             //BenchmarkRunner.Run<PropertyAccess>();
 
-            //BenchmarkRunner.Run<FindMethodInClass>();
+            // BenchmarkRunner.Run<FindMethodInClass>();
+            // BenchmarkRunner.Run<GetConstructor>();
+            var cs = new GetConstructor().GetAll();
+            Console.WriteLine(cs.Length);
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
 
             //var x = RealisticUnitOfWorkWithBigObjectGraphBenchmark.Measure(
             //    RealisticUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIoc());
             //Debug.Assert(x != null);
 
-            var x = RealisticUnitOfWorkBenchmark.Measure(RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi());
-            Console.ReadKey();
+            // var x = RealisticUnitOfWorkBenchmark.Measure(RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi());
+            // Console.ReadKey();
 
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
@@ -90,7 +93,7 @@ namespace Playground
             //BenchmarkRunner.Run<ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<ResolveInstancePerDependencyWith2ParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
 
-            //BenchmarkRunner.Run<IfVsNullСoalescingOperator>();
+            //BenchmarkRunner.Run<IfVsNullCoalescingOperator>();
             //BenchmarkRunner.Run<IfVsTernaryOperator>();
             //BenchmarkRunner.Run<ArrayAccessVsGetOrAddItem>();
             //new BenchmarkRunner().RunCompetition(new ExpressionCompileVsEmit());
