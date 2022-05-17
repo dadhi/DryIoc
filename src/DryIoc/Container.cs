@@ -912,6 +912,36 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
+        public GeneratedExpressions GenerateResolutionExpressions(
+            Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>> getRoots = null, bool allowRuntimeState = false)
+        {
+            var generatingContainer = this.WithExpressionGeneration(allowRuntimeState);
+            var regs = generatingContainer.GetServiceRegistrations();
+            var roots = getRoots != null ? getRoots(regs) : regs.Select(r => r.ToServiceInfo());
+
+            var result = new GeneratedExpressions();
+            foreach (var root in roots)
+            {
+                try
+                {
+                    var request = Request.Create(generatingContainer, root);
+                    var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                    if (expr == null)
+                        continue;
+                    result.Roots.Add(root.Pair(expr.WrapInFactoryExpression()));
+                }
+                catch (ContainerException ex)
+                {
+                    result.Errors.Add(root.Pair(ex));
+                }
+            }
+
+            var depExprs = generatingContainer.Rules.DependencyResolutionCallExprs.Value;
+            result.ResolveDependencies.AddRange(depExprs.Enumerate().Select(r => r.Key.Pair(r.Value)));
+            return result;
+        }
+
+        /// <inheritdoc />
         public bool ClearCache(Type serviceType, FactoryType? factoryType, object serviceKey)
         {
             var hash = RuntimeHelpers.GetHashCode(serviceType);
@@ -4153,6 +4183,19 @@ namespace DryIoc
         public FactoryDelegateExpression(Expression body) : base(body) { }
     }
 
+    /// <summary>Result of GenerateResolutionExpressions methods</summary>
+    public class GeneratedExpressions
+    {
+        /// <summary>Resolutions roots</summary>
+        public readonly List<KeyValuePair<ServiceInfo, Expression<FactoryDelegate>>> Roots = new();
+
+        /// <summary>Dependency of Resolve calls</summary>
+        public readonly List<KeyValuePair<Request, Expression>> ResolveDependencies = new();
+
+        /// <summary>Errors</summary>
+        public readonly List<KeyValuePair<ServiceInfo, ContainerException>> Errors = new();
+    }
+
     /// <summary>Container extended features.</summary>
     public static class ContainerTools
     {
@@ -4452,59 +4495,14 @@ namespace DryIoc
                 isConditionalImplementation: rules._made.IsConditionalImplementation),
                 overrideRegistrationMade: true));
 
-        /// <summary>Result of GenerateResolutionExpressions methods</summary>
-        public class GeneratedExpressions
-        {
-            /// <summary>Resolutions roots</summary>
-            public readonly List<KeyValuePair<ServiceInfo, Expression<FactoryDelegate>>> Roots = new();
-
-            /// <summary>Dependency of Resolve calls</summary>
-            public readonly List<KeyValuePair<Request, Expression>> ResolveDependencies = new();
-
-            /// <summary>Errors</summary>
-            public readonly List<KeyValuePair<ServiceInfo, ContainerException>> Errors = new();
-        }
-
-        /// <summary>Generates expressions for specified roots and their "Resolve-call" dependencies.
-        /// Wraps exceptions into errors. The method does not create any actual services.
-        /// You may use Factory <see cref="Setup.AsResolutionRoot"/>.</summary>
-        public static GeneratedExpressions GenerateResolutionExpressions(this Container container,
-            Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>> getRoots = null, bool allowRuntimeState = false)
-        {
-            var generatingContainer = container.WithExpressionGeneration(allowRuntimeState);
-            var regs = generatingContainer.GetServiceRegistrations();
-            var roots = getRoots != null ? getRoots(regs) : regs.Select(r => r.ToServiceInfo());
-
-            var result = new GeneratedExpressions();
-            foreach (var root in roots)
-            {
-                try
-                {
-                    var request = Request.Create(generatingContainer, root);
-                    var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
-                    if (expr == null)
-                        continue;
-                    result.Roots.Add(root.Pair(expr.WrapInFactoryExpression()));
-                }
-                catch (ContainerException ex)
-                {
-                    result.Errors.Add(root.Pair(ex));
-                }
-            }
-
-            var depExprs = generatingContainer.Rules.DependencyResolutionCallExprs.Value;
-            result.ResolveDependencies.AddRange(depExprs.Enumerate().Select(r => r.Key.Pair(r.Value)));
-            return result;
-        }
-
         /// <summary>Generates expressions for provided root services</summary>
         public static GeneratedExpressions GenerateResolutionExpressions(
-            this Container container, Func<ServiceRegistrationInfo, bool> condition) =>
+            this IContainer container, Func<ServiceRegistrationInfo, bool> condition) =>
             container.GenerateResolutionExpressions(regs => regs.Where(condition.ThrowIfNull()).Select(r => r.ToServiceInfo()));
 
         /// <summary>Generates expressions for provided root services</summary>
         public static GeneratedExpressions GenerateResolutionExpressions(
-            this Container container, params ServiceInfo[] roots) =>
+            this IContainer container, params ServiceInfo[] roots) =>
             container.GenerateResolutionExpressions(roots.ToFunc<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>>);
 
         /// <summary>Excluding open-generic registrations, cause you need to provide type arguments to actually create these types.</summary>
@@ -14044,6 +14042,11 @@ namespace DryIoc
         /// When called without condition parameter, the method will try to resolve all registrations. Use the method overload with `condition` or `roots`
         /// to narrow down the resolution roots.</summary>
         KeyValuePair<ServiceInfo, ContainerException>[] Validate();
+
+        /// <summary>Generates expressions for specified roots and their "Resolve-call" dependencies.
+        /// Wraps exceptions into errors. The method does not create any actual services.
+        /// You may use Factory <see cref="Setup.AsResolutionRoot"/>.</summary>
+        GeneratedExpressions GenerateResolutionExpressions(Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>> getRoots = null, bool allowRuntimeState = false);
 
         /// <summary>Searches for requested factory in registry, and then using <see cref="DryIoc.Rules.UnknownServiceResolvers"/>.</summary>
         /// <param name="request">Factory request.</param>
