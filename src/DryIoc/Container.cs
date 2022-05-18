@@ -423,6 +423,7 @@ namespace DryIoc
             else
             {
                 var expr = factory.GetExpressionOrDefault(request);
+                request.UnRent();
                 if (expr == null)
                     return null;
 
@@ -954,7 +955,7 @@ namespace DryIoc
                 var unknownServiceResolvers = Rules.UnknownServiceResolvers;
                 if (!unknownServiceResolvers.IsNullOrEmpty())
                     for (var i = 0; factory == null && i < unknownServiceResolvers.Length; i++)
-                        factory = unknownServiceResolvers[i](request)?.DoNotCache();
+                        factory = unknownServiceResolvers[i](request.Isolate())?.DoNotCache();
             }
 
             if (factory?.GeneratedFactories != null)
@@ -9275,7 +9276,7 @@ namespace DryIoc
 
     /// <summary>Stored check results of two kinds: inherited down dependency chain and not.</summary>
     [Flags]
-    public enum RequestFlags : byte
+    public enum RequestFlags : ushort
     {
         /// <summary>Nothing is set</summary>
         Default = 0,
@@ -9295,6 +9296,8 @@ namespace DryIoc
         IsGeneratedResolutionDependencyExpression = 1 << 6,
         /// <summary>Non inherited. Indicates the root service inside the function.</summary>
         IsDirectlyWrappedInFunc = 1 << 7,
+        /// means the request is pooled
+        DoNotUnRent = 1 << 8,
     }
 
     /// <summary>Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations</summary>
@@ -9305,7 +9308,7 @@ namespace DryIoc
         public static bool MatchFactoryConditionAndMetadata(this Request request, ServiceDetails details, Factory factory)
         {
             var setup = factory.Setup;
-            return (setup.Condition == null || setup.Condition(request))
+            return (setup.Condition == null || setup.Condition(request.Isolate()))
                 && (details.MetadataKey == null && details.Metadata == null || setup.MatchesMetadata(details.MetadataKey, details.Metadata));
         }
 
@@ -9324,7 +9327,7 @@ namespace DryIoc
                 return null;
 
             var condition = f.Setup.Condition;
-            if (condition != null && !condition(r))
+            if (condition != null && !condition(r.Isolate()))
                 return null;
 
             // make the closing of the open-generic as the last check because it perf hog and some items may be already filtered out by predecessor checks.
@@ -9334,7 +9337,6 @@ namespace DryIoc
             return f;
         }
     }
-    // todo: @perf @mem could we use SmallArrayPool for the Requests array here?
     internal sealed class RequestStack
     {
         public Request[] Requests;
@@ -9355,6 +9357,7 @@ namespace DryIoc
         }
 
         private RequestStack(int capacity) => Requests = new Request[capacity];
+
         [MethodImpl((MethodImplOptions)256)]
         public ref Request GetOrPushRef(int index)
         {
@@ -9436,11 +9439,14 @@ namespace DryIoc
         {
             if (serviceType != null && serviceType.IsOpenGeneric())
                 Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
+
             // todo: @mem @perf Could we avoid the allocation of the ServiceInfo details object for ifUnresolved? because it is unlucky path but we spend the memory on it upfront, especially given that ServiceProviderGetServiceShouldThrowIfUnresolved contains the adjusting value anyway??? 
             object serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : ServiceInfo.Of(serviceType, ifUnresolved);
 
-            // todo: @mem @perf should we event need to create the RequestStack at the root, because it may be just a service without dependencies, why don't wait until level 2 where we see the dependency first???
-            return new Request(container, Empty, 1, 0, null, RequestFlags.IsResolutionCall, serviceInfo, serviceType, null);
+            var req = Rent();
+            return req == null 
+                ?        new Request(container, Empty, 1, 0, null, RequestFlags.IsResolutionCall, serviceInfo, serviceType, null)
+                : req.SetServiceInfo(container, Empty, 1, 0, null, RequestFlags.IsResolutionCall, serviceInfo, serviceType, null);
         }
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
@@ -10142,21 +10148,61 @@ namespace DryIoc
             : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, actualServiceType, inputArgExprs) =>
             SetResolvedFactory(factoryOrImplType, factoryID, factoryType, reuse, decoratedFactoryID);
 
+        internal Request Isolate()
+        {
+            Flags |= RequestFlags.DoNotUnRent;
+            return this;
+        }
+
         /// Severe the connection with the request pool up to the parent so that no one can change the Request state
         internal Request IsolateRequestChain()
         {
-            Request r = null;
-            do
+            Request r = this;
+            while (r.DirectParent != null)
             {
-                r = r == null ? this : r.DirectParent;
                 if (r.RequestStack != null)
                 {
                     // severe the requests links with the stack
                     r.RequestStack.Requests[r.DependencyDepth - 1] = null;
                     r.RequestStack = null;
                 }
+                if ((r.Flags & RequestFlags.IsResolutionCall) != 0)
+                {
+                    r.Isolate();
+                    break;
+                }
+                r = r.DirectParent;
+            }
+            return this;
+        }
 
-            } while ((r.Flags & RequestFlags.IsResolutionCall) == 0 && !r.DirectParent.IsEmpty);
+        private static Request _pooledRequest;
+
+        internal static Request Rent() =>
+            Interlocked.Exchange(ref _pooledRequest, null);
+        internal void UnRent()
+        {
+            if (_pooledRequest == null && (Flags & RequestFlags.DoNotUnRent) == 0)
+                _pooledRequest = Clean();
+        }
+
+        internal Request Clean()
+        {
+            DirectParent = default;
+            RequestStack = default;
+            ServiceTypeOrInfo = default;
+            ActualServiceType = default;
+            InputArgExprs = default;
+            Container = default;
+            DependencyDepth = default;
+            DependencyCount = default;
+            Flags = default;
+            _factoryOrImplType = default;
+            Reuse = default;
+            FactoryID = default;
+            DecoratedFactoryID = default;
+            _hashCode = default;
+            FactoryType = default;
             return this;
         }
 
@@ -10677,7 +10723,7 @@ namespace DryIoc
         /// <summary>Can cache the result expression</summary>
         public bool CanCache => (Flags & FactoryFlags.DoNotCache) == 0;
 
-        /// <summary>Instructs to skip caching the factory unless it really wants to do so via `PleaseDontSetDoNotCache`</summary>
+        /// <summary>Instructs to skip caching the factory unless it really wants to do it via `PleaseDontSetDoNotCache`</summary>
         public Factory DoNotCache()
         {
             if ((Flags & FactoryFlags.PleaseDontSetDoNotCache) == 0)
@@ -10691,7 +10737,7 @@ namespace DryIoc
         public bool CheckCondition(Request request)
         {
             var condition = Setup.Condition;
-            return condition == null || condition(request);
+            return condition == null || condition(request.Isolate());
         }
 
         /// <summary>Shortcut for <see cref="DryIoc.Setup.FactoryType"/>.</summary>

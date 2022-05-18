@@ -184,7 +184,7 @@ namespace DryIoc.IssuesTests
                 .WithDefaultReuse(Reuse.Scoped));
 
             // The DependencyService would be scoped because of the container default reuse and 
-            // the Decorator will also be a scoped becuase it does not specify as reuse.
+            // the Decorator will also be a scoped because it does not specify as reuse.
             c.RegisterExports(typeof(DecoratedService), typeof(DependencyService));
 
             // IDecoratedService should be created via a factory method
