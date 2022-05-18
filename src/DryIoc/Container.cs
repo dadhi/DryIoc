@@ -9428,11 +9428,7 @@ namespace DryIoc
             var inputArgExprs = inputArgs?.Map(a => Constant(a)); // todo: @check what happens if `a == null`, does the `object` type for is fine
 
             // we are re-starting the dependency depth count from `1`
-            var stack = RequestStack.Create();
-            ref var req = ref stack.Requests[0];
-            return req == null
-                ? req =  new Request(container, preResolveParent, 1, 0, stack, flags, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs)
-                : req.SetServiceInfo(container, preResolveParent, 1, 0, stack, flags, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs);
+            return new Request(container, preResolveParent, 1, 0, null, flags, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs);
         }
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
