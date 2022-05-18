@@ -9405,7 +9405,7 @@ namespace DryIoc
             // we are re-starting the dependency depth count from `1`
             ref var req = ref stack.Requests[0];
             return req == null
-                ? new Request(container, Empty, 1, 0, stack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null)
+                ? req =  new Request(container, Empty, 1, 0, stack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null)
                 : req.SetServiceInfo(container, Empty, 1, 0, stack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null);
         }
 
@@ -9436,7 +9436,7 @@ namespace DryIoc
             var stack = RequestStack.Create();
             ref var req = ref stack.Requests[0];
             return req == null
-                ? new Request(container, preResolveParent, 1, 0, stack, flags, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs)
+                ? req =  new Request(container, preResolveParent, 1, 0, stack, flags, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs)
                 : req.SetServiceInfo(container, preResolveParent, 1, 0, stack, flags, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs);
         }
 
@@ -9619,7 +9619,7 @@ namespace DryIoc
                 stack = RequestStack.CreateToAccommodateIndex(indexInStack);
 
                 // traverse all the requests up including the resolution root and set the new stack to them
-                Request parent = null;
+                Request parent = null; // todo: @perf what this obvious first check for `null` does mf? 
                 do
                 {
                     parent = parent == null ? this : parent.DirectParent;
@@ -9645,7 +9645,7 @@ namespace DryIoc
             var depDepth = DependencyDepth;
             ref var req = ref GetOrPushPooledRequest(RequestStack, depDepth);
             return req == null
-                ? new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs)
+                ? req =  new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs)
                 : req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
         }
 
@@ -9671,7 +9671,7 @@ namespace DryIoc
             var depDepth = DependencyDepth;
             ref var req = ref GetOrPushPooledRequest(RequestStack, depDepth);
             return req == null
-                ? new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, actualServiceType, InputArgExprs)
+                ? req =  new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, actualServiceType, InputArgExprs)
                 : req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, actualServiceType, InputArgExprs);
         }
 
@@ -9694,7 +9694,7 @@ namespace DryIoc
             var depDepth = DependencyDepth;
             ref var req = ref GetOrPushPooledRequest(RequestStack, depDepth);
             return req == null
-                ? new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, serviceType, InputArgExprs)
+                ? req =  new Request(Container, this, depDepth + 1, 0, RequestStack, flags, info, serviceType, InputArgExprs)
                 : req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, serviceType, InputArgExprs);
         }
 
