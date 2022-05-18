@@ -9447,6 +9447,7 @@ namespace DryIoc
             // todo: @mem @perf Could we avoid the allocation of the ServiceInfo details object for ifUnresolved? because it is unlucky path but we spend the memory on it upfront, especially given that ServiceProviderGetServiceShouldThrowIfUnresolved contains the adjusting value anyway??? 
             object serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : ServiceInfo.Of(serviceType, ifUnresolved);
 
+            // todo: @mem @perf should we event need to create the RequestStack at the root, because it may be just a service without dependencies, why don't wait until level 2 where we see the dependency first???
             return new Request(container, Empty, 1, 0, RequestStack.Create(), RequestFlags.IsResolutionCall, serviceInfo, serviceType, null);
         }
 
