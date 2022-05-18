@@ -405,6 +405,7 @@ namespace DryIoc
             var serviceKey = request.ServiceKey;
             var scopeName = scope?.Name;
             if (serviceKey != null || scopeName != null)
+                // todo: @perf optimize the call, path the created request/stack, found scope, use this.TryGetUsedInstance, etc.
                 return ResolveAndCacheKeyed(serviceTypeHash, serviceType, serviceKey, ifUnresolved, scopeName, null, Request.Empty, null);
 
             if (factory == null)
@@ -9443,15 +9444,10 @@ namespace DryIoc
         {
             if (serviceType != null && serviceType.IsOpenGeneric())
                 Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
-
+            // todo: @mem @perf Could we avoid the allocation of the ServiceInfo details object for ifUnresolved? because it is unlucky path but we spend the memory on it upfront, especially given that ServiceProviderGetServiceShouldThrowIfUnresolved contains the adjusting value anyway??? 
             object serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : ServiceInfo.Of(serviceType, ifUnresolved);
 
-            // we are re-starting the dependency depth count from `1`
-            var stack = RequestStack.Create();
-            ref var req = ref stack.Requests[0];
-            return req == null
-                ? new Request(container, Empty, 1, 0, stack, RequestFlags.IsResolutionCall, serviceInfo, serviceType, null)
-                : req.SetServiceInfo(container, Empty, 1, 0, stack, RequestFlags.IsResolutionCall, serviceInfo, serviceType, null);
+            return new Request(container, Empty, 1, 0, RequestStack.Create(), RequestFlags.IsResolutionCall, serviceInfo, serviceType, null);
         }
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
