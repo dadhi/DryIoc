@@ -260,23 +260,6 @@ namespace DryIoc
                 RegistrySwap(factory, serviceType, ifAlreadyRegistered.Value, serviceKey);
         }
 
-        /// <inheritdoc />
-        void IRegistrator.RegisterService(Factory factory, Type serviceType, bool isStaticallyChecked)
-        {
-            Debug.Assert(factory.FactoryType == FactoryType.Service, "A RegisterService method expects a FactoryType.Service but got other");
-            Debug.Assert(Rules.DefaultIfAlreadyRegistered == IfAlreadyRegistered.AppendNotKeyed);
-
-            ThrowIfRootContainerDisposed();
-
-            factory.ValidateAndNormalizeRegistration(serviceType, null, isStaticallyChecked, Rules, throwIfInvalid: true);
-
-            if (serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition && serviceType.ContainsGenericParameters)
-                serviceType = serviceType.GetGenericTypeDefinition();
-            var r = _registry.Value;
-            if (!_registry.TrySwapIfStillCurrent(r, Registry.RegisterService(r, factory, serviceType)))
-                RegistrySwap(factory, serviceType, IfAlreadyRegistered.AppendNotKeyed, null);
-        }
-
         // hiding nested lambda in method to reduce allocations
         private ImHashMap<Type, object> RegistrySwap(Factory factory, Type serviceType, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey) =>
             _registry.Swap(r => Registry.Register(r, factory, serviceType, ifAlreadyRegistered.Value, serviceKey));
@@ -2523,46 +2506,6 @@ namespace DryIoc
                     ? r.WithDecorators(r.Decorators.AddOrUpdateByReferenceEquals(serviceTypeHash, serviceType, factory.One(),
                         (_, older, newer) => Container.MergeSortedByLatestOrderOrRegistration((Factory[])older, (Factory[])newer)))
                     : r.WithWrappers(r.Wrappers.AddOrUpdateByReferenceEquals(serviceTypeHash, serviceType, factory));
-            }
-
-            public static ImHashMap<Type, object> RegisterService(ImHashMap<Type, object> registryOrServices, Factory factory, Type serviceType)
-            {
-                var r = registryOrServices as Registry;
-                if (r != null && r.IsChangePermitted != IsRegistryChangePermitted.Permitted)
-                    return r.IsChangePermitted == IsRegistryChangePermitted.Ignored ? registryOrServices
-                        : Throw.For<Registry>(Error.NoMoreRegistrationsAllowed, serviceType, string.Empty, factory);
-
-                var services = r == null ? registryOrServices : r.Services;
-                var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
-                var newEntry = ImHashMap.Entry(serviceTypeHash, serviceType, (object)factory);
-                if (services.IsEmpty)
-                    return r == null ? newEntry : r.WithServices(newEntry);
-
-                var mapOrOldEntry = services.AddOrGetEntry(serviceTypeHash, newEntry);
-                var oldEntry = mapOrOldEntry as ImHashMap<Type, object>.Entry;
-                if (oldEntry == null)
-                    return r == null ? mapOrOldEntry : r.WithServices(mapOrOldEntry);
-
-                var updatedEntry = oldEntry.AppendOrUpdateInPlaceOrKeepByReferenceEquals(factory, newEntry,
-                    (f, o, n) => n.SetValue(o.Value is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
-                        ? oldFactoriesEntry.With(f)
-                        : Throw.For<object>(Error.UnableToRegisterDuplicateDefault, n.Key, f, o)));
-
-                if (updatedEntry == oldEntry)
-                    return registryOrServices;
-
-                var newServices = services.ReplaceEntry(oldEntry, updatedEntry);
-                if (r == null)
-                    return newServices;
-
-                r = r.WithServices(newServices);
-
-                // Don't forget the drop cache for the old value if any
-                var oldValue = oldEntry.GetValueOrDefaultWithTheSameHashByReferenceEquals(serviceType);
-                if (oldValue != null)
-                    DropFactoryCache(r, serviceTypeHash, serviceType, oldValue);
-
-                return r;
             }
 
             public static Factory[] GetRegisteredFactories(ImHashMap<Type, object> registryOrServices,
@@ -10935,8 +10878,7 @@ namespace DryIoc
                         serviceExpr = originalServiceExprType.Cast(serviceExpr);
                 }
             }
-            else if (!rules.UsedForValidation &&
-                     !rules.UsedForExpressionGeneration)
+            else if (!rules.UsedForValidation && !rules.UsedForExpressionGeneration)
             {
                 // Split the expression with dependencies bigger than certain threshold by wrapping it in Func which is a
                 // separate compilation unit and invoking it emmediately
@@ -11090,24 +11032,6 @@ namespace DryIoc
                 if (typeof(IDisposable).IsAssignableFrom(knownImplOrServiceType))
                     return Throw.When(throwIfInvalid, Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType, serviceKey ?? "{no key}", this);
             }
-
-            return true;
-        }
-
-        internal virtual bool ValidateAndNormalizeServiceRegistration(Type serviceType, bool isStaticallyChecked, Rules rules, bool throwIfInvalid)
-        {
-            if (serviceType == null)
-                return Throw.When(throwIfInvalid, Error.ServiceTypeIsNull);
-
-            var setup = Setup;
-            var reuse = Reuse ?? rules.DefaultReuse;
-            if (reuse != DryIoc.Reuse.Transient || setup.AllowDisposableTransient || !rules.ThrowOnRegisteringDisposableTransient ||
-                setup.UseParentReuse)
-                return true;
-
-            var knownImplOrServiceType = CanAccessImplementationType ? ImplementationType : serviceType;
-            if (typeof(IDisposable).IsAssignableFrom(knownImplOrServiceType))
-                return Throw.When(throwIfInvalid, Error.RegisteredDisposableTransientWontBeDisposedByContainer, serviceType, "{no key}", this);
 
             return true;
         }
@@ -12125,70 +12049,6 @@ namespace DryIoc
             if (factoryMethod == null || ReferenceEquals(factoryMethod, FactoryMethod.ConstructorWithResolvableArguments)) // optimizing for one of the common cases with the ConstructorWithResolvableArguments
             {
                 var ctors = implType.GetConstructors(); // getting all public instance constructors with particular order
-                var ctorCount = ctors.Length;
-                if (ctorCount == 1)
-                {
-                    // todo: @perf do we need it for the open-generic because we still want to create the closed-generic type and then ask for its constructors again
-                    _implementationTypeOrProviderOrPubCtorOrCtors = ctors[0];
-                }
-                else if (ctorCount == 0)
-                    return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromNone, implType);
-                else if (factoryMethod == null)
-                    return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromMultiple, implType, ctors);
-                else
-                {
-                    // todo: @perf do we need it for the open-generic because we still want to create the closed-generic type and then ask for its constructors again
-                    _implementationTypeOrProviderOrPubCtorOrCtors = ctors; // store the constructors to prevent calling the GetConstructors(...) again for ConstructorWithResolvableArguments
-                }
-            }
-
-            if (isStaticallyChecked || implType == null)
-                return true;
-
-            if (!implType.IsGenericTypeDefinition)
-            {
-                if (implType.IsGenericType && implType.ContainsGenericParameters)
-                    return Throw.When(throwIfInvalid, Error.RegisteringNotAGenericTypedefImplType, implType, implType.GetGenericDefinitionOrNull());
-
-                if (implType != serviceType || serviceType != typeof(object))
-                {
-                    if (!serviceType.IsGenericTypeDefinition)
-                    {
-                        if (!serviceType.IsAssignableFrom(implType))
-                            return Throw.When(throwIfInvalid, Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
-                    }
-                    else if (implType.GetImplementedTypes().IndexOf(serviceType, (st, t) => t == st || t.GetGenericDefinitionOrNull() == st) == -1)
-                        return Throw.When(throwIfInvalid, Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
-                }
-            }
-            else if (implType != serviceType)
-            {
-                if (serviceType.IsGenericTypeDefinition)
-                    return ValidateImplementationAndServiceTypeParamsMatch(implType, serviceType, throwIfInvalid);
-
-                if (!serviceType.IsGenericType)
-                    return Throw.When(throwIfInvalid, Error.RegisteringOpenGenericImplWithNonGenericService, implType, serviceType);
-
-                if (!implType.IsImplementingServiceType(serviceType.GetGenericTypeDefinition()))
-                    return Throw.When(throwIfInvalid, Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
-            }
-
-            return true;
-        }
-
-        internal override bool ValidateAndNormalizeServiceRegistration(Type serviceType, bool isStaticallyChecked, Rules rules, bool throwIfInvalid)
-        {
-            if (!base.ValidateAndNormalizeServiceRegistration(serviceType, isStaticallyChecked, rules, throwIfInvalid))
-                return false;
-
-            if (!CanAccessImplementationType)
-                return true;
-
-            var implType = ImplementationType;
-            var factoryMethod = Made.FactoryMethodOrSelector ?? rules.FactoryMethodOrSelector;
-            if (factoryMethod == null || ReferenceEquals(factoryMethod, FactoryMethod.ConstructorWithResolvableArguments)) // optimizing for one of the common cases with the ConstructorWithResolvableArguments
-            {
-                var ctors = implType.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
                 var ctorCount = ctors.Length;
                 if (ctorCount == 1)
                 {
@@ -13982,9 +13842,6 @@ namespace DryIoc
         /// <returns>True if factory was added to registry, false otherwise.
         /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
         void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
-
-        /// todo: @wip @perf trying to simplify the Register for the hot path
-        void RegisterService(Factory factory, Type serviceType, bool isStaticallyChecked);
 
         /// <summary>Returns true if expected factory is registered with specified service key and type.
         /// Not provided or <c>null</c> <paramref name="serviceKey"/> means to check the <paramref name="serviceType"/> 
