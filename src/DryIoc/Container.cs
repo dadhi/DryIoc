@@ -14552,7 +14552,7 @@ namespace DryIoc
             if (interfaces.Length == 1)
                 results[interfaceStartIndex] = interfaces[0];
             else if (interfaces.Length > 1)
-                Array.Copy(interfaces, 0, results, interfaceStartIndex, interfaces.Length);
+                Array.Copy(interfaces, 0, results, interfaceStartIndex, interfaces.Length); // todo: @perf optimize change to Array.Resize or stick to the single array
 
             if (interfaceStartIndex == 1)
                 results[0] = sourceType;
