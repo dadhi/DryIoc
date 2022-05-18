@@ -9334,7 +9334,7 @@ namespace DryIoc
             return f;
         }
     }
-
+    // todo: @perf @mem could we use SmallArrayPool for the Requests array here?
     internal sealed class RequestStack
     {
         public Request[] Requests;
@@ -9355,27 +9355,22 @@ namespace DryIoc
         }
 
         private RequestStack(int capacity) => Requests = new Request[capacity];
-
+        [MethodImpl((MethodImplOptions)256)]
         public ref Request GetOrPushRef(int index)
         {
-            var items = Requests;
-            if (index >= items.Length)
-                Requests = items = Expand(items, index);
-            return ref items[index];
+            if (index >= Requests.Length)
+                Expand(index);
+            return ref Requests[index];
         }
 
-        private static Request[] Expand(Request[] items, int index)
+        private void Expand(int index)
         {
-            var count = items.Length;
+            var count = Requests.Length;
             var newCount = count << 1;
-
-            // ensure that the index is always in range
+            // ensure that the index is in range
             while (index >= newCount)
                 newCount <<= 1;
-
-            var newItems = new Request[newCount]; // count x 2
-            Array.Copy(items, 0, newItems, 0, count);
-            return newItems;
+            Array.Resize(ref Requests, newCount);
         }
     }
 
@@ -9449,7 +9444,7 @@ namespace DryIoc
             object serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : ServiceInfo.Of(serviceType, ifUnresolved);
 
             // todo: @mem @perf should we event need to create the RequestStack at the root, because it may be just a service without dependencies, why don't wait until level 2 where we see the dependency first???
-            return new Request(container, Empty, 1, 0, RequestStack.Create(), RequestFlags.IsResolutionCall, serviceInfo, serviceType, null);
+            return new Request(container, Empty, 1, 0, null, RequestFlags.IsResolutionCall, serviceInfo, serviceType, null);
         }
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
@@ -9620,9 +9615,11 @@ namespace DryIoc
 
                 // traverse all the requests up including the resolution root and set the new stack to them
                 Request r = this;
-                while (r.DirectParent != null && (r.Flags & RequestFlags.IsResolutionCall) == 0)
+                while (r.DirectParent != null)
                 {
                     r.RequestStack = stack;
+                    if ((r.Flags & RequestFlags.IsResolutionCall) != 0)
+                        break;
                     r = r.DirectParent;
                 }
             }
