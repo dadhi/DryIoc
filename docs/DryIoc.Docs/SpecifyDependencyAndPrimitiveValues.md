@@ -564,8 +564,8 @@ class The_spec_chain
             made: Parameters.Of
 
                 .Details((req, paramInfo) => paramInfo.ParameterType.IsAssignableTo<IDisposable>()
-                    ? ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault)
-                    : null) // the `null` means to use default parameter resolution
+                    ? ServiceDetails.Of(IfUnresolved.ReturnDefault)
+                    : null) // the `null` means to use the default parameter resolution
 
                 .Name("parameter2", serviceKey: "p2")
 
