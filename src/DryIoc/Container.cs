@@ -11085,11 +11085,6 @@ namespace DryIoc
             : other == null || other == Of ? source
             : req => paramInfo => other(req)?.Invoke(paramInfo) ?? source(req)?.Invoke(paramInfo);
 
-        /// <summary>Obsolete: please use <see cref="OverrideWith"/></summary>
-        [Obsolete("Replaced with OverrideWith", false)]
-        public static ParameterSelector And(this ParameterSelector source, ParameterSelector other) =>
-            source.OverrideWith(other);
-
         /// <summary>Overrides source parameter rules with specific parameter details. 
         /// If it is not your parameter just return null.</summary>
         /// <param name="source">Original parameters rules</param>
