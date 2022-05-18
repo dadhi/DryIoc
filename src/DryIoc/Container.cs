@@ -9619,13 +9619,12 @@ namespace DryIoc
                 stack = RequestStack.CreateToAccommodateIndex(indexInStack);
 
                 // traverse all the requests up including the resolution root and set the new stack to them
-                Request parent = null; // todo: @perf what this obvious first check for `null` does mf? 
-                do
+                Request r = this;
+                while (r.DirectParent != null && (r.Flags & RequestFlags.IsResolutionCall) == 0)
                 {
-                    parent = parent == null ? this : parent.DirectParent;
-                    parent.RequestStack = stack;
+                    r.RequestStack = stack;
+                    r = r.DirectParent;
                 }
-                while ((parent.Flags & RequestFlags.IsResolutionCall) == 0 && !parent.DirectParent.IsEmpty);
             }
             return ref stack.GetOrPushRef(indexInStack);
         }
