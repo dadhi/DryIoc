@@ -9154,11 +9154,11 @@ namespace DryIoc
         {
             var type = parameter.ParameterType;
             if (!parameter.IsOptional)
-                return !type.IsByRef ? null : (ParameterServiceInfo)new Typed(parameter, type.GetElementType());
+                return !type.IsByRef ? null : new Typed(parameter, type.GetElementType());
             var details = parameter.DefaultValue == null
                 ? ServiceDetails.IfUnresolvedReturnDefault
                 : ServiceDetails.Of(ifUnresolved: IfUnresolved.ReturnDefault, defaultValue: parameter.DefaultValue);
-            return !type.IsByRef ? new WithDetails(parameter, details) : (ParameterServiceInfo)new Typed.WithDetails(parameter, type.GetElementType(), details);
+            return !type.IsByRef ? new WithDetails(parameter, details) : new Typed.WithDetails(parameter, type.GetElementType(), details);
         }
 
         /// <summary>Creates service info from parameter alone, setting service type to parameter type,
@@ -9345,9 +9345,10 @@ namespace DryIoc
         public static RequestStack Create(int capacityPowerOfTwo = DefaultCapacity) =>
             new RequestStack(capacityPowerOfTwo);
 
+        [MethodImpl((MethodImplOptions)256)]
         public static RequestStack CreateToAccommodateIndex(int index)
         {
-            var capacity = 4;
+            var capacity = DefaultCapacity;
             while (index >= capacity)
                 capacity <<= 1;
             return new RequestStack(capacity);
@@ -9648,7 +9649,7 @@ namespace DryIoc
                 : req.SetServiceInfo(Container, this, depDepth + 1, 0, RequestStack, flags, info, info.GetActualServiceType(), InputArgExprs);
         }
 
-        /// <summary>Creates new request with provided info, and links current request as a parent.
+        /// <summary>Creates new request with provided parameter info, and links the current request as a parent.
         /// Allows to set some additional flags. Existing/parent request should be resolved to 
         /// factory via `WithResolvedFactory` before pushing info into it.</summary>
         public Request Push(ParameterInfo parameter, RequestFlags additionalFlags = default)
@@ -9658,6 +9659,7 @@ namespace DryIoc
 
             object info = parameter;
             var actualServiceType = parameter.ParameterType;
+            // todo: @perf so in case where we have just a different IfUnresolved, then we have a non default ServiceDetails, which means a whole lot of additional logic being executed with not actual need, right?
             if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
             {
                 info = actualServiceType.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
