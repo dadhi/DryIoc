@@ -4023,6 +4023,33 @@ namespace DryIoc
         public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
             container.CreateChild(newRules: container.Rules.WithFacadeRules(facadeKey));
 
+        /// <summary>The "child" container detached from the parent container.
+        /// With <paramref name="registrySharing" /> you control how registrations will be shared or separated between the parent and child.
+        /// The not `null` <paramref name="childDefaultServiceKey" /> will allow mark services registered to child with the specified key,
+        /// making them invisible for the parent (if they share the registry). Meanwhile you may resolve them from the child without
+        /// specifying any key. So the `childDefaultServiceKey` is like an invisible stamp on the child registration.
+        /// </summary>
+        public static IContainer CreateChild(this IContainer container,
+            RegistrySharing registrySharing, object childDefaultServiceKey,
+            IfAlreadyRegistered? ifAlreadyRegistered = null, Rules newRules = null, bool withDisposables = false)
+        {
+            var rules = newRules != null && newRules != container.Rules ? newRules : container.Rules;
+            if (childDefaultServiceKey != null)
+                rules = rules
+                    .WithDefaultRegistrationServiceKey(childDefaultServiceKey)
+                    .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(childDefaultServiceKey));
+            if (ifAlreadyRegistered != null)
+                rules = rules
+                    .WithDefaultIfAlreadyRegistered(ifAlreadyRegistered.Value);
+            return container.With(
+                container.Parent,
+                rules,
+                container.ScopeContext,
+                registrySharing,
+                container.SingletonScope.Clone(withDisposables),
+                container.CurrentScope ?.Clone(withDisposables));
+        }
+
         /// <summary>The "child" container detached from the parent:
         /// Child creation has O(1) cost - it is cheap thanks to the fast immutable collections cloning.
         /// Child has all parent registrations copied, then the registrations added or removed in the child are not affecting the parent.
