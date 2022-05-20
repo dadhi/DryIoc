@@ -62,15 +62,23 @@ using NUnit.Framework;
 
 public static partial class ContainerTools
 {
-    public static IContainer CreateChild(this IContainer container, 
+    public static IContainer CreateChild(this IContainer container,
+        RegistrySharing registrySharing, object childDefaultServiceKey,
         IfAlreadyRegistered? ifAlreadyRegistered = null, Rules newRules = null, bool withDisposables = false)
     {
         var rules = newRules != null && newRules != container.Rules ? newRules : container.Rules;
+        if (childDefaultServiceKey != null)
+            rules = rules
+                .WithDefaultRegistrationServiceKey(childDefaultServiceKey)
+                .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(childDefaultServiceKey));
+        if (ifAlreadyRegistered != null)
+            rules = rules
+                .WithDefaultIfAlreadyRegistered(ifAlreadyRegistered.Value);
         return container.With(
             container.Parent,
-            ifAlreadyRegistered == null ? rules : rules.WithDefaultIfAlreadyRegistered(ifAlreadyRegistered.Value),
+            rules,
             container.ScopeContext,
-            RegistrySharing.CloneAndDropCache,
+            registrySharing,
             container.SingletonScope.Clone(withDisposables),
             container.CurrentScope ?.Clone(withDisposables));
     }
@@ -80,11 +88,60 @@ public static partial class ContainerTools
 
 The result container will have the following traits:
 
-- It has all parent registrations copied, so that the registrations added or removed in the child are not affecting the parent. By default child will use the parent `IfAlreadyRegistered` policy but you may specify `IfAlreadyRegistered.Replace` to "shadow" the parent registrations
+- It has all parent registrations copied or shared.
+- You may control whether you want share or copy via `registrySharing` parameter.
+- A not null `childDefaultServiceKey` argument will mark services registered to child with the specified key, making them invisible for the parent (if they share the registry). Meanwhile you may resolve the registrations from the child without specifying any key. So the `childDefaultServiceKey` is like an invisible stamp on the child registration.
+- By default child will use parent's `IfAlreadyRegistered` policy but you may specify `IfAlreadyRegistered.Replace` to "shadow" the parent registrations
 - It has an access to the scoped services and singletons already created by parent.
 - It can be disposed without affecting the parent, disposing the child will dispose only the scoped services and singletons created in the child and not in the parent (can be opt-out with `withDisposables` parameter).
-- Its creation has O(1) cost - it is cheap thanks to the fast immutable collections cloning.
+- The worst child creation performance is O(1) - because the cloning of the registry is O(1).
 
+Let's try it with example:
+```cs 
+
+class ChildExample
+{
+    public class A { public D D; public A(D d) => D = d; }
+    public class A1 { public D D; public A1(D d) => D = d; }
+    public class B { public D D; public B(D d) => D = d; }
+    public class D { }
+    public class D1 : D { }
+    public class D2 : D { }
+
+    [Test]
+    public void Parent_and_child()
+    {
+        using var parent = new Container();
+
+        parent.Register<A>();
+        parent.Register<D, D1>();
+
+        var a = parent.Resolve<A>();
+        Assert.IsInstanceOf<D1>(a.D);
+
+        var childServiceKey = "@child";
+        using var child = parent.CreateChild(RegistrySharing.Share, childServiceKey);
+
+        child.Register<B>();
+        child.Register<D, D2>();
+
+        var b = child.Resolve<B>();
+        Assert.IsInstanceOf<D2>(b.D);
+
+        // Register later into the parent, resolve from the existing child
+        parent.Register<A1>();
+        var a1 = child.Resolve<A1>();
+        Assert.IsInstanceOf<D2>(a1.D);
+
+        // The parent registration is still available if needed through explicit service key, 
+        // as well as parent may request the child service if needed via explicit key
+        var parentD = child.Resolve<D>(serviceKey: DefaultKey.Value);
+        var childD = parent.Resolve<D>(serviceKey: childServiceKey);
+        Assert.IsInstanceOf<D1>(parentD);
+        Assert.IsInstanceOf<D2>(childD);
+    }
+}
+```
 
 ## Facade
 
