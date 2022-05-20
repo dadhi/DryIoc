@@ -1,6 +1,12 @@
 Version History
 ---------------
 
+## v5.1.0 Small feature and bug-fix release / 2022-05-20
+
+- fixed: #486 RegisterInstance in principle does not support non Singleton reuse but InstanceFactory still allows to pass different reuse
+- added: #487 Create CreateChild overload exposing RegistrySharing and childKey arguments
+
+
 ## v5.0.2 Bug-fix release / 2022-05-10
 
 - fixed: #180 Azure Function DI issue - Anonymously Hosted DynamicMethods Assembly. Object reference not set. (Nullable int optional argument with default int value is set to null)

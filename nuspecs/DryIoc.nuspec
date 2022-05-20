@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>5.0.2</version>
+        <version>5.1.0</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,6 +14,11 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v5.1.0 Small feature and bug-fix release
+
+- fixed: #486 RegisterInstance in principle does not support non Singleton reuse but InstanceFactory still allows to pass different reuse
+- added: #487 Create CreateChild overload exposing RegistrySharing and childKey arguments
+
 ## v5.0.2 Bug-fix release
 
 - fixed: #180 Azure Function DI issue - Anonymously Hosted DynamicMethods Assembly. Object reference not set. (Nullable int optional argument with default int value is set to null)
