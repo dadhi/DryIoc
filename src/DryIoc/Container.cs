@@ -9322,7 +9322,7 @@ namespace DryIoc
         /// <summary>Non inherited. Indicates the root service inside the function.</summary>
         IsDirectlyWrappedInFunc = 1 << 7,
         /// means the request is pooled
-        DoNotUnRent = 1 << 8,
+        DoNotPoolRequest = 1 << 8,
     }
 
     /// <summary>Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations</summary>
@@ -10175,7 +10175,7 @@ namespace DryIoc
 
         internal Request Isolate()
         {
-            Flags |= RequestFlags.DoNotUnRent;
+            Flags |= RequestFlags.DoNotPoolRequest;
             return this;
         }
 
@@ -10207,7 +10207,7 @@ namespace DryIoc
             Interlocked.Exchange(ref _pooledRequest, null);
         internal void UnRent()
         {
-            if (_pooledRequest == null && (Flags & RequestFlags.DoNotUnRent) == 0)
+            if (_pooledRequest == null && (Flags & RequestFlags.DoNotPoolRequest) == 0)
                 _pooledRequest = Clean();
         }
 

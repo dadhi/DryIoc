@@ -1,4 +1,3 @@
-using System;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -12,10 +11,10 @@ namespace DryIoc.IssuesTests
             return 1;
         }
 
-        [Test, Ignore("fixme")]
+        [Test, Ignore("think it through")]
         public void Test()
         {
-            using var c = new Container();
+            var c = new Container();
 
             c.Register<A>();
 
