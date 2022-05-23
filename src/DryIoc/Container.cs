@@ -285,58 +285,8 @@ namespace DryIoc
         /// For diagnostics reasons, you may globally set the rule <see cref="DryIoc.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved"/> to alter the behavior. 
         /// It may help to highlight the issues by throwing the original rich <see cref="ContainerException"/> instead of just returning the `null`.
         /// </summary>
-        object IServiceProvider.GetService(Type serviceType)
-        {
-            // Note: The method body is inlined from the Resolve below, 
-            // avoiding the need for greedy calculation of
-            // `Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered`
-            object service = null;
-            ResolveGenerated(ref service, serviceType);
-            if (service != null)
-                return service;
-
-            var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
-
-            // manually inlined GetCachedDefaultFactoryOrDefault
-            var entry = (_registry.Value as Registry)
-                ?.DefaultFactoryCache?[serviceTypeHash & Registry.CACHE_SLOT_COUNT_MASK]
-                ?.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
-
-            var rules = Rules;
-            if (entry != null)
-            {
-                if (entry.Value is FactoryDelegate cachedDelegate)
-                    return cachedDelegate(this);
-
-                var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
-                if (this.TryGetUsedInstance((Scope)scope, (Scope)_singletonScope, serviceTypeHash, serviceType, out var used))
-                {
-                    entry.Value = null; // reset the cache
-                    return used;
-                }
-
-                while (entry.Value is Expression expr)
-                {
-                    if (rules.UseInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var result))
-                        return result;
-
-                    // set to Compiling to notify other threads to use the interpretation until the service is compiled
-                    if (Interlocked.CompareExchange(ref entry.Value, new Registry.Compiling(expr), expr) == expr)
-                    {
-                        var compiledFactory = expr.CompileToFactoryDelegate(rules.UseInterpretation);
-                        entry.Value = compiledFactory; // todo: @unclear should we instead cache only after invoking the factory delegate
-                        return compiledFactory(this);
-                    }
-                }
-
-                if (entry.Value is Registry.Compiling compiling)
-                    return Interpreter.TryInterpretAndUnwrapContainerException(this, compiling.Expression, out var result) ? result
-                         : compiling.Expression.CompileToFactoryDelegate(rules.UseInterpretation)(this);
-            }
-            // todo: @perf push this down to ResolveAndCache?
-            var ifUnresolved = rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
-            return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
-        }
+        object IServiceProvider.GetService(Type serviceType) =>
+            Resolve(serviceType, Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered);
 
         /// <inheritdoc />
         public object Resolve(Type serviceType, IfUnresolved ifUnresolved)
