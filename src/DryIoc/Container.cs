@@ -10201,8 +10201,7 @@ namespace DryIoc
             return this;
         }
 
-        private Request() {}
-        private static Request _pooledRequest = new Request();
+        private static Request _pooledRequest;
         internal static Request Rent() => Interlocked.Exchange(ref _pooledRequest, null);
         internal void Pool()
         {
