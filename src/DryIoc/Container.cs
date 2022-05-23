@@ -864,7 +864,7 @@ namespace DryIoc
         {
             var validatingContainer = this.With(rules => rules.ForValidate());
 
-            var stack = RequestStack.Create(16);
+            var stack = DepRequestStack.Create(8);
 
             List<KeyValuePair<ServiceInfo, ContainerException>> errors = null;
             for (var i = 0; i < roots.Length; i++)
@@ -9362,28 +9362,27 @@ namespace DryIoc
             return f;
         }
     }
-    internal sealed class RequestStack
+    internal sealed class DepRequestStack // todo: @perf remove the stack and use Requests directly
     {
+        public const int DefaultCapacity = 4;
         public Request[] Requests;
 
-        public const int DefaultCapacity = 4;
-
         [MethodImpl((MethodImplOptions)256)]
-        public static RequestStack Create(int capacityPowerOfTwo = DefaultCapacity) =>
-            new RequestStack(capacityPowerOfTwo);
+        public static DepRequestStack Create(int capacityPowerOfTwo = DefaultCapacity) =>
+            new DepRequestStack(capacityPowerOfTwo);
 
-        [MethodImpl((MethodImplOptions)256)]
-        public static RequestStack CreateToAccommodateIndex(int index)
+        [MethodImpl((MethodImplOptions)256)] // todo: @perf inline one usage
+        public static DepRequestStack CreateToAccommodateIndex(int index)
         {
             var capacity = DefaultCapacity;
             while (index >= capacity)
                 capacity <<= 1;
-            return new RequestStack(capacity);
+            return new DepRequestStack(capacity);
         }
 
-        private RequestStack(int capacity) => Requests = new Request[capacity];
+        private DepRequestStack(int capacity) => Requests = new Request[capacity];
 
-        [MethodImpl((MethodImplOptions)256)]
+        [MethodImpl((MethodImplOptions)256)] // todo: @perf inline one usage
         public ref Request GetOrPushRef(int index)
         {
             if (index >= Requests.Length)
@@ -9423,13 +9422,12 @@ namespace DryIoc
         internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
             Field(typeof(Request).GetField(nameof(EmptyOpensResolutionScope)));
 
-        internal static Request CreateForValidation(Container container, ServiceInfo serviceInfo, RequestStack stack)
+        internal static Request CreateForValidation(Container container, ServiceInfo serviceInfo, DepRequestStack depStack)
         {
-            // we are re-starting the dependency depth count from `1`
-            ref var req = ref stack.Requests[0];
+            var req = Rent();
             return req == null
-                ? req =  new Request(container, Empty, 1, 0, stack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null)
-                : req.SetServiceInfo(container, Empty, 1, 0, stack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null);
+                ? req =  new Request(container, Empty, 1, 0, depStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null)
+                : req.SetServiceInfo(container, Empty, 1, 0, depStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null);
         }
 
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
@@ -9486,7 +9484,7 @@ namespace DryIoc
         /// <summary>Request immediate parent.</summary>
         public Request DirectParent;
 
-        internal RequestStack RequestStack;
+        internal DepRequestStack RequestStack;
 
         // mutable because of RequestFlags.AddedToResolutionExpressions
         /// <summary>Persisted request conditions</summary>
@@ -9634,23 +9632,25 @@ namespace DryIoc
         /// <summary>Known implementation, or otherwise actual service type.</summary>
         public Type GetKnownImplementationOrServiceType() => _factoryOrImplType as Type ?? Factory?.ImplementationType ?? ActualServiceType;
 
-        private ref Request GetOrPushPooledRequest(RequestStack stack, int indexInStack)
-        {
-            if (stack == null)
-            {
-                stack = RequestStack.CreateToAccommodateIndex(indexInStack);
+        private ref Request GetOrPushPooledRequest(DepRequestStack stack, int depDepth)
+        {   Debug.Assert(depDepth > 0);
+            // Get advantage of the fact that we never reusing root request, because it always a single one for the graph.
+            // So the depDepth is always starting from 1, and we can put its request into 0 index.
+            var indexInStack = depDepth - 1;
+            if (stack != null)
+                return ref stack.GetOrPushRef(indexInStack);
 
-                // traverse all the requests up including the resolution root and set the new stack to them
-                Request r = this;
-                while (r.DirectParent != null)
-                {
-                    r.RequestStack = stack;
-                    if ((r.Flags & RequestFlags.IsResolutionCall) != 0)
-                        break;
-                    r = r.DirectParent;
-                }
+            // Traverse all the requests up including the resolution root and set the new stack to them
+            stack = DepRequestStack.CreateToAccommodateIndex(indexInStack);
+            Request r = this;
+            while (r.DirectParent != null)
+            {
+                r.RequestStack = stack;
+                if ((r.Flags & RequestFlags.IsResolutionCall) != 0)
+                    break;
+                r = r.DirectParent;
             }
-            return ref stack.GetOrPushRef(indexInStack);
+            return ref stack.Requests[indexInStack];
         }
 
         /// <summary>Creates new request with provided info, and links current request as a parent.
@@ -10152,7 +10152,7 @@ namespace DryIoc
 
         // Initial request without the factory info
         internal Request(Container container, Request parent, int dependencyDepth, int dependencyCount,
-             RequestStack stack, RequestFlags flags, object serviceInfo, Type actualServiceType, Expression[] inputArgExprs)
+             DepRequestStack stack, RequestFlags flags, object serviceInfo, Type actualServiceType, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             RequestStack = stack;
@@ -10167,7 +10167,7 @@ namespace DryIoc
 
         // Request with resolved factory state
         private Request(Container container,
-            Request parent, int dependencyDepth, int dependencyCount, RequestStack stack,
+            Request parent, int dependencyDepth, int dependencyCount, DepRequestStack stack,
             RequestFlags flags, object serviceInfo, Type actualServiceType, Expression[] inputArgExprs,
             object factoryOrImplType, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
             : this(container, parent, dependencyDepth, dependencyCount, stack, flags, serviceInfo, actualServiceType, inputArgExprs) =>
@@ -10187,8 +10187,14 @@ namespace DryIoc
             {
                 if (r.RequestStack != null)
                 {
-                    // severe the requests links with the stack
-                    r.RequestStack.Requests[r.DependencyDepth - 1] = null;
+                    // severe the requests links with the stack starting from the parent
+                    var reqs = r.RequestStack.Requests; 
+                    for (var i = 0; (uint)i < reqs.Length; ++i)
+                        if (reqs[i] == r)
+                        {
+                            reqs[i] = null;
+                            break;
+                        }
                     r.RequestStack = null;
                 }
                 if ((r.Flags & RequestFlags.IsResolutionCall) != 0)
@@ -10230,7 +10236,7 @@ namespace DryIoc
         }
 
         internal Request SetServiceInfo(Container container, Request parent, int dependencyDepth, int dependencyCount,
-            RequestStack stack, RequestFlags flags, object serviceTypeOrInfo, Type actualServiceType, Expression[] inputArgExprs)
+            DepRequestStack stack, RequestFlags flags, object serviceTypeOrInfo, Type actualServiceType, Expression[] inputArgExprs)
         {
             DirectParent = parent;
             RequestStack = stack;
