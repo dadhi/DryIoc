@@ -423,7 +423,7 @@ namespace DryIoc
             else
             {
                 var expr = factory.GetExpressionOrDefault(request);
-                request.UnRent();
+                request.Pool();
                 if (expr == null)
                     return null;
 
@@ -10201,17 +10201,16 @@ namespace DryIoc
             return this;
         }
 
-        private static Request _pooledRequest;
-
-        internal static Request Rent() =>
-            Interlocked.Exchange(ref _pooledRequest, null);
-        internal void UnRent()
+        private Request() {}
+        private static Request _pooledRequest = new Request();
+        internal static Request Rent() => Interlocked.Exchange(ref _pooledRequest, null);
+        internal void Pool()
         {
             if (_pooledRequest == null && (Flags & RequestFlags.DoNotPoolRequest) == 0)
-                _pooledRequest = Clean();
+                _pooledRequest = CleanBeforePool();
         }
 
-        internal Request Clean()
+        internal Request CleanBeforePool()
         {
             DirectParent = default;
             RequestStack = default;

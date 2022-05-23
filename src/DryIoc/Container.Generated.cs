@@ -62,7 +62,7 @@ namespace DryIoc
                         20001,
                         typeof(MyService),
                         Reuse.Transient,
-                        RequestFlags.IsResolutionCall)))
+                        RequestFlags.IsResolutionCall|RequestFlags.DoNotPoolRequest)))
                     service = GetDependency_DependencyB_0(this);
             }
         }
@@ -92,7 +92,7 @@ namespace DryIoc
                         20001,
                         typeof(MyService),
                         Reuse.Transient,
-                        RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck),
+                        RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),
                     null)),
                 ((RuntimeDependencyC)r.Resolve(
                     typeof(RuntimeDependencyC),
@@ -104,7 +104,7 @@ namespace DryIoc
                         20001,
                         typeof(MyService),
                         Reuse.Transient,
-                        RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck),
+                        RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),
                     null)));
 
         // DependencyB<string>
