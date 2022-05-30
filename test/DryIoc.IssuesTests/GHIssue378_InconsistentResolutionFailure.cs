@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel.Composition;
-using DryIoc.FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 using DryIoc.MefAttributedModel;
 
