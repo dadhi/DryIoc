@@ -11417,9 +11417,9 @@ namespace DryIoc
         public static ReflectionFactory Of(Type implementationType)
         {
             ValidateImplementationType(implementationType);
-            if (IsFactoryGenerator(implementationType))
-                return new WithAllDetails(implementationType, null, Made.Default, Setup.Default, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
-            return new ReflectionFactory(implementationType);
+            return IsFactoryGenerator(implementationType)
+                ? new WithAllDetails(implementationType, null, Made.Default, Setup.Default, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty)
+                : new ReflectionFactory(implementationType);
         }
 
         /// <summary>Creates the memory-optimized factory based on arguments</summary>
@@ -11427,9 +11427,9 @@ namespace DryIoc
         public static ReflectionFactory Of(Type implementationType, IReuse reuse)
         {
             ValidateImplementationType(implementationType);
-            if (IsFactoryGenerator(implementationType))
-                return new WithAllDetails(implementationType, reuse, Made.Default, Setup.Default, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
-            return OfReuse(implementationType, reuse);
+            return IsFactoryGenerator(implementationType)
+                ? new WithAllDetails(implementationType, reuse, Made.Default, Setup.Default, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty)
+                : OfReuse(implementationType, reuse);
         }
 
         [MethodImpl((MethodImplOptions)256)]
@@ -11439,7 +11439,7 @@ namespace DryIoc
             : reuse == DryIoc.Reuse.Scoped ? new WithScopedReuse(implementationType)
             : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(implementationType)
             : reuse == DryIoc.Reuse.ScopedOrSingleton ? new WithScopedOrSingletonReuse(implementationType)
-            : (ReflectionFactory)new WithReuse(implementationType, reuse);
+            : new WithReuse(implementationType, reuse);
 
         /// <summary>Creates the memory-optimized factory based on arguments</summary>
         public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
@@ -11448,15 +11448,13 @@ namespace DryIoc
             if (setup == null) setup = Setup.Default;
 
             var validatedImplType = ValidateImplementationType(implementationType, made);
-            if (IsFactoryGenerator(validatedImplType ?? implementationType, made))
-                return new WithAllDetails(validatedImplType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
-
-            if (setup == Setup.Default)
-                return made == Made.Default ? OfReuse(validatedImplType, reuse)
-                    : reuse == null ? new WithMade(validatedImplType, made)
-                    : new WithMadeAndReuse(validatedImplType, reuse, made);
-
-            return new WithAllDetails(validatedImplType, reuse, made, setup);
+            return IsFactoryGenerator(validatedImplType ?? implementationType, made)
+                ? new WithAllDetails(validatedImplType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty) 
+                : setup == Setup.Default
+                    ? (made == Made.Default ? OfReuse(validatedImplType, reuse)
+                        : reuse == null ? new WithMade(validatedImplType, made)
+                        : new WithMadeAndReuse(validatedImplType, reuse, made))
+                    : new WithAllDetails(validatedImplType, reuse, made, setup);
         }
 
         internal static ReflectionFactory OfTypeAndMadeNoValidation(Type implementationType, Made made, IReuse reuse = null, Setup setup = null) =>
