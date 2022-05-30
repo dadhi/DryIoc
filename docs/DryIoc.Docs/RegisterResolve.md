@@ -817,7 +817,12 @@ class Register_delegate_returning_object
 
 ## RegisterInstance
 
-Basically `RegisterInstance` method will supply an already created external instance to the container to use it for dependency injection.
+`RegisterInstance` method will supply the passed instance to the container to use it for dependency injection or resolution.
+It is supplied at the Container level so its lifetime at least matches the lifetime of the Container, due that it is internally registered as singleton.
+
+__Note:__ To register external instance at the Scope level please refer to the [Use method described below](RegisterResolve.md#method-use-to-add-instance-directly-into-scope).
+
+If instance implements an `IDisposable` then it can be tracked for disposal in the container `SingletonScope`. You may also directly call `TrackDisposable(instance)` on the specific scope.
 
 ```cs 
 class Register_instance_example
@@ -844,15 +849,13 @@ class Register_instance_example
 } 
 ```
 
-OK, now we have a pre-created instance in the registry, but what if I need a different instance when opening a new scope.
-Say I want to put `RequestMessage` object into ASP .NET request scope. A request message has a different value in different requests.
-
 ### Method Use to add instance directly into scope
+
+Say I want to put `RequestMessage` object into ASP .NET request scope. A request message has a different value in different requests.
 
 In this case you may use method `Use` to put an instance directly into the current scope skipping the registration ceremony.
 
-__Caution:__ the instance put in via `Use` does not support `serviceKey`, [Wrappers](Wrappers), and [Decorators](Decorators), 
-but instead it provides a nice performance gains and less memory allocations.
+__Note:__ The instance added via `Use` does not support `serviceKey`, [Wrappers](Wrappers), and [Decorators](Decorators). It also won't show in `IsRegistered` - you need to use `IsUsed` instead.
 
 ```cs 
 
@@ -918,10 +921,10 @@ class Typed_instance
 
 ## RegisterInitializer
 
-`RegisterInitializer` allows to pass the action to be invoked on created a service before returning it from resolve method, 
+`RegisterInitializer` allows to pass the action to be invoked when service is created and just before returning it from the `Resolve` method, 
 or before injecting it as dependency. 
 
-__Note:__ From the implementation perspective `RegisterInitializer` is just a sugar for registering a [Decorator](Decorators).
+__Note:__ From the implementation perspective `RegisterInitializer` is just a sugar for the [Decorator](Decorators).
 
 Let's say we want to log the creation of our service:
 ```cs 
