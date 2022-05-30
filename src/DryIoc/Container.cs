@@ -12798,15 +12798,6 @@ namespace DryIoc
             return maps;
         }
 
-        private static ImHashMap<int, object>[] PoolOrCreateEmptyMaps()
-        {
-            var maps = new ImHashMap<int, object>[MAP_COUNT];
-            var empty = ImHashMap<int, object>.Empty;
-            for (var i = 0; i < MAP_COUNT; ++i)
-                maps[i] = empty;
-            return maps;
-        }
-
         ///<summary>Creating scope with parent and name</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static IScope Of(IScope parent, object name) =>
@@ -12823,7 +12814,7 @@ namespace DryIoc
             name == null ? new Scope() : new WithParentAndName(null, name);
 
         /// <summary>Creates scope with optional parent and name.</summary>
-        public Scope() : this(PoolOrCreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImHashMap.Entry(0, ImList<IDisposable>.Empty)) // todo: @question ты забыл барашка такая зачем ты это сделал, проверь нужно ли нам создавать entry здесь?
+        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImHashMap.Entry(0, ImList<IDisposable>.Empty)) // todo: @question ты забыл барашка такая зачем ты это сделал, проверь нужно ли нам создавать entry здесь?
         { }
 
         /// <summary>The basic constructor</summary>
