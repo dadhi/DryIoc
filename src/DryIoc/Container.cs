@@ -5231,12 +5231,10 @@ namespace DryIoc
 
         private static Expression GetFactoryDelegateExpressionOrDefault(Request request)
         {
-            Type serviceType;
             var wrapperType = request.ServiceType;
-            if (wrapperType == typeof(FactoryDelegate))
-                serviceType = request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request);
-            else
-                serviceType = request.RequiredServiceType ?? wrapperType.GetGenericArguments()[0];
+            var serviceType = wrapperType == typeof(FactoryDelegate)
+                ? request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request)
+                : request.RequiredServiceType ?? wrapperType.GetGenericArguments()[0];
 
             request = request.PushServiceType(serviceType);
             var container = request.Container;
@@ -5244,11 +5242,9 @@ namespace DryIoc
             if (expr == null)
                 return null;
 
-            var rules = container.Rules;
-            if (wrapperType == typeof(FactoryDelegate))
-                return Constant(expr.CompileToFactoryDelegate(rules.UseInterpretation));
-
-            return Constant(expr.CompileToFactoryDelegate(wrapperType, serviceType, rules.UseInterpretation), wrapperType);
+            return wrapperType == typeof(FactoryDelegate)
+                ? Constant(expr.CompileToFactoryDelegate(container.Rules.UseInterpretation))
+                : Constant(expr.CompileToFactoryDelegate(wrapperType, serviceType, container.Rules.UseInterpretation), wrapperType);
         }
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request, Factory serviceFactory = null)
@@ -7523,7 +7519,7 @@ namespace DryIoc
             registrator.RegisterInstance(false, serviceType, instance, ifAlreadyRegistered, setup, serviceKey);
 
         /// <summary>
-        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegestered`, 
+        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegistered`, 
         /// apply wrappers and decorators, etc.
         /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
         /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -7535,7 +7531,7 @@ namespace DryIoc
 
         /// <summary>
         /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
-        /// so you can check it via `IsRegestered` for each service type, 
+        /// so you can check it via `IsRegistered` for each service type, 
         /// apply wrappers and decorators, etc.
         /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
         /// Look at the `Use` method to put instance directly into current or singleton scope,
