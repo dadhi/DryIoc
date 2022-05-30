@@ -822,7 +822,7 @@ It is supplied at the Container level so its lifetime at least matches the lifet
 
 __Note:__ To register external instance at the Scope level please refer to the [Use method described below](RegisterResolve.md#method-use-to-add-instance-directly-into-scope).
 
-If instance implements an `IDisposable` then it can be tracked for disposal in the container `SingletonScope`. You may also directly call `TrackDisposable(instance)` on the specific scope.
+If instance implements an `IDisposable` then it will be tracked for disposal in the container `SingletonScope`. You may also directly call `TrackDisposable(instance)` on the specific scope.
 
 ```cs 
 class Register_instance_example
