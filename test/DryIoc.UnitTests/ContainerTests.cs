@@ -11,8 +11,9 @@ namespace DryIoc.UnitTests
         public int Run()
         {
             Resolving_service_should_return_registered_implementation();
+            Register_and_resolve_scoped_delegate_with_single_dependency_should_work();
             Can_generate_expressions_from_closed_and_open_generic_registrations_via_required_service_type();
-            return 2;
+            return 3;
         }
 
         [Test]
@@ -25,6 +26,23 @@ namespace DryIoc.UnitTests
 
             Assert.IsInstanceOf<Service>(service);
         }
+
+        [Test]
+        public void Register_and_resolve_scoped_delegate_with_single_dependency_should_work()
+        {
+            var container = new Container();
+
+            container.Register<M>();
+            container.RegisterDelegate<L>(r => new L(r.Resolve<M>()), Reuse.Scoped);
+
+            using var scope = container.OpenScope();
+            var service = scope.Resolve<L>();
+
+            Assert.IsInstanceOf<L>(service);
+        }
+
+        class L { public L(M m) {}}
+        class M {}
 
         [Test]
         public void Given_named_and_default_registrations_Resolving_without_name_returns_default()
