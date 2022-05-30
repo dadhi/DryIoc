@@ -163,7 +163,8 @@ You may use this API as following:
 ```cs md*/
 class One_level_deep_registration_API
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container();
 
@@ -173,8 +174,8 @@ class One_level_deep_registration_API
         Assert.IsInstanceOf<A>(a);
     }
 
-    interface IA {}
-    class A : IA {}
+    interface IA { }
+    class A : IA { }
 }/*md
 ```
 
@@ -574,7 +575,7 @@ public class RegisterMany_examples
     {
         // Allows registration of B which implements IDisposable as Transient, which is default `RegisterMany` reuse.
         var container = new Container(rules => rules
-            .WithTrackingDisposableTransients()); 
+            .WithTrackingDisposableTransients());
 
         // Registers X, Y and A itself with A implementation 
         container.RegisterMany<A>();
@@ -611,7 +612,7 @@ public class RegisterMany_examples
         // Provides full control to you
         container.RegisterMany(new[] { typeof(A).Assembly },
             getServiceTypes: implType => implType.GetImplementedServiceTypes(),
-            getImplFactory:  implType => ReflectionFactory.Of(implType,
+            getImplFactory: implType => ReflectionFactory.Of(implType,
                 implType.IsAssignableTo<IDisposable>() ? Reuse.Scoped : Reuse.Transient,
                 FactoryMethod.ConstructorWithResolvableArguments));
     }
@@ -768,7 +769,8 @@ The example:
 
 class Register_delegate_with_parameters
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container();
 
@@ -781,11 +783,11 @@ class Register_delegate_with_parameters
         Assert.IsNotNull(container.Resolve<X>());
     }
 
-    class A {}
-    class B {}
-    class X 
+    class A { }
+    class B { }
+    class X
     {
-        public X(A a, B b) {}
+        public X(A a, B b) { }
     }
 }
 
@@ -846,14 +848,14 @@ class Register_instance_example
 ```
 
 OK, now we have a pre-created instance in the registry, but what if I need a different instance when opening a new scope.
-Say I want to put `RequestMessage` object into ASP request scope. A request message has a different value in different requests.
+Say I want to put `RequestMessage` object into ASP .NET request scope. A request message has a different value in different requests.
 
 ### Method Use to add instance directly into scope
 
-In that case we can use method `Use` to put an instance directly into the current scope skipping the registration ceremony.
+In this case you may use method `Use` to put an instance directly into the current scope skipping the registration ceremony.
 
 __Caution:__ the instance put in via `Use` does not support `serviceKey`, [Wrappers](Wrappers), and [Decorators](Decorators), 
-but instead it provides nice performance gains and less memory allocations.
+but instead it provides a nice performance gains and less memory allocations.
 
 ```cs md*/
 
@@ -911,8 +913,8 @@ class Typed_instance
         container.Use(typeof(ISomeService), aa);
     }
 
-    interface ISomeService {}
-    class A : ISomeService {}
+    interface ISomeService { }
+    class A : ISomeService { }
 } /*md
 ```
 
@@ -928,7 +930,8 @@ Let's say we want to log the creation of our service:
 ```cs md*/
 class Register_initializer
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container();
         container.Register<Logger>(Reuse.Singleton);
@@ -947,8 +950,8 @@ class Register_initializer
         public void Log(string s) => LogData.Add(s);
     }
 
-    interface IService {}
-    class MyService: IService {}
+    interface IService { }
+    class MyService : IService { }
 }/*md
 ```
 
@@ -957,7 +960,8 @@ OK, this works for the specific service `IService` but what if I want to log the
 ```cs md*/
 class Register_initializer_for_any_object
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container();
         var loggerKey = "logger";
@@ -1008,12 +1012,13 @@ Having a separate reuse option makes possible to apply initializer once per scop
 ```cs md*/
 class RegisterInitializer_with_reuse_different_from_initialized_object
 {
-    [Test] public void Example()
+    [Test]
+    public void Example()
     {
         var container = new Container();
 
         container.Register<IFoo, Boo>(Reuse.Singleton);
-        
+
         var scopedUsages = 0;
         container.RegisterInitializer<IFoo>((x, r) => ++scopedUsages, Reuse.Scoped);
 
@@ -1134,7 +1139,7 @@ class Register_disposer_for_many_services
 
     interface IClosable
     {
-        bool IsClosed { get; } 
+        bool IsClosed { get; }
         void Close();
     }
     class X : IClosable

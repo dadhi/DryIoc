@@ -141,7 +141,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             var singletons = container.SingletonScope;
             singletons.Use<IServiceProviderIsService>(capabilities);
             singletons.Use<ISupportRequiredService>(capabilities);
-            singletons.UseFactory<IServiceScopeFactory>(r => new DryIocServiceScopeFactory(r));
+            singletons.Use<IServiceScopeFactory>(capabilities);
 
             if (descriptors != null)
                 container.Populate(descriptors, registerDescriptor);
@@ -254,7 +254,8 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
     }
 
-    /// <summary>Creates/opens new scope in passed scoped container.</summary>
+    // todo: @vNext mark as Obsolete
+    /// <summary>[Obsolete("The implementation of `IServiceScopeFactory` is moved to `DryIocServiceProviderCapabilities`")]</summary>
     public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
     {
         private readonly IResolverContext _scopedResolver;
@@ -289,8 +290,8 @@ namespace DryIoc.Microsoft.DependencyInjection
         public void Dispose() => _resolverContext.Dispose();
     }
 
-    /// <summary>Wrapper of DryIoc `IsRegistered` and `Resolve` throwing the exception on unresolved type capabilities.</summary>
-    public sealed class DryIocServiceProviderCapabilities : IServiceProviderIsService, ISupportRequiredService
+    /// <summary>Impl of `IsRegistered`, `GetRequiredService`, `CreateScope`.</summary>
+    public sealed class DryIocServiceProviderCapabilities : IServiceProviderIsService, ISupportRequiredService, IServiceScopeFactory
     {
         private readonly IContainer _container;
         /// <summary>Statefully wraps the passed <paramref name="container"/></summary>
@@ -322,5 +323,15 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <inheritdoc />
         public object GetRequiredService(Type serviceType) => _container.Resolve(serviceType);
+
+        /// <inheritdoc />
+        public IServiceScope CreateScope() 
+        {
+            var r = _container;
+            var scope = r.ScopeContext == null
+                ? Scope.Of(r.OwnCurrentScope)
+                : r.ScopeContext.SetCurrent(p => Scope.Of(p));
+            return new DryIocServiceScope(r.WithCurrentScope(scope));
+        }
     }
 }

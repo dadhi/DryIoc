@@ -769,8 +769,7 @@ namespace DryIoc
             propertiesAndFields = propertiesAndFields ?? Rules.PropertiesAndFields ?? PropertiesAndFields.Auto;
 
             var request = Request.CreateResolutionRoot(this, instanceType)
-                .WithResolvedFactory(InstanceFactory.Of(instance, Reuse.Transient),
-                    skipRecursiveDependencyCheck: true, skipCaptiveDependencyCheck: true);
+                .WithResolvedFactory(new InjectedIntoFactoryDummy(instanceType), skipRecursiveDependencyCheck: true, skipCaptiveDependencyCheck: true);
 
             foreach (var serviceInfo in propertiesAndFields(request))
                 if (serviceInfo != null)
@@ -4028,6 +4027,33 @@ namespace DryIoc
         public static IContainer CreateFacade(this IContainer container, string facadeKey = FacadeKey) =>
             container.CreateChild(newRules: container.Rules.WithFacadeRules(facadeKey));
 
+        /// <summary>The "child" container detached from the parent container.
+        /// With <paramref name="registrySharing" /> you control how registrations will be shared or separated between the parent and child.
+        /// The not `null` <paramref name="childDefaultServiceKey" /> will allow mark services registered to child with the specified key,
+        /// making them invisible for the parent (if they share the registry). Meanwhile you may resolve them from the child without
+        /// specifying any key. So the `childDefaultServiceKey` is like an invisible stamp on the child registration.
+        /// </summary>
+        public static IContainer CreateChild(this IContainer container,
+            RegistrySharing registrySharing, object childDefaultServiceKey,
+            IfAlreadyRegistered? ifAlreadyRegistered = null, Rules newRules = null, bool withDisposables = false)
+        {
+            var rules = newRules != null && newRules != container.Rules ? newRules : container.Rules;
+            if (childDefaultServiceKey != null)
+                rules = rules
+                    .WithDefaultRegistrationServiceKey(childDefaultServiceKey)
+                    .WithFactorySelector(Rules.SelectKeyedOverDefaultFactory(childDefaultServiceKey));
+            if (ifAlreadyRegistered != null)
+                rules = rules
+                    .WithDefaultIfAlreadyRegistered(ifAlreadyRegistered.Value);
+            return container.With(
+                container.Parent,
+                rules,
+                container.ScopeContext,
+                registrySharing,
+                container.SingletonScope.Clone(withDisposables),
+                container.CurrentScope ?.Clone(withDisposables));
+        }
+
         /// <summary>The "child" container detached from the parent:
         /// Child creation has O(1) cost - it is cheap thanks to the fast immutable collections cloning.
         /// Child has all parent registrations copied, then the registrations added or removed in the child are not affecting the parent.
@@ -6730,7 +6756,7 @@ namespace DryIoc
                         }
 
                         injectedExpr = paramDetails.DefaultValue != null
-                            ? request.Container.GetConstantExpression(paramDetails.DefaultValue)
+                            ? request.Container.GetConstantExpression(paramDetails.DefaultValue, paramRequest.ServiceType)
                             : paramRequest.ServiceType.GetDefaultValueExpression();
                     }
 
@@ -7432,7 +7458,7 @@ namespace DryIoc
         public static void RegisterInstance(this IRegistrator registrator, bool isChecked, Type serviceType, object instance,
             IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
         {
-            registrator.Register(InstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup),
+            registrator.Register(InstanceFactory.Of(instance, setup),
                 serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: isChecked);
             registrator.TrackDisposable(instance, setup);
         }
@@ -7484,8 +7510,7 @@ namespace DryIoc
         /// though without ability to use decorators and wrappers on it.
         /// </summary>
         public static void RegisterInstanceMany(this IRegistrator registrator, Type implType, object instance,
-            bool nonPublicServiceTypes = false,
-            IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
+            bool nonPublicServiceTypes = false, IfAlreadyRegistered? ifAlreadyRegistered = null, Setup setup = null, object serviceKey = null)
         {
             instance.ThrowIfNull();
             if (implType != null)
@@ -7498,7 +7523,7 @@ namespace DryIoc
             if (serviceTypes.Length == 0)
                 Throw.It(Error.NoServicesWereRegisteredByRegisterMany, implType.One());
 
-            var factory = InstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup);
+            var factory = InstanceFactory.Of(instance, setup);
             foreach (var serviceType in serviceTypes)
                 registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
@@ -7536,7 +7561,7 @@ namespace DryIoc
             if (serviceTypes.IsNullOrEmpty())
                 Throw.It(Error.NoServicesWereRegisteredByRegisterMany, instance);
 
-            var factory = InstanceFactory.Of(instance, DryIoc.Reuse.Singleton, setup);
+            var factory = InstanceFactory.Of(instance, setup);
 
             foreach (var serviceType in serviceTypes)
             {
@@ -11802,7 +11827,7 @@ namespace DryIoc
                     if (paramDetails.IfUnresolved == IfUnresolved.Throw)
                         return null;
                     injectedExpr = paramDetails.DefaultValue != null
-                        ? container.GetConstantExpression(paramDetails.DefaultValue)
+                        ? container.GetConstantExpression(paramDetails.DefaultValue, paramRequest.ServiceType)
                         : paramRequest.ServiceType.GetDefaultValueExpression();
                 }
 
@@ -12326,7 +12351,6 @@ namespace DryIoc
         public override IReuse Reuse => DryIoc.Reuse.Singleton;
         /// <inheritdoc/>
         public override Setup Setup => Setup.AsResolutionCallForGeneratedExpressionSetup;
-
         /// <inheritdoc />
         public override bool HasRuntimeState => true;
 
@@ -12334,27 +12358,16 @@ namespace DryIoc
         public static InstanceFactory Of(object instance) => new InstanceFactory(instance);
 
         /// <summary>Creates the memory-optimized factory from the supplied arguments</summary>
-        public static InstanceFactory Of(object instance, IReuse reuse) =>
-            reuse == DryIoc.Reuse.Singleton
-                ? new InstanceFactory(instance)
-                : new WithAllDetails(instance, reuse, Setup.Default);
-
-        /// <summary>Creates the memory-optimized factory from the supplied arguments</summary>
         public static InstanceFactory Of(object instance, Setup setup) =>
-            new WithAllDetails(instance, null, setup ?? Setup.Default);
-
-        /// <summary>Creates the memory-optimized factory from the supplied arguments</summary>
-        public static InstanceFactory Of(object instance, IReuse reuse, Setup setup) =>
-            reuse == DryIoc.Reuse.Singleton && (setup == null || setup == Setup.Default)
+            setup == null || setup == Setup.Default
                 ? new InstanceFactory(instance)
-                : new WithAllDetails(instance, reuse, setup ?? Setup.Default);
+                : new WithAllDetails(instance, setup ?? Setup.Default);
 
         /// <summary>Creates the factory.</summary>
         public InstanceFactory(object instance) => Instance = instance;
 
         internal sealed class WithAllDetails : InstanceFactory
         {
-            public override IReuse Reuse { get; }
             public override Setup Setup { get; }
             public override Type ImplementationType
             {
@@ -12365,12 +12378,9 @@ namespace DryIoc
                 }
             }
 
-            public WithAllDetails(object instance, IReuse reuse, Setup setup)
-                : base(instance != null && setup.WeaklyReferenced ? new WeakReference(instance) : instance)
-            {
-                Reuse = reuse;
+            public WithAllDetails(object instance, Setup setup)
+                : base(instance != null && setup.WeaklyReferenced ? new WeakReference(instance) : instance) =>
                 Setup = setup.WithAsResolutionCallForGeneratedExpression();
-            }
         }
 
         /// Simplified specially for the register instance 
@@ -12397,9 +12407,8 @@ namespace DryIoc
             // otherwise just return a constant
             var instanceExpr = request.Container.GetConstantExpression(Instance);
             var serviceType = request.GetActualServiceType();
-            if (serviceType.IsAssignableFrom(ImplementationType))
-                return instanceExpr;
-            return serviceType.Cast(instanceExpr);
+            var implType = ImplementationType;
+            return implType == null || serviceType.IsAssignableFrom(implType) ? instanceExpr : serviceType.Cast(instanceExpr);
         }
 
         /// <summary>Simplified path for the registered instance</summary>
@@ -12415,8 +12424,6 @@ namespace DryIoc
             if (serviceType.IsArray)
                 serviceType = typeof(IEnumerable<>).MakeGenericType(serviceType.GetElementType());
 
-            // todo: @perf Prevents the costly `WithResolvedFactory` call
-            // todo: @hack with IContainer cast - move to the interface
             var c = (Container)request.Container;
             if (c._registry.Value is Container.Registry r && !r.Decorators.IsEmpty)
             {
@@ -12623,13 +12630,32 @@ namespace DryIoc
         /// <summary>May be used in places where placeholder is needed</summary>
         public static readonly Factory Default = new FactoryPlaceholder();
 
-        ///<summary> Always resolved asResolutionCall, to create a hole in object graph to be filled in later </summary>
-        public override Setup Setup => _setup;
         private static readonly Setup _setup = Setup.AsResolutionCallSetup;
+        ///<summary> Always resolved asResolutionCall, to create a hole in object graph to be filled-in later by the runtime container</summary>
+        public override Setup Setup => _setup;
+
+        /// <summary>Explicit Transient reuse to avoid captive dependency error, e.g. if the Rules.Default reuse is Singleton</summary>
+        public override IReuse Reuse => DryIoc.Reuse.Transient;
 
         /// <inheritdoc />
         public override Expression CreateExpressionOrDefault(Request request) =>
             Throw.For<Expression>(Error.NoImplementationForPlaceholder, request);
+    }
+
+    internal sealed class InjectedIntoFactoryDummy : Factory
+    {
+        private static readonly Setup _setup = Setup.AsResolutionCallSetup;
+
+        public override Setup Setup => _setup;
+
+        /// Explicit Transient reuse to avoid captive dependency error, e.g. if the Rules.Default reuse is Singleton
+        public override IReuse Reuse => DryIoc.Reuse.Transient;
+
+        public override Type ImplementationType { get; }
+
+        public InjectedIntoFactoryDummy(Type instanceType) => ImplementationType = instanceType;
+
+        public override Expression CreateExpressionOrDefault(Request request) => Throw.For<Expression>(Error.InjectedIntoFactoryDummy);
     }
 
     /// Should return value stored in scope
@@ -12996,8 +13022,14 @@ namespace DryIoc
             if (_disposed != 1)
             {
                 if (!_used.IsEmpty)
-                    return _used.TryFind(hash, type, out used);
-
+                {
+                    var e = _used.GetEntryOrDefaultByReferenceEquals(hash, type);
+                    if (e != null)
+                    {
+                        used = e.Value;
+                        return true;
+                    }
+                }
                 var p = Parent;
                 if (p != null)
                     return p.TryGetUsed(hash, type, out used);
@@ -14023,7 +14055,7 @@ namespace DryIoc
                 var factoryId = (int)Details;
                 var reg = container.GetServiceRegistrations().FirstOrDefault(r => r.Factory.FactoryID == factoryId);
                 if (reg.Factory == null)
-                    return "Unable to get the service registration for the problematic FactoryID=" + factoryId;
+                    return "Unable to get the service registration for the problematic factory with FactoryID=" + factoryId;
                 return "The service registration related to the problem is " + reg;
             }
             return string.Empty;
@@ -14202,6 +14234,8 @@ namespace DryIoc
             NoImplementationForPlaceholder = Of(
                 "There is no real implementation, only a placeholder for the service {0}." + NewLine +
                 "Please Register the implementation with the ifAlreadyRegistered.Replace parameter to fill the placeholder."),
+            InjectedIntoFactoryDummy = Of(
+                "This is not a real factory but a dummy for the instance where properties and fields are injected into"),
             DecoratorShouldNotBeRegisteredWithServiceKey = Of(
                 "Registering Decorator {0} with service key {1} is not supported," + NewLine +
                 "because instead of decorator with the key you actually want a decorator for service registered with the key." + NewLine +
@@ -14239,7 +14273,7 @@ namespace DryIoc
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(
-                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {1} ticks without the completion. " + NewLine +
+                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {0} ticks without the completion. " + NewLine +
                 "You may call `exception.TryGetDetails(container)` to get the details of the problematic service registration." + NewLine +
                 "The error means that either the \"other party\" is the parallel thread which has started but is unable to finish the creation of the service in the provided amount of time. " + NewLine +
                 "Or more likely the \"other party\"  is the same thread and there is an undetected recursive dependency or " + NewLine +
