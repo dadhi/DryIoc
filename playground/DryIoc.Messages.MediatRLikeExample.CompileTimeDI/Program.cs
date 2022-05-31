@@ -24,7 +24,7 @@ namespace DryIoc.Messages.MediatRLikeExample.CompileTimeDI
         private static void BuildMediator(IRegistrator container, TextWriter writer)
         {
             container.RegisterInstance(writer);
-            container.RegisterMany(new[] { typeof(Program).GetAssembly() }, Registrator.Interfaces);
+            container.RegisterMany(new[] { typeof(Program).GetAssembly() }, t => t.IsInterface && t?.Namespace != "DryIoc");
 
             container.Register(typeof(IMessageHandler<,>), typeof(MiddlewareMessageHandler<,>), setup: Setup.Decorator);
             container.Register(typeof(BroadcastMessageHandler<>));
