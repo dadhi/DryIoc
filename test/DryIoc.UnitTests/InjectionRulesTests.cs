@@ -10,8 +10,34 @@ using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class InjectionRulesTests
+    public class InjectionRulesTests : ITest
     {
+        public int Run()
+        {
+            Specify_property_selector_when_registering_service();
+            Specify_property_selector_with_custom_service_type_when_registering_service();
+            Should_simply_specify_that_all_assignable_properties_and_fields_should_be_resolved();
+            I_can_resolve_property_with_internal_setter();
+            I_can_specify_to_throw_if_property_is_unresolved();
+            I_can_resolve_internal_property();
+            Can_resolve_private_field();
+            Can_resolve_only_properties();
+            When_resolving_readonly_field_it_should_throw();
+            Only_non_primitive_properties_and_fields_should_be_resolved();
+            Can_specify_all_to_throw_if_Any_property_is_unresolved();
+            Indexer_properties_should_be_ignored_by_All_properties_discovery();
+            Should_support_optional_constructor_parameters_if_dependency_registered_for_parameter();
+            Should_automatically_specify_IfUnresolvedReturnDefault_for_optional_parameters();
+            Unable_to_specify_default_value_for_parameter_name_because_it_requires_state();
+            Could_not_specify_default_value_for_parameter_name_with_specific_rule();
+            Unable_to_specify_default_value_for_parameter_type_because_it_requires_state();
+            Can_pass_parent_type_as_string_param_to_dependency();
+            Can_pass_parent_type_as_string_param_to_dependency_using_factory_method();
+            MadeOf_should_inform_on_absence_of_member();
+            MadeOf_should_inform_on_presence_of_factory_info_for_static_member();
+            return 21;
+        }
+
         [Test]
         public void Specify_property_selector_when_registering_service()
         {
@@ -41,7 +67,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_simply_specify_that_all_assignable_properties_and_fiels_should_be_resolved()
+        public void Should_simply_specify_that_all_assignable_properties_and_fields_should_be_resolved()
         {
             var container = new Container();
             container.Register<IService, Service>();

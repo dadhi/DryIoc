@@ -7,8 +7,25 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class KeyValuePairResolutionTests
+    public class KeyValuePairResolutionTests : ITest
     {
+        public int Run()
+        {
+            Resolve_default_registration_as_pair_should_Succeed();
+            Resolve_indexed_registration_as_pair_When_resolving_with_that_index_should_Succeed();
+            Resolve_indexed_registration_as_pair_When_resolving_without_index_should_Throw();
+            Resolve_named_registration_as_pair_When_resolving_with_name_should_Succeed();
+            Resolve_named_registration_as_pair_When_resolving_without_name_should_Throw();
+            Resolve_couple_of_default_registrations_as_pair_array_should_Succeed();
+            Resolve_couple_of_default_registrations_as_pair_Many_should_Succeed();
+            When_present_default_and_named_registrations_Then_resolving_as_pairs_should_return_both();
+            When_present_default_and_named_registrations_Then_resolving_as_pairs_with_default_key_should_return_default_only();
+            When_present_default_and_named_registrations_Then_resolving_as_pairs_with_string_key_should_return_named_only();
+            When_present_default_and_enum_registrations_Then_resolving_as_pairs_with_enum_key_should_return_enum_only();
+            Can_resolve_all_type_of_registrations_with_object_key_type();
+            return 12;
+        }
+
         [Test]
         public void Resolve_default_registration_as_pair_should_Succeed()
         {
