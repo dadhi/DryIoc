@@ -11445,7 +11445,7 @@ namespace DryIoc
 
             var validatedImplType = ValidateImplementationType(implementationType, made);
             return IsFactoryGenerator(validatedImplType ?? implementationType, made)
-                ? new WithAllDetails(validatedImplType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty) 
+                ? new WithAllDetails(validatedImplType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty)
                 : setup == Setup.Default
                     ? (made == Made.Default ? OfReuse(validatedImplType, reuse)
                         : reuse == null ? new WithMade(validatedImplType, made)
@@ -15289,23 +15289,23 @@ namespace DryIoc.Messages
     using System.Threading;
     using System.Threading.Tasks;
 
-    /// Base type for messages
+    /// <summary>Base type for messages</summary>
     public interface IMessage<out TResponse> { }
 
-    /// Type for an empty response
+    /// <summary>Type for an empty response</summary>
     public struct EmptyResponse
     {
-        /// Single value of empty response
+        /// <summary>Single value of empty response</summary>
         public static readonly EmptyResponse Value = new EmptyResponse();
 
-        /// Single completed task for the empty response
+        /// <summary>Single completed task for the empty response</summary>
         public static readonly Task<EmptyResponse> Task = System.Threading.Tasks.Task.FromResult(Value);
     }
 
-    /// Message extensions
+    /// <summary>Message extensions</summary>
     public static class MessageExtensions
     {
-        /// Converts the task to empty response task
+        /// <summary>Converts the task to empty response task</summary>
         public static async Task<EmptyResponse> ToEmptyResponse(this Task task)
         {
             await task;
@@ -15313,20 +15313,20 @@ namespace DryIoc.Messages
         }
     }
 
-    /// Message with empty response
+    /// <summary>Message with empty response</summary>
     public interface IMessage : IMessage<EmptyResponse> { }
 
-    /// Base message handler
+    /// <summary>Base message handler</summary>
     public interface IMessageHandler<in M, R> where M : IMessage<R>
     {
-        /// Generic handler
+        /// <summary>Generic handler</summary>
         Task<R> Handle(M message, CancellationToken cancellationToken);
     }
 
-    /// Base message handler for message with empty response
+    /// <summary>Base message handler for message with empty response</summary>
     public interface IMessageHandler<in M> : IMessageHandler<M, EmptyResponse> where M : IMessage<EmptyResponse> { }
 
-    /// Message handler middleware to handle the message and pass the result to the next middleware
+    /// <summary>Message handler middleware to handle the message and pass the result to the next middleware</summary>
     public interface IMessageMiddleware<in M, R>
     {
         /// <summary>`0` means the default registration order,
@@ -15338,31 +15338,31 @@ namespace DryIoc.Messages
         Task<R> Handle(M message, CancellationToken cancellationToken, Func<Task<R>> nextMiddleware);
     }
 
-    /// Base class for implementing async handlers
+    /// <summary>Base class for implementing async handlers</summary>
     public abstract class AsyncMessageHandler<M, R> : IMessageHandler<M, R>
         where M : IMessage<R>
     {
-        /// Base method to implement in your inheritor
+        /// <summary>Base method to implement in your inheritor</summary>
         protected abstract Task<R> Handle(M message, CancellationToken cancellationToken);
 
         async Task<R> IMessageHandler<M, R>.Handle(M message, CancellationToken cancellationToken) =>
             await Handle(message, cancellationToken).ConfigureAwait(false);
     }
 
-    /// Sequential middleware type of message handler decorator
+    /// <summary>Sequential middleware type of message handler decorator</summary>
     public class MiddlewareMessageHandler<M, R> : IMessageHandler<M, R> where M : IMessage<R>
     {
         private readonly IMessageHandler<M, R> _handler;
         private readonly IEnumerable<IMessageMiddleware<M, R>> _middlewares;
 
-        /// Decorates message handler with optional middlewares
+        /// <summary>Decorates message handler with optional middlewares</summary>
         public MiddlewareMessageHandler(IMessageHandler<M, R> handler, IEnumerable<IMessageMiddleware<M, R>> middlewares)
         {
             _handler = handler;
             _middlewares = middlewares;
         }
 
-        /// Composes middlewares with handler
+        /// <summary>Composes middlewares with handler</summary>
         public Task<R> Handle(M message, CancellationToken cancellationToken)
         {
             return _middlewares
@@ -15375,17 +15375,17 @@ namespace DryIoc.Messages
         }
     }
 
-    /// Broadcasting type of message handler decorator
+    /// <summary>Broadcasting type of message handler decorator</summary>
     public class BroadcastMessageHandler<M> : IMessageHandler<M, EmptyResponse>
         where M : IMessage<EmptyResponse>
     {
         private readonly IEnumerable<IMessageHandler<M, EmptyResponse>> _handlers;
 
-        /// Constructs the hub with the handler and optional middlewares
+        /// <summary>Constructs the hub with the handler and optional middlewares</summary>
         public BroadcastMessageHandler(IEnumerable<IMessageHandler<M, EmptyResponse>> handlers) =>
             _handlers = handlers;
 
-        /// Composes middlewares with handler
+        /// <summary>Composes middlewares with handler</summary>
         public async Task<EmptyResponse> Handle(M message, CancellationToken cancellationToken)
         {
             await Task.WhenAll(_handlers.Select(h => h.Handle(message, cancellationToken)));
