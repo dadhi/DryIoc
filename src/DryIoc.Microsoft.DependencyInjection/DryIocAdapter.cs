@@ -254,21 +254,6 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
     }
 
-    // todo: @vNext mark as Obsolete
-    /// <summary>[Obsolete("The implementation of `IServiceScopeFactory` is moved to `DryIocServiceProviderCapabilities`")]</summary>
-    public sealed class DryIocServiceScopeFactory : IServiceScopeFactory
-    {
-        private readonly IResolverContext _scopedResolver;
-
-        /// <summary>Stores passed scoped container to open nested scope.</summary>
-        /// <param name="scopedResolver">Scoped container to be used to create nested scope.</param>
-        public DryIocServiceScopeFactory(IResolverContext scopedResolver) => _scopedResolver = scopedResolver;
-
-        /// <summary>Opens scope and wraps it into DI <see cref="IServiceScope"/> interface.</summary>
-        /// <returns>DI wrapper of opened scope.</returns>
-        public IServiceScope CreateScope() => new DryIocServiceScope(_scopedResolver.WithNewOpenScope());
-    }
-
     /// <summary>Bare-bones IServiceScope implementations</summary>
     public sealed class DryIocServiceScope : IServiceScope
     {
