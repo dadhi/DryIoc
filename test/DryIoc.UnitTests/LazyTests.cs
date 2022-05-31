@@ -7,8 +7,24 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class LazyTests
+    public class LazyTests : ITest
     {
+        public int Run()
+        {
+            Resolved_Lazy_should_be_LazyOfService_type();
+            Given_registered_transient_resolved_Lazy_should_create_new_instances();
+            Given_registered_singleton_resolved_Lazy_should_create_same_instances();
+            Given_registered_singleton_resolving_as_Lazy_should_NOT_create_service_instance_until_Value_is_accessed();
+            It_is_possible_to_resolve_Lazy_of_Lazy();
+            It_is_possible_to_resolve_Lazy_of_Func();
+            Given_registered_service_Injecting_it_as_Lazy_dependency_should_work();
+            Lazy_is_dynamic_and_allow_recursive_dependency();
+            Resolving_Func_With_Args_of_Lazy_should_throw_for_missing_dependency();
+            Lazy_dependency_is_injected_as_nested_Resolve_method();
+            Can_resolve_dynamic_dependency_as_Lazy();
+            return 11;
+        }
+
         [Test]
         public void Resolved_Lazy_should_be_LazyOfService_type()
         {
