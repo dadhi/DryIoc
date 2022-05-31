@@ -7,8 +7,29 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class DelegateFactoryTests
+    public class DelegateFactoryTests : ITest
     {
+        public int Run()
+        {
+            Can_register_custom_delegates_without_ReflectionFactory();
+            Given_Lambda_registration_Resolving_service_should_be_of_Lambda_provided_implementation();
+            Can_use_factory_method_instead_register_delegate();
+            Lambda_registration_without_specified_service_type_should_use_implementation_type_as_service_type();
+            Lambda_registration_could_be_resolved_as_Func();
+            Lambda_registration_could_be_resolved_as_Lazy();
+            Given_lambda_registration_Injecting_it_as_dependency_should_work();
+            While_registering_It_is_possible_to_resolve_lambda_parameters_from_container();
+            Can_use_factory_method_instead_register_delegate_with_dependency_resolve();
+            Can_use_factory_method_instead_register_delegate_with_dependency_resolve_Better_approach();
+            Resolving_non_registered_dependency_inside_lambda_should_throw();
+            Possible_to_Register_delegate_with_runtime_type_of_service();
+            Resolving_delegate_with_service_type_not_assignable_to_created_object_type_should_Throw();
+            Possible_to_Register_delegate_with_runtime_type_of_dependency_and_service();
+            Possible_to_Register_delegate_with_value_type_dependency_and_service();
+            Cannot_register_delegate_for_open_generic_service_type();
+            return 16;
+        }
+
         [Test]
         public void Can_register_custom_delegates_without_ReflectionFactory()
         {

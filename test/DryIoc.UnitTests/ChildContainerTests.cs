@@ -4,8 +4,31 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ChildContainerTests
+    public class ChildContainerTests : ITest
     {
+        public int Run()
+        {
+            Can_resolve_service_from_parent_container();
+            Can_resolve_service_wrapper_with_dependency_from_parent_container();
+            Can_inject_singleton_service_from_parent_container();
+            Can_inject_current_scope_service_from_fallback_container();
+            Can_inject_scoped_or_singleton_service_from_fallback_container();
+            Can_fallback_to_parent_and_return_back_to_child();
+            Can_use_registration_copy_instead_of_facade();
+            Child_should_not_throw_if_parent_is_disposed();
+            Without_singletons_should_work();
+            With_registration_copy();
+            Reusing_singletons_from_parent_and_not_disposing_them_in_scoped_container();
+            Can_resolve_instance_from_fallback_container_If_instance_registered_as_delegate();
+            Can_produce_container_which_throws_on_further_registrations();
+            Can_produce_container_which_throws_on_further_un_registrations();
+            Resolve_scoped_lazy_service_in_parent_container_with_WithoutThrowIfDependencyHasShorterReuseLifespan_via_InjectPropertiesAndFields_should_not_return_null();
+            Resolve_scoped_service_in_parent_container_with_WithoutThrowIfDependencyHasShorterReuseLifespan_via_InjectPropertiesAndFields_should_not_return_null();
+            Resolve_lazy_service_in_parent_container_should_work();
+            Resolve_service_in_parent_container_should_work();
+            return 18;
+        }
+
         [Test]
         public void Can_resolve_service_from_parent_container()
         {

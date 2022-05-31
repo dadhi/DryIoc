@@ -3,8 +3,14 @@
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class DecoratorConditionTests
+    public class DecoratorConditionTests : ITest
     {
+        public int Run()
+        {
+            Can_register_decorator_with_condition_based_on_service_name();
+            return 1;
+        }
+
         [Test]
         public void Can_register_decorator_with_condition_based_on_service_name()
         {

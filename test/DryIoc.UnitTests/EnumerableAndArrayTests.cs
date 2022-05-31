@@ -7,8 +7,41 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class EnumerableAndArrayTests
+    public class EnumerableAndArrayTests : ITest
     {
+        public int Run()
+        {
+            Resolving_array_with_default_and_one_named_service_will_return_both_services();
+            I_can_resolve_array_of_singletons();
+            I_can_resolve_mixed_array_of_singletons_and_transients();
+            Resolving_enumerable_of_service_should_return_enumerable_type();
+            Resolving_enumerable_with_default_and_one_named_service_will_return_both_services();
+            Resolving_enumerable_of_service_registered_with_func_should_return_enumerable_with_single_service();
+            I_can_resolve_array_of_open_generics(true);
+            I_can_resolve_array_of_open_generics(false);
+            I_can_resolve_array_of_lazy_singletons();
+            I_can_inject_enumerable_as_dependency();
+            Resolving_array_of_not_registered_services_should_return_empty_array();
+            When_enumerable_is_injected_it_will_Not_change_after_registering_of_new_service();
+            When_enumerable_dependency_is_reresolved_after_registering_another_service_Then_enumerable_should_NOT_contain_that_service();
+            I_should_be_able_to_resolve_Lazy_of_Func_of_IEnumerable();
+            If_some_item_is_not_resolved_then_it_will_return_empty_collection();
+            Resolve_func_of_default_service_then_array_of_default_and_named_service_should_Succeed();
+            Resolve_generic_wrappers();
+            Skip_resolution_on_missing_dependency_when_resolved_with_ReturnDefault();
+            Lazy_enumerable_should_throw_on_missing_dependency();
+            Lazy_enumerable_should_Not_throw_on_missing_dependency_when_resolved_as_ResolveDefault();
+            Lazy_enumerable_of_enumerable_should_throw_for_nested_enumerable_of_ResolveThrow();
+            Lazy_enumerable_of_enumerable_of_meta_dep_should_throw_for_nested_enumerable_of_ResolveThrow();
+            Lazy_enumerable_of_enumerable_of_array_dep_should_throw_for_nested_enumerable_of_ResolveThrow();
+            Should_include_closed_and_open_generic_version_of_service_in_order_of_registration();
+            LazyEnumerable_should_include_closed_and_open_generic_version_of_service_in_order_of_registration();
+            Can_resolve_array_of_strings();
+            Can_resolve_array_of_asResolutionCall_service();
+            Inject_Enumerable_in_the_class_with_the_base_constructor();
+            return 28;
+        }
+
         [Test]
         public void Resolving_array_with_default_and_one_named_service_will_return_both_services()
         {
@@ -200,7 +233,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resove_func_of_default_service_then_array_of_default_and_named_service_should_Succeed()
+        public void Resolve_func_of_default_service_then_array_of_default_and_named_service_should_Succeed()
         {
             var container = new Container();
             container.Register<IService, Service>(serviceKey: 1);
@@ -265,7 +298,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Lazy_enumerable_of_enumerable_should_throw_for_nested_enumarable_of_ResolveThrow()
+        public void Lazy_enumerable_of_enumerable_should_throw_for_nested_enumerable_of_ResolveThrow()
         {
             var container = new Container(rules =>
                 rules.WithResolveIEnumerableAsLazyEnumerable());

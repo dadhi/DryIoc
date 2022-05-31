@@ -7,8 +7,22 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class CompositePatternTests
+    public class CompositePatternTests : ITest
     {
+        public int Run()
+        {
+            I_should_be_able_to_resolve_composite_of_enumerable_without_exception();
+            I_should_be_able_to_resolve_enumerable_of_funcs_without_exception();
+            I_should_be_able_to_resolve_composite_of_array_without_exception();
+            I_should_be_able_to_resolve_default_composite_without_exception();
+            I_should_be_able_to_resolve_composite_as_item_without_exception();
+            I_should_be_able_to_resolve_composite_of_many_as_item_without_exception();
+            No_recursion_with_required_type();
+            No_recursion_with_required_type_in_lazy_enumerable();
+            Working_example_with_decorator();
+            return 9;
+        }
+
         [Test]
         public void I_should_be_able_to_resolve_composite_of_enumerable_without_exception()
         {

@@ -5,8 +5,27 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ConstructionTests
+    public class ConstructionTests : ITest
     {
+        public int Run()
+        {
+            Can_use_static_method_for_service_creation();
+            Can_use_any_type_static_method_for_service_creation();
+            Can_use_any_type_static_method_for_service_creation_Refactoring_friendly();
+            Can_register_service_with_static_method_creating_implementation();
+            Can_use_instance_method_for_service_creation();
+            Can_use_instance_method_with_resolved_parameter();
+            Can_specify_instance_method_without_strings();
+            Can_get_factory_registered_with_key();
+            Can_get_factory_registered_with_key_and_specify_factory_method_parameter_with_key();
+            Should_throw_if_instance_factory_unresolved();
+            Should_throw_for_instance_method_without_factory();
+            Should_return_null_if_instance_factory_is_not_resolved_on_TryResolve();
+            What_if_factory_method_returned_incompatible_type();
+            It_is_fine_to_have_static_ctor();
+            return 14;
+        }
+
         [Test]
         public void Can_use_static_method_for_service_creation()
         {

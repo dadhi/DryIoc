@@ -3,8 +3,17 @@ using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
-    public class IfUnresolvedTests
+    public class IfUnresolvedTests : ITest
     {
+        public int Run()
+        {
+            Resolving_with_IfUnresolved_ReturnNull_When_dependency_is_not_resolved_Should_return_null();
+            Resolving_Enumerable_of_unregistered_service_with_ReturnNull_should_return_empty_array();
+            Resolving_service_with_dependency_first_with_ReturnNull_then_with_Throw_should_throw();
+            Resolving_service_first_as_return_null_then_resolving_next_as_Throw_should_throw();
+            return 4;
+        }
+
         [Test]
         public void Resolving_with_IfUnresolved_ReturnNull_When_dependency_is_not_resolved_Should_return_null()
         {

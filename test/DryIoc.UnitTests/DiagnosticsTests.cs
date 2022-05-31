@@ -4,8 +4,14 @@ using NUnit.Framework;
 
 namespace DryIoc.UnitTests
 {
-    public class DiagnosticsTests
+    public class DiagnosticsTests : ITest
     {
+        public int Run()
+        {
+            Factory_expression_returns_expression_used_by_Container_to_create_service();
+            return 1;
+        }
+
         [Test]
         public void Factory_expression_returns_expression_used_by_Container_to_create_service()
         {

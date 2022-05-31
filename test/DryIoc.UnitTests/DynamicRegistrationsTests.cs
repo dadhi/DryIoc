@@ -29,7 +29,7 @@ namespace DryIoc.UnitTests
             Can_register_open_generic_dynamic_decorator_and_resolve_with_different_type_arguments();
             Should_not_call_default_dynamic_registration_providers_for_decorators();
             Issue_521();
-            return 17;
+            return 18;
         }
 
         private IEnumerable<DynamicRegistration> GetX(Type serviceType, object key)

@@ -5,8 +5,24 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class IfAlreadyRegisteredTests
+    public class IfAlreadyRegisteredTests : ITest
     {
+        public int Run()
+        {
+            By_default_appends_new_default_registration();
+            I_can_say_to_Throw_on_new_default_registration();
+            I_can_say_to_Throw_on_new_default_registration_when_multi_keyed_registrations_present();
+            Can_update_registered_default_with_new_default();
+            Can_update_registered_named_with_new_named_preserving_defaults();
+            Replace_option_will_replace_all_previous_service_registrations();
+            Can_register_distinct_implementations();
+            RegisterMany_services_of_single_implementation_with_AppendNewImplementation_option();
+            RegisterMany_services_of_single_implementation_with_Replace_option();
+            RegisterMany_for_each_of_many_implementations_with_Replace_option();
+            RegisterMany_many_implementations_with_Replace_option();
+            return 11;
+        }
+
         [Test]
         public void By_default_appends_new_default_registration()
         {
