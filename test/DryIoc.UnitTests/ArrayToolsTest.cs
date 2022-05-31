@@ -5,8 +5,21 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ArrayToolsTest
+    public class ArrayToolsTest : ITest
     {
+        public int Run()
+        {
+            For_first_not_matching_item_it_should_exclude_the_item_from_result_array();
+            For_last_matching_item_it_should_include_the_item_into_result_array();
+            For_all_not_matched_items_it_should_return_empty_array();
+            For_all_matched_items_it_should_return_original_array();
+            Matched_item_in_one_item_array_should_return_original_array();
+            Not_matched_item_in_one_item_array_should_return_original_array();
+            Match_of_empty_array_should_return_the_original_array();
+            Match_of_null_array_should_return_null();
+            return 8;
+        }
+
         [Test]
         public void For_first_not_matching_item_it_should_exclude_the_item_from_result_array()
         {
@@ -50,7 +63,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Matched_iten_in_one_item_array_should_return_original_array()
+        public void Matched_item_in_one_item_array_should_return_original_array()
         {
             var a = new[] { 1 };
 

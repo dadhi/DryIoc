@@ -1,7 +1,7 @@
 #if !NETSTANDARD1_0 && !NETSTANDARD1_1 && !NETSTANDARD1_2 && !NETCOREAPP1_0 && !NETCOREAPP1_1
 #define SUPPORTS_FAST_EXPRESSION_COMPILER
 #endif
-
+using System;
 #if SUPPORTS_FAST_EXPRESSION_COMPILER
 using DryIoc.FastExpressionCompiler.LightExpression;
 using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
@@ -21,8 +21,8 @@ namespace DryIoc.UnitTests
         public void Test()
         {
             var blah = Constant("blah");
-            var fExp = Lambda<FactoryDelegate>(
-                Invoke(Lambda<FactoryDelegate>(blah, FactoryDelegateCompiler.ResolverContextParamExpr),
+            var fExp = Lambda<Func<IResolverContext, object>>(
+                Invoke(Lambda<Func<IResolverContext, object>>(blah, FactoryDelegateCompiler.ResolverContextParamExpr),
                     FactoryDelegateCompiler.ResolverContextParamExpr),
                 FactoryDelegateCompiler.ResolverContextParamExpr);
 

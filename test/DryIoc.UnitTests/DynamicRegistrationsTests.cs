@@ -11,10 +11,25 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            Can_resolve_service();
+            Can_resolve_service_array();
+            Can_resolve_service_enumerable();
+            Can_resolve_multi_service_array();
+            Can_exclude_dynamic_registration_if_there_is_a_normal_one();
+            Can_replace_normal_by_dynamic_registration();
+            Can_replace_normal_with_dynamic_and_dynamic_with_dynamic_registration();
+            Can_append_new_implementation_via_dynamic_registration();
+            Can_append_non_keyed_via_dynamic_registration();
+            Will_keep_first_keyed_registration_by_default();
+            Can_replace_keyed_registration();
+            Can_validate_dynamic_registration();
+            Should_exclude_decorators_from_dynamic_services();
             Can_register_dynamic_decorator();
             Can_register_open_generic_dynamic_decorator();
+            Can_register_open_generic_dynamic_decorator_and_resolve_with_different_type_arguments();
             Should_not_call_default_dynamic_registration_providers_for_decorators();
-            return 3;
+            Issue_521();
+            return 17;
         }
 
         private IEnumerable<DynamicRegistration> GetX(Type serviceType, object key)

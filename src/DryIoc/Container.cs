@@ -165,7 +165,7 @@ namespace DryIoc
         public struct ResolveManyResult
         {
             /// <summary>Factory, the required part</summary>
-            public FactoryDelegate FactoryDelegate;
+            public Func<IResolverContext, object> FactoryDelegate;
 
             /// <summary>Optional key</summary>
             public object ServiceKey;
@@ -174,7 +174,7 @@ namespace DryIoc
             public Type RequiredServiceType;
 
             /// <summary>Constructs the struct.</summary>
-            public static ResolveManyResult Of(FactoryDelegate factoryDelegate,
+            public static ResolveManyResult Of(Func<IResolverContext, object> factoryDelegate,
                 object serviceKey = null, Type requiredServiceType = null) =>
                 new ResolveManyResult
                 {
@@ -305,7 +305,7 @@ namespace DryIoc
 
             if (entry != null)
             {
-                if (entry.Value is FactoryDelegate cachedDelegate)
+                if (entry.Value is Func<IResolverContext, object> cachedDelegate)
                     return cachedDelegate(this);
 
                 var scope = _scopeContext == null ? _ownCurrentScope : _scopeContext.GetCurrentOrDefault();
@@ -362,7 +362,7 @@ namespace DryIoc
                 return null;
 
             var rules = Rules;
-            FactoryDelegate factoryDelegate;
+            Func<IResolverContext, object> factoryDelegate;
 
             if (!rules.UseInterpretationForTheFirstResolution)
             {
@@ -380,8 +380,8 @@ namespace DryIoc
                 if (expr is ConstantExpression constExpr)
                 {
                     var value = constExpr.Value;
-                    if (factory.CanCache)
-                        TryCacheDefaultFactory<FactoryDelegate>(serviceTypeHash, serviceType, value.ToFactoryDelegate);
+                    if (factory.CanCache) // todo: @perf @mem why do we convert to Func<>, can we store the object as is?
+                        TryCacheDefaultFactory<Func<IResolverContext, object>>(serviceTypeHash, serviceType, value.ToFactoryDelegate);
                     return value;
                 }
 
@@ -443,7 +443,7 @@ namespace DryIoc
 
                 if (Registry.GetCachedKeyedFactoryOrDefault(_registry.Value, serviceTypeHash, serviceType, cacheKey, out var cacheEntry))
                 {
-                    if (cacheEntry.Factory is FactoryDelegate cachedDelegate)
+                    if (cacheEntry.Factory is Func<IResolverContext, object> cachedDelegate)
                         return cachedDelegate(this);
                     if (TryInterpretOrCompileCachedExpression(this, cacheEntry, Rules, out var result))
                         return result;
@@ -469,14 +469,14 @@ namespace DryIoc
                 cacheKey = scopeName == null ? request.ServiceKey : KV.Of(scopeName, request.ServiceKey);
                 if (Registry.GetCachedKeyedFactoryOrDefault(_registry.Value, serviceTypeHash, serviceType, cacheKey, out var cacheEntry))
                 {
-                    if (cacheEntry.Factory is FactoryDelegate cachedDelegate)
+                    if (cacheEntry.Factory is Func<IResolverContext, object> cachedDelegate)
                         return cachedDelegate(this);
                     if (TryInterpretOrCompileCachedExpression(this, cacheEntry, Rules, out var result))
                         return result;
                 }
             }
 
-            FactoryDelegate factoryDelegate;
+            Func<IResolverContext, object> factoryDelegate;
             if (!Rules.UseInterpretationForTheFirstResolution)
             {
                 factoryDelegate = factory.GetDelegateOrDefault(request);
@@ -493,7 +493,7 @@ namespace DryIoc
                 {
                     var value = constExpr.Value;
                     if (cacheKey != null)
-                        TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, (FactoryDelegate)value.ToFactoryDelegate);
+                        TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, (Func<IResolverContext, object>)value.ToFactoryDelegate);
                     return value;
                 }
 
@@ -3254,7 +3254,7 @@ namespace DryIoc
                         }
 
                         var delegateExpr = invokeExpr.Expression;
-                        if (delegateExpr is ConstantExpression dc && dc.Value is FactoryDelegate facDel)
+                        if (delegateExpr is ConstantExpression dc && dc.Value is Func<IResolverContext, object> facDel)
                         {
                             if (!TryInterpret(r, invokeExpr.GetArgument(0), paramExprs, paramValues, parentArgs, out var resolver))
                                 return false;
@@ -3816,7 +3816,7 @@ namespace DryIoc
             object result = null;
             var lambda = e.ServiceFactoryExpr;
             if (lambda is ConstantExpression lambdaConstExpr)
-                result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
+                result = ((Func<IResolverContext, object>)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
             itemRef.Value = result;
@@ -3869,7 +3869,7 @@ namespace DryIoc
             object result = null;
             var lambda = e.ServiceFactoryExpr;
             if (lambda is ConstantExpression lambdaConstExpr)
-                result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
+                result = ((Func<IResolverContext, object>)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
             itemRef.Value = result;
@@ -3921,7 +3921,7 @@ namespace DryIoc
             var lambda = args.Argument4;
             object result = null;
             if (lambda is ConstantExpression lambdaConstExpr)
-                result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
+                result = ((Func<IResolverContext, object>)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
             itemRef.Value = result;
@@ -3980,8 +3980,8 @@ namespace DryIoc
         /// <summary>The array of a single `ResolverContextParamExpr` for memory optimization</summary>
         public static readonly ParameterExpression[] ResolverContextParamExprs = { ResolverContextParamExpr };
 
-        /// <summary>FactoryDelegate.Invoke method info for calling from Reflection</summary>
-        public static MethodInfo InvokeMethod = typeof(FactoryDelegate).GetMethod("Invoke");
+        /// <summary>Invoke method info for calling from Reflection</summary>
+        public static MethodInfo InvokeMethod = typeof(Func<IResolverContext, object>).GetMethod("Invoke");
 
         /// Optimization: the empty lambda with a single IResolverContext parameters
         internal static readonly OneParameterLambdaExpression FactoryDelegateParamExprs = new OneParameterLambdaExpression(null, null, ResolverContextParamExpr);
@@ -4002,17 +4002,17 @@ namespace DryIoc
             return expr;
         }
 
-        /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
-        public static Expression<FactoryDelegate> WrapInFactoryExpression(this Expression expression) =>
+        /// <summary>Wraps service creation expression (body) into `Func{IResolverContext, object}` and returns result lambda expression.</summary>
+        public static Expression<Func<IResolverContext, object>> WrapInFactoryExpression(this Expression expression) =>
             new FactoryDelegateExpression(expression.NormalizeExpression());
 
-        /// <summary>Wraps service creation expression (body) into <see cref="FactoryDelegate"/> and returns result lambda expression.</summary>
-        public static Expression<FactoryDelegate> WrapInFactoryExpressionWithoutNormalization(this Expression expression) =>
+        /// <summary>Wraps service creation expression (body) into `Func{IResolverContext, object}` and returns result lambda expression.</summary>
+        public static Expression<Func<IResolverContext, object>> WrapInFactoryExpressionWithoutNormalization(this Expression expression) =>
             new FactoryDelegateExpression(expression);
 
         /// <summary>First wraps the input service expression into lambda expression and
-        /// then compiles lambda expression to actual <see cref="FactoryDelegate"/> used for service resolution.</summary>
-        public static FactoryDelegate CompileToFactoryDelegate(this Expression expression, bool preferInterpretation)
+        /// then compiles lambda expression to actual `Func{IResolverContext, object}` used for service resolution.</summary>
+        public static Func<IResolverContext, object> CompileToFactoryDelegate(this Expression expression, bool preferInterpretation)
         {
             expression = expression.NormalizeExpression();
             if (expression is ConstantExpression constExpr)
@@ -4020,8 +4020,8 @@ namespace DryIoc
 
             if (!preferInterpretation)
             {
-                var factoryDelegate = (FactoryDelegate)(FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompileBoundToFirstClosureParam(
-                    typeof(FactoryDelegate), expression, FactoryDelegateParamExprs,
+                var factoryDelegate = (Func<IResolverContext, object>)(FastExpressionCompiler.LightExpression.ExpressionCompiler.TryCompileBoundToFirstClosureParam(
+                    typeof(Func<IResolverContext, object>), expression, FactoryDelegateParamExprs,
                     new[] { typeof(FastExpressionCompiler.LightExpression.ExpressionCompiler.ArrayClosure), typeof(IResolverContext) },
                     typeof(object),
                     CompilerFlags.NoInvocationLambdaInlining));
@@ -4043,7 +4043,7 @@ namespace DryIoc
             return lambda.Compile();
         }
 
-        /// <summary>Compiles lambda expression to actual `FactoryDelegate` wrapper.</summary>
+        /// <summary>Compiles lambda expression to actual `Func{IResolverContext, object}` wrapper.</summary>
         public static object CompileToFactoryDelegate(this Expression expression, Type factoryDelegateType, Type resultType, bool preferInterpretation)
         {
             if (!preferInterpretation)
@@ -4068,7 +4068,7 @@ namespace DryIoc
         }
     }
 
-    internal sealed class FactoryDelegateExpression : Expression<FactoryDelegate>
+    internal sealed class FactoryDelegateExpression : Expression<Func<IResolverContext, object>>
     {
         public override Type ReturnType => typeof(object);
         public override int ParameterCount => 1;
@@ -4081,7 +4081,7 @@ namespace DryIoc
     public class GeneratedExpressions
     {
         /// <summary>Resolutions roots</summary>
-        public readonly List<KeyValuePair<ServiceInfo, Expression<FactoryDelegate>>> Roots = new();
+        public readonly List<KeyValuePair<ServiceInfo, Expression<Func<IResolverContext, object>>>> Roots = new();
 
         /// <summary>Dependency of Resolve calls</summary>
         public readonly List<KeyValuePair<Request, Expression>> ResolveDependencies = new();
@@ -4557,7 +4557,7 @@ namespace DryIoc
             container.ClearCache(serviceType, factoryType, serviceKey);
 
         /// <summary>Setting the factory directly to scope for resolution</summary> 
-        public static void Use(this IContainer container, Type serviceType, FactoryDelegate factory) =>
+        public static void Use(this IContainer container, Type serviceType, Func<IResolverContext, object> factory) =>
             container.Use(serviceType, factory);
     }
 
@@ -4884,7 +4884,7 @@ namespace DryIoc
             }
             if (e == null)
                 e = singletons._used.GetEntryOrDefaultByReferenceEquals(serviceTypeHash, serviceType);
-            instance = e == null ? default : e.Value is FactoryDelegate f ? f(r) : e.Value;
+            instance = e == null ? default : e.Value is Func<IResolverContext, object> f ? f(r) : e.Value;
             return e != null;
         }
 
@@ -4892,12 +4892,6 @@ namespace DryIoc
         public static T TrackDisposable<T>(this IResolverContext r, T instance, int disposalOrder = 0) where T : IDisposable =>
             (T)r.CurrentOrSingletonScope.TrackDisposable(instance, disposalOrder);
     }
-
-    /// <summary>The result delegate generated by DryIoc for service creation.</summary>
-    public delegate object FactoryDelegate(IResolverContext r);
-
-    /// <summary>The stronly typed delegate for service creation registered as a Wrapper.</summary>
-    public delegate TService FactoryDelegate<TService>(IResolverContext r);
 
     /// <summary>Adds to Container support for:
     /// <list type="bullet">
@@ -4956,8 +4950,6 @@ namespace DryIoc
                 typeof(Tuple<,>).Entry(WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0))),
                 typeof(System.Linq.Expressions.LambdaExpression).Entry(new ExpressionFactory(r => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
                 typeof(LambdaExpression).Entry(new ExpressionFactory(r => GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
-                typeof(FactoryDelegate).Entry(new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.Wrapper)),
-                typeof(FactoryDelegate<>).Entry(new ExpressionFactory(r => GetFactoryDelegateExpressionOrDefault(r), setup: Setup.WrapperWith(0))),
                 typeof(Func<>).Entry(WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.Wrapper))
             );
 
@@ -5166,14 +5158,32 @@ namespace DryIoc
             var isAction = wrapperType == typeof(Action);
             if (!isAction)
             {
-                var openGenericWrapperType = wrapperType.GetGenericDefinitionOrNull().ThrowIfNull();
+                var openGenericWrapperType = wrapperType.GetGenericDefinitionOrNull(); // cannot be null
                 if (FuncTypes.IndexOfReference(openGenericWrapperType) == -1)
-                    Throw.If(!(isAction = ActionTypes.IndexOfReference(openGenericWrapperType) != -1));
+                {
+                    isAction = ActionTypes.IndexOfReference(openGenericWrapperType) != -1;
+                    Throw.If(!isAction); // todo: @feature add distinct error message
+                }
             }
 
             var argTypes = wrapperType.GetGenericArguments();
             var argCount = isAction ? argTypes.Length : argTypes.Length - 1;
             var serviceType = isAction ? typeof(void) : argTypes[argCount];
+
+            // special case for the Factory delegate of Func<IResolverContext, ?>, so we may avoid using the InputArgs and use the result expression directly
+            if (!isAction && argCount == 1 && argTypes[0] == typeof(IResolverContext))
+            {
+                serviceType = wrapperType == typeof(Func<IResolverContext, object>)
+                    ? request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request)
+                    : request.RequiredServiceType ?? serviceType;
+
+                request = request.PushServiceType(serviceType);
+                var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                return expr == null ? null :
+                    wrapperType == typeof(Func<IResolverContext, object>)
+                    ? Constant(expr.CompileToFactoryDelegate(request.Container.Rules.UseInterpretation))
+                    : Constant(expr.CompileToFactoryDelegate(wrapperType, serviceType, request.Container.Rules.UseInterpretation), wrapperType);
+            }
 
             var argExprs = Empty<ParameterExpression>();
             if (argCount != 0)
@@ -5227,24 +5237,6 @@ namespace DryIoc
             if (expr == null)
                 return null;
             return ConstantOf<FastExpressionCompiler.LightExpression.LambdaExpression>(expr.WrapInFactoryExpression());
-        }
-
-        private static Expression GetFactoryDelegateExpressionOrDefault(Request request)
-        {
-            var wrapperType = request.ServiceType;
-            var serviceType = wrapperType == typeof(FactoryDelegate)
-                ? request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request)
-                : request.RequiredServiceType ?? wrapperType.GetGenericArguments()[0];
-
-            request = request.PushServiceType(serviceType);
-            var container = request.Container;
-            var expr = container.ResolveFactory(request)?.GetExpressionOrDefault(request);
-            if (expr == null)
-                return null;
-
-            return wrapperType == typeof(FactoryDelegate)
-                ? Constant(expr.CompileToFactoryDelegate(container.Rules.UseInterpretation))
-                : Constant(expr.CompileToFactoryDelegate(wrapperType, serviceType, container.Rules.UseInterpretation), wrapperType);
         }
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request, Factory serviceFactory = null)
@@ -7875,6 +7867,7 @@ namespace DryIoc
         /// Minimizes the number of allocations when converting from Func to named delegate
         public static object ToFactoryDelegate<TService>(this Func<IResolverContext, TService> f, IResolverContext r) => f(r);
 
+        // todo: @perf @mem check do we really need to coalesce to Func, of rather adjust the code to use the `object` directly
         /// Lifts the result to the factory delegate without allocations on capturing value in lambda closure
         public static object ToFactoryDelegate(this object result, IResolverContext _) => result;
 
@@ -8117,7 +8110,7 @@ namespace DryIoc
             if (serviceType.IsOpenGeneric())
                 Throw.It(Error.ImpossibleToRegisterOpenGenericWithRegisterDelegate, serviceType);
 
-            FactoryDelegate checkedDelegate = r => factoryDelegate(r)
+            Func<IResolverContext, object> checkedDelegate = r => factoryDelegate(r)
                 .ThrowIfNotInstanceOf(serviceType, Error.RegisteredDelegateResultIsNotOfServiceType);
 
             var factory = DelegateFactory.Of(checkedDelegate, reuse, setup);
@@ -8139,54 +8132,46 @@ namespace DryIoc
 
         /// <summary>Adding the factory directly to scope for resolution</summary> 
         public static void Use<TService>(this IResolverContext r, Func<IResolverContext, TService> factory) =>
-            r.Use(typeof(TService), (FactoryDelegate)factory.ToFactoryDelegate);
+            r.Use(typeof(TService), factory.ToFactoryDelegate);
 
         /// <summary>Adding the factory directly to the scope for resolution</summary>
-        public static void Use(this IResolverContext r, Type serviceType, FactoryDelegate factory) =>
+        public static void Use(this IResolverContext r, Type serviceType, Func<IResolverContext, object> factory) =>
             r.Use(serviceType, factory);
 
         /// <summary>Adding the factory directly to the scope for resolution</summary>
-        public static void Use<TService>(this IResolverContext r, FactoryDelegate factory) =>
-            r.Use(typeof(TService), factory);
+        public static void Use<TService>(this IResolverContext r, Func<IResolverContext, object> factory) => r.Use(typeof(TService), factory);
 
         /// <summary>Adding the instance directly to the scope for resolution</summary>
-        public static void Use(this IResolverContext r, Type serviceType, object instance) =>
-            r.Use(serviceType, instance);
+        public static void Use(this IResolverContext r, Type serviceType, object instance) => r.Use(serviceType, instance);
 
         /// <summary>Adding the instance directly to the scope for resolution</summary> 
-        public static void Use<TService>(this IResolverContext r, TService instance) =>
-            r.Use(typeof(TService), instance);
+        public static void Use<TService>(this IResolverContext r, TService instance) => r.Use(typeof(TService), instance);
 
         /// <summary>Adding the factory directly to the scope for resolution</summary>
-        public static void Use<TService>(this IRegistrator r, Func<IResolverContext, TService> factory) =>
-            r.Use(typeof(TService), (FactoryDelegate)factory.ToFactoryDelegate);
+        public static void Use<TService>(this IRegistrator r, Func<IResolverContext, TService> factory) => r.Use(typeof(TService), factory);
 
         /// <summary>Adding the factory directly to the scope for resolution</summary>
-        public static void Use<TService>(this IRegistrator r, FactoryDelegate factory) =>
-            r.Use(typeof(TService), factory);
+        public static void Use<TService>(this IRegistrator r, Func<IResolverContext, object> factory) => r.Use(typeof(TService), factory);
 
         /// <summary>Adding the factory directly to the scope for resolution</summary>
-        public static void Use(this IRegistrator r, Type serviceType, FactoryDelegate factory) =>
-            r.Use(serviceType, factory);
+        public static void Use(this IRegistrator r, Type serviceType, Func<IResolverContext, object> factory) => r.Use(serviceType, factory);
 
         /// <summary>Adding the instance directly to scope for resolution</summary>
-        public static void Use(this IRegistrator r, Type serviceType, object instance) =>
-            r.Use(serviceType, instance);
+        public static void Use(this IRegistrator r, Type serviceType, object instance) => r.Use(serviceType, instance);
 
         /// <summary>Adding the instance directly to scope for resolution</summary> 
-        public static void Use<TService>(this IRegistrator r, TService instance) =>
-            r.Use(typeof(TService), instance);
+        public static void Use<TService>(this IRegistrator r, TService instance) => r.Use(typeof(TService), instance);
 
         /// <summary>Adding the factory directly to scope for resolution</summary> 
         public static void Use<TService>(this IContainer c, Func<IResolverContext, TService> factory) =>
-            ((IResolverContext)c).Use(typeof(TService), (FactoryDelegate)factory.ToFactoryDelegate);
-
-        /// <summary>Adding the factory directly to scope for resolution</summary> 
-        public static void Use<TService>(this IContainer c, FactoryDelegate factory) =>
             ((IResolverContext)c).Use(typeof(TService), factory);
 
         /// <summary>Adding the factory directly to scope for resolution</summary> 
-        public static void Use(this IContainer c, Type serviceType, FactoryDelegate factory) =>
+        public static void Use<TService>(this IContainer c, Func<IResolverContext, object> factory) =>
+            ((IResolverContext)c).Use(typeof(TService), factory);
+
+        /// <summary>Adding the factory directly to scope for resolution</summary> 
+        public static void Use(this IContainer c, Type serviceType, Func<IResolverContext, object> factory) =>
             ((IResolverContext)c).Use(serviceType, factory);
 
         /// <summary>Adding the instance directly to scope for resolution</summary>
@@ -10653,7 +10638,7 @@ namespace DryIoc
     /// <item>Using custom expression - <see cref="ExpressionFactory"/></item>
     /// <item>A placeholder for future actual implementation - <see cref="FactoryPlaceholder"/></item>
     /// </list>
-    /// For all of the types Factory should provide result as <see cref="Expression"/> and <see cref="FactoryDelegate"/>.
+    /// For all of the types Factory should provide result as <see cref="Expression"/> and `Func{IResolverContext, object}`.
     /// Factories are supposed to be immutable and stateless.
     /// Each created factory has an unique ID set in <see cref="FactoryID"/>.</summary>
     public abstract class Factory
@@ -10972,7 +10957,7 @@ namespace DryIoc
         }
 
         /// <summary>Creates factory delegate from service expression and returns it.</summary>
-        public virtual FactoryDelegate GetDelegateOrDefault(Request request) =>
+        public virtual Func<IResolverContext, object> GetDelegateOrDefault(Request request) =>
             GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseInterpretation);
 
         internal virtual bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules, bool throwIfInvalid)
@@ -12461,7 +12446,7 @@ namespace DryIoc
         }
 
         /// <summary>Used at resolution root too simplify getting the actual instance</summary>
-        public override FactoryDelegate GetDelegateOrDefault(Request request)
+        public override Func<IResolverContext, object> GetDelegateOrDefault(Request request)
         {
             request = request.WithResolvedFactory(this);
 
@@ -12469,8 +12454,8 @@ namespace DryIoc
                 return base.GetDelegateOrDefault(request);
 
             return Setup.WeaklyReferenced
-                ? (FactoryDelegate)UnpackWeakRefFactory
-                : (FactoryDelegate)Instance.ToFactoryDelegate;
+                ? (Func<IResolverContext, object>)UnpackWeakRefFactory
+                : (Func<IResolverContext, object>)Instance.ToFactoryDelegate;
         }
 
         private object UnpackWeakRefFactory(IResolverContext _) => (Instance as WeakReference)?.Target.WeakRefReuseWrapperGCed();
@@ -12484,15 +12469,15 @@ namespace DryIoc
         public override bool HasRuntimeState => true;
         /// <inheritdoc />
         public override Setup Setup => DryIoc.Setup.AsResolutionCallForGeneratedExpressionSetup;
-        private readonly FactoryDelegate _factoryDelegate;
+        private readonly Func<IResolverContext, object> _factoryDelegate;
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static DelegateFactory Of(FactoryDelegate factoryDelegate) => new DelegateFactory(factoryDelegate);
+        public static DelegateFactory Of(Func<IResolverContext, object> factoryDelegate) => new DelegateFactory(factoryDelegate);
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static DelegateFactory Of(FactoryDelegate factoryDelegate, IReuse reuse) =>
+        public static DelegateFactory Of(Func<IResolverContext, object> factoryDelegate, IReuse reuse) =>
             reuse == null ? new DelegateFactory(factoryDelegate)
                 : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(factoryDelegate)
                 : reuse == DryIoc.Reuse.Scoped ? new WithScopedReuse(factoryDelegate)
@@ -12501,55 +12486,55 @@ namespace DryIoc
                 : new WithReuse(factoryDelegate, reuse);
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
-        public static DelegateFactory Of(FactoryDelegate factoryDelegate, Setup setup) =>
+        public static DelegateFactory Of(Func<IResolverContext, object> factoryDelegate, Setup setup) =>
             setup == null || setup == Setup.Default
                 ? new DelegateFactory(factoryDelegate)
                 : new WithAllDetails(factoryDelegate, null, setup ?? Setup.Default);
 
         /// <summary>Creates the memory-optimized factory from the provided arguments</summary>
-        public static DelegateFactory Of(FactoryDelegate factoryDelegate, IReuse reuse, Setup setup) =>
+        public static DelegateFactory Of(Func<IResolverContext, object> factoryDelegate, IReuse reuse, Setup setup) =>
             setup == null || setup == Setup.Default
                 ? Of(factoryDelegate, reuse)
                 : new WithAllDetails(factoryDelegate, reuse, setup ?? Setup.Default);
 
         /// <summary>Creates the factory.</summary>
-        public DelegateFactory(FactoryDelegate factoryDelegate) => _factoryDelegate = factoryDelegate.ThrowIfNull();
+        public DelegateFactory(Func<IResolverContext, object> factoryDelegate) => _factoryDelegate = factoryDelegate.ThrowIfNull();
 
         internal sealed class WithSingletonReuse : DelegateFactory
         {
             public override IReuse Reuse => DryIoc.Reuse.Singleton;
-            public WithSingletonReuse(FactoryDelegate factoryDelegate) : base(factoryDelegate) { }
+            public WithSingletonReuse(Func<IResolverContext, object> factoryDelegate) : base(factoryDelegate) { }
         }
 
         internal sealed class WithScopedReuse : DelegateFactory
         {
             public override IReuse Reuse => DryIoc.Reuse.Scoped;
-            public WithScopedReuse(FactoryDelegate factoryDelegate) : base(factoryDelegate) { }
+            public WithScopedReuse(Func<IResolverContext, object> factoryDelegate) : base(factoryDelegate) { }
         }
 
         internal sealed class WithTransientReuse : DelegateFactory
         {
             public override IReuse Reuse => DryIoc.Reuse.Transient;
-            public WithTransientReuse(FactoryDelegate factoryDelegate) : base(factoryDelegate) { }
+            public WithTransientReuse(Func<IResolverContext, object> factoryDelegate) : base(factoryDelegate) { }
         }
 
         internal sealed class WithScopedOrSingletonReuse : DelegateFactory
         {
             public override IReuse Reuse => DryIoc.Reuse.ScopedOrSingleton;
-            public WithScopedOrSingletonReuse(FactoryDelegate factoryDelegate) : base(factoryDelegate) { }
+            public WithScopedOrSingletonReuse(Func<IResolverContext, object> factoryDelegate) : base(factoryDelegate) { }
         }
 
         internal sealed class WithReuse : DelegateFactory
         {
             public override IReuse Reuse { get; }
-            public WithReuse(FactoryDelegate factoryDelegate, IReuse reuse) : base(factoryDelegate) => Reuse = reuse;
+            public WithReuse(Func<IResolverContext, object> factoryDelegate, IReuse reuse) : base(factoryDelegate) => Reuse = reuse;
         }
 
         internal sealed class WithAllDetails : DelegateFactory
         {
             public override IReuse Reuse { get; }
             public override Setup Setup { get; }
-            public WithAllDetails(FactoryDelegate factoryDelegate, IReuse reuse, Setup setup) : base(factoryDelegate)
+            public WithAllDetails(Func<IResolverContext, object> factoryDelegate, IReuse reuse, Setup setup) : base(factoryDelegate)
             {
                 Reuse = reuse;
                 Setup = setup.WithAsResolutionCallForGeneratedExpression();
@@ -12570,11 +12555,11 @@ namespace DryIoc
                 : new InvokeFactoryDelegateExpression(request.ActualServiceType, _factoryDelegate);
         }
 
-        /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in <see cref="FactoryDelegate"/>.
+        /// <summary>If possible returns delegate directly, without creating expression trees, just wrapped in `Func{IResolverContext, object}`/>.
         /// If decorator found for request then factory fall-backs to expression creation.</summary>
         /// <param name="request">Request to resolve.</param>
         /// <returns>Factory delegate directly calling wrapped delegate, or invoking expression if decorated.</returns>
-        public override FactoryDelegate GetDelegateOrDefault(Request request)
+        public override Func<IResolverContext, object> GetDelegateOrDefault(Request request)
         {
             request = request.WithResolvedFactory(this);
 
@@ -12592,12 +12577,12 @@ namespace DryIoc
     internal class InvokeFactoryDelegateExpression : InvocationExpression
     {
         public sealed override Type Type { get; }
-        public readonly FactoryDelegate FactoryDelegate;
+        public readonly Func<IResolverContext, object> FactoryDelegate;
         public sealed override Expression Expression => ConstantOf(FactoryDelegate);
         public sealed override int ArgumentCount => 1;
         public override IReadOnlyList<Expression> Arguments => FactoryDelegateCompiler.ResolverContextParamExprs;
         public override Expression GetArgument(int index) => FactoryDelegateCompiler.ResolverContextParamExpr;
-        public InvokeFactoryDelegateExpression(Type type, FactoryDelegate f)
+        public InvokeFactoryDelegateExpression(Type type, Func<IResolverContext, object> f)
         {
             Type = type;
             FactoryDelegate = f;
@@ -12636,7 +12621,7 @@ namespace DryIoc
     {
         public override IReadOnlyList<Expression> Arguments => new[] { ResolverContext.RootOrSelfExpr };
         public override Expression GetArgument(int index) => ResolverContext.RootOrSelfExpr;
-        public InvokeFactoryDelegateOfRootOrSelfExpression(Type type, FactoryDelegate f) : base(type, f) { }
+        public InvokeFactoryDelegateOfRootOrSelfExpression(Type type, Func<IResolverContext, object> f) : base(type, f) { }
 
         public sealed override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
@@ -12699,11 +12684,11 @@ namespace DryIoc
         /// <summary>Looks up for stored item by id.</summary>
         bool TryGet(out object item, int id);
 
-        /// Create the value via `FactoryDelegate` passing the `IResolverContext`
-        object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r);
+        /// Create the value via `Func{IResolverContext, object}` passing the `IResolverContext`
+        object GetOrAddViaFactoryDelegate(int id, Func<IResolverContext, object> createValue, IResolverContext r);
 
-        /// Create the value via `FactoryDelegate` passing the `IResolverContext`
-        object GetOrAddViaFactoryDelegateWithDisposalOrder(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder);
+        /// Create the value via `Func{IResolverContext, object}` passing the `IResolverContext`
+        object GetOrAddViaFactoryDelegateWithDisposalOrder(int id, Func<IResolverContext, object> createValue, IResolverContext r, int disposalOrder);
 
         /// Creates, stores, and returns created item
         object TryGetOrAddWithoutClosure(int id, IResolverContext resolveContext, Expression expr,
@@ -12739,12 +12724,12 @@ namespace DryIoc
 
         /// <summary>Sets (replaces) instance to the scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void UseFactory(this IScope s, Type type, FactoryDelegate factory) =>
+        public static void UseFactory(this IScope s, Type type, Func<IResolverContext, object> factory) =>
             s.SetUsed(RuntimeHelpers.GetHashCode(type), type, factory);
 
         /// <summary>Sets (replaces) instance to the scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static void UseFactory<T>(this IScope s, FactoryDelegate factory) =>
+        public static void UseFactory<T>(this IScope s, Func<IResolverContext, object> factory) =>
             s.UseFactory(typeof(T), factory);
 
         /// <summary>Sets (replaces) instance in the scope</summary>
@@ -12852,7 +12837,7 @@ namespace DryIoc
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
-        public object GetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r)
+        public object GetOrAddViaFactoryDelegate(int id, Func<IResolverContext, object> createValue, IResolverContext r)
         {
             var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
             return itemRef != null
@@ -12862,7 +12847,7 @@ namespace DryIoc
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]
-        public object GetOrAddViaFactoryDelegateWithDisposalOrder(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder)
+        public object GetOrAddViaFactoryDelegateWithDisposalOrder(int id, Func<IResolverContext, object> createValue, IResolverContext r, int disposalOrder)
         {
             var itemRef = _maps[id & MAP_COUNT_SUFFIX_MASK].GetEntryOrDefault(id);
             return itemRef != null
@@ -12876,7 +12861,7 @@ namespace DryIoc
         internal static readonly MethodInfo GetOrAddViaFactoryDelegateWithDisposalOrderMethod =
             typeof(IScope).GetMethod(nameof(IScope.GetOrAddViaFactoryDelegateWithDisposalOrder));
 
-        internal object TryGetOrAddViaFactoryDelegate(int id, FactoryDelegate createValue, IResolverContext r, int disposalOrder = 0)
+        internal object TryGetOrAddViaFactoryDelegate(int id, Func<IResolverContext, object> createValue, IResolverContext r, int disposalOrder = 0)
         {
             if (_disposed == 1)
                 Throw.ScopeIsDisposed(this, r);
@@ -13293,7 +13278,7 @@ namespace DryIoc
             {
                 Expression factoryDelegateExpr;
                 if (serviceFactoryExpr is InvocationExpression ie && ie.Expression is ConstantExpression registeredDelegateExpr &&
-                    registeredDelegateExpr.Type == typeof(FactoryDelegate))
+                    registeredDelegateExpr.Type == typeof(Func<IResolverContext, object>))
                 {
                     factoryDelegateExpr = registeredDelegateExpr;
                 }
@@ -13363,7 +13348,7 @@ namespace DryIoc
         public readonly bool ScopedOrSingleton;
 
         /// Subject
-        public static object GetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(IResolverContext r, int id, FactoryDelegate createValue,
+        public static object GetScopedOrSingletonViaFactoryDelegateWithDisposalOrder(IResolverContext r, int id, Func<IResolverContext, object> createValue,
             int disposalOrder = 0) => disposalOrder == 0
                 ? r.CurrentOrSingletonScope.GetOrAddViaFactoryDelegate(id, createValue, r)
                 : r.CurrentOrSingletonScope.GetOrAddViaFactoryDelegateWithDisposalOrder(id, createValue, r, disposalOrder);
@@ -13393,7 +13378,7 @@ namespace DryIoc
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config) &&
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, ServiceFactoryExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
-            // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, FactoryDelegate createValue, IResolverContext r)
+            // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1)
             {
@@ -13426,12 +13411,12 @@ namespace DryIoc
         }
 
         /// Subject
-        public static object GetScopedViaFactoryDelegate(IResolverContext r, bool throwIfNoScope, int id, FactoryDelegate createValue) =>
+        public static object GetScopedViaFactoryDelegate(IResolverContext r, bool throwIfNoScope, int id, Func<IResolverContext, object> createValue) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r);
 
         /// Subject
         public static object GetScopedViaFactoryDelegateWithDisposalOrder(IResolverContext r,
-            bool throwIfNoScope, int id, FactoryDelegate createValue, int disposalOrder) =>
+            bool throwIfNoScope, int id, Func<IResolverContext, object> createValue, int disposalOrder) =>
             r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegateWithDisposalOrder(id, createValue, r, disposalOrder);
 
         internal static readonly MethodInfo GetScopedViaFactoryDelegateWithDisposalOrderMethod =
@@ -13459,7 +13444,7 @@ namespace DryIoc
 
         /// Subject
         public static object GetNameScopedViaFactoryDelegate(IResolverContext r,
-            object scopeName, bool throwIfNoScope, int id, FactoryDelegate createValue, int disposalOrder) =>
+            object scopeName, bool throwIfNoScope, int id, Func<IResolverContext, object> createValue, int disposalOrder) =>
             r.GetNamedScope(scopeName, throwIfNoScope)?.GetOrAddViaFactoryDelegateWithDisposalOrder(id, createValue, r, disposalOrder);
 
         internal static readonly MethodInfo GetNameScopedViaFactoryDelegateMethod =

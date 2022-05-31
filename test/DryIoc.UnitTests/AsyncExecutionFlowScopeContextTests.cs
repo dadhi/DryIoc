@@ -5,8 +5,22 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class AsyncExecutionFlowScopeContextTests
+    public class AsyncExecutionFlowScopeContextTests : ITest
     {
+        public int Run()
+        {
+            Reuse_can_select_scope_with_specific_name();
+            If_not_matched_name_found_then_current_scope_reuse_should_Throw();
+            If_no_scope_opened_and_no_matched_name_found_then_resolving_should_Throw();
+            I_can_use_execution_flow_context();
+            Scoped_service_should_Not_propagate_over_async_boundary_with_exec_flow_context().GetAwaiter().GetResult();
+            Scoped_service_should_Not_propagate_over_async_boundary_with_thread_context().GetAwaiter().GetResult();
+            Given_thread_context_the_ScopedOrSingleton_service_may_be_resolved_outside_of_context().GetAwaiter().GetResult();
+            Undisposed_scope_from_context_should_be_disposed_by_container_disposal();
+            Different_containers_should_not_conflict_with_ambient_scope();
+            return 9;
+        }
+
         [Test]
         public void Reuse_can_select_scope_with_specific_name()
         {

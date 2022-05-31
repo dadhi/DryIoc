@@ -4,5 +4,8 @@
     <PropertyGroup>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
+        <MSBuildWarningsAsMessages>
+            $(MSBuildWarningsAsMessages);MSB3277
+        </MSBuildWarningsAsMessages>
     </PropertyGroup>
 </Project>

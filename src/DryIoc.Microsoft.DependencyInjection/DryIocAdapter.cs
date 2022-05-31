@@ -241,7 +241,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             }
             else if (descriptor.ImplementationFactory != null)
             {
-                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory.ToFactoryDelegate, descriptor.Lifetime.ToReuse()), serviceType,
+                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory, descriptor.Lifetime.ToReuse()), serviceType,
                     null, null, isStaticallyChecked: true);
             }
             else

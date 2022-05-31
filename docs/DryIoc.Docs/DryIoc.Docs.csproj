@@ -5,6 +5,9 @@
         <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp3.1;net472</TargetFrameworks>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
+        <MSBuildWarningsAsMessages>
+            $(MSBuildWarningsAsMessages);MSB3277
+        </MSBuildWarningsAsMessages>
     </PropertyGroup>
 
     <ItemGroup>

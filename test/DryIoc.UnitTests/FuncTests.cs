@@ -5,8 +5,48 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class FuncTests
+    public class FuncTests : ITest
     {
+        public int Run()
+        {
+            Resolving_as_Func_should_produce_FuncOfService();
+            Resolving_as_Func_should_throw_for_not_registered_service();
+            Given_registered_transient_Resolved_Func_should_create_new_instances();
+            Given_registered_singleton_Resolved_Func_should_create_same_instances();
+            Given_registered_singleton_Resolving_service_dependency_as_is_and_as_Func_should_provide_same_instances();
+            Given_implementation_with_one_constructor_primitive_parameter_Possible_to_resolve_service_as_Func_of_one_parameter();
+            Given_implementation_with_many_constructor_primitive_parameters_Possible_to_resolve_service_as_Func_of_many_parameters();
+            Given_registered_singleton_Resolved_Func_of_one_parameter_should_create_same_instances_Where_created_first_will_determine_parameter_value();
+            Given_registered_singleton_Resolved_Func_of_many_parameters_should_create_same_instances_Where_created_first_will_determine_parameters_value();
+            Given_registered_service_Resolving_service_dependency_Func_with_parameter_and_as_is_should_provide_same_instances();
+            Given_implementation_with_two_constructor_parameters_Possible_to_resolve_service_as_Func_of_one_parameter_with_another_provided_by_Container();
+            Constructor_will_use_func_argument_only_once_for_first_ctor_parameter();
+            Given_constructor_with_two_parameters_Possible_to_resolve_Func_with_swapped_parameter_positions();
+            Given_constructor_with_two_parameters_Resolving_Func_twice_with_one_BUT_different_parameter_should_work();
+            Possible_to_resolve_Func_or_Func();
+            Possible_to_resolve_Func_of_Lazy();
+            Resolving_service_with_recursive_Func_dependency_should_throw();
+            Resolving_service_with_recursive_dependency_with_the_Func_on_the_road_should_throw();
+            Possible_to_register_and_resolve_delegate_as_instance();
+            Possible_to_register_Instance_of_Func_of_argument_and_Resolve_it_as_Func();
+            Resolving_func_with_some_unused_args_should_not_throw();
+            Resolving_Func_of_delegate_factory_should_not_throw_The_func_argument_will_not_be_used();
+            One_func_argument_should_be_used_only_once_for_one_parameter();
+            Can_resolve_sub_dependency_with_func_argument();
+            Can_reuse_func_argument_for_dependency_and_sub_dependency();
+            Func_correctly_handles_IfUnresolvedReturnDefault_for_unregistered_service();
+            Func_correctly_handles_IfUnresolvedReturnDefault_for_unregistered_dependency();
+            Reuse_func_arguments_in_nested_dependencies();
+            Should_not_reuse_func_arguments_in_the_same_service();
+            For_singleton_can_use_func_without_args_or_just_resolve_after_func_with_args();
+            Can_propagate_args_through_resolution_call();
+            Can_both_provide_args_and_resolve_as_Func_with_args();
+            Can_supply_fresh_args_in_multiple_resolve_call_Using_the_rule_for_ignoring_Reuse();
+            Can_supply_fresh_args_in_different_open_scopes();
+            For_Func_returned_type_with_lazy_dependency_Func_parameters_are_correctly_passed();
+            return 36;
+        }
+
         [Test]
         public void Resolving_as_Func_should_produce_FuncOfService()
         {
@@ -149,7 +189,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_implementation_with_two_constructor_parameters_Possible_to_resolve_service_as_Func_of_one_parameter_with_another_provided_by_Conrainer()
+        public void Given_implementation_with_two_constructor_parameters_Possible_to_resolve_service_as_Func_of_one_parameter_with_another_provided_by_Container()
         {
             var container = new Container();
             container.Register(typeof(IServiceWithParameterAndDependency), typeof(ServiceWithParameterAndDependency));
@@ -166,10 +206,10 @@ namespace DryIoc.UnitTests
         public void Constructor_will_use_func_argument_only_once_for_first_ctor_parameter()
         {
             var container = new Container();
-            container.Register(typeof(ServiceWithTwoDepenedenciesOfTheSameType));
+            container.Register(typeof(ServiceWithTwoDependenciesOfTheSameType));
             container.Register(typeof(Service));
 
-            var func = container.Resolve<Func<Service, ServiceWithTwoDepenedenciesOfTheSameType>>();
+            var func = container.Resolve<Func<Service, ServiceWithTwoDependenciesOfTheSameType>>();
             var freeParameter = new Service();
             var service = func(freeParameter);
 

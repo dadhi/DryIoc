@@ -44,13 +44,18 @@ namespace DryIoc.UnitTests
 
             var tests = new ITest[] 
             {
+                new ActionTests(),
+                new ArrayToolsTest(),
+                new AsyncExecutionFlowScopeContextTests(),
                 new ContainerTests(),
                 new DecoratorTests(),
                 new DynamicRegistrationsTests(),
+                new FuncTests(),
                 new OpenGenericsTests(),
                 new SelectConstructorWithAllResolvableArgumentTests(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
                 new GHIssue180_Option_nullable_int_argument_with_not_null_default_value(),
+                new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service(),
                 new GHIssue198_Open_generics_resolve_fails_if_there_is_a_static_constructor(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
@@ -72,12 +77,14 @@ namespace DryIoc.UnitTests
             {
                 Console.WriteLine();
                 Console.WriteLine("ERROR: Some tests are FAILED!");
+                Console.WriteLine($"In other news, {totalTestPassed,-4} of tests are passing in {sw.ElapsedMilliseconds} ms.");
+
                 Environment.ExitCode = 1; // error exit code
                 return;
             }
 
             Console.WriteLine();
-            Console.WriteLine($"{totalTestPassed,-4} of all tests are passing in {sw.ElapsedMilliseconds} ms.");
+            Console.WriteLine($"{totalTestPassed,-4} of tests are passing in {sw.ElapsedMilliseconds} ms.");
         }
     }
 }

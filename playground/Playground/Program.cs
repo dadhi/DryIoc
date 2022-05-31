@@ -54,7 +54,7 @@ namespace Playground
             // var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
             // Console.WriteLine("Press any key");
             // Console.ReadKey();
-            // var f = (FactoryDelegate)e.CompileFast();
+            // var f = (Func<IResolverContext, object>)e.CompileFast();
             // var r = f(d.OpenScope());
             // var s = e.ToCSharpString();
 

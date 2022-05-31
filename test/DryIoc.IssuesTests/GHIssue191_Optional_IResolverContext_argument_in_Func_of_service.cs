@@ -5,8 +5,19 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue191_Optional_IResolverContext_argument_in_Func_of_service
+    public class GHIssue191_Optional_IResolverContext_argument_in_Func_of_service : ITest
     {
+        public int Run()
+        {
+            Can_resolve_as_FactoryDelegate();
+            Main_test();
+            Main_test_with_strongly_typed_FactoryDelegate();
+            Main_test_with_RegisterDelegate_and_strongly_typed_FactoryDelegate();
+            ResolverContext_is_ignored_in_resolved_Func();
+            ResolverContext_is_ignored_in_injected_Func();
+            return 6;
+        }
+
         [Test]
         public void Can_resolve_as_FactoryDelegate()
         {
@@ -15,7 +26,7 @@ namespace DryIoc.IssuesTests
             container.Register<A>();
             container.Register<B>();
 
-            var f = container.Resolve<FactoryDelegate>(typeof(B));
+            var f = container.Resolve<Func<IResolverContext, object>>(typeof(B));
             var b = f(container) as B;
 
             Assert.IsNotNull(b);
@@ -25,12 +36,12 @@ namespace DryIoc.IssuesTests
         public void Main_test()
         {
             var c = new Container();
-            
+
             c.Register<IFoo, Foo>(Reuse.Scoped);
             c.Register<IFoo, FooDecorator>(Reuse.Scoped, setup: Setup.Decorator);
             c.Register<FooFactory>(Reuse.Scoped);
-            c.Register<IFoo>(Made.Of(_ => ServiceInfo.Of<FooFactory>(), 
-                f => f.GetOrCreate(Arg.Of<IResolverContext>(), Arg.Of<FactoryDelegate, Func<string, IFoo>>(), Arg.Of<string>())), 
+            c.Register<IFoo>(Made.Of(_ => ServiceInfo.Of<FooFactory>(),
+                f => f.GetOrCreate(Arg.Of<IResolverContext>(), Arg.Of<Func<IResolverContext, object>, Func<string, IFoo>>(), Arg.Of<string>())),
                 setup: Setup.Decorator);
 
             using (var scope = c.OpenScope())
@@ -66,7 +77,7 @@ namespace DryIoc.IssuesTests
             c.Register<IFoo, FooDecorator>(Reuse.Scoped, setup: Setup.Decorator);
             c.Register<FooFactory>(Reuse.Scoped);
             c.Register<IFoo>(Made.Of(_ => ServiceInfo.Of<FooFactory>(),
-                    f => f.GetOrCreate2(Arg.Of<IResolverContext>(), Arg.Of<FactoryDelegate<Func<string, IFoo>>>(), Arg.Of<string>())),
+                    f => f.GetOrCreate2(Arg.Of<IResolverContext>(), Arg.Of<Func<IResolverContext, Func<string, IFoo>>>(), Arg.Of<string>())),
                 setup: Setup.Decorator);
 
             using (var scope = c.OpenScope())
@@ -102,7 +113,7 @@ namespace DryIoc.IssuesTests
             c.Register<IFoo, FooDecorator>(Reuse.Scoped, setup: Setup.Decorator);
 
             var _scopes = ImHashMap<string, IResolverContext>.Empty;
-            c.RegisterDelegate<IResolverContext, FactoryDelegate<Func<string, IFoo>>, string, IFoo>(
+            c.RegisterDelegate<IResolverContext, Func<IResolverContext, Func<string, IFoo>>, string, IFoo>(
                 (ctx, decorateeFactory, address) =>
                 {
                     // fancy ensuring that we have a single new Scope created and stored
@@ -159,7 +170,7 @@ namespace DryIoc.IssuesTests
 
             public void DoSomething() { }
 
-            public void Dispose() {}
+            public void Dispose() { }
         }
 
         public class FooDecorator : IFoo
@@ -182,7 +193,7 @@ namespace DryIoc.IssuesTests
         {
             private ImHashMap<string, IResolverContext> _scopes = ImHashMap<string, IResolverContext>.Empty;
 
-            public IFoo GetOrCreate(IResolverContext ctx, FactoryDelegate fooFactory, string address)
+            public IFoo GetOrCreate(IResolverContext ctx, Func<IResolverContext, object> fooFactory, string address)
             {
                 // fancy ensuring that we have a single new Scope created and stored
                 var scopeEntry = _scopes.GetEntryOrDefault(address);
@@ -199,7 +210,7 @@ namespace DryIoc.IssuesTests
                 return ((Func<string, IFoo>)fooFactory(scopeEntry.Value)).Invoke(address);
             }
 
-            public IFoo GetOrCreate2(IResolverContext ctx, FactoryDelegate<Func<string, IFoo>> fooFactory, string address)
+            public IFoo GetOrCreate2(IResolverContext ctx, Func<IResolverContext, Func<string, IFoo>> fooFactory, string address)
             {
                 // fancy ensuring that we have a single new Scope created and stored
                 var scopeEntry = _scopes.GetEntryOrDefault(address);
@@ -247,7 +258,7 @@ namespace DryIoc.IssuesTests
             Assert.IsInstanceOf<A>(c.F(container));
         }
 
-        public class A {}
+        public class A { }
 
         public class B
         {

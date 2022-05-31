@@ -4,8 +4,19 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ActionTests
+    public class ActionTests : ITest
     {
+        public int Run()
+        {
+            Can_resolve_void_method_with_no_args_as_Action();
+            Can_resolve_void_method_with_one_arg_as_Action();
+            Can_resolve_void_method_with_one_arg_as_Action_of_one_arg();
+            Can_inject_void_method_with_one_arg_as_Action_of_one_arg();
+            Can_inject_void_method_with_one_arg_as_Action_of_one_arg();
+            Can_inject_Lazy_of_void_method_with_one_arg_as_Action_of_one_arg();
+            return 6;
+        }
+
         [Test]
         public void Can_resolve_void_method_with_no_args_as_Action()
         {

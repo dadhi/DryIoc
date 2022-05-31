@@ -710,7 +710,7 @@ class Reusing_the_scoped_service_from_the_parent_scope
         public FactoryInfo(int id) => Id = id;
     }
 
-    public static T GetFromParentOrCurrent<T>(FactoryDelegate<T> fd, FactoryInfo<T> fi, IResolverContext r)
+    public static T GetFromParentOrCurrent<T>(Func<IResolverContext, T> fd, FactoryInfo<T> fi, IResolverContext r)
     {
         var id = fi.Id;
         for (var s = r.CurrentScope; s != null; s = s.Parent)

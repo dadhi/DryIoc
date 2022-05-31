@@ -748,8 +748,8 @@ class Resolve_expression
 
         StringAssert.Contains("r => new Service()", expr.ToString());
 
-        // The result expression is of type `Expression<FactoryDelegate>`, like this:
-        Expression<FactoryDelegate> f = (IResolverContext r) => new Service();
+        // The result expression is of type `Expression<Func<IResolverContext, object>>`, like this:
+        Expression<Func<IResolverContext, object>> f = (IResolverContext r) => new Service();
     }
 
     interface IService { }
@@ -788,7 +788,7 @@ class Swap_container_in_factory_delegate
         container.Register<B>(Reuse.Scoped);
 
         var expr = container.Resolve<LambdaExpression>(typeof(A));
-        var factory = (FactoryDelegate)expr.Compile();
+        var factory = (Func<IResolverContext, object>)expr.Compile();
 
         using (var scope = container.OpenScope())
         {
