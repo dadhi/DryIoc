@@ -387,6 +387,10 @@ namespace DryIoc
                 if (expr is ConstantExpression constExpr)
                 {
                     var value = constExpr.Value;
+                    if (value is Func<IResolverContext, object> cachedDelegate)
+                    {
+                        // todo: @wip remove
+                    }
                     if (factory.CanCache)
                         TryCacheDefaultFactory(serviceTypeHash, serviceType, value);
                     return value;
@@ -755,7 +759,7 @@ namespace DryIoc
                 if (serviceInfo != null)
                 {
                     var details = serviceInfo.Details;
-                    var value = ((IResolver)this).Resolve(serviceInfo.ServiceType, details.ServiceKey,
+                    var value = Resolve(serviceInfo.ServiceType, details.ServiceKey,
                         details.IfUnresolved, details.RequiredServiceType, request, args: null);
                     if (value != null)
                         serviceInfo.SetValue(instance, value);
@@ -4014,10 +4018,10 @@ namespace DryIoc
             if (expr.NodeType == ExprType.Convert)
             {
                 var operandExpr = ((UnaryExpression)expr).Operand;
-                if (operandExpr.Type == typeof(object))
+                if (operandExpr.Type == typeof(object)) // todo: @wip check if we can do less compat checks and be smart people
                     return operandExpr;
             }
-            // todo: @perf Introduce ConvertValueTypeToObjectIntrinsic
+            // todo: @perf introduce ConvertValueTypeToObjectIntrinsic
             return expr.Type != typeof(void) && expr.Type.IsValueType ? Convert<object>(expr) : expr;
         }
 
@@ -4043,6 +4047,11 @@ namespace DryIoc
 
         internal static Func<IResolverContext, object> CompileToFactoryDelegateNoNormalization(this Expression expression, bool preferInterpretation)
         {
+            if (expression is ConstantExpression)
+            {
+                // todo: @wip remove
+            }
+
             if (!preferInterpretation)
             {
                 var factoryDelegate = (Func<IResolverContext, object>)(ExpressionCompiler.TryCompileBoundToFirstClosureParam(
@@ -8595,9 +8604,7 @@ namespace DryIoc
             var resolveCallExpr = Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
                 ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
 
-            if (serviceType == typeof(object))
-                return resolveCallExpr;
-            return serviceType.Cast(resolveCallExpr);
+            return serviceType == typeof(object) ? resolveCallExpr : serviceType.Cast(resolveCallExpr);
         }
 
         private static void PopulateDependencyResolutionCallExpressions(Request request)
@@ -13258,7 +13265,7 @@ namespace DryIoc
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            // todo: @perf start wioth checking for hot-path first - just check that expression is NewExpression here to short-circuit the apply logic
+            // todo: @perf start with checking for hot-path first - just check that expression is NewExpression here to short-circuit the apply logic
             serviceFactoryExpr = serviceFactoryExpr.NormalizeExpression();
 
             if (request.TracksTransientDisposable)

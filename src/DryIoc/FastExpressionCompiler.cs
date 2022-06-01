@@ -58,7 +58,7 @@ namespace DryIoc.FastExpressionCompiler
 
     /// <summary>The options for the compiler</summary>
     [Flags]
-    public enum CompilerFlags
+    public enum CompilerFlags : byte
     {
         /// <summary>The default options: Invocation lambda is inlined, no debug info</summary>
         Default = 0,
@@ -71,7 +71,7 @@ namespace DryIoc.FastExpressionCompiler
     }
 
     /// <summary>Indicates the not supported expression combination</summary>
-    public enum NotSupported
+    public enum NotSupported : ushort
     {
         /// <summary>Multi-dimensional array initializer is not supported</summary>
         NewArrayInit_MultidimensionalArray,
@@ -128,7 +128,7 @@ namespace DryIoc.FastExpressionCompiler
             (TDelegate)(TryCompileBoundToFirstClosureParam(
                 typeof(TDelegate) == typeof(Delegate) ? lambdaExpr.Type : typeof(TDelegate), lambdaExpr.Body,
 #if LIGHT_EXPRESSION
-                lambdaExpr, GetClosureTypeToParamTypes(lambdaExpr),
+                lambdaExpr, RentOrNewClosureTypeToParamTypes(lambdaExpr),
 #else
                 lambdaExpr.Parameters, GetClosureTypeToParamTypes(lambdaExpr.Parameters),
 #endif
@@ -168,7 +168,7 @@ namespace DryIoc.FastExpressionCompiler
         public static Delegate CompileFast(this LambdaExpression lambdaExpr, bool ifFastFailedReturnNull = false, CompilerFlags flags = CompilerFlags.Default) =>
             (Delegate)TryCompileBoundToFirstClosureParam(lambdaExpr.Type, lambdaExpr.Body,
 #if LIGHT_EXPRESSION
-            lambdaExpr, GetClosureTypeToParamTypes(lambdaExpr),
+            lambdaExpr, RentOrNewClosureTypeToParamTypes(lambdaExpr),
 #else
             lambdaExpr.Parameters, GetClosureTypeToParamTypes(lambdaExpr.Parameters),
 #endif
@@ -364,7 +364,7 @@ namespace DryIoc.FastExpressionCompiler
             where TDelegate : class =>
             (TDelegate)TryCompileBoundToFirstClosureParam(typeof(TDelegate) == typeof(Delegate) ? lambdaExpr.Type : typeof(TDelegate), lambdaExpr.Body,
 #if LIGHT_EXPRESSION
-            lambdaExpr, GetClosureTypeToParamTypes(lambdaExpr),
+            lambdaExpr, RentOrNewClosureTypeToParamTypes(lambdaExpr),
 #else
             lambdaExpr.Parameters, GetClosureTypeToParamTypes(lambdaExpr.Parameters),
 #endif
@@ -398,7 +398,7 @@ namespace DryIoc.FastExpressionCompiler
             this LambdaExpression lambdaExpr, ref ClosureInfo closureInfo, CompilerFlags flags) where TDelegate : class
         {
 #if LIGHT_EXPRESSION
-            var closurePlusParamTypes = GetClosureTypeToParamTypes(lambdaExpr);
+            var closurePlusParamTypes = RentOrNewClosureTypeToParamTypes(lambdaExpr);
 #else
             var closurePlusParamTypes = GetClosureTypeToParamTypes(lambdaExpr.Parameters);
 #endif
@@ -434,7 +434,7 @@ namespace DryIoc.FastExpressionCompiler
         {
             var closureInfo = new ClosureInfo(ClosureStatus.UserProvided);
 #if LIGHT_EXPRESSION
-            var closurePlusParamTypes = GetClosureTypeToParamTypes(lambdaExpr);
+            var closurePlusParamTypes = RentOrNewClosureTypeToParamTypes(lambdaExpr);
 #else
             var closurePlusParamTypes = GetClosureTypeToParamTypes(lambdaExpr.Parameters);
 #endif
@@ -485,7 +485,7 @@ namespace DryIoc.FastExpressionCompiler
             if (!TryCollectBoundConstants(ref closureInfo, bodyExpr, paramExprs, false, ref closureInfo, flags))
                 return null;
 
-            var nestedLambdaOrLambdas = closureInfo.NestedLambdaOrLambdas;
+            var nestedLambdaOrLambdas = closureInfo.NestedLambdaOrLambdas; // todo: @perf @mem can we pool a single nested lambda info?
             if (nestedLambdaOrLambdas != null)
                 if (nestedLambdaOrLambdas is NestedLambdaInfo[] nestedLambdas)
                 {
@@ -521,19 +521,18 @@ namespace DryIoc.FastExpressionCompiler
             var parent = returnType == typeof(void) ? ParentFlags.IgnoreResult : ParentFlags.Empty;
             if (!EmittingVisitor.TryEmit(bodyExpr, paramExprs, il, ref closureInfo, flags, parent))
                 return null;
-
             il.Emit(OpCodes.Ret);
 
-            var @delegate = method.CreateDelegate(delegateType, closure);
-            ReturnClosureTypeToParamTypesToPool(closurePlusParamTypes);
-            return @delegate;
+            return method.CreateDelegate(delegateType, closure);
+            //ReturnClosureTypeToParamTypesToPool(closurePlusParamTypes);
+            // return @delegate;
         }
 
         private static readonly Type[] _closureAsASingleParamType = { typeof(ArrayClosure) };
         private static readonly Type[][] _closureTypePlusParamTypesPool = new Type[8][];
 
 #if LIGHT_EXPRESSION
-        private static Type[] GetClosureTypeToParamTypes(IParameterProvider paramExprs)
+        private static Type[] RentOrNewClosureTypeToParamTypes(IParameterProvider paramExprs)
         {
             var count = paramExprs.ParameterCount;
 #else
@@ -551,7 +550,7 @@ namespace DryIoc.FastExpressionCompiler
                 {
                     for (var i = 0; i < count; i++)
                     {
-                        var parameterExpr = paramExprs.GetParameter(i);
+                        var parameterExpr = paramExprs.GetParameter(i); // todo: @perf can we avoid calling virtual GetParameter() and maybe use intrinsic with NoByRef?
                         pooledClosureAndParamTypes[i + 1] = parameterExpr.IsByRef ? parameterExpr.Type.MakeByRefType() : parameterExpr.Type;
                     }
                     return pooledClosureAndParamTypes;
@@ -574,7 +573,7 @@ namespace DryIoc.FastExpressionCompiler
         {
             var paramCount = closurePlusParamTypes.Length - 1;
             if (paramCount != 0 && paramCount < 8)
-                Interlocked.Exchange(ref _closureTypePlusParamTypesPool[paramCount], closurePlusParamTypes);
+                Interlocked.Exchange(ref _closureTypePlusParamTypesPool[paramCount], closurePlusParamTypes); // todo: @perf we don't need the Interlocked here
         }
 
         private struct BlockInfo
@@ -1572,7 +1571,7 @@ namespace DryIoc.FastExpressionCompiler
 
             if (nestedLambdaBody is NoArgsNewClassIntrinsicExpression newNoArgs)
             {
-                var paramTypes = GetClosureTypeToParamTypes(nestedLambdaParamExprs);
+                var paramTypes = RentOrNewClosureTypeToParamTypes(nestedLambdaParamExprs);
                 nestedLambdaInfo.Lambda = CompileNoArgsNew(newNoArgs.Constructor, nestedLambdaExpr.Type, paramTypes, nestedReturnType);
                 ReturnClosureTypeToParamTypesToPool(paramTypes);
                 return true;
@@ -1599,7 +1598,7 @@ namespace DryIoc.FastExpressionCompiler
                     ? EmptyArrayClosure
                     : new ArrayClosure(nestedClosureInfo.GetArrayOfConstantsAndNestedLambdas());
 
-            var closurePlusParamTypes = GetClosureTypeToParamTypes(nestedLambdaParamExprs);
+            var closurePlusParamTypes = RentOrNewClosureTypeToParamTypes(nestedLambdaParamExprs);
 
             var method = new DynamicMethod(string.Empty, nestedReturnType, closurePlusParamTypes, typeof(ArrayClosure), true);
             var il = method.GetILGenerator();
@@ -1613,18 +1612,11 @@ namespace DryIoc.FastExpressionCompiler
                 return false;
             il.Emit(OpCodes.Ret);
 
-            if (nestedLambdaClosure != null)
-            {
-                nestedLambdaInfo.Lambda = method.CreateDelegate(nestedLambdaExpr.Type, nestedLambdaClosure);
-            }
-            else
-            {
-                // Otherwise create a static or an open delegate to pass closure later with `TryEmitNestedLambda`,
-                // constructing the new closure with non-passed arguments and the rest of items
-                nestedLambdaInfo.Lambda = method.CreateDelegate(
-                    Tools.GetFuncOrActionType(closurePlusParamTypes, nestedReturnType),
-                    null);
-            }
+            // If we don't have closure then create a static or an open delegate to pass closure later with `TryEmitNestedLambda`,
+            // constructing the new closure with non-passed arguments and the rest of items
+            nestedLambdaInfo.Lambda = nestedLambdaClosure != null
+                ? method.CreateDelegate(nestedLambdaExpr.Type, nestedLambdaClosure)
+                : nestedLambdaInfo.Lambda = method.CreateDelegate( Tools.GetFuncOrActionType(closurePlusParamTypes, nestedReturnType), null);
 
             ReturnClosureTypeToParamTypesToPool(closurePlusParamTypes);
             return true;

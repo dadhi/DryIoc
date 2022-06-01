@@ -99,7 +99,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         internal abstract SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> convertedExpressions);
 
         /// <summary>Converts to Expression and outputs its as string</summary>
-        public override string ToString() => ToExpression().ToString();
+        public override string ToString() => ToExpression().ToString(); // todo: @bug why don't it use to ToCSharpString() ???
 
         /// <summary>Reduces the Expression to simple ones</summary>
         public virtual Expression Reduce() => this;

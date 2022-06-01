@@ -1,4 +1,3 @@
-using System;
 using DryIoc.FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
@@ -32,7 +31,7 @@ namespace DryIoc.IssuesTests
 
             container.Register<A>();
 
-            container.RegisterDelegate(typeof(B), (A a) => new Wrong());
+            container.RegisterDelegate(typeof(B), (A a) => new NotB());
             Assert.IsTrue(container.IsRegistered<B>());
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<B>());
@@ -95,6 +94,6 @@ namespace DryIoc.IssuesTests
             public C(A a, B b) => (A, B) = (a, b);
         }
 
-        class Wrong { }
+        class NotB { }
     }
 }
