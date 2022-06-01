@@ -3995,11 +3995,8 @@ namespace DryIoc
                 if (operandExpr.Type == typeof(object))
                     return operandExpr;
             }
-
-            if (expr.Type != typeof(void) && expr.Type.IsValueType)
-                return Convert<object>(expr);
-
-            return expr;
+            // todo: @perf Introduce ConvertValueTypeToObjectIntrinsic
+            return expr.Type != typeof(void) && expr.Type.IsValueType ? Convert<object>(expr) : expr;
         }
 
         /// <summary>Wraps service creation expression (body) into `Func{IResolverContext, object}` and returns result lambda expression.</summary>
@@ -9466,7 +9463,7 @@ namespace DryIoc
         /// <summary>Returns expression for func arguments.</summary>
         public Expression GetInputArgsExpr() =>
             InputArgExprs == null ? Constant(null, typeof(object[]))
-            : (Expression)NewArrayInit(typeof(object), InputArgExprs.Map(x => x.Type.IsValueType ? Convert<object>(x) : x));
+            : NewArrayInit(typeof(object), InputArgExprs.Map(x => x.Type.IsValueType ? Convert<object>(x) : x));
 
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
         public bool TracksTransientDisposable => (Flags & RequestFlags.TracksTransientDisposable) != 0;
@@ -11737,7 +11734,7 @@ namespace DryIoc
 
                     var assignements = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
                     var newExpr = New((ConstructorInfo)ctorOrMember, factoryMethod.ResolvedParameterExpressions);
-                    return failedToGetMember ? null : assignements == null ? newExpr : (Expression)MemberInit(newExpr, assignements);
+                    return failedToGetMember ? null : assignements == null ? newExpr : MemberInit(newExpr, assignements);
                 }
 
                 ctorOrMethod = ctorOrMember as MethodBase;
@@ -12449,13 +12446,11 @@ namespace DryIoc
         public override Func<IResolverContext, object> GetDelegateOrDefault(Request request)
         {
             request = request.WithResolvedFactory(this);
-
-            if (request.Container.GetDecoratorExpressionOrDefault(request) != null)
-                return base.GetDelegateOrDefault(request);
-
-            return Setup.WeaklyReferenced
-                ? (Func<IResolverContext, object>)UnpackWeakRefFactory
-                : (Func<IResolverContext, object>)Instance.ToFactoryDelegate;
+            return request.Container.GetDecoratorExpressionOrDefault(request) != null
+                ? base.GetDelegateOrDefault(request)
+                : Setup.WeaklyReferenced
+                    ? (Func<IResolverContext, object>)UnpackWeakRefFactory
+                    : (Func<IResolverContext, object>)Instance.ToFactoryDelegate;
         }
 
         private object UnpackWeakRefFactory(IResolverContext _) => (Instance as WeakReference)?.Target.WeakRefReuseWrapperGCed();
@@ -13198,13 +13193,7 @@ namespace DryIoc
         /// <summary>Returns expression call to GetOrAddItem.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            // strip the conversion as we are operating with object anyway
-            if (serviceFactoryExpr.NodeType == ExprType.Convert)
-                serviceFactoryExpr = ((UnaryExpression)serviceFactoryExpr).Operand;
-
-            // this is required because we cannot use ValueType for the object
-            if (serviceFactoryExpr.Type.IsValueType)
-                serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
+            serviceFactoryExpr = serviceFactoryExpr.NormalizeExpression();
 
             var disposalOrder = request.Factory.Setup.DisposalOrder;
 
@@ -13253,14 +13242,9 @@ namespace DryIoc
 
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
-        {   // todo: @perf start wioth checking for hot-path first - just check that expression is NewExpression here to short-circuit the apply logic
-            // strip the conversion as we are operating with object anyway
-            if (serviceFactoryExpr.NodeType == ExprType.Convert)
-                serviceFactoryExpr = ((UnaryExpression)serviceFactoryExpr).Operand;
-
-            // this is required because we cannot use ValueType for the object
-            if (serviceFactoryExpr.Type.IsValueType)
-                serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
+        {
+            // todo: @perf start wioth checking for hot-path first - just check that expression is NewExpression here to short-circuit the apply logic
+            serviceFactoryExpr = serviceFactoryExpr.NormalizeExpression();
 
             if (request.TracksTransientDisposable)
             {
