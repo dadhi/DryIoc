@@ -1259,17 +1259,20 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 
 ## v6 - RequestStack optimized and ResolutionRoot request pool
 
-|      Method |      Mean |    Error |   StdDev |    Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
-|------------ |----------:|---------:|---------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
-|      DryIoc |  91.37 us | 1.826 us | 3.245 us |  89.79 us |  1.00 |    0.00 | 10.8643 |      - |     - |  33.59 KB |
-| DryIoc_MsDI | 104.45 us | 2.073 us | 1.939 us | 103.55 us |  1.14 |    0.04 | 13.4277 |      - |     - |  41.37 KB |
-|        MsDI | 106.02 us | 2.097 us | 2.653 us | 104.93 us |  1.16 |    0.05 | 22.9492 | 0.4883 |     - |  70.04 KB |
-
 |      Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------ |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
 |      DryIoc |  93.61 us | 1.870 us | 4.025 us |  1.00 |    0.00 | 10.8643 |      - |     - |  33.56 KB |
 | DryIoc_MsDI | 108.99 us | 2.145 us | 4.972 us |  1.17 |    0.08 | 13.4277 |      - |     - |  41.25 KB |
 |        MsDI | 106.98 us | 2.114 us | 3.353 us |  1.15 |    0.07 | 22.9492 | 0.4883 |     - |  70.04 KB |
+
+
+## v6 - FactoryDelegate is replaced with Func avoiding the need for conversion
+
+|      Method |      Mean |    Error |   StdDev |    Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|---------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc |  98.57 us | 3.044 us | 8.974 us |  95.87 us |  1.00 |    0.00 | 10.8643 |      - |     - |  33.56 KB |
+| DryIoc_MsDI |  99.77 us | 0.970 us | 0.757 us |  99.65 us |  1.08 |    0.04 | 13.1836 |      - |     - |  40.75 KB |
+|        MsDI | 101.72 us | 1.980 us | 3.519 us | 100.69 us |  1.08 |    0.07 | 22.9492 | 0.6104 |     - |  70.04 KB |
 
 */
             [Benchmark(Baseline = true)]
