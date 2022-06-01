@@ -322,7 +322,7 @@ namespace DryIoc
                         return result;
 
                     // set to Compiling to notify other threads to use the interpretation until the service is compiled
-                    if (Interlocked.CompareExchange(ref entry.Value, new Registry.Compiling(expr), expr) == expr)
+                    if (Interlocked.CompareExchange(ref entry.Value, new FactoryDelegateCompiler.Compiling(expr), expr) == expr)
                     {
                         var compiledFactory = expr.CompileToFactoryDelegate(rules.UseInterpretation);
                         entry.Value = compiledFactory; // todo: @unclear should we instead cache only after invoking the factory delegate
@@ -330,7 +330,7 @@ namespace DryIoc
                     }
                 }
 
-                if (entry.Value is Registry.Compiling compiling)
+                if (entry.Value is FactoryDelegateCompiler.Compiling compiling)
                     return Interpreter.TryInterpretAndUnwrapContainerException(this, compiling.Expression, out var result) ? result
                          : compiling.Expression.CompileToFactoryDelegate(rules.UseInterpretation)(this);
             }
@@ -526,7 +526,7 @@ namespace DryIoc
                     return true;
 
                 // set to Compiling to notify other threads to use the interpretation until the service is compiled
-                if (Interlocked.CompareExchange(ref cacheEntry.Factory, new Registry.Compiling(expr), expr) == expr)
+                if (Interlocked.CompareExchange(ref cacheEntry.Factory, new FactoryDelegateCompiler.Compiling(expr), expr) == expr)
                 {
                     var factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
                     // todo: @unclear should we instead cache only after invoking the factory delegate
@@ -536,7 +536,7 @@ namespace DryIoc
                 }
             }
 
-            if (cacheEntry.Factory is Registry.Compiling compiling)
+            if (cacheEntry.Factory is FactoryDelegateCompiler.Compiling compiling)
             {
                 if (!Interpreter.TryInterpretAndUnwrapContainerException(r, compiling.Expression, out result))
                     result = compiling.Expression.CompileToFactoryDelegate(rules.UseInterpretation)(r);
@@ -2057,12 +2057,6 @@ namespace DryIoc
             public virtual ImHashMap<int, object>[] FactoryExpressionCache => null;
 
             internal virtual IsRegistryChangePermitted IsChangePermitted => default;
-
-            public sealed class Compiling
-            {
-                public readonly Expression Expression;
-                public Compiling(Expression expression) => Expression = expression;
-            }
 
             [MethodImpl((MethodImplOptions)256)]
             public static ImHashMapEntry<Type, object> GetCachedDefaultFactoryOrDefault(ImHashMap<Type, object> rs, int serviceTypeHash, Type serviceType) =>
@@ -3974,6 +3968,12 @@ namespace DryIoc
     /// <summary>Compiles expression to factory delegate.</summary>
     public static class FactoryDelegateCompiler
     {
+        internal sealed class Compiling
+        {
+            public readonly Expression Expression;
+            public Compiling(Expression expression) => Expression = expression;
+        }
+
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
         public static readonly ParameterExpression ResolverContextParamExpr = ParameterOf<IResolverContext>("r");
 
@@ -5466,7 +5466,7 @@ namespace DryIoc
         /// A; then K, B (at this point Y is already has 3 dependencies but is not fully resolved until C is resolved);
         /// then L, M, C (here Y is fully resolved with 6 dependencies) so we can split it only on 6 dependencies instead of 3.
         ///
-        /// The split itseft just wraps the node in `Func{T}` delegate making it a separate compilation unit.
+        /// The split itself just wraps the node in `Func{T}` delegate making it a separate compilation unit.
         /// In our example it will be `Func{Y} f = () => new Y(A, new B(K), new C(new L(), new M()))` considering
         /// that everything is transient.
         /// </summary>
@@ -5501,7 +5501,7 @@ namespace DryIoc
         public ParameterSelector TryGetParameterSelector(Made made) =>
             OverrideRegistrationMade ? made.Parameters.OverrideWith(Parameters) : Parameters.OverrideWith(made.Parameters);
 
-        /// <summary>Returns the properties and fields selectorbased on <see cref="OverrideRegistrationMade"/></summary>
+        /// <summary>Returns the properties and fields selector based on <see cref="OverrideRegistrationMade"/></summary>
         public PropertiesAndFieldsSelector TryGetPropertiesAndFieldsSelector(Made made) =>
             OverrideRegistrationMade
                 ? made.PropertiesAndFields.OverrideWith(PropertiesAndFields)
@@ -5671,7 +5671,7 @@ namespace DryIoc
         public Rules WithDynamicRegistrations(params DynamicRegistrationProvider[] rules) =>
             WithDynamicRegistrations(DefaultDynamicRegistrationFlags, rules);
 
-        /// <summary>Only services and no decorators as it will greately affect the performance, 
+        /// <summary>Only services and no decorators as it will greatly affect the performance, 
         /// calling the provider for every resolved service</summary>
         public static readonly DynamicRegistrationFlags DefaultDynamicRegistrationFlags = DryIoc.DynamicRegistrationFlags.Service;
 
@@ -6153,11 +6153,11 @@ namespace DryIoc
         public Rules WithoutUseInterpretation() =>
             WithSettings(_settings & ~Settings.UseInterpretation);
 
-        /// <summary>If Decorator reuse is not set instructs to use `Decorator.SetupWith(useDecarateeReuse: true)`</summary>
+        /// <summary>If Decorator reuse is not set instructs to use `Decorator.SetupWith(useDecorateeReuse: true)`</summary>
         public bool UseDecorateeReuseForDecorators =>
             (_settings & Settings.UseDecorateeReuseForDecorators) != 0;
 
-        /// <summary>If Decorator reuse is not set instructs to use `Decorator.SetupWith(useDecarateeReuse: true)`</summary>
+        /// <summary>If Decorator reuse is not set instructs to use `Decorator.SetupWith(useDecorateeReuse: true)`</summary>
         public Rules WithUseDecorateeReuseForDecorators() =>
             WithSettings(_settings | Settings.UseDecorateeReuseForDecorators);
 
@@ -7466,7 +7466,7 @@ namespace DryIoc
             registrator.Register<TService, TService>(made, reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>
-        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegestered`, 
+        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegistered`, 
         /// apply wrappers and decorators, etc.
         /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
         /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -7497,7 +7497,7 @@ namespace DryIoc
         }
 
         /// <summary>
-        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegestered`, 
+        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegistered`, 
         /// apply wrappers and decorators, etc.
         /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
         /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -7551,7 +7551,7 @@ namespace DryIoc
 
         /// <summary>
         /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
-        /// so you can check it via `IsRegestered` for each service type, 
+        /// so you can check it via `IsRegistered` for each service type, 
         /// apply wrappers and decorators, etc.
         /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
         /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -7565,7 +7565,7 @@ namespace DryIoc
 
         /// <summary>
         /// Registers the instance with possible multiple service types creating a "normal" DryIoc registration 
-        /// so you can check it via `IsRegestered` for each service type, 
+        /// so you can check it via `IsRegistered` for each service type, 
         /// apply wrappers and decorators, etc.
         /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
         /// Look at the `Use` method to put instance directly into current or singleton scope,
@@ -7864,7 +7864,6 @@ namespace DryIoc
         /// Minimizes the number of allocations when converting from Func to named delegate
         public static object ToFactoryDelegate<TService>(this Func<IResolverContext, TService> f, IResolverContext r) => f(r);
 
-        // todo: @perf @mem check do we really need to coalesce to Func, of rather adjust the code to use the `object` directly
         /// Lifts the result to the factory delegate without allocations on capturing value in lambda closure
         public static object ToFactoryDelegate(this object result, IResolverContext _) => result;
 
@@ -8195,7 +8194,7 @@ namespace DryIoc
         /// just before returning it to the caller. You can register multiple initializers for a single service.
         /// Or you can register initializer for the <see cref="Object"/> type to be applied 
         /// for all services and use <paramref name="condition"/> to specify the target services.
-        /// Note: You may specify a <paramref name="reuse"/> different from the initiliazed object enabling the
+        /// Note: You may specify a <paramref name="reuse"/> different from the initialized object enabling the
         /// <paramref name="initialize"/> action to run once (Singleton), run once-per-scope (Scoped), run always (Transient).
         /// Note2: By convention the initializer is not applied for wrappers (collections, Func, Lazy, etc.). If you need this you may directly use the decorator.
         /// </summary>
