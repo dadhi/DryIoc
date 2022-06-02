@@ -6,8 +6,48 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class RegisterInstanceTests
+    public class RegisterInstanceTests : ITest
     {
+        public int Run()
+        {
+            Can_re_register_instance_with_different_reuse();
+            Possible_to_Register_pre_created_instance_of_runtime_service_type();
+            Registering_pre_created_instance_not_assignable_to_runtime_service_type_should_Throw();
+            Wiping_cache_should_not_delete_current_instance_value();
+            Register_instance_with_replace_option_will_replace_registered_instance_in_place();
+            Can_register_instance_with_keep_option();
+            For_multiple_registered_instances_Then_Replace_should_replace_them_all();
+            Replace_keyed_instance_registration();
+            Can_replace_keyed_delegate_with_used_instance();
+            Can_register_with_and_then_without_PreventDisposal_behavior();
+            Can_use_instance_of_Int_type();
+            Can_work_with_multiple_keyed_and_default_instances();
+            The_Use_by_default_should_replace_previous_typed_registration();
+            Can_append_to_previous_typed_registration();
+            Can_append_multiple_and_then_replace_all();
+            Can_append_multiple_and_then_replace_all_in_presence_of_keyed();
+            Can_have_both_default_and_keyed_instances_and_keyed_ifAlreadyRegistered_does_not_apply();
+            Can_append_new_default_with_presence_of_keyed();
+            Can_keep_previous_default();
+            Can_keep_previous_default_with_presence_of_keyed();
+            Can_throw_on_previous_default();
+            Can_throw_on_previous_default_with_presence_of_keyed();
+            Can_append_new_default_implementation_And_ignore_the_duplicate_implementation();
+            Can_reuse_the_default_factory();
+            Should_use_correct_instance_in_collection_in_and_out_of_scope();
+            Should_fallback_to_singleton_in_collection_if_no_scoped_instance();
+            Should_use_correct_instance_in_lazy_collection_in_and_out_of_scope();
+            The_used_instance_dependency_should_be_independent_of_scope();
+            Singleton_service_should_consume_singleton_instance_despite_presence_of_scoped_instance();
+            Use_instance_wont_replace_existing_typed_registration_instead_will_append_to_it();
+            Use_instance_wont_replace_existing_typed_registration_instead_will_append_to_it_In_presence_or_keyed_registration();
+            Can_apply_decorator_to_resolved_used_instance();
+            Can_apply_decorator_to_injected_used_instance();
+            Can_use_instance_in_upper_scope_and_resolve_it_in_nested_scope();
+            Can_resolve_collection_of_open_generic_and_instance_in_order_of_registration();
+            return 35;
+        }
+
         [Test]
         public void Can_re_register_instance_with_different_reuse()
         {

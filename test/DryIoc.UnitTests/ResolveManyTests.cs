@@ -7,8 +7,26 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ResolveManyTests
+    public class ResolveManyTests : ITest
     {
+        public int Run()
+        {
+            Return_empty_collection_for_registered_service();
+            Return_one_item_collection();
+            Return_two_items_in_order_of_registration();
+            Aware_of_newly_registered_service();
+            Result_enumerable_Behavior_Not_aware_of_newly_registered_services();
+            Result_enumerable_Behavior_aware_of_newly_registered_services();
+            Newly_registered_services_still_could_be_returned_by_resolving_as_dynamic_after_fixed();
+            Return_enumerable_of_object_is_possible_with_required_service_type();
+            Return_enumerable_of_object_is_possible_with_required_service_type_is_fine_fixed_view_too();
+            Should_return_empty_collection_if_required_service_is_not_assignable_collection_item_type();
+            Could_resolve_collection_of_generic_wrappers_if_needed();
+            Can_specify_service_key_to_resolve_many();
+            Should_throw_on_undetermined_dependency();
+            return 13;
+        }
+
         [Test]
         public void Return_empty_collection_for_registered_service()
         {
@@ -61,7 +79,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Result_enumrable_Behavior_Not_aware_of_newly_registered_services()
+        public void Result_enumerable_Behavior_Not_aware_of_newly_registered_services()
         {
             var container = new Container();
 
@@ -73,7 +91,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Result_enumrable_Behavior_aware_of_newly_registered_services()
+        public void Result_enumerable_Behavior_aware_of_newly_registered_services()
         {
             var container = new Container();
 

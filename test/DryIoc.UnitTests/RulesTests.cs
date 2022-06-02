@@ -10,8 +10,51 @@ using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class RulesTests
+    public class RulesTests : ITest
     {
+        public int Run()
+        {
+            Given_service_with_two_ctors_I_can_specify_what_ctor_to_choose_for_resolve();
+            I_should_be_able_to_add_rule_to_resolve_not_registered_service();
+            I_can_remove_rule_to_resolve_not_registered_service();
+            I_can_add_rule_to_resolve_any_unknown_concrete_type();
+            I_can_Not_resolve_unknown_concrete_type_on_specific_condition();
+            I_can_resolve_unknown_concrete_type_on_specific_condition();
+            Can_resolve_unknown_concrete_type_as_Func_with_required_type();
+            Cannot_resolve_unknown_concrete_type_as_Func_with_required_type();
+            Can_collect_unresolved_concrete_type_dependency();
+            Can_fallback_to_next_rule_if_AutoConcreteResolution_is_unable_to_resolve_concrete_type();
+            When_service_registered_with_name_Then_it_could_be_resolved_with_ctor_parameter_ImportAttribute();
+            I_should_be_able_to_import_single_service_based_on_specified_metadata();
+            Can_specify_rules_to_resolve_last_registration_from_multiple_available();
+            Can_specify_rules_to_resolve_last_registration_from_mixed_open_and_closed_generics();
+            You_can_specify_rules_to_disable_registration_based_on_reuse_type();
+            Can_turn_Off_singleton_optimization();
+            AutoFallback_resolution_rule_should_respect_IfUnresolved_policy_in_case_of_multiple_registrations();
+            AutoFallback_resolution_rule_should_respect_IfUnresolved_policy_in_case_of_multiple_registrations_from_assemblies();
+            Can_specify_condition_to_exclude_unwanted_services_from_AutoFallback_resolution_rule();
+            Exist_support_for_non_primitive_value_injection_via_container_rule();
+            Container_rule_for_serializing_custom_value_to_expression_should_throw_proper_exception_for_not_supported_type();
+            Container_should_throw_on_registering_disposable_transient();
+            I_can_silence_throw_on_registering_disposable_transient_for_specific_registration();
+            I_can_silence_throw_on_registering_disposable_transient_for_whole_container();
+            Should_track_transient_disposable_dependency_in_singleton_scope();
+            Should_not_track_func_of_transient_disposable_dependency_in_singleton_scope();
+            Should_track_lazy_of_transient_disposable_dependency_in_singleton_scope();
+            Should_track_transient_disposable_dependency_in_current_scope();
+            Should_track_transient_disposable_dependency_in_singleton_scope_even_if_resolved_in_the_scope();
+            Should_track_transient_service_in_open_scope_if_present();
+            Tracked_disposables_should_be_different();
+            Should_track_transient_service_in_open_scope_of_any_name_if_present();
+            Should_track_transient_service_in_singleton_scope_if_no_open_scope();
+            Can_specify_IfAlreadyRegistered_per_Container();
+            If_IfAlreadyRegistered_per_Container_is_overriden_by_individual_registrations();
+            If_IfAlreadyRegistered_per_Container_affects_RegisterMany_as_expected();
+            Can_specify_to_capture_stack_trace_and_display_it_disposed_exception();
+            DisposedContainer_error_message_should_include_tip_how_to_enable_stack_trace();
+            return 38;
+        }
+
         [Test]
         public void Given_service_with_two_ctors_I_can_specify_what_ctor_to_choose_for_resolve()
         {

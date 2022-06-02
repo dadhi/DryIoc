@@ -4,8 +4,21 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class RegisterPlaceholderTests
+    public class RegisterPlaceholderTests : ITest
     {
+        public int Run()
+        {
+            Can_register_service_without_impl();
+            Can_register_service_without_impl_and_fill_it_in_later();
+            Should_throw_when_resolving_placeholder_service();
+            Can_register_service_without_impl_resolve_it_in_lazy_Wrapper();
+            Can_register_multiple_placeholders();
+            Can_register_the_decorator_without_the_actual_implementation_using_the_placeholder();
+            Can_register_the_decorator_without_the_actual_implementation_using_the_placeholder_2();
+            Can_register_the_decorator_without_the_actual_implementation_using_the_placeholder_2_and_replace_implementation_later();
+            return 8;
+        }
+
         [Test]
         public void Can_register_service_without_impl()
         {

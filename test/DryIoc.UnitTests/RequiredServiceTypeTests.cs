@@ -7,8 +7,23 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class RequiredServiceTypeTests
+    public class RequiredServiceTypeTests : ITest
     {
+        public int Run()
+        {
+            Resolving_service_with_not_assignable_required_type_should_Throw();
+            Resolving_Lazy_service_with_required_type_and_key_should_work();
+            Resolve_array_of_required_type_should_work();
+            Resolve_Enumerable_of_required_type_should_work();
+            Resolve_Many_of_required_type_should_work();
+            Resolve_Many_services_twice_with_different_required_types_should_work();
+            Resolve_Meta_of_Func_of_required_type_should_work();
+            Resolve_required_service_type_without_key();
+            Can_specify_generic_for_Func_of_object_for_ResolveMany();
+            Can_specify_to_Resolve_open_over_closed_generic();
+            return 10;
+        }
+
         [Test]
         public void Resolving_service_with_not_assignable_required_type_should_Throw()
         {
