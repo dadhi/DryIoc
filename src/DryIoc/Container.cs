@@ -4039,9 +4039,7 @@ namespace DryIoc
             if (expression is ConstantExpression constExpr)
             {
                 var value = constExpr.Value;
-                if (value is Func<IResolverContext, object> f)
-                    return f;
-                return value.ToFactoryDelegate;
+                return value is Func<IResolverContext, object> f ? f : value.ToFactoryDelegate;
             }
             if (!preferInterpretation)
             {
