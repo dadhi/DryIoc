@@ -8977,6 +8977,15 @@ namespace DryIoc
             return t != null && info.ServiceType.IsAssignableFrom(t) ? t : info.ServiceType;
         }
 
+        /// <summary>Returns required service type if it is specified and assignable to service type,
+        /// otherwise returns service type.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static Type GetActualServiceType(this ServiceDetails details, Type serviceType)
+        {
+            var t = details.RequiredServiceType;
+            return t != null && serviceType.IsAssignableFrom(t) ? t : serviceType;
+        }
+
         /// <summary>Appends info string representation into provided builder.</summary>
         public static StringBuilder Print(this StringBuilder s, ServiceInfo info)
         {
@@ -9367,7 +9376,7 @@ namespace DryIoc
                 Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
 
             // todo: @mem @perf Could we avoid the allocation of the ServiceInfo details object for ifUnresolved? because it is unlucky path but we spend the memory on it upfront, especially given that ServiceProviderGetServiceShouldThrowIfUnresolved contains the adjusting value anyway??? 
-            object serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : ServiceInfo.Of(serviceType, ifUnresolved);
+            object serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : ServiceDetails.Of(ifUnresolved);
 
             var req = RentRequest();
             return req == null
@@ -9518,16 +9527,19 @@ namespace DryIoc
         public Type ActualServiceType;
 
         /// <summary>Get the details</summary>
-        public ServiceDetails GetServiceDetails() => ServiceTypeOrInfo is ServiceInfo i ? i.Details : ServiceDetails.Default;
+        public ServiceDetails GetServiceDetails() => 
+            ServiceTypeOrInfo is ServiceDetails d ? d :
+            ServiceTypeOrInfo is ServiceInfo i ? i.Details :
+            ServiceDetails.Default;
 
         /// <summary>Optional service key to identify service of the same type.</summary>
-        public object ServiceKey => ServiceTypeOrInfo is ServiceInfo i ? i.Details.ServiceKey : null;
+        public object ServiceKey => GetServiceDetails().ServiceKey;
 
         /// <summary>Policy to deal with unresolved service.</summary>
-        public IfUnresolved IfUnresolved => ServiceTypeOrInfo is ServiceInfo i ? i.Details.IfUnresolved : default;
+        public IfUnresolved IfUnresolved => GetServiceDetails().IfUnresolved;
 
         /// <summary>Required service type if specified.</summary>
-        public Type RequiredServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.Details.RequiredServiceType : null;
+        public Type RequiredServiceType => GetServiceDetails().RequiredServiceType;
 
         /// <summary>Relative number representing reuse lifespan.</summary>
         public int ReuseLifespan => Reuse?.Lifespan ?? 0;
@@ -9584,8 +9596,9 @@ namespace DryIoc
             if (FactoryID == 0)
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
 
-            if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
-                info = info.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
+            var details = GetServiceDetails();
+            if (details != null && details != ServiceDetails.Default)
+                info = info.InheritInfoFromDependencyOwner(ActualServiceType, details, Container, FactoryType);
 
             var flags = Flags & InheritedFlags | additionalFlags;
             ref var req = ref GetOrPushDepRequestStack(DependencyDepth);
@@ -9605,9 +9618,10 @@ namespace DryIoc
             object info = parameter;
             var actualServiceType = parameter.ParameterType;
             // todo: @perf so in case where we have just a different IfUnresolved, then we have a non default ServiceDetails, which means a whole lot of additional logic being executed with not actual need, right?
-            if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
+            var details = GetServiceDetails();
+            if (details != null && details != ServiceDetails.Default)
             {
-                info = actualServiceType.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
+                info = actualServiceType.InheritInfoFromDependencyOwner(ActualServiceType, details, Container, FactoryType);
                 if (info is ServiceInfo i)
                     actualServiceType = i.GetActualServiceType();
             }
@@ -9625,9 +9639,10 @@ namespace DryIoc
         public Request PushServiceType(Type serviceType, RequestFlags additionalFlags = default)
         {
             object info;
-            if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
+            var details = GetServiceDetails();
+            if (details != null && details != ServiceDetails.Default)
             {
-                info = serviceType.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
+                info = serviceType.InheritInfoFromDependencyOwner(ActualServiceType, details, Container, FactoryType);
                 if (info is ServiceInfo i)
                     serviceType = i.GetActualServiceType();
             }
