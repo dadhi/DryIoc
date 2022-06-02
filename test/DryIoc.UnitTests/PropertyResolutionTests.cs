@@ -7,8 +7,24 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class PropertyResolutionTests
+    public class PropertyResolutionTests : ITest
     {
+        public int Run()
+        {
+            Resolving_unregistered_property_should_NOT_throw_and_should_preserve_original_property_value();
+            Resolving_property_registered_in_container_should_succeed();
+            Resolving_field_registered_in_container_should_succeed();
+            Resolving_property_with_nonpublic_setter_should_NOT_throw_and_should_preserve_original_property_value();
+            Resolving_property_without_set_should_NOT_throw_and_should_preserve_original_property_value();
+            Resolving_readonly_field_should_NOT_throw_and_should_preserve_field_original_value();
+            Can_resolve_property_marked_with_Import();
+            Can_resolve_field_marked_with_Import();
+            Should_not_throw_on_resolving_readonly_field_marked_with_Import();
+            Can_resolve_Func_of_field_marked_with_Import();
+            Can_resolve_named_Lazy_of_property_marked_with_Import();
+            return 11;
+        }
+
         [Test]
         public void Resolving_unregistered_property_should_NOT_throw_and_should_preserve_original_property_value()
         {
@@ -185,9 +201,9 @@ namespace DryIoc.UnitTests
     {
         public IDependency Dependency { get; set; }
 
-// ReSharper disable UnusedAutoPropertyAccessor.Local
+        // ReSharper disable UnusedAutoPropertyAccessor.Local
         public IBar Bar { get; private set; }
-// ReSharper restore UnusedAutoPropertyAccessor.Local
+        // ReSharper restore UnusedAutoPropertyAccessor.Local
 
         public IBar BarWithoutSet
         {

@@ -6,8 +6,30 @@ using DryIoc.ImTools;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class RegisterManyTests
+    public class RegisterManyTests : ITest
     {
+        public int Run()
+        {
+            Can_register_single_registrations_for_all_public_types_implemented();
+            Singleton_registered_with_multiple_interfaces_should_be_the_same();
+            Non_optimized_singleton_registered_with_multiple_interfaces_should_be_the_same();
+            Non_optimized_singleton_injected_as_different_interfaces_should_be_the_same();
+            Can_register_service_with_implementations_found_in_assemblies();
+            Can_register_generic_service_Only_with_its_implementations_found_in_assemblies();
+            Can_register_something_from_assembly_as_singleton();
+            RegisterMany_should_skip_Compiler_generated_classes_and_throw_an_exception();
+            RegisterMany_should_inform_if_impl_type_is_abstract();
+            RegisterMany_should_inform_if_no_services_where_registered_for_impl_type();
+            Can_get_all_service_registrations();
+            Can_register_internal_implementations();
+            Can_register_mapping_to_registered_service();
+            Can_register_mapping_to_not_assignable_service_of_the_same_implementation();
+            Register_mapping_should_throw_if_factory_is_not_found();
+            Register_mapping_should_throw_if_new_service_type_is_not_compatible_with_registered_implementation();
+            Can_register_and_resolve_scoped_one_impl_two_services();
+            return 17;
+        }
+
         [Test]
         public void Can_register_single_registrations_for_all_public_types_implemented()
         {
