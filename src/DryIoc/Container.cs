@@ -9510,7 +9510,7 @@ namespace DryIoc
         /// <summary>Requested service type.</summary>
         public Type ServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.ServiceType : ActualServiceType;
 
-        /// <summary>[Obsolete(Use the `ActualServiceType` instead)]</summary>
+        [Obsolete("Use the `ActualServiceType` instead")]
         public Type GetActualServiceType() => ActualServiceType;
         /// <summary>Compatible required or service type.</summary>
         public Type ActualServiceType;
@@ -12422,7 +12422,7 @@ namespace DryIoc
 
             // otherwise just return a constant
             var instanceExpr = request.Container.GetConstantExpression(Instance);
-            var serviceType = request.GetActualServiceType();
+            var serviceType = request.ActualServiceType;
             var implType = ImplementationType;
             return implType == null || serviceType.IsAssignableFrom(implType) ? instanceExpr : serviceType.Cast(instanceExpr);
         }
