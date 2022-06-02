@@ -5877,7 +5877,7 @@ namespace DryIoc.ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, K key, V value) =>
             map.AddOrUpdateEntryByReferenceEquals(EntryWithHash(key, value));
-
+        // todo: @feature we need and Add method to throw for the existing key, maybe based on GetOrAdd
         /// <summary>Add sure not present item, so before calling this method you may either check the map via GetEntryOrNull or be sure that the new added key is unique</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> AddSureNotPresentEntry<K, V>(this ImHashMap<K, V> map, ImHashMapEntry<K, V> newEntry) =>

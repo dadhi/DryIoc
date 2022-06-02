@@ -512,7 +512,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
         /// <summary>Creates a UnaryExpression that represents a type conversion operation.</summary>
         public static UnaryExpression Convert(Expression expression, Type type) =>
-            new ConvertUnaryExpression(expression, type);
+            new ConvertUnaryExpression(expression, type); // todo: @perf @mem optimize the same as Parameter for the well known often used types
 
         public static UnaryExpression Convert<T>(Expression expression) =>
             new TypedConvertUnaryExpression<T>(expression);

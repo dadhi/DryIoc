@@ -320,7 +320,7 @@ namespace DryIoc
                 var useInterpretation = Rules.UseInterpretation;
 
                 // Cached expression cannot be ConstantExpression because we unwrap the constant and put its value in the cache instead.
-                // Also the expression is already normalized via NormalizeExpression before put into cache, that's why will call CompileToFactoryDelegateNoNormalization
+                // Also the expression is already normalized via NormalizeExpression before put into cache, that's why will call CompileToFactoryDelegate
                 while (entry.Value is Expression cachedExpr) 
                 {
                     if (useInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(this, cachedExpr, out var result))
@@ -329,7 +329,7 @@ namespace DryIoc
                     // set to Compiling to notify other threads to use the interpretation until the service is compiled
                     if (Interlocked.CompareExchange(ref entry.Value, new FactoryDelegateCompiler.Compiling(cachedExpr), cachedExpr) == cachedExpr)
                     {
-                        var compiledFactory = cachedExpr.CompileToFactoryDelegateNoNormalization(useInterpretation);
+                        var compiledFactory = cachedExpr.CompileToFactoryDelegate(useInterpretation);
                         entry.Value = compiledFactory; // todo: @unclear should we instead cache only after invoking the factory delegate, avoiding the failing delegate in cache
                         return compiledFactory(this);
                     }
@@ -337,7 +337,7 @@ namespace DryIoc
 
                 if (entry.Value is FactoryDelegateCompiler.Compiling compiling)
                     return Interpreter.TryInterpretAndUnwrapContainerException(this, compiling.Expression, out var result) ? result
-                         : compiling.Expression.CompileToFactoryDelegateNoNormalization(useInterpretation)(this);
+                         : compiling.Expression.CompileToFactoryDelegate(useInterpretation)(this);
             }
 
             return ResolveAndCache(serviceTypeHash, serviceType, ifUnresolved);
@@ -383,16 +383,11 @@ namespace DryIoc
                 if (expr == null)
                     return null;
 
-                expr = expr.NormalizeExpression();
                 if (expr is ConstantExpression constExpr)
                 {
                     var value = constExpr.Value;
-                    if (value is Func<IResolverContext, object> cachedDelegate)
-                    {
-                        // todo: @wip remove
-                    }
                     if (factory.CanCache)
-                        TryCacheDefaultFactory(serviceTypeHash, serviceType, value);
+                        TryCacheDefaultFactory(serviceTypeHash, serviceType, value.ToCachedResult());
                     return value;
                 }
 
@@ -405,7 +400,7 @@ namespace DryIoc
                     return instance;
 
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegateNoNormalization(rules.UseInterpretation);
+                factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
             }
 
             if (factory.CanCache)
@@ -503,16 +498,11 @@ namespace DryIoc
                 if (expr == null)
                     return null;
 
-                expr = expr.NormalizeExpression();
                 if (expr is ConstantExpression constExpr)
                 {
                     var value = constExpr.Value;
-                    if (value is Func<IResolverContext, object> f)
-                    {
-                        
-                    }
                     if (cacheKey != null)
-                        TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, value);
+                        TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, value.ToCachedResult());
                     return value;
                 }
 
@@ -525,7 +515,7 @@ namespace DryIoc
                     return instance;
 
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegateNoNormalization(Rules.UseInterpretation);
+                factoryDelegate = expr.CompileToFactoryDelegate(Rules.UseInterpretation);
             }
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
@@ -546,7 +536,7 @@ namespace DryIoc
                 // set to Compiling to notify other threads to use the interpretation until the service is compiled
                 if (Interlocked.CompareExchange(ref cacheEntry.Factory, new FactoryDelegateCompiler.Compiling(expr), expr) == expr)
                 {
-                    var factoryDelegate = expr.CompileToFactoryDelegateNoNormalization(useInterpretation);
+                    var factoryDelegate = expr.CompileToFactoryDelegate(useInterpretation);
                     // todo: @unclear should we instead cache only after invoking the factory delegate
                     cacheEntry.Factory = factoryDelegate;
                     result = factoryDelegate(r);
@@ -557,7 +547,7 @@ namespace DryIoc
             if (cacheEntry.Factory is FactoryDelegateCompiler.Compiling compiling)
             {
                 if (!Interpreter.TryInterpretAndUnwrapContainerException(r, compiling.Expression, out result))
-                    result = compiling.Expression.CompileToFactoryDelegateNoNormalization(useInterpretation)(r);
+                    result = compiling.Expression.CompileToFactoryDelegate(useInterpretation)(r);
                 return true;
             }
 
@@ -1664,15 +1654,17 @@ namespace DryIoc
             public FactoriesEntry With(Factory factory)
             {
                 var lastDefaultKey = LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next();
-                return new FactoriesEntry(lastDefaultKey, Factories.AddSureNotPresent(lastDefaultKey, factory));
+                // todo: @bug we need a method `Add` which throws for found key, e.g. based on `GetOrAdd`, 
+                // todo: @bug because `AddSureNotPresent` does not work for the same hash, for example `X.A` of `enum X { A = 0 }` and `DefaultKey.Value` have the same hash
+                return new FactoriesEntry(lastDefaultKey, Factories.AddOrUpdate(lastDefaultKey, factory)); 
             }
 
             public FactoriesEntry WithTwo(Factory oldFactory, Factory newFactory)
             {
                 var lastDefaultKey = LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next();
                 var factories = Factories
-                    .AddSureNotPresent(lastDefaultKey, oldFactory)
-                    .AddSureNotPresent(lastDefaultKey = lastDefaultKey.Next(), newFactory);
+                    .AddOrUpdate(lastDefaultKey, oldFactory)
+                    .AddOrUpdate(lastDefaultKey = lastDefaultKey.Next(), newFactory);
                 return new FactoriesEntry(lastDefaultKey, factories);
             }
 
@@ -4000,6 +3992,9 @@ namespace DryIoc
             public CachedResult(object instance) => Instance = instance;
         }
 
+        [MethodImpl((MethodImplOptions)256)]
+        internal static CachedResult ToCachedResult(this object result) => new CachedResult(result);
+
         /// <summary>Resolver context parameter expression in FactoryDelegate.</summary>
         public static readonly ParameterExpression ResolverContextParamExpr = ParameterOf<IResolverContext>("r");
 
@@ -4018,11 +4013,13 @@ namespace DryIoc
             if (expr.NodeType == ExprType.Convert)
             {
                 var operandExpr = ((UnaryExpression)expr).Operand;
-                if (operandExpr.Type == typeof(object)) // todo: @wip check if we can do less compat checks and be smart people
+                if (operandExpr.Type == typeof(object))
                     return operandExpr;
             }
             // todo: @perf introduce ConvertValueTypeToObjectIntrinsic
-            return expr.Type != typeof(void) && expr.Type.IsValueType ? Convert<object>(expr) : expr;
+            if (expr.Type != typeof(void) && expr.Type.IsValueType)
+                return Convert<object>(expr);
+            return expr;
         }
 
         /// <summary>Wraps service creation expression (body) into `Func{IResolverContext, object}` and returns result lambda expression.</summary>
@@ -4033,25 +4030,19 @@ namespace DryIoc
         public static Expression<Func<IResolverContext, object>> WrapInFactoryExpressionWithoutNormalization(this Expression expression) =>
             new FactoryDelegateExpression(expression);
 
+        private static Type[] _factoryDelegateAndClosureParams = new[] { typeof(ExpressionCompiler.ArrayClosure), typeof(IResolverContext) };
+
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual `Func{IResolverContext, object}` used for service resolution.</summary>
         public static Func<IResolverContext, object> CompileToFactoryDelegate(this Expression expression, bool preferInterpretation)
         {
-            expression = expression.NormalizeExpression();
             if (expression is ConstantExpression constExpr)
-                return constExpr.Value.ToFactoryDelegate;
-            return CompileToFactoryDelegateNoNormalization(expression, preferInterpretation);
-        }
-
-        private static Type[] _factoryDelegateAndClosureParams = new[] { typeof(ExpressionCompiler.ArrayClosure), typeof(IResolverContext) };
-
-        internal static Func<IResolverContext, object> CompileToFactoryDelegateNoNormalization(this Expression expression, bool preferInterpretation)
-        {
-            if (expression is ConstantExpression)
             {
-                // todo: @wip remove
+                var value = constExpr.Value;
+                if (value is Func<IResolverContext, object> f)
+                    return f;
+                return value.ToFactoryDelegate;
             }
-
             if (!preferInterpretation)
             {
                 var factoryDelegate = (Func<IResolverContext, object>)(ExpressionCompiler.TryCompileBoundToFirstClosureParam(
@@ -9442,7 +9433,7 @@ namespace DryIoc
         public int DecoratedFactoryID { get; private set; } // todo: @perf can we remove or combine it with the other fields?
 
         /// <summary>Number of nested dependencies. Set with each new Push.</summary>
-        public int DependencyDepth; // todo: @perf combine with theDependencyCount or other fields, use the ObjectLayoutInspector to check the layout
+        public int DependencyDepth; // todo: @perf @mem we may not need it at all because it is used only for pooling the requests
 
         /// <summary>The total dependency count</summary>
         public int DependencyCount; // todo: @perf combine with the DependencyDepth or other fields
