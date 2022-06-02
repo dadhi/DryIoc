@@ -6,8 +6,16 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class TypeCSharpNameFormattingTests
+    public class TypeCSharpNameFormattingTests : ITest
     {
+        public int Run()
+        {
+            GetCSharpTypeName_should_return_correct_open_generic_type_name();
+            GetCSharpTypeName_should_return_correct_closed_generic_type_name();
+            GetCSharpTypeName_for_array_of_open_generics();
+            return 3;
+        }
+
         [Test]
         public void GetCSharpTypeName_should_return_correct_open_generic_type_name()
         {

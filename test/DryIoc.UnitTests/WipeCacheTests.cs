@@ -4,10 +4,19 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class WipeCacheTests
+    public class WipeCacheTests : ITest
     {
+        public int Run()
+        {
+            Resolving_service_after_updating_dependency_registration_will_return_old_dependency_due_Resolution_Cache();
+            When_resolution_cache_is_wiped_Then_resolving_service_after_updating_dependency_registration_will_return_New_dependency();
+            Should_throw_for_second_default_registration();
+            Should_return_updated_registration();
+            return 4;
+        }
+
         [Test]
-        public void Resolving_service_after_updating_depenency_registration_will_return_old_dependency_due_Resolution_Cache()
+        public void Resolving_service_after_updating_dependency_registration_will_return_old_dependency_due_Resolution_Cache()
         {
             var container = new Container();
             container.Register<ServiceWithDependency>();
@@ -21,7 +30,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void When_resolution_cache_is_wiped_Then_resolving_service_after_updating_depenency_registration_will_return_New_dependency()
+        public void When_resolution_cache_is_wiped_Then_resolving_service_after_updating_dependency_registration_will_return_New_dependency()
         {
             IContainer container = new Container();
             container.Register<ServiceWithDependency>();

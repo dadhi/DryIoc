@@ -4,8 +4,37 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class StronglyTypeConstructorAndParametersSpecTests
+    public class StronglyTypeConstructorAndParametersSpecTests : ITest
     {
+        public int Run()
+        {
+            Specify_default_constructor_without_reflection();
+            Specifying_constructor_of_wrong_type_should_throw();
+            Specify_constructor_with_params_without_reflection();
+            Specify_parameter_ifUnresolved_behavior_without_reflection();
+            Specify_service_key_and_required_service_type_for_parameter();
+            Specify_static_factory_method();
+            Specify_for_factory_method_service_key_and_required_service_type_for_parameter();
+            Can_specify_properties_and_fields_together_with_constructor();
+            Can_specify_custom_value_via_variable_for_a_property();
+            Can_handle_default_parameters();
+            Can_handle_default_parameters_with_explicit_specification();
+            Can_use_enum_service_key();
+            Arg_method_do_nothing_and_just_return_default_arg_value();
+            Can_specify_default_parameter();
+            Can_specify_default_parameter_and_service_key();
+            If_default_parameter_is_specified_Then_IfUnresolved_should_be_set_to_ReturnDefault();
+            I_should_be_able_to_specify_custom_constant_value_instead_of_Arg();
+            Can_specify_to_use_property();
+            Can_specify_to_use_field();
+            Can_specify_property_custom_value_with_factory_spec();
+            Will_throw_for_custom_value_with_factory_spec_But_without_value_provider();
+            Can_use_cast_to_specific_return_type_in_factory_expression();
+            Can_specify_requirement_service_type_for_the_wrapper();
+            Should_throw_with_enough_info_to_find_culprit_MadeOf();
+            return 24;
+        }
+
         [Test]
         public void Specify_default_constructor_without_reflection()
         {

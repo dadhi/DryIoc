@@ -4,8 +4,32 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ThrowTests
+    public class ThrowTests : ITest
     {
+        public int Run()
+        {
+
+            Run(If_arg_null_message_should_say_arg_of_type_is_null);
+            Run(If_bad_arg_condition_You_should_specify_error_message);
+            Run(If_bad_condition_Then_InvalidOpEx_should_be_thrown);
+            Run(Can_log_exception_if_I_want_to);
+            Run(Can_wrap_inner_exception);
+            return 5;
+        }
+
+        private void Run(Action action)
+        {
+            SetupTestException();
+            try 
+            {
+                action();
+            }
+            finally
+            {
+                TearDownTestException();
+            }
+        }
+
         private Throw.GetMatchedExceptionHandler _original;
 
         [SetUp]
