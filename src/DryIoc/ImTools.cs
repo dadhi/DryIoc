@@ -2108,7 +2108,6 @@ namespace DryIoc.ImTools
         /// otherwise the result. Returns the Entry with the `hash` though it may be a `HashConflictingEntry`</summary>
         internal virtual Entry GetSurePresentEntry(int hash) => throw new InvalidOperationException("The sure present hash does not exist in the empty map");
 
-        // todo: @wip remove hash from here for simplicity
         /// <summary>Returns the found entry with the same hash or the new map with added new entry.
         /// Note that the empty map will return the entry the same as if the entry was found - so the consumer should check for the empty map.
         /// Note that the method cannot return the `null` - when the existing entry is not found it will always be the new map with the added entry.</summary>
@@ -6389,7 +6388,6 @@ namespace DryIoc.ImTools
             void IDisposable.Dispose() { }
         }
 
-        // todo: @wip for the ImHashMap<int, V>
         /// <summary>Do something for each entry.
         /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
         /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
