@@ -413,8 +413,8 @@ namespace DryIoc
         public object Resolve(Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args)
         {
-            // fallback to simple Resolve and its default cache if no keys are passed
             var scopeName = CurrentScope?.Name;
+            // fallback to simple Resolve and its default cache if no keys are passed
             return serviceKey == null && requiredServiceType == null && scopeName == null &&
                 (preResolveParent == null || preResolveParent.IsEmpty) && args.IsNullOrEmpty()
                 ? Resolve(serviceType, ifUnresolved)
@@ -1708,14 +1708,7 @@ namespace DryIoc
             if (factory?.GeneratedFactories != null)
                 factory = factory.GetGeneratedFactoryOrDefault(request);
 
-            if (factory == null)
-                return null;
-
-            var condition = factory.Setup.Condition;
-            if (condition != null && !condition(request))
-                return null;
-
-            return factory;
+            return factory != null && factory.CheckCondition(request) ? factory : null;
         }
 
         #endregion
@@ -5107,7 +5100,7 @@ namespace DryIoc
         private static Expression GetLazyEnumerableExpressionOrDefault(Request request)
         {
             var container = request.Container;
-            var collectionType = request.ServiceType;
+            var collectionType = request.ServiceType; // todo: @wip repeats logic of the calling side, we know the `itemType` already
             var itemType = collectionType.IsArray ? collectionType.GetElementType() : collectionType.GetGenericArguments()[0];
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
 
@@ -5123,7 +5116,7 @@ namespace DryIoc
 
             return New(typeof(LazyEnumerable<>).MakeGenericType(itemType).GetConstructors()[0],
                 // cast to object is not required cause Resolve already returns IEnumerable<object>
-                itemType == typeof(object) ? (Expression)resolveManyExpr : Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr));
+                itemType == typeof(object) ? resolveManyExpr : Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr));
         }
 
         private static readonly MethodInfo _enumerableCastMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast));
@@ -9139,6 +9132,7 @@ namespace DryIoc
 
         /// <summary>Creates service info from parameter alone, setting service type to parameter type,
         /// and setting resolution policy to <see cref="IfUnresolved.ReturnDefault"/> if parameter is optional.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static ParameterServiceInfo Of(ParameterInfo parameter) =>
             OrNull(parameter) ?? new ParameterServiceInfo(parameter);
 
@@ -9356,9 +9350,10 @@ namespace DryIoc
             preResolveParent = preResolveParent ?? Empty;
             if (!preResolveParent.IsEmpty)
             {
-                var parentServiceInfo = preResolveParent.ServiceTypeOrInfo;
-                if (parentServiceInfo is ServiceInfo ps && ps.Details != null && ps.Details != ServiceDetails.Default)
-                    serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(ps.ServiceType, ps.Details, container, preResolveParent.FactoryType);
+                var parentServiceType = preResolveParent.ActualServiceType;
+                var parentDetails = preResolveParent.GetServiceDetails();
+                if (parentDetails != null && parentDetails != ServiceDetails.Default)
+                    serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(parentServiceType, parentDetails, container, preResolveParent.FactoryType);
 
                 flags |= preResolveParent.Flags & InheritedFlags;
             }
@@ -9642,6 +9637,7 @@ namespace DryIoc
             var details = GetServiceDetails();
             if (details != null && details != ServiceDetails.Default)
             {
+                // todo: @wip check what the mess it is
                 info = serviceType.InheritInfoFromDependencyOwner(ActualServiceType, details, Container, FactoryType);
                 if (info is ServiceInfo i)
                     serviceType = i.GetActualServiceType();
