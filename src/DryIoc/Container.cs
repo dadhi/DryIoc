@@ -5013,7 +5013,7 @@ namespace DryIoc
 
             if (rules.ResolveIEnumerableAsLazyEnumerable)
             {
-                var lazyEnumerableExpr = GetLazyEnumerableExpressionOrDefault(request);
+                var lazyEnumerableExpr = GetLazyEnumerableExpressionOrDefault(request, itemType);
                 return collectionType.GetGenericDefinitionOrNull() != typeof(IEnumerable<>)
                     ? Call(ToArrayMethod.MakeGenericMethod(itemType), lazyEnumerableExpr)
                     : lazyEnumerableExpr;
@@ -5097,13 +5097,15 @@ namespace DryIoc
             return NewArrayInit(itemType, itemExprs);
         }
 
-        private static Expression GetLazyEnumerableExpressionOrDefault(Request request)
+        private static Expression GetLazyEnumerableExpressionOrDefault(Request request, Type itemType = null)
         {
+            if (itemType == null)
+            {
+                var collectionType = request.ServiceType;
+                itemType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericArguments()[0];
+            }
             var container = request.Container;
-            var collectionType = request.ServiceType; // todo: @wip repeats logic of the calling side, we know the `itemType` already
-            var itemType = collectionType.IsArray ? collectionType.GetElementType() : collectionType.GetGenericArguments()[0];
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
-
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             var preResolveParentExpr = container.GetRequestExpression(request);
 
@@ -9397,9 +9399,9 @@ namespace DryIoc
         /// <summary>Persisted request conditions</summary>
         public RequestFlags Flags; // todo: @perf combine with the FactoryType or other numeric fields
 
-        // todo: @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
+        // todo: @wip @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
         // The field is mutable so that the ServiceKey or IfUnresolved can be changed in place.
-        internal object ServiceTypeOrInfo; // the Type or the ServiceInfo
+        internal object ServiceTypeOrInfo; // the Type or ServiceInfo or ServiceDetails
 
         /// <summary>Input arguments provided with `Resolve`</summary>
         internal Expression[] InputArgExprs;
@@ -9514,9 +9516,9 @@ namespace DryIoc
         }
 
         /// <summary>Requested service type.</summary>
-        public Type ServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.ServiceType : ActualServiceType;
+        public Type ServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.ServiceType : ActualServiceType; // todo: @wip check that it works in all cases
 
-        /// <summary>[Obsolete(Use the `ActualServiceType` instead)]</summary>
+        [Obsolete("Use the `ActualServiceType` instead")]
         public Type GetActualServiceType() => ActualServiceType;
         /// <summary>Compatible required or service type.</summary>
         public Type ActualServiceType;
@@ -12435,7 +12437,7 @@ namespace DryIoc
 
             // otherwise just return a constant
             var instanceExpr = request.Container.GetConstantExpression(Instance);
-            var serviceType = request.GetActualServiceType();
+            var serviceType = request.ActualServiceType;
             var implType = ImplementationType;
             return implType == null || serviceType.IsAssignableFrom(implType) ? instanceExpr : serviceType.Cast(instanceExpr);
         }
