@@ -1376,7 +1376,7 @@ namespace DryIoc
 
             var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
             if (arrayElementType != null)
-                request = request.WithChangedType(arrayElementType, (_, et) => typeof(IEnumerable<>).MakeGenericType(et));
+                request = request.WithChangedType(arrayElementType, (_, et) => typeof(IEnumerable<>).MakeGenericType(et)); // todo: @wip try to remove this method
 
             var serviceType = request.ServiceType;
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
@@ -9401,7 +9401,7 @@ namespace DryIoc
 
         // todo: @wip @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
         // The field is mutable so that the ServiceKey or IfUnresolved can be changed in place.
-        internal object ServiceTypeOrInfo; // the Type or ServiceInfo or ServiceDetails
+        internal object ServiceTypeOrInfo; // the Type or ServiceInfo or ServiceDetails or ParameterInfo
 
         /// <summary>Input arguments provided with `Resolve`</summary>
         internal Expression[] InputArgExprs;
@@ -9516,11 +9516,9 @@ namespace DryIoc
         }
 
         /// <summary>Requested service type.</summary>
-        public Type ServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.ServiceType : ActualServiceType; // todo: @wip check that it works in all cases
+        public Type ServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.ServiceType : ActualServiceType;
 
-        [Obsolete("Use the `ActualServiceType` instead")]
-        public Type GetActualServiceType() => ActualServiceType;
-        /// <summary>Compatible required or service type.</summary>
+        /// <summary>The required service type when assignable to service type, or service type otherwise.</summary>
         public Type ActualServiceType;
 
         /// <summary>Get the details</summary>
@@ -9622,6 +9620,10 @@ namespace DryIoc
                 if (info is ServiceInfo i)
                     actualServiceType = i.GetActualServiceType();
             }
+            else
+            {
+                // todo: @wip
+            }
 
             var flags = Flags & InheritedFlags | additionalFlags;
             ref var req = ref GetOrPushDepRequestStack(DependencyDepth);
@@ -9636,6 +9638,7 @@ namespace DryIoc
         public Request PushServiceType(Type serviceType, RequestFlags additionalFlags = default)
         {
             object info;
+            // todo: @perf so in case where we have just a different IfUnresolved, then we have a non default ServiceDetails, which means a whole lot of additional logic being executed with not actual need, right?
             var details = GetServiceDetails();
             if (details != null && details != ServiceDetails.Default)
             {
@@ -9645,7 +9648,7 @@ namespace DryIoc
                     serviceType = i.GetActualServiceType();
             }
             else
-                info = ServiceInfo.Of(serviceType);
+                info = serviceType;
 
             var flags = Flags & InheritedFlags | additionalFlags;
             ref var req = ref GetOrPushDepRequestStack(DependencyDepth);
@@ -9668,7 +9671,7 @@ namespace DryIoc
                 factoryID, FactoryType.Service, implementationType, reuse, default, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith4Args = Lazy.Of(() =>
-            typeof(Request).Method(nameof(Push), typeof(Type), typeof(int), typeof(Type), typeof(IReuse)));
+            typeof(Request).Method("Push", typeof(Type), typeof(int), typeof(Type), typeof(IReuse)));
 
         /// <summary>Creates info by supplying the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse, RequestFlags flags) =>
@@ -9676,7 +9679,7 @@ namespace DryIoc
                 factoryID, FactoryType.Service, implementationType, reuse, flags, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith5Args = Lazy.Of(() =>
-            typeof(Request).Method(nameof(Push), typeof(Type), typeof(int), typeof(Type), typeof(IReuse), typeof(RequestFlags)));
+            typeof(Request).Method("Push", typeof(Type), typeof(int), typeof(Type), typeof(IReuse), typeof(RequestFlags)));
 
         /// <summary>Creates info by supplying the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey,
@@ -9685,7 +9688,7 @@ namespace DryIoc
                 factoryID, factoryType, implementationType, reuse, flags, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith8Args = Lazy.Of(() =>
-            typeof(Request).Method(nameof(Push), typeof(Type), typeof(Type), typeof(object),
+            typeof(Request).Method("Push", typeof(Type), typeof(Type), typeof(object),
                 typeof(int), typeof(FactoryType), typeof(Type), typeof(IReuse), typeof(RequestFlags)));
 
         /// <summary>Creates info by supplying the properties and chaining it with current (parent) info.</summary>
@@ -9696,7 +9699,7 @@ namespace DryIoc
                 factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith10Args = Lazy.Of(() =>
-            typeof(Request).Method(nameof(Push),
+            typeof(Request).Method("Push",
                 typeof(Type), typeof(Type), typeof(object), typeof(IfUnresolved),
                 typeof(int), typeof(FactoryType), typeof(Type), typeof(IReuse), typeof(RequestFlags), typeof(int)));
 
@@ -9711,7 +9714,7 @@ namespace DryIoc
         }
 
         internal static readonly Lazy<MethodInfo> PushMethodWith12Args = Lazy.Of(() =>
-            typeof(Request).Method(nameof(Push),
+            typeof(Request).Method("Push",
             typeof(Type), typeof(Type), typeof(object), typeof(string), typeof(object), typeof(IfUnresolved),
             typeof(int), typeof(FactoryType), typeof(Type), typeof(IReuse), typeof(RequestFlags), typeof(int)));
 
