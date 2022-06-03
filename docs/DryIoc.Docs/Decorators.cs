@@ -59,7 +59,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-
 using DryIoc;
 using DryIoc.FastExpressionCompiler.LightExpression; // light alternative to the System.Linq.Expressions
 // ReSharper disable UnusedParameter.Local
@@ -263,7 +262,7 @@ class Nested_decorators
 
         // ACTUALLY, you even can see how service is created yourself
         var expr = container.Resolve<LambdaExpression>(typeof(S));
-        Assert.AreEqual("r => new D2(new D1(new S()))", expr.ToString());
+        StringAssert.Contains("new D2(new D1(new S()))", expr.ToString());
     }
 } /*md
 ```
@@ -272,7 +271,7 @@ class Nested_decorators
 
 The order of decorator nesting may be explicitly specified with `order` setup option:
 ```cs md*/
-class Nested_decorators_order
+public class Nested_decorators_order
 {
     [Test]
     public void Example()
@@ -286,7 +285,7 @@ class Nested_decorators_order
         Assert.IsInstanceOf<D1>(s);
 
         var expr = container.Resolve<LambdaExpression>(typeof(S));
-        Assert.AreEqual("r => new D1(new D2(new S()))", expr.ToString());
+        StringAssert.Contains("new D1(new D2(new S()))", expr.ToString());
     }
 } /*md
 ```

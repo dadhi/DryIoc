@@ -99,8 +99,15 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         internal abstract SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> convertedExpressions);
 
         /// <summary>Converts to Expression and outputs its as string</summary>
-        public override string ToString() => this.ToCSharpString(constant => 
-            "default/*" + constant.Value.ToString() + "*/");
+        public override string ToString() => this.ToCSharpString(constant =>
+        { 
+            var val = constant.Value;
+            if (val == null)
+                return "null";
+            if (constant.Type.IsPrimitive)
+                return val.ToString();
+            return "default/*{value=`" + val.ToString() + "`}*/";
+        });
 
         /// <summary>Reduces the Expression to simple ones</summary>
         public virtual Expression Reduce() => this;

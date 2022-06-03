@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj" />
+    <ProjectReference Include="..\..\docs\DryIoc.Docs\DryIoc.Docs.csproj" />
     <PackageReference Include="ObjectLayoutInspector" Version="0.1.2" />
   </ItemGroup>
 

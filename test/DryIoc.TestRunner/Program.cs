@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using DryIoc.IssuesTests;
+// using DryIoc.Docs;
 
 namespace DryIoc.UnitTests
 {
@@ -72,6 +73,7 @@ namespace DryIoc.UnitTests
                 new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service(),
                 new GHIssue198_Open_generics_resolve_fails_if_there_is_a_static_constructor(),
                 new GHIssue289_Think_how_to_make_Use_to_directly_replace_scoped_service_without_special_asResolutionCall_setup(),
+                new GHIssue323_Add_registration_setup_option_to_avoidResolutionScopeTracking(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
                 new GHIssue390_NullReferenceException_on_Unregister(),
@@ -84,6 +86,10 @@ namespace DryIoc.UnitTests
                 new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
             };
+            // var docsTests = new Func<int>[] 
+            // { 
+            //     () => { new Nested_decorators_order().Example(); return 1; }
+            // };
 
             Scope.WaitForScopedServiceIsCreatedTimeoutTicks = 50; // @important
 
