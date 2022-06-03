@@ -321,7 +321,7 @@ namespace DryIoc
 
                 // Cached expression cannot be ConstantExpression because we unwrap the constant and put its value in the cache instead.
                 // Also the expression is already normalized via NormalizeExpression before put into cache, that's why will call CompileToFactoryDelegate
-                while (entry.Value is Expression cachedExpr) 
+                while (entry.Value is Expression cachedExpr)
                 {
                     if (useInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(this, cachedExpr, out var result))
                         return result;
@@ -370,7 +370,7 @@ namespace DryIoc
             var rules = Rules;
             if (!rules.UseInterpretationForTheFirstResolution)
             {
-                 // todo: @perf @mem should we introduce the GetInstanceOrDefault to avoid lifting object ToFactoryDelegate, e.g. for InstanceFactory
+                // todo: @perf @mem should we introduce the GetInstanceOrDefault to avoid lifting object ToFactoryDelegate, e.g. for InstanceFactory
                 factoryDelegate = factory.GetDelegateOrDefault(request);
                 request.ReturnToPool();
                 if (factoryDelegate == null)
@@ -1656,7 +1656,7 @@ namespace DryIoc
                 var lastDefaultKey = LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next();
                 // todo: @bug we need a method `Add` which throws for found key, e.g. based on `GetOrAdd`, 
                 // todo: @bug because `AddSureNotPresent` does not work for the same hash, for example `X.A` of `enum X { A = 0 }` and `DefaultKey.Value` have the same hash
-                return new FactoriesEntry(lastDefaultKey, Factories.AddOrUpdate(lastDefaultKey, factory)); 
+                return new FactoriesEntry(lastDefaultKey, Factories.AddOrUpdate(lastDefaultKey, factory));
             }
 
             public FactoriesEntry WithTwo(Factory oldFactory, Factory newFactory)
@@ -9522,10 +9522,10 @@ namespace DryIoc
         public Type ActualServiceType;
 
         /// <summary>Get the details</summary>
-        public ServiceDetails GetServiceDetails() => 
-            ServiceTypeOrInfo is ServiceDetails d ? d :
+        public ServiceDetails GetServiceDetails() =>
             ServiceTypeOrInfo is ServiceInfo i ? i.Details :
-            ServiceDetails.Default;
+            ServiceTypeOrInfo is ServiceDetails d ? d :
+            ServiceDetails.Default; // is is default for ServiceType and ParameterInfo
 
         /// <summary>Optional service key to identify service of the same type.</summary>
         public object ServiceKey => GetServiceDetails().ServiceKey;
@@ -9637,7 +9637,7 @@ namespace DryIoc
         /// factory via `WithResolvedFactory` before pushing info into it.</summary>
         public Request PushServiceType(Type serviceType, RequestFlags additionalFlags = default)
         {
-            object info;
+            object info = serviceType;
             // todo: @perf so in case where we have just a different IfUnresolved, then we have a non default ServiceDetails, which means a whole lot of additional logic being executed with not actual need, right?
             var details = GetServiceDetails();
             if (details != null && details != ServiceDetails.Default)
@@ -9647,8 +9647,6 @@ namespace DryIoc
                 if (info is ServiceInfo i)
                     serviceType = i.GetActualServiceType();
             }
-            else
-                info = serviceType;
 
             var flags = Flags & InheritedFlags | additionalFlags;
             ref var req = ref GetOrPushDepRequestStack(DependencyDepth);
@@ -9773,11 +9771,12 @@ namespace DryIoc
         /// <summary>Sets service key to the passed value. Required for multiple default services to change null key to
         /// actual <see cref="DefaultKey"/></summary>
         public void ChangeServiceKey(object serviceKey) =>
-            ServiceTypeOrInfo = ServiceTypeOrInfo is ServiceInfo i
-                ? i.Create(i.ServiceType, ServiceDetails.OfServiceKey(i.Details, serviceKey)) // todo: @unclear check for the custom _value
-                : ServiceTypeOrInfo is ParameterInfo pi
+            ServiceTypeOrInfo
+            = ServiceTypeOrInfo is ServiceInfo i
+                ? i.Create(i.ServiceType, ServiceDetails.OfServiceKey(i.Details, serviceKey)) // todo: @unclear check for the custom value
+            : ServiceTypeOrInfo is ParameterInfo pi
                 ? ParameterServiceInfo.Of(pi, ActualServiceType, ServiceDetails.OfServiceKey(ServiceDetails.Default, serviceKey))
-                : ServiceTypeOrInfo = ServiceInfo.Of(ActualServiceType, serviceKey);
+            : ServiceInfo.Of(ActualServiceType, serviceKey);
 
         /// <summary>Prepends input arguments to existing arguments in request. It is done because the
         /// nested Func/Action input argument has a priority over outer argument.
