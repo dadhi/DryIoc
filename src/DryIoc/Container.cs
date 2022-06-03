@@ -5138,7 +5138,7 @@ namespace DryIoc
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
             {
-                // Here we need to know if the lazy is resolvable, 
+                // Here we need to know if Lazy is resolvable, 
                 // by resolving the factory we are checking that the service itself is registered...
                 // But what about its dependencies. In order to check on them we need to get the expression,
                 // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
