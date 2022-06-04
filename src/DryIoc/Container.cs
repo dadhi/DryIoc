@@ -3244,9 +3244,9 @@ namespace DryIoc
                 case ExprType.Invoke:
                     {
                         var invokeExpr = (InvocationExpression)expr;
-                        if (invokeExpr is InvokeFactoryDelegateExpression fd)
+                        if (invokeExpr is InvokeFactoryDelegateExpression fdInvoke)
                         {
-                            result = fd.FactoryDelegate(fd is InvokeFactoryDelegateOfRootOrSelfExpression ? r.Root ?? r : r);
+                            result = fdInvoke.FactoryDelegate(fdInvoke is InvokeFactoryDelegateOfRootOrSelfExpression ? r.Root ?? r : r);
                             return true;
                         }
 
@@ -3811,19 +3811,13 @@ namespace DryIoc
             }
 
             object result = null;
-            var lambda = e.FactoryDelegateLambdaOrInvokeExpr;
-            if (lambda is InvokeFactoryDelegateExpression i)
-                result = i.FactoryDelegate(r);
-            else if (lambda is ConstantExpression lambdaConstExpr)
-            {
-                //todo: @wip
-                result = ((Func<IResolverContext, object>)lambdaConstExpr.Value)(r);
-            }
-            // todo: @perf @mem we still unpacking the lambda, why do we need to store it then?
-            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
-            itemRef.Value = result;
+            var serviceExpr = e.ServiceOrInvokeExpr;
+            if (serviceExpr is InvokeFactoryDelegateExpression invokeExpr)
+                result = invokeExpr.FactoryDelegate(r);
+            else if (!TryInterpret(r, serviceExpr, paramExprs, paramValues, parentArgs, out result))
+                result = serviceExpr.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
 
+            itemRef.Value = result;
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
                 scope.AddUnorderedDisposable(disp);
             return result;
@@ -3870,20 +3864,15 @@ namespace DryIoc
             }
 
             object result = null;
-            var lambda = e.FactoryDelegateLambdaOrInvokeExpr;
-            if (lambda is InvokeFactoryDelegateExpression i)
-                result = i.FactoryDelegate(r);
-            else if (lambda is ConstantExpression lambdaConstExpr)
-            {
-                //todo: @wip
-                result = ((Func<IResolverContext, object>)lambdaConstExpr.Value)(r);
-            }
-            else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
-                result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
+            var serviceExpr = e.ServiceOrInvokeExpr;
+            if (serviceExpr is InvokeFactoryDelegateExpression invokeExpr)
+                result = invokeExpr.FactoryDelegate(r);
+            else if (!TryInterpret(r, serviceExpr, paramExprs, paramValues, parentArgs, out result))
+                result = serviceExpr.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
+
             itemRef.Value = result;
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
                 scope.AddDisposable(disp, e.DisposalOrder);
-
             return result;
         }
 
@@ -3928,15 +3917,15 @@ namespace DryIoc
 
             var lambda = args.Argument4;
             object result = null;
+            // todo: @perf optimize
             if (lambda is ConstantExpression lambdaConstExpr)
                 result = ((Func<IResolverContext, object>)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
-            itemRef.Value = result;
 
+            itemRef.Value = result;
             if (result is IDisposable disp)
                 scope.AddDisposable(disp, TryGetIntConstantValue(args.Argument5));
-
             return result;
         }
 
@@ -13291,38 +13280,29 @@ namespace DryIoc
             }
             else
             {
-                Expression factoryDelegateExpr;
-                if (serviceFactoryExpr is InvokeFactoryDelegateExpression fd)
-                    factoryDelegateExpr = fd;
-                else if (serviceFactoryExpr is InvocationExpression ie && ie.Expression is ConstantExpression registeredDelegateExpr &&
-                    registeredDelegateExpr.Type == typeof(Func<IResolverContext, object>))
-                    factoryDelegateExpr = registeredDelegateExpr;
-                else
-                {
-                    // decrease the dependency count when wrapping into lambda
-                    if (request.DependencyCount > 0)
-                        request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
-                    // todo: @perf @mem avoid wrapping it in FactoryDelegateExpression because it is interpeted directly
-                    factoryDelegateExpr = new FactoryDelegateExpression(serviceFactoryExpr);
-                }
+                // decrease the dependency count when wrapping into lambda
+                if (serviceFactoryExpr is InvokeFactoryDelegateExpression == false && request.DependencyCount > 0)
+                    request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
 
                 var disposalOrder = request.Factory.Setup.DisposalOrder;
                 var factoryId = request.GetCombinedDecoratorAndFactoryID();
                 if (ScopedOrSingleton)
                     return disposalOrder == 0
-                        ? new GetScopedOrSingletonViaFactoryDelegateExpression(factoryId, factoryDelegateExpr)
-                        : new GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(factoryId, factoryDelegateExpr, disposalOrder);
+                        ? new GetScopedOrSingletonViaFactoryDelegateExpression(factoryId, serviceFactoryExpr)
+                        : new GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(factoryId, serviceFactoryExpr, disposalOrder);
 
                 var ifNoScopeThrow = request.IfUnresolved == IfUnresolved.Throw;
 
                 if (Name == null)
                     return disposalOrder == 0
-                        ? new GetScopedViaFactoryDelegateExpression(ifNoScopeThrow, factoryId, factoryDelegateExpr)
-                        : new GetScopedViaFactoryDelegateWithDisposalOrderExpression(ifNoScopeThrow, factoryId, factoryDelegateExpr, disposalOrder);
+                        ? new GetScopedViaFactoryDelegateExpression(ifNoScopeThrow, factoryId, serviceFactoryExpr)
+                        : new GetScopedViaFactoryDelegateWithDisposalOrderExpression(ifNoScopeThrow, factoryId, serviceFactoryExpr, disposalOrder);
 
+                // todo: @perf optimize the same way as for scope without Name
+                serviceFactoryExpr = serviceFactoryExpr is InvokeFactoryDelegateExpression i ? i.Expression : new FactoryDelegateExpression(serviceFactoryExpr);
                 return Call(GetNameScopedViaFactoryDelegateMethod, FactoryDelegateCompiler.ResolverContextParamExpr,
                     request.Container.GetConstantExpression(Name, typeof(object)),
-                    Constant(ifNoScopeThrow), ConstantInt(factoryId), factoryDelegateExpr, ConstantInt(disposalOrder));
+                    Constant(ifNoScopeThrow), ConstantInt(factoryId), serviceFactoryExpr, ConstantInt(disposalOrder));
             }
         }
 
@@ -13371,24 +13351,23 @@ namespace DryIoc
 
         internal class GetScopedOrSingletonViaFactoryDelegateExpression : MethodCallExpression
         {
-            public override Type Type =>
-                FactoryDelegateLambdaOrInvokeExpr is LambdaExpression l ? l.Body.Type : FactoryDelegateLambdaOrInvokeExpr.Type;
+            public override Type Type => ServiceOrInvokeExpr.Type;
             public override Expression Object => ResolverContext.CurrentOrSingletonScopeExpr;
             public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateMethod;
             public readonly int FactoryId;
             public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
-            public readonly Expression FactoryDelegateLambdaOrInvokeExpr;
+            public readonly Expression ServiceOrInvokeExpr;
             public Expression FactoryDelegateExpr =>
-                FactoryDelegateLambdaOrInvokeExpr is InvokeFactoryDelegateExpression i ? i.Expression : FactoryDelegateLambdaOrInvokeExpr;
+                ServiceOrInvokeExpr is InvokeFactoryDelegateExpression i ? i.Expression : new FactoryDelegateExpression(ServiceOrInvokeExpr);
             public override int ArgumentCount => 3;
             public override IReadOnlyList<Expression> Arguments =>
                 new[] { FactoryIdExpr, FactoryDelegateExpr, FactoryDelegateCompiler.ResolverContextParamExpr };
             public override Expression GetArgument(int i) =>
                 i == 0 ? FactoryIdExpr : i == 1 ? FactoryDelegateExpr : FactoryDelegateCompiler.ResolverContextParamExpr;
-            internal GetScopedOrSingletonViaFactoryDelegateExpression(int factoryId, Expression factoryDelegateLambdaOrInvokeExpr)
+            internal GetScopedOrSingletonViaFactoryDelegateExpression(int factoryId, Expression serviceOrInvokeExpr)
             {
                 FactoryId = factoryId;
-                FactoryDelegateLambdaOrInvokeExpr = factoryDelegateLambdaOrInvokeExpr;
+                ServiceOrInvokeExpr = serviceOrInvokeExpr;
             }
 
             internal override System.Linq.Expressions.Expression CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
@@ -13442,18 +13421,6 @@ namespace DryIoc
             internal GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(
                 int factoryId, Expression createValueExpr, int disposalOrder) : base(factoryId, createValueExpr) => DisposalOrder = disposalOrder;
         }
-
-        /// Subject
-        public static object GetScopedViaFactoryDelegate(IResolverContext r, bool throwIfNoScope, int id, Func<IResolverContext, object> createValue) =>
-            r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegate(id, createValue, r);
-
-        /// Subject
-        public static object GetScopedViaFactoryDelegateWithDisposalOrder(IResolverContext r,
-            bool throwIfNoScope, int id, Func<IResolverContext, object> createValue, int disposalOrder) =>
-            r.GetCurrentScope(throwIfNoScope)?.GetOrAddViaFactoryDelegateWithDisposalOrder(id, createValue, r, disposalOrder);
-
-        internal static readonly MethodInfo GetScopedViaFactoryDelegateWithDisposalOrderMethod =
-            typeof(CurrentScopeReuse).GetMethod(nameof(GetScopedViaFactoryDelegateWithDisposalOrder));
 
         internal sealed class GetScopedViaFactoryDelegateExpression : GetScopedOrSingletonViaFactoryDelegateExpression
         {

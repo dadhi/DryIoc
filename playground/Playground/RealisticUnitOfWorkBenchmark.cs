@@ -1290,7 +1290,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDI | 180.5 us | 7.23 us | 20.98 us | 174.1 us |  1.13 |    0.20 | 12.6953 |      - |     - |  39.34 KB |
 |        MsDI | 232.2 us | 4.64 us | 10.18 us | 232.5 us |  1.41 |    0.20 | 22.9492 | 0.9766 |     - |  70.04 KB |
 
-## v6 @wip Directly recognizing and using InvokeFactoryDelegateExpression
+## v6 Directly recognizing and using InvokeFactoryDelegateExpression
 
 |      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------ |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
@@ -1306,7 +1306,17 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDI | 165.19 us | 5.806 us | 16.657 us |  1.94 |    0.16 |       - |      - |     - |  38.52 KB |
 |        MsDI |  96.35 us | 1.108 us |  0.982 us |  1.16 |    0.05 | 11.8408 | 4.2725 |     - |  72.62 KB |
 
+## v6 Removing the FactoryDelegateExpression wrapper
+
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 79.95 us | 1.016 us | 0.950 us |  1.00 |    0.00 |  5.1270 | 0.4883 |     - |  31.55 KB |
+| DryIoc_MsDI | 89.66 us | 0.951 us | 0.843 us |  1.12 |    0.02 |  5.9814 | 0.4883 |     - |  37.31 KB |
+|        MsDI | 91.18 us | 0.974 us | 0.911 us |  1.14 |    0.02 | 11.8408 | 4.2725 |     - |  72.61 KB |
+
 */
+
+            // [Benchmark]
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
 
