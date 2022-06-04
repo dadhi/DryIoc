@@ -321,7 +321,7 @@ namespace DryIoc
 
                 // Cached expression cannot be ConstantExpression because we unwrap the constant and put its value in the cache instead.
                 // Also the expression is already normalized via NormalizeExpression before put into cache, that's why will call CompileToFactoryDelegate
-                while (entry.Value is Expression cachedExpr) 
+                while (entry.Value is Expression cachedExpr)
                 {
                     if (useInterpretation && Interpreter.TryInterpretAndUnwrapContainerException(this, cachedExpr, out var result))
                         return result;
@@ -370,7 +370,7 @@ namespace DryIoc
             var rules = Rules;
             if (!rules.UseInterpretationForTheFirstResolution)
             {
-                 // todo: @perf @mem should we introduce the GetInstanceOrDefault to avoid lifting object ToFactoryDelegate, e.g. for InstanceFactory
+                // todo: @perf @mem should we introduce the GetInstanceOrDefault to avoid lifting object ToFactoryDelegate, e.g. for InstanceFactory
                 factoryDelegate = factory.GetDelegateOrDefault(request);
                 request.ReturnToPool();
                 if (factoryDelegate == null)
@@ -413,8 +413,8 @@ namespace DryIoc
         public object Resolve(Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args)
         {
-            // fallback to simple Resolve and its default cache if no keys are passed
             var scopeName = CurrentScope?.Name;
+            // fallback to simple Resolve and its default cache if no keys are passed
             return serviceKey == null && requiredServiceType == null && scopeName == null &&
                 (preResolveParent == null || preResolveParent.IsEmpty) && args.IsNullOrEmpty()
                 ? Resolve(serviceType, ifUnresolved)
@@ -1376,7 +1376,7 @@ namespace DryIoc
 
             var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
             if (arrayElementType != null)
-                request = request.WithChangedType(arrayElementType, (_, et) => typeof(IEnumerable<>).MakeGenericType(et));
+                request = request.WithChangedType(arrayElementType, (_, et) => typeof(IEnumerable<>).MakeGenericType(et)); // todo: @wip try to remove this method
 
             var serviceType = request.ServiceType;
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
@@ -1656,7 +1656,7 @@ namespace DryIoc
                 var lastDefaultKey = LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next();
                 // todo: @bug we need a method `Add` which throws for found key, e.g. based on `GetOrAdd`, 
                 // todo: @bug because `AddSureNotPresent` does not work for the same hash, for example `X.A` of `enum X { A = 0 }` and `DefaultKey.Value` have the same hash
-                return new FactoriesEntry(lastDefaultKey, Factories.AddOrUpdate(lastDefaultKey, factory)); 
+                return new FactoriesEntry(lastDefaultKey, Factories.AddOrUpdate(lastDefaultKey, factory));
             }
 
             public FactoriesEntry WithTwo(Factory oldFactory, Factory newFactory)
@@ -1708,14 +1708,7 @@ namespace DryIoc
             if (factory?.GeneratedFactories != null)
                 factory = factory.GetGeneratedFactoryOrDefault(request);
 
-            if (factory == null)
-                return null;
-
-            var condition = factory.Setup.Condition;
-            if (condition != null && !condition(request))
-                return null;
-
-            return factory;
+            return factory != null && factory.CheckCondition(request) ? factory : null;
         }
 
         #endregion
@@ -5018,7 +5011,7 @@ namespace DryIoc
 
             if (rules.ResolveIEnumerableAsLazyEnumerable)
             {
-                var lazyEnumerableExpr = GetLazyEnumerableExpressionOrDefault(request);
+                var lazyEnumerableExpr = GetLazyEnumerableExpressionOrDefault(request, itemType);
                 return collectionType.GetGenericDefinitionOrNull() != typeof(IEnumerable<>)
                     ? Call(ToArrayMethod.MakeGenericMethod(itemType), lazyEnumerableExpr)
                     : lazyEnumerableExpr;
@@ -5102,13 +5095,15 @@ namespace DryIoc
             return NewArrayInit(itemType, itemExprs);
         }
 
-        private static Expression GetLazyEnumerableExpressionOrDefault(Request request)
+        private static Expression GetLazyEnumerableExpressionOrDefault(Request request, Type itemType = null)
         {
+            if (itemType == null)
+            {
+                var collectionType = request.ServiceType;
+                itemType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericArguments()[0];
+            }
             var container = request.Container;
-            var collectionType = request.ServiceType;
-            var itemType = collectionType.IsArray ? collectionType.GetElementType() : collectionType.GetGenericArguments()[0];
             var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
-
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             var preResolveParentExpr = container.GetRequestExpression(request);
 
@@ -5121,7 +5116,7 @@ namespace DryIoc
 
             return New(typeof(LazyEnumerable<>).MakeGenericType(itemType).GetConstructors()[0],
                 // cast to object is not required cause Resolve already returns IEnumerable<object>
-                itemType == typeof(object) ? (Expression)resolveManyExpr : Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr));
+                itemType == typeof(object) ? resolveManyExpr : Call(_enumerableCastMethod.MakeGenericMethod(itemType), resolveManyExpr));
         }
 
         private static readonly MethodInfo _enumerableCastMethod = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast));
@@ -5141,7 +5136,7 @@ namespace DryIoc
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
             {
-                // Here we need to know if the lazy is resolvable, 
+                // Here we need to know if Lazy is resolvable, 
                 // by resolving the factory we are checking that the service itself is registered...
                 // But what about its dependencies. In order to check on them we need to get the expression,
                 // but avoid the creation of singletons on the way (and materializing the types) - because "lazy".
@@ -8975,6 +8970,15 @@ namespace DryIoc
             return t != null && info.ServiceType.IsAssignableFrom(t) ? t : info.ServiceType;
         }
 
+        /// <summary>Returns required service type if it is specified and assignable to service type,
+        /// otherwise returns service type.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static Type GetActualServiceType(this ServiceDetails details, Type serviceType)
+        {
+            var t = details.RequiredServiceType;
+            return t != null && serviceType.IsAssignableFrom(t) ? t : serviceType;
+        }
+
         /// <summary>Appends info string representation into provided builder.</summary>
         public static StringBuilder Print(this StringBuilder s, ServiceInfo info)
         {
@@ -9128,6 +9132,7 @@ namespace DryIoc
 
         /// <summary>Creates service info from parameter alone, setting service type to parameter type,
         /// and setting resolution policy to <see cref="IfUnresolved.ReturnDefault"/> if parameter is optional.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static ParameterServiceInfo Of(ParameterInfo parameter) =>
             OrNull(parameter) ?? new ParameterServiceInfo(parameter);
 
@@ -9345,9 +9350,10 @@ namespace DryIoc
             preResolveParent = preResolveParent ?? Empty;
             if (!preResolveParent.IsEmpty)
             {
-                var parentServiceInfo = preResolveParent.ServiceTypeOrInfo;
-                if (parentServiceInfo is ServiceInfo ps && ps.Details != null && ps.Details != ServiceDetails.Default)
-                    serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(ps.ServiceType, ps.Details, container, preResolveParent.FactoryType);
+                var parentServiceType = preResolveParent.ActualServiceType;
+                var parentDetails = preResolveParent.GetServiceDetails();
+                if (parentDetails != null && parentDetails != ServiceDetails.Default)
+                    serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(parentServiceType, parentDetails, container, preResolveParent.FactoryType);
 
                 flags |= preResolveParent.Flags & InheritedFlags;
             }
@@ -9365,7 +9371,7 @@ namespace DryIoc
                 Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
 
             // todo: @mem @perf Could we avoid the allocation of the ServiceInfo details object for ifUnresolved? because it is unlucky path but we spend the memory on it upfront, especially given that ServiceProviderGetServiceShouldThrowIfUnresolved contains the adjusting value anyway??? 
-            object serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : ServiceInfo.Of(serviceType, ifUnresolved);
+            object serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : ServiceDetails.Of(ifUnresolved);
 
             var req = RentRequest();
             return req == null
@@ -9391,9 +9397,9 @@ namespace DryIoc
         /// <summary>Persisted request conditions</summary>
         public RequestFlags Flags; // todo: @perf combine with the FactoryType or other numeric fields
 
-        // todo: @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
+        // todo: @wip @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
         // The field is mutable so that the ServiceKey or IfUnresolved can be changed in place.
-        internal object ServiceTypeOrInfo; // the Type or the ServiceInfo
+        internal object ServiceTypeOrInfo; // the Type or ServiceInfo or ServiceDetails or ParameterInfo
 
         /// <summary>Input arguments provided with `Resolve`</summary>
         internal Expression[] InputArgExprs;
@@ -9510,22 +9516,23 @@ namespace DryIoc
         /// <summary>Requested service type.</summary>
         public Type ServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.ServiceType : ActualServiceType;
 
-        [Obsolete("Use the `ActualServiceType` instead")]
-        public Type GetActualServiceType() => ActualServiceType;
-        /// <summary>Compatible required or service type.</summary>
+        /// <summary>The required service type when assignable to service type, or service type otherwise.</summary>
         public Type ActualServiceType;
 
         /// <summary>Get the details</summary>
-        public ServiceDetails GetServiceDetails() => ServiceTypeOrInfo is ServiceInfo i ? i.Details : ServiceDetails.Default;
+        public ServiceDetails GetServiceDetails() =>
+            ServiceTypeOrInfo is ServiceInfo i ? i.Details :
+            ServiceTypeOrInfo is ServiceDetails d ? d :
+            ServiceDetails.Default; // is is default for ServiceType and ParameterInfo
 
         /// <summary>Optional service key to identify service of the same type.</summary>
-        public object ServiceKey => ServiceTypeOrInfo is ServiceInfo i ? i.Details.ServiceKey : null;
+        public object ServiceKey => GetServiceDetails().ServiceKey;
 
         /// <summary>Policy to deal with unresolved service.</summary>
-        public IfUnresolved IfUnresolved => ServiceTypeOrInfo is ServiceInfo i ? i.Details.IfUnresolved : default;
+        public IfUnresolved IfUnresolved => GetServiceDetails().IfUnresolved;
 
         /// <summary>Required service type if specified.</summary>
-        public Type RequiredServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.Details.RequiredServiceType : null;
+        public Type RequiredServiceType => GetServiceDetails().RequiredServiceType;
 
         /// <summary>Relative number representing reuse lifespan.</summary>
         public int ReuseLifespan => Reuse?.Lifespan ?? 0;
@@ -9582,8 +9589,9 @@ namespace DryIoc
             if (FactoryID == 0)
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
 
-            if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
-                info = info.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
+            var details = GetServiceDetails();
+            if (details != null && details != ServiceDetails.Default)
+                info = info.InheritInfoFromDependencyOwner(ActualServiceType, details, Container, FactoryType);
 
             var flags = Flags & InheritedFlags | additionalFlags;
             ref var req = ref GetOrPushDepRequestStack(DependencyDepth);
@@ -9603,11 +9611,16 @@ namespace DryIoc
             object info = parameter;
             var actualServiceType = parameter.ParameterType;
             // todo: @perf so in case where we have just a different IfUnresolved, then we have a non default ServiceDetails, which means a whole lot of additional logic being executed with not actual need, right?
-            if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
+            var details = GetServiceDetails();
+            if (details != null && details != ServiceDetails.Default)
             {
-                info = actualServiceType.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
+                info = actualServiceType.InheritInfoFromDependencyOwner(ActualServiceType, details, Container, FactoryType);
                 if (info is ServiceInfo i)
                     actualServiceType = i.GetActualServiceType();
+            }
+            else
+            {
+                // todo: @wip
             }
 
             var flags = Flags & InheritedFlags | additionalFlags;
@@ -9622,15 +9635,16 @@ namespace DryIoc
         /// factory via `WithResolvedFactory` before pushing info into it.</summary>
         public Request PushServiceType(Type serviceType, RequestFlags additionalFlags = default)
         {
-            object info;
-            if (ServiceTypeOrInfo is ServiceInfo s && s.Details != null && s.Details != ServiceDetails.Default)
+            object info = serviceType;
+            // todo: @perf so in case where we have just a different IfUnresolved, then we have a non default ServiceDetails, which means a whole lot of additional logic being executed with not actual need, right?
+            var details = GetServiceDetails();
+            if (details != null && details != ServiceDetails.Default)
             {
-                info = serviceType.InheritInfoFromDependencyOwner(s.ServiceType, s.Details, Container, FactoryType);
+                // todo: @wip check what the mess it is
+                info = serviceType.InheritInfoFromDependencyOwner(ActualServiceType, details, Container, FactoryType);
                 if (info is ServiceInfo i)
                     serviceType = i.GetActualServiceType();
             }
-            else
-                info = ServiceInfo.Of(serviceType);
 
             var flags = Flags & InheritedFlags | additionalFlags;
             ref var req = ref GetOrPushDepRequestStack(DependencyDepth);
@@ -9653,7 +9667,7 @@ namespace DryIoc
                 factoryID, FactoryType.Service, implementationType, reuse, default, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith4Args = Lazy.Of(() =>
-            typeof(Request).Method(nameof(Push), typeof(Type), typeof(int), typeof(Type), typeof(IReuse)));
+            typeof(Request).Method("Push", typeof(Type), typeof(int), typeof(Type), typeof(IReuse)));
 
         /// <summary>Creates info by supplying the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, int factoryID, Type implementationType, IReuse reuse, RequestFlags flags) =>
@@ -9661,7 +9675,7 @@ namespace DryIoc
                 factoryID, FactoryType.Service, implementationType, reuse, flags, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith5Args = Lazy.Of(() =>
-            typeof(Request).Method(nameof(Push), typeof(Type), typeof(int), typeof(Type), typeof(IReuse), typeof(RequestFlags)));
+            typeof(Request).Method("Push", typeof(Type), typeof(int), typeof(Type), typeof(IReuse), typeof(RequestFlags)));
 
         /// <summary>Creates info by supplying the properties and chaining it with current (parent) info.</summary>
         public Request Push(Type serviceType, Type requiredServiceType, object serviceKey,
@@ -9670,7 +9684,7 @@ namespace DryIoc
                 factoryID, factoryType, implementationType, reuse, flags, 0);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith8Args = Lazy.Of(() =>
-            typeof(Request).Method(nameof(Push), typeof(Type), typeof(Type), typeof(object),
+            typeof(Request).Method("Push", typeof(Type), typeof(Type), typeof(object),
                 typeof(int), typeof(FactoryType), typeof(Type), typeof(IReuse), typeof(RequestFlags)));
 
         /// <summary>Creates info by supplying the properties and chaining it with current (parent) info.</summary>
@@ -9681,7 +9695,7 @@ namespace DryIoc
                 factoryID, factoryType, implementationType, reuse, flags, decoratedFactoryID);
 
         internal static readonly Lazy<MethodInfo> PushMethodWith10Args = Lazy.Of(() =>
-            typeof(Request).Method(nameof(Push),
+            typeof(Request).Method("Push",
                 typeof(Type), typeof(Type), typeof(object), typeof(IfUnresolved),
                 typeof(int), typeof(FactoryType), typeof(Type), typeof(IReuse), typeof(RequestFlags), typeof(int)));
 
@@ -9696,7 +9710,7 @@ namespace DryIoc
         }
 
         internal static readonly Lazy<MethodInfo> PushMethodWith12Args = Lazy.Of(() =>
-            typeof(Request).Method(nameof(Push),
+            typeof(Request).Method("Push",
             typeof(Type), typeof(Type), typeof(object), typeof(string), typeof(object), typeof(IfUnresolved),
             typeof(int), typeof(FactoryType), typeof(Type), typeof(IReuse), typeof(RequestFlags), typeof(int)));
 
@@ -9755,11 +9769,12 @@ namespace DryIoc
         /// <summary>Sets service key to the passed value. Required for multiple default services to change null key to
         /// actual <see cref="DefaultKey"/></summary>
         public void ChangeServiceKey(object serviceKey) =>
-            ServiceTypeOrInfo = ServiceTypeOrInfo is ServiceInfo i
-                ? i.Create(i.ServiceType, ServiceDetails.OfServiceKey(i.Details, serviceKey)) // todo: @unclear check for the custom _value
-                : ServiceTypeOrInfo is ParameterInfo pi
+            ServiceTypeOrInfo
+            = ServiceTypeOrInfo is ServiceInfo i
+                ? i.Create(i.ServiceType, ServiceDetails.OfServiceKey(i.Details, serviceKey)) // todo: @unclear check for the custom value
+            : ServiceTypeOrInfo is ParameterInfo pi
                 ? ParameterServiceInfo.Of(pi, ActualServiceType, ServiceDetails.OfServiceKey(ServiceDetails.Default, serviceKey))
-                : ServiceTypeOrInfo = ServiceInfo.Of(ActualServiceType, serviceKey);
+            : ServiceInfo.Of(ActualServiceType, serviceKey);
 
         /// <summary>Prepends input arguments to existing arguments in request. It is done because the
         /// nested Func/Action input argument has a priority over outer argument.

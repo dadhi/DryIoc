@@ -1,4 +1,3 @@
-using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 using System;
 using DryIoc.FastExpressionCompiler.LightExpression;
@@ -6,8 +5,14 @@ using DryIoc.FastExpressionCompiler.LightExpression;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue323_Add_registration_setup_option_to_avoidResolutionScopeTracking
+    public class GHIssue323_Add_registration_setup_option_to_avoidResolutionScopeTracking : ITest
     {
+        public int Run()
+        {
+            ExportSingletonPropertyWorks();
+            return 1;
+        }
+
         [Test]
         public void ExportSingletonPropertyWorks()
         {
@@ -21,10 +26,13 @@ namespace DryIoc.IssuesTests
             Assert.True(a.B.IsDisposed);
 
             var s = c.Resolve<LambdaExpression, A>().ToString();
-            StringAssert.Contains(", False)", s);
+            StringAssert.Contains("False).Resolve", s);
         }
 
-        class A 
+        public override int GetHashCode() => base.GetHashCode();
+        public override string ToString() => base.ToString();
+
+        class A
         {
             public B B;
             public IResolverContext R;
@@ -40,6 +48,5 @@ namespace DryIoc.IssuesTests
             public bool IsDisposed;
             public void Dispose() => IsDisposed = true;
         }
-
     }
 }

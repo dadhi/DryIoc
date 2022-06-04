@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using DryIoc.IssuesTests;
+// using DryIoc.Docs;
 
 namespace DryIoc.UnitTests
 {
@@ -9,7 +10,7 @@ namespace DryIoc.UnitTests
         public static void Main()
         {
             RunAllTests();
-    
+
             // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
 
             // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
@@ -17,32 +18,7 @@ namespace DryIoc.UnitTests
 
         public static void RunAllTests()
         {
-            Scope.WaitForScopedServiceIsCreatedTimeoutTicks = 50; // @important
-            var failed = false;
-            var totalTestPassed = 0;
-            void Run(Func<int> run, string name = null)
-            {
-                var testsName = name ?? run.Method.DeclaringType.FullName;
-                try
-                {
-                    var testsPassed = run();
-                    totalTestPassed += testsPassed;
-                    Console.WriteLine($"{testsPassed,-4} of {testsName}");
-                }
-                catch (Exception ex)
-                {
-                    failed = true;
-                    Console.WriteLine($"ERROR: Tests `{testsName}` failed with '{ex}'");
-                }
-            }
-
-            var sw = Stopwatch.StartNew();
-
-            Console.WriteLine();
-            Console.WriteLine("Running UnitTests and IssueTests (.NET Core) ...");
-            Console.WriteLine();
-
-            var tests = new ITest[] 
+            var unitTests = new ITest[]
             {
                 new ActionTests(),
                 new ArrayToolsTest(),
@@ -89,10 +65,15 @@ namespace DryIoc.UnitTests
                 new UnregisterTests(),
                 new WipeCacheTests(),
                 new WrapperTests(),
+            };
+            var issueTests = new ITest[]
+            {
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
                 new GHIssue180_Option_nullable_int_argument_with_not_null_default_value(),
                 new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service(),
                 new GHIssue198_Open_generics_resolve_fails_if_there_is_a_static_constructor(),
+                new GHIssue289_Think_how_to_make_Use_to_directly_replace_scoped_service_without_special_asResolutionCall_setup(),
+                new GHIssue323_Add_registration_setup_option_to_avoidResolutionScopeTracking(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
                 new GHIssue390_NullReferenceException_on_Unregister(),
@@ -105,22 +86,58 @@ namespace DryIoc.UnitTests
                 new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
             };
+            // var docsTests = new Func<int>[] 
+            // { 
+            //     () => { new Nested_decorators_order().Example(); return 1; }
+            // };
 
-            // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added
-            foreach (var x in tests) Run(x.Run);
+            Scope.WaitForScopedServiceIsCreatedTimeoutTicks = 50; // @important
 
-            if (failed)
+            var totalPassed = 0;
+            var sw = Stopwatch.StartNew();
+            totalPassed += RunTests(unitTests, "UnitTests");
+            totalPassed += RunTests(issueTests, "IssueTests");
+            Console.WriteLine($"\nTotal {totalPassed} of tests are passing in {sw.ElapsedMilliseconds} ms.");
+
+            int Run(Func<int> run, string name = null)
             {
-                Console.WriteLine();
-                Console.WriteLine("ERROR: Some tests are FAILED!");
-                Console.WriteLine($"In other news, {totalTestPassed,-4} of tests are passing in {sw.ElapsedMilliseconds} ms.");
-
-                Environment.ExitCode = 1; // error exit code
-                return;
+                var testsName = name ?? run.Method.DeclaringType.FullName;
+                int testsPassed;
+                try
+                {
+                    testsPassed = run();
+                    Console.WriteLine($"{testsPassed,-4} of {testsName}");
+                }
+                catch (Exception ex)
+                {
+                    testsPassed = 0;
+                    Console.WriteLine($"ERROR: Tests `{testsName}` failed with '{ex}'");
+                }
+                return testsPassed;
             }
 
-            Console.WriteLine();
-            Console.WriteLine($"{totalTestPassed,-4} of tests are passing in {sw.ElapsedMilliseconds} ms.");
+            int RunTests(ITest[] tests, string name)
+            {
+                Console.WriteLine($"\n{name} - running on .NET Core..\n");
+                var somePassed = 0;
+                var someFailed = false;
+                var sw = Stopwatch.StartNew();
+                foreach (var x in tests)
+                {
+                    var passed = Run(x.Run);
+                    if (passed > 0) somePassed += passed;
+                    else someFailed = true;
+                }
+                if (!someFailed)
+                    Console.WriteLine($"\n{somePassed} {name} are passing in {sw.ElapsedMilliseconds} ms.");
+                else
+                {
+                    Console.WriteLine("\nFAILURE! Some tests are FAILED!");
+                    Console.WriteLine($"\nThe rest {somePassed} of {name} are passing in {sw.ElapsedMilliseconds} ms.");
+                    Environment.ExitCode = 1; // error exit code
+                }
+                return somePassed;
+            }
         }
     }
 }
