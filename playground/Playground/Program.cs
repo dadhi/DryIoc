@@ -46,19 +46,19 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
-            // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
-            var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
-            var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
-            var f = (Func<IResolverContext, object>)e.CompileFast();
-            var r = f(d.OpenScope());
-            var s = e.ToCSharpString();
-            // var s = e.ToExpressionString();
-            Console.WriteLine(s);
-            Console.WriteLine("Press any key");
-            Console.ReadKey();
+            // var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
+            // var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
+            // var f = (Func<IResolverContext, object>)e.CompileFast();
+            // var r = f(d.OpenScope());
+            // var s = e.ToCSharpString();
+            // // var s = e.ToExpressionString();
+            // Console.WriteLine(s);
+            // Console.WriteLine("Press any key");
+            // Console.ReadKey();
 
             // var dms = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
             // var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);

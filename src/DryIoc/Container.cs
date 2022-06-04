@@ -12040,7 +12040,7 @@ namespace DryIoc
                     // todo: @perf do we need it for the open-generic because we still want to create the closed-generic type and then ask for its constructors again
                     _implementationTypeOrProviderOrPubCtorOrCtors = ctors[0];
                 }
-                else if (ctorCount == 0)
+                else if (ctorCount == 0) // todo: @feature struct/ValueType without constructor is not supported, because there is no default constructor generated for it
                     return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromNone, implType);
                 else if (factoryMethod == null)
                     return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromMultiple, implType, ctors);
@@ -13301,7 +13301,8 @@ namespace DryIoc
                     // decrease the dependency count when wrapping into lambda
                     if (request.DependencyCount > 0)
                         request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
-                    factoryDelegateExpr = new FactoryDelegateExpression(serviceFactoryExpr); // todo: @perf do we need to do it for a simple constructor expression?
+                    // todo: @perf @mem avoid wrapping it in FactoryDelegateExpression because it is interpeted directly
+                    factoryDelegateExpr = new FactoryDelegateExpression(serviceFactoryExpr);
                 }
 
                 var disposalOrder = request.Factory.Setup.DisposalOrder;
@@ -13411,7 +13412,17 @@ namespace DryIoc
                     return false;
 
                 EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
-                return EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
+                EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
+                var type = Type;
+                if (type.IsValueType)
+                    il.Emit(OpCodes.Unbox_Any, type);
+#if NETFRAMEWORK
+                else
+                    // The cast is required only for Full CLR starting from NET45, e.g.
+                    // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
+                    il.Emit(OpCodes.Castclass, type);
+#endif
+                return true;
             }
         }
 

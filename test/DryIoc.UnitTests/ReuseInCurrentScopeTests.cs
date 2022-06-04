@@ -30,7 +30,8 @@ namespace DryIoc.UnitTests
             Open_multiple_context_independent_scopes();
             Can_resolve_service_as_scoped_or_singleton_depending_on_scope_availability();
             Can_inject_service_as_scoped_or_singleton_depending_on_scope_availability();
-            return 19;
+            ValueType_scoped_dependency_should_be_correctly_interpreted_and_compiled();
+            return 20;
         }
 
         [Test]
@@ -412,6 +413,35 @@ namespace DryIoc.UnitTests
 
             container.Dispose();
             Assert.IsTrue(singleton.Blah.IsDisposed);
+        }
+
+        [Test]
+        public void ValueType_scoped_dependency_should_be_correctly_interpreted_and_compiled()
+        {
+            var c = new Container();
+
+            c.Register<Uno>(Reuse.Scoped);
+            c.Register<DosValue>(Reuse.Scoped);
+
+            using var s = c.OpenScope();
+
+            var u0 = s.Resolve<Uno>();
+            var u1 = s.Resolve<Uno>();
+            var u2 = s.Resolve<Uno>();
+
+            Assert.IsNotNull(u0);
+            Assert.AreSame(u0, u1);
+            Assert.AreSame(u1, u2);
+        }
+
+        class Uno
+        {
+            public readonly DosValue Dos;
+            public Uno(DosValue dos) => Dos = dos;
+        }
+
+        struct DosValue {
+            public DosValue() {}
         }
 
         public class SingletonBlahUser
