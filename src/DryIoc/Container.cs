@@ -3819,6 +3819,7 @@ namespace DryIoc
                 //todo: @wip
                 result = ((Func<IResolverContext, object>)lambdaConstExpr.Value)(r);
             }
+            // todo: @perf @mem we still unpacking the lambda, why do we need to store it then?
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
             itemRef.Value = result;

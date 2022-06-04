@@ -6028,13 +6028,14 @@ namespace DryIoc.FastExpressionCompiler
                     }
                 case ExpressionType.Call:
                     {
-                        var x = (MethodCallExpression)e;
-                        sb.Append("Call(");
-                        sb.NewLineIdentExpr(x.Object, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(", ");
-                        sb.NewLineIdent(lineIdent).AppendMethod(x.Method, stripNamespace, printType);
-                        if (x.Arguments.Count > 0)
-                            sb.Append(',').NewLineIdentArgumentExprs(x.Arguments, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
-                        return sb.Append(')');
+                        var mc = (MethodCallExpression)e;
+                        var diffTypes = mc.Type != mc.Method.ReturnType;
+                        sb.Append(diffTypes ? "Convert(Call(" : "Call(");
+                        sb.NewLineIdentExpr(mc.Object, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(", ");
+                        sb.NewLineIdent(lineIdent).AppendMethod(mc.Method, stripNamespace, printType);
+                        if (mc.Arguments.Count > 0)
+                            sb.Append(',').NewLineIdentArgumentExprs(mc.Arguments, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
+                        return diffTypes ? sb.Append("), ").AppendTypeof(e.Type, stripNamespace, printType).Append(')') : sb.Append(')');
                     }
                 case ExpressionType.MemberAccess:
                     {
@@ -6267,6 +6268,7 @@ namespace DryIoc.FastExpressionCompiler
                         if (e is UnaryExpression u)
                         {
                             sb.Append(name).Append('(');
+                            // todo: @feature maybe for big expression it makes sense to print the Type in comment here so you don't navigate to the closing parentheses to find it
                             sb.NewLineIdentExpr(u.Operand, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
 
                             if (e.NodeType == ExpressionType.Convert ||
