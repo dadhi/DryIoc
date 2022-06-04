@@ -12,6 +12,7 @@ echo:## Starting: TestRunner... ##
 echo:
 
 dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
 
 if %ERRORLEVEL% neq 0 goto :error
 echo:## Finished: TestRunner ##

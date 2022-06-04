@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net472</TargetFramework>
     <IsTestProject>false</IsTestProject>
     <SkipDocGen>true</SkipDocGen>
   </PropertyGroup>
@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj" />
+    <ProjectReference Include="..\DryIoc.Issue139_ReducedLoadTests\ReducedStackoverflow.csproj" />
     <ProjectReference Include="..\..\docs\DryIoc.Docs\DryIoc.Docs.csproj" />
   </ItemGroup>
 

@@ -52,11 +52,13 @@ namespace Playground
 
             // var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
             // var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
-            // Console.WriteLine("Press any key");
-            // Console.ReadKey();
             // var f = (Func<IResolverContext, object>)e.CompileFast();
             // var r = f(d.OpenScope());
-            // var s = e.ToCSharpString();
+            // // var s = e.ToCSharpString();
+            // var s = e.ToExpressionString();
+            // Console.WriteLine(s);
+            // Console.WriteLine("Press any key");
+            // Console.ReadKey();
 
             // var dms = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
             // var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);

@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks Condition="'$(DevMode)' == 'true'">netcoreapp3.1</TargetFrameworks>
-        <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp3.1;net472</TargetFrameworks>
+        <TargetFrameworks>netcoreapp3.1;net472</TargetFrameworks>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
         <MSBuildWarningsAsMessages>
@@ -32,7 +31,7 @@
     </ItemGroup>
 
     <Target Name="MdGenerate" BeforeTargets="BeforeBuild"
-        Condition=" '$(Configuration)' == 'Debug' ">
+        Condition=" '$(Configuration)' == 'Debug' AND '$(SkipDocGen)' != 'true' ">
         <Message Text="Generating the Markdown documentation..." Importance="high"/>
         <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet tool restore" />
         <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet cstomd %(DocFile.Identity)" />

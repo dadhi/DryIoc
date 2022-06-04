@@ -15,8 +15,16 @@ namespace LoadTest
      * Reproduces https://github.com/dadhi/DryIoc/issues/139
      */
     [TestFixture]
-    public class ReducedLoadTest
+    public class ReducedLoadTest : ITest
     {
+        public int Run()
+        {
+            Test_with_UseDecorateeReuse_decorators_Examine_expression_and_the_split_graph();
+            Test_with_singleton_decorators();
+            Test_with_transient_decorators();
+            return 3;
+        }
+
         [Test]
         public void Test_with_UseDecorateeReuse_decorators_Examine_expression_and_the_split_graph()
         {
