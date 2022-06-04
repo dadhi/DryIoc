@@ -1376,7 +1376,7 @@ namespace DryIoc
 
             var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
             if (arrayElementType != null)
-                request = request.WithChangedType(arrayElementType, (_, et) => typeof(IEnumerable<>).MakeGenericType(et)); // todo: @wip try to remove this method
+                request = request.WithChangedType(arrayElementType, (_, et) => typeof(IEnumerable<>).MakeGenericType(et)); // todo: @simplify try to remove this method
 
             var serviceType = request.ServiceType;
             var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
@@ -9397,7 +9397,6 @@ namespace DryIoc
         /// <summary>Persisted request conditions</summary>
         public RequestFlags Flags; // todo: @perf combine with the FactoryType or other numeric fields
 
-        // todo: @wip @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
         // The field is mutable so that the ServiceKey or IfUnresolved can be changed in place.
         internal object ServiceTypeOrInfo; // the Type or ServiceInfo or ServiceDetails or ParameterInfo
 
@@ -9610,6 +9609,7 @@ namespace DryIoc
 
             object info = parameter;
             var actualServiceType = parameter.ParameterType;
+
             // todo: @perf so in case where we have just a different IfUnresolved, then we have a non default ServiceDetails, which means a whole lot of additional logic being executed with not actual need, right?
             var details = GetServiceDetails();
             if (details != null && details != ServiceDetails.Default)
@@ -9617,10 +9617,6 @@ namespace DryIoc
                 info = actualServiceType.InheritInfoFromDependencyOwner(ActualServiceType, details, Container, FactoryType);
                 if (info is ServiceInfo i)
                     actualServiceType = i.GetActualServiceType();
-            }
-            else
-            {
-                // todo: @wip
             }
 
             var flags = Flags & InheritedFlags | additionalFlags;
@@ -9640,7 +9636,6 @@ namespace DryIoc
             var details = GetServiceDetails();
             if (details != null && details != ServiceDetails.Default)
             {
-                // todo: @wip check what the mess it is
                 info = serviceType.InheritInfoFromDependencyOwner(ActualServiceType, details, Container, FactoryType);
                 if (info is ServiceInfo i)
                     serviceType = i.GetActualServiceType();
@@ -13269,7 +13264,6 @@ namespace DryIoc
         /// <summary>Creates scoped item creation and access expression.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            // todo: @perf start with checking for hot-path first - just check that expression is NewExpression here to short-circuit the apply logic
             serviceFactoryExpr = serviceFactoryExpr.NormalizeExpression();
 
             if (request.TracksTransientDisposable)
