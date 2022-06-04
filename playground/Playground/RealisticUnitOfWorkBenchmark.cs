@@ -1282,7 +1282,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDI | 97.42 us | 0.646 us | 0.572 us |  1.14 |    0.01 |  6.4697 | 0.6104 |     - |   40.2 KB |
 |        MsDI | 93.91 us | 1.406 us | 1.315 us |  1.10 |    0.02 | 11.8408 | 4.2725 |     - |  72.53 KB |
 
-## v6 @wip storing the ServiceDetails instead of ServiceInfo in Request
+## v6 Storing the ServiceDetails as ServiceInfo in Request
 
 |      Method |     Mean |   Error |   StdDev |   Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
 |------------ |---------:|--------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
@@ -1290,6 +1290,13 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDI | 180.5 us | 7.23 us | 20.98 us | 174.1 us |  1.13 |    0.20 | 12.6953 |      - |     - |  39.34 KB |
 |        MsDI | 232.2 us | 4.64 us | 10.18 us | 232.5 us |  1.41 |    0.20 | 22.9492 | 0.9766 |     - |  70.04 KB |
 
+## v6 @wip Directly recognizing and using InvokeFactoryDelegateExpression
+
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 85.37 us | 1.618 us | 1.731 us |  1.00 |    0.00 |  5.3711 | 0.4883 |     - |   33.2 KB |
+| DryIoc_MsDI | 96.08 us | 1.806 us | 1.855 us |  1.13 |    0.04 |  6.3477 | 0.6104 |     - |  39.15 KB |
+|        MsDI | 93.17 us | 0.802 us | 0.750 us |  1.09 |    0.02 | 11.8408 | 4.2725 |     - |  72.61 KB |
 */
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());

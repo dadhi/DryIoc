@@ -3811,9 +3811,14 @@ namespace DryIoc
             }
 
             object result = null;
-            var lambda = e.ServiceFactoryExpr;
-            if (lambda is ConstantExpression lambdaConstExpr)
+            var lambda = e.FactoryDelegateLambdaOrInvokeExpr;
+            if (lambda is InvokeFactoryDelegateExpression i)
+                result = i.FactoryDelegate(r);
+            else if (lambda is ConstantExpression lambdaConstExpr)
+            {
+                //todo: @wip
                 result = ((Func<IResolverContext, object>)lambdaConstExpr.Value)(r);
+            }
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
             itemRef.Value = result;
@@ -3864,9 +3869,14 @@ namespace DryIoc
             }
 
             object result = null;
-            var lambda = e.ServiceFactoryExpr;
-            if (lambda is ConstantExpression lambdaConstExpr)
+            var lambda = e.FactoryDelegateLambdaOrInvokeExpr;
+            if (lambda is InvokeFactoryDelegateExpression i)
+                result = i.FactoryDelegate(r);
+            else if (lambda is ConstantExpression lambdaConstExpr)
+            {
+                //todo: @wip
                 result = ((Func<IResolverContext, object>)lambdaConstExpr.Value)(r);
+            }
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
             itemRef.Value = result;
@@ -13281,11 +13291,11 @@ namespace DryIoc
             else
             {
                 Expression factoryDelegateExpr;
-                if (serviceFactoryExpr is InvocationExpression ie && ie.Expression is ConstantExpression registeredDelegateExpr &&
+                if (serviceFactoryExpr is InvokeFactoryDelegateExpression fd)
+                    factoryDelegateExpr = fd;
+                else if (serviceFactoryExpr is InvocationExpression ie && ie.Expression is ConstantExpression registeredDelegateExpr &&
                     registeredDelegateExpr.Type == typeof(Func<IResolverContext, object>))
-                {
                     factoryDelegateExpr = registeredDelegateExpr;
-                }
                 else
                 {
                     // decrease the dependency count when wrapping into lambda
@@ -13363,16 +13373,18 @@ namespace DryIoc
             public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateMethod;
             public readonly int FactoryId;
             public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
-            public readonly Expression ServiceFactoryExpr;
+            public readonly Expression FactoryDelegateLambdaOrInvokeExpr;
+            public Expression FactoryDelegateExpr =>
+                FactoryDelegateLambdaOrInvokeExpr is InvokeFactoryDelegateExpression i ? i.Expression : FactoryDelegateLambdaOrInvokeExpr;
             public override int ArgumentCount => 3;
             public override IReadOnlyList<Expression> Arguments =>
-                new[] { FactoryIdExpr, ServiceFactoryExpr, FactoryDelegateCompiler.ResolverContextParamExpr };
+                new[] { FactoryIdExpr, FactoryDelegateExpr, FactoryDelegateCompiler.ResolverContextParamExpr };
             public override Expression GetArgument(int i) =>
-                i == 0 ? FactoryIdExpr : i == 1 ? ServiceFactoryExpr : FactoryDelegateCompiler.ResolverContextParamExpr;
-            internal GetScopedOrSingletonViaFactoryDelegateExpression(int factoryId, Expression createValueExpr)
+                i == 0 ? FactoryIdExpr : i == 1 ? FactoryDelegateExpr : FactoryDelegateCompiler.ResolverContextParamExpr;
+            internal GetScopedOrSingletonViaFactoryDelegateExpression(int factoryId, Expression factoryDelegateLambdaOrInvokeExpr)
             {
                 FactoryId = factoryId;
-                ServiceFactoryExpr = createValueExpr;
+                FactoryDelegateLambdaOrInvokeExpr = factoryDelegateLambdaOrInvokeExpr;
             }
 
             public override bool IsIntrinsic => true;
@@ -13380,7 +13392,7 @@ namespace DryIoc
             public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 bool isNestedLambda, ref ClosureInfo rootClosure) =>
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config) &&
-                ExpressionCompiler.TryCollectBoundConstants(ref closure, ServiceFactoryExpr, paramExprs, isNestedLambda, ref rootClosure, config);
+                ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
             // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -13390,7 +13402,7 @@ namespace DryIoc
                 EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
 
                 // todo: @perf more intelligent emit?
-                if (!EmittingVisitor.TryEmit(ServiceFactoryExpr, paramExprs, il, ref closure, config, parent))
+                if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
                     return false;
 
                 EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
@@ -13405,9 +13417,9 @@ namespace DryIoc
             public ConstantExpression DisposalOrderExpr => ConstantInt(DisposalOrder);
             public override int ArgumentCount => 4;
             public override IReadOnlyList<Expression> Arguments =>
-                new[] { FactoryIdExpr, ServiceFactoryExpr, FactoryDelegateCompiler.ResolverContextParamExpr, DisposalOrderExpr };
+                new[] { FactoryIdExpr, FactoryDelegateExpr, FactoryDelegateCompiler.ResolverContextParamExpr, DisposalOrderExpr };
             public override Expression GetArgument(int i) =>
-                i == 0 ? FactoryIdExpr : i == 1 ? ServiceFactoryExpr : i == 2 ? FactoryDelegateCompiler.ResolverContextParamExpr : DisposalOrderExpr;
+                i == 0 ? FactoryIdExpr : i == 1 ? FactoryDelegateExpr : i == 2 ? FactoryDelegateCompiler.ResolverContextParamExpr : DisposalOrderExpr;
             // todo: @perf make it true but for now it is a rare case to be so much optimized
             public override bool IsIntrinsic => false;
             internal GetScopedOrSingletonViaFactoryDelegateWithDisposalOrderExpression(
