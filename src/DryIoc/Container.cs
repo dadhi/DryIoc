@@ -4084,7 +4084,7 @@ namespace DryIoc
 
     internal sealed class FactoryDelegateExpression : Expression<Func<IResolverContext, object>>
     {
-        public override Type ReturnType => typeof(object);
+        public override Type ReturnType => Body.Type;
         public override int ParameterCount => 1;
         public override IReadOnlyList<ParameterExpression> Parameters => FactoryDelegateCompiler.ResolverContextParamExprs;
         public override ParameterExpression GetParameter(int index) => FactoryDelegateCompiler.ResolverContextParamExpr;
@@ -10864,7 +10864,7 @@ namespace DryIoc
 
                     serviceExpr = ApplyReuse(serviceExpr, request); // todo: @perf pass a possibly calculated id to here
 
-                    var serviceExprType = serviceExpr.Type;
+                    var serviceExprType = serviceExpr.Type; // todo: @perf @simplify move the conversion inside the Reuse.Apply, make it the requirement for reuse to return the same Type of Expression
                     if (serviceExpr.NodeType != ExprType.Constant && // todo: @perf just check that 
                         serviceExprType != originalServiceExprType && !originalServiceExprType.IsAssignableFrom(serviceExprType))
                         serviceExpr = originalServiceExprType.Cast(serviceExpr);
@@ -13369,6 +13369,8 @@ namespace DryIoc
 
         internal class GetScopedOrSingletonViaFactoryDelegateExpression : MethodCallExpression
         {
+            public override Type Type =>
+                FactoryDelegateLambdaOrInvokeExpr is LambdaExpression l ? l.Body.Type : FactoryDelegateLambdaOrInvokeExpr.Type;
             public override Expression Object => ResolverContext.CurrentOrSingletonScopeExpr;
             public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateMethod;
             public readonly int FactoryId;
@@ -13386,6 +13388,9 @@ namespace DryIoc
                 FactoryId = factoryId;
                 FactoryDelegateLambdaOrInvokeExpr = factoryDelegateLambdaOrInvokeExpr;
             }
+
+            internal override System.Linq.Expressions.Expression CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
+                System.Linq.Expressions.Expression.Convert(base.CreateSysExpression(ref exprsConverted), Type);
 
             public override bool IsIntrinsic => true;
 

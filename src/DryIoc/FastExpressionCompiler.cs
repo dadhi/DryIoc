@@ -6369,33 +6369,35 @@ namespace DryIoc.FastExpressionCompiler
                     }
                 case ExpressionType.Call:
                     {
-                        var x = (MethodCallExpression)e;
-                        if (x.Object != null)
-                            x.Object.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
-                        else // for the static method or the static extension method we need to qualify with the class
-                            sb.Append(x.Method.DeclaringType.ToCode(stripNamespace, printType));
+                        var mc = (MethodCallExpression)e;
 
-                        var name = x.Method.Name;
+                        // output convert only if it is required, e.g. it may happen for custom expressions designed by users
+                        var diffTypes = mc.Type != mc.Method.ReturnType;
+                        if (diffTypes) sb.Append("((").Append(mc.Type.ToCode(stripNamespace, printType)).Append(')');
+
+                        if (mc.Object != null)
+                            mc.Object.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
+                        else // for the static method or the static extension method we need to qualify with the class
+                            sb.Append(mc.Method.DeclaringType.ToCode(stripNamespace, printType));
+
+                        var name = mc.Method.Name;
                         // check for the special methods, e.g. property access `get_` or `set_` and output them as properties
-                        if (x.Method.IsSpecialName)
-                        {
-                            if (name.StartsWith("get_") || name.StartsWith("set_"))
-                                return sb.Append('.').Append(name.Substring(4));
-                        }
+                        if (mc.Method.IsSpecialName && (name.StartsWith("get_") || name.StartsWith("set_")))
+                            return sb.Append('.').Append(name.Substring(4));
 
                         sb.Append('.').Append(name);
-                        if (x.Method.IsGenericMethod)
+                        if (mc.Method.IsGenericMethod)
                         {
                             sb.Append('<');
-                            var typeArgs = x.Method.GetGenericArguments();
+                            var typeArgs = mc.Method.GetGenericArguments();
                             for (var i = 0; i < typeArgs.Length; i++)
                                 (i == 0 ? sb : sb.Append(", ")).Append(typeArgs[i].ToCode(stripNamespace, printType));
                             sb.Append('>');
                         }
 
                         sb.Append('(');
-                        var pars = x.Method.GetParameters();
-                        var args = x.Arguments;
+                        var pars = mc.Method.GetParameters();
+                        var args = mc.Arguments;
                         if (args.Count == 1)
                         {
                             var p = pars[0];
@@ -6417,7 +6419,8 @@ namespace DryIoc.FastExpressionCompiler
                                 args[i].ToCSharpString(sb, lineIdent + identSpaces, stripNamespace, printType, identSpaces, tryPrintConstant);
                             }
                         }
-                        return sb.Append(')');
+                        // for the different return and expression types wrapping the whole expression including the cast with additional parentheses
+                        return diffTypes ? sb.Append("))") : sb.Append(')');
                     }
                 case ExpressionType.MemberAccess:
                     {
@@ -6782,8 +6785,11 @@ namespace DryIoc.FastExpressionCompiler
 
                                 case ExpressionType.Convert:
                                 case ExpressionType.ConvertChecked:
-                                    sb.Append("((").Append(e.Type.ToCode(stripNamespace, printType)).Append(')');
-                                    return op.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(')');
+                                    var diffTypes = e.Type != op.Type; // output convert only if it is required
+                                    if (diffTypes) sb.Append("((").Append(e.Type.ToCode(stripNamespace, printType)).Append(')');
+                                    sb = op.ToCSharpString(sb, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
+                                    if (diffTypes) sb.Append(')');
+                                    return sb;
 
                                 case ExpressionType.Decrement:
                                     return op.ToCSharpString(sb.Append('('), lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(" - 1)");

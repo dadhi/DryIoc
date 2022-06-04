@@ -40,8 +40,8 @@ namespace Playground
             //    RealisticUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIoc());
             //Debug.Assert(x != null);
 
-            var x = RealisticUnitOfWorkBenchmark.Measure(RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi());
-            Console.ReadKey();
+            // var x = RealisticUnitOfWorkBenchmark.Measure(RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi());
+            // Console.ReadKey();
 
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
@@ -50,15 +50,15 @@ namespace Playground
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
-            // var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
-            // var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
-            // var f = (Func<IResolverContext, object>)e.CompileFast();
-            // var r = f(d.OpenScope());
-            // // var s = e.ToCSharpString();
+            var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
+            var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
+            var f = (Func<IResolverContext, object>)e.CompileFast();
+            var r = f(d.OpenScope());
+            var s = e.ToCSharpString();
             // var s = e.ToExpressionString();
-            // Console.WriteLine(s);
-            // Console.WriteLine("Press any key");
-            // Console.ReadKey();
+            Console.WriteLine(s);
+            Console.WriteLine("Press any key");
+            Console.ReadKey();
 
             // var dms = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
             // var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);
