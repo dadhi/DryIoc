@@ -69,6 +69,7 @@ namespace DryIoc.UnitTests.net472
             var issueTests = new ITest[]
             {
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
+                new GHIssue80_ScopedOrSingleton_extra_constructor_calls(),
                 new GHIssue180_Option_nullable_int_argument_with_not_null_default_value(),
                 new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service(),
                 new GHIssue198_Open_generics_resolve_fails_if_there_is_a_static_constructor(),

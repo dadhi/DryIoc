@@ -4074,7 +4074,7 @@ namespace DryIoc
 
     internal sealed class FactoryDelegateExpression : Expression<Func<IResolverContext, object>>
     {
-        public override Type ReturnType => Body.Type;
+        public override Type ReturnType => typeof(object);
         public override int ParameterCount => 1;
         public override IReadOnlyList<ParameterExpression> Parameters => FactoryDelegateCompiler.ResolverContextParamExprs;
         public override ParameterExpression GetParameter(int index) => FactoryDelegateCompiler.ResolverContextParamExpr;
@@ -12611,26 +12611,12 @@ namespace DryIoc
             closure.AddConstantOrIncrementUsageCount(FactoryDelegate) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
-        internal static bool EmitConvertObjectTo(ILGenerator il, Type t)
-        {
-            if (t != typeof(object))
-                if (t.IsValueType)
-                    il.Emit(OpCodes.Unbox_Any, t);
-#if NETFRAMEWORK
-                // The cast is required only for Full CLR starting from NET45, e.g.
-                // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
-                else
-                    il.Emit(OpCodes.Castclass, t);
-#endif
-            return true;
-        }
-
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
             EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
             EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
             EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
-            EmitConvertObjectTo(il, Type);
+            il.EmitConvertObjectTo(Type);
     }
 
     internal sealed class InvokeFactoryDelegateOfRootOrSelfExpression : InvokeFactoryDelegateExpression
@@ -12644,7 +12630,7 @@ namespace DryIoc
             EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
             ResolverContext.RootOrSelfExpr.TryEmit(config, ref closure, paramExprs, il, parent, byRefIndex) &&
             EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
-            EmitConvertObjectTo(il, Type);
+            il.EmitConvertObjectTo(Type);
     }
 
     /// <summary>The placeholder for thr later resgitration</summary>
@@ -13389,20 +13375,11 @@ namespace DryIoc
 
                 // todo: @perf more intelligent emit?
                 if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
-                    return false;
+                    return false; // todo: @bug uncomment the FEC NestedLambdaInfo.IsTheSameLambda and check why fallback System compile does not work
 
                 EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
                 EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
-                var type = Type;
-                if (type.IsValueType)
-                    il.Emit(OpCodes.Unbox_Any, type);
-#if NETFRAMEWORK
-                else
-                    // The cast is required only for Full CLR starting from NET45, e.g.
-                    // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
-                    il.Emit(OpCodes.Castclass, type);
-#endif
-                return true;
+                return il.EmitConvertObjectTo(Type);
             }
         }
 
@@ -14990,6 +14967,20 @@ namespace DryIoc
             !type.IsValueType
                 ? ConvertViaCastClassIntrinsic(source, type)
                 : Convert(source, type);
+
+        internal static bool EmitConvertObjectTo(this ILGenerator il, Type t)
+        {
+            if (t != typeof(object))
+                if (t.IsValueType)
+                    il.Emit(OpCodes.Unbox_Any, t);
+#if NETFRAMEWORK
+                // The cast is required only for Full CLR starting from NET45, e.g.
+                // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
+                else
+                    il.Emit(OpCodes.Castclass, t);
+#endif
+            return true;
+        }
 
         /// <summary>Optimized version of the map GetValueOrDefault for the Type key and object value</summary>
         [MethodImpl((MethodImplOptions)256)]

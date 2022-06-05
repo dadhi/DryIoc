@@ -974,6 +974,8 @@ namespace DryIoc.FastExpressionCompiler
                 ClosureInfo = new ClosureInfo(ClosureStatus.ToBeCollected);
                 Lambda = null;
             }
+            internal bool IsTheSameLambda(LambdaExpression lambda) => // todo: @unclear @wip parameters or is comparing the body is enough?
+                ReferenceEquals(LambdaExpression, lambda) || ReferenceEquals(LambdaExpression.Body, lambda.Body);
         }
 
         internal static class CurryClosureFuncs
@@ -1522,7 +1524,7 @@ namespace DryIoc.FastExpressionCompiler
         private static NestedLambdaInfo FindAlreadyCollectedNestedLambdaInfo(
             NestedLambdaInfo nestedLambda, LambdaExpression nestedLambdaExpr, out object foundInLambdaOrLambdas)
         {
-            if (ReferenceEquals(nestedLambda.LambdaExpression, nestedLambdaExpr))
+            if (nestedLambda.IsTheSameLambda(nestedLambdaExpr))
             {
                 foundInLambdaOrLambdas = nestedLambda;
                 return nestedLambda;
@@ -4252,7 +4254,7 @@ namespace DryIoc.FastExpressionCompiler
                 var nestedLambdaInfo = outerNestedLambdaOrLambdas as NestedLambdaInfo;
                 if (nestedLambdaInfo != null)
                 {
-                    if (!ReferenceEquals(nestedLambdaInfo.LambdaExpression, lambdaExpr))
+                    if (!nestedLambdaInfo.IsTheSameLambda(lambdaExpr))
                         return false;
                 }
                 else
@@ -4261,7 +4263,7 @@ namespace DryIoc.FastExpressionCompiler
                     for (var i = 0; i < outerNestedLambdas.Length && nestedLambdaInfo == null; ++i)
                     {
                         var outer = outerNestedLambdas[i];
-                        if (ReferenceEquals(outer.LambdaExpression, lambdaExpr))
+                        if (outer.IsTheSameLambda(lambdaExpr))
                         {
                             nestedLambdaInfo = outer;
                             nestedLambdaInClosureIndex += i;
