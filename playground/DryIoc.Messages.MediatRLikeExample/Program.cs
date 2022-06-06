@@ -42,7 +42,7 @@ namespace DryIoc.Messages.MediatRLikeExample
 
         public JingHandler(TextWriter writer) => _writer = writer;
 
-        protected override Task<EmptyResponse> Handle(Jing request, CancellationToken cancellationToken) => 
+        protected override Task<EmptyResponse> Handle(Jing request, CancellationToken cancellationToken) =>
             _writer.WriteLineAsync($"--- Handled Jing: {request.Message}, no Jong").ToEmptyResponse();
     }
 
@@ -70,7 +70,7 @@ namespace DryIoc.Messages.MediatRLikeExample
 
         public PingedHandler(TextWriter writer) => _writer = writer;
 
-        public Task<EmptyResponse> Handle(Pinged notification, CancellationToken cancellationToken) => 
+        public Task<EmptyResponse> Handle(Pinged notification, CancellationToken cancellationToken) =>
             _writer.WriteLineAsync("Got pinged async.").ToEmptyResponse();
     }
 
@@ -80,7 +80,7 @@ namespace DryIoc.Messages.MediatRLikeExample
 
         public PongedHandler(TextWriter writer) => _writer = writer;
 
-        public Task<EmptyResponse> Handle(Ponged notification, CancellationToken cancellationToken) => 
+        public Task<EmptyResponse> Handle(Ponged notification, CancellationToken cancellationToken) =>
             _writer.WriteLineAsync("Got ponged async.").ToEmptyResponse();
     }
 
@@ -90,7 +90,7 @@ namespace DryIoc.Messages.MediatRLikeExample
         private readonly TextWriter _writer;
         public ConstrainedPingedHandler(TextWriter writer) => _writer = writer;
 
-        public Task<EmptyResponse> Handle(TNotification notification, CancellationToken cancellationToken) => 
+        public Task<EmptyResponse> Handle(TNotification notification, CancellationToken cancellationToken) =>
             _writer.WriteLineAsync("Got pinged constrained async.").ToEmptyResponse();
     }
 
@@ -98,10 +98,10 @@ namespace DryIoc.Messages.MediatRLikeExample
     {
         private readonly TextWriter _writer;
 
-        public PingedAlsoHandler(TextWriter writer) => 
+        public PingedAlsoHandler(TextWriter writer) =>
             _writer = writer;
 
-        public Task<EmptyResponse> Handle(Pinged notification, CancellationToken cancellationToken) => 
+        public Task<EmptyResponse> Handle(Pinged notification, CancellationToken cancellationToken) =>
             _writer.WriteLineAsync("Got pinged also async.").ToEmptyResponse();
     }
 

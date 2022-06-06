@@ -4,12 +4,23 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+    {
+        "name": "MediatR comptime",
+        "type": "coreclr",
+        "request": "launch",
+        "preLaunchTask": "build_mediatr_comptime",
+        "program": "${workspaceFolder}/playground/DryIoc.Messages.MediatRLikeExample.CompileTimeDI/bin/Debug/net6.0/DryIoc.Messages.MediatRLikeExample.CompileTimeDI.exe",
+        "args": [],
+        "cwd": "${workspaceFolder}",
+        "stopAtEntry": false,
+        "console": "internalConsole"
+    },
         {
             "name": "Benchmarks",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build_benchmark",
-            "program": "${workspaceFolder}/playground/Playground/bin/Debug/net6/Playground.dll",
+            "program": "${workspaceFolder}/playground/Playground/bin/Debug/net6.0/Playground.exe",
             "args": [],
             "cwd": "${workspaceFolder}/playground/Playground",
             "stopAtEntry": false,

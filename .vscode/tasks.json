@@ -4,6 +4,20 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "build_mediatr_comptime",
+            "type": "process",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/playground/DryIoc.Messages.MediatRLikeExample.CompileTimeDI/DryIoc.Messages.MediatRLikeExample.CompileTimeDI.csproj"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
             "label": "build_benchmark",
             "type": "process",
             "command": "dotnet",
