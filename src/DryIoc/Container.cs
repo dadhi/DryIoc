@@ -5665,13 +5665,39 @@ namespace DryIoc
         }
 
         /// <summary>Returns the new rules with the passed dynamic registration rule appended.</summary>
-        public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, DynamicRegistrationFlags flags)
+        public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, 
+            DynamicRegistrationFlags flags = DryIoc.DynamicRegistrationFlags.Service)
         {
             var newRules = Clone(cloneMade: false);
             newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.Append(provider);
             newRules.DynamicRegistrationFlags = DynamicRegistrationFlags.Append(flags);
             return newRules;
         }
+
+        /// <summary>Removes the dynamic registration provider</summary>
+        public Rules WithoutDynamicRegistration(DynamicRegistrationProvider provider)
+        {
+            var ruleIndex = DynamicRegistrationProviders.IndexOf(provider);
+            if (ruleIndex != -1)
+            {
+                var newRules = Clone(cloneMade: false);
+                newRules.DynamicRegistrationProviders = DynamicRegistrationProviders.RemoveAt(ruleIndex);
+                newRules.DynamicRegistrationFlags = DynamicRegistrationFlags.RemoveAt(ruleIndex);
+                return newRules;
+            }
+            return this;
+        } 
+
+        /// <summary>Returns a single dynamic registration made out of factory</summary>
+        public static DynamicRegistrationProvider DynamicRegistrationOf(Func<Type, Factory> getFactoryOrNull) =>
+            (serviceType, _) => {
+                var f = getFactoryOrNull(serviceType);
+                return f == null ? null : new DynamicRegistration(f).One();
+            };
+
+        /// <summary>Add as single dynamic registration provider to the rules</summary>
+        public Rules WithDynamicRegistration(Func<Type, Factory> getFactoryOrNull) =>
+            WithDynamicRegistration(DynamicRegistrationOf(getFactoryOrNull));
 
         /// <summary>The flags per dynamic registration provider</summary>
         public DynamicRegistrationFlags[] DynamicRegistrationFlags { get; private set; }
