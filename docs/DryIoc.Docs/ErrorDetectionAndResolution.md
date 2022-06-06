@@ -76,6 +76,7 @@ class Unable_to_resolve_unknown_service
         //   from Container without Scope
         //   Where no service registrations found
         // and no dynamic registrations found in 0 of Rules.DynamicServiceProviders
+        //   and nothing found in 0 of Rules.UnknownServiceResolvers
     }
 }
 ```
@@ -314,6 +315,7 @@ message: Unable to resolve RequiredDependency as parameter "dependency"
   from container without scope
 Where no service registrations found
   and no dynamic registrations found in 0 of Rules.DynamicServiceProviders
+  and nothing found in 0 of Rules.UnknownServiceResolvers
 ```
 
 `Validate` allows to specify the registrations to resolve via predicate `Func<ServiceRegistrationInfo, bool>` 

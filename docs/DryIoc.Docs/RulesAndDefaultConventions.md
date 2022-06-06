@@ -18,6 +18,7 @@
   - [Rules per Container](#rules-per-container)
     - [FactorySelector](#factoryselector)
     - [FactoryMethod, Parameters and Properties selector](#factorymethod-parameters-and-properties-selector)
+    - [UnknownServiceResolvers](#unknownserviceresolvers)
     - [DynamicRegistrationProvider](#dynamicregistrationprovider)
       - [AutoFallbackDynamicRegistrations](#autofallbackdynamicregistrations)
       - [WithConcreteTypeDynamicRegistrations](#withconcretetypedynamicregistrations)
@@ -646,15 +647,39 @@ marked with `ImportingConstructor` and `Import` attributes.
 In addition you can use the rule to [select constructor with all resolvable parameters](RulesAndDefaultConventions.md#default-constructor-selection).
 
 
+### UnknownServiceResolvers
+
+**Obsolete** - please use the the `WithDynamicRegistrations` and `WithDynamicRegistrationsAsFallback` instead.
+
+The `UnknownServiceResolvers` is **obsolete** Today because they did not support the other DryIoc features,
+(e.g. wrappers, decorators, `ResolveMany`) comparing to the normal registrations.
+The reason is because the `UnknownServiceResolvers` were implemented as a mechanism different from the registration resolution pipeline.
+The newer alternative is the `WithDynamicRegistrations` and the features based on it. See below.
+
+
 ### DynamicRegistrationProvider 
 
-Example of how to `ResolveMany` including some additional dynamically registered services,
-which where not directly registered into Container. 
-We will be using `DynamicRegistrationProvider` delegate and the `Rules.WithDynamicRegistration`:
+Example of how `ResolveMany` is not working with the `UnknownServiceResolvers` and working with the `WithDynamicRegistration`:
 
 ```cs 
 class ResolveMany_does_not_work_WithUnknownResolvers 
 {
+    [Test]public void Example_not_working()
+    {
+        var parent = new Container();
+        parent.Register<IService, Service1>();
+        parent.Register<IService, Service2>();
+
+        var child = new Container(Rules.Default.WithUnknownServiceResolvers(req =>
+            DelegateFactory.Of(_ => parent.Resolve(req.ServiceType))));
+
+        // does not work
+        var actual = child.ResolveMany<IService>();
+
+        // the result count is 0!
+        Assert.AreEqual(0, actual.Count());
+    }
+
     [Test]public void Example_working()
     {
         var parent = new Container();
