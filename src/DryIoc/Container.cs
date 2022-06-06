@@ -13831,7 +13831,7 @@ namespace DryIoc
         /// You may use Factory <see cref="Setup.AsResolutionRoot"/>.</summary>
         GeneratedExpressions GenerateResolutionExpressions(Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>> getRoots = null, bool allowRuntimeState = false);
 
-        /// <summary>Searches for requested factory in registry, and then using <see cref="DryIoc.Rules.UnknownServiceResolvers"/>.</summary>
+        /// <summary>Searches for requested factory in registry and in the dynamic registrations provided by rules.</summary>
         /// <param name="request">Factory request.</param>
         /// <returns>Found factory, otherwise null if <see cref="Request.IfUnresolved"/> is set to <see cref="IfUnresolved.ReturnDefault"/>.</returns>
         Factory ResolveFactory(Request request);

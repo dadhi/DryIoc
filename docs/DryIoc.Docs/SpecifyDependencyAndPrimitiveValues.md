@@ -178,7 +178,7 @@ _Unresolved_ means that Container unable to resolve either service itself or one
 Reason for that may differ: 
 
 - Service or its dependency is not registered,
-- And there is no fallback `Rules.UnknownServiceResolvers`,
+- And there is no fallback `Rules.DynamicRegistrationProviders`,
 - Or you forget to specify Service Key, or Required Service Type, or Condition.
 
 DryIoc supports two options to handle unresolved service:
@@ -186,7 +186,9 @@ DryIoc supports two options to handle unresolved service:
 - Throw corresponding exception.
 - Return default value of service, usually `null`.
 
-__Note:__ Throwing exception is the default option for everything except Properties/Fields. That's default convention because Properties/Fields may be assigned at any time even after service creation, but constructor parameters is something required for creation. 
+__Note:__ Throwing the exception is the default option for everything except Properties/Fields. 
+That's default convention because Properties/Fields may be assigned at any time even after service creation, 
+but **constructor parameters are required** for the service creation. 
 
 These options may be specified when calling `Resolve` method:
 
