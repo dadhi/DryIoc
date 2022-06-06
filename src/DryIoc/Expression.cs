@@ -3294,8 +3294,11 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 #if SUPPORTS_VISITOR
         protected internal override Expression Accept(ExpressionVisitor visitor) => visitor.VisitMethodCall(this);
 #endif
-        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
-            SysExpr.Call(Object?.ToExpression(ref exprsConverted), Method, ToExpressions(Arguments, ref exprsConverted));
+        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted)
+        {
+            var expr = SysExpr.Call(Object?.ToExpression(ref exprsConverted), Method, ToExpressions(Arguments, ref exprsConverted));
+            return Type == Method.ReturnType ? expr : SysExpr.Convert(expr, Type); // insert the safe-guard convert
+        }
     }
 
     public class NotNullMethodCallExpression : MethodCallExpression
@@ -3584,8 +3587,12 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 #if SUPPORTS_VISITOR
         protected internal override Expression Accept(ExpressionVisitor visitor) => visitor.VisitInvocation(this);
 #endif
-        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
-            SysExpr.Invoke(Expression.ToExpression(ref exprsConverted), ToExpressions(Arguments, ref exprsConverted));
+        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted)
+        {
+            var expr = SysExpr.Invoke(Expression.ToExpression(ref exprsConverted), ToExpressions(Arguments, ref exprsConverted));
+            return Expression is LambdaExpression ? expr
+                : SysExpr.Convert(expr, Type); // insert the safe-guard convert
+        }
     }
 
     public class NotNullExpressionInvocationExpression : InvocationExpression
@@ -3594,6 +3601,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         internal NotNullExpressionInvocationExpression(Expression expression) => Expression = expression;
     }
 
+    /// Implies that the Type may be different from the `expression` return type
     public sealed class TypedInvocationExpression : NotNullExpressionInvocationExpression
     {
         public override Type Type { get; }

@@ -975,7 +975,12 @@ namespace DryIoc.FastExpressionCompiler
                 Lambda = null;
             }
             internal bool IsTheSameLambda(LambdaExpression lambda) => // todo: @unclear @wip parameters or is comparing the body is enough?
-                ReferenceEquals(LambdaExpression, lambda) || ReferenceEquals(LambdaExpression.Body, lambda.Body);
+                ReferenceEquals(LambdaExpression, lambda) || 
+                ReferenceEquals(LambdaExpression.Body, lambda.Body) 
+#if LIGHT_EXPRESSION
+                && LambdaExpression.ParameterCount == lambda.ParameterCount
+#endif
+                ;
         }
 
         internal static class CurryClosureFuncs

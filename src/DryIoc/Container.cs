@@ -13356,9 +13356,6 @@ namespace DryIoc
                 ServiceOrInvokeExpr = serviceOrInvokeExpr;
             }
 
-            internal override System.Linq.Expressions.Expression CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
-                System.Linq.Expressions.Expression.Convert(base.CreateSysExpression(ref exprsConverted), Type);
-
             public override bool IsIntrinsic => true;
 
             public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
