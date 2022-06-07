@@ -248,7 +248,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static NewExpression New(ConstructorInfo ctor, IEnumerable<Expression> arguments) =>
             New(ctor, arguments.AsReadOnlyList());
 
-        public static NewExpression NewManyObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object[] arguments) =>
+        public static NewExpression NewManyArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object[] arguments) =>
             arguments == null || arguments.Length == 0
             ? new NoArgsNewIntrinsicExpression(ctor)
             : new ManyObjectArgsNewIntrinsicExpression(ctor, ps, arguments);
@@ -257,47 +257,47 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg) => new OneArgumentNewExpression(ctor, arg);
 
-        public static NewExpression NewOneObjectArgIntrinsic(ConstructorInfo ctor, ParameterInfo p, object arg) =>
+        public static NewExpression NewFewArgsIntrinsic(ConstructorInfo ctor, ParameterInfo p, object arg) =>
             new OneObjectArgNewIntrinsicExpression(ctor, p, arg);
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1) =>
             new TwoArgumentsNewExpression(ctor, arg0, arg1);
 
-        public static NewExpression NewTwoObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1) =>
+        public static NewExpression NewFewArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1) =>
             new TwoObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1);
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2) =>
             new ThreeArgumentsNewExpression(ctor, arg0, arg1, arg2);
 
-        public static NewExpression NewThreeObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2) =>
+        public static NewExpression NewFewArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2) =>
             new ThreeObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1, a2);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
             new FourArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3);
 
-        public static NewExpression NewFourObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3) =>
+        public static NewExpression NewFewArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3) =>
             new FourObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1, a2, a3);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
             new FiveArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4);
 
-        public static NewExpression NewFiveObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4) =>
+        public static NewExpression NewFewArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4) =>
             new FiveObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1, a2, a3, a4);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5) =>
             new SixArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5);
 
-        public static NewExpression NewSixObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4, object a5) =>
+        public static NewExpression NewFewArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4, object a5) =>
             new SixObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1, a2, a3, a4, a5);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5, Expression arg6) =>
             new SevenArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
 
-        public static NewExpression NewSevenObjectArgsIntrinsic(ConstructorInfo ctor,ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4, object a5, object a6) =>
+        public static NewExpression NewFewArgsIntrinsic(ConstructorInfo ctor,ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4, object a5, object a6) =>
             new SevenObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1, a2, a3, a4, a5, a6);
 
         public static MethodCallExpression Call(MethodInfo method, IReadOnlyList<Expression> arguments) =>
@@ -2876,6 +2876,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class OneObjectArgNewIntrinsicExpression : OneArgumentNewExpression
     {
+        // null value indicates absence of ByRef parameters
         public readonly ParameterInfo _p;
         internal OneObjectArgNewIntrinsicExpression(ConstructorInfo ctor, ParameterInfo p, object a) : base(ctor, a) => _p = p;
         public override bool IsIntrinsic => true;
@@ -2886,7 +2887,8 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
             var f = parent | ParentFlags.CtorCall;
-            var ok = A is E a ? Emit.TryEmit(a, paramExprs, il, ref closure, setup, f, _p.ParameterType.IsByRef ? 0 : -1) : Emit.TryEmitConstant(A, il, ref closure, _p.ParameterType.IsByRef ? 0 : -1);
+            var i = _p == null || !_p.ParameterType.IsByRef ? -1 : 0;
+            var ok = A is E a ? Emit.TryEmit(a, paramExprs, il, ref closure, setup, f, i) : Emit.TryEmitConstant(A, il, ref closure, i);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
