@@ -40,6 +40,9 @@ using SysExpr = System.Linq.Expressions.Expression;
 namespace DryIoc.FastExpressionCompiler.LightExpression
 {
     using static ExpressionCompiler;
+    using Comp = ExpressionCompiler;
+    using Emit = ExpressionCompiler.EmittingVisitor;
+    using E = Expression;
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
@@ -100,7 +103,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
         /// <summary>Converts to Expression and outputs its as string</summary>
         public override string ToString() => this.ToCSharpString(constant =>
-        { 
+        {
             var val = constant.Value;
             if (val == null)
                 return "null";
@@ -229,14 +232,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
             foreach (var x in type.GetConstructors())
                 if (x.GetParameters().Length == 0)
-                    return new NoArgsNewClassIntrinsicExpression(x);
+                    return new NoArgsNewIntrinsicExpression(x);
 
             throw new ArgumentException($"The type {type} is missing the default constructor");
         }
 
         public static NewExpression New(ConstructorInfo ctor, IReadOnlyList<Expression> arguments) =>
             arguments == null || arguments.Count == 0
-            ? new NoArgsNewClassIntrinsicExpression(ctor)
+            ? new NoArgsNewIntrinsicExpression(ctor)
             : new ManyArgumentsNewExpression(ctor, arguments);
 
         public static NewExpression New(ConstructorInfo ctor, params Expression[] arguments) =>
@@ -245,67 +248,57 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static NewExpression New(ConstructorInfo ctor, IEnumerable<Expression> arguments) =>
             New(ctor, arguments.AsReadOnlyList());
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, IReadOnlyList<Expression> arguments) =>
-            arguments == null || arguments.Count == 0
-            ? new NoArgsNewClassIntrinsicExpression(ctor)
-            : new NoByRefManyArgumentsNewExpression(ctor, arguments);
+        public static NewExpression NewManyObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object[] arguments) =>
+            arguments == null || arguments.Length == 0
+            ? new NoArgsNewIntrinsicExpression(ctor)
+            : new ManyObjectArgsNewIntrinsicExpression(ctor, ps, arguments);
 
-        public static NewExpression New(ConstructorInfo ctor) =>
-            new NoArgsNewClassIntrinsicExpression(ctor);
+        public static NewExpression New(ConstructorInfo ctor) => new NoArgsNewIntrinsicExpression(ctor);
 
-        public static NewExpression New(ConstructorInfo ctor, Expression arg) =>
-            new OneArgumentNewExpression(ctor, arg);
+        public static NewExpression New(ConstructorInfo ctor, Expression arg) => new OneArgumentNewExpression(ctor, arg);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, Expression arg) =>
-            new NoByRefOneArgumentNewExpression(ctor, arg);
-
-        // todo: @perf @mem
-        // public static NewExpression NewNoByRefArgs<TArg>(ConstructorInfo ctor, TArg arg) =>
-        //     new NoByRefOneArgumentNewExpression<TArg>(ctor, arg); // the argument maybe Expression or directly ConstructorInfo, static MethodInfo, constant object
+        public static NewExpression NewOneObjectArgIntrinsic(ConstructorInfo ctor, ParameterInfo p, object arg) =>
+            new OneObjectArgNewIntrinsicExpression(ctor, p, arg);
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1) =>
             new TwoArgumentsNewExpression(ctor, arg0, arg1);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, Expression arg0, Expression arg1) =>
-            new NoByRefTwoArgumentsNewExpression(ctor, arg0, arg1);
+        public static NewExpression NewTwoObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1) =>
+            new TwoObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1);
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2) =>
             new ThreeArgumentsNewExpression(ctor, arg0, arg1, arg2);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2) =>
-            new NoByRefThreeArgumentsNewExpression(ctor, arg0, arg1, arg2);
+        public static NewExpression NewThreeObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2) =>
+            new ThreeObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1, a2);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
             new FourArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
-            new NoByRefFourArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3);
+        public static NewExpression NewFourObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3) =>
+            new FourObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1, a2, a3);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
             new FiveArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
-            new NoByRefFiveArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4);
+        public static NewExpression NewFiveObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4) =>
+            new FiveObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1, a2, a3, a4);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5) =>
             new SixArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5) =>
-            new NoByRefSixArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5);
+        public static NewExpression NewSixObjectArgsIntrinsic(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4, object a5) =>
+            new SixObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1, a2, a3, a4, a5);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5, Expression arg6) =>
             new SevenArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5, Expression arg6) =>
-            new NoByRefSevenArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+        public static NewExpression NewSevenObjectArgsIntrinsic(ConstructorInfo ctor,ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4, object a5, object a6) =>
+            new SevenObjectArgsNewIntrinsicExpression(ctor, ps, a0, a1, a2, a3, a4, a5, a6);
 
         public static MethodCallExpression Call(MethodInfo method, IReadOnlyList<Expression> arguments) =>
             arguments == null || arguments.Count == 0
@@ -2840,10 +2833,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public virtual IReadOnlyList<Expression> Arguments => Tools.Empty<Expression>();
         public virtual int ArgumentCount => 0;
         public virtual Expression GetArgument(int i) => throw new NotImplementedException();
-
-        /// <summary>Ensures that there is no by-ref (in, our, ref) parameters in the constructor.
-        /// Which allows some optimizations when compiling the expression to the delegate</summary>
-        public virtual bool NoByRefArgs => false;
         internal NewExpression(ConstructorInfo constructor) => Constructor = constructor;
 #if SUPPORTS_VISITOR
         protected internal override Expression Accept(ExpressionVisitor visitor) => visitor.VisitNew(this);
@@ -2861,9 +2850,9 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     }
 
 
-    public sealed class NoArgsNewClassIntrinsicExpression : NewExpression
+    public sealed class NoArgsNewIntrinsicExpression : NewExpression
     {
-        internal NoArgsNewClassIntrinsicExpression(ConstructorInfo constructor) : base(constructor) { }
+        internal NoArgsNewIntrinsicExpression(ConstructorInfo constructor) : base(constructor) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) => true;
@@ -2877,25 +2866,27 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class OneArgumentNewExpression : NewExpression
     {
-        public readonly Expression Argument;
+        public readonly object A;
+        public Expression Argument => A.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument };
         public override int ArgumentCount => 1;
-        public override Expression GetArgument(int i) => Argument;
-        internal OneArgumentNewExpression(ConstructorInfo constructor, Expression argument) : base(constructor) => Argument = argument;
+        public override Expression GetArgument(int i) => A.AsExpr();
+        internal OneArgumentNewExpression(ConstructorInfo ctor, object a) : base(ctor) => A = a;
     }
 
-    public sealed class NoByRefOneArgumentNewExpression : OneArgumentNewExpression
+    public sealed class OneObjectArgNewIntrinsicExpression : OneArgumentNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefOneArgumentNewExpression(ConstructorInfo constructor, Expression argument) : base(constructor, argument) { }
+        public readonly ParameterInfo _p;
+        internal OneObjectArgNewIntrinsicExpression(ConstructorInfo ctor, ParameterInfo p, object a) : base(ctor, a) => _p = p;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument, paramExprs, isNestedLambda, ref rootClosure, config);
+            A is E a ? Comp.TryCollectBoundConstants(ref closure, a, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A);
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok = A is E a ? Emit.TryEmit(a, paramExprs, il, ref closure, setup, f, _p.ParameterType.IsByRef ? 0 : -1) : Emit.TryEmitConstant(A, il, ref closure, _p.ParameterType.IsByRef ? 0 : -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -2903,30 +2894,35 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class TwoArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1;
+        public readonly object A0, A1;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1 };
         public override int ArgumentCount => 2;
-        public override Expression GetArgument(int i) => i == 0 ? Argument0 : Argument1;
-        internal TwoArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1) : base(constructor)
+        public override Expression GetArgument(int i) => i == 0 ? A0.AsExpr() : A1.AsExpr();
+        internal TwoArgumentsNewExpression(ConstructorInfo ctor, object a0, object a1) : base(ctor)
         {
-            Argument0 = a0; Argument1 = a1;
+            A0 = a0; A1 = a1;
         }
     }
 
-    public sealed class NoByRefTwoArgumentsNewExpression : TwoArgumentsNewExpression
+    public sealed class TwoObjectArgsNewIntrinsicExpression : TwoArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefTwoArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1) : base(constructor, a0, a1) { }
+        public readonly ParameterInfo[] _ps;
+        internal TwoObjectArgsNewIntrinsicExpression(ConstructorInfo constructor, ParameterInfo[] ps, object a0, object a1) : base(constructor, a0, a1) => _ps = ps;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config);
+            (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0)) &&
+            (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1));
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var p = _ps;
+            var ok =
+                (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, setup, f, p[0].ParameterType.IsByRef ? 0 : -1) : Emit.TryEmitConstant(A0, il, ref closure, p[0].ParameterType.IsByRef ? 0 : -1)) &&
+                (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, setup, f, p[1].ParameterType.IsByRef ? 1 : -1) : Emit.TryEmitConstant(A1, il, ref closure, p[1].ParameterType.IsByRef ? 1 : -1));
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -2934,35 +2930,40 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class ThreeArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1, Argument2;
+        public readonly object A0, A1, A2;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2 };
         public override int ArgumentCount => 3;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : Argument2;
-        internal ThreeArgumentsNewExpression(ConstructorInfo constructor,
-            Expression a0, Expression a1, Expression a2) : base(constructor)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : A2.AsExpr();
+        internal ThreeArgumentsNewExpression(ConstructorInfo ctor, object a0, object a1, object a2) : base(ctor)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2;
+            A0 = a0; A1 = a1; A2 = a2;
         }
     }
 
-    public sealed class NoByRefThreeArgumentsNewExpression : ThreeArgumentsNewExpression
+    public sealed class ThreeObjectArgsNewIntrinsicExpression : ThreeArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefThreeArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2)
-            : base(constructor, a0, a1, a2) { }
+        public readonly ParameterInfo[] _ps;
+        internal ThreeObjectArgsNewIntrinsicExpression(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2)
+            : base(ctor, a0, a1, a2) => _ps = ps;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config);
+            (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0)) &&
+            (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1)) &&
+            (A2 is E a2 ? Comp.TryCollectBoundConstants(ref closure, a2, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A2));
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var p = _ps;
+            var ok =
+                (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, setup, f, p[0].ParameterType.IsByRef ? 0 : -1) : Emit.TryEmitConstant(A0, il, ref closure, p[0].ParameterType.IsByRef ? 0 : -1)) &&
+                (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, setup, f, p[1].ParameterType.IsByRef ? 1 : -1) : Emit.TryEmitConstant(A1, il, ref closure, p[1].ParameterType.IsByRef ? 1 : -1)) &&
+                (A2 is E a2 ? Emit.TryEmit(a2, paramExprs, il, ref closure, setup, f, p[2].ParameterType.IsByRef ? 2 : -1) : Emit.TryEmitConstant(A2, il, ref closure, p[2].ParameterType.IsByRef ? 2 : -1));
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -2970,37 +2971,44 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class FourArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1, Argument2, Argument3;
+        public readonly object A0, A1, A2, A3;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3 };
         public override int ArgumentCount => 4;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : Argument3;
-        internal FourArgumentsNewExpression(ConstructorInfo constructor,
-            Expression a0, Expression a1, Expression a2, Expression a3) : base(constructor)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : A3.AsExpr();
+        internal FourArgumentsNewExpression(ConstructorInfo ctor, object a0, object a1, object a2, object a3) : base(ctor)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3;
         }
     }
 
-    public sealed class NoByRefFourArgumentsNewExpression : FourArgumentsNewExpression
+    public sealed class FourObjectArgsNewIntrinsicExpression : FourArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefFourArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3)
-            : base(constructor, a0, a1, a2, a3) { }
+        public readonly ParameterInfo[] _ps;
+        internal FourObjectArgsNewIntrinsicExpression(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3)
+            : base(ctor, a0, a1, a2, a3) => _ps = ps;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config);
+            (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0)) &&
+            (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1)) &&
+            (A2 is E a2 ? Comp.TryCollectBoundConstants(ref closure, a2, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A2)) &&
+            (A3 is E a3 ? Comp.TryCollectBoundConstants(ref closure, a3, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A3));
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var p = _ps;
+            var ok =
+                (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, setup, f, p[0].ParameterType.IsByRef ? 0 : -1) : Emit.TryEmitConstant(A0, il, ref closure, p[0].ParameterType.IsByRef ? 0 : -1)) &&
+                (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, setup, f, p[1].ParameterType.IsByRef ? 1 : -1) : Emit.TryEmitConstant(A1, il, ref closure, p[1].ParameterType.IsByRef ? 1 : -1)) &&
+                (A2 is E a2 ? Emit.TryEmit(a2, paramExprs, il, ref closure, setup, f, p[2].ParameterType.IsByRef ? 2 : -1) : Emit.TryEmitConstant(A2, il, ref closure, p[2].ParameterType.IsByRef ? 2 : -1)) &&
+                (A3 is E a3 ? Emit.TryEmit(a3, paramExprs, il, ref closure, setup, f, p[3].ParameterType.IsByRef ? 3 : -1) : Emit.TryEmitConstant(A3, il, ref closure, p[3].ParameterType.IsByRef ? 3 : -1));
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3008,39 +3016,46 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class FiveArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4;
+        public readonly object A0, A1, A2, A3, A4;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4 };
         public override int ArgumentCount => 5;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : Argument4;
-        internal FiveArgumentsNewExpression(ConstructorInfo constructor,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4) : base(constructor)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : A4.AsExpr();
+        internal FiveArgumentsNewExpression(ConstructorInfo ctor, object a0, object a1, object a2, object a3, object a4) : base(ctor)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4;
         }
     }
 
-    public sealed class NoByRefFiveArgumentsNewExpression : FiveArgumentsNewExpression
+    public sealed class FiveObjectArgsNewIntrinsicExpression : FiveArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefFiveArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4)
-            : base(constructor, a0, a1, a2, a3, a4) { }
+        public readonly ParameterInfo[] _ps;
+        internal FiveObjectArgsNewIntrinsicExpression(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4)
+            : base(ctor, a0, a1, a2, a3, a4) => _ps = ps;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config);
+            (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0)) &&
+            (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1)) &&
+            (A2 is E a2 ? Comp.TryCollectBoundConstants(ref closure, a2, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A2)) &&
+            (A3 is E a3 ? Comp.TryCollectBoundConstants(ref closure, a3, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A3)) &&
+            (A4 is E a4 ? Comp.TryCollectBoundConstants(ref closure, a4, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A4));
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var p = _ps;
+            var ok =
+                (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, setup, f, p[0].ParameterType.IsByRef ? 0 : -1) : Emit.TryEmitConstant(A0, il, ref closure, p[0].ParameterType.IsByRef ? 0 : -1)) &&
+                (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, setup, f, p[1].ParameterType.IsByRef ? 1 : -1) : Emit.TryEmitConstant(A1, il, ref closure, p[1].ParameterType.IsByRef ? 1 : -1)) &&
+                (A2 is E a2 ? Emit.TryEmit(a2, paramExprs, il, ref closure, setup, f, p[2].ParameterType.IsByRef ? 2 : -1) : Emit.TryEmitConstant(A2, il, ref closure, p[2].ParameterType.IsByRef ? 2 : -1)) &&
+                (A3 is E a3 ? Emit.TryEmit(a3, paramExprs, il, ref closure, setup, f, p[3].ParameterType.IsByRef ? 3 : -1) : Emit.TryEmitConstant(A3, il, ref closure, p[3].ParameterType.IsByRef ? 3 : -1)) &&
+                (A4 is E a4 ? Emit.TryEmit(a4, paramExprs, il, ref closure, setup, f, p[4].ParameterType.IsByRef ? 4 : -1) : Emit.TryEmitConstant(A4, il, ref closure, p[4].ParameterType.IsByRef ? 4 : -1));
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3048,42 +3063,51 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class SixArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5;
+        public readonly object A0, A1, A2, A3, A4, A5;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
+        public Expression Argument5 => A5.AsExpr();
+
         public override IReadOnlyList<Expression> Arguments =>
             new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5 };
         public override int ArgumentCount => 6;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : i == 4 ? Argument4 : Argument5;
-        internal SixArgumentsNewExpression(ConstructorInfo constructor,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5) : base(constructor)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : i == 4 ? A4.AsExpr() : A5.AsExpr();
+        internal SixArgumentsNewExpression(ConstructorInfo ctor, object a0, object a1, object a2, object a3, object a4, object a5) : base(ctor)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4; Argument5 = a5;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4; A5 = a5;
         }
     }
 
-    public sealed class NoByRefSixArgumentsNewExpression : SixArgumentsNewExpression
+    public sealed class SixObjectArgsNewIntrinsicExpression : SixArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefSixArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5)
-            : base(constructor, a0, a1, a2, a3, a4, a5) { }
+        public readonly ParameterInfo[] _ps;
+        internal SixObjectArgsNewIntrinsicExpression(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4, object a5)
+            : base(ctor, a0, a1, a2, a3, a4, a5) => _ps = ps;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config);
+            (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0)) &&
+            (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1)) &&
+            (A2 is E a2 ? Comp.TryCollectBoundConstants(ref closure, a2, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A2)) &&
+            (A3 is E a3 ? Comp.TryCollectBoundConstants(ref closure, a3, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A3)) &&
+            (A4 is E a4 ? Comp.TryCollectBoundConstants(ref closure, a4, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A4)) &&
+            (A5 is E a5 ? Comp.TryCollectBoundConstants(ref closure, a5, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A5));
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var p = _ps;
+            var ok =
+                (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, setup, f, p[0].ParameterType.IsByRef ? 0 : -1) : Emit.TryEmitConstant(A0, il, ref closure, p[0].ParameterType.IsByRef ? 0 : -1)) &&
+                (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, setup, f, p[1].ParameterType.IsByRef ? 1 : -1) : Emit.TryEmitConstant(A1, il, ref closure, p[1].ParameterType.IsByRef ? 1 : -1)) &&
+                (A2 is E a2 ? Emit.TryEmit(a2, paramExprs, il, ref closure, setup, f, p[2].ParameterType.IsByRef ? 2 : -1) : Emit.TryEmitConstant(A2, il, ref closure, p[2].ParameterType.IsByRef ? 2 : -1)) &&
+                (A3 is E a3 ? Emit.TryEmit(a3, paramExprs, il, ref closure, setup, f, p[3].ParameterType.IsByRef ? 3 : -1) : Emit.TryEmitConstant(A3, il, ref closure, p[3].ParameterType.IsByRef ? 3 : -1)) &&
+                (A4 is E a4 ? Emit.TryEmit(a4, paramExprs, il, ref closure, setup, f, p[4].ParameterType.IsByRef ? 4 : -1) : Emit.TryEmitConstant(A4, il, ref closure, p[4].ParameterType.IsByRef ? 4 : -1)) &&
+                (A5 is E a5 ? Emit.TryEmit(a5, paramExprs, il, ref closure, setup, f, p[5].ParameterType.IsByRef ? 5 : -1) : Emit.TryEmitConstant(A5, il, ref closure, p[5].ParameterType.IsByRef ? 5 : -1));
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3091,44 +3115,53 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class SevenArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5, Argument6;
+        public readonly object A0, A1, A2, A3, A4, A5, A6;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
+        public Expression Argument5 => A5.AsExpr();
+        public Expression Argument6 => A6.AsExpr();
         public override IReadOnlyList<Expression> Arguments =>
             new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5, Argument6 };
         public override int ArgumentCount => 7;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : i == 4 ? Argument4 : i == 5 ? Argument5 : Argument6;
-        internal SevenArgumentsNewExpression(ConstructorInfo constructor,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6) : base(constructor)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : i == 4 ? A4.AsExpr() : i == 5 ? A5.AsExpr() : A6.AsExpr();
+        internal SevenArgumentsNewExpression(ConstructorInfo ctor, object a0, object a1, object a2, object a3, object a4, object a5, object a6) : base(ctor)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4; Argument5 = a5; Argument6 = a6;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4; A5 = a5; A6 = a6;
         }
     }
 
-    public sealed class NoByRefSevenArgumentsNewExpression : SevenArgumentsNewExpression
+    public sealed class SevenObjectArgsNewIntrinsicExpression : SevenArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefSevenArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6)
-            : base(constructor, a0, a1, a2, a3, a4, a5, a6) { }
+        public readonly ParameterInfo[] _ps;
+        internal SevenObjectArgsNewIntrinsicExpression(ConstructorInfo ctor, ParameterInfo[] ps, object a0, object a1, object a2, object a3, object a4, object a5, object a6)
+            : base(ctor, a0, a1, a2, a3, a4, a5, a6) => _ps = ps;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument6, paramExprs, isNestedLambda, ref rootClosure, config);
+            (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0)) &&
+            (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1)) &&
+            (A2 is E a2 ? Comp.TryCollectBoundConstants(ref closure, a2, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A2)) &&
+            (A3 is E a3 ? Comp.TryCollectBoundConstants(ref closure, a3, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A3)) &&
+            (A4 is E a4 ? Comp.TryCollectBoundConstants(ref closure, a4, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A4)) &&
+            (A5 is E a5 ? Comp.TryCollectBoundConstants(ref closure, a5, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A5)) &&
+            (A6 is E a6 ? Comp.TryCollectBoundConstants(ref closure, a6, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A6));
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument6, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var p = _ps;
+            var ok =
+                (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, setup, f, p[0].ParameterType.IsByRef ? 0 : -1) : Emit.TryEmitConstant(A0, il, ref closure, p[0].ParameterType.IsByRef ? 0 : -1)) &&
+                (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, setup, f, p[1].ParameterType.IsByRef ? 1 : -1) : Emit.TryEmitConstant(A1, il, ref closure, p[1].ParameterType.IsByRef ? 1 : -1)) &&
+                (A2 is E a2 ? Emit.TryEmit(a2, paramExprs, il, ref closure, setup, f, p[2].ParameterType.IsByRef ? 2 : -1) : Emit.TryEmitConstant(A2, il, ref closure, p[2].ParameterType.IsByRef ? 2 : -1)) &&
+                (A3 is E a3 ? Emit.TryEmit(a3, paramExprs, il, ref closure, setup, f, p[3].ParameterType.IsByRef ? 3 : -1) : Emit.TryEmitConstant(A3, il, ref closure, p[3].ParameterType.IsByRef ? 3 : -1)) &&
+                (A4 is E a4 ? Emit.TryEmit(a4, paramExprs, il, ref closure, setup, f, p[4].ParameterType.IsByRef ? 4 : -1) : Emit.TryEmitConstant(A4, il, ref closure, p[4].ParameterType.IsByRef ? 4 : -1)) &&
+                (A5 is E a5 ? Emit.TryEmit(a5, paramExprs, il, ref closure, setup, f, p[5].ParameterType.IsByRef ? 5 : -1) : Emit.TryEmitConstant(A5, il, ref closure, p[5].ParameterType.IsByRef ? 5 : -1)) &&
+                (A6 is E a6 ? Emit.TryEmit(a6, paramExprs, il, ref closure, setup, f, p[6].ParameterType.IsByRef ? 6 : -1) : Emit.TryEmitConstant(A6, il, ref closure, p[6].ParameterType.IsByRef ? 6 : -1));
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3144,10 +3177,40 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             _arguments = arguments;
     }
 
-    public sealed class NoByRefManyArgumentsNewExpression : ManyArgumentsNewExpression
+    public class ManyObjectArgsNewIntrinsicExpression : NewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefManyArgumentsNewExpression(ConstructorInfo constructor, IReadOnlyList<Expression> arguments) : base(constructor, arguments) { }
+        private readonly ParameterInfo[] _ps;
+        private readonly object[] _args;
+        public override IReadOnlyList<Expression> Arguments => _args.AsExprs();
+        public override int ArgumentCount => _args.Length;
+        public override Expression GetArgument(int i) => _args[i].AsExpr();
+        internal ManyObjectArgsNewIntrinsicExpression(ConstructorInfo constructor, ParameterInfo[] ps, object[] args) : base(constructor) => _args = args;
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure)
+        {
+            var args = _args;
+            for (var i = 0; i < args.Length; ++i)
+                if (!(args[i] is E a
+                    ? Comp.TryCollectBoundConstants(ref closure, a, paramExprs, isNestedLambda, ref rootClosure, config)
+                    : closure.AddClosureBoundConstant(args[i])))
+                    return false;
+            return true;
+        }
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var args = _args;
+            var ps = _ps;
+            var f = parent | ParentFlags.CtorCall;
+            for (var i = 0; i < args.Length; ++i)
+                if (!(args[i] is E a
+                    ? Emit.TryEmit(a, paramExprs, il, ref closure, setup, f, ps[i].ParameterType.IsByRef ? i : -1)
+                    : Emit.TryEmitConstant(args[i], il, ref closure, ps[i].ParameterType.IsByRef ? i : -1)))
+                    return false;
+            il.Emit(OpCodes.Newobj, Constructor);
+            return true;
+        }
     }
 
     public abstract class NewArrayExpression : Expression, IArgumentProvider
@@ -3334,11 +3397,12 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class OneArgumentMethodCallExpression : NotNullMethodCallExpression
     {
+        public readonly object A;
+        public Expression Argument => A.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument };
-        public readonly Expression Argument;
         public override int ArgumentCount => 1;
-        public override Expression GetArgument(int i) => Argument;
-        internal OneArgumentMethodCallExpression(MethodInfo method, Expression argument) : base(method) => Argument = argument;
+        public override Expression GetArgument(int i) => A.AsExpr();
+        internal OneArgumentMethodCallExpression(MethodInfo method, object a) : base(method) => A = a;
     }
 
     public sealed class InstanceOneArgumentMethodCallExpression : OneArgumentMethodCallExpression
@@ -3351,13 +3415,15 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class TwoArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
+        public readonly object A0, A1;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1 };
-        public readonly Expression Argument0, Argument1;
         public override int ArgumentCount => 2;
-        public override Expression GetArgument(int i) => i == 0 ? Argument0 : Argument1;
-        internal TwoArgumentsMethodCallExpression(MethodInfo method, Expression a0, Expression a1) : base(method)
+        public override Expression GetArgument(int i) => i == 0 ? A0.AsExpr() : A1.AsExpr();
+        internal TwoArgumentsMethodCallExpression(MethodInfo method, object a0, object a1) : base(method)
         {
-            Argument0 = a0; Argument1 = a1;
+            A0 = a0; A1 = a1;
         }
     }
 
@@ -3371,14 +3437,16 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class ThreeArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
+        public readonly object A0, A1, A2;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2 };
-        public readonly Expression Argument0, Argument1, Argument2;
         public override int ArgumentCount => 3;
-        public override Expression GetArgument(int i) => i == 0 ? Argument0 : i == 1 ? Argument1 : Argument2;
-        internal ThreeArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2) : base(method)
+        public override Expression GetArgument(int i) => i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : A2.AsExpr();
+        internal ThreeArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2;
+            A0 = a0; A1 = a1; A2 = a2;
         }
     }
 
@@ -3391,15 +3459,18 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class FourArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
+        public readonly object A0, A1, A2, A3;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3;
         public override int ArgumentCount => 4;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : Argument3;
-        internal FourArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : A3.AsExpr();
+        internal FourArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3;
         }
     }
 
@@ -3413,15 +3484,19 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class FiveArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
+        public readonly object A0, A1, A2, A3, A4;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4;
         public override int ArgumentCount => 5;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : Argument4;
-        internal FiveArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : A4.AsExpr();
+        internal FiveArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3, object a4) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4;
         }
     }
 
@@ -3435,15 +3510,20 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class SixArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
+        public readonly object A0, A1, A2, A3, A4, A5;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
+        public Expression Argument5 => A5.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5;
         public override int ArgumentCount => 6;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : i == 4 ? Argument4 : Argument5;
-        internal SixArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : i == 4 ? A4.AsExpr() : A5.AsExpr();
+        internal SixArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3, object a4, object a5) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4; Argument5 = a5;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4; A5 = a5;
         }
     }
 
@@ -3457,15 +3537,21 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class SevenArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
+        public readonly object A0, A1, A2, A3, A4, A5, A6;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
+        public Expression Argument5 => A5.AsExpr();
+        public Expression Argument6 => A6.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5, Argument6 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5, Argument6;
         public override int ArgumentCount => 7;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : i == 4 ? Argument4 : i == 5 ? Argument5 : Argument6;
-        internal SevenArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : i == 4 ? A4.AsExpr() : i == 5 ? A5.AsExpr() : A6.AsExpr();
+        internal SevenArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3, object a4, object a5, object a6) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4; Argument5 = a5; Argument6 = a6;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4; A5 = a5; A6 = a6;
         }
     }
 
@@ -3845,7 +3931,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             : base(@object, arguments) => Indexer = indexer;
     }
 
-    /// <summary>Base Block expression with no variables and with Type of its last (Result) exporession</summary>
+    /// <summary>Base Block expression with no variables and with Type of its last (Result) expression</summary>
     public class BlockExpression : Expression, IArgumentProvider
     {
         public override ExpressionType NodeType => ExpressionType.Block;

@@ -52,7 +52,10 @@ namespace DryIoc
 
     using FastExpressionCompiler.LightExpression;
     using static FastExpressionCompiler.LightExpression.Expression;
+    using E = FastExpressionCompiler.LightExpression.Expression;
     using static FastExpressionCompiler.LightExpression.ExpressionCompiler;
+    using Comp = FastExpressionCompiler.LightExpression.ExpressionCompiler;
+    using Emit = FastExpressionCompiler.LightExpression.ExpressionCompiler.EmittingVisitor;
 
     /// <summary>Inversion of control container</summary>
     public partial class Container : IContainer
@@ -3037,6 +3040,7 @@ namespace DryIoc
             }
         }
 
+        // todo: @simplify replace the `bool` return type with the object result using Scope.NoItem to represent failing interpretation 
         /// <summary>Interprets passed expression.</summary>
         public static bool TryInterpret(IResolverContext r, Expression expr,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, out object result)
@@ -3049,14 +3053,14 @@ namespace DryIoc
                     return true;
                 case ExprType.New:
                     {
-                        if (expr is NoArgsNewClassIntrinsicExpression defaultCtorExpr)
+                        if (expr is NoArgsNewIntrinsicExpression defaultCtorExpr)
                         {
                             result = defaultCtorExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                             return true;
                         }
                         var newExpr = (NewExpression)expr;
                         object[] args = null;
-                        var ok = false;
+                        var ok = true;
                         var argCount = newExpr.ArgumentCount;
                         switch (argCount)
                         {
@@ -3064,9 +3068,10 @@ namespace DryIoc
                                 result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                                 return true;
                             case 1:
-                                if (newExpr is OneArgumentNewExpression e1)
+                                if (newExpr is OneObjectArgNewIntrinsicExpression e1)
                                 {
-                                    ok = TryInterpret(r, e1.Argument, paramExprs, paramValues, parentArgs, out result);
+                                    result = e1.A;
+                                    if (result is E ae0) ok = TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out result);
                                     args = SmallArrayPool<object>.RentOrNew(1);
                                     args[0] = result;
                                 }
@@ -3074,8 +3079,9 @@ namespace DryIoc
                             case 2:
                                 if (newExpr is TwoArgumentsNewExpression e2)
                                 {
-                                    ok = TryInterpret(r, e2.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        & TryInterpret(r, e2.Argument1, paramExprs, paramValues, parentArgs, out var a1);
+                                    result = e2.A0; var a1 = e2.A1;
+                                    if (result is E ae0) ok = TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out result);
+                                    if (a1 is E ae1) ok &= TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1);
                                     args = SmallArrayPool<object>.RentOrNew(2);
                                     args[0] = result; args[1] = a1;
                                 }
@@ -4023,7 +4029,7 @@ namespace DryIoc
         public static Expression<Func<IResolverContext, object>> WrapInFactoryExpressionWithoutNormalization(this Expression expression) =>
             new FactoryDelegateExpression(expression);
 
-        private static Type[] _factoryDelegateAndClosureParams = new[] { typeof(ExpressionCompiler.ArrayClosure), typeof(IResolverContext) };
+        private static Type[] _factoryDelegateAndClosureParams = new[] { typeof(Comp.ArrayClosure), typeof(IResolverContext) };
 
         /// <summary>First wraps the input service expression into lambda expression and
         /// then compiles lambda expression to actual `Func{IResolverContext, object}` used for service resolution.</summary>
@@ -4036,7 +4042,7 @@ namespace DryIoc
             }
             if (!preferInterpretation)
             {
-                var factoryDelegate = (Func<IResolverContext, object>)(ExpressionCompiler.TryCompileBoundToFirstClosureParam(
+                var factoryDelegate = (Func<IResolverContext, object>)(Comp.TryCompileBoundToFirstClosureParam(
                     typeof(Func<IResolverContext, object>), expression, FactoryDelegateParamExprs, _factoryDelegateAndClosureParams, typeof(object),
                     CompilerFlags.NoInvocationLambdaInlining));
                 if (factoryDelegate != null)
@@ -4056,7 +4062,7 @@ namespace DryIoc
         {
             if (!preferInterpretation)
             {
-                var factoryDelegate = ExpressionCompiler.TryCompileBoundToFirstClosureParam(
+                var factoryDelegate = Comp.TryCompileBoundToFirstClosureParam(
                     factoryDelegateType, expression, FactoryDelegateParamExprs, _factoryDelegateAndClosureParams, resultType,
                     CompilerFlags.NoInvocationLambdaInlining);
                 if (factoryDelegate != null)
@@ -4755,12 +4761,12 @@ namespace DryIoc
 
             public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 bool isNestedLambda, ref ClosureInfo rootClosure) =>
-                ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config);
+                Comp.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
-                EmittingVisitor.EmitMethodCall(il, Method);
+                Emit.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
+                Emit.EmitMethodCall(il, Method);
         }
 
         /// <summary>Provides access to the current scope - may return `null` if ambient scope context has it scope changed in-between</summary>
@@ -6342,88 +6348,88 @@ namespace DryIoc
             closure.AddConstantOrIncrementUsageCount(Func.Target);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
-                EmittingVisitor.EmitMethodCall(il, Method);
+                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
+                Emit.EmitMethodCall(il, Method);
     }
 
     sealed class FuncInvoke1Expression : OneArgumentMethodCallExpression, IFuncInvokeExpression
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke1Expression(Delegate f, MethodInfo m, Expression a0) : base(m, a0) => Func = f;
+        internal FuncInvoke1Expression(Delegate f, MethodInfo m, object a) : base(m, a) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            closure.AddConstantOrIncrementUsageCount(Func.Target) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument, paramExprs, isNestedLambda, ref rootClosure, config);
+            closure.AddConstantOrIncrementUsageCount(Func.Target) &
+            (A is E a ? Comp.TryCollectBoundConstants(ref closure, a, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A));
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
-                && EmittingVisitor.TryEmit(Argument, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.EmitMethodCall(il, Method);
+                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                & (A is E a ? Emit.TryEmit(a, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A, il, ref closure))
+                & Emit.EmitMethodCall(il, Method);
     }
 
     sealed class FuncInvoke2Expression : TwoArgumentsMethodCallExpression, IFuncInvokeExpression
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke2Expression(Delegate f, MethodInfo m, Expression a0, Expression a1) : base(m, a0, a1) => Func = f;
+        internal FuncInvoke2Expression(Delegate f, MethodInfo m, object a0, object a1) : base(m, a0, a1) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            closure.AddConstantOrIncrementUsageCount(Func.Target) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config);
+            closure.AddConstantOrIncrementUsageCount(Func.Target)
+            & (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0))
+            & (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1));
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
-            EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent) &&
-            EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent) &&
-            EmittingVisitor.EmitMethodCall(il, Method);
+                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                & (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A0, il, ref closure))
+                & (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A1, il, ref closure))
+                & Emit.EmitMethodCall(il, Method);
     }
 
     sealed class FuncInvoke3Expression : ThreeArgumentsMethodCallExpression, IFuncInvokeExpression
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke3Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2) : base(m, a0, a1, a2) => Func = f;
+        internal FuncInvoke3Expression(Delegate f, MethodInfo m, object a0, object a1, object a2) : base(m, a0, a1, a2) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-                closure.AddConstantOrIncrementUsageCount(Func.Target)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config);
+            closure.AddConstantOrIncrementUsageCount(Func.Target)
+            & (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0))
+            & (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1))
+            & (A2 is E a2 ? Comp.TryCollectBoundConstants(ref closure, a2, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A2));
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
-                && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.EmitMethodCall(il, Method);
+                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                & (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A0, il, ref closure))
+                & (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A1, il, ref closure))
+                & (A2 is E a2 ? Emit.TryEmit(a2, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A2, il, ref closure))
+                & Emit.EmitMethodCall(il, Method);
     }
 
     sealed class FuncInvoke4Expression : FourArgumentsMethodCallExpression, IFuncInvokeExpression
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke4Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2, Expression a3) : base(m, a0, a1, a2, a3) => Func = f;
+        internal FuncInvoke4Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3) : base(m, a0, a1, a2, a3) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-                closure.AddConstantOrIncrementUsageCount(Func.Target)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config);
+            closure.AddConstantOrIncrementUsageCount(Func.Target)
+            & (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0))
+            & (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1))
+            & (A2 is E a2 ? Comp.TryCollectBoundConstants(ref closure, a2, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A2))
+            & (A3 is E a3 ? Comp.TryCollectBoundConstants(ref closure, a3, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A3));
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
-                && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.EmitMethodCall(il, Method);
+                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                & (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A0, il, ref closure))
+                & (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A1, il, ref closure))
+                & (A2 is E a2 ? Emit.TryEmit(a2, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A2, il, ref closure))
+                & (A3 is E a3 ? Emit.TryEmit(a3, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A3, il, ref closure))
+                & Emit.EmitMethodCall(il, Method);
     }
 
     sealed class FuncInvoke5Expression : FiveArgumentsMethodCallExpression, IFuncInvokeExpression
@@ -6436,20 +6442,20 @@ namespace DryIoc
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
                 closure.AddConstantOrIncrementUsageCount(Func.Target) &&
-                ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
-                ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
-                ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
-                ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config) &&
-                ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config);
+                Comp.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
+                Comp.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
+                Comp.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
+                Comp.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config) &&
+                Comp.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
-                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent) &&
-                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent) &&
-                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent) &&
-                EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, config, parent) &&
-                EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, config, parent) &&
-                EmittingVisitor.EmitMethodCall(il, Method);
+                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
+                Emit.TryEmit(Argument0, paramExprs, il, ref closure, config, parent) &&
+                Emit.TryEmit(Argument1, paramExprs, il, ref closure, config, parent) &&
+                Emit.TryEmit(Argument2, paramExprs, il, ref closure, config, parent) &&
+                Emit.TryEmit(Argument3, paramExprs, il, ref closure, config, parent) &&
+                Emit.TryEmit(Argument4, paramExprs, il, ref closure, config, parent) &&
+                Emit.EmitMethodCall(il, Method);
     }
 
     sealed class FuncInvoke6Expression : SixArgumentsMethodCallExpression, IFuncInvokeExpression
@@ -6462,22 +6468,22 @@ namespace DryIoc
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
                 closure.AddConstantOrIncrementUsageCount(Func.Target)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config);
+                && Comp.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
-                && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.EmitMethodCall(il, Method);
+                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                && Emit.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument3, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument4, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument5, paramExprs, il, ref closure, config, parent)
+                && Emit.EmitMethodCall(il, Method);
     }
 
     sealed class FuncInvoke7Expression : SevenArgumentsMethodCallExpression, IFuncInvokeExpression
@@ -6490,24 +6496,24 @@ namespace DryIoc
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
                 closure.AddConstantOrIncrementUsageCount(Func.Target)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config)
-                && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument6, paramExprs, isNestedLambda, ref rootClosure, config);
+                && Comp.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config)
+                && Comp.TryCollectBoundConstants(ref closure, Argument6, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
-                && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.TryEmit(Argument6, paramExprs, il, ref closure, config, parent)
-                && EmittingVisitor.EmitMethodCall(il, Method);
+                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                && Emit.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument3, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument4, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument5, paramExprs, il, ref closure, config, parent)
+                && Emit.TryEmit(Argument6, paramExprs, il, ref closure, config, parent)
+                && Emit.EmitMethodCall(il, Method);
     }
 
     /// <summary>Wraps constructor or factory method optionally with factory instance to create service.</summary>
@@ -10764,7 +10770,7 @@ namespace DryIoc
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
-        public virtual Expression GetExpressionOrDefault(Request request)
+        public virtual object GetExpressionOrDefault(Request request)
         {
             // The factory usually is null unleast it is provided by the collection or other higher wrapper.
             // Note, that we are storing it in the local variable Here because the follow-up WithResolvedFactorywill override it with "this" factory.
@@ -10986,8 +10992,8 @@ namespace DryIoc
             {
                 if (weaklyReferencedOrPreventDisposal)
                     serviceExpr = setup.WeaklyReferenced
-                        ? NewNoByRefArgs(ReflectionTools.WeakReferenceCtor, serviceExpr)
-                        : NewNoByRefArgs(HiddenDisposable.Ctor, serviceExpr);
+                        ? NewOneObjectArgumentIntrinsicExpression(ReflectionTools.WeakReferenceCtor, serviceExpr)
+                        : NewOneObjectArgumentIntrinsicExpression(HiddenDisposable.Ctor, serviceExpr);
 
                 serviceExpr = reuse.Apply(request, serviceExpr);
             }
@@ -11001,8 +11007,14 @@ namespace DryIoc
         }
 
         /// <summary>Creates factory delegate from service expression and returns it.</summary>
-        public virtual Func<IResolverContext, object> GetDelegateOrDefault(Request request) =>
-            GetExpressionOrDefault(request)?.CompileToFactoryDelegate(request.Rules.UseInterpretation);
+        public virtual Func<IResolverContext, object> GetDelegateOrDefault(Request request)
+        {
+            var exprOrObj = GetExpressionOrDefault(request);
+            return exprOrObj == null ? null 
+                : exprOrObj is Expression e 
+                    ? e.CompileToFactoryDelegate(request.Rules.UseInterpretation)
+                    : exprOrObj.ToFactoryDelegate;
+        }
 
         internal virtual bool ValidateAndNormalizeRegistration(Type serviceType, object serviceKey, bool isStaticallyChecked, Rules rules, bool throwIfInvalid)
         {
@@ -11762,9 +11774,10 @@ namespace DryIoc
                         if (factoryMethod.FactoryServiceInfo != null)
                         {
                             var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
-                            factoryExpr = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
-                            if (factoryExpr == null)
+                            var factoryObj = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
+                            if (factoryObj == null)
                                 return null; // todo: @check should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
+                            factoryExpr = factoryObj as Expression ?? Constant(factoryObj); // todo: @perf try to remove Constant 
                         }
                     }
                 }
@@ -11786,15 +11799,16 @@ namespace DryIoc
 
                 ctorOrMethod = ctorOrMember as MethodBase;
                 if (ctorOrMethod == null) // return earlier when factory is Property or Field
-                    return ConvertExpressionIfNeeded(
-                        ctorOrMember is PropertyInfo p ? Property(factoryExpr, p) : Field(factoryExpr, (FieldInfo)ctorOrMember), request, ctorOrMember);
-
+                {
+                    var expr = ctorOrMember is PropertyInfo p ? Property(factoryExpr, p) : Field(factoryExpr, (FieldInfo)ctorOrMember); 
+                    return ConvertExpressionIfNeeded(expr, request, ctorOrMember);
+                }
                 ctor = ctorOrMember as ConstructorInfo;
                 method = ctorOrMember as MethodInfo;
             }
 
-            var parameters = ctorOrMethod.GetParameters();
-            if (parameters.Length == 0)
+            var ps = ctorOrMethod.GetParameters();
+            if (ps.Length == 0)
             {
                 if (rules.UsedForValidation)
                 {
@@ -11811,9 +11825,8 @@ namespace DryIoc
                 return failedToGetMember ? null : assignments == null ? New(ctor) : MemberInit(New(ctor), assignments);
             }
 
-            var hasByRefParams = false;
-            Expression a0 = null, a1 = null, a2 = null, a3 = null, a4 = null, a5 = null, a6 = null;
-            var paramExprs = parameters.Length > 7 ? new Expression[parameters.Length] : null;
+            object a0 = null, a1 = null, a2 = null, a3 = null, a4 = null, a5 = null, a6 = null;
+            var paramExprs = ps.Length > 7 ? new object[ps.Length] : null;
             var rulesParams = rules._made.Parameters;
             var madeParams = Made.Parameters;
             Func<ParameterInfo, ParameterServiceInfo> paramSelector = null;
@@ -11822,9 +11835,9 @@ namespace DryIoc
 
             var inputArgs = request.InputArgExprs;
             var argsUsedMask = 0;
-            for (var i = 0; i < parameters.Length; i++)
+            for (var i = 0; i < ps.Length; i++)
             {
-                var param = parameters[i];
+                var param = ps[i];
                 var paramType = param.ParameterType;
                 if (inputArgs != null)
                 {
@@ -11847,7 +11860,6 @@ namespace DryIoc
                     }
                 }
 
-                hasByRefParams = hasByRefParams || paramType.IsByRef;
                 var paramServiceInfo = paramSelector == null ? ParameterServiceInfo.OrNull(param) : paramSelector(param) ?? ParameterServiceInfo.OrNull(param);
                 var paramRequest = paramServiceInfo == null ? request.Push(param) : request.Push(paramServiceInfo);
                 var paramDetails = paramServiceInfo == null ? ServiceDetails.Default : paramServiceInfo.Details;
@@ -11872,7 +11884,7 @@ namespace DryIoc
                 var injectedExpr = container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
                 if (injectedExpr == null ||
                     // When param is an empty array / collection, then we may use a default value instead (#581)
-                    paramDetails.DefaultValue != null && injectedExpr.NodeType == ExprType.NewArrayInit && ((NewArrayExpression)injectedExpr).ArgumentCount == 0)
+                    paramDetails.DefaultValue != null && injectedExpr is NewArrayExpression newArr && newArr.ArgumentCount == 0)
                 {
                     // Check if parameter dependency itself (without propagated parent details)
                     // does not allow default, then stop checking the rest of parameters.
@@ -11902,28 +11914,27 @@ namespace DryIoc
 
             Expression serviceExpr;
             if (a0 == null) // thus handling multiple arguments (more than 7 currently)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, paramExprs) : NewNoByRefArgs(ctor, paramExprs)
-                    : Call(factoryExpr, method, paramExprs);
+                serviceExpr = ctor != null ? NewManyObjectArgsIntrinsic(ctor, ps, paramExprs) : Call(factoryExpr, method, paramExprs.AsExprs());
             else if (a1 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0) : NewNoByRefArgs(ctor, a0)
-                    : factoryFunc != null ? new FuncInvoke1Expression(factoryFunc, method, a0) : Call(factoryExpr, method, a0);
+                serviceExpr = ctor != null ? NewOneObjectArgIntrinsic(ctor, ps[0], a0)
+                    : factoryFunc != null ? new FuncInvoke1Expression(factoryFunc, method, a0) : Call(factoryExpr, method, a0.AsExpr());
             else if (a2 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1) : NewNoByRefArgs(ctor, a0, a1)
+                serviceExpr = ctor != null ? NewTwoObjectArgsIntrinsic(ctor, ps, a0, a1)
                     : factoryFunc != null ? new FuncInvoke2Expression(factoryFunc, method, a0, a1) : Call(factoryExpr, method, a0, a1);
             else if (a3 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2) : NewNoByRefArgs(ctor, a0, a1, a2)
+                serviceExpr = ctor != null ? NewThreeObjectArgsIntrinsic(ctor, ps, a0, a1, a2)
                     : factoryFunc != null ? new FuncInvoke3Expression(factoryFunc, method, a0, a1, a2) : Call(factoryExpr, method, a0, a1, a2);
             else if (a4 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3) : NewNoByRefArgs(ctor, a0, a1, a2, a3)
+                serviceExpr = ctor != null ? NewFourObjectArgsIntrinsic(ctor, ps, a0, a1, a2, a3)
                     : factoryFunc != null ? new FuncInvoke4Expression(factoryFunc, method, a0, a1, a2, a3) : Call(factoryExpr, method, a0, a1, a2, a3);
             else if (a5 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4)
+                serviceExpr = ctor != null ? NewFiveObjectArgsIntrinsic(ctor, ps, a0, a1, a2, a3, a4)
                     : factoryFunc != null ? new FuncInvoke5Expression(factoryFunc, method, a0, a1, a2, a3, a4) : Call(factoryExpr, method, a0, a1, a2, a3, a4);
             else if (a6 == null)
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5)
+                serviceExpr = ctor != null ? NewSixObjectArgsIntrinsic(ctor, ps, a0, a1, a2, a3, a4, a5)
                     : factoryFunc != null ? new FuncInvoke6Expression(factoryFunc, method, a0, a1, a2, a3, a4, a5) : Call(factoryExpr, method, a0, a1, a2, a3, a4, a5);
             else
-                serviceExpr = ctor != null ? hasByRefParams ? New(ctor, a0, a1, a2, a3, a4, a5, a6) : NewNoByRefArgs(ctor, a0, a1, a2, a3, a4, a5, a6)
+                serviceExpr = ctor != null ? NewSevenObjectArgsIntrinsic(ctor, ps, a0, a1, a2, a3, a4, a5, a6)
                     : factoryFunc != null ? new FuncInvoke7Expression(factoryFunc, method, a0, a1, a2, a3, a4, a5, a6) : Call(factoryExpr, method, a0, a1, a2, a3, a4, a5, a6);
 
             if (ctor == null)
@@ -12635,13 +12646,13 @@ namespace DryIoc
         public sealed override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) =>
             closure.AddConstantOrIncrementUsageCount(FactoryDelegate) &&
-            ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config);
+            Comp.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
-            EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
-            EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
+            Emit.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
+            Emit.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
+            Emit.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
             il.EmitConvertObjectTo(Type);
     }
 
@@ -12653,9 +12664,9 @@ namespace DryIoc
 
         public sealed override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
+            Emit.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
             ResolverContext.RootOrSelfExpr.TryEmit(config, ref closure, paramExprs, il, parent, byRefIndex) &&
-            EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
+            Emit.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
             il.EmitConvertObjectTo(Type);
     }
 
@@ -13386,22 +13397,22 @@ namespace DryIoc
 
             public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 bool isNestedLambda, ref ClosureInfo rootClosure) =>
-                ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config) &&
-                ExpressionCompiler.TryCollectBoundConstants(ref closure, FactoryDelegateExpr, paramExprs, isNestedLambda, ref rootClosure, config);
+                Comp.TryCollectBoundConstants(ref closure, FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, isNestedLambda, ref rootClosure, config) &&
+                Comp.TryCollectBoundConstants(ref closure, FactoryDelegateExpr, paramExprs, isNestedLambda, ref rootClosure, config);
 
             // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
             public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1)
             {
-                EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent);
-                EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
+                Emit.TryEmit(Object, paramExprs, il, ref closure, config, parent);
+                Emit.EmitLoadConstantInt(il, FactoryId);
 
                 // todo: @perf more intelligent emit?
-                if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
+                if (!Emit.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
                     return false; // todo: @bug uncomment the FEC NestedLambdaInfo.IsTheSameLambda and check why fallback System compile does not work
 
-                EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
-                EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
+                Emit.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
+                Emit.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
                 return il.EmitConvertObjectTo(Type);
             }
         }
@@ -14981,9 +14992,7 @@ namespace DryIoc
         /// <summary>Creates default(T) expression for provided <paramref name="type"/>.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static Expression GetDefaultValueExpression(this Type type) =>
-            !type.IsValueType
-                ? ContainerTools.NullTypeConstant
-                : Call(GetDefaultMethod.MakeGenericMethod(type));
+            !type.IsValueType ? ContainerTools.NullTypeConstant : Call(GetDefaultMethod.MakeGenericMethod(type));
 
         [MethodImpl((MethodImplOptions)256)]
         internal static Expression Cast(this Type type, Expression source) =>

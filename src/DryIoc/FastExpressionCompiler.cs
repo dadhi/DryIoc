@@ -474,7 +474,7 @@ namespace DryIoc.FastExpressionCompiler
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IParameterProvider paramExprs,
             Type[] closurePlusParamTypes, Type returnType, CompilerFlags flags)
         {
-            if (bodyExpr is NoArgsNewClassIntrinsicExpression newNoArgs)
+            if (bodyExpr is NoArgsNewIntrinsicExpression newNoArgs)
                 return CompileNoArgsNew(newNoArgs.Constructor, delegateType, closurePlusParamTypes, returnType);
 #else
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IReadOnlyList<PE> paramExprs,
@@ -657,41 +657,40 @@ namespace DryIoc.FastExpressionCompiler
             public bool AddConstantOrIncrementUsageCount(object value)
             {
                 Status |= ClosureStatus.HasClosure;
+
                 var constItems = Constants.Items;
                 var constIndex = Constants.Count - 1;
                 while (constIndex != -1 && !ReferenceEquals(constItems[constIndex], value))
                     --constIndex;
-
-                if (constIndex == -1)
+                if (constIndex != -1)
+                    ++ConstantUsageThenVarIndex.Items[constIndex];
+                else
                 {
                     Constants.PushSlot(value);
                     ConstantUsageThenVarIndex.PushSlot(1);
                 }
-                else
-                {
-                    ++ConstantUsageThenVarIndex.Items[constIndex];
-                }
                 return true; // here for fluency, don't delete
             }
+
+            public bool AddClosureBoundConstant(object value) =>
+                value == null || !IsClosureBoundConstant(value, value.GetType()) || AddConstantOrIncrementUsageCount(value);
 
             public void AddNonPassedParam(ParameterExpression expr)
             {
                 Status |= ClosureStatus.HasClosure;
 
                 if (NonPassedParameters.Length == 0)
-                {
                     NonPassedParameters = new[] { expr }; // todo: @perf optimize for a single non passed parameter
-                    return;
+                else 
+                {
+                    var nonPassedParams = NonPassedParameters;
+                    var count = nonPassedParams.Length;
+                    for (var i = 0; i < count; ++i)
+                        if (ReferenceEquals(nonPassedParams[i], expr))
+                            return;
+                    Array.Resize(ref NonPassedParameters, count + 1);
+                    NonPassedParameters[count] = expr;
                 }
-
-                var nonPassedParams = NonPassedParameters;
-                var count = nonPassedParams.Length;
-                for (var i = 0; i < count; ++i)
-                    if (ReferenceEquals(nonPassedParams[i], expr))
-                        return;
-
-                Array.Resize(ref NonPassedParameters, count + 1);
-                NonPassedParameters[count] = expr;
             }
 
             public void AddNestedLambda(NestedLambdaInfo nestedLambdaInfo)
@@ -1105,9 +1104,7 @@ namespace DryIoc.FastExpressionCompiler
 #endif
                         var constantExpr = (ConstantExpression)expr;
                         var value = constantExpr.Value;
-                        if (value != null && IsClosureBoundConstant(value, value.GetType()))
-                            closure.AddConstantOrIncrementUsageCount(value);
-                        return true;
+                        return value == null || !IsClosureBoundConstant(value, value.GetType()) || closure.AddConstantOrIncrementUsageCount(value);
 
                     case ExpressionType.Parameter:
                         {
@@ -1576,7 +1573,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
             var nestedLambdaParamExprs = (IParameterProvider)nestedLambdaExpr;
 
-            if (nestedLambdaBody is NoArgsNewClassIntrinsicExpression newNoArgs)
+            if (nestedLambdaBody is NoArgsNewIntrinsicExpression newNoArgs)
             {
                 var paramTypes = RentOrNewClosureTypeToParamTypes(nestedLambdaParamExprs);
                 nestedLambdaInfo.Lambda = CompileNoArgsNew(newNoArgs.Constructor, nestedLambdaExpr.Type, paramTypes, nestedReturnType);
@@ -1851,7 +1848,7 @@ namespace DryIoc.FastExpressionCompiler
                             if ((parent & ParentFlags.IgnoreResult) != 0)
                                 return true;
 #if LIGHT_EXPRESSION
-                            if (expr is IntConstantExpression n) // todo: convert to intrinsic
+                            if (expr is IntConstantExpression n) // todo: @simplify convert to intrinsic
                             {
                                 EmitLoadConstantInt(il, n.IntValue);
                                 return true;
@@ -1866,7 +1863,6 @@ namespace DryIoc.FastExpressionCompiler
                                     il.Emit(OpCodes.Ldnull);
                                 return true;
                             }
-
                             return TryEmitConstantOfNotNullValue(closure.ContainsConstantsOrNestedLambdas(),
                                 constExpr.Type, constExpr.Value, il, ref closure, byRefIndex);
 
@@ -2123,25 +2119,11 @@ namespace DryIoc.FastExpressionCompiler
                 var ctor = newExpr.Constructor;
                 if (argCount > 0)
                 {
-#if LIGHT_EXPRESSION
-                    var args = newExpr.NoByRefArgs ? null : ctor.GetParameters();
-#else
                     var args = ctor.GetParameters();
-#endif
-                    if (args == null)
-                    {
-                        for (var i = 0; i < argCount; ++i)
-                            if (!TryEmit(argExprs.GetArgument(i),
-                                paramExprs, il, ref closure, setup, parent, -1))
-                                return false;
-                    }
-                    else
-                    {
-                        for (var i = 0; i < argCount; ++i)
-                            if (!TryEmit(argExprs.GetArgument(i),
-                                paramExprs, il, ref closure, setup, parent, args[i].ParameterType.IsByRef ? i : -1))
-                                return false;
-                    }
+                    for (var i = 0; i < argCount; ++i)
+                        if (!TryEmit(argExprs.GetArgument(i),
+                            paramExprs, il, ref closure, setup, parent, args[i].ParameterType.IsByRef ? i : -1))
+                            return false;
                 }
 
                 // ReSharper disable once ConditionIsAlwaysTrueOrFalse
@@ -3070,6 +3052,15 @@ namespace DryIoc.FastExpressionCompiler
                     il.Emit(OpCodes.Conv_R8);
                 else
                     return false;
+                return true;
+            }
+
+            [MethodImpl((MethodImplOptions)256)]
+            public static bool TryEmitConstant(object constantValue, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1)
+            {
+                if (constantValue != null)
+                    return TryEmitConstantOfNotNullValue(closure.ContainsConstantsOrNestedLambdas(), null, constantValue, il, ref closure, byRefIndex);
+                il.Emit(OpCodes.Ldnull);
                 return true;
             }
 
@@ -5412,6 +5403,19 @@ namespace DryIoc.FastExpressionCompiler
     // in order to prevent conflicts with YOUR helpers with standard names
     internal static class Tools
     {
+        [MethodImpl((MethodImplOptions)256)]
+        internal static Expression AsExpr(this object a) => a as Expression ?? Constant(a);
+
+        [MethodImpl((MethodImplOptions)256)]
+        internal static Expression[] AsExprs(this object[] aa)
+        {
+            var exprs = new Expression[aa.Length]; // todo: @perf @mem how to optimize this, pooling?
+            for (var i = 0; i < aa.Length; i++)
+                exprs[i] = aa[i].AsExpr();
+            return exprs;
+        }
+
+        [MethodImpl((MethodImplOptions)256)]
         internal static bool IsUnsigned(this Type type) =>
             type == typeof(byte) ||
             type == typeof(ushort) ||
