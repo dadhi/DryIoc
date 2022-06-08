@@ -44,7 +44,8 @@ namespace DryIoc.UnitTests
             Can_supply_fresh_args_in_multiple_resolve_call_Using_the_rule_for_ignoring_Reuse();
             Can_supply_fresh_args_in_different_open_scopes();
             For_Func_returned_type_with_lazy_dependency_Func_parameters_are_correctly_passed();
-            return 35;
+            Can_register_the_custom_delegate_that_accepts_the_func_in_constructor();
+            return 36;
         }
 
         [Test]
@@ -87,7 +88,7 @@ namespace DryIoc.UnitTests
             var container = new Container();
             container.Register(typeof(IService), typeof(Service), Reuse.Singleton);
 
-            var func = container.Resolve<Func<IService>>(); 
+            var func = container.Resolve<Func<IService>>();
 
             var one = func();
             var another = func();
@@ -549,7 +550,43 @@ namespace DryIoc.UnitTests
             Assert.IsNotNull(f, "Expected F will be created via Lazy<> evaluation.");
         }
 
+        [Test]
+        public void Can_register_the_custom_delegate_that_accepts_the_func_in_constructor()
+        {
+            var c = new Container();
+
+            c.Register<FooBar>();
+            c.Register<GotMe>();
+            c.Register<Milk>();
+
+            var fb = c.Resolve<FooBar>();
+
+            Assert.IsNotNull(fb.Me.Milk);
+            Assert.AreSame(fb.Milk, fb.Me.Milk);
+        }
+
         #region CUT
+
+        public delegate Me GotMe(Milk milk);
+
+        public class FooBar
+        {
+            public Me Me;
+            public Milk Milk;
+            public FooBar(GotMe gotMe, Milk milk)
+            {
+                Milk = milk;
+                Me = gotMe(milk);
+            }
+        }
+
+        public class Me
+        {
+            public Milk Milk;
+            public Me(Milk milk) => Milk = milk;
+        }
+
+        public class Milk { }
 
         class SS
         {

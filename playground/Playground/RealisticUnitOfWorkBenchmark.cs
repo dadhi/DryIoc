@@ -1314,6 +1314,12 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDI | 89.66 us | 0.951 us | 0.843 us |  1.12 |    0.02 |  5.9814 | 0.4883 |     - |  37.31 KB |
 |        MsDI | 91.18 us | 0.974 us | 0.911 us |  1.14 |    0.02 | 11.8408 | 4.2725 |     - |  72.61 KB |
 
+|      Method |     Mean |   Error |   StdDev |   Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|--------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 131.5 us | 4.13 us | 11.59 us | 127.4 us |  1.00 |    0.00 | 10.2539 |      - |     - |   31.7 KB |
+| DryIoc_MsDI | 154.1 us | 5.77 us | 16.74 us | 148.1 us |  1.17 |    0.16 | 12.2070 |      - |     - |  37.45 KB |
+|        MsDI | 227.5 us | 4.51 us | 10.45 us | 226.3 us |  1.72 |    0.16 | 22.9492 | 0.4883 |     - |  70.05 KB |
+
 */
 
             // [Benchmark]
