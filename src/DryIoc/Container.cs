@@ -381,12 +381,19 @@ namespace DryIoc
             }
             else
             {
-                var expr = factory.GetExpressionOrDefault(request);
+                var exprOrObj = factory.GetExpressionOrDefault(request);
                 request.ReturnToPool();
-                if (expr == null)
+                if (exprOrObj == null)
                     return null;
 
-                if (expr is ConstantExpression constExpr)
+                if (exprOrObj is Expression == false)
+                {
+                    if (factory.CanCache)
+                        TryCacheDefaultFactory(serviceTypeHash, serviceType, exprOrObj.ToCachedResult());
+                    return exprOrObj;
+                }
+
+                if (exprOrObj is ConstantExpression constExpr)
                 {
                     var value = constExpr.Value;
                     if (factory.CanCache)
@@ -396,14 +403,14 @@ namespace DryIoc
 
                 // Important to cache expression first before trying to interpret, so that parallel resolutions may already use it.
                 if (factory.CanCache)
-                    TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
+                    TryCacheDefaultFactory(serviceTypeHash, serviceType, exprOrObj);
 
                 // 1) First try to interpret
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, (E)exprOrObj, out var instance))
                     return instance;
 
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
+                factoryDelegate = exprOrObj.CompileToFactoryDelegate(rules.UseInterpretation);
             }
 
             if (factory.CanCache)
@@ -496,12 +503,19 @@ namespace DryIoc
             }
             else
             {
-                var expr = factory.GetExpressionOrDefault(request);
+                var exprOrObj = factory.GetExpressionOrDefault(request);
                 request.ReturnToPool();
-                if (expr == null)
+                if (exprOrObj == null)
                     return null;
 
-                if (expr is ConstantExpression constExpr)
+                if (exprOrObj is Expression == false)
+                {
+                    if (factory.CanCache)
+                        TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, exprOrObj.ToCachedResult());
+                    return exprOrObj;
+                }
+
+                if (exprOrObj is ConstantExpression constExpr)
                 {
                     var value = constExpr.Value;
                     if (cacheKey != null)
@@ -511,14 +525,14 @@ namespace DryIoc
 
                 // Important to cache expression first before tying to interpret, so that parallel resolutions may already use it
                 if (cacheKey != null)
-                    TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, expr);
+                    TryCacheKeyedFactory(serviceTypeHash, serviceType, cacheKey, exprOrObj);
 
                 // 1) First try to interpret
-                if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
+                if (Interpreter.TryInterpretAndUnwrapContainerException(this, (E)exprOrObj, out var instance))
                     return instance;
 
                 // 2) Fallback to expression compilation
-                factoryDelegate = expr.CompileToFactoryDelegate(Rules.UseInterpretation);
+                factoryDelegate = exprOrObj.CompileToFactoryDelegate(Rules.UseInterpretation);
             }
 
             // Cache factory only when we successfully called the factory delegate, to prevent failing delegates to be cached.
@@ -873,7 +887,7 @@ namespace DryIoc
                     var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                     if (expr == null)
                         continue;
-                    result.Roots.Add(root.Pair(expr.WrapInFactoryExpression()));
+                    result.Roots.Add(root.Pair(expr.AsExpr().WrapInFactoryExpression()));
                 }
                 catch (ContainerException ex)
                 {
@@ -1486,14 +1500,14 @@ namespace DryIoc
                         break;
                     }
 
-            var decoratorExpr = decorator?.GetExpressionOrDefault(request);
-            if (decoratorExpr == null)
+            var decoratorExprOrObj = decorator?.GetExpressionOrDefault(request);
+            if (decoratorExprOrObj == null)
                 return null;
 
+            var decoratorExpr = decoratorExprOrObj.AsExpr();
             // decorator of arrays should be converted back from IEnumerable to array.
             if (arrayElementType != null)
                 decoratorExpr = Call(WrappersSupport.ToArrayMethod.MakeGenericMethod(arrayElementType), decoratorExpr);
-
             return decoratorExpr;
         }
 
@@ -3060,7 +3074,6 @@ namespace DryIoc
                         }
                         var newExpr = (NewExpression)expr;
                         object[] args = null;
-                        var ok = true;
                         var argCount = newExpr.ArgumentCount;
                         switch (argCount)
                         {
@@ -3070,92 +3083,104 @@ namespace DryIoc
                             case 1:
                                 if (newExpr is OneObjectArgNewIntrinsicExpression e1)
                                 {
-                                    result = e1.A;
-                                    if (result is E ae0) ok = TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out result);
+                                    var a = e1.A;
+                                    if (a is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a))
+                                        return false;
                                     args = SmallArrayPool<object>.RentOrNew(1);
-                                    args[0] = result;
+                                    args[0] = a;
                                 }
                                 break;
                             case 2:
                                 if (newExpr is TwoArgumentsNewExpression e2)
                                 {
-                                    result = e2.A0; var a1 = e2.A1;
-                                    if (result is E ae0) ok = TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out result);
-                                    if (a1 is E ae1) ok &= TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1);
+                                    object a0 = e2.A0, a1 = e2.A1;
+                                    if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                                        a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1))
+                                        return false;
                                     args = SmallArrayPool<object>.RentOrNew(2);
-                                    args[0] = result; args[1] = a1;
+                                    args[0] = a0; args[1] = a1;
                                 }
                                 break;
                             case 3:
                                 if (newExpr is ThreeArgumentsNewExpression e3)
                                 {
-                                    ok = TryInterpret(r, e3.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        & TryInterpret(r, e3.Argument1, paramExprs, paramValues, parentArgs, out var a1)
-                                        & TryInterpret(r, e3.Argument2, paramExprs, paramValues, parentArgs, out var a2);
+                                    object a0 = e3.A0, a1 = e3.A1, a2 = e3.A2;
+                                    if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                                        a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1) ||
+                                        a2 is E ae2 && !TryInterpret(r, ae2, paramExprs, paramValues, parentArgs, out a2))
+                                        return false;
                                     args = SmallArrayPool<object>.RentOrNew(3);
-                                    args[0] = result; args[1] = a1; args[2] = a2;
+                                    args[0] = a0; args[1] = a1; args[2] = a2;
                                 }
                                 break;
                             case 4:
                                 if (newExpr is FourArgumentsNewExpression e4)
                                 {
-                                    ok = TryInterpret(r, e4.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        & TryInterpret(r, e4.Argument1, paramExprs, paramValues, parentArgs, out var a1)
-                                        & TryInterpret(r, e4.Argument2, paramExprs, paramValues, parentArgs, out var a2)
-                                        & TryInterpret(r, e4.Argument3, paramExprs, paramValues, parentArgs, out var a3);
+                                    object a0 = e4.A0, a1 = e4.A1, a2 = e4.A2, a3 = e4.A3;
+                                    if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                                        a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1) ||
+                                        a2 is E ae2 && !TryInterpret(r, ae2, paramExprs, paramValues, parentArgs, out a2) ||
+                                        a3 is E ae3 && !TryInterpret(r, ae3, paramExprs, paramValues, parentArgs, out a3))
+                                        return false;
                                     args = SmallArrayPool<object>.RentOrNew(4);
-                                    args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3;
+                                    args[0] = a0; args[1] = a1; args[2] = a2; args[3] = a3;
                                 }
                                 break;
                             case 5:
                                 if (newExpr is FiveArgumentsNewExpression e5)
                                 {
-                                    ok = TryInterpret(r, e5.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        & TryInterpret(r, e5.Argument1, paramExprs, paramValues, parentArgs, out var a1)
-                                        & TryInterpret(r, e5.Argument2, paramExprs, paramValues, parentArgs, out var a2)
-                                        & TryInterpret(r, e5.Argument3, paramExprs, paramValues, parentArgs, out var a3)
-                                        & TryInterpret(r, e5.Argument4, paramExprs, paramValues, parentArgs, out var a4);
+                                    object a0 = e5.A0, a1 = e5.A1, a2 = e5.A2, a3 = e5.A3, a4 = e5.A4;
+                                    if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                                        a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1) ||
+                                        a2 is E ae2 && !TryInterpret(r, ae2, paramExprs, paramValues, parentArgs, out a2) ||
+                                        a3 is E ae3 && !TryInterpret(r, ae3, paramExprs, paramValues, parentArgs, out a3) ||
+                                        a4 is E ae4 && !TryInterpret(r, ae4, paramExprs, paramValues, parentArgs, out a4))
+                                        return false;
                                     args = SmallArrayPool<object>.RentOrNew(5);
-                                    args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4;
+                                    args[0] = a0; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4;
                                 }
                                 break;
                             case 6:
                                 if (newExpr is SixArgumentsNewExpression e6)
                                 {
-                                    ok = TryInterpret(r, e6.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        & TryInterpret(r, e6.Argument1, paramExprs, paramValues, parentArgs, out var a1)
-                                        & TryInterpret(r, e6.Argument2, paramExprs, paramValues, parentArgs, out var a2)
-                                        & TryInterpret(r, e6.Argument3, paramExprs, paramValues, parentArgs, out var a3)
-                                        & TryInterpret(r, e6.Argument4, paramExprs, paramValues, parentArgs, out var a4)
-                                        & TryInterpret(r, e6.Argument5, paramExprs, paramValues, parentArgs, out var a5);
+                                    object a0 = e6.A0, a1 = e6.A1, a2 = e6.A2, a3 = e6.A3, a4 = e6.A4, a5 = e6.A5;
+                                    if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                                        a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1) ||
+                                        a2 is E ae2 && !TryInterpret(r, ae2, paramExprs, paramValues, parentArgs, out a2) ||
+                                        a3 is E ae3 && !TryInterpret(r, ae3, paramExprs, paramValues, parentArgs, out a3) ||
+                                        a4 is E ae4 && !TryInterpret(r, ae4, paramExprs, paramValues, parentArgs, out a4) ||
+                                        a5 is E ae5 && !TryInterpret(r, ae5, paramExprs, paramValues, parentArgs, out a5))
+                                        return false;
                                     args = SmallArrayPool<object>.RentOrNew(6);
-                                    args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5;
+                                    args[0] = a0; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5;
                                 }
                                 break;
                             case 7:
                                 if (newExpr is SevenArgumentsNewExpression e7)
                                 {
-                                    ok = TryInterpret(r, e7.Argument0, paramExprs, paramValues, parentArgs, out result)
-                                        & TryInterpret(r, e7.Argument1, paramExprs, paramValues, parentArgs, out var a1)
-                                        & TryInterpret(r, e7.Argument2, paramExprs, paramValues, parentArgs, out var a2)
-                                        & TryInterpret(r, e7.Argument3, paramExprs, paramValues, parentArgs, out var a3)
-                                        & TryInterpret(r, e7.Argument4, paramExprs, paramValues, parentArgs, out var a4)
-                                        & TryInterpret(r, e7.Argument5, paramExprs, paramValues, parentArgs, out var a5)
-                                        & TryInterpret(r, e7.Argument6, paramExprs, paramValues, parentArgs, out var a6);
+                                    object a0 = e7.A0, a1 = e7.A1, a2 = e7.A2, a3 = e7.A3, a4 = e7.A4, a5 = e7.A5, a6 = e7.A6;
+                                    if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                                        a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1) ||
+                                        a2 is E ae2 && !TryInterpret(r, ae2, paramExprs, paramValues, parentArgs, out a2) ||
+                                        a3 is E ae3 && !TryInterpret(r, ae3, paramExprs, paramValues, parentArgs, out a3) ||
+                                        a4 is E ae4 && !TryInterpret(r, ae4, paramExprs, paramValues, parentArgs, out a4) ||
+                                        a5 is E ae5 && !TryInterpret(r, ae5, paramExprs, paramValues, parentArgs, out a5) ||
+                                        a6 is E ae6 && !TryInterpret(r, ae6, paramExprs, paramValues, parentArgs, out a6))
                                     args = SmallArrayPool<object>.RentOrNew(7);
-                                    args[0] = result; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5; args[6] = a6;
+                                    args[0] = a0; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5; args[6] = a6;
                                 }
                                 break;
                         }
                         if (args != null)
                         {
-                            if (ok) result = newExpr.Constructor.Invoke(args);
+                            result = newExpr.Constructor.Invoke(args);
                             SmallArrayPool<object>.Return(args);
-                            return ok;
+                            return true;
                         }
                         args = new object[argCount];
                         for (var i = 0; i < args.Length; ++i)
                         {
+                            // todo: @wip @perf optimize
                             var argExpr = newExpr.GetArgument(i);
                             if (argExpr is ConstantExpression ac)
                                 args[i] = ac.Value;
@@ -3508,7 +3533,7 @@ namespace DryIoc
             }
 
             if (callExpr is IFactoryCallExpression)
-                return TryInterpretFuncInvoke(r, callExpr, paramExprs, paramValues, parentArgs, ref result);
+                return TryInterpretFactoryExpression(r, callExpr, paramExprs, paramValues, parentArgs, ref result);
 
             var method = callExpr.Method;
             var methodDeclaringType = method.DeclaringType;
@@ -3697,60 +3722,62 @@ namespace DryIoc
             return true;
         }
 
-        private static bool TryInterpretFuncInvoke(IResolverContext r, MethodCallExpression e,
+        private static bool TryInterpretFactoryExpression(IResolverContext r, MethodCallExpression e,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, ref object result)
         {
             var argCount = e.ArgumentCount;
             if (argCount == 0)
-                result = ((Func<object>)((FactoryCall0Expression)e).Func)();
+                result = ((Func<object>)((FactoryCall0Expression)e).FuncOrExpr)();
             else if (argCount == 1)
             {
                 var f1 = (FactoryCall1Expression)e;
-                if (!TryInterpret(r, f1.Argument, paramExprs, paramValues, parentArgs, out var a0))
+                var a0 = f1.A;
+                if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0))
                     return false;
-                result = ((Func<object, object>)f1.Func)(a0);
+                result = ((Func<object, object>)f1.FuncOrExpr)(a0);
             }
             else if (argCount == 2)
             {
-                var f2 = (FuncInvoke2Expression)e;
-                if (!TryInterpret(r, f2.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
-                    !TryInterpret(r, f2.Argument1, paramExprs, paramValues, parentArgs, out var a1))
+                var f2 = (FactoryCall2Expression)e;
+                object a0 = f2.A0, a1 = f2.A1;
+                if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                    a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1))
                     return false;
-                result = ((Func<object, object, object>)f2.Func)(a0, a1);
+                result = ((Func<object, object, object>)f2.FuncOrExpr)(a0, a1);
             }
-            else if (argCount == 3)
+            else if (argCount == 3) // todo: @wip tbd
             {
-                var f3 = (FuncInvoke3Expression)e;
+                var f3 = (FactoryCall3Expression)e;
                 if (!TryInterpret(r, f3.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
                     !TryInterpret(r, f3.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
                     !TryInterpret(r, f3.Argument2, paramExprs, paramValues, parentArgs, out var a2))
                     return false;
-                result = ((Func<object, object, object, object>)f3.Func)(a0, a1, a2);
+                result = ((Func<object, object, object, object>)f3.FuncOrExpr)(a0, a1, a2);
             }
             else if (argCount == 4)
             {
-                var f4 = (FuncInvoke4Expression)e;
+                var f4 = (FactoryCall4Expression)e;
                 if (!TryInterpret(r, f4.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
                     !TryInterpret(r, f4.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
                     !TryInterpret(r, f4.Argument2, paramExprs, paramValues, parentArgs, out var a2) ||
                     !TryInterpret(r, f4.Argument3, paramExprs, paramValues, parentArgs, out var a3))
                     return false;
-                result = ((Func<object, object, object, object, object>)f4.Func)(a0, a1, a2, a3);
+                result = ((Func<object, object, object, object, object>)f4.FuncOrExpr)(a0, a1, a2, a3);
             }
             else if (argCount == 5)
             {
-                var f5 = (FuncInvoke5Expression)e;
+                var f5 = (FactoryCall5Expression)e;
                 if (!TryInterpret(r, f5.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
                     !TryInterpret(r, f5.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
                     !TryInterpret(r, f5.Argument2, paramExprs, paramValues, parentArgs, out var a2) ||
                     !TryInterpret(r, f5.Argument3, paramExprs, paramValues, parentArgs, out var a3) ||
                     !TryInterpret(r, f5.Argument4, paramExprs, paramValues, parentArgs, out var a4))
                     return false;
-                result = ((Func<object, object, object, object, object, object>)f5.Func)(a0, a1, a2, a3, a4);
+                result = ((Func<object, object, object, object, object, object>)f5.FuncOrExpr)(a0, a1, a2, a3, a4);
             }
             else if (argCount == 6)
             {
-                var f6 = (FuncInvoke6Expression)e;
+                var f6 = (FactoryCall6Expression)e;
                 if (!TryInterpret(r, f6.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
                     !TryInterpret(r, f6.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
                     !TryInterpret(r, f6.Argument2, paramExprs, paramValues, parentArgs, out var a2) ||
@@ -3758,11 +3785,11 @@ namespace DryIoc
                     !TryInterpret(r, f6.Argument4, paramExprs, paramValues, parentArgs, out var a4) ||
                     !TryInterpret(r, f6.Argument5, paramExprs, paramValues, parentArgs, out var a5))
                     return false;
-                result = ((Func<object, object, object, object, object, object, object>)f6.Func)(a0, a1, a2, a3, a4, a5);
+                result = ((Func<object, object, object, object, object, object, object>)f6.FuncOrExpr)(a0, a1, a2, a3, a4, a5);
             }
             else
             {
-                var f7 = (FuncInvoke7Expression)e;
+                var f7 = (FactoryCall7Expression)e;
                 if (!TryInterpret(r, f7.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
                     !TryInterpret(r, f7.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
                     !TryInterpret(r, f7.Argument2, paramExprs, paramValues, parentArgs, out var a2) ||
@@ -3771,7 +3798,7 @@ namespace DryIoc
                     !TryInterpret(r, f7.Argument5, paramExprs, paramValues, parentArgs, out var a5) ||
                     !TryInterpret(r, f7.Argument6, paramExprs, paramValues, parentArgs, out var a6))
                     return false;
-                result = ((Func<object, object, object, object, object, object, object, object>)f7.Func)(a0, a1, a2, a3, a4, a5, a6);
+                result = ((Func<object, object, object, object, object, object, object, object>)f7.FuncOrExpr)(a0, a1, a2, a3, a4, a5, a6);
             }
             return true;
         }
@@ -4061,18 +4088,26 @@ namespace DryIoc
         }
 
         /// <summary>Compiles lambda expression to actual `Func{IResolverContext, object}` wrapper.</summary>
-        public static object CompileToFactoryDelegate(this Expression expression, Type factoryDelegateType, Type resultType, bool preferInterpretation)
+        public static object CompileToFactoryDelegate(this object exprOrNotNullObj, Type factoryDelegateType, Type resultType, bool preferInterpretation)
         {
+            if (exprOrNotNullObj is Expression == false)
+                return exprOrNotNullObj is Func<IResolverContext, object> f ? f : exprOrNotNullObj.ToFactoryDelegate;
+            if (exprOrNotNullObj is ConstantExpression constExpr)
+            {
+                var value = constExpr.Value;
+                return value is Func<IResolverContext, object> f ? f : value.ToFactoryDelegate;
+            }
+            var expr = (Expression)exprOrNotNullObj;
             if (!preferInterpretation)
             {
                 var factoryDelegate = Comp.TryCompileBoundToFirstClosureParam(
-                    factoryDelegateType, expression, FactoryDelegateParamExprs, _factoryDelegateAndClosureParams, resultType,
+                    factoryDelegateType, expr, FactoryDelegateParamExprs, _factoryDelegateAndClosureParams, resultType,
                     CompilerFlags.NoInvocationLambdaInlining);
                 if (factoryDelegate != null)
                     return factoryDelegate;
             }
             // fallback for the platforms where FastExpressionCompiler does not support the expression
-            return Lambda(factoryDelegateType, expression, ResolverContextParamExpr, resultType).ToLambdaExpression()
+            return Lambda(factoryDelegateType, expr, ResolverContextParamExpr, resultType).ToLambdaExpression()
                 .Compile(
 #if SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
                     preferInterpretation
@@ -5195,9 +5230,9 @@ namespace DryIoc
                 request = request.PushServiceType(serviceType);
                 var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
                 return expr == null ? null :
-                    wrapperType == typeof(Func<IResolverContext, object>)
-                    ? Constant(expr.CompileToFactoryDelegate(request.Container.Rules.UseInterpretation))
-                    : Constant(expr.CompileToFactoryDelegate(wrapperType, serviceType, request.Container.Rules.UseInterpretation), wrapperType);
+                    wrapperType == typeof(Func<IResolverContext, object>) // todo: @wip why to Constant
+                        ? Constant(expr.CompileToFactoryDelegate(request.Container.Rules.UseInterpretation))
+                        : Constant(expr.CompileToFactoryDelegate(wrapperType, serviceType, request.Container.Rules.UseInterpretation), wrapperType);
             }
 
             var argExprs = Empty<ParameterExpression>();
@@ -5229,7 +5264,7 @@ namespace DryIoc
                         ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
                         : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
                 }
-                serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
+                serviceExpr = factory?.GetExpressionOrDefault(serviceRequest).AsExpr();
                 if (serviceExpr == null)
                     return null;
             }
@@ -5242,7 +5277,7 @@ namespace DryIoc
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)
                 return null;
-            return ConstantOf<System.Linq.Expressions.LambdaExpression>(expr.WrapInFactoryExpression().ToLambdaExpression());
+            return ConstantOf<System.Linq.Expressions.LambdaExpression>(expr.AsExpr().WrapInFactoryExpression().ToLambdaExpression());
         }
 
         private static Expression GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(Request request)
@@ -5251,7 +5286,7 @@ namespace DryIoc
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)
                 return null;
-            return ConstantOf<FastExpressionCompiler.LightExpression.LambdaExpression>(expr.WrapInFactoryExpression());
+            return ConstantOf<FastExpressionCompiler.LightExpression.LambdaExpression>(expr.AsExpr().WrapInFactoryExpression());
         }
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request, Factory serviceFactory = null)
@@ -5286,7 +5321,7 @@ namespace DryIoc
                 return null;
 
             var keyExpr = request.Container.GetConstantExpression(serviceKey, requiredServiceKeyType);
-            return New(wrapperType.GetConstructors()[0], keyExpr, serviceExpr);
+            return New(wrapperType.GetConstructors()[0], keyExpr, serviceExpr.AsExpr());
         }
 
         /// <summary>Discovers and combines service with its setup metadata.
@@ -5370,7 +5405,7 @@ namespace DryIoc
 
             var resultMetadata = serviceFactory.Setup.GetMetadataValueMatchedByMetadataType(metadataType);
             var metadataExpr = container.GetConstantExpression(resultMetadata, metadataType);
-            return New(metaCtor, serviceExpr, metadataExpr);
+            return New(metaCtor, serviceExpr.AsExpr(), metadataExpr);
         }
 
         /// <summary>Find out if factory metadata is matches the passed metadata type</summary>
@@ -6359,7 +6394,7 @@ namespace DryIoc
     {
         public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
         public readonly object FuncOrExpr;
-        internal FactoryCall1Expression(object funcOrExpr, MethodInfo m, object a) : base(m, a) => FuncOrExpr = funcOrExpr;
+        internal FactoryCall1Expression(object f, MethodInfo m, object a) : base(m, a) => FuncOrExpr = f;
         public override bool IsIntrinsic => FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
@@ -6372,62 +6407,62 @@ namespace DryIoc
                 & Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FuncInvoke2Expression : TwoArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall2Expression : TwoArgumentsMethodCallExpression, IFactoryCallExpression
     {
-        public override Expression Object => Constant(Func.Target);
-        public readonly Delegate Func;
-        internal FuncInvoke2Expression(Delegate f, MethodInfo m, object a0, object a1) : base(m, a0, a1) => Func = f;
-        public override bool IsIntrinsic => true;
+        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public readonly object FuncOrExpr;
+        internal FactoryCall2Expression(object f, MethodInfo m, object a0, object a1) : base(m, a0, a1) => FuncOrExpr = f;
+        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            closure.AddConstantOrIncrementUsageCount(Func.Target)
+            closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target)
             & (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0))
             & (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1));
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                Emit.TryEmitConstantOfNotNullValue(true, null, ((Delegate)FuncOrExpr).Target, il, ref closure)
                 & (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A0, il, ref closure))
                 & (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A1, il, ref closure))
                 & Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FuncInvoke3Expression : ThreeArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall3Expression : ThreeArgumentsMethodCallExpression, IFactoryCallExpression
     {
-        public override Expression Object => Constant(Func.Target);
-        public readonly Delegate Func;
-        internal FuncInvoke3Expression(Delegate f, MethodInfo m, object a0, object a1, object a2) : base(m, a0, a1, a2) => Func = f;
-        public override bool IsIntrinsic => true;
+        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public readonly object FuncOrExpr;
+        internal FactoryCall3Expression(object f, MethodInfo m, object a0, object a1, object a2) : base(m, a0, a1, a2) => FuncOrExpr = f;
+        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            closure.AddConstantOrIncrementUsageCount(Func.Target)
+            closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target)
             & (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0))
             & (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1))
             & (A2 is E a2 ? Comp.TryCollectBoundConstants(ref closure, a2, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A2));
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                Emit.TryEmitConstantOfNotNullValue(true, null, ((Delegate)FuncOrExpr).Target, il, ref closure)
                 & (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A0, il, ref closure))
                 & (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A1, il, ref closure))
                 & (A2 is E a2 ? Emit.TryEmit(a2, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A2, il, ref closure))
                 & Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FuncInvoke4Expression : FourArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall4Expression : FourArgumentsMethodCallExpression, IFactoryCallExpression
     {
-        public override Expression Object => Constant(Func.Target);
-        public readonly Delegate Func;
-        internal FuncInvoke4Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3) : base(m, a0, a1, a2, a3) => Func = f;
-        public override bool IsIntrinsic => true;
+        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public readonly object FuncOrExpr;
+        internal FactoryCall4Expression(object f, MethodInfo m, object a0, object a1, object a2, object a3) : base(m, a0, a1, a2, a3) => FuncOrExpr = f;
+        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            closure.AddConstantOrIncrementUsageCount(Func.Target)
+            closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target)
             & (A0 is E a0 ? Comp.TryCollectBoundConstants(ref closure, a0, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A0))
             & (A1 is E a1 ? Comp.TryCollectBoundConstants(ref closure, a1, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A1))
             & (A2 is E a2 ? Comp.TryCollectBoundConstants(ref closure, a2, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A2))
             & (A3 is E a3 ? Comp.TryCollectBoundConstants(ref closure, a3, paramExprs, isNestedLambda, ref rootClosure, config) : closure.AddClosureBoundConstant(A3));
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                Emit.TryEmitConstantOfNotNullValue(true, null, ((Delegate)FuncOrExpr).Target, il, ref closure)
                 & (A0 is E a0 ? Emit.TryEmit(a0, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A0, il, ref closure))
                 & (A1 is E a1 ? Emit.TryEmit(a1, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A1, il, ref closure))
                 & (A2 is E a2 ? Emit.TryEmit(a2, paramExprs, il, ref closure, config, parent) : Emit.TryEmitConstant(A2, il, ref closure))
@@ -6435,16 +6470,16 @@ namespace DryIoc
                 & Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FuncInvoke5Expression : FiveArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall5Expression : FiveArgumentsMethodCallExpression, IFactoryCallExpression
     {
-        public override Expression Object => Constant(Func.Target);
-        public readonly Delegate Func;
-        internal FuncInvoke5Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4)
-            : base(m, a0, a1, a2, a3, a4) => Func = f;
-        public override bool IsIntrinsic => true;
+        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public readonly object FuncOrExpr;
+        internal FactoryCall5Expression(object f, MethodInfo m, object a0, object a1, object a2, object a3, object a4)
+            : base(m, a0, a1, a2, a3, a4) => FuncOrExpr = f;
+        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-                closure.AddConstantOrIncrementUsageCount(Func.Target) &&
+                closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target) &&
                 Comp.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
                 Comp.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
                 Comp.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
@@ -6452,7 +6487,7 @@ namespace DryIoc
                 Comp.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
+                Emit.TryEmitConstantOfNotNullValue(true, null, ((Delegate)FuncOrExpr).Target, il, ref closure) &&
                 Emit.TryEmit(Argument0, paramExprs, il, ref closure, config, parent) &&
                 Emit.TryEmit(Argument1, paramExprs, il, ref closure, config, parent) &&
                 Emit.TryEmit(Argument2, paramExprs, il, ref closure, config, parent) &&
@@ -6461,16 +6496,16 @@ namespace DryIoc
                 Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FuncInvoke6Expression : SixArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall6Expression : SixArgumentsMethodCallExpression, IFactoryCallExpression
     {
-        public override Expression Object => Constant(Func.Target);
-        public readonly Delegate Func;
-        internal FuncInvoke6Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5)
-            : base(m, a0, a1, a2, a3, a4, a5) => Func = f;
-        public override bool IsIntrinsic => true;
+        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public readonly object FuncOrExpr;
+        internal FactoryCall6Expression(object f, MethodInfo m, object a0, object a1, object a2, object a3, object a4, object a5)
+            : base(m, a0, a1, a2, a3, a4, a5) => FuncOrExpr = f;
+        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-                closure.AddConstantOrIncrementUsageCount(Func.Target)
+                closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target)
                 && Comp.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
                 && Comp.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
                 && Comp.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
@@ -6479,7 +6514,7 @@ namespace DryIoc
                 && Comp.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                Emit.TryEmitConstantOfNotNullValue(true, null, ((Delegate)FuncOrExpr).Target, il, ref closure)
                 && Emit.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
                 && Emit.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
                 && Emit.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
@@ -6489,16 +6524,16 @@ namespace DryIoc
                 && Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FuncInvoke7Expression : SevenArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall7Expression : SevenArgumentsMethodCallExpression, IFactoryCallExpression
     {
-        public override Expression Object => Constant(Func.Target);
-        public readonly Delegate Func;
-        internal FuncInvoke7Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6)
-            : base(m, a0, a1, a2, a3, a4, a5, a6) => Func = f;
-        public override bool IsIntrinsic => true;
+        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public readonly object FuncOrExpr;
+        internal FactoryCall7Expression(object f, MethodInfo m, object a0, object a1, object a2, object a3, object a4, object a5, object a6)
+            : base(m, a0, a1, a2, a3, a4, a5, a6) => FuncOrExpr = f;
+        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
-                closure.AddConstantOrIncrementUsageCount(Func.Target)
+                closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target)
                 && Comp.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config)
                 && Comp.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config)
                 && Comp.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config)
@@ -6508,7 +6543,7 @@ namespace DryIoc
                 && Comp.TryCollectBoundConstants(ref closure, Argument6, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                Emit.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                Emit.TryEmitConstantOfNotNullValue(true, null, ((Delegate)FuncOrExpr).Target, il, ref closure)
                 && Emit.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
                 && Emit.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
                 && Emit.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
@@ -6806,7 +6841,7 @@ namespace DryIoc
                     var injectedExpr = request.Container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
                     if (injectedExpr == null ||
                         // When param is an empty array / collection, then we may use a default value instead (#581)
-                        paramDetails.DefaultValue != null && injectedExpr.NodeType == ExprType.NewArrayInit && ((NewArrayExpression)injectedExpr).ArgumentCount == 0)
+                        paramDetails.DefaultValue != null && injectedExpr is NewArrayExpression na && na.ArgumentCount == 0)
                     {
                         // Check if parameter dependency itself (without propagated parent details)
                         // does not allow default, then stop checking the rest of parameters.
@@ -6821,7 +6856,7 @@ namespace DryIoc
                             : paramRequest.ServiceType.GetDefaultValueExpression();
                     }
 
-                    paramExprs[i] = injectedExpr;
+                    paramExprs[i] = injectedExpr.AsExpr(); // todo: @perf hey
                 }
 
                 if (paramExprs != null && usedInputArgOrUsedOrCustomValueCount > mostUsedArgCount)
@@ -8645,7 +8680,7 @@ namespace DryIoc
 
             request.Flags |= RequestFlags.IsGeneratedResolutionDependencyExpression;
 
-            var factoryExpr = factory.GetExpressionOrDefault(request)?.NormalizeExpression();
+            var factoryExpr = factory.GetExpressionOrDefault(request)?.AsExpr().NormalizeExpression();
             if (factoryExpr == null)
                 return;
 
@@ -10994,8 +11029,8 @@ namespace DryIoc
             {
                 if (weaklyReferencedOrPreventDisposal)
                     serviceExpr = setup.WeaklyReferenced
-                        ? NewFewArgsIntrinsic(ReflectionTools.WeakReferenceCtor, null, serviceExpr)
-                        : NewFewArgsIntrinsic(HiddenDisposable.Ctor, null, serviceExpr);
+                        ? New(ReflectionTools.WeakReferenceCtor, serviceExpr)
+                        : New(HiddenDisposable.Ctor, serviceExpr);
 
                 serviceExpr = reuse.Apply(request, serviceExpr);
             }
@@ -11912,17 +11947,17 @@ namespace DryIoc
             else if (a1 == null)
                 serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps[0], a0) : new FactoryCall1Expression(factoryExpr, method, a0);
             else if (a2 == null)
-                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1) : new FuncInvoke2Expression(factoryExpr, method, a0, a1);
+                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1) : new FactoryCall2Expression(factoryExpr, method, a0, a1);
             else if (a3 == null)
-                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1, a2) : new FuncInvoke3Expression(factoryExpr, method, a0, a1, a2);
+                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1, a2) : new FactoryCall3Expression(factoryExpr, method, a0, a1, a2);
             else if (a4 == null)
-                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1, a2, a3) : new FuncInvoke4Expression(factoryExpr, method, a0, a1, a2, a3);
+                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1, a2, a3) : new FactoryCall4Expression(factoryExpr, method, a0, a1, a2, a3);
             else if (a5 == null)
-                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1, a2, a3, a4) : new FuncInvoke5Expression(factoryExpr, method, a0, a1, a2, a3, a4);
+                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1, a2, a3, a4) : new FactoryCall5Expression(factoryExpr, method, a0, a1, a2, a3, a4);
             else if (a6 == null)
-                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1, a2, a3, a4, a5) : new FuncInvoke6Expression(factoryExpr, method, a0, a1, a2, a3, a4, a5);
+                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1, a2, a3, a4, a5) : new FactoryCall6Expression(factoryExpr, method, a0, a1, a2, a3, a4, a5);
             else
-                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1, a2, a3, a4, a5, a6) : new FuncInvoke7Expression(factoryExpr, method, a0, a1, a2, a3, a4, a5, a6);
+                serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps, a0, a1, a2, a3, a4, a5, a6) : new FactoryCall7Expression(factoryExpr, method, a0, a1, a2, a3, a4, a5, a6);
 
             // todo: @wip check do we need convert for FactoryCallExpression
             if (ctor == null)
@@ -11961,7 +11996,7 @@ namespace DryIoc
                         TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, member.Details)
                         ?? container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
                     if (memberExpr != null)
-                        assignments = assignments.Append(Bind(member.Member, memberExpr));
+                        assignments = assignments.Append(Bind(member.Member, memberExpr.AsExpr()));
                     else if (request.IfUnresolved == IfUnresolved.ReturnDefault)
                     {
                         failedToGet = true;
@@ -12463,7 +12498,7 @@ namespace DryIoc
         }
 
         /// <summary>Simplified path for the registered instance</summary>
-        public override Expression GetExpressionOrDefault(Request request)
+        public override object GetExpressionOrDefault(Request request)
         {
             if (// preventing recursion
                 (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 && !request.IsResolutionCall &&

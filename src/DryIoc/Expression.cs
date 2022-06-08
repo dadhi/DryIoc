@@ -2887,7 +2887,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
             var f = parent | ParentFlags.CtorCall;
-            var i = _p == null || !_p.ParameterType.IsByRef ? -1 : 0;
+            var i = _p.ParameterType.IsByRef ? 0 : -1;
             var ok = A is E a ? Emit.TryEmit(a, paramExprs, il, ref closure, setup, f, i) : Emit.TryEmitConstant(A, il, ref closure, i);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
@@ -3186,7 +3186,12 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override IReadOnlyList<Expression> Arguments => _args.AsExprs();
         public override int ArgumentCount => _args.Length;
         public override Expression GetArgument(int i) => _args[i].AsExpr();
-        internal ManyObjectArgsNewIntrinsicExpression(ConstructorInfo constructor, ParameterInfo[] ps, object[] args) : base(constructor) => _args = args;
+        internal ManyObjectArgsNewIntrinsicExpression(ConstructorInfo constructor, ParameterInfo[] ps, object[] args) : base(constructor)
+        {
+            _ps = ps;
+            _args = args;
+        }
+
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure)

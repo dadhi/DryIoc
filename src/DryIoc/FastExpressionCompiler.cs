@@ -5403,6 +5403,7 @@ namespace DryIoc.FastExpressionCompiler
     // in order to prevent conflicts with YOUR helpers with standard names
     internal static class Tools
     {
+        // todo: @perf @mem check usages and try to remove them
         [MethodImpl((MethodImplOptions)256)]
         internal static Expression AsExpr(this object a) => a as Expression ?? Constant(a);
 
