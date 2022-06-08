@@ -1324,7 +1324,7 @@ namespace DryIoc.ImTools
         {
             for (var i = 0; (uint)i < arr.Length; ++i)
                 arr[i] = default;
-            Arrays[arr.Length - 1] = arr;
+            Arrays[arr.Length - 1] = arr; // we don't need to be atomic here because we don't care much if Arrays already have the arr in slot. For simplicity we will assign the new array anyway.
         }
     }
 

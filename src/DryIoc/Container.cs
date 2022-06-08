@@ -3168,6 +3168,7 @@ namespace DryIoc
                                         a4 is E ae4 && !TryInterpret(r, ae4, paramExprs, paramValues, parentArgs, out a4) ||
                                         a5 is E ae5 && !TryInterpret(r, ae5, paramExprs, paramValues, parentArgs, out a5) ||
                                         a6 is E ae6 && !TryInterpret(r, ae6, paramExprs, paramValues, parentArgs, out a6))
+                                        return false;
                                     args = SmallArrayPool<object>.RentOrNew(7);
                                     args[0] = a0; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5; args[6] = a6;
                                 }
@@ -3182,7 +3183,7 @@ namespace DryIoc
                         args = new object[argCount];
                         for (var i = 0; i < args.Length; ++i)
                         {
-                            // todo: @wip @perf optimize
+                            // todo: @wip @perf optimize GetArgument for the actual object argument
                             var argExpr = newExpr.GetArgument(i);
                             if (argExpr is ConstantExpression ac)
                                 args[i] = ac.Value;
