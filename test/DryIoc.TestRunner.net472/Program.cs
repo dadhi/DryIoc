@@ -10,6 +10,7 @@ namespace DryIoc.UnitTests.net472
         public static void Main()
         {
             RunAllTests();
+            // new ReducedLoadTest().Run()
 
             // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
 

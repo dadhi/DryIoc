@@ -5266,7 +5266,7 @@ namespace DryIoc
                         ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
                         : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
                 }
-                serviceExpr = factory?.GetObjectOrExpressionOrNull(serviceRequest).AsExpr();
+                serviceExpr = factory?.GetObjectOrExpressionOrNull(serviceRequest)?.AsExpr();
                 if (serviceExpr == null)
                     return null;
             }
@@ -5277,18 +5277,16 @@ namespace DryIoc
         {
             request = request.PushServiceType(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
             var expr = request.Container.ResolveFactory(request)?.GetObjectOrExpressionOrNull(request);
-            if (expr == null)
-                return null;
-            return ConstantOf<System.Linq.Expressions.LambdaExpression>(expr.AsExpr().WrapInFactoryExpression().ToLambdaExpression());
+            return expr == null ? null :
+                ConstantOf<System.Linq.Expressions.LambdaExpression>(expr.AsExpr().WrapInFactoryExpression().ToLambdaExpression());
         }
 
         private static Expression GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(Request request)
         {
             request = request.PushServiceType(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
             var expr = request.Container.ResolveFactory(request)?.GetObjectOrExpressionOrNull(request);
-            if (expr == null)
-                return null;
-            return ConstantOf<FastExpressionCompiler.LightExpression.LambdaExpression>(expr.AsExpr().WrapInFactoryExpression());
+            return expr == null ? null :
+                ConstantOf<FastExpressionCompiler.LightExpression.LambdaExpression>(expr.AsExpr().WrapInFactoryExpression());
         }
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request, Factory serviceFactory = null)
@@ -5319,11 +5317,8 @@ namespace DryIoc
             }
 
             var serviceExpr = factory?.GetObjectOrExpressionOrNull(serviceRequest);
-            if (serviceExpr == null)
-                return null;
-
-            var keyExpr = request.Container.GetConstantExpression(serviceKey, requiredServiceKeyType);
-            return New(wrapperType.GetConstructors()[0], keyExpr, serviceExpr.AsExpr());
+            return serviceExpr == null ? null :
+                New(wrapperType.GetConstructors()[0], container.GetConstantExpression(serviceKey, requiredServiceKeyType), serviceExpr.AsExpr());
         }
 
         /// <summary>Discovers and combines service with its setup metadata.
@@ -6864,7 +6859,7 @@ namespace DryIoc
                             : paramRequest.ServiceType.GetDefaultValueExpression();
                     }
 
-                    paramExprs[i] = injectedExpr.AsExpr(); // todo: @perf hey
+                    paramExprs[i] = injectedExpr?.AsExpr(); // todo: @perf hey
                 }
 
                 if (paramExprs != null && usedInputArgOrUsedOrCustomValueCount > mostUsedArgCount)
@@ -11843,7 +11838,7 @@ namespace DryIoc
                 ctorOrMethod = ctorOrMember as MethodBase;
                 if (ctorOrMethod == null) // return earlier when factory is Property or Field
                     return ConvertExpressionIfNeeded(
-                        ctorOrMember is PropertyInfo p ? Property(factoryExpr.AsExpr(), p) : Field(factoryExpr.AsExpr(), (FieldInfo)ctorOrMember),
+                        ctorOrMember is PropertyInfo p ? Property(factoryExpr?.AsExpr(), p) : Field(factoryExpr?.AsExpr(), (FieldInfo)ctorOrMember),
                         request, ctorOrMember);
                 ctor = ctorOrMember as ConstructorInfo;
                 method = ctorOrMember as MethodInfo;
@@ -11955,8 +11950,7 @@ namespace DryIoc
 
             Expression serviceExpr;
             if (a0 == null) // thus handling multiple arguments (more than 7 currently)
-                serviceExpr = ctor != null ? NewManyArgsIntrinsic(ctor, ps, paramExprs) : 
-                    Call(factoryExpr?.AsExpr(), method, paramExprs.AsExprs());
+                serviceExpr = ctor != null ? NewManyArgsIntrinsic(ctor, ps, paramExprs) : Call(factoryExpr?.AsExpr(), method, paramExprs.AsExprs());
             else if (a1 == null)
                 serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps[0], a0) : new FactoryCall1Expression(factoryExpr, method, a0);
             else if (a2 == null)
