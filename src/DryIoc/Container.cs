@@ -3748,60 +3748,65 @@ namespace DryIoc
                     return false;
                 result = ((Func<object, object, object>)f2.FuncOrExpr)(a0, a1);
             }
-            else if (argCount == 3) // todo: @wip tbd
+            else if (argCount == 3)
             {
-                var f3 = (FactoryCall3Expression)e;
-                if (!TryInterpret(r, f3.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
-                    !TryInterpret(r, f3.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
-                    !TryInterpret(r, f3.Argument2, paramExprs, paramValues, parentArgs, out var a2))
+                var f = (FactoryCall3Expression)e;
+                object a0 = f.A0, a1 = f.A1, a2 = f.A2;
+                if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                    a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1) ||
+                    a2 is E ae2 && !TryInterpret(r, ae2, paramExprs, paramValues, parentArgs, out a2))
                     return false;
-                result = ((Func<object, object, object, object>)f3.FuncOrExpr)(a0, a1, a2);
+                result = ((Func<object, object, object, object>)f.FuncOrExpr)(a0, a1, a2);
             }
             else if (argCount == 4)
             {
                 var f4 = (FactoryCall4Expression)e;
-                if (!TryInterpret(r, f4.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
-                    !TryInterpret(r, f4.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
-                    !TryInterpret(r, f4.Argument2, paramExprs, paramValues, parentArgs, out var a2) ||
-                    !TryInterpret(r, f4.Argument3, paramExprs, paramValues, parentArgs, out var a3))
+                object a0 = f4.A0, a1 = f4.A1, a2 = f4.A2, a3 = f4.A3;
+                if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                    a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1) ||
+                    a2 is E ae2 && !TryInterpret(r, ae2, paramExprs, paramValues, parentArgs, out a2) ||
+                    a3 is E ae3 && !TryInterpret(r, ae3, paramExprs, paramValues, parentArgs, out a3))
                     return false;
                 result = ((Func<object, object, object, object, object>)f4.FuncOrExpr)(a0, a1, a2, a3);
             }
             else if (argCount == 5)
             {
-                var f5 = (FactoryCall5Expression)e;
-                if (!TryInterpret(r, f5.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
-                    !TryInterpret(r, f5.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
-                    !TryInterpret(r, f5.Argument2, paramExprs, paramValues, parentArgs, out var a2) ||
-                    !TryInterpret(r, f5.Argument3, paramExprs, paramValues, parentArgs, out var a3) ||
-                    !TryInterpret(r, f5.Argument4, paramExprs, paramValues, parentArgs, out var a4))
+                var f = (FactoryCall5Expression)e;
+                object a0 = f.A0, a1 = f.A1, a2 = f.A2, a3 = f.A3, a4 = f.A4;
+                if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                    a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1) ||
+                    a2 is E ae2 && !TryInterpret(r, ae2, paramExprs, paramValues, parentArgs, out a2) ||
+                    a3 is E ae3 && !TryInterpret(r, ae3, paramExprs, paramValues, parentArgs, out a3) ||
+                    a4 is E ae4 && !TryInterpret(r, ae4, paramExprs, paramValues, parentArgs, out a4))
                     return false;
-                result = ((Func<object, object, object, object, object, object>)f5.FuncOrExpr)(a0, a1, a2, a3, a4);
+                result = ((Func<object, object, object, object, object, object>)f.FuncOrExpr)(a0, a1, a2, a3, a4);
             }
             else if (argCount == 6)
             {
-                var f6 = (FactoryCall6Expression)e;
-                if (!TryInterpret(r, f6.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
-                    !TryInterpret(r, f6.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
-                    !TryInterpret(r, f6.Argument2, paramExprs, paramValues, parentArgs, out var a2) ||
-                    !TryInterpret(r, f6.Argument3, paramExprs, paramValues, parentArgs, out var a3) ||
-                    !TryInterpret(r, f6.Argument4, paramExprs, paramValues, parentArgs, out var a4) ||
-                    !TryInterpret(r, f6.Argument5, paramExprs, paramValues, parentArgs, out var a5))
+                var f = (FactoryCall6Expression)e;
+                object a0 = f.A0, a1 = f.A1, a2 = f.A2, a3 = f.A3, a4 = f.A4, a5 = f.A5;
+                if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                    a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1) ||
+                    a2 is E ae2 && !TryInterpret(r, ae2, paramExprs, paramValues, parentArgs, out a2) ||
+                    a3 is E ae3 && !TryInterpret(r, ae3, paramExprs, paramValues, parentArgs, out a3) ||
+                    a4 is E ae4 && !TryInterpret(r, ae4, paramExprs, paramValues, parentArgs, out a4) ||
+                    a5 is E ae5 && !TryInterpret(r, ae5, paramExprs, paramValues, parentArgs, out a5))
                     return false;
-                result = ((Func<object, object, object, object, object, object, object>)f6.FuncOrExpr)(a0, a1, a2, a3, a4, a5);
+                result = ((Func<object, object, object, object, object, object, object>)f.FuncOrExpr)(a0, a1, a2, a3, a4, a5);
             }
             else
             {
-                var f7 = (FactoryCall7Expression)e;
-                if (!TryInterpret(r, f7.Argument0, paramExprs, paramValues, parentArgs, out var a0) ||
-                    !TryInterpret(r, f7.Argument1, paramExprs, paramValues, parentArgs, out var a1) ||
-                    !TryInterpret(r, f7.Argument2, paramExprs, paramValues, parentArgs, out var a2) ||
-                    !TryInterpret(r, f7.Argument3, paramExprs, paramValues, parentArgs, out var a3) ||
-                    !TryInterpret(r, f7.Argument4, paramExprs, paramValues, parentArgs, out var a4) ||
-                    !TryInterpret(r, f7.Argument5, paramExprs, paramValues, parentArgs, out var a5) ||
-                    !TryInterpret(r, f7.Argument6, paramExprs, paramValues, parentArgs, out var a6))
+                var f = (FactoryCall7Expression)e;
+                object a0 = f.A0, a1 = f.A1, a2 = f.A2, a3 = f.A3, a4 = f.A4, a5 = f.A5, a6 = f.A6;
+                if (a0 is E ae0 && !TryInterpret(r, ae0, paramExprs, paramValues, parentArgs, out a0) ||
+                    a1 is E ae1 && !TryInterpret(r, ae1, paramExprs, paramValues, parentArgs, out a1) ||
+                    a2 is E ae2 && !TryInterpret(r, ae2, paramExprs, paramValues, parentArgs, out a2) ||
+                    a3 is E ae3 && !TryInterpret(r, ae3, paramExprs, paramValues, parentArgs, out a3) ||
+                    a4 is E ae4 && !TryInterpret(r, ae4, paramExprs, paramValues, parentArgs, out a4) ||
+                    a5 is E ae5 && !TryInterpret(r, ae5, paramExprs, paramValues, parentArgs, out a5) ||
+                    a6 is E ae6 && !TryInterpret(r, ae6, paramExprs, paramValues, parentArgs, out a6))
                     return false;
-                result = ((Func<object, object, object, object, object, object, object, object>)f7.FuncOrExpr)(a0, a1, a2, a3, a4, a5, a6);
+                result = ((Func<object, object, object, object, object, object, object, object>)f.FuncOrExpr)(a0, a1, a2, a3, a4, a5, a6);
             }
             return true;
         }
