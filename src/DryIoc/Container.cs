@@ -381,7 +381,7 @@ namespace DryIoc
             }
             else
             {
-                var exprOrObj = factory.GetExpressionOrDefault(request);
+                var exprOrObj = factory.GetObjectOrExpressionOrNull(request);
                 request.ReturnToPool();
                 if (exprOrObj == null)
                     return null;
@@ -503,7 +503,7 @@ namespace DryIoc
             }
             else
             {
-                var exprOrObj = factory.GetExpressionOrDefault(request);
+                var exprOrObj = factory.GetObjectOrExpressionOrNull(request);
                 request.ReturnToPool();
                 if (exprOrObj == null)
                     return null;
@@ -848,7 +848,7 @@ namespace DryIoc
                 try
                 {
                     var request = Request.CreateForValidation(validatingContainer, root, depRequestStack);
-                    validatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                    validatingContainer.ResolveFactory(request)?.GetObjectOrExpressionOrNull(request);
                 }
                 catch (ContainerException ex)
                 {
@@ -884,7 +884,7 @@ namespace DryIoc
                 try
                 {
                     var request = Request.Create(generatingContainer, root);
-                    var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                    var expr = generatingContainer.ResolveFactory(request)?.GetObjectOrExpressionOrNull(request);
                     if (expr == null)
                         continue;
                     result.Roots.Add(root.Pair(expr.AsExpr().WrapInFactoryExpression()));
@@ -1500,7 +1500,7 @@ namespace DryIoc
                         break;
                     }
 
-            var decoratorExprOrObj = decorator?.GetExpressionOrDefault(request);
+            var decoratorExprOrObj = decorator?.GetObjectOrExpressionOrNull(request);
             if (decoratorExprOrObj == null)
                 return null;
 
@@ -3033,6 +3033,8 @@ namespace DryIoc
             }
         }
 
+        internal static readonly object FactoryExpressionTag = new object();
+
         /// <summary>Stores parent lambda params and args</summary>
         public sealed class ParentLambdaArgs
         {
@@ -3532,7 +3534,7 @@ namespace DryIoc
                 return true;
             }
 
-            if (callExpr is IFactoryCallExpression)
+            if (callExpr.Tag == Interpreter.FactoryExpressionTag && callExpr.IsIntrinsic)
                 return TryInterpretFactoryExpression(r, callExpr, paramExprs, paramValues, parentArgs, ref result);
 
             var method = callExpr.Method;
@@ -5129,7 +5131,7 @@ namespace DryIoc
                     ? itemRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(item.Factory)
                     : container.ResolveFactory(itemRequest.WithWrappedServiceFactory(item.Factory));
 
-                var itemExpr = factory?.GetExpressionOrDefault(itemRequest);
+                var itemExpr = factory?.GetObjectOrExpressionOrNull(itemRequest);
                 if (itemExpr != null)
                     itemExprs[itemExprIndex++] = itemExpr.AsExpr();
             }
@@ -5228,7 +5230,7 @@ namespace DryIoc
                     : request.RequiredServiceType ?? serviceType;
 
                 request = request.PushServiceType(serviceType);
-                var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                var expr = request.Container.ResolveFactory(request)?.GetObjectOrExpressionOrNull(request);
                 return expr == null ? null :
                     wrapperType == typeof(Func<IResolverContext, object>) // todo: @wip why to Constant
                         ? Constant(expr.CompileToFactoryDelegate(request.Container.Rules.UseInterpretation))
@@ -5264,7 +5266,7 @@ namespace DryIoc
                         ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
                         : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
                 }
-                serviceExpr = factory?.GetExpressionOrDefault(serviceRequest).AsExpr();
+                serviceExpr = factory?.GetObjectOrExpressionOrNull(serviceRequest).AsExpr();
                 if (serviceExpr == null)
                     return null;
             }
@@ -5274,7 +5276,7 @@ namespace DryIoc
         private static Expression GetLambdaExpressionExpressionOrDefault(Request request)
         {
             request = request.PushServiceType(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
-            var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
+            var expr = request.Container.ResolveFactory(request)?.GetObjectOrExpressionOrNull(request);
             if (expr == null)
                 return null;
             return ConstantOf<System.Linq.Expressions.LambdaExpression>(expr.AsExpr().WrapInFactoryExpression().ToLambdaExpression());
@@ -5283,7 +5285,7 @@ namespace DryIoc
         private static Expression GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(Request request)
         {
             request = request.PushServiceType(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
-            var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
+            var expr = request.Container.ResolveFactory(request)?.GetObjectOrExpressionOrNull(request);
             if (expr == null)
                 return null;
             return ConstantOf<FastExpressionCompiler.LightExpression.LambdaExpression>(expr.AsExpr().WrapInFactoryExpression());
@@ -5316,7 +5318,7 @@ namespace DryIoc
                     : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
             }
 
-            var serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
+            var serviceExpr = factory?.GetObjectOrExpressionOrNull(serviceRequest);
             if (serviceExpr == null)
                 return null;
 
@@ -5399,7 +5401,7 @@ namespace DryIoc
                 ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
                 : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
 
-            var serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
+            var serviceExpr = factory?.GetObjectOrExpressionOrNull(serviceRequest);
             if (serviceExpr == null)
                 return null;
 
@@ -5846,7 +5848,7 @@ namespace DryIoc
                     made: DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam);
 
                 // to enable fallback to other rules if unresolved try to resolve expression first and return null
-                return factory.GetExpressionOrDefault(request.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null ? factory : null;
+                return factory.GetObjectOrExpressionOrNull(request.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null ? factory : null;
             };
 
         /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract.
@@ -5878,7 +5880,7 @@ namespace DryIoc
                 // the condition checks that factory is resolvable
                 factory = ReflectionFactory.Of(implType, reuse,
                     DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam,
-                    Setup.With(condition: req => factory?.GetExpressionOrDefault(req.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null));
+                    Setup.With(condition: req => factory?.GetObjectOrExpressionOrNull(req.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null));
 
                 return factory;
             });
@@ -6373,14 +6375,13 @@ namespace DryIoc
         #endregion
     }
 
-    internal interface IFactoryCallExpression { }
-
-    sealed class FactoryCall0Expression : NotNullMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall0Expression : NotNullMethodCallExpression
     {
-        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public override object Tag => Interpreter.FactoryExpressionTag; 
+        public override Expression Object => FuncOrExpr == null ? null : (FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target));
         public readonly object FuncOrExpr;
         internal FactoryCall0Expression(object funcOrExpr, MethodInfo m) : base(m) => FuncOrExpr = funcOrExpr;
-        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
+        public override bool IsIntrinsic => FuncOrExpr != null && FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
             closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target);
@@ -6390,12 +6391,13 @@ namespace DryIoc
                 Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FactoryCall1Expression : OneArgumentMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall1Expression : OneArgumentMethodCallExpression
     {
-        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public override object Tag => Interpreter.FactoryExpressionTag; 
+        public override Expression Object => FuncOrExpr == null ? null : (FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target));
         public readonly object FuncOrExpr;
         internal FactoryCall1Expression(object f, MethodInfo m, object a) : base(m, a) => FuncOrExpr = f;
-        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
+        public override bool IsIntrinsic => FuncOrExpr != null && FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
             closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target) &
@@ -6407,12 +6409,13 @@ namespace DryIoc
                 & Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FactoryCall2Expression : TwoArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall2Expression : TwoArgumentsMethodCallExpression
     {
-        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public override object Tag => Interpreter.FactoryExpressionTag;
+        public override Expression Object => FuncOrExpr == null ? null : (FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target));
         public readonly object FuncOrExpr;
         internal FactoryCall2Expression(object f, MethodInfo m, object a0, object a1) : base(m, a0, a1) => FuncOrExpr = f;
-        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
+        public override bool IsIntrinsic => FuncOrExpr != null && FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
             closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target)
@@ -6426,12 +6429,13 @@ namespace DryIoc
                 & Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FactoryCall3Expression : ThreeArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall3Expression : ThreeArgumentsMethodCallExpression
     {
-        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public override object Tag => Interpreter.FactoryExpressionTag;
+        public override Expression Object => FuncOrExpr == null ? null : (FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target));
         public readonly object FuncOrExpr;
         internal FactoryCall3Expression(object f, MethodInfo m, object a0, object a1, object a2) : base(m, a0, a1, a2) => FuncOrExpr = f;
-        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
+        public override bool IsIntrinsic => FuncOrExpr != null && FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
             closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target)
@@ -6447,12 +6451,13 @@ namespace DryIoc
                 & Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FactoryCall4Expression : FourArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall4Expression : FourArgumentsMethodCallExpression
     {
-        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public override object Tag => Interpreter.FactoryExpressionTag;
+        public override Expression Object => FuncOrExpr == null ? null : (FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target));
         public readonly object FuncOrExpr;
         internal FactoryCall4Expression(object f, MethodInfo m, object a0, object a1, object a2, object a3) : base(m, a0, a1, a2, a3) => FuncOrExpr = f;
-        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
+        public override bool IsIntrinsic => FuncOrExpr != null && FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
             closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target)
@@ -6470,13 +6475,14 @@ namespace DryIoc
                 & Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FactoryCall5Expression : FiveArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall5Expression : FiveArgumentsMethodCallExpression
     {
-        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public override object Tag => Interpreter.FactoryExpressionTag;
+        public override Expression Object => FuncOrExpr == null ? null : (FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target));
         public readonly object FuncOrExpr;
         internal FactoryCall5Expression(object f, MethodInfo m, object a0, object a1, object a2, object a3, object a4)
             : base(m, a0, a1, a2, a3, a4) => FuncOrExpr = f;
-        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
+        public override bool IsIntrinsic => FuncOrExpr != null && FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
                 closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target) &&
@@ -6496,13 +6502,14 @@ namespace DryIoc
                 Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FactoryCall6Expression : SixArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall6Expression : SixArgumentsMethodCallExpression
     {
-        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public override object Tag => Interpreter.FactoryExpressionTag;
+        public override Expression Object => FuncOrExpr == null ? null : (FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target));
         public readonly object FuncOrExpr;
         internal FactoryCall6Expression(object f, MethodInfo m, object a0, object a1, object a2, object a3, object a4, object a5)
             : base(m, a0, a1, a2, a3, a4, a5) => FuncOrExpr = f;
-        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
+        public override bool IsIntrinsic => FuncOrExpr != null && FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
                 closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target)
@@ -6524,13 +6531,14 @@ namespace DryIoc
                 && Emit.EmitMethodCall(il, Method);
     }
 
-    sealed class FactoryCall7Expression : SevenArgumentsMethodCallExpression, IFactoryCallExpression
+    sealed class FactoryCall7Expression : SevenArgumentsMethodCallExpression
     {
-        public override Expression Object => FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target);
+        public override object Tag => Interpreter.FactoryExpressionTag;
+        public override Expression Object => FuncOrExpr == null ? null : (FuncOrExpr as Expression ?? Constant(((Delegate)FuncOrExpr).Target));
         public readonly object FuncOrExpr;
         internal FactoryCall7Expression(object f, MethodInfo m, object a0, object a1, object a2, object a3, object a4, object a5, object a6)
             : base(m, a0, a1, a2, a3, a4, a5, a6) => FuncOrExpr = f;
-        public override bool IsIntrinsic => FuncOrExpr is Expression == false;
+        public override bool IsIntrinsic => FuncOrExpr != null && FuncOrExpr is Expression == false;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
                 closure.AddConstantOrIncrementUsageCount(((Delegate)FuncOrExpr).Target)
@@ -6838,7 +6846,7 @@ namespace DryIoc
                         continue;
                     }
 
-                    var injectedExpr = request.Container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
+                    var injectedExpr = request.Container.ResolveFactory(paramRequest)?.GetObjectOrExpressionOrNull(paramRequest);
                     if (injectedExpr == null ||
                         // When param is an empty array / collection, then we may use a default value instead (#581)
                         paramDetails.DefaultValue != null && injectedExpr is NewArrayExpression na && na.ArgumentCount == 0)
@@ -8680,7 +8688,7 @@ namespace DryIoc
 
             request.Flags |= RequestFlags.IsGeneratedResolutionDependencyExpression;
 
-            var factoryExpr = factory.GetExpressionOrDefault(request)?.AsExpr().NormalizeExpression();
+            var factoryExpr = factory.GetObjectOrExpressionOrNull(request)?.AsExpr().NormalizeExpression();
             if (factoryExpr == null)
                 return;
 
@@ -10807,9 +10815,14 @@ namespace DryIoc
         public virtual Expression CreateExpressionWithWrappedFactory(Request request, Factory serviceFactory) => CreateExpressionOrDefault(request);
 
         /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
+        /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
+        public virtual Expression GetExpressionOrDefault(Request request) =>
+            GetObjectOrExpressionOrNull(request)?.AsExpr();
+
+        /// <summary>Returns service expression: either by creating it with <see cref="CreateExpressionOrDefault"/> or taking expression from cache.
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.
         /// The method returns object, expression or `null` indicating of no service resolved, though it may return the Constant(null, type).</summary>
-        public virtual object GetExpressionOrDefault(Request request)
+        public virtual object GetObjectOrExpressionOrNull(Request request)
         {
             // The factory usually is null unleast it is provided by the collection or other higher wrapper.
             // Note, that we are storing it in the local variable Here because the follow-up WithResolvedFactorywill override it with "this" factory.
@@ -11046,7 +11059,7 @@ namespace DryIoc
         /// <summary>Creates factory delegate from service expression and returns it.</summary>
         public virtual Func<IResolverContext, object> GetDelegateOrDefault(Request request)
         {
-            var exprOrObj = GetExpressionOrDefault(request);
+            var exprOrObj = GetObjectOrExpressionOrNull(request);
             return exprOrObj == null ? null 
                 : exprOrObj is Expression e 
                     ? e.CompileToFactoryDelegate(request.Rules.UseInterpretation)
@@ -11806,10 +11819,9 @@ namespace DryIoc
                     if (factoryExpr == null && factoryMethod.FactoryServiceInfo != null)
                     {
                         var factoryRequest = request.Push(factoryMethod.FactoryServiceInfo);
-                        var factoryObj = container.ResolveFactory(factoryRequest)?.GetExpressionOrDefault(factoryRequest);
-                        if (factoryObj == null)
+                        factoryExpr = container.ResolveFactory(factoryRequest)?.GetObjectOrExpressionOrNull(factoryRequest);
+                        if (factoryExpr == null)
                             return null; // todo: @check should we check for request.IfUnresolved != IfUnresolved.ReturnDefault here?
-                        factoryExpr = factoryObj as Expression ?? Constant(factoryObj); // todo: @perf try to remove Constant 
                     }
                 }
 
@@ -11910,7 +11922,7 @@ namespace DryIoc
                     continue;
                 }
 
-                var injectedExprOrObj = container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
+                var injectedExprOrObj = container.ResolveFactory(paramRequest)?.GetObjectOrExpressionOrNull(paramRequest);
                 if (injectedExprOrObj == null ||
                     // When param is an empty array / collection, then we may use a default value instead (#581)
                     paramDetails.DefaultValue != null && injectedExprOrObj is NewArrayExpression newArr && newArr.ArgumentCount == 0)
@@ -11943,7 +11955,8 @@ namespace DryIoc
 
             Expression serviceExpr;
             if (a0 == null) // thus handling multiple arguments (more than 7 currently)
-                serviceExpr = ctor != null ? NewManyArgsIntrinsic(ctor, ps, paramExprs) : Call(factoryExpr.AsExpr(), method, paramExprs.AsExprs());
+                serviceExpr = ctor != null ? NewManyArgsIntrinsic(ctor, ps, paramExprs) : 
+                    Call(factoryExpr?.AsExpr(), method, paramExprs.AsExprs());
             else if (a1 == null)
                 serviceExpr = ctor != null ? NewFewArgsIntrinsic(ctor, ps[0], a0) : new FactoryCall1Expression(factoryExpr, method, a0);
             else if (a2 == null)
@@ -11994,7 +12007,7 @@ namespace DryIoc
                     var memberRequest = request.Push(member);
                     var memberExpr =
                         TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, member.Details)
-                        ?? container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
+                        ?? container.ResolveFactory(memberRequest)?.GetObjectOrExpressionOrNull(memberRequest);
                     if (memberExpr != null)
                         assignments = assignments.Append(Bind(member.Member, memberExpr.AsExpr()));
                     else if (request.IfUnresolved == IfUnresolved.ReturnDefault)
@@ -12498,7 +12511,7 @@ namespace DryIoc
         }
 
         /// <summary>Simplified path for the registered instance</summary>
-        public override object GetExpressionOrDefault(Request request)
+        public override object GetObjectOrExpressionOrNull(Request request)
         {
             if (// preventing recursion
                 (request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) == 0 && !request.IsResolutionCall &&
