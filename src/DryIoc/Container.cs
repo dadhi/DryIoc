@@ -2233,14 +2233,10 @@ namespace DryIoc
                         entry = ImHashMap.EntryWithDefaultValue<Type, object>(serviceTypeHash, serviceType);
                         var oldMap = map;
                         var newMap = oldMap.AddOrKeepEntryByReferenceEquals(entry);
-                        if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
-                        {
-                            if (newMap == oldMap)
-                                entry = map.GetSurePresentByReferenceEquals(serviceTypeHash, serviceType);
-                        }
-                        else
-                            entry = Ref.SwapAndGetNewValue(ref map, entry, (x, en) => x.AddOrKeepEntryByReferenceEquals(en))
-                                .GetSurePresentByReferenceEquals(serviceTypeHash, serviceType);
+                        if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
+                            entry = Ref.SwapAndGetNewValue(ref map, entry, (x, en) => x.AddOrKeepEntryByReferenceEquals(en)).GetSurePresentByReferenceEquals(serviceTypeHash, serviceType);
+                        else if (newMap == oldMap)
+                            entry = map.GetSurePresentByReferenceEquals(serviceTypeHash, serviceType);
                     }
 
                     var e = entry.Value;
@@ -10897,7 +10893,7 @@ namespace DryIoc
             }
 
             if (cacheExpression)
-                (cacheEntry ?? ((Container)container).CacheFactoryExpression(request.FactoryID, serviceExpr)).Value =
+                (cacheEntry ?? ((Container)container).CacheFactoryExpression(request.FactoryID)).Value =
                     reuse == DryIoc.Reuse.Transient ? new Container.ExprCacheOfTransientWithDepCount(serviceExpr, request.DependencyCount) :
                     reuse is CurrentScopeReuse scoped && scoped.Name != null ? new Container.ExprCacheOfScopedWithName(serviceExpr, scoped.Name) :
                     serviceExpr;
