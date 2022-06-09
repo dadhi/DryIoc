@@ -4297,27 +4297,6 @@ namespace DryIoc
             RegistrySharing registrySharing = RegistrySharing.CloneButKeepCache) =>
             (T)container.New(typeof(T), made, registrySharing);
 
-        /// <summary>Obsolete: please use WithAutoFallbackDynamicRegistration</summary>
-        [Obsolete("Please use WithAutoFallbackDynamicRegistration instead")]
-        public static IContainer WithAutoFallbackResolution(this IContainer container,
-            IEnumerable<Type> implTypes,
-            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
-            Func<Request, bool> condition = null) =>
-            container.ThrowIfNull().With(rules =>
-                rules.WithUnknownServiceResolvers(
-                    Rules.AutoRegisterUnknownServiceRule(implTypes, changeDefaultReuse, condition)));
-
-        /// Obsolete: please use WithAutoFallbackDynamicRegistration
-        [Obsolete("Please use WithAutoFallbackDynamicRegistration instead")]
-        public static IContainer WithAutoFallbackResolution(this IContainer container,
-            IEnumerable<Assembly> implTypeAssemblies,
-            Func<IReuse, Request, IReuse> changeDefaultReuse = null,
-            Func<Request, bool> condition = null) =>
-            container.WithAutoFallbackResolution(implTypeAssemblies.ThrowIfNull()
-                     .SelectMany(assembly => assembly.GetLoadedTypes())
-                     .Where(Registrator.IsImplementationType).ToArray(),
-                     changeDefaultReuse, condition);
-
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
@@ -10910,6 +10889,12 @@ namespace DryIoc
                     ? Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(e), HiddenDisposable.ValueField)
                 : e;
         }
+
+        // todo: @todo for later
+        private static Expression GetSingletonExpression(Expression e, Setup setup) =>
+            setup.WeaklyReferenced
+                ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(e), ReflectionTools.WeakReferenceValueProperty))
+                : Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(e), HiddenDisposable.ValueField);
 
         /// <summary>Applies reuse to created expression, by wrapping passed expression into scoped access
         /// and producing the result expression.</summary>
