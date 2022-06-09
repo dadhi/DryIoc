@@ -10836,24 +10836,87 @@ namespace DryIoc
                 {
                     var originalServiceExprType = serviceExpr.Type;
 
-                    serviceExpr = ApplyReuse(serviceExpr, request); // todo: @perf pass a possibly calculated id to here
+                    // This optimization eagerly creates singleton during the construction of object graph
+                    // Singleton is created once and then is stored for the container lifetime (until Сontainer.SingletonScope is disposed).
+                    // That's why we are always intepreting them even if `Rules.WithoutInterpretationForTheFirstResolution()` is set.
+                    var weaklyReferencedOrPreventDisposal = setup.WeaklyReferencedOrPreventDisposal;
+                    if (reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
+                        !request.TracksTransientDisposable && !request.IsWrappedInFunc())
+                    {
+                        var id = request.GetCombinedDecoratorAndFactoryID();
+                        var singleton = Scope.NoItem; // NoItem is a marker for the value is not created yet
+
+                        // Creating a new local item with the id and the marker for not yet created item
+                        var itemRef = ImHashMap.Entry(id, Scope.NoItem);
+                        var singletonScope = (Scope)container.SingletonScope; // todo: @unsafe @perf remove cast and virtual property call
+                        ref var map = ref singletonScope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK]; // got a live reference to the map where value can be queried and stored
+
+                        var oldMap = map; // get a reference to the map available now as an oldMap
+                        var newMap = oldMap.AddOrKeepEntry(itemRef);
+
+                        // If the `newMap` is the same as an `oldMap` it means there is item already in the map.
+                        // The check before the CAS operation is only here for Singleton and not for the scope 
+                        // because the race for the Singletons and the situation where singleton is already create in parallel 
+                        // is far more likely and the race for the Scoped services is almost non-existent 
+                        // (because Scoped is almost equal to the single thread or the single invocation flow)
+                        if (newMap == oldMap)
+                        {
+                            // It does not matter if the live `map` changed because the item can only be added and not removed ever
+                            var otherItemRef = newMap.GetSurePresent(id);
+                            singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                        }
+                        else if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap) // set map to newMap if the map did no change since getting oldMap
+                        {
+                            // if the map was changed in parallel, let's retry using the Swap
+                            newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+                            var otherItemRef = newMap.GetSurePresent(id);
+                            if (otherItemRef != itemRef)
+                                singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
+                        }
+
+                        if (singleton == Scope.NoItem)
+                        {
+                            if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, out singleton))
+                                singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseInterpretation)(container);
+
+                            if (weaklyReferencedOrPreventDisposal)
+                                singleton = setup.WeaklyReferenced ? new WeakReference(singleton) : new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
+
+                            itemRef.Value = singleton;
+                            if (singleton is IDisposable disp && !ReferenceEquals(disp, singletonScope))
+                                singletonScope.AddDisposable(disp, setup.DisposalOrder);
+                        }
+
+                        if (request.DependencyCount > 0)
+                            request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
+
+                        Debug.Assert(singleton != Scope.NoItem, "Should not be the case otherwise I am effing failed");
+                        serviceExpr = singleton != null ? Constant(singleton) : Constant(null, serviceExpr.Type); // fixes #258
+                    }
+                    else
+                    {
+                        if (weaklyReferencedOrPreventDisposal)
+                            serviceExpr = setup.WeaklyReferenced ? NewNoByRefArgs(ReflectionTools.WeakReferenceCtor, serviceExpr) : NewNoByRefArgs(HiddenDisposable.Ctor, serviceExpr);
+
+                        serviceExpr = reuse.Apply(request, serviceExpr);
+                    }
+
+                    if (weaklyReferencedOrPreventDisposal)
+                        serviceExpr = GetWrappedSingletonAccessExpression(serviceExpr, setup);
 
                     var serviceExprType = serviceExpr.Type; // todo: @perf @simplify move the conversion inside the Reuse.Apply, make it the requirement for reuse to return the same Type of Expression
-                    if (serviceExpr.NodeType != ExprType.Constant && // todo: @perf just check that 
+                    if (serviceExpr.NodeType != ExprType.Constant && // todo: @perf just check that
                         serviceExprType != originalServiceExprType && !originalServiceExprType.IsAssignableFrom(serviceExprType))
                         serviceExpr = originalServiceExprType.Cast(serviceExpr);
                 }
             }
-            else if (!rules.UsedForValidation && !rules.UsedForExpressionGeneration)
+            else if (!rules.UsedForValidation && !rules.UsedForExpressionGeneration &&
+                request.DependencyCount >= rules.DependencyCountInLambdaToSplitBigObjectGraph)
             {
                 // Split the expression with dependencies bigger than certain threshold by wrapping it in Func which is a
                 // separate compilation unit and invoking it emmediately
-                var depCount = request.DependencyCount;
-                if (depCount >= rules.DependencyCountInLambdaToSplitBigObjectGraph)
-                {
-                    request.DecreaseTrackedDependencyCountForParents(depCount);
-                    serviceExpr = Invoke(serviceExpr.Type, Lambda<Func<object>>(serviceExpr, Empty<ParameterExpression>(), typeof(object)), Empty<Expression>());
-                }
+                request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
+                serviceExpr = Invoke(serviceExpr.Type, Lambda<Func<object>>(serviceExpr, Empty<ParameterExpression>(), typeof(object)), Empty<Expression>());
             }
 
             if (cacheExpression)
@@ -10869,84 +10932,6 @@ namespace DryIoc
             setup.WeaklyReferenced
                 ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(e), ReflectionTools.WeakReferenceValueProperty))
                 : Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(e), HiddenDisposable.ValueField);
-
-        /// <summary>Applies reuse to created expression, by wrapping passed expression into scoped access
-        /// and producing the result expression.</summary>
-        protected virtual Expression ApplyReuse(Expression serviceExpr, Request request)
-        {
-            // This optimization eagerly creates singleton during the construction of object graph
-            // Singleton is created once and then is stored for the container lifetime (until Сontainer.SingletonScope is disposed).
-            // That's why we are always intepreting them even if `Rules.WithoutInterpretationForTheFirstResolution()` is set.
-            var reuse = request.Reuse;
-            var setup = Setup;
-            var weaklyReferencedOrPreventDisposal = setup.WeaklyReferencedOrPreventDisposal;
-            if (reuse is SingletonReuse && request.Rules.EagerCachingSingletonForFasterAccess &&
-                !request.TracksTransientDisposable && !request.IsWrappedInFunc())
-            {
-                var container = request.Container;
-                var scope = (Scope)container.SingletonScope; // todo: @unsafe @perf remove cast and virtual property call
-                if (scope.IsDisposed)
-                    Throw.ScopeIsDisposed(scope, container);
-
-                var id = request.GetCombinedDecoratorAndFactoryID();
-                var singleton = Scope.NoItem; // NoItem is a marker for the value is not created yet
-                // Creating a new local item with the id and the marker for not yet created item
-                var itemRef = ImHashMap.Entry(id, Scope.NoItem);
-                ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK]; // got a live reference to the map where value can be queried and stored
-
-                var oldMap = map; // get a reference to the map available now as an oldMap
-                var newMap = oldMap.AddOrKeepEntry(itemRef);
-
-                // If the `newMap` is the same as an `oldMap` it means there is item already in the map.
-                // The check before the CAS operation is only here for Singleton and not for the scope 
-                // because the race for the Singletons and the situation where singleton is already create in parallel 
-                // is far more likely and the race for the Scoped services is almost non-existent 
-                // (because Scoped is almost equal to the single thread or the single invocation flow)
-                if (newMap == oldMap)
-                {
-                    // It does not matter if the live `map` changed because the item can only be added and not removed ever
-                    var otherItemRef = newMap.GetSurePresent(id);
-                    singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-                }
-                else if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap) // set map to newMap if the map did no change since getting oldMap
-                {
-                    // if the map was changed in parallel, let's retry using the Swap
-                    newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
-                    var otherItemRef = newMap.GetSurePresent(id);
-                    if (otherItemRef != itemRef)
-                        singleton = otherItemRef.Value != Scope.NoItem ? otherItemRef.Value : Scope.WaitForItemIsSet(otherItemRef);
-                }
-
-                if (singleton == Scope.NoItem)
-                {
-                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, out singleton))
-                        singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseInterpretation)(container);
-
-                    if (weaklyReferencedOrPreventDisposal)
-                        singleton = setup.WeaklyReferenced ? new WeakReference(singleton) : new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
-
-                    itemRef.Value = singleton;
-                    if (singleton is IDisposable disp && !ReferenceEquals(disp, scope))
-                        scope.AddDisposable(disp, setup.DisposalOrder);
-                }
-
-                Debug.Assert(singleton != Scope.NoItem, "Should not be the case otherwise I am effing failed");
-                serviceExpr = singleton != null ? Constant(singleton) : Constant(null, serviceExpr.Type); // fixes #258
-                if (request.DependencyCount > 0)
-                    request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
-            }
-            else
-            {
-                if (weaklyReferencedOrPreventDisposal)
-                    serviceExpr = setup.WeaklyReferenced
-                        ? NewNoByRefArgs(ReflectionTools.WeakReferenceCtor, serviceExpr)
-                        : NewNoByRefArgs(HiddenDisposable.Ctor, serviceExpr);
-
-                serviceExpr = reuse.Apply(request, serviceExpr);
-            }
-
-            return !weaklyReferencedOrPreventDisposal ? serviceExpr : GetWrappedSingletonAccessExpression(serviceExpr, setup);
-        }
 
         /// <summary>Creates factory delegate from service expression and returns it.</summary>
         public virtual Func<IResolverContext, object> GetDelegateOrDefault(Request request) =>
