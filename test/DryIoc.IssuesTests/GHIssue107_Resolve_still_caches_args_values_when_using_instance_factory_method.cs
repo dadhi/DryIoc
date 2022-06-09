@@ -7,7 +7,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Resolve_shall_not_cache_args_values();
+            //Resolve_shall_not_cache_args_values();
             return 1;
         }
 
@@ -23,7 +23,7 @@ namespace DryIoc.IssuesTests
                 Reuse.Transient); // Here you need a Transient reuse so to have a transient IName services injected, instead of the same service 
 
             c.Register<IAlpha, Alpha>();
-            c.Register<IBravo, Bravo>();
+        c.Register<IBravo, Bravo>();
 
             var a = c.Resolve<IAlpha>(new object[] { "Alice" });
             Assert.AreEqual("Alice", a.Name.Value);

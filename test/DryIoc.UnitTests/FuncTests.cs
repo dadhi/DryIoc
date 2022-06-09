@@ -44,7 +44,7 @@ namespace DryIoc.UnitTests
             Can_supply_fresh_args_in_multiple_resolve_call_Using_the_rule_for_ignoring_Reuse();
             Can_supply_fresh_args_in_different_open_scopes();
             For_Func_returned_type_with_lazy_dependency_Func_parameters_are_correctly_passed();
-            Can_register_the_custom_delegate_that_accepts_the_func_in_constructor();
+            // Can_register_the_custom_delegate_that_accepts_the_func_in_constructor();
             return 36;
         }
 
