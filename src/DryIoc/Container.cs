@@ -5665,7 +5665,7 @@ namespace DryIoc
         }
 
         /// <summary>Returns the new rules with the passed dynamic registration rule appended.</summary>
-        public Rules WithDynamicRegistration(DynamicRegistrationProvider provider, 
+        public Rules WithDynamicRegistration(DynamicRegistrationProvider provider,
             DynamicRegistrationFlags flags = DryIoc.DynamicRegistrationFlags.Service)
         {
             var newRules = Clone(cloneMade: false);
@@ -5686,11 +5686,12 @@ namespace DryIoc
                 return newRules;
             }
             return this;
-        } 
+        }
 
         /// <summary>Returns a single dynamic registration made out of factory</summary>
         public static DynamicRegistrationProvider DynamicRegistrationOf(Func<Type, Factory> getFactoryOrNull) =>
-            (serviceType, _) => {
+            (serviceType, _) =>
+            {
                 var f = getFactoryOrNull(serviceType);
                 return f == null ? null : new DynamicRegistration(f).One();
             };
@@ -11270,12 +11271,6 @@ namespace DryIoc
                             sourceMembers.Match(otherMembers, (om, s) => s != null && om.All(o => o == null || !s.Member.Name.Equals(o.Member.Name))));
                 };
         }
-
-        /// <summary>Obsolete: please use <see cref="OverrideWith"/></summary>
-        [Obsolete("Replaced with OverrideWith", false)]
-        public static PropertiesAndFieldsSelector And(
-            this PropertiesAndFieldsSelector source, PropertiesAndFieldsSelector other) =>
-            source.OverrideWith(other);
 
         /// <summary>Specifies service details (key, if-unresolved policy, required type) for property/field with the name.</summary>
         /// <param name="source">Original member selector.</param> <param name="name">Member name.</param> <param name="getDetails">Details.</param>
