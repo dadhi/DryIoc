@@ -13571,16 +13571,10 @@ namespace DryIoc
         public static IReuse ScopedTo(object name, bool scopedOrSingleton, int lifespan) =>
             new CurrentScopeReuse(name, scopedOrSingleton, lifespan);
 
-
         /// <summary>Scoped to the closest scope (in scope parent hierarchy) with the name from the specified names list. 
         /// The `names` should no contain the `null`</summary>
         public static IReuse ScopedTo(params object[] names) =>
             names.IsNullOrEmpty() ? Scoped : names.Length == 1 ? ScopedTo(names[0]) : new CurrentScopeReuse(CompositeScopeName.Of(names));
-
-        /// <summary>[Obsolete("Use ScopedToService to prevent ambiguity with the ScopeTo(object name) where name is the Type")]</summary>
-        [Obsolete("Use ScopedToService to prevent ambiguity with the ScopeTo(object name) where name is the Type")]
-        public static IReuse ScopedTo(Type serviceType = null, object serviceKey = null) =>
-            serviceType == null && serviceKey == null ? Scoped : new CurrentScopeReuse(ResolutionScopeName.Of(serviceType, serviceKey));
 
         /// <summary>Scoped to the scope created by the service with the specified type and optional key</summary>
         public static IReuse ScopedToService(Type serviceType = null, object serviceKey = null) =>
