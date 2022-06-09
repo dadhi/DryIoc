@@ -58,7 +58,7 @@ namespace DryIoc.UnitTests
             var one = container.Resolve<Lazy<ISingleton>>();
             var two = container.Resolve<Lazy<ISingleton>>();
 
-            Assert.That(one.Value, Is.SameAs(two.Value));
+            Assert.AreSame(one.Value, two.Value);
         }
 
         [Test]
