@@ -4086,8 +4086,10 @@ namespace DryIoc
         /// then compiles lambda expression to actual `Func{IResolverContext, object}` used for service resolution.</summary>
         public static Func<IResolverContext, object> CompileToFactoryDelegate(this object exprOrNotNullObj, bool preferInterpretation)
         {
+            // todo: @perf can we safely remove this check?
             if (exprOrNotNullObj is Expression == false)
                 return exprOrNotNullObj is Func<IResolverContext, object> f ? f : exprOrNotNullObj.ToFactoryDelegate;
+            // todo: @perf can we safely remove this check?
             if (exprOrNotNullObj is ConstantExpression constExpr)
             {
                 var value = constExpr.Value;
