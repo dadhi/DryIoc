@@ -5712,16 +5712,10 @@ namespace DryIoc
             return DynamicRegistrationFlags.Append(newFlags);
         }
 
-
         /// <summary>Returns the new rules with the passed dynamic registration rules appended. 
         /// The rules applied only when no normal registrations found!</summary>
         public Rules WithDynamicRegistrationsAsFallback(DynamicRegistrationFlags flags, params DynamicRegistrationProvider[] rules) =>
             WithDynamicRegistrations(flags | DryIoc.DynamicRegistrationFlags.AsFallback, rules);
-
-        /// <summary>Obsolete: Instead use `HasDynamicRegistrationProvider(DynamicRegistrationFlags.AsFallback)`</summary>
-        [Obsolete("Instead use `HasDynamicRegistrationProvider(DynamicRegistrationFlags.AsFallback)`")]
-        public bool UseDynamicRegistrationsAsFallbackOnly =>
-            (_settings & Settings.UseDynamicRegistrationsAsFallbackOnly) != 0;
 
         /// <summary>Defines delegate to return factory for request not resolved by registered factories or prior rules.
         /// Applied in specified array order until return not null <see cref="Factory"/>.</summary>
@@ -5875,31 +5869,6 @@ namespace DryIoc
                     });
             };
         }
-
-        /// <summary>Obsolete: replaced by <see cref="AutoFallbackDynamicRegistrations"/></summary>
-        [Obsolete("Replaced by " + nameof(AutoFallbackDynamicRegistrations), false)]
-        public static UnknownServiceResolver AutoRegisterUnknownServiceRule(IEnumerable<Type> implTypes,
-            Func<IReuse, Request, IReuse> changeDefaultReuse = null, Func<Request, bool> condition = null) =>
-            request =>
-            {
-                if (condition != null && !condition(request))
-                    return null;
-
-                var scope = request.Container.CurrentScope;
-                var reuse = scope != null ? Reuse.ScopedTo(scope.Name) : Reuse.Singleton;
-
-                if (changeDefaultReuse != null)
-                    reuse = changeDefaultReuse(reuse, request);
-
-                var requestedServiceType = request.ActualServiceType;
-                request.Container.RegisterMany(implTypes, reuse,
-                    serviceTypeCondition: serviceType =>
-                        serviceType.IsOpenGeneric() && requestedServiceType.IsClosedGeneric()
-                            ? serviceType == requestedServiceType.GetGenericTypeDefinition()
-                            : serviceType == requestedServiceType);
-
-                return request.Container.GetServiceFactoryOrDefault(request);
-            };
 
         /// <summary>See <see cref="WithDefaultReuse"/></summary>
         public IReuse DefaultReuse { get; private set; }
@@ -8121,8 +8090,8 @@ namespace DryIoc
             registrator.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: false);
         }
 
-        // [Obsolete("Replaced with RegisterDelegate{MyService, Dep1...Dep2, MyService}((service, d1, d2) => new MyServiceDecorator(service, d1, d2), setup: Setup.DecoratorWith(useDecorateeReuse: true, condition: optional))")]
         ///<summary>Obsolete("Replaced with RegisterDelegate{MyService, Dep1...Dep2, MyService}((service, d1, d2) => new MyServiceDecorator(service, d1, d2), setup: Setup.DecoratorWith(useDecorateeReuse: true, condition: optional))")</summary>
+        [Obsolete("Replaced with RegisterDelegate{MyService, Dep1...Dep2, MyService}((service, d1, d2) => new MyServiceDecorator(service, d1, d2), setup: Setup.DecoratorWith(useDecorateeReuse: true, condition: optional))")]
         public static void RegisterDelegateDecorator<TService>(this IRegistrator registrator,
             Func<IResolverContext, Func<TService, TService>> getDecorator, Func<Request, bool> condition = null)
         {
