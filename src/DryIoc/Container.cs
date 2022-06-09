@@ -2013,13 +2013,10 @@ namespace DryIoc
                 entry = ImHashMap.EntryWithDefaultValue<object>(factoryId);
                 var oldMap = map;
                 var newMap = oldMap.AddOrKeepEntry(entry);
-                if (Interlocked.CompareExchange(ref map, newMap, oldMap) == oldMap)
-                {
-                    if (newMap == oldMap)
-                        entry = map.GetSurePresent(factoryId);
-                }
-                else
+                if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
                     entry = Ref.SwapAndGetNewValue(ref map, entry, (x, e) => x.AddOrKeepEntry(e)).GetSurePresent(factoryId);
+                else if (newMap == oldMap)
+                    entry = map.GetSurePresent(factoryId);
             }
             return entry;
         }
