@@ -13594,25 +13594,12 @@ namespace DryIoc
         /// <remarks>The <see cref="Error.DependencyHasShorterReuseLifespan"/> is applied the same way as for <see cref="Scoped"/> reuse.</remarks>
         public static readonly IReuse ScopedOrSingleton = new CurrentScopeReuse(scopedOrSingleton: true);
 
-        /// <summary>Obsolete: same as <see cref="Scoped"/>.</summary>
-        [Obsolete("The same as Reuse.Scoped, please prefer to use Reuse.Scoped or the Reuse.ScopedTo to specify a bound service.")]
-        public static readonly IReuse InResolutionScope = Scoped;
-
         /// <summary>Obsolete: please use <see cref="Scoped"/> instead.</summary>
         public static readonly IReuse InCurrentScope = Scoped;
 
         /// <summary>Obsolete: please use `ScopedTo` instead.</summary>
         public static IReuse InCurrentNamedScope(object name = null) => ScopedTo(name);
 
-        /// <summary>Obsolete: Please use `ScopedToService` instead.</summary>
-        [Obsolete("Please use `ScopedToService` instead")]
-        public static IReuse InResolutionScopeOf(Type assignableFromServiceType = null, object serviceKey = null) =>
-            ScopedToService(assignableFromServiceType, serviceKey);
-
-        /// <summary>Obsolete: Please use `ScopedToService` instead.</summary>
-        [Obsolete("Please use `ScopedToService` instead.")]
-        public static IReuse InResolutionScopeOf<TAssignableFromServiceType>(object serviceKey = null) =>
-            ScopedToService<TAssignableFromServiceType>(serviceKey);
 
         /// <summary>Same as Scoped but requires <see cref="ThreadScopeContext"/>.</summary>
         public static readonly IReuse InThread = Scoped;
