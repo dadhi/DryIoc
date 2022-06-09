@@ -1995,7 +1995,7 @@ namespace DryIoc
             withCache.TryCacheKeyedFactory(serviceTypeHash, serviceType, key, factory);
         }
 
-        internal ImHashMapEntry<int, object> CacheFactoryExpression(int factoryId, Expression expr)
+        internal ImHashMapEntry<int, object> CacheFactoryExpression(int factoryId)
         {
             var registry = _registry.Value as Registry.AndCache ??
                 (Registry.AndCache)_registry.SwapAndGetNewValue(r => r is Registry reg ? reg.WithFactoryExpressionCache() : Registry.NewWithFactoryExpressionCache(r));
@@ -13599,7 +13599,6 @@ namespace DryIoc
 
         /// <summary>Obsolete: please use `ScopedTo` instead.</summary>
         public static IReuse InCurrentNamedScope(object name = null) => ScopedTo(name);
-
 
         /// <summary>Same as Scoped but requires <see cref="ThreadScopeContext"/>.</summary>
         public static readonly IReuse InThread = Scoped;
