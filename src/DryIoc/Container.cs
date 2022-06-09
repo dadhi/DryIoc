@@ -10753,7 +10753,7 @@ namespace DryIoc
             ImHashMapEntry<int, object> cacheEntry = null;
             if (cacheExpression)
             {
-                if (((Container)container)._registry.Value is Container.Registry r)
+                if (container._registry.Value is Container.Registry r)
                 {
                     var factoryId = request.FactoryID;
                     cacheEntry = r.FactoryExpressionCache?[factoryId & Container.Registry.CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(factoryId);
@@ -10841,7 +10841,7 @@ namespace DryIoc
             }
 
             if (cacheExpression)
-                (cacheEntry ?? ((Container)container).CacheFactoryExpression(request.FactoryID)).Value =
+                (cacheEntry ?? container.CacheFactoryExpression(request.FactoryID)).Value =
                     reuse == DryIoc.Reuse.Transient ? new Container.ExprCacheOfTransientWithDepCount(serviceExpr, request.DependencyCount) :
                     reuse is CurrentScopeReuse scoped && scoped.Name != null ? new Container.ExprCacheOfScopedWithName(serviceExpr, scoped.Name) :
                     serviceExpr;
