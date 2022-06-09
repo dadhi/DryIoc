@@ -10812,10 +10812,13 @@ namespace DryIoc
                     // and proceed to the normal Expression creation.
                     //
                     var singleton = itemRef.Value;
+                    if (singleton == Scope.NoItem && !request.TracksTransientDisposable && !request.IsWrappedInFunc())
+                        singleton = Scope.WaitForItemIsSet(itemRef);
                     if (singleton != Scope.NoItem)
-                        return GetSingletonExpression(singleton, setup, request);
-                    if (!request.TracksTransientDisposable && !request.IsWrappedInFunc())
-                        return GetSingletonExpression(Scope.WaitForItemIsSet(itemRef), setup, request);
+                    {
+                        var e = singleton != null ? Constant(singleton) : Constant(null, request.ActualServiceType); // fixes #258
+                        return !setup.WeaklyReferencedOrPreventDisposal ? e : GetWrappedSingletonAccessExpression(e, setup);
+                    }
                 }
             }
 
@@ -10862,18 +10865,7 @@ namespace DryIoc
             return serviceExpr;
         }
 
-        private static Expression GetSingletonExpression(object instance, Setup setup, Request req)
-        {
-            var e = instance != null ? Constant(instance) : Constant(null, req.ActualServiceType); // fixes #258
-            return setup.WeaklyReferenced // Unwrap WeakReference or HiddenDisposable in that order!
-                    ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(e), ReflectionTools.WeakReferenceValueProperty))
-                : setup.PreventDisposal
-                    ? Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(e), HiddenDisposable.ValueField)
-                : e;
-        }
-
-        // todo: @todo for later
-        private static Expression GetSingletonExpression(Expression e, Setup setup) =>
+        private static Expression GetWrappedSingletonAccessExpression(Expression e, Setup setup) =>
             setup.WeaklyReferenced
                 ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(e), ReflectionTools.WeakReferenceValueProperty))
                 : Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(e), HiddenDisposable.ValueField);
@@ -10939,7 +10931,7 @@ namespace DryIoc
                 }
 
                 Debug.Assert(singleton != Scope.NoItem, "Should not be the case otherwise I am effing failed");
-                serviceExpr = singleton == null ? Constant(null, serviceExpr.Type) /* fixes #258 */ : Constant(singleton);
+                serviceExpr = singleton != null ? Constant(singleton) : Constant(null, serviceExpr.Type); // fixes #258
                 if (request.DependencyCount > 0)
                     request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
             }
@@ -10953,12 +10945,7 @@ namespace DryIoc
                 serviceExpr = reuse.Apply(request, serviceExpr);
             }
 
-            if (weaklyReferencedOrPreventDisposal)
-                serviceExpr = setup.WeaklyReferenced
-                    ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(serviceExpr), ReflectionTools.WeakReferenceValueProperty))
-                    : Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(serviceExpr), HiddenDisposable.ValueField);
-
-            return serviceExpr;
+            return !weaklyReferencedOrPreventDisposal ? serviceExpr : GetWrappedSingletonAccessExpression(serviceExpr, setup);
         }
 
         /// <summary>Creates factory delegate from service expression and returns it.</summary>
