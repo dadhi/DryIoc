@@ -4535,6 +4535,43 @@ namespace DryIoc
         /// <summary>Setting the factory directly to scope for resolution</summary> 
         public static void Use(this IContainer container, Type serviceType, Func<IResolverContext, object> factory) =>
             container.Use(serviceType, factory);
+
+        internal static bool TryGetCachedExpression(this Container.Registry r,
+            Request request, IReuse reuse, Rules rules, ref ImHashMapEntry<int, object> cacheEntry, out Expression result)
+        {
+            var id = request.FactoryID;
+            cacheEntry = r.FactoryExpressionCache?[id & Container.Registry.CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(id);
+            if (cacheEntry?.Value is object entry)
+            {
+                if (entry is Expression expr)
+                {
+                    if (reuse is SingletonReuse || reuse is CurrentScopeReuse sr && sr.Name == null)
+                    {
+                        result = expr;
+                        return true;
+                    }
+                }
+                else if (entry is Container.ExprCacheOfTransientWithDepCount t)
+                {
+                    if (reuse == DryIoc.Reuse.Transient)
+                    {
+                        if (t.Count > 0 && !rules.UsedForValidation && !rules.UsedForExpressionGeneration)
+                            request.IncreaseTrackedDependencyCountForParents(t.Count);
+                        {
+                            result = t.Expr;
+                            return true;
+                        }
+                    }
+                }
+                else if (entry is Container.ExprCacheOfScopedWithName s && reuse.Name?.Equals(s.Name) == true)
+                {
+                    result = s.Expr;
+                    return true;
+                }
+            }
+            result = null;
+            return false;
+        }
     }
 
     /// <summary>Interface used to convert reuse instance to expression.</summary>
@@ -10751,33 +10788,9 @@ namespace DryIoc
 
             // First, lookup in the expression cache
             ImHashMapEntry<int, object> cacheEntry = null;
-            if (cacheExpression)
-            {
-                if (container._registry.Value is Container.Registry r)
-                {
-                    var factoryId = request.FactoryID;
-                    cacheEntry = r.FactoryExpressionCache?[factoryId & Container.Registry.CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(factoryId);
-                    if (cacheEntry?.Value is object entry)
-                    {
-                        if (entry is Expression expr)
-                        {
-                            if (reuse is SingletonReuse || reuse is CurrentScopeReuse sr && sr.Name == null)
-                                return expr;
-                        }
-                        else if (entry is Container.ExprCacheOfTransientWithDepCount t)
-                        {
-                            if (reuse == DryIoc.Reuse.Transient)
-                            {
-                                if (t.Count > 0 && !rules.UsedForValidation && !rules.UsedForExpressionGeneration)
-                                    request.IncreaseTrackedDependencyCountForParents(t.Count);
-                                return t.Expr;
-                            }
-                        }
-                        else if (entry is Container.ExprCacheOfScopedWithName s && reuse.Name?.Equals(s.Name) == true)
-                            return s.Expr;
-                    }
-                }
-            }
+            if (cacheExpression && container._registry.Value is Container.Registry r && 
+                r.TryGetCachedExpression(request, reuse, rules, ref cacheEntry, out var cachedExpr))
+                return cachedExpr;
 
             // Next, lookup for the already created service in the singleton scope
             Expression serviceExpr;
