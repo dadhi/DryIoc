@@ -474,7 +474,7 @@ namespace DryIoc.FastExpressionCompiler
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IParameterProvider paramExprs,
             Type[] closurePlusParamTypes, Type returnType, CompilerFlags flags)
         {
-            if (bodyExpr is NoArgsNewClassIntrinsicExpression newNoArgs)
+            if (bodyExpr is NoArgsNewClassIntrinsic newNoArgs)
                 return CompileNoArgsNew(newNoArgs.Constructor, delegateType, closurePlusParamTypes, returnType);
 #else
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IReadOnlyList<PE> paramExprs,
@@ -1576,7 +1576,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
             var nestedLambdaParamExprs = (IParameterProvider)nestedLambdaExpr;
 
-            if (nestedLambdaBody is NoArgsNewClassIntrinsicExpression newNoArgs)
+            if (nestedLambdaBody is NoArgsNewClassIntrinsic newNoArgs)
             {
                 var paramTypes = RentOrNewClosureTypeToParamTypes(nestedLambdaParamExprs);
                 nestedLambdaInfo.Lambda = CompileNoArgsNew(newNoArgs.Constructor, nestedLambdaExpr.Type, paramTypes, nestedReturnType);
@@ -5397,6 +5397,15 @@ namespace DryIoc.FastExpressionCompiler
     // in order to prevent conflicts with YOUR helpers with standard names
     internal static class Tools
     {
+        public static Expression AsExpr(this object obj) => obj as Expression ?? Constant(obj);
+        public static Expression[] AsExprs(this object[] obj)
+        {
+            var exprs = new Expression[obj.Length];
+            for (var i = 0; i < obj.Length; i++)
+                exprs[i] = obj[i].AsExpr();
+            return exprs;
+        }
+
         internal static bool IsUnsigned(this Type type) =>
             type == typeof(byte) ||
             type == typeof(ushort) ||

@@ -3042,7 +3042,7 @@ namespace DryIoc
                     return true;
                 case ExprType.New:
                     {
-                        if (expr is NoArgsNewClassIntrinsicExpression defaultCtorExpr)
+                        if (expr is NoArgsNewClassIntrinsic defaultCtorExpr)
                         {
                             result = defaultCtorExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                             return true;
