@@ -100,7 +100,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
         /// <summary>Converts to Expression and outputs its as string</summary>
         public override string ToString() => this.ToCSharpString(constant =>
-        { 
+        {
             var val = constant.Value;
             if (val == null)
                 return "null";
@@ -2925,8 +2925,10 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -2960,9 +2962,11 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -2997,10 +3001,12 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3036,11 +3042,13 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3078,12 +3086,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3122,13 +3132,15 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                && EmittingVisitor.TryEmit(Argument6, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument6, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3136,18 +3148,38 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class ManyArgumentsNewExpression : NewExpression
     {
-        private readonly IReadOnlyList<Expression> _arguments;
-        public override IReadOnlyList<Expression> Arguments => _arguments;
-        public override int ArgumentCount => _arguments.Count;
-        public override Expression GetArgument(int i) => _arguments[i];
-        internal ManyArgumentsNewExpression(ConstructorInfo constructor, IReadOnlyList<Expression> arguments) : base(constructor) =>
-            _arguments = arguments;
+        protected readonly IReadOnlyList<Expression> Args;
+        public override IReadOnlyList<Expression> Arguments => Args;
+        public override int ArgumentCount => Args.Count;
+        public override Expression GetArgument(int i) => Args[i];
+        internal ManyArgumentsNewExpression(ConstructorInfo constructor, IReadOnlyList<Expression> args) : base(constructor) => Args = args;
     }
 
     public sealed class NoByRefManyArgumentsNewExpression : ManyArgumentsNewExpression
     {
         public override bool NoByRefArgs => true;
         internal NoByRefManyArgumentsNewExpression(ConstructorInfo constructor, IReadOnlyList<Expression> arguments) : base(constructor, arguments) { }
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure)
+        {
+            var args = Args;
+            for (var i = 0; i < args.Count; i++)
+                if (!ExpressionCompiler.TryCollectBoundConstants(ref closure, args[i], paramExprs, isNestedLambda, ref rootClosure, config))
+                    return false;
+            return true;
+        }
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var f = parent | ParentFlags.CtorCall;
+            var args = Args;
+            for (var i = 0; i < args.Count; i++)
+                if (!EmittingVisitor.TryEmit(args[i], paramExprs, il, ref closure, setup, f, -1))
+                    return false;
+            il.Emit(OpCodes.Newobj, Constructor);
+            return true;
+        }
     }
 
     public abstract class NewArrayExpression : Expression, IArgumentProvider

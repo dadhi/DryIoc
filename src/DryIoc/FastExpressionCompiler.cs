@@ -2123,27 +2123,12 @@ namespace DryIoc.FastExpressionCompiler
                 var ctor = newExpr.Constructor;
                 if (argCount > 0)
                 {
-#if LIGHT_EXPRESSION
-                    var args = newExpr.NoByRefArgs ? null : ctor.GetParameters();
-#else
                     var args = ctor.GetParameters();
-#endif
-                    if (args == null)
-                    {
-                        for (var i = 0; i < argCount; ++i)
-                            if (!TryEmit(argExprs.GetArgument(i),
-                                paramExprs, il, ref closure, setup, parent, -1))
-                                return false;
-                    }
-                    else
-                    {
-                        for (var i = 0; i < argCount; ++i)
-                            if (!TryEmit(argExprs.GetArgument(i),
-                                paramExprs, il, ref closure, setup, parent, args[i].ParameterType.IsByRef ? i : -1))
-                                return false;
-                    }
+                    for (var i = 0; i < argCount; ++i)
+                        if (!TryEmit(argExprs.GetArgument(i),
+                            paramExprs, il, ref closure, setup, parent, args[i].ParameterType.IsByRef ? i : -1))
+                            return false;
                 }
-
                 // ReSharper disable once ConditionIsAlwaysTrueOrFalse
                 if (ctor != null)
                     il.Emit(OpCodes.Newobj, ctor);
