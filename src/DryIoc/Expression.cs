@@ -2841,9 +2841,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public virtual int ArgumentCount => 0;
         public virtual Expression GetArgument(int i) => throw new NotImplementedException();
 
-        /// <summary>Ensures that there is no by-ref (in, our, ref) parameters in the constructor.
-        /// Which allows some optimizations when compiling the expression to the delegate</summary>
-        public virtual bool NoByRefArgs => false;
         internal NewExpression(ConstructorInfo constructor) => Constructor = constructor;
 #if SUPPORTS_VISITOR
         protected internal override Expression Accept(ExpressionVisitor visitor) => visitor.VisitNew(this);
@@ -2886,7 +2883,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefOneArgumentNewExpression : OneArgumentNewExpression
     {
-        public override bool NoByRefArgs => true;
         internal NoByRefOneArgumentNewExpression(ConstructorInfo constructor, Expression argument) : base(constructor, argument) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -2915,7 +2911,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefTwoArgumentsNewExpression : TwoArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
         internal NoByRefTwoArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1) : base(constructor, a0, a1) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -2950,7 +2945,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefThreeArgumentsNewExpression : ThreeArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
         internal NoByRefThreeArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2)
             : base(constructor, a0, a1, a2) { }
         public override bool IsIntrinsic => true;
@@ -2988,7 +2982,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefFourArgumentsNewExpression : FourArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
         internal NoByRefFourArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3)
             : base(constructor, a0, a1, a2, a3) { }
         public override bool IsIntrinsic => true;
@@ -3028,7 +3021,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefFiveArgumentsNewExpression : FiveArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
         internal NoByRefFiveArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4)
             : base(constructor, a0, a1, a2, a3, a4) { }
         public override bool IsIntrinsic => true;
@@ -3071,7 +3063,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefSixArgumentsNewExpression : SixArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
         internal NoByRefSixArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5)
             : base(constructor, a0, a1, a2, a3, a4, a5) { }
         public override bool IsIntrinsic => true;
@@ -3116,7 +3107,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefSevenArgumentsNewExpression : SevenArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
         internal NoByRefSevenArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6)
             : base(constructor, a0, a1, a2, a3, a4, a5, a6) { }
         public override bool IsIntrinsic => true;
@@ -3157,7 +3147,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefManyArgumentsNewExpression : ManyArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
         internal NoByRefManyArgumentsNewExpression(ConstructorInfo constructor, IReadOnlyList<Expression> arguments) : base(constructor, arguments) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
