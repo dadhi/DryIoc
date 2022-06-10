@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -9,6 +10,8 @@ namespace DryIoc.Messages.MediatRLikeExample
 {
     public class Program
     {
+        static readonly string Namespace = typeof(Program).Namespace;
+
         public static Task Main() => new Program().Run();
 
         public Task Run()
@@ -23,11 +26,20 @@ namespace DryIoc.Messages.MediatRLikeExample
 
         private static void BuildMediator(IRegistrator container, TextWriter writer)
         {
-            container.RegisterInstance(writer);
-            container.RegisterMany(new[] { typeof(Program).GetAssembly() }, Registrator.Interfaces);
+            // restrict the implementation types the current Program namespace excluding the referenced things
+            var implTypes = typeof(Program).GetAssembly().GetImplementationTypes().Where(t => t.Namespace == Namespace);
+            container.RegisterMany(implTypes, serviceTypeCondition: Registrator.Interfaces);
 
             container.Register(typeof(IMessageHandler<,>), typeof(MiddlewareMessageHandler<,>), setup: Setup.Decorator);
             container.Register(typeof(BroadcastMessageHandler<>));
+            container.RegisterInstance(writer);
+
+            var regs = container.GetServiceRegistrations().OrderBy(r => r.ServiceType.Name).ToList();
+            Console.WriteLine("Service registrations: " + regs.Count);
+            Debug.Assert(regs.Count == 26, $"Expecting 26 registrations but found {regs.Count}");
+            foreach (var reg in regs) 
+                Console.WriteLine($"{reg.ServiceType.Print(t => t.Name)}-{reg.OptionalServiceKey ?? ""}-{reg.ImplementationType.Print(t => t.Name)}");
+            Console.WriteLine("-----------------------");
         }
     }
 
