@@ -15042,11 +15042,9 @@ namespace DryIoc
 
             var definedTypesProperty = typeof(Assembly).GetTypeInfo().GetDeclaredProperty("DefinedTypes");
             if (definedTypesProperty != null)
-            {
-                if (definedTypesProperty.PropertyType == typeof(IEnumerable<TypeInfo>))
-                    return a => ((IEnumerable<TypeInfo>)definedTypesProperty.GetValue(a, null)).Select(t => t.AsType());
-                return a => (IEnumerable<Type>)definedTypesProperty.GetValue(a, null);
-            }
+                return definedTypesProperty.PropertyType == typeof(IEnumerable<TypeInfo>)
+                    ? a => ((IEnumerable<TypeInfo>)definedTypesProperty.GetValue(a, null)).Select(t => t.AsType())
+                    : a => (IEnumerable<Type>)definedTypesProperty.GetValue(a, null);
 
             var getTypesMethod = typeof(Assembly).GetTypeInfo().GetDeclaredMethod("GetTypes");
             return a => (IEnumerable<Type>)getTypesMethod.Invoke(a, Empty<object>());
