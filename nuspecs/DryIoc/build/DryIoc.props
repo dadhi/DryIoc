@@ -10,12 +10,13 @@
           DestinationFiles="$(ProjectDir)\CompileTimeDI\Container.Generated.tt"
           SkipUnchangedFiles="true"/>
         <Copy
-          SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeRegistrations.ttinclude" 
-          DestinationFiles="$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.ttinclude" 
-          SkipUnchangedFiles="true"/>
-        <Copy
           SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeRegistrations.Example.cs" 
           DestinationFiles="$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.Example.cs" 
+          SkipUnchangedFiles="true"/>
+
+        <Copy Condition="!Exists('$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.ttinclude')"
+          SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeRegistrations.ttinclude" 
+          DestinationFiles="$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.ttinclude" 
           SkipUnchangedFiles="true"/>
 
         <Copy Condition="!Exists('$(ProjectDir)\.config\dotnet-tools.json')"
