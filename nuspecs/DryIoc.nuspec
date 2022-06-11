@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>6.0.0-preview-01</version>
+        <version>6.0.0-preview-01-b1</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -19,6 +19,7 @@
 
 - Compile-time Dependency Injection
 - Decrease memory footprint
+- Remove Obsolete API
 
 ]]>
         </releaseNotes>
@@ -40,39 +41,36 @@
         <file src="..\DryIoc.snk" />
         <file src="..\nuspecs\DryIoc\readme.md" />
         <file src="..\logo\logo128.png" target="logo.png" />
-
+        
         <!--"build" is the special folder where you can put your .props or .targets files 
-        named after the NuGet package to be INCLUDED by NuGet into the target project-->
-        <!-- <file src="..\nuspecs\DryIoc\build\DryIoc.props"              target="build" /> -->
-        <file src="..\src\DryIoc\Container.Generated.tt"              target="CompileTimeDI" />
-        <file src="..\src\DryIoc\CompileTimeRegistrations.ttinclude"  target="CompileTimeDI" />
-        <file src="..\src\DryIoc\CompileTimeRegistrations.Example.cs" target="CompileTimeDI" />
+            named after the NuGet package to be INCLUDED by NuGet into the target project-->
+        <file src="..\nuspecs\DryIoc\build\DryIoc.props"                            target="build\DryIoc.Internal.props" />
+
+        <!--CompileTimeDI-->
+        <file src="..\src\DryIoc\CompileTimeDI\Container.Generated.tt"              target="CompileTimeDI" />
+        <file src="..\src\DryIoc\CompileTimeDI\CompileTimeRegistrations.ttinclude"  target="CompileTimeDI" />
+        <file src="..\src\DryIoc\CompileTimeDI\CompileTimeRegistrations.Example.cs" target="CompileTimeDI" />
+        <file src="..\src\DryIoc\.config\dotnet-tools.json"                         target="CompileTimeDI" />
 
         <!--net45-->
-        <file src="..\src\DryIoc\Container.cs"                        target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\Messages.cs"                         target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Expression.cs"                       target="content\net45\DryIoc" />
+        <!-- note that the Messages are public because they expose the public API to extend and use i nthe client code -->
+        <file src="..\src\DryIoc\Messages.cs"                                   target="content\net45\DryIoc" />
 
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\Messages.cs"                         target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Expression.cs"                       target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc\Messages.cs"                                  target="contentFiles\cs\net45\DryIoc" />
 
         <!-- .netstandard 2.0 -->
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\Messages.cs"                         target="contentFiles\cs\netstandard2.0\DryIoc" />
-
-        <!-- .netstandard 2.1 -->
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\netstandard2.1\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\netstandard2.1\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard2.1\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\netstandard2.1\DryIoc" />
-        <file src="..\src\DryIoc\Messages.cs"                         target="contentFiles\cs\netstandard2.1\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Expression.cs"                       target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc\Messages.cs"                                  target="contentFiles\cs\netstandard2.0\DryIoc" />
     </files>
 </package>

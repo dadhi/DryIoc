@@ -1,0 +1,65 @@
+<Project>
+    <Target Name="CopyCompileTimeDIToProject" AfterTargets="Restore">
+
+        <Message Text="Package dir: $(MSBuildThisFileDirectory)" Importance="high"/>
+        <Message Text="Project dir: $(ProjectDir)"  Importance="high"/>
+        <Message Text="Copying T4 template, T4 include, example files and T4 CLI-tool manifest to the project..." Importance="high" />
+
+        <Copy Condition="!Exists('$(ProjectDir)\CompileTimeDI\Container.Generated.tt')" 
+          SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\Container.Generated.tt" 
+          DestinationFiles="$(ProjectDir)\CompileTimeDI\Container.Generated.tt"
+          SkipUnchangedFiles="true"/>
+        <Copy Condition="!Exists('$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.ttinclude')"
+          SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeRegistrations.ttinclude" 
+          DestinationFiles="$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.ttinclude" 
+          SkipUnchangedFiles="true"/>
+        <Copy Condition="!Exists('$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.Example.cs')"
+          SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeRegistrations.Example.cs" 
+          DestinationFiles="$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.Example.cs" 
+          SkipUnchangedFiles="true"/>
+        <Copy Condition="!Exists('$(ProjectDir)\.config\dotnet-tools.json')"
+          SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\dotnet-tools.json" 
+          DestinationFiles="$(ProjectDir)\.config\dotnet-tools.json" 
+          SkipUnchangedFiles="true"/>
+
+        <Exec WorkingDirectory="$(ProjectDir)" 
+            Command='dotnet tool install --ignore-failed-sources --tool-manifest "$(ProjectDir)\.config\dotnet-tools.json" dotnet-t4' />
+
+        <ItemGroup>
+            <T4File Include="$(ProjectDir)\CompileTimeDI\Container.Generated.tt" />
+        </ItemGroup>
+
+        <!-- <Message Text="Generating the object graphs from the compile-time registrations..." Importance="high"/> -->
+        <Message Text="[TargetDir=$(TargetDir)]" Importance="high"/>
+
+        <!-- <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) %(T4File.Identity)" /> -->
+    </Target>
+
+    <ItemGroup>
+        <T4File Include="CompileTimeDI\Container.Generated.tt" />
+    </ItemGroup>
+
+    <Target Name="CompileTimeGenerate" BeforeTargets="BeforeBuild"
+        Condition=" '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
+
+        <Message Text="Generating the object graphs from the compile-time registrations..." Importance="high"/>
+        <Message Text="[TargetDir=$(TargetDir)]" Importance="high"/>
+
+        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) %(T4File.Identity)" />
+    </Target>
+
+    <ItemGroup>
+      <Compile Update="CompileTimeDI\Container.Generated.cs">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>CompileTimeDI\Container.Generated.tt</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="CompileTimeDI\Container.Generated.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>CompileTimeDI\Container.Generated.cs</LastGenOutput>
+      </None>
+    </ItemGroup>
+</Project>
