@@ -186,7 +186,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static ConstantExpression Constant(object value, Type type) =>
             value == null ? ConstantNull(type) :
             type == typeof(bool) ? ((bool)value ? TrueConstant : FalseConstant) :
-            type == value.GetType() ? new ValueConstantExpression(value) : 
+            type == value.GetType() ? new ValueConstantExpression(value) :
             new TypedValueConstantExpression(value, type);
 
         [MethodImpl((MethodImplOptions)256)]
@@ -238,50 +238,68 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg) => new OneArgumentNewExpression(ctor, arg);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, Expression arg) => new NoByRefOneArgNewIntrinsic(ctor, arg);
+        public static NewExpression NewObjArgs(ConstructorInfo ctor, object arg) => new OneArgumentNewExpression(ctor, arg);
+
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, object arg) => new NoByRefOneArgNewIntrinsic(ctor, arg);
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1) =>
             new TwoArgumentsNewExpression(ctor, arg0, arg1);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, Expression arg0, Expression arg1) =>
+        public static NewExpression NewObjArgs(ConstructorInfo ctor, object arg0, object arg1) =>
+            new TwoArgumentsNewExpression(ctor, arg0, arg1);
+
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, object arg0, object arg1) =>
             new NoByRefTwoArgumentsNewExpression(ctor, arg0, arg1);
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2) =>
             new ThreeArgumentsNewExpression(ctor, arg0, arg1, arg2);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2) =>
+        public static NewExpression New(ConstructorInfo ctor, object arg0, object arg1, object arg2) =>
+            new ThreeArgumentsNewExpression(ctor, arg0, arg1, arg2);
+
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, object arg0, object arg1, object arg2) =>
             new NoByRefThreeArgumentsNewIntrinsic(ctor, arg0, arg1, arg2);
 
-        public static NewExpression New(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
+        public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
             new FourArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
+        public static NewExpression NewObjArgs(ConstructorInfo ctor, object arg0, object arg1, object arg2, object arg3) =>
+            new FourArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3);
+
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, object arg0, object arg1, object arg2, object arg3) =>
             new NoByRefFourArgumentsNewIntrinsic(ctor, arg0, arg1, arg2, arg3);
 
-        public static NewExpression New(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
+        public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
             new FiveArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
+        public static NewExpression NewObjArgs(ConstructorInfo ctor, object arg0, object arg1, object arg2, object arg3, object arg4) =>
+            new FiveArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4);
+
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, object arg0, object arg1, object arg2, object arg3, object arg4) =>
             new NoByRefFiveArgumentsNewIntrinsic(ctor, arg0, arg1, arg2, arg3, arg4);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5) =>
             new SixArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5);
 
+        public static NewExpression NewObjArgs(ConstructorInfo ctor,
+            object arg0, object arg1, object arg2, object arg3, object arg4, object arg5) =>
+            new SixArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5);
+
         public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5) =>
+            object arg0, object arg1, object arg2, object arg3, object arg4, object arg5) =>
             new NoByRefSixArgumentsNewIntrinsic(ctor, arg0, arg1, arg2, arg3, arg4, arg5);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5, Expression arg6) =>
             new SevenArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
 
+        public static NewExpression NewObjArgs(ConstructorInfo ctor,
+            object arg0, object arg1, object arg2, object arg3, object arg4, object arg5, object arg6) =>
+            new SevenArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+
         public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5, Expression arg6) =>
+            object arg0, object arg1, object arg2, object arg3, object arg4, object arg5, object arg6) =>
             new NoByRefSevenArgumentsNewIntrinsic(ctor, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
 
         public static MethodCallExpression Call(MethodInfo method, IReadOnlyList<Expression> arguments) =>
@@ -2861,7 +2879,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefOneArgNewIntrinsic : OneArgumentNewExpression
     {
-        internal NoByRefOneArgNewIntrinsic(ConstructorInfo constructor, Expression argument) : base(constructor, argument) { }
+        internal NoByRefOneArgNewIntrinsic(ConstructorInfo constructor, object arg) : base(constructor, arg) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) =>
@@ -2891,7 +2909,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefTwoArgumentsNewExpression : TwoArgumentsNewExpression
     {
-        internal NoByRefTwoArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1) : base(constructor, a0, a1) { }
+        internal NoByRefTwoArgumentsNewExpression(ConstructorInfo constructor, object a0, object a1) : base(constructor, a0, a1) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) =>
@@ -2927,7 +2945,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefThreeArgumentsNewIntrinsic : ThreeArgumentsNewExpression
     {
-        internal NoByRefThreeArgumentsNewIntrinsic(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2)
+        internal NoByRefThreeArgumentsNewIntrinsic(ConstructorInfo constructor, object a0, object a1, object a2)
             : base(constructor, a0, a1, a2) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -2967,7 +2985,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefFourArgumentsNewIntrinsic : FourArgumentsNewExpression
     {
-        internal NoByRefFourArgumentsNewIntrinsic(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3)
+        internal NoByRefFourArgumentsNewIntrinsic(ConstructorInfo constructor, object a0, object a1, object a2, object a3)
             : base(constructor, a0, a1, a2, a3) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -3011,7 +3029,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefFiveArgumentsNewIntrinsic : FiveArgumentsNewExpression
     {
-        internal NoByRefFiveArgumentsNewIntrinsic(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4)
+        internal NoByRefFiveArgumentsNewIntrinsic(ConstructorInfo constructor, object a0, object a1, object a2, object a3, object a4)
             : base(constructor, a0, a1, a2, a3, a4) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -3059,7 +3077,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefSixArgumentsNewIntrinsic : SixArgumentsNewExpression
     {
-        internal NoByRefSixArgumentsNewIntrinsic(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5)
+        internal NoByRefSixArgumentsNewIntrinsic(ConstructorInfo constructor, object a0, object a1, object a2, object a3, object a4, object a5)
             : base(constructor, a0, a1, a2, a3, a4, a5) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
@@ -3110,7 +3128,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoByRefSevenArgumentsNewIntrinsic : SevenArgumentsNewExpression
     {
-        internal NoByRefSevenArgumentsNewIntrinsic(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6)
+        internal NoByRefSevenArgumentsNewIntrinsic(ConstructorInfo constructor, object a0, object a1, object a2, object a3, object a4, object a5, object a6)
             : base(constructor, a0, a1, a2, a3, a4, a5, a6) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
