@@ -56,7 +56,7 @@
         <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="content\net45\DryIoc" />
         <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="content\net45\DryIoc" />
         <file src="..\src\DryIoc.Internal\Expression.cs"                       target="content\net45\DryIoc" />
-        <!-- note that the Messages are public because they expose the public API to extend and use i nthe client code -->
+        <!-- todo: @wip Messages are public but used IResolved is not, the what? -->
         <file src="..\src\DryIoc\Messages.cs"                                   target="content\net45\DryIoc" />
 
         <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\net45\DryIoc" />
