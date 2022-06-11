@@ -5,18 +5,19 @@
         <Message Text="Project dir: $(ProjectDir)"  Importance="high"/>
         <Message Text="Copying T4 template, T4 include, example files and T4 CLI-tool manifest to the project..." Importance="high" />
 
-        <Copy Condition="!Exists('$(ProjectDir)\CompileTimeDI\Container.Generated.tt')" 
+        <Copy
           SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\Container.Generated.tt" 
           DestinationFiles="$(ProjectDir)\CompileTimeDI\Container.Generated.tt"
           SkipUnchangedFiles="true"/>
-        <Copy Condition="!Exists('$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.ttinclude')"
+        <Copy
           SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeRegistrations.ttinclude" 
           DestinationFiles="$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.ttinclude" 
           SkipUnchangedFiles="true"/>
-        <Copy Condition="!Exists('$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.Example.cs')"
+        <Copy
           SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\CompileTimeRegistrations.Example.cs" 
           DestinationFiles="$(ProjectDir)\CompileTimeDI\CompileTimeRegistrations.Example.cs" 
           SkipUnchangedFiles="true"/>
+
         <Copy Condition="!Exists('$(ProjectDir)\.config\dotnet-tools.json')"
           SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\dotnet-tools.json" 
           DestinationFiles="$(ProjectDir)\.config\dotnet-tools.json" 
@@ -29,10 +30,7 @@
             <T4File Include="$(ProjectDir)\CompileTimeDI\Container.Generated.tt" />
         </ItemGroup>
 
-        <!-- <Message Text="Generating the object graphs from the compile-time registrations..." Importance="high"/> -->
-        <Message Text="[TargetDir=$(TargetDir)]" Importance="high"/>
-
-        <!-- <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) %(T4File.Identity)" /> -->
+        <Message Text="[TargetPath=$(TargetPath)]" Importance="high"/>
     </Target>
 
     <ItemGroup>
@@ -43,9 +41,9 @@
         Condition=" '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
 
         <Message Text="Generating the object graphs from the compile-time registrations..." Importance="high"/>
-        <Message Text="[TargetDir=$(TargetDir)]" Importance="high"/>
+        <Message Text="[TargetPath=$(TargetPath)]" Importance="high"/>
 
-        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) %(T4File.Identity)" />
+        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) %(T4File.Identity)" />
     </Target>
 
     <ItemGroup>

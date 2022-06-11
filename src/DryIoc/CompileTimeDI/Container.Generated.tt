@@ -24,13 +24,12 @@ THE SOFTWARE.
 */
 <#@ template language="C#" #>
 <#@ output extension=".cs" #>
-<#@ assembly Name="DryIoc.dll" #>
 <#@ import Namespace="System.Linq" #>
 <#@ import Namespace="System.Text" #>
 <#@ import Namespace="DryIoc" #>
 <#@ import Namespace="DryIoc.ImTools" #>
 <#@ import Namespace="DryIoc.FastExpressionCompiler.LightExpression" #>
-<#@ include File="CompileTimeRegistrations.ttinclude" #>
+<#@ include File="CompileTimeDI\CompileTimeRegistrations.ttinclude" #>
 <#
 // The rules for `ForExpressionGeneration` are required` here because later the `container` will be used for `GetRequestExpression` and `GetConstantExpression`,
 // otherwise we would need to get the container adjusted inside the `GenerateResolutionExpressions`
