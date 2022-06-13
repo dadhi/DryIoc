@@ -1,39 +1,43 @@
-namespace DryIoc.SourceGenerator.UnitTests;
-
 using System.Threading.Tasks;
-using DryIoc;
 using NUnit.Framework;
 using VerifyNUnit;
 using VerifyTests;
+using DryIoc;
 
-
-[TestFixture]
-// [UsesVerify]
-public class GeneratorTests 
+namespace DryIoc.SourceGenerator.UnitTests
 {
-    [Test]
-    public Task Test()
+    [TestFixture]
+    public class GeneratorTests : ITest
     {
-        // The source code to test
-        var source = @"
-using Tests;
+        public int Run()
+        {
+            Test().GetAwaiter().GetResult();
+            return 1;
+        }
+
+        [Test]
+        public Task Test()
+        {
+            var source = @"
+using DryIoc;
 
 [Register(typeof(IA), typeof(A))]
-public partial class Container// : ICompileTimeResolver
+public partial class CompileTimeContainer
 {
 }
 
 interface IA {}
 class A {}";
 
-        return GeneratorVerifier.Verify(source);
+            return GeneratorVerifier.Verify(source);
+        }
     }
-}
 
-[Register(typeof(IA), typeof(A))]
-public partial class Container// : ICompileTimeResolver 
-{
-}
+    [Register(typeof(IA), typeof(A))]
+    public partial class Container
+    {
+    }
 
-interface IA {}
-class A {}
+    interface IA { }
+    class A { }
+}

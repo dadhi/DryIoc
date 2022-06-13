@@ -15202,7 +15202,7 @@ namespace DryIoc
     using System.Collections.Generic;
 
     /// <summary>Interface of the compile-time container which will be called from the Container methods</summary>
-    public interface ICompileTimeResolver
+    public interface ICompileTimeContainer
     {
         /// <summary>Try resolve a single composition root implementation</summary>
         void ResolveGenerated(ref object service, Type serviceType);
