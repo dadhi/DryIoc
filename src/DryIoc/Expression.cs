@@ -3377,10 +3377,11 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class OneArgumentMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument };
-        public readonly Expression Argument;
+        public readonly object Arg;
+        public Expression Argument => Arg.AsExpr();
         public override int ArgumentCount => 1;
-        public override Expression GetArgument(int i) => Argument;
-        internal OneArgumentMethodCallExpression(MethodInfo method, Expression argument) : base(method) => Argument = argument;
+        public override Expression GetArgument(int i) => Argument.AsExpr();
+        internal OneArgumentMethodCallExpression(MethodInfo method, object arg) : base(method) => Arg = arg;
     }
 
     public sealed class InstanceOneArgumentMethodCallExpression : OneArgumentMethodCallExpression
@@ -3394,12 +3395,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class TwoArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1 };
-        public readonly Expression Argument0, Argument1;
+        public readonly object A0, A1;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
         public override int ArgumentCount => 2;
-        public override Expression GetArgument(int i) => i == 0 ? Argument0 : Argument1;
-        internal TwoArgumentsMethodCallExpression(MethodInfo method, Expression a0, Expression a1) : base(method)
+        public override Expression GetArgument(int i) => i == 0 ? A0.AsExpr() : A1.AsExpr();
+        internal TwoArgumentsMethodCallExpression(MethodInfo method, object a0, object a1) : base(method)
         {
-            Argument0 = a0; Argument1 = a1;
+            A0 = a0; A1 = a1;
         }
     }
 
@@ -3414,13 +3417,15 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class ThreeArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2 };
-        public readonly Expression Argument0, Argument1, Argument2;
+        public readonly object A0, A1, A2;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
         public override int ArgumentCount => 3;
-        public override Expression GetArgument(int i) => i == 0 ? Argument0 : i == 1 ? Argument1 : Argument2;
-        internal ThreeArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2) : base(method)
+        public override Expression GetArgument(int i) => i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : A2.AsExpr();
+        internal ThreeArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2;
+            A0 = a0; A1 = a1; A2 = a2;
         }
     }
 
@@ -3434,14 +3439,17 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class FourArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3;
+        public readonly object A0, A1, A2, A3;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
         public override int ArgumentCount => 4;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : Argument3;
-        internal FourArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : A3.AsExpr();
+        internal FourArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3;
         }
     }
 
@@ -3456,14 +3464,18 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class FiveArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4;
+        public readonly object A0, A1, A2, A3, A4;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
         public override int ArgumentCount => 5;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : Argument4;
-        internal FiveArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : A4.AsExpr();
+        internal FiveArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3, object a4) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4;
         }
     }
 
@@ -3478,14 +3490,19 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class SixArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5;
+        public readonly object A0, A1, A2, A3, A4, A5;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
+        public Expression Argument5 => A5.AsExpr();
         public override int ArgumentCount => 6;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : i == 4 ? Argument4 : Argument5;
-        internal SixArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : i == 4 ? A4.AsExpr() : A5.AsExpr();
+        internal SixArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3, object a4, object a5) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4; Argument5 = a5;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4; A5 = a5;
         }
     }
 
@@ -3500,14 +3517,20 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class SevenArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5, Argument6 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5, Argument6;
+        public readonly object A0, A1, A2, A3, A4, A5, A6;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
+        public Expression Argument5 => A5.AsExpr();
+        public Expression Argument6 => A6.AsExpr();
         public override int ArgumentCount => 7;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : i == 4 ? Argument4 : i == 5 ? Argument5 : Argument6;
-        internal SevenArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : i == 4 ? A4.AsExpr() : i == 5 ? A5.AsExpr() : A6.AsExpr();
+        internal SevenArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3, object a4, object a5, object a6) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4; Argument5 = a5; Argument6 = a6;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4; A5 = a5; A6 = a6;
         }
     }
 
