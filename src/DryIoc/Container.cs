@@ -6330,7 +6330,7 @@ namespace DryIoc
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke1Expression(Delegate f, MethodInfo m, Expression a0) : base(m, a0) => Func = f;
+        internal FuncInvoke1Expression(Delegate f, MethodInfo m, object a0) : base(m, a0) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
@@ -6347,7 +6347,7 @@ namespace DryIoc
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke2Expression(Delegate f, MethodInfo m, Expression a0, Expression a1) : base(m, a0, a1) => Func = f;
+        internal FuncInvoke2Expression(Delegate f, MethodInfo m, object a0, object a1) : base(m, a0, a1) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
@@ -6366,7 +6366,7 @@ namespace DryIoc
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke3Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2) : base(m, a0, a1, a2) => Func = f;
+        internal FuncInvoke3Expression(Delegate f, MethodInfo m, object a0, object a1, object a2) : base(m, a0, a1, a2) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
@@ -6387,7 +6387,7 @@ namespace DryIoc
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke4Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2, Expression a3) : base(m, a0, a1, a2, a3) => Func = f;
+        internal FuncInvoke4Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3) : base(m, a0, a1, a2, a3) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, bool isNestedLambda, ref ClosureInfo rootClosure) =>
@@ -6410,7 +6410,7 @@ namespace DryIoc
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke5Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4)
+        internal FuncInvoke5Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3, object a4)
             : base(m, a0, a1, a2, a3, a4) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
@@ -6436,7 +6436,7 @@ namespace DryIoc
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke6Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5)
+        internal FuncInvoke6Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3, object a4, object a5)
             : base(m, a0, a1, a2, a3, a4, a5) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
@@ -6464,7 +6464,7 @@ namespace DryIoc
     {
         public override Expression Object => Constant(Func.Target);
         public readonly Delegate Func;
-        internal FuncInvoke7Expression(Delegate f, MethodInfo m, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6)
+        internal FuncInvoke7Expression(Delegate f, MethodInfo m, object a0, object a1, object a2, object a3, object a4, object a5, object a6)
             : base(m, a0, a1, a2, a3, a4, a5, a6) => Func = f;
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(
