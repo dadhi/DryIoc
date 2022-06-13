@@ -1861,9 +1861,8 @@ namespace DryIoc.FastExpressionCompiler
                             if (constExpr.Value == null)
                             {
                                 if (constExpr.Type.IsValueType)
-                                    EmitLoadLocalVariable(il, InitValueTypeVariable(il, constExpr.Type)); // yep, this is a proper way to emit the Nullable null
-                                else
-                                    il.Emit(OpCodes.Ldnull);
+                                    return EmitLoadLocalVariable(il, InitValueTypeVariable(il, constExpr.Type)); // yep, this is a proper way to emit the Nullable null
+                                il.Emit(OpCodes.Ldnull);
                                 return true;
                             }
 
@@ -3056,6 +3055,19 @@ namespace DryIoc.FastExpressionCompiler
                 else
                     return false;
                 return true;
+            }
+
+            public static bool TryEmitConstant(
+                bool considerClosure, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1)
+            {
+                if (constantValue == null)
+                {
+                    if (exprType.IsValueType)
+                        return EmitLoadLocalVariable(il, InitValueTypeVariable(il, exprType)); // yep, this is a proper way to emit the Nullable null
+                    il.Emit(OpCodes.Ldnull);
+                    return true;
+                }
+                return TryEmitConstantOfNotNullValue(closure.ContainsConstantsOrNestedLambdas(), exprType, constantValue, il, ref closure, byRefIndex);
             }
 
             public static bool TryEmitConstantOfNotNullValue(
@@ -5216,7 +5228,7 @@ namespace DryIoc.FastExpressionCompiler
             }
 
             [MethodImpl((MethodImplOptions)256)]
-            private static void EmitLoadLocalVariable(ILGenerator il, int location)
+            private static bool EmitLoadLocalVariable(ILGenerator il, int location)
             {
                 if (location == 0)
                     il.Emit(OpCodes.Ldloc_0);
@@ -5230,6 +5242,7 @@ namespace DryIoc.FastExpressionCompiler
                     il.Emit(OpCodes.Ldloc_S, (byte)location);
                 else
                     il.Emit(OpCodes.Ldloc, (short)location);
+                return true;
             }
 
             [MethodImpl((MethodImplOptions)256)]
