@@ -15195,3 +15195,22 @@ namespace DryIoc
         int Run();
     }
 }
+
+namespace DryIoc
+{
+    using System;
+    using System.Collections.Generic;
+
+    /// <summary>Interface of the compile-time container which will be called from the Container methods</summary>
+    public interface ICompileTimeContainerGenerator
+    {
+        /// <summary>Try resolve a single composition root implementation</summary>
+        void ResolveGenerated(ref object service, Type serviceType);
+
+        /// <summary>Try resolve a single dynamic dependency implementation</summary>
+        void ResolveGenerated(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
+
+        /// <summary>Try resolve many service implementations</summary>
+        IEnumerable<Container.ResolveManyResult> ResolveManyGenerated(Type serviceType);
+    }
+}

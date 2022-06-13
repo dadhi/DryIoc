@@ -128,6 +128,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Messages.MediatRLike
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.TestRunner.net472", "test\DryIoc.TestRunner.net472\DryIoc.TestRunner.net472.csproj", "{4B7B7E57-3975-448A-B79A-9315DDC3DB38}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.SourceGenerator", "src\DryIoc.SourceGenerator\DryIoc.SourceGenerator.csproj", "{2D81DD4B-B162-4BD4-9FA5-3766F96D993C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -270,6 +272,10 @@ Global
 		{4B7B7E57-3975-448A-B79A-9315DDC3DB38}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4B7B7E57-3975-448A-B79A-9315DDC3DB38}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4B7B7E57-3975-448A-B79A-9315DDC3DB38}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2D81DD4B-B162-4BD4-9FA5-3766F96D993C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2D81DD4B-B162-4BD4-9FA5-3766F96D993C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2D81DD4B-B162-4BD4-9FA5-3766F96D993C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2D81DD4B-B162-4BD4-9FA5-3766F96D993C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -309,6 +315,7 @@ Global
 		{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
 		{04CF7347-035B-4707-8C4B-47DA19B113CE} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
 		{4B7B7E57-3975-448A-B79A-9315DDC3DB38} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
+		{2D81DD4B-B162-4BD4-9FA5-3766F96D993C} = {258FA031-1B82-403A-B235-9A25B17A024A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}

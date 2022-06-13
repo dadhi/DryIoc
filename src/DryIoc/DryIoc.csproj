@@ -32,14 +32,14 @@
         <T4File Include="CompileTimeDI\Container.Generated.tt" />
     </ItemGroup>
 
-    <Target Name="CompileTimeGenerate" BeforeTargets="BeforeBuild"
+    <!-- <Target Name="CompileTimeGenerate" BeforeTargets="BeforeBuild"
         Condition=" '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
 
         <Message Text="Generating the object graphs from the compile-time registrations..." Importance="high"/>
         <Message Text="[TargetPath=$(TargetPath)]" Importance="high"/>
 
         <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) %(T4File.Identity)" />
-    </Target>
+    </Target> -->
 
     <ItemGroup>
       <Compile Update="CompileTimeDI\Container.Generated.cs">
