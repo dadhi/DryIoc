@@ -15202,7 +15202,7 @@ namespace DryIoc
     using System.Collections.Generic;
 
     /// <summary>Interface of the compile-time container which will be called from the Container methods</summary>
-    public interface ICompileTimeContainerGenerator
+    public interface ICompileTimeResolver
     {
         /// <summary>Try resolve a single composition root implementation</summary>
         void ResolveGenerated(ref object service, Type serviceType);
@@ -15212,5 +15212,23 @@ namespace DryIoc
 
         /// <summary>Try resolve many service implementations</summary>
         IEnumerable<Container.ResolveManyResult> ResolveManyGenerated(Type serviceType);
+    }
+
+    /// <summary>Registration API attibute</summary>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+    public class RegisterAttribute : Attribute
+    {
+        /// <summary>Service type of the registered service.</summary>
+        public Type ServiceType { get; set; }
+
+        /// <summary>Implementation type of the registered service.</summary>
+        public Type ImplementationType { get; set; }
+
+        /// <summary>Constructing attibute from the passed data</summary>
+        public RegisterAttribute(Type serviceType, Type implementationType = null)
+        {
+            ServiceType = serviceType;
+            ImplementationType = implementationType;
+        }
     }
 }
