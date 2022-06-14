@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using DryIoc.IssuesTests;
+using DryIoc.SourceGenerator.UnitTests;
 // using DryIoc.Docs;
 
 namespace DryIoc.UnitTests
@@ -10,6 +11,8 @@ namespace DryIoc.UnitTests
         public static void Main()
         {
             RunAllTests();
+
+            // new GeneratorTests().Run();
 
             // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
 

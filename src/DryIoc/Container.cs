@@ -161,29 +161,6 @@ namespace DryIoc
 
         partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType);
 
-        /// <summary>Identifies the service when resolving collection</summary>
-        public struct ResolveManyResult
-        {
-            /// <summary>Factory, the required part</summary>
-            public Func<IResolverContext, object> FactoryDelegate;
-
-            /// <summary>Optional key</summary>
-            public object ServiceKey;
-
-            /// <summary>Optional required service type, can be an open-generic type.</summary>
-            public Type RequiredServiceType;
-
-            /// <summary>Constructs the struct.</summary>
-            public static ResolveManyResult Of(Func<IResolverContext, object> factoryDelegate,
-                object serviceKey = null, Type requiredServiceType = null) =>
-                new ResolveManyResult
-                {
-                    FactoryDelegate = factoryDelegate,
-                    ServiceKey = serviceKey,
-                    RequiredServiceType = requiredServiceType
-                };
-        }
-
         /// <summary>Directly uses generated factories to resolve service. Or returns the default if service does not have generated factory.</summary>
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ExpressionIsAlwaysNull", Justification = "Per design")]
@@ -2939,6 +2916,29 @@ namespace DryIoc
             if (hasIt && Factory._lastFactoryID <= 10_000)
                 Factory._lastFactoryID = 20_000; // todo: wtf is this logic, please explain it bro!
         }
+    }
+
+    /// <summary>Identifies the service when resolving collection</summary>
+    public struct ResolveManyResult
+    {
+        /// <summary>Factory, the required part</summary>
+        public Func<IResolverContext, object> FactoryDelegate;
+
+        /// <summary>Optional key</summary>
+        public object ServiceKey;
+
+        /// <summary>Optional required service type, can be an open-generic type.</summary>
+        public Type RequiredServiceType;
+
+        /// <summary>Constructs the struct.</summary>
+        public static ResolveManyResult Of(Func<IResolverContext, object> factoryDelegate,
+            object serviceKey = null, Type requiredServiceType = null) =>
+            new ResolveManyResult
+            {
+                FactoryDelegate = factoryDelegate,
+                ServiceKey = serviceKey,
+                RequiredServiceType = requiredServiceType
+            };
     }
 
     /// Special service key with info about open-generic service type
@@ -15196,7 +15196,7 @@ namespace DryIoc
     }
 }
 
-namespace DryIoc
+namespace DryIoc.CompileTime
 {
     using System;
     using System.Collections.Generic;
@@ -15211,11 +15211,11 @@ namespace DryIoc
         void ResolveGenerated(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
 
         /// <summary>Try resolve many service implementations</summary>
-        IEnumerable<Container.ResolveManyResult> ResolveManyGenerated(Type serviceType);
+        IEnumerable<ResolveManyResult> ResolveManyGenerated(Type serviceType);
     }
 
     /// <summary>Registration API attibute</summary>
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, AllowMultiple = true, Inherited = false)]
     public class RegisterAttribute : Attribute
     {
         /// <summary>Service type of the registered service.</summary>
