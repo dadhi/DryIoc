@@ -15214,6 +15214,27 @@ namespace DryIoc.CompileTime
         IEnumerable<ResolveManyResult> ResolveManyGenerated(Type serviceType);
     }
 
+    /// <summary>The implementation provides the means of adjusting the container rules</summary>
+    public interface IConfigureRules
+    {
+        /// <summary>Configures the container.</summary>
+        Rules Configure(Rules rules);
+    }
+
+    /// <summary>Factory Setup provider</summary>
+    public interface ISetup
+    {
+        /// <summary>Provides the setup for the registration</summary>
+        Setup Setup { get; }
+    }
+
+    /// <summary>Factory Made provider</summary>
+    public interface IMade
+    {
+        /// <summary>Provides the made for the registration</summary>
+        Made Made { get; }
+    }
+
     /// <summary>Registration API attibute</summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, AllowMultiple = true, Inherited = false)]
     public class RegisterAttribute : Attribute
