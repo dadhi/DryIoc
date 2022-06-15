@@ -20,7 +20,6 @@ namespace DryIoc.SourceGenerator.UnitTests
 using DryIoc.CompileTime;
 namespace DryIoc.SourceGenerator.UnitTests
 {
-
     [Register(typeof(IA), typeof(A))]
     public partial class CompileTimeContainer
     {
@@ -35,7 +34,7 @@ namespace DryIoc.SourceGenerator.UnitTests
     }
 
     [Register(typeof(IA), typeof(A))]
-    public partial class Container
+    public partial class CompileTimeContainer
     {
     }
 
