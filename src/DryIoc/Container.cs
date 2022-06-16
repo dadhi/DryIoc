@@ -370,7 +370,6 @@ namespace DryIoc
             var rules = Rules;
             if (!rules.UseInterpretationForTheFirstResolution)
             {
-                // todo: @perf @mem should we introduce the GetInstanceOrDefault to avoid lifting object ToFactoryDelegate, e.g. for InstanceFactory
                 factoryDelegate = factory.GetDelegateOrDefault(request);
                 request.ReturnToPool();
                 if (factoryDelegate == null)
@@ -8648,7 +8647,6 @@ namespace DryIoc
         Ignored
     }
 
-    // todo: @perf @memory split by IfUnresolved and separate the Metadata
     /// <summary>Provides optional service resolution details: service key, required service type, what return when service is unresolved,
     /// default value if service is unresolved, custom service value.</summary>
     public sealed class ServiceDetails
@@ -9336,7 +9334,7 @@ namespace DryIoc
 
         internal static Request CreateForValidation(Container container, ServiceInfo serviceInfo, Request[] depRequestStack)
         {
-            var req = RentRequest();
+            var req = RentRequestOrNull();
             return req == null
                 ? req = new Request(container, Empty, 1, 0, depRequestStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null)
                 : req.SetServiceInfo(container, Empty, 1, 0, depRequestStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null);
@@ -9376,10 +9374,9 @@ namespace DryIoc
             if (serviceType != null && serviceType.IsOpenGeneric())
                 Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
 
-            // todo: @mem @perf Could we avoid the allocation of the ServiceInfo details object for ifUnresolved? because it is unlucky path but we spend the memory on it upfront, especially given that ServiceProviderGetServiceShouldThrowIfUnresolved contains the adjusting value anyway??? 
             object serviceInfo = ifUnresolved == IfUnresolved.Throw ? serviceType : ServiceDetails.Of(ifUnresolved);
 
-            var req = RentRequest();
+            var req = RentRequestOrNull();
             return req == null
                 ? new Request(container, Empty, 1, 0, null, RequestFlags.IsResolutionCall, serviceInfo, serviceType, null)
                 : req.SetServiceInfo(container, Empty, 1, 0, null, RequestFlags.IsResolutionCall, serviceInfo, serviceType, null);
@@ -10142,7 +10139,7 @@ namespace DryIoc
         }
 
         private static Request _pooledRequest;
-        internal static Request RentRequest() => Interlocked.Exchange(ref _pooledRequest, null);
+        internal static Request RentRequestOrNull() => Interlocked.Exchange(ref _pooledRequest, null);
         internal void ReturnToPool()
         {
             if (_pooledRequest == null && (Flags & RequestFlags.DoNotPoolRequest) == 0)
