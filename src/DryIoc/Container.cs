@@ -6091,6 +6091,15 @@ namespace DryIoc
         public Rules WithoutVariantGenericTypesInResolve() =>
             WithSettings(_settings & ~Settings.VariantGenericTypesInResolve);
 
+        /// <summary>If the dependency factory is not found (including the dynamic factories) generate the `Resolve` call for it, 
+        /// so it may be resolved from the compile-time registrations</summary>
+        public Rules WithGenerateResolutionCallForMissingDependency() =>
+            WithSettings(_settings | Settings.GenerateResolutionCallForMissingDependency);
+
+        /// <summary>Switch off the <see ref="WithGenerateResolutionCallForMissingDependency"/>/summary>
+        public Rules WithoutGenerateResolutionCallForMissingDependency() =>
+            WithSettings(_settings & ~Settings.GenerateResolutionCallForMissingDependency);
+
         /// <summary><see cref="WithDefaultIfAlreadyRegistered"/>.</summary>
         public IfAlreadyRegistered DefaultIfAlreadyRegistered { get; private set; }
 
@@ -6293,6 +6302,7 @@ namespace DryIoc
             ServiceProviderGetServiceShouldThrowIfUnresolved = 1 << 22,
             ThrowIfScopedOrSingletonHasTransientDependency = 1 << 23,
             VariantGenericTypesInResolve = 1 << 24,
+            GenerateResolutionCallForMissingDependency = 1 << 25,
         }
 
         private const Settings DEFAULT_SETTINGS
