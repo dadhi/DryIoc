@@ -1,5 +1,6 @@
 ﻿using DryIoc.FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
+using System;
 
 namespace DryIoc.IssuesTests
 {
@@ -8,12 +9,13 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Test();
-            return 1;
+            Missing_dependency_test();
+            Missing_Func_dependency_test();
+            return 2;
         }
 
         [Test]
-        public void Test()
+        public void Missing_dependency_test()
         {
             var c = new Container(Rules.Default.WithGenerateResolutionCallForMissingDependency());
 
@@ -27,6 +29,28 @@ namespace DryIoc.IssuesTests
             StringAssert.Contains("r.Resolve(", cs);
         }
 
+        [Test]
+        public void Missing_Func_dependency_test()
+        {
+            var container = new Container(Rules.Default.WithGenerateResolutionCallForMissingDependency());
+
+            container.Register<F>();
+            container.Register<B>();
+
+            var f = container.Resolve<F>();
+            Assert.IsNotNull(f);
+            Assert.IsNotNull(f.Fc);
+            Assert.Throws<ContainerException>(() => f.Fc());
+
+            container.Register<C>();
+
+            var c = f.Fc();
+            Assert.IsNotNull(c);
+        }
+
+        public class B { }
+        public class C { }
+
         public class A
         {
             public readonly B B;
@@ -38,7 +62,15 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        public class B { }
-        public class C { }
+        public class F
+        {
+            public readonly B B;
+            public readonly Func<C> Fc;
+            public F(B b, Func<C> fc)
+            {
+                B = b;
+                Fc = fc;
+            }
+        }
     }
 }

@@ -918,7 +918,7 @@ namespace DryIoc
                 factory = factory.GetGeneratedFactoryOrDefault(request);
 
             return factory != null ? factory
-                : request.Container.Rules.GenerateResolutionCallForMissingDependency ? null
+                : !request.IsResolutionCall && request.Container.Rules.GenerateResolutionCallForMissingDependency ? null
                 : ThrowUnableToResolveOrGetDefault(request, factory);
         }
 
@@ -5195,7 +5195,7 @@ namespace DryIoc
                     : request.RequiredServiceType ?? serviceType;
 
                 request = request.PushServiceType(serviceType);
-                var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request); // todo: @wip #495
+                var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
                 return expr == null ? null :
                     wrapperType == typeof(Func<IResolverContext, object>)
                     ? Constant(expr.CompileToFactoryDelegate(request.Container.Rules.UseInterpretation))
@@ -5219,19 +5219,24 @@ namespace DryIoc
             Expression serviceExpr;
             if (!isAction && container.Rules.FuncAndLazyWithoutRegistration)
                 serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, stopRecursiveDependencyCheck: true);
+            else if (serviceFactory == null)
+            {
+                serviceFactory = container.ResolveFactory(serviceRequest);
+                if (serviceFactory == null && container.Rules.GenerateResolutionCallForMissingDependency)
+                    serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, stopRecursiveDependencyCheck: true);
+                else 
+                {
+                    serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
+                    if (serviceExpr == null)
+                        return null;
+                }
+            }
             else
             {
-                Factory factory;
-                if (serviceFactory == null)
-                    factory = container.ResolveFactory(serviceRequest);
-                else
-                {
-                    var requiredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
-                    factory = requiredServiceType == serviceType
-                        ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
-                        : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
-                }
-                serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
+                serviceFactory = serviceType == container.GetWrappedType(serviceType, request.RequiredServiceType)
+                    ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
+                    : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
+                serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
                 if (serviceExpr == null)
                     return null;
             }
@@ -9319,11 +9324,9 @@ namespace DryIoc
             if (condition != null && !condition(r.Isolate()))
                 return null;
 
-            // make the closing of the open-generic as the last check because it perf hog and some items may be already filtered out by predecessor checks.
-            if (f.GeneratedFactories != null)
-                return f.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true);
-
-            return f;
+            // make the closing of the open-generic as the last check because it is a perf hog and some items may be already filtered out by predecessor checks.
+            return f.GeneratedFactories == null ? f
+                : f.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true);
         }
     }
 
