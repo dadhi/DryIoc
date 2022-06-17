@@ -5281,8 +5281,7 @@ namespace DryIoc
                 factory = container.ResolveFactory(serviceRequest);
             else
             {
-                var requiredServiceType = container.GetWrappedType(serviceType, request.RequiredServiceType);
-                factory = requiredServiceType == serviceType
+                factory = serviceType == container.GetWrappedType(serviceType, request.RequiredServiceType)
                     ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
                     : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
             }

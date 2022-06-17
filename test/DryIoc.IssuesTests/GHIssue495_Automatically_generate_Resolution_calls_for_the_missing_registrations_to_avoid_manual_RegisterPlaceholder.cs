@@ -11,7 +11,8 @@ namespace DryIoc.IssuesTests
         {
             Missing_dependency_test();
             Missing_Func_dependency_test();
-            return 2;
+            Missing_Lazy_dependency_test();
+            return 3;
         }
 
         [Test]
