@@ -6,7 +6,7 @@ namespace DryIoc.IssuesTests
     [TestFixture]
     public class Issue_HandleVariance
     {
-        [Test, Explicit] // todo: @bug? check why it is failing
+        [Test, Explicit] // Ignore("fixme") todo: @bug? check why it is failing
         public void CommandHandlers_CanBeResolved_From_IoC()
         {
             var container = new Container();

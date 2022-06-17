@@ -4995,11 +4995,11 @@ namespace DryIoc
                 Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
 
             var containerExpr = new ExpressionFactory(
-                r => ConvertViaCastClassIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)),
+                r => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)),
                 Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
 
             var registratorExpr = new ExpressionFactory(
-                r => ConvertViaCastClassIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)),
+                r => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)),
                 Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
 
             return wrappers
@@ -5223,7 +5223,7 @@ namespace DryIoc
                 serviceFactory = container.ResolveFactory(serviceRequest);
                 if (serviceFactory == null && container.Rules.GenerateResolutionCallForMissingDependency)
                     serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, stopRecursiveDependencyCheck: true);
-                else 
+                else
                 {
                     serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
                     if (serviceExpr == null)
@@ -6019,7 +6019,7 @@ namespace DryIoc
                       & ~Settings.ImplicitCheckForReuseMatchingScope
                       & ~Settings.UseInterpretationForTheFirstResolution
                       & ~Settings.UseInterpretation
-                    //   | Settings.GenerateResolutionCallForMissingDependency // todo: @feature #495
+                      //   | Settings.GenerateResolutionCallForMissingDependency // todo: @feature #495
                       | Settings.UsedForExpressionGeneration
                       | (allowRuntimeState ? 0 : Settings.ThrowIfRuntimeStateRequired);
 
@@ -8612,8 +8612,18 @@ namespace DryIoc
             // todo: @perf #498
             var resolveCallExpr = Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
                 ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
+            // todo: @wpi should we include the Unbox for the value type services?
+            return serviceType == typeof(object) ? resolveCallExpr : TryConvertIntrinsic(resolveCallExpr, serviceType);
+        }
 
-            return serviceType == typeof(object) ? resolveCallExpr : serviceType.Cast(resolveCallExpr);
+        // todo: @wip #498
+        internal sealed class ResolveFullCallExpression : MethodCallExpression
+        {
+            // object Resolve(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args);
+            internal ResolveFullCallExpression(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType,
+                Request preResolveParent, object[] args)
+            {
+            }
         }
 
         private static void PopulateDependencyResolutionCallExpressions(Request request)
@@ -9499,8 +9509,9 @@ namespace DryIoc
 
         /// <summary>Returns expression for func arguments.</summary>
         public Expression GetInputArgsExpr() =>
-            InputArgExprs == null ? Constant(null, typeof(object[]))
-            : NewArrayInit(typeof(object), InputArgExprs.Map(x => x.Type.IsValueType ? Convert<object>(x) : x));
+            InputArgExprs == null
+            ? ConstantNull(typeof(object[]))
+            : NewArrayInit(typeof(object), InputArgExprs.Map(x => x.Type.IsValueType ? Convert<object>(x) : x)); // todo: @perf optimize Convert to object
 
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
         public bool TracksTransientDisposable => (Flags & RequestFlags.TracksTransientDisposable) != 0;
@@ -10910,7 +10921,7 @@ namespace DryIoc
                         serviceExpr = singleton != null ? Constant(singleton) : Constant(null, serviceExpr.Type); // fixes #258
 
                         if (weaklyReferencedOrPreventDisposal)
-                            serviceExpr = originalServiceExprType.Cast(GetWrappedSingletonAccessExpression(serviceExpr, setup));
+                            serviceExpr = TryConvertIntrinsic(GetWrappedSingletonAccessExpression(serviceExpr, setup), originalServiceExprType);
                     }
                     else
                     {
@@ -10920,10 +10931,10 @@ namespace DryIoc
                         serviceExpr = reuse.Apply(request, serviceExpr);
 
                         if (weaklyReferencedOrPreventDisposal)
-                            serviceExpr = originalServiceExprType.Cast(GetWrappedSingletonAccessExpression(serviceExpr, setup));
+                            serviceExpr = TryConvertIntrinsic(GetWrappedSingletonAccessExpression(serviceExpr, setup), originalServiceExprType);
                         else if (serviceExpr.NodeType != ExprType.Constant &&
                             serviceExpr.Type != originalServiceExprType && !originalServiceExprType.IsAssignableFrom(serviceExpr.Type))
-                            serviceExpr = originalServiceExprType.Cast(serviceExpr);
+                            serviceExpr = TryConvertIntrinsic(serviceExpr, originalServiceExprType);
                     }
                 }
             }
@@ -10947,8 +10958,8 @@ namespace DryIoc
 
         private static Expression GetWrappedSingletonAccessExpression(Expression e, Setup setup) =>
             setup.WeaklyReferenced
-                ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(ConvertViaCastClassIntrinsic<WeakReference>(e), ReflectionTools.WeakReferenceValueProperty))
-                : Field(ConvertViaCastClassIntrinsic<HiddenDisposable>(e), HiddenDisposable.ValueField);
+                ? Call(ThrowInGeneratedCode.WeakRefReuseWrapperGCedMethod, Property(TryConvertIntrinsic<WeakReference>(e), ReflectionTools.WeakReferenceValueProperty))
+                : Field(TryConvertIntrinsic<HiddenDisposable>(e), HiddenDisposable.ValueField);
 
         /// <summary>Creates factory delegate from service expression and returns it.</summary>
         public virtual Func<IResolverContext, object> GetDelegateOrDefault(Request request) =>
@@ -11820,15 +11831,15 @@ namespace DryIoc
                     if (paramExprs != null)
                         paramExprs[i] = paramResolutionCall;
                     else switch (i)
-                    {
-                        case 0: a0 = paramResolutionCall; break;
-                        case 1: a1 = paramResolutionCall; break;
-                        case 2: a2 = paramResolutionCall; break;
-                        case 3: a3 = paramResolutionCall; break;
-                        case 4: a4 = paramResolutionCall; break;
-                        case 5: a5 = paramResolutionCall; break;
-                        case 6: a6 = paramResolutionCall; break;
-                    }
+                        {
+                            case 0: a0 = paramResolutionCall; break;
+                            case 1: a1 = paramResolutionCall; break;
+                            case 2: a2 = paramResolutionCall; break;
+                            case 3: a3 = paramResolutionCall; break;
+                            case 4: a4 = paramResolutionCall; break;
+                            case 5: a5 = paramResolutionCall; break;
+                            case 6: a6 = paramResolutionCall; break;
+                        }
                     continue;
                 }
                 var injectedExpr = paramFactory?.GetExpressionOrDefault(paramRequest);
@@ -11931,7 +11942,7 @@ namespace DryIoc
             if (serviceExprType == actualServiceType || actualServiceType.IsAssignableFrom(serviceExprType))
                 return serviceExpr;
             if (serviceExprType == typeof(object))
-                return actualServiceType.Cast(serviceExpr);
+                return TryConvertIntrinsic(serviceExpr, actualServiceType);
             var conversionMethod = serviceExprType.GetConversionOperatorOrNull(actualServiceType);
             if (conversionMethod != null)
                 return Convert(serviceExpr, actualServiceType, conversionMethod);
@@ -12403,7 +12414,7 @@ namespace DryIoc
             var instanceExpr = request.Container.GetConstantExpression(Instance);
             var serviceType = request.ActualServiceType;
             var implType = ImplementationType;
-            return implType == null || serviceType.IsAssignableFrom(implType) ? instanceExpr : serviceType.Cast(instanceExpr);
+            return implType == null || serviceType.IsAssignableFrom(implType) ? instanceExpr : TryConvertIntrinsic(instanceExpr, serviceType);
         }
 
         /// <summary>Simplified path for the registered instance</summary>
@@ -14906,12 +14917,6 @@ namespace DryIoc
             !type.IsValueType
                 ? ContainerTools.NullTypeConstant
                 : Call(GetDefaultMethod.MakeGenericMethod(type));
-
-        [MethodImpl((MethodImplOptions)256)]
-        internal static Expression Cast(this Type type, Expression source) =>
-            !type.IsValueType
-                ? ConvertViaCastClassIntrinsic(source, type)
-                : Convert(source, type);
 
         internal static bool EmitConvertObjectTo(this ILGenerator il, Type t)
         {

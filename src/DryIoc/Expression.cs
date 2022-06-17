@@ -520,11 +520,15 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static UnaryExpression Convert<T>(Expression expression) =>
             new TypedConvertUnaryExpression<T>(expression);
 
-        public static UnaryExpression ConvertViaCastClassIntrinsic(Expression expression, Type type) =>
-            new ConvertViaCastClassIntrinsicExpression(expression, type);
+        public static UnaryExpression TryConvertIntrinsic(Expression expression, Type type) =>
+            !type.IsValueType && (!expression.Type.IsValueType || type == typeof(object))
+                ? new ConvertIntrinsicExpression(expression, type)
+                : Convert(expression, type);
 
-        public static UnaryExpression ConvertViaCastClassIntrinsic<T>(Expression expression) where T : class =>
-            new ConvertViaCastClassIntrinsicExpression<T>(expression);
+        public static UnaryExpression TryConvertIntrinsic<T>(Expression expression) where T : class =>
+            !typeof(T).IsValueType && (!expression.Type.IsValueType || typeof(T) == typeof(object))
+                ? new ConvertIntrinsicExpression<T>(expression)
+                : Convert<T>(expression);
 
         /// <summary>Creates a UnaryExpression that represents a conversion operation for which the implementing method is specified.</summary>
         public static UnaryExpression Convert(Expression expression, Type type, MethodInfo method) =>
@@ -2324,11 +2328,11 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             Method = method;
     }
 
-    public class ConvertViaCastClassIntrinsicExpression<T> : UnaryExpression where T : class
+    public class ConvertIntrinsicExpression<T> : UnaryExpression where T : class
     {
         public sealed override ExpressionType NodeType => ExpressionType.Convert;
         public override Type Type => typeof(T);
-        public ConvertViaCastClassIntrinsicExpression(Expression operand) : base(operand) { }
+        internal ConvertIntrinsicExpression(Expression operand) : base(operand) { }
 
         public override bool IsIntrinsic => true;
 
@@ -2341,23 +2345,26 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         {
             if (!EmittingVisitor.TryEmit(Operand, paramExprs, il, ref closure, config, parent, byRefIndex))
                 return false;
+            if (Type == typeof(object))
+            {
+                var operandType = Operand.Type;
+                if (operandType.IsValueType)
+                    il.Emit(OpCodes.Box, operandType);
+            }
 #if NETFRAMEWORK
-            // The cast is required only for Full CLR starting from NET45, e.g.
-            // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
-            il.Emit(OpCodes.Castclass, Type);
+            else
+                // The cast is required only for Full CLR starting from NET45, e.g.
+                // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
+                il.Emit(OpCodes.Castclass, Type);
 #endif
             return true;
         }
     }
 
-    public sealed class ConvertViaCastClassIntrinsicExpression : ConvertViaCastClassIntrinsicExpression<object>
+    public sealed class ConvertIntrinsicExpression : ConvertIntrinsicExpression<object>
     {
         public override Type Type { get; }
-        public ConvertViaCastClassIntrinsicExpression(Expression operand, Type type) : base(operand)
-        {
-            Debug.Assert(!type.IsValueType, $"the type `{type}` is expected to be a non-value type");
-            Type = type;
-        }
+        internal ConvertIntrinsicExpression(Expression operand, Type type) : base(operand) => Type = type;
     }
 
     public abstract class BinaryExpression : Expression
@@ -3508,7 +3515,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class InstanceSixArgumentsMethodCallExpression : SixArgumentsMethodCallExpression
     {
-        public override Expression Object { get; }
+        public override Expression Object { get; } // todo: @perf @mem make it an object?
         internal InstanceSixArgumentsMethodCallExpression(Expression instance, MethodInfo method,
             Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5)
             : base(method, a0, a1, a2, a3, a4, a5) => Object = instance;
