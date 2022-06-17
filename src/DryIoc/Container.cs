@@ -6019,6 +6019,7 @@ namespace DryIoc
                       & ~Settings.ImplicitCheckForReuseMatchingScope
                       & ~Settings.UseInterpretationForTheFirstResolution
                       & ~Settings.UseInterpretation
+                    //   | Settings.GenerateResolutionCallForMissingDependency // todo: @feature #495
                       | Settings.UsedForExpressionGeneration
                       | (allowRuntimeState ? 0 : Settings.ThrowIfRuntimeStateRequired);
 
