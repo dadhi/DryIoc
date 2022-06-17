@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue497_ConstructorWithResolvableArguments_is_not_working_properly
+    public class Issue497_ConstructorWithResolvableArguments_is_not_working_properly : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

@@ -36,7 +36,6 @@
         Condition=" '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
 
         <Message Text="Generating the object graphs from the compile-time registrations..." Importance="high"/>
-        <Message Text="[TargetPath=$(TargetPath)]" Importance="high"/>
 
         <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) %(T4File.Identity)" />
     </Target>

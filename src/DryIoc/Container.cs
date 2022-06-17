@@ -917,7 +917,9 @@ namespace DryIoc
             if (factory?.GeneratedFactories != null)
                 factory = factory.GetGeneratedFactoryOrDefault(request);
 
-            return factory == null ? ThrowUnableToResolveOrGetDefault(request, factory) : factory;
+            return factory != null ? factory
+                : request.Container.Rules.GenerateResolutionCallForMissingDependency ? null
+                : ThrowUnableToResolveOrGetDefault(request, factory);
         }
 
         internal static T ThrowUnableToResolveOrGetDefault<T>(Request request, T defaultResult)
@@ -5153,13 +5155,13 @@ namespace DryIoc
                 // See #449 for additional details
                 var factory = serviceFactory ?? container.ResolveFactory(serviceRequest);
                 if (factory == null)
-                    return null;
+                    return null; // todo: @wip #495
                 serviceRequest = serviceRequest.WithResolvedFactory(factory, skipRecursiveDependencyCheck: true);
             }
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
-            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
+            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, stopRecursiveDependencyCheck: true);
             var funcType = typeof(Func<>).MakeGenericType(serviceType);
             var wrapperCtor = wrapperType.Constructor(funcType);
 
@@ -5193,7 +5195,7 @@ namespace DryIoc
                     : request.RequiredServiceType ?? serviceType;
 
                 request = request.PushServiceType(serviceType);
-                var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
+                var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request); // todo: @wip #495
                 return expr == null ? null :
                     wrapperType == typeof(Func<IResolverContext, object>)
                     ? Constant(expr.CompileToFactoryDelegate(request.Container.Rules.UseInterpretation))
@@ -5216,7 +5218,7 @@ namespace DryIoc
             var container = request.Container;
             Expression serviceExpr;
             if (!isAction && container.Rules.FuncAndLazyWithoutRegistration)
-                serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
+                serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, stopRecursiveDependencyCheck: true);
             else
             {
                 Factory factory;
@@ -6093,10 +6095,14 @@ namespace DryIoc
 
         /// <summary>If the dependency factory is not found (including the dynamic factories) generate the `Resolve` call for it, 
         /// so it may be resolved from the compile-time registrations</summary>
+        public bool GenerateResolutionCallForMissingDependency =>
+            (_settings & Settings.GenerateResolutionCallForMissingDependency) != 0;
+
+        /// <summary>Sets the <see cref="GenerateResolutionCallForMissingDependency"/></summary>
         public Rules WithGenerateResolutionCallForMissingDependency() =>
             WithSettings(_settings | Settings.GenerateResolutionCallForMissingDependency);
 
-        /// <summary>Switch off the <see ref="WithGenerateResolutionCallForMissingDependency"/>/summary>
+        /// <summary>Un-sets the <see ref="GenerateResolutionCallForMissingDependency"/></summary>
         public Rules WithoutGenerateResolutionCallForMissingDependency() =>
             WithSettings(_settings & ~Settings.GenerateResolutionCallForMissingDependency);
 
@@ -8559,7 +8565,7 @@ namespace DryIoc
 
         /// <summary>Used for internal purposes to create the expression of Resolve method of the passed `request`</summary>
         public static Expression CreateResolutionExpression(Request request,
-            bool openResolutionScope = false, bool asResolutionCall = false)
+            bool openResolutionScope = false, bool stopRecursiveDependencyCheck = false)
         {
             if (request.Rules.DependencyResolutionCallExprs != null &&
                 request.Factory != null && !request.Factory.HasRuntimeState)
@@ -8593,13 +8599,13 @@ namespace DryIoc
             var parentFlags = default(RequestFlags);
             if (openResolutionScope)
                 parentFlags |= RequestFlags.OpensResolutionScope;
-            if (asResolutionCall || (request.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+            if (stopRecursiveDependencyCheck || (request.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
                 parentFlags |= RequestFlags.StopRecursiveDependencyCheck;
 
             // Only parent is converted to be passed to Resolve.
             // The current request is formed by rest of Resolve parameters.
             var preResolveParentExpr = container.GetRequestExpression(request.DirectParent, parentFlags);
-
+            // todo: @perf #498
             var resolveCallExpr = Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
                 ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
 
@@ -11805,7 +11811,25 @@ namespace DryIoc
                     continue;
                 }
 
-                var injectedExpr = container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
+                var paramFactory = container.ResolveFactory(paramRequest);
+                if (paramFactory == null && rules.GenerateResolutionCallForMissingDependency)
+                {
+                    var paramResolutionCall = Resolver.CreateResolutionExpression(paramRequest);
+                    if (paramExprs != null)
+                        paramExprs[i] = paramResolutionCall;
+                    else switch (i)
+                    {
+                        case 0: a0 = paramResolutionCall; break;
+                        case 1: a1 = paramResolutionCall; break;
+                        case 2: a2 = paramResolutionCall; break;
+                        case 3: a3 = paramResolutionCall; break;
+                        case 4: a4 = paramResolutionCall; break;
+                        case 5: a5 = paramResolutionCall; break;
+                        case 6: a6 = paramResolutionCall; break;
+                    }
+                    continue;
+                }
+                var injectedExpr = paramFactory?.GetExpressionOrDefault(paramRequest);
                 if (injectedExpr == null ||
                     // When param is an empty array / collection, then we may use a default value instead (#581)
                     paramDetails.DefaultValue != null && injectedExpr.NodeType == ExprType.NewArrayInit && ((NewArrayExpression)injectedExpr).ArgumentCount == 0)
@@ -11867,17 +11891,6 @@ namespace DryIoc
 
             var memberInits = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
             return failedToGetMember ? null : memberInits == null ? serviceExpr : MemberInit((NewExpression)serviceExpr, memberInits);
-        }
-
-        private static Expression GetFactoryFuncResolutionExpression(Request request, ref Delegate factoryFunc)
-        {
-            var func = (Delegate)factoryFunc.Target;
-            var funcReturnType = func.Method.ReturnType;
-            var factoryRequest = funcReturnType == typeof(object)
-                ? request.Push(ServiceInfo.Of(func.GetType(), request.ActualServiceType))
-                : request.PushServiceType(func.GetType());
-            factoryFunc = null;
-            return Resolver.CreateResolutionExpression(factoryRequest, false, true);
         }
 
         private MemberAssignment[] TryGetMemberAssignments(ref bool failedToGet, Request request, IContainer container, Rules rules)
@@ -12357,15 +12370,7 @@ namespace DryIoc
         internal sealed class WithAllDetails : InstanceFactory
         {
             public override Setup Setup { get; }
-            public override Type ImplementationType
-            {
-                get
-                {
-                    var x = Instance;
-                    return (x as WeakReference)?.Target.GetType() ?? x?.GetType();
-                }
-            }
-
+            public override Type ImplementationType => (Instance as WeakReference)?.Target.GetType() ?? Instance?.GetType();
             public WithAllDetails(object instance, Setup setup)
                 : base(instance != null && setup.WeaklyReferenced ? new WeakReference(instance) : instance) =>
                 Setup = setup.WithAsResolutionCallForGeneratedExpression();
@@ -12413,11 +12418,10 @@ namespace DryIoc
                 serviceType = typeof(IEnumerable<>).MakeGenericType(serviceType.GetElementType());
 
             // todo: @perf Prevents the costly `WithResolvedFactory` call
-            var c = request.Container;
-            if (c._registry.Value is Container.Registry r && !r.Decorators.IsEmpty)
+            if (request.Container._registry.Value is Container.Registry r && !r.Decorators.IsEmpty)
             {
                 // todo: @perf optimize WithResolvedFactory for registered instance
-                var decoratorExpr = c.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
+                var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request.WithResolvedFactory(this));
                 if (decoratorExpr != null)
                     return decoratorExpr;
             }

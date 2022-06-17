@@ -217,7 +217,7 @@ namespace DryIoc.MefAttributedModel
 
             // we are not setting the unwrapped service factory here because it does not matter for resolution call
             serviceRequest = serviceRequest.WithResolvedFactory(factory, skipRecursiveDependencyCheck: true);
-            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, asResolutionCall: true);
+            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, stopRecursiveDependencyCheck: true);
 
             var funcType = typeof(Func<>).MakeGenericType(serviceType);
             var wrapperCtor = wrapperType.Constructor(funcType, metadataType);

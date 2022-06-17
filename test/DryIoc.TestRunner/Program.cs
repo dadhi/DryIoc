@@ -68,6 +68,7 @@ namespace DryIoc.UnitTests
             };
             var issueTests = new ITest[]
             {
+                new Issue497_ConstructorWithResolvableArguments_is_not_working_properly(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
                 new GHIssue180_Option_nullable_int_argument_with_not_null_default_value(),
                 new GHIssue80_ScopedOrSingleton_extra_constructor_calls(),
@@ -86,6 +87,7 @@ namespace DryIoc.UnitTests
                 new GHIssue461_Transient_IDisposable_factory_method_with_custom_constructor_args(),
                 new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
+                new GHIssue495_Automatically_generate_Resolution_calls_for_the_missing_registrations_to_avoid_manual_RegisterPlaceholder(),
             };
             // var docsTests = new Func<int>[] 
             // { 
