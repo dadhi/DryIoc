@@ -2,16 +2,9 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    [TestFixture]
-    public class GHIssue489_Resolve_with_IfUnresolved_ReturnDefaultIfNotRegistered_throws_if_dependency_is_not_registered : ITest
+    // "think it through"
+    public class GHIssue489_Resolve_with_IfUnresolved_ReturnDefaultIfNotRegistered_throws_if_dependency_is_not_registered
     {
-        public int Run()
-        {
-            Test();
-            return 1;
-        }
-
-        [Test, Ignore("think it through")]
         public void Test()
         {
             var c = new Container();

@@ -5140,9 +5140,7 @@ namespace DryIoc
         {
             var wrapperType = request.ActualServiceType;
             var serviceType = wrapperType.GetGenericArguments()[0];
-            // because the Lazy constructed with Func factory it has the same behavior as a Func wrapper in that regard, that's why we marked it as so
-            var serviceRequest = request.PushServiceType(serviceType,
-                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.IsResolutionCall);
+            var serviceRequest = request.PushServiceType(serviceType);
 
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
@@ -5154,9 +5152,10 @@ namespace DryIoc
                 // Plus we need to stop on the encountering the root service because lazy permits a circular dependencies.
                 // See #449 for additional details
                 var factory = serviceFactory ?? container.ResolveFactory(serviceRequest);
-                if (factory == null)
-                    return null; // todo: @wip #495
-                serviceRequest = serviceRequest.WithResolvedFactory(factory, skipRecursiveDependencyCheck: true);
+                if (factory != null)
+                    serviceRequest = serviceRequest.WithResolvedFactory(factory, skipRecursiveDependencyCheck: true);
+                else if (!container.Rules.GenerateResolutionCallForMissingDependency)
+                    return null;
             }
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
