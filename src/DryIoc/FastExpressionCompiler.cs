@@ -975,8 +975,8 @@ namespace DryIoc.FastExpressionCompiler
                 Lambda = null;
             }
             internal bool IsTheSameLambda(LambdaExpression lambda) => // todo: @unclear @wip parameters or is comparing the body is enough?
-                ReferenceEquals(LambdaExpression, lambda) || 
-                ReferenceEquals(LambdaExpression.Body, lambda.Body) 
+                ReferenceEquals(LambdaExpression, lambda) ||
+                ReferenceEquals(LambdaExpression.Body, lambda.Body)
 #if LIGHT_EXPRESSION
                 && LambdaExpression.ParameterCount == lambda.ParameterCount
 #endif
@@ -1092,7 +1092,7 @@ namespace DryIoc.FastExpressionCompiler
                     return false;
 
 #if LIGHT_EXPRESSION
-                if (expr.IsIntrinsic) 
+                if (expr.IsIntrinsic)
                     return expr.TryCollectBoundConstants(flags, ref closure, paramExprs, isNestedLambda, ref rootClosure);
 #endif
 
@@ -1623,7 +1623,7 @@ namespace DryIoc.FastExpressionCompiler
             // constructing the new closure with non-passed arguments and the rest of items
             nestedLambdaInfo.Lambda = nestedLambdaClosure != null
                 ? method.CreateDelegate(nestedLambdaExpr.Type, nestedLambdaClosure)
-                : nestedLambdaInfo.Lambda = method.CreateDelegate( Tools.GetFuncOrActionType(closurePlusParamTypes, nestedReturnType), null);
+                : nestedLambdaInfo.Lambda = method.CreateDelegate(Tools.GetFuncOrActionType(closurePlusParamTypes, nestedReturnType), null);
 
             ReturnClosureTypeToParamTypesToPool(closurePlusParamTypes);
             return true;
@@ -2552,7 +2552,7 @@ namespace DryIoc.FastExpressionCompiler
                         }
                         else if (!isArgByRef && (parent & ParentFlags.Call) != 0 ||
                                 (parent & (ParentFlags.MemberAccess | ParentFlags.Coalesce | ParentFlags.IndexAccess)) != 0)
-                                il.Emit(OpCodes.Ldind_Ref);
+                            il.Emit(OpCodes.Ldind_Ref);
                     }
 
                     return true;
@@ -4212,12 +4212,12 @@ namespace DryIoc.FastExpressionCompiler
 
                         // #248 indicates that expression is argument passed by ref to Call
                         var isByAddress = byRefIndex != -1;
-                        if (field.FieldType.IsValueType && 
+                        if (field.FieldType.IsValueType &&
                             (parent & ParentFlags.InstanceAccess) != 0 &&
                                 // #302 - if the field is used as an index or
                                 // #333 - if the field is access from the just constructed object `new Widget().DodgyValue`
                                 (parent & (ParentFlags.IndexAccess | ParentFlags.Ctor)) == 0)
-                                isByAddress = true;
+                            isByAddress = true;
 
                         closure.LastEmitIsAddress = isByAddress;
                         il.Emit(isByAddress ? OpCodes.Ldflda : OpCodes.Ldfld, field);

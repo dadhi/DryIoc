@@ -137,7 +137,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
         public static ParameterExpression Variable(Type type, string name = null) => Parameter(type, name);
 
-        // todo: @perf benchmark thw switch on the LightExprVsExpr_Create_ComplexExpr
         // Enum is excluded because otherwise TypeCode will return the thing for the underlying 
         private static ParameterExpression TryToMakeKnownTypeParameter(Type type, string name = null) =>
             Type.GetTypeCode(type) switch
@@ -515,7 +514,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
         /// <summary>Creates a UnaryExpression that represents a type conversion operation.</summary>
         public static UnaryExpression Convert(Expression expression, Type type) =>
-            new ConvertUnaryExpression(expression, type); // todo: @perf @mem optimize the same as Parameter for the well known often used types
+            new ConvertUnaryExpression(expression, type);
 
         public static UnaryExpression Convert<T>(Expression expression) =>
             new TypedConvertUnaryExpression<T>(expression);
@@ -559,12 +558,10 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             new TypedUnaryExpression<bool>(ExpressionType.IsTrue, expression);
 
         /// <summary>Creates a UnaryExpression, given an operand, by calling the appropriate factory method.</summary>
-        public static UnaryExpression MakeUnary(ExpressionType unaryType, Expression operand, Type type)
-        {
-            if (type == null || type == operand.Type)
-                return new NodeTypedUnaryExpression(unaryType, operand);
-            return new TypedUnaryExpression(unaryType, operand, type);
-        }
+        public static UnaryExpression MakeUnary(ExpressionType unaryType, Expression operand, Type type) =>
+            type == null || type == operand.Type
+                ? new NodeTypedUnaryExpression(unaryType, operand)
+                : new TypedUnaryExpression(unaryType, operand, type);
 
         /// <summary>Creates a UnaryExpression that represents an arithmetic negation operation.</summary>
         public static UnaryExpression Negate(Expression expression) =>
@@ -635,20 +632,19 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         {
             if (delegateType == null || delegateType == typeof(Delegate))
                 return Lambda(body);
-
             var returnType = GetDelegateReturnType(delegateType);
-            if (returnType == body.Type)
-                return new TypedLambdaExpression(delegateType, body);
-            return new TypedReturnLambdaExpression(delegateType, body, returnType);
+            return returnType == body.Type
+                ? new TypedLambdaExpression(delegateType, body)
+                : new TypedReturnLambdaExpression(delegateType, body, returnType);
         }
 
         public static LambdaExpression Lambda(Type delegateType, Expression body, Type returnType)
         {
             if (delegateType == null || delegateType == typeof(Delegate))
                 delegateType = Tools.GetFuncOrActionType(returnType);
-            if (returnType == body.Type)
-                return new TypedLambdaExpression(delegateType, body);
-            return new TypedReturnLambdaExpression(delegateType, body, returnType);
+            return returnType == body.Type
+                ? new TypedLambdaExpression(delegateType, body)
+                : new TypedReturnLambdaExpression(delegateType, body, returnType);
         }
 
         public static LambdaExpression Lambda(Expression body, IReadOnlyList<ParameterExpression> parameters) =>
@@ -687,23 +683,20 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static LambdaExpression Lambda(Expression body, IReadOnlyList<ParameterExpression> parameters, Type returnType)
         {
             if (returnType == body.Type)
-                Lambda(body, parameters);
+                return Lambda(body, parameters);
             var delegateType = Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), returnType);
-            if (parameters?.Count > 0)
-                return new TypedReturnManyParametersLambdaExpression(delegateType, body, parameters, returnType);
-            return new TypedReturnLambdaExpression(delegateType, body, returnType);
+            return parameters?.Count > 0
+                ? new TypedReturnManyParametersLambdaExpression(delegateType, body, parameters, returnType)
+                : new TypedReturnLambdaExpression(delegateType, body, returnType);
         }
 
         public static LambdaExpression Lambda(Expression body, IEnumerable<ParameterExpression> parameters, Type returnType) =>
             Lambda(body, parameters.AsReadOnlyList(), returnType);
 
-        public static LambdaExpression Lambda(Type delegateType, Expression body, IReadOnlyList<ParameterExpression> parameters)
-        {
-            if (delegateType == null || delegateType == typeof(Delegate))
-                return Lambda(body, parameters);
-            var returnType = GetDelegateReturnType(delegateType);
-            return Lambda(delegateType, body, parameters, returnType);
-        }
+        public static LambdaExpression Lambda(Type delegateType, Expression body, IReadOnlyList<ParameterExpression> parameters) =>
+            delegateType == null || delegateType == typeof(Delegate)
+                ? Lambda(body, parameters)
+                : Lambda(delegateType, body, parameters, GetDelegateReturnType(delegateType));
 
         public static LambdaExpression Lambda(Type delegateType, Expression body, params ParameterExpression[] parameters) =>
             Lambda(delegateType, body, (IReadOnlyList<ParameterExpression>)parameters);

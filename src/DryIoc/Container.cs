@@ -53,6 +53,8 @@ namespace DryIoc
     using FastExpressionCompiler.LightExpression;
     using static FastExpressionCompiler.LightExpression.Expression;
     using static FastExpressionCompiler.LightExpression.ExpressionCompiler;
+    using Comp = FastExpressionCompiler.LightExpression.ExpressionCompiler;
+    using Emit = FastExpressionCompiler.LightExpression.ExpressionCompiler.EmittingVisitor;
 
     /// <summary>Inversion of control container</summary>
     public partial class Container : IContainer
@@ -5118,6 +5120,7 @@ namespace DryIoc
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             var preResolveParentExpr = container.GetRequestExpression(request);
 
+            // todo: @perf @mem separated expression same as for Resolve
             var resolveManyExpr = Call(resolverExpr, Resolver.ResolveManyMethod,
                 Constant(itemType),
                 container.GetConstantExpression(request.ServiceKey),
@@ -8609,21 +8612,58 @@ namespace DryIoc
             // Only parent is converted to be passed to Resolve.
             // The current request is formed by rest of Resolve parameters.
             var preResolveParentExpr = container.GetRequestExpression(request.DirectParent, parentFlags);
-            // todo: @perf #498
             var resolveCallExpr = Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
                 ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
             // todo: @wpi should we include the Unbox for the value type services?
             return serviceType == typeof(object) ? resolveCallExpr : TryConvertIntrinsic(resolveCallExpr, serviceType);
         }
 
-        // todo: @wip #498
         internal sealed class ResolveFullCallExpression : MethodCallExpression
         {
-            // object Resolve(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType, Request preResolveParent, object[] args);
-            internal ResolveFullCallExpression(Type serviceType, object serviceKey, IfUnresolved ifUnresolved, Type requiredServiceType,
-                Request preResolveParent, object[] args)
+            public override Expression Object { get; }
+            public override MethodInfo Method => ResolveMethod;
+            public readonly Type ServiceType;
+            public readonly Expression ServiceKeyExpr;
+            public readonly IfUnresolved IfUnresolved;
+            public readonly Type RequiredServiceType;
+            public readonly Expression PreResolveParentExpr;
+            public readonly Expression ArgExprs;
+            internal ResolveFullCallExpression(Expression resolver,
+                Type serviceType, Expression serviceKeyExpr, IfUnresolved ifUnresolved, Type requiredServiceType, Expression preResolveParentExpr, Expression args)
             {
+                Object = resolver;
+                ServiceType = serviceType;
+                ServiceKeyExpr = serviceKeyExpr;
+                IfUnresolved = ifUnresolved;
+                RequiredServiceType = requiredServiceType;
+                PreResolveParentExpr = preResolveParentExpr;
+                ArgExprs = args;
             }
+
+            // public override bool IsIntrinsic => true;
+
+            // public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            //     bool isNestedLambda, ref ClosureInfo rootClosure) =>
+            //     Comp.TryCollectBoundConstants(ref closure, Object, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            //     (ServiceKeyExpr == NullConstant || Comp.TryCollectBoundConstants(ref closure, ServiceKeyExpr, paramExprs, isNestedLambda, ref rootClosure, config)) && 
+            //     Comp.TryCollectBoundConstants(ref closure, PreResolveParentExpr, paramExprs, isNestedLambda, ref rootClosure, config) &&
+            //     (ArgExprs == NullConstant || Comp.TryCollectBoundConstants(ref closure, ArgExprs, paramExprs, isNestedLambda, ref rootClosure, config));
+
+            // // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
+            // public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            //     ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+            // {
+            //     Emit.TryEmit(Object, paramExprs, il, ref closure, config, parent);
+            //     EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
+
+            //     // todo: @perf more intelligent emit?
+            //     if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
+            //         return false; // todo: @bug uncomment the FEC NestedLambdaInfo.IsTheSameLambda and check why fallback System compile does not work
+
+            //     EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
+            //     EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
+            //     return il.EmitConvertObjectTo(Type);
+            // }
         }
 
         private static void PopulateDependencyResolutionCallExpressions(Request request)
@@ -9510,8 +9550,8 @@ namespace DryIoc
         /// <summary>Returns expression for func arguments.</summary>
         public Expression GetInputArgsExpr() =>
             InputArgExprs == null
-            ? ConstantNull(typeof(object[]))
-            : NewArrayInit(typeof(object), InputArgExprs.Map(x => x.Type.IsValueType ? Convert<object>(x) : x)); // todo: @perf optimize Convert to object
+                ? ConstantNull(typeof(object[]))
+                : NewArrayInit(typeof(object), InputArgExprs.Map(x => x.Type.IsValueType ? Convert<object>(x) : x)); // todo: @perf optimize Convert to object
 
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
         public bool TracksTransientDisposable => (Flags & RequestFlags.TracksTransientDisposable) != 0;
