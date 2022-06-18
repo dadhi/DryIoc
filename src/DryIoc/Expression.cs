@@ -706,68 +706,50 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             if (delegateType == null || delegateType == typeof(Delegate))
                 return Lambda(body, parameters, returnType);
             if (parameters?.Count > 0)
-            {
-                if (returnType == body.Type)
-                    return new ManyParametersLambdaExpression(delegateType, body, parameters);
-                return new TypedReturnManyParametersLambdaExpression(delegateType, body, parameters, returnType);
-            }
-            if (returnType == body.Type)
-                return new TypedLambdaExpression(delegateType, body);
-            return new TypedReturnLambdaExpression(delegateType, body, returnType);
+                return returnType == body.Type
+                    ? new ManyParametersLambdaExpression(delegateType, body, parameters)
+                    : new TypedReturnManyParametersLambdaExpression(delegateType, body, parameters, returnType);
+            return returnType == body.Type
+                ? new TypedLambdaExpression(delegateType, body)
+                : new TypedReturnLambdaExpression(delegateType, body, returnType);
         }
 
         public static LambdaExpression Lambda(Type delegateType, Expression body, IEnumerable<ParameterExpression> parameters, Type returnType) =>
             Lambda(delegateType, body, parameters.AsReadOnlyList(), returnType);
 
-        public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new OneParameterLambdaExpression(delegateType, body, p0);
-            return new TypedReturnOneParameterLambdaExpression(delegateType, body, p0, returnType);
-        }
+        public static LambdaExpression Lambda(Type delegateType, Expression body, ParameterExpression p0, Type returnType) =>
+            returnType == body.Type
+                ? new OneParameterLambdaExpression(delegateType, body, p0)
+                : new TypedReturnOneParameterLambdaExpression(delegateType, body, p0, returnType);
+
+        public static LambdaExpression Lambda(Type delegateType, Expression body, ParameterExpression p0, ParameterExpression p1, Type returnType) =>
+            returnType == body.Type
+                ? new TwoParametersLambdaExpression(delegateType, body, p0, p1)
+                : new TypedReturnTwoParametersLambdaExpression(delegateType, body, p0, p1, returnType);
 
         public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, ParameterExpression p1, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new TwoParametersLambdaExpression(delegateType, body, p0, p1);
-            return new TypedReturnTwoParametersLambdaExpression(delegateType, body, p0, p1, returnType);
-        }
+            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, Type returnType) =>
+            returnType == body.Type
+                ? new ThreeParametersLambdaExpression(delegateType, body, p0, p1, p2)
+                : new TypedReturnThreeParametersLambdaExpression(delegateType, body, p0, p1, p2, returnType);
 
         public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new ThreeParametersLambdaExpression(delegateType, body, p0, p1, p2);
-            return new TypedReturnThreeParametersLambdaExpression(delegateType, body, p0, p1, p2, returnType);
-        }
+            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3, Type returnType) =>
+            returnType == body.Type
+                ? new FourParametersLambdaExpression(delegateType, body, p0, p1, p2, p3)
+                : new TypedReturnFourParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, returnType);
 
         public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new FourParametersLambdaExpression(delegateType, body, p0, p1, p2, p3);
-            return new TypedReturnFourParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, returnType);
-        }
+            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3, ParameterExpression p4, Type returnType) =>
+            returnType == body.Type
+                ? new FiveParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4)
+                : new TypedReturnFiveParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, returnType);
 
         public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3,
-            ParameterExpression p4, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new FiveParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4);
-            return new TypedReturnFiveParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, returnType);
-        }
-
-        public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3,
-            ParameterExpression p4, ParameterExpression p5, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new SixParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, p5);
-            return new TypedReturnSixParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, p5, returnType);
-        }
+            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3, ParameterExpression p4, ParameterExpression p5, Type returnType) =>
+            returnType == body.Type
+                ? new SixParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, p5)
+                : new TypedReturnSixParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, p5, returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body) where TDelegate : System.Delegate =>
             Lambda<TDelegate>(body, GetDelegateReturnType(typeof(TDelegate)));
@@ -778,12 +760,10 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                 : new TypedReturnExpression<TDelegate>(body, returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body, ParameterExpression p0, Type returnType)
-            where TDelegate : System.Delegate
-        {
-            if (returnType == body.Type)
-                return new OneParameterExpression<TDelegate>(body, p0);
-            return new TypedReturnOneParameterExpression<TDelegate>(body, p0, returnType);
-        }
+            where TDelegate : System.Delegate =>
+            returnType == body.Type
+                ? new OneParameterExpression<TDelegate>(body, p0)
+                : new TypedReturnOneParameterExpression<TDelegate>(body, p0, returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body, ParameterExpression p0) where TDelegate : System.Delegate =>
             Lambda<TDelegate>(body, p0, GetDelegateReturnType(typeof(TDelegate)));
