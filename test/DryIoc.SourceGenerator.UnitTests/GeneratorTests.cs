@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using NUnit.Framework;
 using DryIoc.CompileTime;
+using DryIoc.SourceGenerator.UnitTests.CUT;
 
 namespace DryIoc.SourceGenerator.UnitTests
 {
@@ -18,15 +19,14 @@ namespace DryIoc.SourceGenerator.UnitTests
         {
             var source = @"
 using DryIoc.CompileTime;
+using DryIoc.SourceGenerator.UnitTests.CUT;
+
 namespace DryIoc.SourceGenerator.UnitTests
 {
     [Register(typeof(IA), typeof(A))]
     public partial class CompileTimeContainer
     {
     }
-
-    interface IA {}
-    class A {}
 }";
 
             return GeneratorVerifier.Verify(source);
@@ -37,7 +37,4 @@ namespace DryIoc.SourceGenerator.UnitTests
     public partial class CompileTimeContainer
     {
     }
-
-    interface IA { }
-    class A { }
 }

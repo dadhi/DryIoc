@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
     <ProjectReference Include="..\..\src\DryIoc.SourceGenerator\DryIoc.SourceGenerator.csproj" />
+    <ProjectReference Include="..\..\test_sut\DryIoc.SourceGenerator.UnitTests.CUT\DryIoc.SourceGenerator.UnitTests.CUT.csproj" />
   </ItemGroup>
 
 </Project>
