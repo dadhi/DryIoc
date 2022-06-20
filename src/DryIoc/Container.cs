@@ -3033,7 +3033,7 @@ namespace DryIoc
             }
         }
 
-        /// <summary>Interprets passed expression.</summary>
+        /// <summary>Interprets the expression producing the `result`. If it fails then it returns `false`.</summary>
         public static bool TryInterpret(IResolverContext r, Expression expr,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, out object result)
         {
@@ -3153,7 +3153,6 @@ namespace DryIoc
                             else if (!TryInterpret(r, argExpr, paramExprs, paramValues, parentArgs, out args[i]))
                                 return false;
                         }
-
                         result = newExpr.Constructor.Invoke(args);
                         return true;
                     }
@@ -6974,7 +6973,7 @@ namespace DryIoc
             }
 
             if (FactoryMethodKnownResultType != null)
-                s += (s == "{" ? "" : ", ") + "FactoryMethodKnownResultType=" + FactoryMethodKnownResultType;
+                s += (s == "{" ? "" : ", ") + "FactoryMethodKnownResultType=typeof(" + FactoryMethodKnownResultType.Print() + ")";
             if (HasCustomDependencyValue)
                 s += (s == "{" ? "" : ", ") + "HasCustomDependencyValue=true";
             if (PropertiesAndFields != null)
@@ -8808,7 +8807,7 @@ namespace DryIoc
                 return s.Append("{CustomValue=").Print(CustomValue ?? "null").Append("}").ToString();
 
             if (RequiredServiceType != null)
-                s.Append("RequiredServiceType=").Print(RequiredServiceType);
+                s.Append("RequiredServiceType=typeof(").Print(RequiredServiceType).Append(')');
             if (ServiceKey != null)
                 (s.Length == 0 ? s.Append('{') : s.Append(", ")).Append("ServiceKey=").Print(ServiceKey);
             if (MetadataKey != null || Metadata != null)
@@ -9062,8 +9061,7 @@ namespace DryIoc
         public static StringBuilder Print(this StringBuilder s, ServiceInfo info)
         {
             s.Print(info.ServiceType);
-            var details = info.Details.ToString();
-            return details == string.Empty ? s : s.Append(' ').Append(details);
+            return info.Details == ServiceDetails.Default ? s : s.Append(' ').Append(info.Details);
         }
     }
 
@@ -10068,7 +10066,7 @@ namespace DryIoc
             if (FactoryID != 0) // request is with resolved factory
             {
                 if (Reuse != DryIoc.Reuse.Transient)
-                    s.Append(Reuse is SingletonReuse ? "Singleton" : "Scoped").Append(' ');
+                    s.Append(Reuse).Append(' ');
 
                 if (FactoryType != FactoryType.Service)
                     s.Append(FactoryType.ToString().ToLower()).Append(' ');
@@ -10078,26 +10076,33 @@ namespace DryIoc
                     s.Print(implType).Append(": ");
             }
 
-            s.Append(ServiceTypeOrInfo is ParameterInfo pi ? ParameterServiceInfo.Of(pi) : ServiceTypeOrInfo);
-
-            if (Factory != null && Factory is ReflectionFactory == false)
-                s.Append(' ').Append(Factory.GetType().Name).Append(' ');
+            if (ServiceTypeOrInfo is Type t)
+                s.Print(t);
+            else if (ServiceTypeOrInfo is ParameterInfo pi)
+                s.Append(ParameterServiceInfo.Of(pi));
+            else
+                s.Append(ServiceTypeOrInfo);
 
             if (FactoryID != 0)
                 s.Append(" FactoryId=").Append(FactoryID);
 
             if (DecoratedFactoryID != 0)
-                s.Append(" decorating FactoryId=").Append(DecoratedFactoryID);
+                s.Append(" DecoratedFactoryId=").Append(DecoratedFactoryID);
 
             if (!InputArgExprs.IsNullOrEmpty())
                 s.AppendFormat(" with passed arguments [{0}]", InputArgExprs);
 
+            // avoid the non-relevant noise in the Flags output
             var flags = Flags;
-            if (isResolutionCall) // excluding the doubled info
+            if (isResolutionCall)
                 flags &= ~RequestFlags.IsResolutionCall;
-
+            flags &= ~RequestFlags.DoNotPoolRequest;
+            if ((flags & RequestFlags.IsDirectlyWrappedInFunc) != 0)
+                flags &= ~RequestFlags.IsWrappedInFunc;
+            if (Reuse is SingletonReuse)
+                flags &= ~RequestFlags.IsSingletonOrDependencyOfSingleton;
             if (flags != default(RequestFlags))
-                s.Append(" (").Append(Flags).Append(')');
+                s.Append(" Flags=").Append(flags);
 
             return s;
         }
@@ -13327,14 +13332,21 @@ namespace DryIoc
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
         {
-            var s = new StringBuilder(ScopedOrSingleton ? "ScopedOrSingleton {" : "Scoped {");
+            var s = new StringBuilder(ScopedOrSingleton ? "ScopedOrSingleton" : "Scoped");
+            if (Name == null && Lifespan == DefaultLifespan)
+                return s.ToString();
+            s.Append("{");
+            var addComma = false;
             if (Name != null)
-                s.Append("Name=").Print(Name).Append(", ");
+            {
+                s.Append("Name=").Print(Name);
+                addComma = true;
+            }
             if (Lifespan != DefaultLifespan)
-                s.Append("NON DEFAULT LIFESPAN=").Append(Lifespan);
-            else
+            {
+                if (addComma) s.Append(", ");
                 s.Append("Lifespan=").Append(Lifespan);
-
+            }
             return s.Append("}").ToString();
         }
 

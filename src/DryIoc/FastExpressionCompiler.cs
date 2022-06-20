@@ -6098,7 +6098,7 @@ namespace DryIoc.FastExpressionCompiler
                     }
                 case ExpressionType.Lambda:
                     {
-                        var x = (LambdaExpression)e;
+                        var x = (LambdaExpression)e; // todo: @wip remove the noise of //$ - we may search by by the `) =>` instead
                         sb.Append("Lambda<").Append(x.Type.ToCode(stripNamespace, printType)).Append(">( //$"); // bookmark for the lambdas - $ means the cost of the lambda, specifically nested lambda
                         sb.NewLineIdentExpr(x.Body, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant).Append(',');
                         sb.NewLineIdentArgumentExprs(x.Parameters, paramsExprs, uniqueExprs, lts, lineIdent, stripNamespace, printType, identSpaces, tryPrintConstant);
@@ -6322,11 +6322,11 @@ namespace DryIoc.FastExpressionCompiler
 
     /// <summary>Converts the expression into the valid C# code representation</summary>
     public static class ToCSharpPrinter
-    {
+    {   // todo: @improve - avoid the `;` at the end - it is not good for the compasablity when we using the output as the part of bigger expression 
         /// <summary>Tries hard to convert the expression into the correct C# code</summary>
         public static string ToCSharpString(this Expression expr) =>
             expr.ToCSharpString(new StringBuilder(1024), 4, true).Append(';').ToString();
-
+        // todo: @improve - avoid the `;` at the end
         /// <summary>Tries hard to convert the expression into the correct C# code</summary>
         public static string ToCSharpString(this Expression expr, TryPrintConstant tryPrintConstant) =>
             expr.ToCSharpString(new StringBuilder(1024), 4, true, tryPrintConstant: tryPrintConstant).Append(';').ToString();

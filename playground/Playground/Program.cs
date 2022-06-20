@@ -40,15 +40,15 @@ namespace Playground
             //    RealisticUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIoc());
             //Debug.Assert(x != null);
 
-            var di = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
-            var x = RealisticUnitOfWorkBenchmark.Measure(di);
-            var y = RealisticUnitOfWorkBenchmark.Measure(di);
-            Console.ReadKey();
+            // var di = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
+            // var x = RealisticUnitOfWorkBenchmark.Measure(di);
+            // var y = RealisticUnitOfWorkBenchmark.Measure(di);
+            // Console.ReadKey();
 
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
-            // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 

@@ -1246,6 +1246,7 @@ namespace DryIoc.MefAttributedModel
         { }
     }
 
+    // todo: @simplify @optimize use FEC ToCode()
     /// <summary>Converts provided literal into valid C# code. Used for generating registration code
     /// from <see cref="ExportedRegistrationInfo"/> DTOs.</summary>
     public static class PrintCode

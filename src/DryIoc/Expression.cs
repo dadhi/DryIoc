@@ -101,7 +101,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         /// <summary>Converts to Expression and outputs its as string</summary>
         public override string ToString() => this.ToCSharpString(constant =>
         {
-            var val = constant.Value;
+            var val = constant.Value; // todo: @wip do better for constants - use ToCode
             if (val == null)
                 return "null";
             if (constant.Type.IsPrimitive)
