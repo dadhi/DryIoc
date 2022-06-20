@@ -212,14 +212,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
             foreach (var x in type.GetConstructors())
                 if (x.GetParameters().Length == 0)
-                    return new NoArgsNewClassIntrinsicIExpression(x);
+                    return new NoArgsNewClassIntrinsicExpression(x);
 
             throw new ArgumentException($"The type {type} is missing the default constructor");
         }
 
         public static NewExpression New(ConstructorInfo ctor, IReadOnlyList<Expression> arguments) =>
             arguments == null || arguments.Count == 0
-            ? new NoArgsNewClassIntrinsicIExpression(ctor)
+            ? new NoArgsNewClassIntrinsicExpression(ctor)
             : new ManyArgumentsNewExpression(ctor, arguments);
 
         public static NewExpression New(ConstructorInfo ctor, params Expression[] arguments) =>
@@ -230,10 +230,10 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
         public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, IReadOnlyList<Expression> arguments) =>
             arguments == null || arguments.Count == 0
-            ? new NoArgsNewClassIntrinsicIExpression(ctor)
+            ? new NoArgsNewClassIntrinsicExpression(ctor)
             : new NoByRefManyArgsNewIntrinsicExpression(ctor, arguments);
 
-        public static NewExpression New(ConstructorInfo ctor) => new NoArgsNewClassIntrinsicIExpression(ctor);
+        public static NewExpression New(ConstructorInfo ctor) => new NoArgsNewClassIntrinsicExpression(ctor);
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg) => new OneArgumentNewExpression(ctor, arg);
 
@@ -2833,9 +2833,9 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     }
 
 
-    public sealed class NoArgsNewClassIntrinsicIExpression : NewExpression
+    public sealed class NoArgsNewClassIntrinsicExpression : NewExpression
     {
-        internal NoArgsNewClassIntrinsicIExpression(ConstructorInfo constructor) : base(constructor) { }
+        internal NoArgsNewClassIntrinsicExpression(ConstructorInfo constructor) : base(constructor) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) => true;

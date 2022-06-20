@@ -474,7 +474,7 @@ namespace DryIoc.FastExpressionCompiler
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IParameterProvider paramExprs,
             Type[] closurePlusParamTypes, Type returnType, CompilerFlags flags)
         {
-            if (bodyExpr is NoArgsNewClassIntrinsicIExpression newNoArgs)
+            if (bodyExpr is NoArgsNewClassIntrinsicExpression newNoArgs)
                 return CompileNoArgsNew(newNoArgs.Constructor, delegateType, closurePlusParamTypes, returnType);
 #else
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IReadOnlyList<PE> paramExprs,
@@ -1576,7 +1576,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
             var nestedLambdaParamExprs = (IParameterProvider)nestedLambdaExpr;
 
-            if (nestedLambdaBody is NoArgsNewClassIntrinsicIExpression newNoArgs)
+            if (nestedLambdaBody is NoArgsNewClassIntrinsicExpression newNoArgs)
             {
                 var paramTypes = RentOrNewClosureTypeToParamTypes(nestedLambdaParamExprs);
                 nestedLambdaInfo.Lambda = CompileNoArgsNew(newNoArgs.Constructor, nestedLambdaExpr.Type, paramTypes, nestedReturnType);
