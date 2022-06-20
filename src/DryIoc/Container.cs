@@ -3045,7 +3045,7 @@ namespace DryIoc
                     return true;
                 case ExprType.New:
                     {
-                        if (expr is NoArgsNewClassIntrinsic defaultCtorExpr)
+                        if (expr is NoArgsNewClassIntrinsicIExpression defaultCtorExpr)
                         {
                             result = defaultCtorExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                             return true;
@@ -4474,13 +4474,9 @@ namespace DryIoc
 
             if (d.IfUnresolved == IfUnresolved.Throw && d.RequiredServiceType == null && d.ServiceKey == null && d.MetadataKey == null && d.Metadata == null &&
                 factoryType == FactoryType.Service && decoratedFactoryID == 0)
-            {
-                if (flags == default(RequestFlags))
-                    return Call(parentExpr, Request.PushMethodWith4Args.Value,
-                        serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr);
-                return Call(parentExpr, Request.PushMethodWith5Args.Value,
-                    serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr, ConstantOf(flags));
-            }
+                return flags == default(RequestFlags)
+                    ? Call(parentExpr, Request.PushMethodWith4Args.Value, serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr)
+                    : Call(parentExpr, Request.PushMethodWith5Args.Value, serviceTypeExpr, factoryIdExpr, implTypeExpr, reuseExpr, ConstantOf(flags));
 
             var requiredServiceTypeExpr = ConstantOf(d.RequiredServiceType);
             var serviceKeyExpr = container.GetConstantExpression(d.ServiceKey, typeof(object));
@@ -4489,8 +4485,7 @@ namespace DryIoc
 
             if (d.IfUnresolved == IfUnresolved.Throw && d.MetadataKey == null && d.Metadata == null && decoratedFactoryID == 0)
                 return Call(parentExpr, Request.PushMethodWith8Args.Value,
-                    serviceTypeExpr, requiredServiceTypeExpr, serviceKeyExpr,
-                    factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr, flagsExpr);
+                    serviceTypeExpr, requiredServiceTypeExpr, serviceKeyExpr, factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr, flagsExpr);
 
             var ifUnresolvedExpr = d.IfUnresolved.ToConstant();
             var decoratedFactoryIDExpr = ConstantOf(decoratedFactoryID);
@@ -8586,7 +8581,8 @@ namespace DryIoc
             var container = request.Container;
             var serviceType = request.ServiceType;
             var serviceTypeExpr = ConstantOf<Type>(serviceType);
-
+            var details = request.GetServiceDetails();
+            var serviceKeyExpr = details.ServiceKey == null ? NullConstant : container.GetConstantExpression(details.ServiceKey, typeof(object));
             Expression resolverExpr;
             if (!openResolutionScope)
                 resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
@@ -8613,7 +8609,6 @@ namespace DryIoc
             // The current request is formed by rest of Resolve parameters.
             var preResolveParentExpr = container.GetRequestExpression(request.DirectParent, parentFlags);
 
-            var details = request.GetServiceDetails();
             if (details == ServiceDetails.Default)
             {
                 // todo: @perf create a smaller expression #498
@@ -8621,7 +8616,6 @@ namespace DryIoc
 
             var ifUnresolvedExpr = details.IfUnresolved.ToConstant();
             var requiredServiceTypeExpr = details.RequiredServiceType.ToConstant();
-            var serviceKeyExpr = details.ServiceKey == null ? NullConstant : container.GetConstantExpression(details.ServiceKey, typeof(object));
 
             var resolveCallExpr = Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
                 ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
