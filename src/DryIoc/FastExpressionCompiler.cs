@@ -1778,6 +1778,13 @@ namespace DryIoc.FastExpressionCompiler
             return true;
         }
 
+        internal static bool TryEmitBoxOf(this ILGenerator il, Type sourceType)
+        {
+            if (sourceType.IsValueType)
+                il.Emit(OpCodes.Box, sourceType);
+            return true;
+        }
+
         /// <summary>Supports emitting of selected expressions, e.g. lambdaExpr are not supported yet.
         /// When emitter find not supported expression it will return false from <see cref="TryEmit"/>, so I could fallback
         /// to normal and slow Expression.Compile.</summary>
@@ -2389,10 +2396,7 @@ namespace DryIoc.FastExpressionCompiler
                         return false;
 
                     if (right.Type != exprObj.Type)
-                    {
-                        if (right.Type.IsValueType)
-                            il.Emit(OpCodes.Box, right.Type);
-                    }
+                        il.TryEmitBoxOf(right.Type);
 
                     if (left.Type == exprObj.Type)
                         il.MarkLabel(labelFalse);
@@ -2877,8 +2881,8 @@ namespace DryIoc.FastExpressionCompiler
 
                 if (sourceType == targetType || targetType == typeof(object))
                 {
-                    if (targetType == typeof(object) && sourceType.IsValueType)
-                        il.Emit(OpCodes.Box, sourceType);
+                    if (targetType == typeof(object))
+                        il.TryEmitBoxOf(sourceType);
                     return il.EmitPopIfIgnoreResult(parent);
                 }
 
@@ -3021,8 +3025,7 @@ namespace DryIoc.FastExpressionCompiler
                     // cast as the last resort and let's it fail if unlucky
                     if (!TryEmitValueConvert(targetType, il, expr.NodeType == ExpressionType.ConvertChecked))
                     {
-                        if (sourceType.IsValueType)
-                            il.Emit(OpCodes.Box, sourceType);
+                        il.TryEmitBoxOf(sourceType);
                         il.Emit(OpCodes.Castclass, targetType);
                     }
                 }
@@ -3134,8 +3137,8 @@ namespace DryIoc.FastExpressionCompiler
                         il.Emit(OpCodes.Newobj, exprType.GetConstructors().GetFirst());
                 }
                 // boxing the value type, otherwise we can get a strange result when 0 is treated as Null.
-                else if (exprType == typeof(object) && constValueType.IsValueType)
-                    il.Emit(OpCodes.Box, constValueType); // using normal type for Enum instead of underlying type
+                else if (exprType == typeof(object))
+                    return il.TryEmitBoxOf(constValueType); // using normal type for Enum instead of underlying type
                 return true;
             }
 
@@ -3939,8 +3942,7 @@ namespace DryIoc.FastExpressionCompiler
                             il.Emit(OpCodes.Ldfld, ArrayClosureWithNonPassedParamsField);
                             EmitLoadConstantInt(il, nonPassedParamIndex);
                             EmitLoadLocalVariable(il, valueVarIndex);
-                            if (expr.Type.IsValueType)
-                                il.Emit(OpCodes.Box, expr.Type);
+                            il.TryEmitBoxOf(expr.Type);
                             il.Emit(OpCodes.Stelem_Ref); // put the variable into array
                             EmitLoadLocalVariable(il, valueVarIndex); // todo: @perf what if we just dup the `valueVar`?
                         }
@@ -3953,8 +3955,7 @@ namespace DryIoc.FastExpressionCompiler
                             if (!TryEmit(right, paramExprs, il, ref closure, setup, flags))
                                 return false;
 
-                            if (expr.Type.IsValueType)
-                                il.Emit(OpCodes.Box, expr.Type);
+                            il.TryEmitBoxOf(expr.Type);
                             il.Emit(OpCodes.Stelem_Ref); // put the variable into array
                         }
 
@@ -4317,8 +4318,7 @@ namespace DryIoc.FastExpressionCompiler
                     {
                         // Add `+1` to index because the `0` index is for the closure argument
                         EmitLoadArg(il, outerParamIndex + 1);
-                        if (nestedParam.Type.IsValueType)
-                            il.Emit(OpCodes.Box, nestedParam.Type);
+                        il.TryEmitBoxOf(nestedParam.Type);
                     }
                     else // load parameter from outer closure or from the local variables
                     {
@@ -4329,8 +4329,7 @@ namespace DryIoc.FastExpressionCompiler
                         if (outerLocalVarIndex != -1) // it's a local variable
                         {
                             EmitLoadLocalVariable(il, outerLocalVarIndex);
-                            if (nestedParam.Type.IsValueType) // don't forget to box the value type when we store it into object array, (fixes #255)
-                                il.Emit(OpCodes.Box, nestedParam.Type);
+                            il.TryEmitBoxOf(nestedParam.Type);
                         }
                         else // it's a parameter from the outer closure
                         {
