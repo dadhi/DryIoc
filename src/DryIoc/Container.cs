@@ -8432,6 +8432,11 @@ namespace DryIoc
             typeof(IResolver).Method(nameof(IResolver.Resolve), typeof(Type), typeof(object),
                 typeof(IfUnresolved), typeof(Type), typeof(Request), typeof(object[]));
 
+        // todo: @wip
+        // internal static readonly MethodInfo ResolveMethod =
+        //     typeof(IResolver).Method(nameof(IResolver.Resolve), typeof(Type), typeof(object),
+        //         typeof(IfUnresolved), typeof(Type), typeof(Request), typeof(object[]));
+
         internal static readonly MethodInfo ResolveManyMethod =
             typeof(IResolver).GetMethod(nameof(IResolver.ResolveMany));
 
@@ -8580,12 +8585,7 @@ namespace DryIoc
 
             var container = request.Container;
             var serviceType = request.ServiceType;
-
             var serviceTypeExpr = ConstantOf<Type>(serviceType);
-            var details = request.GetServiceDetails();
-            var ifUnresolvedExpr = details.IfUnresolved.ToConstant();
-            var requiredServiceTypeExpr = details.RequiredServiceType.ToConstant();
-            var serviceKeyExpr = details.ServiceKey == null ? NullConstant : container.GetConstantExpression(details.ServiceKey, typeof(object));
 
             Expression resolverExpr;
             if (!openResolutionScope)
@@ -8612,9 +8612,20 @@ namespace DryIoc
             // Only parent is converted to be passed to Resolve.
             // The current request is formed by rest of Resolve parameters.
             var preResolveParentExpr = container.GetRequestExpression(request.DirectParent, parentFlags);
+
+            var details = request.GetServiceDetails();
+            if (details == ServiceDetails.Default)
+            {
+                // todo: @perf create a smaller expression #498
+            }
+
+            var ifUnresolvedExpr = details.IfUnresolved.ToConstant();
+            var requiredServiceTypeExpr = details.RequiredServiceType.ToConstant();
+            var serviceKeyExpr = details.ServiceKey == null ? NullConstant : container.GetConstantExpression(details.ServiceKey, typeof(object));
+
             var resolveCallExpr = Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
                 ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
-            // todo: @wpi should we include the Unbox for the value type services?
+            // todo: @wip should we include the Unbox for the value type services?
             return serviceType == typeof(object) ? resolveCallExpr : TryConvertIntrinsic(resolveCallExpr, serviceType);
         }
 
