@@ -130,7 +130,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
                 lambdaExpr, RentOrNewClosureTypeToParamTypes(lambdaExpr),
 #else
-                lambdaExpr.Parameters, GetClosureTypeToParamTypes(lambdaExpr.Parameters),
+                lambdaExpr.Parameters, RentOrNewClosureTypeToParamTypes(lambdaExpr.Parameters),
 #endif
                 lambdaExpr.ReturnType, flags) ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys()));
 
@@ -170,7 +170,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
             lambdaExpr, RentOrNewClosureTypeToParamTypes(lambdaExpr),
 #else
-            lambdaExpr.Parameters, GetClosureTypeToParamTypes(lambdaExpr.Parameters),
+            lambdaExpr.Parameters, RentOrNewClosureTypeToParamTypes(lambdaExpr.Parameters),
 #endif
             lambdaExpr.ReturnType, flags) ?? (ifFastFailedReturnNull ? null : lambdaExpr.CompileSys());
 
@@ -366,7 +366,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
             lambdaExpr, RentOrNewClosureTypeToParamTypes(lambdaExpr),
 #else
-            lambdaExpr.Parameters, GetClosureTypeToParamTypes(lambdaExpr.Parameters),
+            lambdaExpr.Parameters, RentOrNewClosureTypeToParamTypes(lambdaExpr.Parameters),
 #endif
             lambdaExpr.ReturnType, flags);
 
@@ -400,7 +400,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
             var closurePlusParamTypes = RentOrNewClosureTypeToParamTypes(lambdaExpr);
 #else
-            var closurePlusParamTypes = GetClosureTypeToParamTypes(lambdaExpr.Parameters);
+            var closurePlusParamTypes = RentOrNewClosureTypeToParamTypes(lambdaExpr.Parameters);
 #endif
             var method = new DynamicMethod(string.Empty, lambdaExpr.ReturnType, closurePlusParamTypes,
                 typeof(ExpressionCompiler), skipVisibility: true);
@@ -436,7 +436,7 @@ namespace DryIoc.FastExpressionCompiler
 #if LIGHT_EXPRESSION
             var closurePlusParamTypes = RentOrNewClosureTypeToParamTypes(lambdaExpr);
 #else
-            var closurePlusParamTypes = GetClosureTypeToParamTypes(lambdaExpr.Parameters);
+            var closurePlusParamTypes = RentOrNewClosureTypeToParamTypes(lambdaExpr.Parameters);
 #endif
             var method = new DynamicMethod(string.Empty, lambdaExpr.ReturnType, closurePlusParamTypes, typeof(ArrayClosure),
                 skipVisibility: true);
@@ -524,8 +524,6 @@ namespace DryIoc.FastExpressionCompiler
             il.Emit(OpCodes.Ret);
 
             return method.CreateDelegate(delegateType, closure);
-            //ReturnClosureTypeToParamTypesToPool(closurePlusParamTypes);
-            // return @delegate;
         }
 
         private static readonly Type[] _closureAsASingleParamType = { typeof(ArrayClosure) };
@@ -536,7 +534,7 @@ namespace DryIoc.FastExpressionCompiler
         {
             var count = paramExprs.ParameterCount;
 #else
-        private static Type[] GetClosureTypeToParamTypes(IReadOnlyList<PE> paramExprs)
+        private static Type[] RentOrNewClosureTypeToParamTypes(IReadOnlyList<PE> paramExprs)
         {
             var count = paramExprs.Count;
 #endif
@@ -1623,7 +1621,7 @@ namespace DryIoc.FastExpressionCompiler
             // constructing the new closure with non-passed arguments and the rest of items
             nestedLambdaInfo.Lambda = nestedLambdaClosure != null
                 ? method.CreateDelegate(nestedLambdaExpr.Type, nestedLambdaClosure)
-                : nestedLambdaInfo.Lambda = method.CreateDelegate(Tools.GetFuncOrActionType(closurePlusParamTypes, nestedReturnType), null);
+                : method.CreateDelegate(Tools.GetFuncOrActionType(closurePlusParamTypes, nestedReturnType), null);
 
             ReturnClosureTypeToParamTypesToPool(closurePlusParamTypes);
             return true;
