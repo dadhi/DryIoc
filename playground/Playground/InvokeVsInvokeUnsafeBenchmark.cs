@@ -1,6 +1,5 @@
 using System;
 using System.Reflection;
-using System.Linq;
 using BenchmarkDotNet.Attributes;
 using System.Runtime.InteropServices;
 
