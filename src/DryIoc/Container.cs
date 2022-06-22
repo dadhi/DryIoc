@@ -8426,7 +8426,7 @@ namespace DryIoc
             typeof(IResolver).Method(nameof(IResolver.Resolve), typeof(Type), typeof(object),
                 typeof(IfUnresolved), typeof(Type), typeof(Request), typeof(object[]));
 
-        // todo: @wip
+        // todo: @wip add multiple overloads #498
         // internal static readonly MethodInfo ResolveMethod =
         //     typeof(IResolver).Method(nameof(IResolver.Resolve), typeof(Type), typeof(object),
         //         typeof(IfUnresolved), typeof(Type), typeof(Request), typeof(object[]));
@@ -8804,7 +8804,7 @@ namespace DryIoc
             var s = new StringBuilder();
 
             if (HasCustomValue)
-                return s.Append("{CustomValue=").Print(CustomValue ?? "null").Append("}").ToString();
+                return s.Append("{CustomValue=").Print(CustomValue).Append("}").ToString();
 
             if (RequiredServiceType != null)
                 s.Append("RequiredServiceType=typeof(").Print(RequiredServiceType).Append(')');
@@ -9383,7 +9383,7 @@ namespace DryIoc
     }
 
     /// <summary>Tracks the requested service and resolved factory details in a chain of nested dependencies.</summary>
-    public sealed class Request : IEnumerable<Request>
+    public sealed class Request : IEnumerable<Request>, IPrintable
     {
         internal static readonly RequestFlags InheritedFlags
             = RequestFlags.IsSingletonOrDependencyOfSingleton
@@ -9919,7 +9919,7 @@ namespace DryIoc
                         if ((p.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
                             checkRecursiveDependency = false; // stop the check
                         else if (p.FactoryID == factoryId)
-                            Throw.It(Error.RecursiveDependencyDetected, Print(factoryId));
+                            Throw.It(Error.RecursiveDependencyDetected, PrintRequest(factoryId));
                     }
 
                     if (checkCaptiveDependency)
@@ -10076,12 +10076,7 @@ namespace DryIoc
                     s.Print(implType).Append(": ");
             }
 
-            if (ServiceTypeOrInfo is Type t)
-                s.Print(t);
-            else if (ServiceTypeOrInfo is ParameterInfo pi)
-                s.Append(ParameterServiceInfo.Of(pi));
-            else
-                s.Append(ServiceTypeOrInfo);
+            s.Print(ServiceTypeOrInfo is ParameterInfo pi ? ParameterServiceInfo.Of(pi) : ServiceTypeOrInfo);
 
             if (FactoryID != 0)
                 s.Append(" FactoryId=").Append(FactoryID);
@@ -10090,7 +10085,7 @@ namespace DryIoc
                 s.Append(" DecoratedFactoryId=").Append(DecoratedFactoryID);
 
             if (!InputArgExprs.IsNullOrEmpty())
-                s.AppendFormat(" with passed arguments [{0}]", InputArgExprs);
+                s.Append(" with passed arguments: ").Print(InputArgExprs);
 
             // avoid the non-relevant noise in the Flags output
             var flags = Flags;
@@ -10102,13 +10097,13 @@ namespace DryIoc
             if (Reuse is SingletonReuse)
                 flags &= ~RequestFlags.IsSingletonOrDependencyOfSingleton;
             if (flags != default(RequestFlags))
-                s.Append(" Flags=").Append(flags);
+                s.Append(" Flags=").Print(flags);
 
             return s;
         }
 
         /// <summary>Prints full stack of requests starting from current one using <see cref="PrintCurrent"/>.</summary>
-        public StringBuilder Print(int recursiveFactoryID = 0)
+        public StringBuilder PrintRequest(int recursiveFactoryID = 0)
         {
             if (IsEmpty)
                 return new StringBuilder("<empty request>");
@@ -10130,7 +10125,11 @@ namespace DryIoc
         }
 
         /// <summary>Prints whole request chain.</summary>
-        public override string ToString() => Print().ToString();
+        public override string ToString() => PrintRequest().ToString();
+
+        /// <inheritdoc/>
+        public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer) =>
+            s.Append(PrintRequest());
 
         /// <summary>Returns true if request info and passed object are equal, and their parents recursively are equal.</summary>
         public override bool Equals(object obj) => Equals(obj as Request);
@@ -12228,7 +12227,7 @@ namespace DryIoc
                 if (!isFactoryImplTypeClosed)
                     return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
                         : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodDeclaringTypeWithServiceTypeArgs,
-                            factoryImplType, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "), request);
+                            factoryImplType, serviceTypeArgs, request);
 
                 // For instance factory match its service type from the implementation factory type.
                 if (factoryInfo != null)
@@ -12311,8 +12310,7 @@ namespace DryIoc
                 if (!isMethodClosed)
                     return ifErrorReturnDefault || request.IfUnresolved != IfUnresolved.Throw ? null
                         : Throw.For<FactoryMethod>(Error.NoMatchedFactoryMethodWithServiceTypeArgs,
-                            openFactoryMethod, new StringBuilder().Print(serviceTypeArgs, itemSeparator: ", "),
-                            request);
+                            openFactoryMethod, serviceTypeArgs, request);
 
                 MatchOpenGenericConstraints(methodTypeParams, resultMethodTypeArgs);
 
@@ -13985,8 +13983,7 @@ namespace DryIoc
             errorCode == -1 ? Throw.GetDefaultMessage(errorCheck) : DryIoc.Error.Messages[errorCode];
 
         /// <summary>Prints argument for formatted message.</summary> <param name="arg">To print.</param> <returns>Printed string.</returns>
-        protected static string Print(object arg) =>
-            arg == null ? string.Empty : new StringBuilder().Print(arg).ToString();
+        protected static string Print(object arg) => arg == null ? string.Empty : arg.Print();
 
         /// <summary>Collects many exceptions.</summary>
         public ContainerException(int error, ContainerException[] exceptions)
@@ -14433,8 +14430,7 @@ namespace DryIoc
 
         /// <summary>Print the d*mn exception</summary>
         public static void StateIsRequiredToUseItem(object item, Type itemType = null) =>
-            It(Error.StateIsRequiredToUseItem, (itemType ?? item.GetType()).ToCode(printGenericTypeArgs: true), item);
-
+            It(Error.StateIsRequiredToUseItem, itemType ?? item.GetType(), item);
     }
 
     /// <summary>Called from the generated code to check if WeakReference.Value is GCed.</summary>
@@ -14478,7 +14474,7 @@ namespace DryIoc
             None = 0,
             /// <summary>Include source type to list of implemented types.</summary>
             SourceType = 1,
-            /// <summary>Include <see cref="System.Object"/> type to list of implemented types.</summary>
+            /// <summary>Include <see cref="Object"/> type to list of implemented types.</summary>
             ObjectType = 2
         }
 
@@ -15004,105 +15000,33 @@ namespace DryIoc
             ImHashMap.Entry(RuntimeHelpers.GetHashCode(t), t, value);
     }
 
-    /// <summary>Provides pretty printing/debug view for number of types.</summary>
+    /// <summary>Provides pretty printing/debug view for number of types using the FEC CodePrinter.</summary>
     public static class PrintTools
     {
-        /// <summary>Default separator used for printing enumerable.</summary>
-        public static string DefaultItemSeparator = ", " + NewLine;
-
-        /// <summary>Prints input object by using corresponding Print methods for know types.</summary>
-        /// <param name="s">Builder to append output to.</param> <param name="x">Object to print.</param>
-        /// <param name="quote">(optional) Quote to use for quoting string object.</param>
-        /// <param name="itemSeparator">(optional) Separator for enumerable.</param>
-        /// <param name="getTypeName">(optional) Custom type printing policy.</param>
-        /// <returns>String builder with appended output.</returns>
-        public static StringBuilder Print(this StringBuilder s, object x,
-            string quote = "\"", string itemSeparator = null, Func<Type, string> getTypeName = null) =>
-            x == null ? s.Append("null")
-            : x is string ? s.Print((string)x, quote)
-            : x is Type ? s.Print((Type)x, getTypeName)
-            : x is IPrintable ? ((IPrintable)x).Print(s, (b, p) => b.Print(p, quote, itemSeparator, getTypeName))
-            : x is IScope || x is Request ? s.Append(x) // prevent recursion for IEnumerable
-            : x.GetType().IsEnum ? s.Print(x.GetType()).Append('.').Append(Enum.GetName(x.GetType(), x))
-            : (x is IEnumerable<Type> || x is IEnumerable) &&
-                !x.GetType().IsAssignableTo(typeof(IEnumerable<>).MakeGenericType(x.GetType())) // exclude infinite recursion and StackOverflowEx
-                ? s.Print((IEnumerable)x, itemSeparator ?? DefaultItemSeparator, (_, o) => _.Print(o, quote, null, getTypeName))
-            : s.Append(x);
-
-        /// <summary>Appends string to string builder quoting with <paramref name="quote"/> if provided.</summary>
-        /// <param name="s">String builder to append string to.</param> <param name="str">String to print.</param>
-        /// <param name="quote">(optional) Quote to add before and after string.</param>
-        /// <returns>String builder with appended string.</returns>
-        public static StringBuilder Print(this StringBuilder s, string str, string quote = "\"") =>
-            quote == null ? s.Append(str) : s.Append(quote).Append(str).Append(quote);
-
-        /// <summary>Prints enumerable by using corresponding Print method for known item type.</summary>
-        /// <param name="s">String builder to append output to.</param>
-        /// <param name="items">Items to print.</param>
-        /// <param name="separator">(optional) Custom separator if provided.</param>
-        /// <param name="printItem">(optional) Custom item printer if provided.</param>
-        /// <returns>String builder with appended output.</returns>
-        public static StringBuilder Print(this StringBuilder s, IEnumerable items,
-            string separator = ", ", Action<StringBuilder, object> printItem = null)
-        {
-            if (items == null)
-                return s;
-            printItem = printItem ?? ((_, x) => _.Print(x));
-            var itemCount = 0;
-            foreach (var item in items)
-                printItem(itemCount++ == 0 ? s : s.Append(separator), item);
-            return s;
-        }
-
-        /// <summary>Default delegate to print Type details: by default prints Type FullName and
-        /// skips namespace if it start with "System."</summary>
-        public static Func<Type, string> GetTypeNameDefault = t =>
+        /// <summary>Control the type Namespace display</summary>
+        public static bool StripNamespace
 #if DEBUG
-            t.Name;
+            = true;
 #else
-            t.FullName != null && t.Namespace != null && !t.Namespace.StartsWith("System") ? t.FullName : t.Name;
+            = false;
+#endif
+        /// <summary>Controls the final type display given the source type and ts calculated string representation</summary>
+        public static Func<Type, string, string> TypePrinter
+#if DEBUG
+            = CodePrinter.PrintTypeStripOuterClasses;
+#else
+            // strip the System namespaces from the names for brevity
+            = (t, s) => t.Namespace?.StartsWith("System") == true && s.StartsWith(t.Namespace) ? s.Substring(t.Namespace.Length + 1) : s;
 #endif
 
-        // todo: @bug Use the version from the FEC v3
-        /// <summary>Pretty prints the <paramref name="type"/> in proper C# representation.
-        /// <paramref name="getTypeName"/>Allows to specify if you want Name instead of FullName.</summary>
-        public static StringBuilder Print(this StringBuilder s, Type type, Func<Type, string> getTypeName = null)
-        {
-            if (type == null)
-                return s;
+        /// <summary>Prints input object by using corresponding Print methods for know types.</summary>
+        public static StringBuilder Print(this StringBuilder s, object x) =>
+            x is IPrintable p
+                ? p.Print(s, (s_, a) => s_.Append(a.ToCode(null, StripNamespace, TypePrinter)))
+                : s.Append(x.ToCode(null, StripNamespace, TypePrinter));
 
-            var isArray = type.IsArray;
-            if (isArray)
-                type = type.GetElementType();
-
-            var typeName = (getTypeName ?? GetTypeNameDefault).Invoke(type);
-
-            if (!type.IsGenericType)
-                return s.Append(typeName.Replace('+', '.'));
-
-            var tickIndex = typeName.IndexOf('`');
-            if (tickIndex != -1)
-                typeName = typeName.Substring(0, tickIndex);
-
-            s.Append(typeName.Replace('+', '.'));
-
-            s.Append('<');
-            var genericArgs = type.GetGenericArguments();
-            if (type.IsGenericTypeDefinition)
-                s.Append(',', genericArgs.Length - 1);
-            else
-                s.Print(genericArgs, ", ", (b, t) => b.Print((Type)t, getTypeName));
-            s.Append('>');
-
-            if (isArray)
-                s.Append("[]");
-
-            return s;
-        }
-
-        /// <summary>Pretty-prints the type</summary>
-        public static string Print(this Type type, Func<Type, string> getTypeName = null) =>
-            new StringBuilder().Print(type, getTypeName).ToString();
+        /// <summary>Prints input object by using corresponding Print methods for know types.</summary>
+        public static string Print(this object x) => new StringBuilder().Print(x).ToString();
     }
 
     /// <summary>Ports some methods from .Net 4.0/4.5</summary>

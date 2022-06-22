@@ -99,15 +99,10 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         internal abstract SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> convertedExpressions);
 
         /// <summary>Converts to Expression and outputs its as string</summary>
-        public override string ToString() => this.ToCSharpString(constant =>
-        {
-            var val = constant.Value; // todo: @wip do better for constants - use ToCode
-            if (val == null)
-                return "null";
-            if (constant.Type.IsPrimitive)
-                return val.ToString();
-            return "default/*{value=`" + val.ToString() + "`}*/";
-        });
+        public override string ToString() => this.ToCSharpString(
+            new StringBuilder(256), stripNamespace: true, 
+            notRecognizedToCode: (x, stripNs, printType) => "default(" + x.GetType().ToCode(stripNs, printType) + ")/*" + x.ToString() + "*/")
+            .ToString();
 
         /// <summary>Reduces the Expression to simple ones</summary>
         public virtual Expression Reduce() => this;
@@ -1522,7 +1517,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                 case ExpressionType.Modulo:
                     return GetArithmeticBinary(binaryType, left, right);
 
-                // todo: @wip incomplete - use similar to GetArithmeticBinary
+                // todo: @incomplete - use similar to GetArithmeticBinary
                 case ExpressionType.Power: return Power(left, right);
                 case ExpressionType.And: return And(left, right);
                 case ExpressionType.AndAlso: return AndAlso(left, right);
@@ -1580,7 +1575,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                 case ExpressionType.AndAlso:
                 case ExpressionType.Or:
                 case ExpressionType.OrElse:
-                    return GetLeftTypedBinary(binaryType, left, right, method); // todo: @wip incomplete, see GetArithmeticBinary
+                    return GetLeftTypedBinary(binaryType, left, right, method); // todo: @incomplete, see GetArithmeticBinary
 
                 case ExpressionType.LessThan: return LessThan(left, right, liftToNull, method);
                 case ExpressionType.LessThanOrEqual: return LessThanOrEqual(left, right, liftToNull, method);
@@ -2018,7 +2013,8 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                         if (score == bestScore)
                         {
                             if (m.IsPublic == bestMatch.IsPublic) // prefer public over non-public
-                                throw new InvalidOperationException($"More than one generic method '{m.Name}' with {typeArgCount} type parameter(s) in the type '{type.ToCode()}' is compatible with the supplied arguments.");
+                                throw new InvalidOperationException(
+                                    $"More than one generic method '{m.Name}' with {typeArgCount} type parameter(s) in the type '{type.Print()}' is compatible with the supplied arguments.");
                             if (!m.IsPublic)
                                 continue; // means that `bestMatch` is public so keep it an continue
                         }
@@ -2055,7 +2051,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                         if (score == bestScore)
                         {
                             if (m.IsPublic == bestMatch.IsPublic) // prefer public over non-public 
-                                throw new InvalidOperationException($"More than one non-generic method '{m.Name}' in the type '{type.ToCode()}' is compatible with the supplied arguments.");
+                                throw new InvalidOperationException($"More than one non-generic method '{m.Name}' in the type '{type.Print()}' is compatible with the supplied arguments.");
                             if (!m.IsPublic)
                                 continue;
                         }
@@ -2067,8 +2063,8 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
             if (bestMatch == null)
                 throw new InvalidOperationException(typeArgCount == 0
-                    ? $"The non-generic method '{methodName}' is not found in the type '{type.ToCode()}'"
-                    : $"The generic method '{methodName}' with {typeArgCount} type parameter(s) is not found in the type '{type.ToCode()}'");
+                    ? $"The non-generic method '{methodName}' is not found in the type '{type.Print()}'"
+                    : $"The generic method '{methodName}' with {typeArgCount} type parameter(s) is not found in the type '{type.Print()}'");
 
             return bestMatch;
         }
@@ -2762,7 +2758,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> _) => SysExpr.Constant(Value, Type);
 
         /// <summary>I want to see the actual Value not the default one</summary>
-        public override string ToString() => $"Constant({Value}, typeof({Type.ToCode()}))";
+        public override string ToString() => $"Constant({Value}, typeof({Type.Print()}))";
     }
 
     public sealed class TypedNullConstantExpression : ConstantExpression

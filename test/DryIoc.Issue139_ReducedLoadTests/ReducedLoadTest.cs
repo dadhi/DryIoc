@@ -45,10 +45,10 @@ namespace LoadTest
                 Assert.IsNotNull(expr);
 
                 var code = expr.ToCSharpString(new StringBuilder(100000), 2, true, Abbreviate).ToString();
-                var nestedLambdas = code.Count(c => c == '$');
+                var nestedLambdasCount = CodePrinter.CountLambdas(code);
 
                 // the number when split by `dependencyCount >= 256`
-                Assert.AreEqual(67, nestedLambdas);
+                Assert.AreEqual(67, nestedLambdasCount);
             }
         }
 

@@ -74,6 +74,7 @@ namespace DryIoc.UnitTests
                 new Issue_Register_null_string(),
                 new Issue_SupportForDynamicKeyword(),
                 new Issue_UsingAsyncMethodAsMadeOf(),
+                new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue497_ConstructorWithResolvableArguments_is_not_working_properly(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
                 new GHIssue180_Option_nullable_int_argument_with_not_null_default_value(),

@@ -25,8 +25,9 @@ namespace DryIoc.IssuesTests
             a.R.Dispose();
             Assert.True(a.B.IsDisposed);
 
-            var s = c.Resolve<LambdaExpression, A>().ToString();
-            StringAssert.Contains("False).Resolve", s);
+            var e = c.Resolve<LambdaExpression, A>();
+            var s = e.ToString();
+            StringAssert.Contains("false).Resolve", s);
         }
 
         public override int GetHashCode() => base.GetHashCode();

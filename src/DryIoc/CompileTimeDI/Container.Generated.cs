@@ -84,28 +84,28 @@ namespace DryIoc
                 new DependencyA(),
                 ((DependencyB<string>)r.Resolve(
                     typeof(DependencyB<string>),
-                    null,
+                    default(object),
                     IfUnresolved.Throw,
-                    null,
+                    default(System.Type),
                     Request.Empty.Push(
                         typeof(IService),
                         20001,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),
-                    null)),
+                    default(object[]))),
                 ((RuntimeDependencyC)r.Resolve(
                     typeof(RuntimeDependencyC),
-                    null,
+                    default(object),
                     IfUnresolved.Throw,
-                    null,
+                    default(System.Type),
                     Request.Empty.Push(
                         typeof(IService),
                         20001,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),
-                    null)));
+                    default(object[]))));
 
         // DependencyB<string>
         internal static object GetDependency_DependencyB_0(IResolverContext r) =>

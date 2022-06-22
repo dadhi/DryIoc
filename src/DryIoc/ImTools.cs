@@ -1991,7 +1991,7 @@ namespace DryIoc.ImTools
             return ReferenceEquals(key, e._key) ? ImHashMap.Entry(Hash, key, update(key, Value, e.Value)) : new HashConflictingEntry(Hash, this, e);
         }
 
-        // todo: @wip better method names aligned with the calling side
+        // todo: @naming better method names aligned with the calling side
         internal override ImHashMap<K, V> GetMapOrReplaceWithEntry(ImHashMap<K, V> oldMap, ImHashMapEntry<K, V> newEntry)
         {
             var e = (KVEntry<K, V>)newEntry;
@@ -2076,7 +2076,9 @@ namespace DryIoc.ImTools
             // for the debug purposes we just output the first N keys in array
             const int n = 50;
             var count = this.Count();
-            var hashes = this.Enumerate().Take(n).Select(x => x.Hash).ToList();
+            var hashes = typeof(K) == typeof(int) 
+                ? ((ImHashMap<int, V>)(object)this).Enumerate().Take(n).Select(x => x.Hash).ToList()
+                : this.Enumerate().Take(n).Select(x => x.Hash).ToList();
             return $"{{hashes: new int[{(count > n ? $"{n}/{count}" : "" + count)}] {{{(string.Join(", ", hashes))}}}}}";
 #else
             return "{}";
@@ -5986,7 +5988,7 @@ namespace DryIoc.ImTools
         public static ImHashMap<K, V> Update<K, V>(this ImHashMap<K, V> map, K key, V value) =>
             map.Update(key.GetHashCode(), key, value);
 
-        // todo: @wip add ByReferenceEquals
+        // todo: @feature add ByReferenceEquals
         /// <summary>Updates the map with the new value if the key is found otherwise returns the same unchanged map.</summary>
         public static ImHashMap<K, V> UpdateToDefault<K, V>(this ImHashMap<K, V> map, int hash, K key)
         {

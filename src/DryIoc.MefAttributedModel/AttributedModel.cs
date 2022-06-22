@@ -126,12 +126,12 @@ namespace DryIoc.MefAttributedModel
         /// <returns>The container with registration.</returns>
         public static IContainer WithMefSpecificWrappers(this IContainer container)
         {
-            // todo: @wip optimize to use unwrapped factory
+            // todo: @perf optimize to use unwrapped factory
             container.Register(typeof(ExportFactory<>),
                 made: _createExportFactoryMethod,
                 setup: Setup.Wrapper);
 
-            // todo: @wip optimize to use unwrapped factory
+            // todo: @perf optimize to use unwrapped factory
             container.Register(typeof(ExportFactory<,>),
                 made: _createExportFactoryWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
@@ -166,7 +166,7 @@ namespace DryIoc.MefAttributedModel
                 if (!serviceFactory.MatchMetadataType(metadataType))
                     return null;
             }
-            else // todo: @wip factor this section both here and in the Container into the standalone method
+            else // todo: @simplify factor this section both here and in the Container into the standalone method
             {   
                 // todo: @perf use the GetServiceRegisteredAndDynamicFactories
                 var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true);
@@ -1246,37 +1246,26 @@ namespace DryIoc.MefAttributedModel
         { }
     }
 
-    // todo: @simplify @optimize use FEC ToCode()
+    // todo: @wip @simplify  use FEC ToCode()
     /// <summary>Converts provided literal into valid C# code. Used for generating registration code
     /// from <see cref="ExportedRegistrationInfo"/> DTOs.</summary>
     public static class PrintCode
     {
         /// <summary>Prints valid c# Boolean literal: true/false.</summary>
         public static StringBuilder AppendBool(this StringBuilder code, bool x) =>
-            code.Append(x ? "true" : "false");
+            code.Append(x.ToCode());
 
         /// <summary>Prints valid c# string constant.</summary>
         public static StringBuilder AppendString(this StringBuilder code, string x) =>
-            x == null ? code.Append("null") : code.Append('"').Append(x.Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n")).Append('"');
+            code.Print(x);
 
         /// <summary>Prints valid c# Type literal: <c>typeof(Namespace.Type)</c>.</summary>
         public static StringBuilder AppendType(this StringBuilder code, Type x) =>
-            x == null ? code.Append("null") : code.Append("typeof(")
-            .Print(x, t => t == typeof(void) ? "void" : t.FullName ?? t.Name)
-            .Append(')');
+            x == null ? code.Append("null") : code.Append("typeof(").Print(x).Append(')');
 
         /// <summary>Prints valid c# Enum literal: Enum.Value.</summary>
-        public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object x)
-        {
-            if (enumType.IsNullable())
-            {
-                if (x == null)
-                    return code.Print("null");
-                enumType = enumType.GetTypeInfo().GenericTypeArguments.Single();
-            }
-
-            return code.Print(enumType, t => t.FullName ?? t.Name).Append('.').Append(Enum.GetName(enumType, x));
-        }
+        public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object x) =>
+            code.Append(enumType.ToEnumValueCode(x));
 
         /// <summary>Prints the <see cref="Dictionary{TKey, TValue}"/> where keys are strings.</summary>
         public static StringBuilder AppendDictionary<TValue>(this StringBuilder code,

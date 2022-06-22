@@ -7,8 +7,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize
+    public class Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize : ITest
     {
+        public int Run()
+        {
+            Main();
+            Main_negative();
+            return 2;
+        }
+
         [Test]
         public void Main()
         {
@@ -23,7 +30,7 @@ namespace DryIoc.IssuesTests
             {
                 var rootExpr = scope.Resolve<LambdaExpression>(typeof(Root));
                 var rootCode = rootExpr.ToCSharpString();
-                var nestedLambdas = rootCode.Count(ch => ch == '$');
+                var nestedLambdas = CodePrinter.CountLambdas(rootCode);
                 Assert.AreEqual(2603, nestedLambdas);
             }
         }

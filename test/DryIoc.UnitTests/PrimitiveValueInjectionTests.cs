@@ -53,7 +53,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<InjectionRulesTests.ClientWithStringParam>());
 
-            StringAssert.Contains("Injected value 500 is not assignable to String", ex.Message);
+            StringAssert.Contains("Injected value 500 is not assignable to string when resolving: string {CustomValue=500} as parameter \"x\"", ex.Message);
         }
 
         [Test]

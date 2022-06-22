@@ -47,7 +47,7 @@ namespace Playground
             var argSpan = MemoryMarshal.CreateSpan<object>(ref arg0, 1);
             Console.WriteLine(argSpan[0]);
 
-            // todo: @wip we need to emit something like this:
+            // todo: @incomplete we need to emit something like this:
             // IL_0000: ldloca.s 0
             // IL_0002: ldsfld object[] C::arr
             // IL_0007: call instance void valuetype [System.Private.CoreLib]System.Span`1<object>::.ctor(!0[])
