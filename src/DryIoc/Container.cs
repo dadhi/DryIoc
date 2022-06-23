@@ -8426,36 +8426,6 @@ namespace DryIoc
             typeof(IResolver).Method(nameof(IResolver.Resolve), typeof(Type), typeof(object),
                 typeof(IfUnresolved), typeof(Type), typeof(Request), typeof(object[]));
 
-        /// <summary>Code Generation specific overload</summary>
-        public static object CodeGenResolve(this IResolver resolver, Type serviceType, Request parent) =>
-            resolver.Resolve(serviceType, null, IfUnresolved.Throw, null, parent, null);
-        internal static readonly MethodInfo CodeGenResolveWithReqMethod =
-            typeof(Resolver).Method(nameof(Resolver.CodeGenResolve), typeof(IResolver), typeof(Type), typeof(Request));
-
-        /// <summary>Code Generation specific overload</summary>
-        public static object CodeGenResolve(this IResolver resolver, Type serviceType, Request parent, object[] args) =>
-            resolver.Resolve(serviceType, null, IfUnresolved.Throw, null, parent, args);
-        internal static readonly MethodInfo CodeGenResolveWithReqAndArgsMethod =
-            typeof(Resolver).Method(nameof(Resolver.CodeGenResolve), typeof(IResolver), typeof(Type), typeof(Request), typeof(object[]));
-
-        /// <summary>Code Generation specific overload</summary>
-        public static object CodeGenResolve(this IResolver resolver, Type serviceType, IfUnresolved ifUnresolved, Request parent) =>
-            resolver.Resolve(serviceType, null, ifUnresolved, null, parent, null);
-        internal static readonly MethodInfo CodeGenResolveWithIfUnresolvedAndReqMethod =
-            typeof(Resolver).Method(nameof(Resolver.CodeGenResolve), typeof(IResolver), typeof(Type), typeof(IfUnresolved), typeof(Request));
-
-        /// <summary>Code Generation specific overload</summary>
-        public static object CodeGenResolve(this IResolver resolver, Type serviceType, Type requiredServiceType, Request parent) =>
-            resolver.Resolve(serviceType, requiredServiceType, IfUnresolved.Throw, null, parent, null);
-        internal static readonly MethodInfo CodeGenResolveWithRequiredTypeAndReqMethod =
-            typeof(Resolver).Method(nameof(Resolver.CodeGenResolve), typeof(IResolver), typeof(Type), typeof(Type), typeof(Request));
-
-        /// <summary>Code Generation specific overload</summary>
-        public static object CodeGenResolve(this IResolver resolver, Type serviceType, object serviceKey, Request parent) =>
-            resolver.Resolve(serviceType, serviceKey, IfUnresolved.Throw, null, parent, null);
-        internal static readonly MethodInfo CodeGenResolveWithServiceKeyAndReqMethod =
-            typeof(Resolver).Method(nameof(Resolver.CodeGenResolve), typeof(IResolver), typeof(Type), typeof(object), typeof(Request));
-
         internal static readonly MethodInfo ResolveManyMethod =
             typeof(IResolver).GetMethod(nameof(IResolver.ResolveMany));
 
@@ -8631,11 +8601,6 @@ namespace DryIoc
             // Only parent is converted to be passed to Resolve.
             // The current request is formed by rest of Resolve parameters.
             var preResolveParentExpr = container.GetRequestExpression(request.DirectParent, parentFlags);
-
-            if (details == ServiceDetails.Default)
-            {
-                // todo: @perf create a smaller expression #498
-            }
 
             var ifUnresolvedExpr = details.IfUnresolved.ToConstant();
             var requiredServiceTypeExpr = details.RequiredServiceType.ToConstant();
