@@ -69,6 +69,7 @@ namespace DryIoc.UnitTests.net472
             var issueTests = new ITest[]
             {
                 new Issue_Can_resolve_singleton_with_Func_of_scoped_dependency(),
+                new Issue_HandleVariance(),
                 new Issue_InjectingSerilogLogger(),
                 new ParameterResolutionFixture(),
                 new Issue_Register_null_string(),
