@@ -35,7 +35,7 @@ using System.Collections.Generic;
 using System.Threading;
 using DryIoc.ImTools;
 
-// Specified `NamespaceUsings` if any:
+// Provided `NamespaceUsings`:
 using Example;
 
 namespace DryIoc
@@ -75,11 +75,10 @@ namespace DryIoc
         private IEnumerable<ResolveManyResult> ResolveManyGenerated(Type serviceType)
         {
             if (serviceType == typeof(IService))
-                yield return ResolveManyResult.Of(Get_IService_0);
+                yield return ResolveManyResult.Of(r => Get_IService_0(r));
         }
 
-        // IService
-        internal static object Get_IService_0(IResolverContext r) =>
+        internal static IService Get_IService_0(IResolverContext r) =>
             new MyService(
                 new DependencyA(),
                 ((DependencyB<string>)r.Resolve(
@@ -107,8 +106,7 @@ namespace DryIoc
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),
                     default(object[]))));
 
-        // DependencyB<string>
-        internal static object GetDependency_DependencyB_0(IResolverContext r) =>
+        internal static DependencyB<string> GetDependency_DependencyB_0(IResolverContext r) =>
             new DependencyB<string>();
 
     }

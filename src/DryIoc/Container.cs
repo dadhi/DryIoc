@@ -176,8 +176,7 @@ namespace DryIoc
             public Type RequiredServiceType;
 
             /// <summary>Constructs the struct.</summary>
-            public static ResolveManyResult Of(Func<IResolverContext, object> factoryDelegate,
-                object serviceKey = null, Type requiredServiceType = null) =>
+            public static ResolveManyResult Of(Func<IResolverContext, object> factoryDelegate, object serviceKey = null, Type requiredServiceType = null) =>
                 new ResolveManyResult
                 {
                     FactoryDelegate = factoryDelegate,
@@ -4082,12 +4081,11 @@ namespace DryIoc
     {
         /// <summary>Resolutions roots</summary>
         public readonly List<KeyValuePair<ServiceInfo, Expression<Func<IResolverContext, object>>>> Roots = new();
-
         /// <summary>Dependency of Resolve calls</summary>
         public readonly List<KeyValuePair<Request, Expression>> ResolveDependencies = new();
-
         /// <summary>Errors</summary>
         public readonly List<KeyValuePair<ServiceInfo, ContainerException>> Errors = new();
+        // todo: @improve should I add warnings, e.g. if service is not registered?
     }
 
     /// <summary>Container extended features.</summary>
@@ -4448,7 +4446,7 @@ namespace DryIoc
                     : Request.EmptyRequestExpr;
 
             var flags = request.Flags | requestParentFlags;
-            var r = requestParentFlags == default(RequestFlags) ? request : request.WithFlags(flags);
+            var r = requestParentFlags == default(RequestFlags) ? request : request.WithFlags(flags); // todo: @perf @mem in-place mutation
 
             // When not for generation, using run-time request object to Minimize generated object graph.
             if (!container.Rules.UsedForExpressionGeneration)
@@ -4467,9 +4465,9 @@ namespace DryIoc
 
             var serviceTypeExpr = Constant(serviceType);
             var factoryIdExpr = ConstantInt(factoryID);
-            var implTypeExpr = ConstantOf(implementationType);
-            var reuseExpr = r.Reuse == null ? ConstantNull<IReuse>()
-                : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
+            var implTypeExpr = implementationType.ToConstant();
+            // todo: @mem @perf avoid capture
+            var reuseExpr = r.Reuse == null ? ConstantNull<IReuse>() : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
 
             if (d.IfUnresolved == IfUnresolved.Throw && d.RequiredServiceType == null && d.ServiceKey == null && d.MetadataKey == null && d.Metadata == null &&
                 factoryType == FactoryType.Service && decoratedFactoryID == 0)
@@ -8588,7 +8586,6 @@ namespace DryIoc
                 //
                 var scopeNameExpr = Expression.New(ResolutionScopeNameCtor, ConstantOf<Type>(request.ActualServiceType), serviceKeyExpr);
                 var trackInParent = Constant(!request.Factory?.Setup.AvoidResolutionScopeTracking ?? true);
-                // todo: @perf @mem optimize to specialized expression
                 resolverExpr = Call(ResolverContext.OpenScopeMethod, FactoryDelegateCompiler.ResolverContextParamExpr, scopeNameExpr, trackInParent);
             }
 
@@ -9817,7 +9814,7 @@ namespace DryIoc
                 _factoryOrImplType, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
-        // todo: @perf use in place mutation?
+        // todo: @perf @mem use in place mutation - a huge thing?
         /// <summary>Updates the flags</summary>
         public Request WithFlags(RequestFlags newFlags) =>
             new Request(Container, DirectParent, DependencyDepth, DependencyCount,
@@ -13313,8 +13310,8 @@ namespace DryIoc
             Name == null && !ScopedOrSingleton
                 ? Field(null, typeof(Reuse).GetField(nameof(Reuse.Scoped)))
                 : ScopedOrSingleton
-                    ? (Expression)Field(null, typeof(Reuse).GetField(nameof(Reuse.ScopedOrSingleton)))
-                    : Call(typeof(Reuse).Method("ScopedTo", typeof(object)), fallbackConverter(Name));
+                    ? Field(null, typeof(Reuse).GetField(nameof(Reuse.ScopedOrSingleton)))
+                    : Call(typeof(Reuse).Method(nameof(Reuse.ScopedTo), typeof(object)), fallbackConverter(Name));
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
