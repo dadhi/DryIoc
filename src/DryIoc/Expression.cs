@@ -2014,7 +2014,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                         {
                             if (m.IsPublic == bestMatch.IsPublic) // prefer public over non-public
                                 throw new InvalidOperationException(
-                                    $"More than one generic method '{m.Name}' with {typeArgCount} type parameter(s) in the type '{type.Print()}' is compatible with the supplied arguments.");
+                                    $"More than one generic method '{m.Name}' with {typeArgCount} type parameter(s) in the type '{type.ToCode()}' is compatible with the supplied arguments.");
                             if (!m.IsPublic)
                                 continue; // means that `bestMatch` is public so keep it an continue
                         }
@@ -2051,7 +2051,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                         if (score == bestScore)
                         {
                             if (m.IsPublic == bestMatch.IsPublic) // prefer public over non-public 
-                                throw new InvalidOperationException($"More than one non-generic method '{m.Name}' in the type '{type.Print()}' is compatible with the supplied arguments.");
+                                throw new InvalidOperationException($"More than one non-generic method '{m.Name}' in the type '{type.ToCode()}' is compatible with the supplied arguments.");
                             if (!m.IsPublic)
                                 continue;
                         }
@@ -2063,8 +2063,8 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
             if (bestMatch == null)
                 throw new InvalidOperationException(typeArgCount == 0
-                    ? $"The non-generic method '{methodName}' is not found in the type '{type.Print()}'"
-                    : $"The generic method '{methodName}' with {typeArgCount} type parameter(s) is not found in the type '{type.Print()}'");
+                    ? $"The non-generic method '{methodName}' is not found in the type '{type.ToCode()}'"
+                    : $"The generic method '{methodName}' with {typeArgCount} type parameter(s) is not found in the type '{type.ToCode()}'");
 
             return bestMatch;
         }
@@ -2758,7 +2758,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> _) => SysExpr.Constant(Value, Type);
 
         /// <summary>I want to see the actual Value not the default one</summary>
-        public override string ToString() => $"Constant({Value}, typeof({Type.Print()}))";
+        public override string ToString() => $"Constant({Value}, typeof({Type.ToCode()}))";
     }
 
     public sealed class TypedNullConstantExpression : ConstantExpression
@@ -3886,7 +3886,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             : base(@object, arguments) => Indexer = indexer;
     }
 
-    /// <summary>Base Block expression with no variables and with Type of its last (Result) exporession</summary>
+    /// <summary>Base Block expression with no variables and with Type of its last (Result) expression</summary>
     public class BlockExpression : Expression, IArgumentProvider
     {
         public override ExpressionType NodeType => ExpressionType.Block;
