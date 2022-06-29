@@ -67,7 +67,8 @@ namespace DryIoc.UnitTests
             Can_decorate_ienumerable_and_alter_the_service_key_filtering_and_works_with_nested_wrappers();
             Can_decorate_array_and_alter_the_service_key_filtering();
             Can_use_different_reuses_for_decorators_based_on_different_decoratee_reuse_in_collection();
-            return 55;
+            Using_decorator_to_implement_IsResolved();
+            return 56;
         }
 
         [Test]
@@ -1074,6 +1075,36 @@ namespace DryIoc.UnitTests
 
             Assert.AreSame(aax1[0], aax2[0]);
             Assert.AreNotSame(aax1[1], aax2[1]);
+        }
+
+        [Test]
+        public void Using_decorator_to_implement_IsResolved()
+        {
+            var c = new Container();
+
+            c.Register<Abc>();
+
+            var d = new AbcDecorator();
+            c.RegisterDelegate<Abc, Abc>(a => d.Decorate(a), setup: Setup.Decorator);
+
+            Assert.IsFalse(d.IsResolved);
+
+            var abc = c.Resolve<Abc>();
+            Assert.IsNotNull(abc);
+
+            Assert.IsTrue(d.IsResolved);
+        }
+
+        class Abc {}
+
+        class AbcDecorator 
+        {
+            public bool IsResolved { get; private set; }
+            public Abc Decorate(Abc a)
+            {
+                IsResolved = true;
+                return a;
+            }
         }
 
         public interface IAx { }
