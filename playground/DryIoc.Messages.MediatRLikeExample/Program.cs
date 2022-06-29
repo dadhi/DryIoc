@@ -38,7 +38,7 @@ namespace DryIoc.Messages.MediatRLikeExample
             Console.WriteLine("Service registrations: " + regs.Count);
             Debug.Assert(regs.Count == 26, $"Expecting 26 registrations but found {regs.Count}");
             foreach (var reg in regs) 
-                Console.WriteLine($"{reg.ServiceType.Print(t => t.Name)}-{reg.OptionalServiceKey ?? ""}-{reg.ImplementationType.Print(t => t.Name)}");
+                Console.WriteLine($"{reg.ServiceType.Print()}-{reg.OptionalServiceKey ?? ""}-{reg.ImplementationType.Print()}");
             Console.WriteLine("-----------------------");
         }
     }

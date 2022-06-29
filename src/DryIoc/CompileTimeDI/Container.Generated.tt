@@ -38,7 +38,7 @@ var container = GetContainerWithRegistrations().With(rules => rules.ForExpressio
 var result = container.GenerateResolutionExpressions(x => x.SelectMany(r =>
     SpecifyResolutionRoots(r).EmptyIfNull()).Concat(CustomResolutionRoots.EmptyIfNull()));
 
-string RemoveUsings(string source)
+string TrimUsings(string source)
 {
     source = source.Replace("DryIoc.", "");
     foreach (var x in NamespaceUsings)
@@ -48,16 +48,16 @@ string RemoveUsings(string source)
 
 string Code(object x, int lineIdent = 0) =>
     x == null ? "null" :
-    x is Expression e ? RemoveUsings(e.ToCSharpString(new StringBuilder(), lineIdent, identSpaces: 4).ToString()) :
+    x is Expression e ? TrimUsings(e.ToCSharpString(new StringBuilder(), lineIdent).ToString()) :
     x is Request r ? Code(container.GetRequestExpression(r), lineIdent) :
     Code(container.GetConstantExpression(x, x.GetType(), true), lineIdent);
 
 // without `typeof`
-string TypeOnlyCode(Type type) => RemoveUsings(type.ToCode(printGenericTypeArgs: true));
+string TypeOnlyCode(Type type) => TrimUsings(type.ToCode(printGenericTypeArgs: true));
 
 string GetTypeNameOnly(string typeName) => typeName.Split('`').First().Split('.').Last();
 
-string OptArg(string arg) => arg == "null" ? "" : ", " + arg;
+string CommaOptArg(string arg) => arg == "null" ? "" : ", " + arg;
 
 int getServiceBodyLineIdent = 16;
 
@@ -110,7 +110,7 @@ using System.Collections.Generic;
 using System.Threading;
 using DryIoc.ImTools;
 
-// Specified `NamespaceUsings` if any:
+// Provided `NamespaceUsings`:
 <# foreach (var ns in NamespaceUsings) {#>
 using <#=ns#>;
 <#}#>
@@ -219,7 +219,7 @@ namespace DryIoc
                 foreach (var root in rootGroup)
                 {
 #>
-                yield return ResolveManyResult.Of(<#=root.CreateMethodName#><#=OptArg(root.ServiceKeyCode)#><#=OptArg(root.RequiredServiceTypeCode)#>);
+                yield return ResolveManyResult.Of(r => <#=root.CreateMethodName#>(r)<#=CommaOptArg(root.ServiceKeyCode)#><#=CommaOptArg(root.RequiredServiceTypeCode)#>);
 <#                }
 
                 if (includeVariants && rootGroup.Key.IsGenericType)
@@ -232,7 +232,7 @@ namespace DryIoc
                     foreach (var variant in variants)
                     {
 #>
-                yield return ResolveManyResult.Of(<#=variant.CreateMethodName#><#=OptArg(variant.ServiceKeyCode)#><#=OptArg(variant.RequiredServiceTypeCode)#>); // co-variant
+                yield return ResolveManyResult.Of(r => <#=variant.CreateMethodName#>(r)<#=CommaOptArg(variant.ServiceKeyCode)#><#=CommaOptArg(variant.RequiredServiceTypeCode)#>); // covariant thingy
 <#
                     }
                 }
@@ -245,8 +245,7 @@ namespace DryIoc
     foreach (var root in rootCodes)
     {
 #>
-        // <#=root.ServiceTypeOnlyCode#>
-        internal static object <#=root.CreateMethodName#>(IResolverContext r) =>
+        internal static <#=root.ServiceTypeOnlyCode#> <#=root.CreateMethodName#>(IResolverContext r) =>
             <#=root.ExpressionCode#>;
 
 <#
@@ -256,8 +255,7 @@ namespace DryIoc
     foreach (var dep in depCodes)
     {
 #>
-        // <#=dep.ServiceTypeOnly#>
-        internal static object <#=dep.CreateMethodName#>(IResolverContext r) =>
+        internal static <#=dep.ServiceTypeOnly#> <#=dep.CreateMethodName#>(IResolverContext r) =>
             <#=dep.Expression#>;
 
 <#

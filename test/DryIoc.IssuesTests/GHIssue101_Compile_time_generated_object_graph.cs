@@ -4,8 +4,15 @@ using Example;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue101
+    public class GHIssue101_Compile_time_generated_object_graph : ITest
     {
+        public int Run()
+        {
+            Resolve_compile_time_generated_example_service();
+            Emulate_compile_time_generated_example_service_in_runtime();
+            return 2;
+        }
+
         [Test]
         public void Resolve_compile_time_generated_example_service()
         {

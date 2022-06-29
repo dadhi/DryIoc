@@ -4,27 +4,39 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue_HandleVariance
+    public class Issue_HandleVariance : ITest
     {
-        [Test, Explicit] // Ignore("fixme") todo: @bug? check why it is failing
-        public void CommandHandlers_CanBeResolved_From_IoC()
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
+        [Test]
+        public void Test()
         {
             var container = new Container();
 
-            container.Register(typeof(IBird<>), typeof(BirdBaseImpl<>));
-            container.Register(typeof(IBird<Bird>), typeof(BirdImpl));
+            container.Register(typeof(IContain<>), typeof(ContainBirdBase<>));
+            container.Register(typeof(IContain<Bird>), typeof(ContainBird));
 
-            var services = container.ResolveMany<IBird<Bird>>();
-            Assert.AreEqual(2, services.Count());
+            var birds = container.ResolveMany<IContain<Bird>>().ToList();
+            Assert.AreEqual(1, birds.Count());
 
-            var servicesArray = container.Resolve<IBird<Bird>[]>();
-            Assert.AreEqual(2, servicesArray.Length);
+            var birdBases = container.ResolveMany<IContain<BirdBase<string>>>();
+            Assert.AreEqual(1, birdBases.Count());
+
+            var birdsArray = container.Resolve<IContain<Bird>[]>();
+            Assert.AreEqual(1, birdsArray.Length);
+
+            var birdBasesArray = container.Resolve<IContain<BirdBase<string>>[]>();
+            Assert.AreEqual(1, birdBasesArray.Length);
         }
 
-        public interface IBird<in T> { }
+        public interface IContain<in T> { }
         public class BirdBase<T> { }
         public class Bird : BirdBase<string> { } // IBird<string>
-        public class BirdImpl : IBird<Bird> { }
-        public class BirdBaseImpl<T> : IBird<BirdBase<T>> { }
+        public class ContainBird : IContain<Bird> { }
+        public class ContainBirdBase<T> : IContain<BirdBase<T>> { }
     }
 }

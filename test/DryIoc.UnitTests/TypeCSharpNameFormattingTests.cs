@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using NUnit.Framework;
 
 namespace DryIoc.UnitTests
@@ -19,28 +18,31 @@ namespace DryIoc.UnitTests
         [Test]
         public void GetCSharpTypeName_should_return_correct_open_generic_type_name()
         {
-            var name = new StringBuilder().Print(typeof(
-                OpenGenericServiceWithTwoParameters<,>), t => t.Name).ToString();
+            var name = typeof(OpenGenericServiceWithTwoParameters<,>).Print();
 
-            Assert.That(name, Is.EqualTo("OpenGenericServiceWithTwoParameters<,>"));
+#if DEBUG
+            Assert.That(name, Is.EqualTo("OpenGenericServiceWithTwoParameters<, >"));
+#else
+            Assert.That(name, Is.EqualTo("DryIoc.UnitTests.OpenGenericServiceWithTwoParameters<, >"));
+#endif
         }
 
         [Test]
         public void GetCSharpTypeName_should_return_correct_closed_generic_type_name()
         {
-            var result = new StringBuilder().Print(typeof(
+            var result = typeof(
                     OpenGenericServiceWithTwoParameters<
                         Lazy<IEnumerable<bool>>,
-                        Func<bool, TypeCSharpNameFormattingTests, string>>))
-                .ToString();
+                        Func<bool, TypeCSharpNameFormattingTests, string>>)
+                .Print();
 
             var expected =
 #if DEBUG
-                "OpenGenericServiceWithTwoParameters<Lazy<IEnumerable<Boolean>>, Func<Boolean, TypeCSharpNameFormattingTests, String>>";
+                "OpenGenericServiceWithTwoParameters<Lazy<IEnumerable<bool>>, Func<bool, TypeCSharpNameFormattingTests, string>>";
 #else
                 "DryIoc.UnitTests.OpenGenericServiceWithTwoParameters<" +
-                    "Lazy<IEnumerable<Boolean>>, " +
-                    "Func<Boolean, DryIoc.UnitTests.TypeCSharpNameFormattingTests, String>" +
+                    "Lazy<IEnumerable<bool>>, " +
+                    "Func<bool, DryIoc.UnitTests.TypeCSharpNameFormattingTests, string>" +
                     ">";
 #endif
             Assert.AreEqual(expected, result);
@@ -49,12 +51,12 @@ namespace DryIoc.UnitTests
         [Test]
         public void GetCSharpTypeName_for_array_of_open_generics()
         {
-            var result = new StringBuilder().Print(typeof(OpenGenericServiceWithTwoParameters<int, bool>[])).ToString();
+            var result = typeof(OpenGenericServiceWithTwoParameters<int, bool>[]).Print();
             var expected =
 #if DEBUG
-                "OpenGenericServiceWithTwoParameters<Int32, Boolean>[]";
+                "OpenGenericServiceWithTwoParameters<int, bool>[]";
 #else
-                "DryIoc.UnitTests.OpenGenericServiceWithTwoParameters<Int32, Boolean>[]";
+                "DryIoc.UnitTests.OpenGenericServiceWithTwoParameters<int, bool>[]";
 #endif
             Assert.AreEqual(expected, result);
         }

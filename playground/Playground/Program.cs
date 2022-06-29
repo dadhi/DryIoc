@@ -10,6 +10,8 @@ namespace Playground
     {
         public static void Main()
         {
+            BenchmarkRunner.Run<ZeroArgs_CtorInvoke_Vs_ActivatorCreate>();
+
             // var x = new InvokeVsInvokeUnsafeBenchmark().InvokeUnsafe();
             // BenchmarkRunner.Run<InvokeVsInvokeUnsafeBenchmark>();
 
@@ -40,10 +42,10 @@ namespace Playground
             //    RealisticUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIoc());
             //Debug.Assert(x != null);
 
-            var di = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
-            var x = RealisticUnitOfWorkBenchmark.Measure(di);
-            var y = RealisticUnitOfWorkBenchmark.Measure(di);
-            Console.ReadKey();
+            // var di = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
+            // var x = RealisticUnitOfWorkBenchmark.Measure(di);
+            // var y = RealisticUnitOfWorkBenchmark.Measure(di);
+            // Console.ReadKey();
 
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
