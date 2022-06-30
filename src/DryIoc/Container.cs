@@ -8601,54 +8601,6 @@ namespace DryIoc
             return serviceType == typeof(object) ? resolveCallExpr : TryConvertIntrinsic(resolveCallExpr, serviceType);
         }
 
-        internal sealed class ResolveFullCallExpression : MethodCallExpression
-        {
-            public override Expression Object { get; }
-            public override MethodInfo Method => ResolveMethod;
-            public readonly Type ServiceType;
-            public readonly Expression ServiceKeyExpr;
-            public readonly IfUnresolved IfUnresolved;
-            public readonly Type RequiredServiceType;
-            public readonly Expression PreResolveParentExpr;
-            public readonly Expression ArgExprs;
-            internal ResolveFullCallExpression(Expression resolver,
-                Type serviceType, Expression serviceKeyExpr, IfUnresolved ifUnresolved, Type requiredServiceType, Expression preResolveParentExpr, Expression args)
-            {
-                Object = resolver;
-                ServiceType = serviceType;
-                ServiceKeyExpr = serviceKeyExpr;
-                IfUnresolved = ifUnresolved;
-                RequiredServiceType = requiredServiceType;
-                PreResolveParentExpr = preResolveParentExpr;
-                ArgExprs = args;
-            }
-
-            // public override bool IsIntrinsic => true;
-
-            // public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            //     bool isNestedLambda, ref ClosureInfo rootClosure) =>
-            //     Comp.TryCollectBoundConstants(ref closure, Object, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            //     (ServiceKeyExpr == NullConstant || Comp.TryCollectBoundConstants(ref closure, ServiceKeyExpr, paramExprs, isNestedLambda, ref rootClosure, config)) && 
-            //     Comp.TryCollectBoundConstants(ref closure, PreResolveParentExpr, paramExprs, isNestedLambda, ref rootClosure, config) &&
-            //     (ArgExprs == NullConstant || Comp.TryCollectBoundConstants(ref closure, ArgExprs, paramExprs, isNestedLambda, ref rootClosure, config));
-
-            // // Emitting the arguments for GetOrAddViaFactoryDelegateMethod(int id, Func<IResolverContext, object> createValue, IResolverContext r)
-            // public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            //     ILGenerator il, ParentFlags parent, int byRefIndex = -1)
-            // {
-            //     Emit.TryEmit(Object, paramExprs, il, ref closure, config, parent);
-            //     EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
-
-            //     // todo: @perf more intelligent emit?
-            //     if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
-            //         return false; // todo: @bug uncomment the FEC NestedLambdaInfo.IsTheSameLambda and check why fallback System compile does not work
-
-            //     EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
-            //     EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
-            //     return il.EmitConvertObjectTo(Type);
-            // }
-        }
-
         private static void PopulateDependencyResolutionCallExpressions(Request request)
         {
             // Actually calls nested Resolve and stores produced expression in collection inside the container Rules.

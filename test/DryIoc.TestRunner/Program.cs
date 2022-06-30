@@ -70,6 +70,7 @@ namespace DryIoc.UnitTests
             };
             var issueTests = new ITest[]
             {
+                new DotnetWeekBlogExample(),
                 new Issue_Can_resolve_singleton_with_Func_of_scoped_dependency(),
                 new Issue_HandleVariance(),
                 new Issue_InjectingSerilogLogger(),
@@ -81,6 +82,7 @@ namespace DryIoc.UnitTests
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue497_ConstructorWithResolvableArguments_is_not_working_properly(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
+                new GHIssue4_Rule_for_Func_and_Lazy_to_be_resolved_even_without_requested_service_registered(),
                 new GHIssue80_ScopedOrSingleton_extra_constructor_calls(),
                 new GHIssue101_Compile_time_generated_object_graph(),
                 new GHIssue180_Option_nullable_int_argument_with_not_null_default_value(),
