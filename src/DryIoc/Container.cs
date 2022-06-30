@@ -3056,7 +3056,11 @@ namespace DryIoc
                         switch (argCount)
                         {
                             case 0:
+#if NET6_0
+                                result = Activator.CreateInstance(newExpr.Constructor.DeclaringType);
+#else
                                 result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
+#endif
                                 return true;
                             case 1:
                                 if (newExpr is OneArgumentNewExpression e1)
