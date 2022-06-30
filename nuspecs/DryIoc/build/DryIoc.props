@@ -31,7 +31,7 @@
             <T4File Include="$(ProjectDir)\CompileTimeDI\Container.Generated.tt" />
         </ItemGroup>
 
-        <Message Text="[TargetPath=$(TargetPath)]" Importance="high"/>
+        <Message Text="TargetPath=='$(TargetPath)'" Importance="high"/>
     </Target>
 
     <ItemGroup>
