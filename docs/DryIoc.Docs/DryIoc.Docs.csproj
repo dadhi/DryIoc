@@ -31,7 +31,7 @@
     </ItemGroup>
 
     <Target Name="MdGenerate" BeforeTargets="BeforeBuild"
-        Condition=" '$(Configuration)' == 'Debug' AND '$(SkipDocGen)' != 'true' ">
+        Condition="'$(SkipDocGen)' != 'true' AND '$(TargetFramework)' == 'netcoreapp3.1' AND '$(Configuration)' == 'Debug' ">
         <Message Text="Generating the Markdown documentation..." Importance="high"/>
         <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet tool restore" />
         <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet cstomd %(DocFile.Identity)" />

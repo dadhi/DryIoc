@@ -870,7 +870,7 @@ namespace DryIoc
                     var expr = generatingContainer.ResolveFactory(request)?.GetExpressionOrDefault(request);
                     if (expr == null)
                         continue;
-                    result.Roots.Add(root.Pair(expr.WrapInFactoryExpression()));
+                    result.Roots.Add(root.Pair(expr.WrapInFactoryExpressionWithoutNormalization()));
                 }
                 catch (ContainerException ex)
                 {
@@ -4004,10 +4004,7 @@ namespace DryIoc
                 if (operandExpr.Type == typeof(object))
                     return operandExpr;
             }
-            // todo: @perf introduce ConvertValueTypeToObjectIntrinsic
-            if (expr.Type != typeof(void) && expr.Type.IsValueType)
-                return Convert<object>(expr);
-            return expr;
+            return expr.Type != typeof(void) && expr.Type.IsValueType ? new ConvertIntrinsicExpression<object>(expr) : expr;
         }
 
         /// <summary>Wraps service creation expression (body) into `Func{IResolverContext, object}` and returns result lambda expression.</summary>
@@ -4029,6 +4026,8 @@ namespace DryIoc
                 var value = constExpr.Value;
                 return value is Func<IResolverContext, object> f ? f : value.ToFactoryDelegate;
             }
+            // let's be on the safe side and convert value types to object if required
+            expression = expression.NormalizeExpression();
             if (!preferInterpretation)
             {
                 var factoryDelegate = (Func<IResolverContext, object>)(ExpressionCompiler.TryCompileBoundToFirstClosureParam(
@@ -5241,18 +5240,14 @@ namespace DryIoc
         {
             request = request.PushServiceType(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
-            if (expr == null)
-                return null;
-            return ConstantOf<System.Linq.Expressions.LambdaExpression>(expr.WrapInFactoryExpression().ToLambdaExpression());
+            return expr == null ? null : ConstantOf<System.Linq.Expressions.LambdaExpression>(expr.WrapInFactoryExpression().ToLambdaExpression());
         }
 
         private static Expression GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(Request request)
         {
             request = request.PushServiceType(request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request));
             var expr = request.Container.ResolveFactory(request)?.GetExpressionOrDefault(request);
-            if (expr == null)
-                return null;
-            return ConstantOf<FastExpressionCompiler.LightExpression.LambdaExpression>(expr.WrapInFactoryExpression());
+            return expr == null ? null : ConstantOf<FastExpressionCompiler.LightExpression.LambdaExpression>(expr.WrapInFactoryExpression());
         }
 
         private static Expression GetKeyValuePairExpressionOrDefault(Request request, Factory serviceFactory = null)
@@ -5275,11 +5270,9 @@ namespace DryIoc
             if (serviceFactory == null)
                 factory = container.ResolveFactory(serviceRequest);
             else
-            {
                 factory = serviceType == container.GetWrappedType(serviceType, request.RequiredServiceType)
                     ? serviceRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(serviceFactory)
                     : container.ResolveFactory(serviceRequest.WithWrappedServiceFactory(serviceFactory));
-            }
 
             var serviceExpr = factory?.GetExpressionOrDefault(serviceRequest);
             if (serviceExpr == null)
@@ -8675,7 +8668,7 @@ namespace DryIoc
 
             request.Flags |= RequestFlags.IsGeneratedResolutionDependencyExpression;
 
-            var factoryExpr = factory.GetExpressionOrDefault(request)?.NormalizeExpression();
+            var factoryExpr = factory.GetExpressionOrDefault(request);
             if (factoryExpr == null)
                 return;
 

@@ -107,7 +107,7 @@ namespace DryIoc
                     default(object[]))));
 
         internal static DependencyB<string> GetDependency_DependencyB_0(IResolverContext r) =>
-            new DependencyB<string>();
+            new DependencyB<string>(new DependencyA());
 
     }
 }

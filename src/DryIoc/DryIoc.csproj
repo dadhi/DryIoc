@@ -34,7 +34,7 @@
 
     <!--todo: @wip enable only for the netstandard2.1-->
     <Target Name="CompileTimeGenerate" BeforeTargets="BeforeBuild"
-        Condition="'$(TargetFramework)' == 'netstandard2.1' AND '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
+        Condition="'$(SkipCompTimeGen)' != 'true' AND '$(TargetFramework)' == 'netstandard2.1' AND '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
 
         <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
 

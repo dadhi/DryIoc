@@ -18,6 +18,7 @@
         "overriden",
         "Serilog",
         "Statefully",
+        "ttinclude",
         "typeparam",
         "typeparamref"
     ],

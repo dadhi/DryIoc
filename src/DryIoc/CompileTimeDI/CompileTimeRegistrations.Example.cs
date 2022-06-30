@@ -13,8 +13,11 @@ namespace Example
 
     public class DependencyA : IDependencyA { }
 
-    public class DependencyB<T>
+    // let's make it struct for fun
+    public struct DependencyB<T>
     {
+        public readonly IDependencyA A;
+        public DependencyB(IDependencyA a) => A = a;
     }
 
     public class RuntimeDependencyC

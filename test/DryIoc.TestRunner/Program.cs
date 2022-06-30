@@ -14,6 +14,8 @@ namespace DryIoc.UnitTests
             // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
 
             // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
+
+            // new GHIssue101_Compile_time_generated_object_graph().Run();
         }
 
         public static void RunAllTests()
@@ -75,6 +77,7 @@ namespace DryIoc.UnitTests
                 new Issue_Register_null_string(),
                 new Issue_SupportForDynamicKeyword(),
                 new Issue_UsingAsyncMethodAsMadeOf(),
+                new Issue_Value_type_resolution_dependency(),
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue497_ConstructorWithResolvableArguments_is_not_working_properly(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
