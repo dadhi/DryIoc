@@ -163,28 +163,6 @@ namespace DryIoc
 
         partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType);
 
-        /// <summary>Identifies the service when resolving collection</summary>
-        public struct ResolveManyResult
-        {
-            /// <summary>Factory, the required part</summary>
-            public Func<IResolverContext, object> FactoryDelegate;
-
-            /// <summary>Optional key</summary>
-            public object ServiceKey;
-
-            /// <summary>Optional required service type, can be an open-generic type.</summary>
-            public Type RequiredServiceType;
-
-            /// <summary>Constructs the struct.</summary>
-            public static ResolveManyResult Of(Func<IResolverContext, object> factoryDelegate, object serviceKey = null, Type requiredServiceType = null) =>
-                new ResolveManyResult
-                {
-                    FactoryDelegate = factoryDelegate,
-                    ServiceKey = serviceKey,
-                    RequiredServiceType = requiredServiceType
-                };
-        }
-
         /// <summary>Directly uses generated factories to resolve service. Or returns the default if service does not have generated factory.</summary>
         [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
         [SuppressMessage("ReSharper", "ExpressionIsAlwaysNull", Justification = "Per design")]
@@ -13853,6 +13831,47 @@ namespace DryIoc
 
         /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
         new void Use(Type serviceType, object instance);
+    }
+
+    /// <summary>Identifies the service when resolving collection</summary>
+    public struct ResolveManyResult
+    {
+        /// <summary>Factory, the required part</summary>
+        public Func<IResolverContext, object> FactoryDelegate;
+
+        /// <summary>Optional key</summary>
+        public object ServiceKey;
+
+        /// <summary>Optional required service type, can be an open-generic type.</summary>
+        public Type RequiredServiceType;
+
+        /// <summary>Constructs the struct.</summary>
+        public static ResolveManyResult Of(Func<IResolverContext, object> factoryDelegate, object serviceKey = null, Type requiredServiceType = null) =>
+            new ResolveManyResult
+            {
+                FactoryDelegate = factoryDelegate,
+                ServiceKey = serviceKey,
+                RequiredServiceType = requiredServiceType
+            };
+    }
+
+    /// <summary>The interface for the compile-time container, mostly for the resolution</summary>
+    public interface ICompileTimeContainer
+    {
+        /// <summary>Check if service is registered by type</summary>
+        bool IsRegistered(Type serviceType);
+
+        /// <summary>Check if service is registered by type and the key</summary>
+        bool IsRegistered(Type serviceType, object serviceKey);
+
+        /// <summary>Returns the service object if it can be resolved</summary>
+        bool TryResolve(Type serviceType, out object service);
+
+        /// <summary>Returns the dependency object if it can be resolved</summary>
+        bool TryResolve(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
+
+        /// <summary>Resolve many services or no at all, if nothing are registered</summary>
+        IEnumerable<ResolveManyResult> ResolveMany(Type serviceType);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,
