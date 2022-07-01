@@ -270,6 +270,11 @@ namespace DryIoc
         /// <inheritdoc />
         public object Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
+            var compTime = Rules.CompileTimeContainer;
+            if (compTime != null && compTime.TryResolve(serviceType, out var compTimeService))
+                return compTimeService;
+
+            // todo: @wip rem that
             object service = null;
             ResolveGenerated(ref service, serviceType);
             if (service != null)
@@ -6249,6 +6254,19 @@ namespace DryIoc
         {
             var newRules = Clone();
             newRules._settings = newSettings;
+            return newRules;
+        }
+
+        /// <summary>The optional compile-time (or any time) impl</summary>
+        public ICompileTimeContainer CompileTimeContainer { get; private set; }
+
+        /// <summary>Sets the compile-time container to the impl or un-sets it to `null`</summary>
+        public Rules WithCompileTimeContainer(ICompileTimeContainer container)
+        {
+            if (CompileTimeContainer == container)
+                return this;
+            var newRules = Clone();
+            newRules.CompileTimeContainer = container;
             return newRules;
         }
 

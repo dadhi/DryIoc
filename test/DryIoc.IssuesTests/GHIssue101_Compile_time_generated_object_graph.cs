@@ -1,5 +1,7 @@
 using NUnit.Framework;
 using Example;
+using System;
+using System.Collections.Generic;
 
 namespace DryIoc.IssuesTests
 {
@@ -49,6 +51,32 @@ namespace DryIoc.IssuesTests
             var x = container.Resolve<Example.IService>();
 
             Assert.IsNotNull(x);
+        }
+
+        [Test]
+        public void Resolve_compile_time_generated_example_service_with_the_rules()
+        {
+            var c = new Container(Rules.Default.WithCompileTimeContainer(new TestCompileTimeContainer()));
+
+            var x = c.Resolve<S2>();
+
+            Assert.IsNotNull(x);
+        }
+
+        class S2 {}
+
+        class TestCompileTimeContainer : ICompileTimeContainer
+        {
+            public bool IsRegistered(Type serviceType) => true;
+            public bool IsRegistered(Type serviceType, object serviceKey) => true;
+            public IEnumerable<ResolveManyResult> ResolveMany(Type serviceType) => new[] { ResolveManyResult.Of(_ => new S2()) };
+            public bool TryResolve(Type serviceType, out object service)
+            {
+                service = new S2();
+                return true;
+            }
+
+            public bool TryResolve(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args) => false;
         }
 
         [Test]
