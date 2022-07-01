@@ -14,7 +14,8 @@ namespace DryIoc.IssuesTests
             Emulate_compile_time_generated_example_service_in_runtime();
             Can_resolve_the_struct_service_in_runtime_interpreted_and_compiled();
             Can_resolve_the_keyed_struct_service_in_runtime_interpreted_and_compiled();
-            return 4;
+            Resolve_compile_time_generated_example_service_with_the_rules();
+            return 5;
         }
 
         [Test]
