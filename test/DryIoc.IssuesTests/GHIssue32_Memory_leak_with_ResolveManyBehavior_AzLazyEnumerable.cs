@@ -8,8 +8,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue32_Memory_leak_with_ResolveManyBehavior_AzLazyEnumerable
+    public class GHIssue32_Memory_leak_with_ResolveManyBehavior_AzLazyEnumerable : ITest
     {
+        public int Run()
+        {
+            Test();
+            Test_memory_allocations();
+            return 2;
+        }
+
         [Test]
         public void Test()
         {
