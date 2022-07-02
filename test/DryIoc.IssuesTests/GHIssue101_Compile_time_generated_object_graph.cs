@@ -21,7 +21,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Resolve_compile_time_generated_example_service()
         {
-            var c = new Container();
+            var c = new Container(Rules.Default.WithCompileTimeContainer(CompileTimeContainer.Instance));
             c.Register<Example.RuntimeDependencyC>();
 
             var x = c.Resolve<Example.IService>();
@@ -70,14 +70,17 @@ namespace DryIoc.IssuesTests
         {
             public bool IsRegistered(Type serviceType) => true;
             public bool IsRegistered(Type serviceType, object serviceKey) => true;
-            public IEnumerable<ResolveManyResult> ResolveMany(Type serviceType) => new[] { ResolveManyResult.Of(_ => new S2()) };
-            public bool TryResolve(Type serviceType, out object service)
+            public bool TryResolve(out object service, IResolverContext r, Type serviceType)
             {
                 service = new S2();
                 return true;
             }
-
-            public bool TryResolve(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args) => false;
+            public bool TryResolve(out object service, IResolverContext r, Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
+            {
+                service = null;
+                return false;
+            }
+            public IEnumerable<ResolveManyResult> ResolveMany(IResolverContext _, Type serviceType) => new[] { ResolveManyResult.Of(_ => new S2()) };
         }
 
         [Test]

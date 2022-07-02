@@ -61,7 +61,7 @@ namespace DryIoc
     {
         /// <summary>Creates new container with default rules <see cref="DryIoc.Rules.Default"/>.</summary>
         public Container() : this(Rules.Default, Ref.Of(Registry.Default), NewSingletonScope()) =>
-            SetInitialFactoryID();
+            SetInitialRuntimeFactoryID();
 
         /// <summary>Creates new container, optionally providing <see cref="Rules"/> to modify default container behavior.</summary>
         /// <param name="rules">(optional) Rules to modify container default resolution behavior.
@@ -69,7 +69,7 @@ namespace DryIoc
         /// <param name="scopeContext">(optional) Scope context to use for scoped reuse.</param>
         public Container(Rules rules = null, IScopeContext scopeContext = null)
             : this(rules ?? Rules.Default, Ref.Of(Registry.Default), NewSingletonScope(), scopeContext) =>
-            SetInitialFactoryID();
+            SetInitialRuntimeFactoryID();
 
         /// <summary>Creates new container with configured rules.</summary>
         /// <param name="configure">Allows to modify <see cref="DryIoc.Rules.Default"/> rules.</param>
@@ -152,48 +152,6 @@ namespace DryIoc
             }
         }
 
-        #region Compile-time generated parts
-
-        partial void HasCompileTimeGeneratedContainer(ref bool hasIt);
-
-        partial void ResolveGenerated(ref object service, Type serviceType);
-
-        partial void ResolveGenerated(ref object service,
-            Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
-
-        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType);
-
-        /// <summary>Directly uses generated factories to resolve service. Or returns the default if service does not have generated factory.</summary>
-        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
-        [SuppressMessage("ReSharper", "ExpressionIsAlwaysNull", Justification = "Per design")]
-        public object ResolveCompileTimeGeneratedOrDefault(Type serviceType)
-        {
-            object service = null;
-            ResolveGenerated(ref service, serviceType);
-            return service;
-        }
-
-        /// <summary>Directly uses generated factories to resolve service. Or returns the default if service does not have generated factory.</summary>
-        [SuppressMessage("ReSharper", "InvocationIsSkipped", Justification = "Per design")]
-        [SuppressMessage("ReSharper", "ExpressionIsAlwaysNull", Justification = "Per design")]
-        public object ResolveCompileTimeGeneratedOrDefault(Type serviceType, object serviceKey)
-        {
-            object service = null;
-            ResolveGenerated(ref service, serviceType, serviceKey,
-                requiredServiceType: null, preRequestParent: null, args: null);
-            return service;
-        }
-
-        /// <summary>Resolves many generated only services. Ignores runtime registrations.</summary>
-        public IEnumerable<ResolveManyResult> ResolveManyCompileTimeGeneratedOrEmpty(Type serviceType)
-        {
-            IEnumerable<ResolveManyResult> manyGenerated = ArrayTools.Empty<ResolveManyResult>();
-            ResolveManyGenerated(ref manyGenerated, serviceType);
-            return manyGenerated;
-        }
-
-        #endregion
-
         #region IRegistrator
 
         /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
@@ -271,14 +229,8 @@ namespace DryIoc
         public object Resolve(Type serviceType, IfUnresolved ifUnresolved)
         {
             var compTime = Rules.CompileTimeContainer;
-            if (compTime != null && compTime.TryResolve(serviceType, out var compTimeService))
+            if (compTime != null && compTime.TryResolve(out var compTimeService, this, serviceType))
                 return compTimeService;
-
-            // todo: @wip rem that
-            object service = null;
-            ResolveGenerated(ref service, serviceType);
-            if (service != null)
-                return service;
 
             var serviceTypeHash = RuntimeHelpers.GetHashCode(serviceType);
 
@@ -409,9 +361,8 @@ namespace DryIoc
             object serviceKey, IfUnresolved ifUnresolved, object scopeName, Type requiredServiceType, Request preResolveParent,
             object[] args)
         {
-            object service = null;
-            ResolveGenerated(ref service, serviceType, serviceKey, requiredServiceType, preResolveParent, args);
-            if (service != null)
+            var compTime = Rules.CompileTimeContainer;
+            if (compTime != null && compTime.TryResolve(out var service, this, serviceType, serviceKey, requiredServiceType, preResolveParent, args))
                 return service;
 
             // #288 - ignoring the parent, `args`, `scopeName`seems OK because Use is supposed to overwrite anything with args,
@@ -541,11 +492,9 @@ namespace DryIoc
         IEnumerable<object> IResolver.ResolveMany(Type serviceType, object serviceKey,
             Type requiredServiceType, Request preResolveParent, object[] args)
         {
-            var requiredItemType = requiredServiceType ?? serviceType;
+            var generatedFactories = Rules.CompileTimeContainer?.ResolveMany(this, serviceType) ?? Enumerable.Empty<ResolveManyResult>();
 
-            // first return compile-time generated factories if any
-            var generatedFactories = Enumerable.Empty<ResolveManyResult>();
-            ResolveManyGenerated(ref generatedFactories, serviceType);
+            var requiredItemType = requiredServiceType ?? serviceType;
             if (serviceKey != null)
                 generatedFactories = generatedFactories.Where(x => serviceKey.Equals(x.ServiceKey));
             if (requiredServiceType != null)
@@ -2917,12 +2866,11 @@ namespace DryIoc
             _parent = parent;
         }
 
-        private void SetInitialFactoryID()
+        private void SetInitialRuntimeFactoryID()
         {
-            var hasIt = false;
-            HasCompileTimeGeneratedContainer(ref hasIt);
-            if (hasIt && Factory._lastFactoryID <= 10_000)
-                Factory._lastFactoryID = 20_000; // todo: wtf is this logic, please explain it bro!
+            // todo: @wip remove factory ID from the equation
+            if (Rules.CompileTimeContainer != null && Factory._lastFactoryID <= 10_000)
+                Factory._lastFactoryID = 20_000;
         }
     }
 
@@ -8597,7 +8545,6 @@ namespace DryIoc
 
             var resolveCallExpr = Call(resolverExpr, ResolveMethod, serviceTypeExpr, serviceKeyExpr,
                 ifUnresolvedExpr, requiredServiceTypeExpr, preResolveParentExpr, request.GetInputArgsExpr());
-            // todo: @wip should we include the Unbox for the value type services?
             return serviceType == typeof(object) ? resolveCallExpr : TryConvertIntrinsic(resolveCallExpr, serviceType);
         }
 
@@ -13883,13 +13830,13 @@ namespace DryIoc
         bool IsRegistered(Type serviceType, object serviceKey);
 
         /// <summary>Returns the service object if it can be resolved</summary>
-        bool TryResolve(Type serviceType, out object service);
+        bool TryResolve(out object service, IResolverContext r, Type serviceType);
 
         /// <summary>Returns the dependency object if it can be resolved</summary>
-        bool TryResolve(ref object service, Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
+        bool TryResolve(out object service, IResolverContext r, Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args);
 
         /// <summary>Resolve many services or no at all, if nothing are registered</summary>
-        IEnumerable<ResolveManyResult> ResolveMany(Type serviceType);
+        IEnumerable<ResolveManyResult> ResolveMany(IResolverContext r, Type serviceType);
     }
 
     /// <summary>Resolves all registered services of <typeparamref name="TService"/> type on demand,

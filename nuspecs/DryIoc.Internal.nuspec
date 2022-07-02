@@ -56,20 +56,19 @@
         <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="content\net45\DryIoc" />
         <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="content\net45\DryIoc" />
         <file src="..\src\DryIoc.Internal\Expression.cs"                       target="content\net45\DryIoc" />
-        <!-- todo: @wip Messages are public but used IResolved is not, the what? -->
-        <file src="..\src\DryIoc\Messages.cs"                                   target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Messages.cs"                         target="content\net45\DryIoc" />
 
         <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\net45\DryIoc" />
         <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="contentFiles\cs\net45\DryIoc" />
         <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="contentFiles\cs\net45\DryIoc" />
         <file src="..\src\DryIoc.Internal\Expression.cs"                       target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\Messages.cs"                                  target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Messages.cs"                         target="contentFiles\cs\net45\DryIoc" />
 
         <!-- .netstandard 2.0 -->
         <file src="..\src\DryIoc.Internal\Container.cs"                        target="contentFiles\cs\netstandard2.0\DryIoc" />
         <file src="..\src\DryIoc.Internal\ImTools.cs"                          target="contentFiles\cs\netstandard2.0\DryIoc" />
         <file src="..\src\DryIoc.Internal\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard2.0\DryIoc" />
         <file src="..\src\DryIoc.Internal\Expression.cs"                       target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\Messages.cs"                                  target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc.Internal\Messages.cs"                         target="contentFiles\cs\netstandard2.0\DryIoc" />
     </files>
 </package>

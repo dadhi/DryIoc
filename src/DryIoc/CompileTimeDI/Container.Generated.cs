@@ -40,17 +40,32 @@ using Example;
 
 namespace DryIoc
 {
-    partial class Container
+    ///<summary>The container provides access to the object graph generated using the DryIoc own tools at compile-time</summary>
+    public sealed class CompileTimeContainer : ICompileTimeContainer
     {
-        partial void HasCompileTimeGeneratedContainer(ref bool hasIt) => hasIt = true;
+        ///<summary>The instance if generated compile-time container.</summary>
+        public static readonly CompileTimeContainer Instance = new CompileTimeContainer();
 
-        partial void ResolveGenerated(ref object service, Type serviceType)
+        // todo: @wip tbd
+        /// <inheritdoc/>
+        public bool IsRegistered(Type serviceType) => false;
+        /// <inheritdoc/>
+        public bool IsRegistered(Type serviceType, object serviceKey) => false;
+
+        /// <inheritdoc/>
+        public bool TryResolve(out object service, IResolverContext r, Type serviceType)
         {
             if (serviceType == typeof(IService))
-                service = Get_IService_0(this);
+            {
+                service = Get_IService_0(r);
+                return true;
+            }
+            service = null;
+            return false;
         }
 
-        partial void ResolveGenerated(ref object service,
+        /// <inheritdoc/>
+        public bool TryResolve(out object service, IResolverContext r,
             Type serviceType, object serviceKey, Type requiredServiceType, Request preRequestParent, object[] args)
         {
             if (serviceType == typeof(DependencyB<string>))
@@ -59,20 +74,21 @@ namespace DryIoc
                     requiredServiceType == null &&
                     Equals(preRequestParent, Request.Empty.Push(
                         typeof(IService),
-                        20001,
+                        1,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.DoNotPoolRequest)))
-                    service = GetDependency_DependencyB_0(this);
+                {
+                    service = GetDependency_DependencyB_0(r);
+                    return true;
+                }
             }
+            service = null;
+            return false;
         }
 
-        partial void ResolveManyGenerated(ref IEnumerable<ResolveManyResult> services, Type serviceType)
-        {
-            services = ResolveManyGenerated(serviceType);
-        }
-
-        private IEnumerable<ResolveManyResult> ResolveManyGenerated(Type serviceType)
+        /// <inheritdoc/>
+        public IEnumerable<ResolveManyResult> ResolveMany(IResolverContext _, Type serviceType)
         {
             if (serviceType == typeof(IService))
                 yield return ResolveManyResult.Of(r => Get_IService_0(r));
@@ -88,7 +104,7 @@ namespace DryIoc
                     default(System.Type),
                     Request.Empty.Push(
                         typeof(IService),
-                        20001,
+                        1,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),
@@ -100,7 +116,7 @@ namespace DryIoc
                     default(System.Type),
                     Request.Empty.Push(
                         typeof(IService),
-                        20001,
+                        1,
                         typeof(MyService),
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),

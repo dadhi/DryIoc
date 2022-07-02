@@ -2,7 +2,8 @@ $inputFiles = @(
     ".\src\DryIoc\Container.cs",
     ".\src\DryIoc\ImTools.cs",
     ".\src\DryIoc\FastExpressionCompiler.cs",
-    ".\src\DryIoc\Expression.cs"
+    ".\src\DryIoc\Expression.cs",
+    ".\src\DryIoc\Messages.cs"
 )
 $outputFolder = ".\src\DryIoc.Internal"
 
