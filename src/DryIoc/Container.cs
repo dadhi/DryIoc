@@ -4886,14 +4886,14 @@ namespace DryIoc
         private static ImHashMap<Type, object> BuildSupportedWrappers()
         {
             var wrappers = ImHashMap.BuildFromDifferent(
-                typeof(LazyEnumerable<>).Entry(new ExpressionFactory(r => GetLazyEnumerableExpressionOrDefault(r), setup: Setup.Wrapper)),
-                typeof(Lazy<>).Entry(WrapperExpressionFactory.Of(GetLazyExpressionOrDefault)),
-                typeof(KeyValuePair<,>).Entry(WrapperExpressionFactory.Of(GetKeyValuePairExpressionOrDefault, Setup.WrapperWith(1))),
-                typeof(Meta<,>).Entry(WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0))),
-                typeof(Tuple<,>).Entry(WrapperExpressionFactory.Of(GetMetaExpressionOrDefault, Setup.WrapperWith(0))),
+                typeof(LazyEnumerable<>).Entry(new ExpressionFactory(r => GetLazyEnumerableExpressionOrDefault(r, itemType: null), setup: Setup.Wrapper)),
+                typeof(Lazy<>).Entry(WrapperExpressionFactory.Of((r, f) => GetLazyExpressionOrDefault(r, f))),
+                typeof(KeyValuePair<,>).Entry(WrapperExpressionFactory.Of((r, f) => GetKeyValuePairExpressionOrDefault(r, f), Setup.WrapperWith(1))),
+                typeof(Meta<,>).Entry(WrapperExpressionFactory.Of((r, f) => GetMetaExpressionOrDefault(r, f), Setup.WrapperWith(0))),
+                typeof(Tuple<,>).Entry(WrapperExpressionFactory.Of((r, f) => GetMetaExpressionOrDefault(r, f), Setup.WrapperWith(0))),
                 typeof(System.Linq.Expressions.LambdaExpression).Entry(new ExpressionFactory(r => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
                 typeof(LambdaExpression).Entry(new ExpressionFactory(r => GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
-                typeof(Func<>).Entry(WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.Wrapper))
+                typeof(Func<>).Entry(WrapperExpressionFactory.Of((r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.Wrapper))
             );
 
             var arrayExpr = new ExpressionFactory(r => GetArrayExpression(r), setup: Setup.Wrapper);
@@ -4906,11 +4906,14 @@ namespace DryIoc
             // Skip the `i == 0` because `Func<>` type was added above
             for (var i = 1; i < FuncTypes.Length; i++)
                 wrappers = wrappers.AddSureNotPresent(FuncTypes[i],
-                    WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.WrapperWith(i)));
+                    WrapperExpressionFactory.Of((r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.WrapperWith(i)));
 
             for (var i = 0; i < ActionTypes.Length; i++)
                 wrappers = wrappers.AddSureNotPresent(ActionTypes[i],
-                    WrapperExpressionFactory.Of(GetFuncOrActionExpressionOrDefault, Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
+                    WrapperExpressionFactory.Of((r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
+
+            wrappers = wrappers.AddSureNotPresent(typeof(IDictionary<,>),
+                ExpressionFactory.Of(r => GetDictionaryExpressionOrDefault(r), Setup.WrapperWith(1)));
 
             wrappers = wrappers.AddContainerInterfaces();
             return wrappers;
@@ -4940,9 +4943,9 @@ namespace DryIoc
 
         internal static readonly MethodInfo ToArrayMethod = typeof(ArrayTools).GetMethod(nameof(ArrayTools.ToArrayOrSelf));
 
-        private static Expression GetArrayExpression(Request request)
+        private static Expression GetArrayExpression(Request request, Type collectionType = null)
         {
-            var collectionType = request.ActualServiceType;
+            collectionType ??= request.ActualServiceType;
             var container = request.Container;
             var rules = container.Rules;
 
@@ -5048,9 +5051,9 @@ namespace DryIoc
 
             // todo: @perf @mem separated expression same as for Resolve
             var resolveManyExpr = Call(resolverExpr, Resolver.ResolveManyMethod,
-                Constant(itemType),
+                ConstantOf<Type>(itemType),
                 container.GetConstantExpression(request.ServiceKey),
-                Constant(requiredItemType),
+                ConstantOf<Type>(requiredItemType),
                 preResolveParentExpr,
                 request.GetInputArgsExpr());
 
@@ -5170,6 +5173,29 @@ namespace DryIoc
             }
             return Lambda(wrapperType, serviceExpr, argExprs, serviceType);
         }
+
+        /// <summary>Creating new array expression and then converting it ToDictionary of service -> service key pairs</summary>
+        public static Expression GetDictionaryExpressionOrDefault(Request request)
+        {
+            var dictType = request.ActualServiceType;
+            var keyValueTypes = dictType.GetGenericArguments();
+            var keyValueType = typeof(KeyValuePair<,>).MakeGenericType(keyValueTypes);
+            var arrType = keyValueType.MakeArrayType();
+            var arrExpr = GetArrayExpression(request, arrType);
+            var dictMethod = _wrapInDictionaryMethod.MakeGenericMethod(keyValueTypes);
+            return Call(dictMethod, arrExpr);
+        }
+
+        /// <summary>The method converting collection to dictionary wrapper</summary>
+        public static IDictionary<K, V> WrapInDictionary<K, V>(KeyValuePair<K, V>[] pairs)
+        {
+            var dict = new Dictionary<K, V>(pairs.Length);
+            foreach (var pair in pairs)
+                dict.Add(pair.Key, pair.Value);
+            return dict;
+        }
+
+        private static readonly MethodInfo _wrapInDictionaryMethod = typeof(WrappersSupport).GetMethod(nameof(WrapInDictionary));
 
         private static Expression GetLambdaExpressionExpressionOrDefault(Request request)
         {
@@ -12214,6 +12240,10 @@ namespace DryIoc
         /// <inheritdoc/>
         public override Setup Setup { get; } // todo: @perf @vNext split
         private readonly Func<Request, Expression> _getServiceExpression;
+
+        /// <summary>Constructs the factory from expression and setup, e.g. for the wrapper</summary>
+        public static ExpressionFactory Of(Func<Request, Expression> getServiceExpression, Setup setup) =>
+            new ExpressionFactory(getServiceExpression, null, setup);
 
         /// <summary>Constructor</summary>
         public ExpressionFactory(Func<Request, Expression> getServiceExpression, IReuse reuse = null, Setup setup = null)

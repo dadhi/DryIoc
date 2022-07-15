@@ -107,6 +107,7 @@ namespace DryIoc.UnitTests
                 new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
                 new GHIssue495_Automatically_generate_Resolution_calls_for_the_missing_registrations_to_avoid_manual_RegisterPlaceholder(),
+                new GHIssue504_Add_IDictionary_wrapper(),
             };
             // var docsTests = new Func<int>[] 
             // { 
