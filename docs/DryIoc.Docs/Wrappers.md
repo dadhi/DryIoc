@@ -21,6 +21,7 @@
       - [Co-variant generics](#co-variant-generics)
       - [Composite Pattern support](#composite-pattern-support)
     - [LazyEnumerable of A](#lazyenumerable-of-a)
+    - [IDictionary of services A and their keys](#idictionary-of-services-a-and-their-keys)
     - [LambdaExpression](#lambdaexpression)
       - [DryIoc is not a magic](#dryioc-is-not-a-magic)
   - [Nested wrappers](#nested-wrappers)
@@ -724,6 +725,65 @@ class Specify_to_use_LazyEnumerable_for_all_IEnumerable
     }
 } 
 ```
+
+
+### IDictionary of services A and their keys
+
+The `IDictionary` wrapper provides a convenient way to combine services and their service keys in one collection, 
+and allows access to service by key.
+Basically it is a wrapper around array of pairs `KeyValuePair<TServiceKey, A>[]` turned into a dictionary.
+
+The `TKey` type in dictionary will filter only keys matched this type only, e.g. for services registered with `string` key
+and `int` keys, resolving or injecting `IDictionary<string, A>` will return dictionary with `string` keys only.
+
+You need to specify `object` as key to return all services including the ones without keys.
+
+Note: For service without key you will get the `DefaultKey` value for its key.
+
+```cs 
+class Dictionary_of_services_with_their_keys
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<I, A>(serviceKey: "A");
+        container.Register<I, B>(); // no key
+        container.Register<I, C>(serviceKey: "C");
+        container.Register<I, D>(serviceKey: 42);
+        container.Register<Consumer>();
+
+        // inject 2 services with string keys into consumer constructor
+        var c = container.Resolve<Consumer>();
+        Assert.AreEqual(2, c.Services.Count);
+        Assert.IsInstanceOf<A>(c.Services["A"]);
+        Assert.IsInstanceOf<C>(c.Services["C"]);
+
+        // resolve single int service as dictionary
+        var i = container.Resolve<IDictionary<int, I>>();
+        Assert.AreEqual(1, i.Count);
+        Assert.IsInstanceOf<D>(i[42]);
+
+        // resolve all services as dictionary with object key, including the B without key
+        var all = container.Resolve<IDictionary<object, I>>();
+        Assert.AreEqual(4, all.Count);
+        Assert.IsInstanceOf<B>(all[DefaultKey.Value]);
+    }
+
+    interface I { }
+    class A : I { }
+    class B : I { }
+    class C : I { }
+    class D : I { }
+    class Consumer 
+    {
+        public readonly IDictionary<string, I> Services;
+        public Consumer(IDictionary<string, I> services) => Services = services;
+    }
+} 
+```
+
+If you want to get services lazily, wrap the value either in `Func` or `Lazy`, e.g. `IDictionary<string, Lazy<I>>`.
 
 
 ### LambdaExpression
