@@ -60,6 +60,13 @@ namespace DryIoc
                 service = Get_IService_0(r);
                 return true;
             }
+
+            else
+            if (serviceType == typeof(BaseAConsumer))
+            {
+                service = Get_BaseAConsumer_1(r);
+                return true;
+            }
             service = null;
             return false;
         }
@@ -92,6 +99,8 @@ namespace DryIoc
         {
             if (serviceType == typeof(IService))
                 yield return ResolveManyResult.Of(r => Get_IService_0(r));
+            if (serviceType == typeof(BaseAConsumer))
+                yield return ResolveManyResult.Of(r => Get_BaseAConsumer_1(r));
         }
 
         internal static IService Get_IService_0(IResolverContext r) =>
@@ -121,6 +130,15 @@ namespace DryIoc
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),
                     default(object[]))));
+
+        internal static BaseAConsumer Get_BaseAConsumer_1(IResolverContext r) =>
+            new BaseAConsumer(WrappersSupport.WrapInDictionary<object, BaseA>(new System.Collections.Generic.KeyValuePair<object, BaseA>[] {
+                new System.Collections.Generic.KeyValuePair<object, BaseA>(
+                    DefaultKey.Of(0),
+                    new KeyedA()),
+                new System.Collections.Generic.KeyValuePair<object, BaseA>(
+                    DefaultKey.Of(1),
+                    new NonKeyedA())}));
 
         internal static DependencyB<string> GetDependency_DependencyB_0(IResolverContext r) =>
             new DependencyB<string>(new DependencyA());

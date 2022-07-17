@@ -1,5 +1,7 @@
 #pragma warning disable 1591
 
+using System.Collections.Generic;
+
 namespace Example
 {
     public interface IService { }
@@ -22,5 +24,14 @@ namespace Example
 
     public class RuntimeDependencyC
     {
+    }
+
+    public abstract class BaseA { }
+    public class KeyedA : BaseA { }
+    public class NonKeyedA : BaseA { }
+    public class BaseAConsumer
+    {
+        public IDictionary<object, BaseA> Addict;
+        public BaseAConsumer(IDictionary<object, BaseA> addict) => Addict = addict;
     }
 }
