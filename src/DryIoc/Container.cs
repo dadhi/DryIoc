@@ -4886,17 +4886,17 @@ namespace DryIoc
         private static ImHashMap<Type, object> BuildSupportedWrappers()
         {
             var wrappers = ImHashMap.BuildFromDifferent(
-                typeof(LazyEnumerable<>).Entry(new ExpressionFactory(r => GetLazyEnumerableExpressionOrDefault(r, itemType: null), setup: Setup.Wrapper)),
+                typeof(LazyEnumerable<>).Entry(WrapperExpressionFactory.Of((r, _) => GetLazyEnumerableExpressionOrDefault(r, itemType: null), setup: Setup.Wrapper)),
                 typeof(Lazy<>).Entry(WrapperExpressionFactory.Of((r, f) => GetLazyExpressionOrDefault(r, f))),
                 typeof(KeyValuePair<,>).Entry(WrapperExpressionFactory.Of((r, f) => GetKeyValuePairExpressionOrDefault(r, f), Setup.WrapperWith(1))),
                 typeof(Meta<,>).Entry(WrapperExpressionFactory.Of((r, f) => GetMetaExpressionOrDefault(r, f), Setup.WrapperWith(0))),
                 typeof(Tuple<,>).Entry(WrapperExpressionFactory.Of((r, f) => GetMetaExpressionOrDefault(r, f), Setup.WrapperWith(0))),
-                typeof(System.Linq.Expressions.LambdaExpression).Entry(new ExpressionFactory(r => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
-                typeof(LambdaExpression).Entry(new ExpressionFactory(r => GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
+                typeof(System.Linq.Expressions.LambdaExpression).Entry(WrapperExpressionFactory.Of((r, _) => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
+                typeof(LambdaExpression).Entry(WrapperExpressionFactory.Of((r, _) => GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
                 typeof(Func<>).Entry(WrapperExpressionFactory.Of((r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.Wrapper))
             );
 
-            var arrayExpr = new ExpressionFactory(r => GetArrayExpression(r), setup: Setup.Wrapper);
+            var arrayExpr = WrapperExpressionFactory.Of((r, _) => GetArrayExpression(r), setup: Setup.Wrapper);
             CollectionWrapperID = arrayExpr.FactoryID;
 
             var arrayInterfaces = SupportedCollectionTypes;
@@ -4913,7 +4913,7 @@ namespace DryIoc
                     WrapperExpressionFactory.Of((r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
 
             wrappers = wrappers.AddSureNotPresent(typeof(IDictionary<,>),
-                ExpressionFactory.Of(r => GetDictionaryExpressionOrDefault(r), Setup.WrapperWith(1)));
+                WrapperExpressionFactory.Of((r, _) => GetDictionaryExpressionOrDefault(r), Setup.WrapperWith(1)));
 
             wrappers = wrappers.AddContainerInterfaces();
             return wrappers;
@@ -4921,17 +4921,17 @@ namespace DryIoc
 
         private static ImHashMap<Type, object> AddContainerInterfaces(this ImHashMap<Type, object> wrappers)
         {
-            var resolverContextExpr = new ExpressionFactory(
-                ResolverContext.GetRootOrSelfExpr,
-                Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
+            var resolverContextExpr = WrapperExpressionFactory.Of(
+                (r, _) => ResolverContext.GetRootOrSelfExpr(r),
+                Setup.WrapperWith(preventDisposal: true));
 
-            var containerExpr = new ExpressionFactory(
-                r => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)),
-                Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
+            var containerExpr = WrapperExpressionFactory.Of(
+                (r, _) => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)),
+                Setup.WrapperWith(preventDisposal: true));
 
-            var registratorExpr = new ExpressionFactory(
-                r => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)),
-                Reuse.Transient, Setup.WrapperWith(preventDisposal: true));
+            var registratorExpr = WrapperExpressionFactory.Of(
+                (r, _) => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)),
+                Setup.WrapperWith(preventDisposal: true));
 
             return wrappers
                 .AddSureNotPresent(typeof(IContainer), containerExpr)
@@ -12236,14 +12236,10 @@ namespace DryIoc
     public sealed class ExpressionFactory : Factory
     {
         /// <inheritdoc/>
-        public override IReuse Reuse { get; } // todo: @perf @vNext split
+        public override IReuse Reuse { get; }
         /// <inheritdoc/>
-        public override Setup Setup { get; } // todo: @perf @vNext split
+        public override Setup Setup { get; }
         private readonly Func<Request, Expression> _getServiceExpression;
-
-        /// <summary>Constructs the factory from expression and setup, e.g. for the wrapper</summary>
-        public static ExpressionFactory Of(Func<Request, Expression> getServiceExpression, Setup setup) =>
-            new ExpressionFactory(getServiceExpression, null, setup);
 
         /// <summary>Constructor</summary>
         public ExpressionFactory(Func<Request, Expression> getServiceExpression, IReuse reuse = null, Setup setup = null)
@@ -12276,6 +12272,9 @@ namespace DryIoc
             reuse == null
                 ? Of(getServiceExpression, setup)
                 : new WrapperExpressionFactoryWithReuseAndSetup(getServiceExpression, reuse, setup ?? Setup.Wrapper);
+
+        /// <inheritdoc/>
+        public override IReuse Reuse => DryIoc.Reuse.Transient;
 
         /// <inheritdoc/>
         public override Setup Setup => Setup.Wrapper;
