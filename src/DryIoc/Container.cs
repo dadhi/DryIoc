@@ -4129,7 +4129,9 @@ namespace DryIoc
 
         /// <summary>Prepares container for expression generation.</summary>
         public static T WithExpressionGeneration<T>(this T container, bool allowRuntimeState = false) where T : IContainer =>
-            container.With(rules => rules.WithExpressionGeneration(allowRuntimeState));
+            container.With(allowRuntimeState
+                ? (Func<Rules, Rules>)(rules => rules.WithExpressionGeneration(true))
+                : (Func<Rules, Rules>)(rules => rules.WithExpressionGeneration(false)));
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
@@ -5987,7 +5989,7 @@ namespace DryIoc
         }
 
         /// <summary>Removes runtime optimizations preventing an expression generation.</summary>
-        public Rules ForExpressionGeneration(bool allowRuntimeState = false) =>
+        public Rules WithExpressionGenerationSettingsOnly(bool allowRuntimeState = false) =>
             WithSettings(GetSettingsForExpressionGeneration(allowRuntimeState));
 
         /// <summary>Indicates that rules are used for the validation, e.g. the rules created in `Validate` method</summary>

@@ -40,7 +40,7 @@ namespace DryIoc.IssuesTests
 
             container.Register(typeof(DependencyB<>), setup: Setup.With(asResolutionCall: true));
 
-            container.RegisterPlaceholder<RuntimeDependencyC>();
+            //container.RegisterPlaceholder<RuntimeDependencyC>();
 
             var exprs = container.GenerateResolutionExpressions(ServiceInfo.Of<IService>());
             Assert.AreEqual(0, exprs.Errors.Count);

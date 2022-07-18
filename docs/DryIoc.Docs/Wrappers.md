@@ -842,7 +842,7 @@ class Swap_container_in_factory_delegate
 {
     [Test] public void Example()
     {
-        var container = new Container(rules => rules.ForExpressionGeneration());
+        var container = new Container(rules => rules.WithExpressionGenerationSettingsOnly());
 
         container.Register<A>(Reuse.Singleton);
         container.Register<B>(Reuse.Scoped);
