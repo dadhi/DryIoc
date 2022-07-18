@@ -134,10 +134,10 @@ namespace DryIoc
         internal static BaseAConsumer Get_BaseAConsumer_1(IResolverContext r) =>
             new BaseAConsumer(WrappersSupport.WrapInDictionary<object, BaseA>(new System.Collections.Generic.KeyValuePair<object, BaseA>[] {
                 new System.Collections.Generic.KeyValuePair<object, BaseA>(
-                    DefaultKey.Of(0),
+                    (object)"keyed",
                     new KeyedA()),
                 new System.Collections.Generic.KeyValuePair<object, BaseA>(
-                    DefaultKey.Of(1),
+                    DefaultKey.Of(0),
                     new NonKeyedA())}));
 
         internal static DependencyB<string> GetDependency_DependencyB_0(IResolverContext r) =>

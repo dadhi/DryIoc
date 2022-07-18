@@ -103,7 +103,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Can_resolve_the_keyed_struct_service_in_runtime_interpreted_and_compiled()
         {
-            var c = new Container();
+            var c = new Container(Rules.Default.WithCompileTimeContainer(CompileTimeContainer.Instance));
             c.Register<IA, A>();
             c.Register<BVal>(serviceKey: "1");
 
@@ -115,6 +115,18 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(b.A);
             Assert.IsNotNull(b1.A);
             Assert.IsNotNull(b2.A);
+        }
+
+        [Test]
+        public void Can_resolve_service_with_injected_dictionary()
+        {
+            var c = new Container();
+
+            var x = c.Resolve<BaseAConsumer>();
+
+            Assert.AreEqual(2, x.Addict.Count);
+            Assert.IsInstanceOf<KeyedA>(x.Addict["keyed"]);
+            Assert.IsInstanceOf<NonKeyedA>(x.Addict[DefaultKey.Of(0)]);
         }
 
         public interface IA { }

@@ -33,7 +33,7 @@
         // then you fill it in with the run-time registration, e.g. `container.Register<RuntimeDependency>();`
         container.RegisterPlaceholder<RuntimeDependencyC>();
 
-        container.Register<BaseA, KeyedA>();
+        container.Register<BaseA, KeyedA>(serviceKey: "keyed");
         container.Register<BaseA, NonKeyedA>();
         container.Register<BaseAConsumer>(setup: Setup.With(asResolutionCall: true));
 
