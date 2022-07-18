@@ -4019,7 +4019,6 @@ namespace DryIoc
         public readonly List<KeyValuePair<Request, Expression>> ResolveDependencies = new();
         /// <summary>Errors</summary>
         public readonly List<KeyValuePair<ServiceInfo, ContainerException>> Errors = new();
-        // todo: @improve should I add warnings, e.g. if service is not registered?
     }
 
     /// <summary>Container extended features.</summary>
@@ -5074,6 +5073,7 @@ namespace DryIoc
             var serviceType = wrapperType.GetGenericArguments()[0];
             var serviceRequest = request.PushServiceType(serviceType);
 
+            var generateResolutionCallForMissingDependency = false;
             var container = request.Container;
             if (!container.Rules.FuncAndLazyWithoutRegistration)
             {
@@ -5086,16 +5086,20 @@ namespace DryIoc
                 var factory = serviceFactory ?? container.ResolveFactory(serviceRequest);
                 if (factory != null)
                     serviceRequest = serviceRequest.WithResolvedFactory(factory, skipRecursiveDependencyCheck: true);
-                else if (!container.Rules.GenerateResolutionCallForMissingDependency)
+                else if (container.Rules.GenerateResolutionCallForMissingDependency)
+                    generateResolutionCallForMissingDependency = true;
+                else
                     return null;
             }
 
             // creates: r => new Lazy(() => r.Resolve<X>(key))
             // or for singleton : r => new Lazy(() => r.Root.Resolve<X>(key))
-            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, stopRecursiveDependencyCheck: true);
+            var serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, 
+                stopRecursiveDependencyCheck: true, 
+                generateResolutionCallForMissingDependency: generateResolutionCallForMissingDependency);
+
             var funcType = typeof(Func<>).MakeGenericType(serviceType);
             var wrapperCtor = wrapperType.Constructor(funcType);
-
             return New(wrapperCtor, Lambda(funcType, serviceExpr, Empty<ParameterExpression>(), serviceType));
         }
 
@@ -5154,7 +5158,7 @@ namespace DryIoc
             {
                 serviceFactory = container.ResolveFactory(serviceRequest);
                 if (serviceFactory == null && container.Rules.GenerateResolutionCallForMissingDependency)
-                    serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, openResolutionScope: false, stopRecursiveDependencyCheck: true);
+                    serviceExpr = Resolver.CreateResolutionExpression(serviceRequest, stopRecursiveDependencyCheck: true, generateResolutionCallForMissingDependency: true);
                 else
                 {
                     serviceExpr = serviceFactory?.GetExpressionOrDefault(serviceRequest);
@@ -5968,7 +5972,7 @@ namespace DryIoc
                       & ~Settings.ImplicitCheckForReuseMatchingScope
                       & ~Settings.UseInterpretationForTheFirstResolution
                       & ~Settings.UseInterpretation
-                      //   | Settings.GenerateResolutionCallForMissingDependency // todo: @feature #495
+                      | Settings.GenerateResolutionCallForMissingDependency
                       | Settings.UsedForExpressionGeneration
                       | (allowRuntimeState ? 0 : Settings.ThrowIfRuntimeStateRequired);
 
@@ -8530,11 +8534,11 @@ namespace DryIoc
 
         /// <summary>Used for internal purposes to create the expression of Resolve method of the passed `request`</summary>
         public static Expression CreateResolutionExpression(Request request,
-            bool openResolutionScope = false, bool stopRecursiveDependencyCheck = false)
+            bool openResolutionScope = false, bool stopRecursiveDependencyCheck = false, bool generateResolutionCallForMissingDependency = false)
         {
             if (request.Rules.DependencyResolutionCallExprs != null &&
                 request.Factory != null && !request.Factory.HasRuntimeState)
-                PopulateDependencyResolutionCallExpressions(request);
+                ResolveAndPopulateDependencyResolutionCallExpressions(request, generateResolutionCallForMissingDependency);
 
             var container = request.Container;
             var serviceType = request.ServiceType;
@@ -8574,34 +8578,45 @@ namespace DryIoc
             return serviceType == typeof(object) ? resolveCallExpr : TryConvertIntrinsic(resolveCallExpr, serviceType);
         }
 
-        private static void PopulateDependencyResolutionCallExpressions(Request request)
+        private static void ResolveAndPopulateDependencyResolutionCallExpressions(Request request, bool generateResolutionCallForMissingDependency = false)
         {
-            // Actually calls nested Resolve and stores produced expression in collection inside the container Rules.
-            // Stops on recursive dependency, e.g. 
-            // `new A(new Lazy<B>(r => r.Resolve<B>())` and `new B(new A())`
-            for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
-                if (p.FactoryID == request.FactoryID)
+            if (generateResolutionCallForMissingDependency)
+            {
+                // Store `null` as expression to indicate that the dependency resolution call is not generated, 
+                // and the registration for the dependency should be provided. 
+                // This information will help compile-time container to output message the the runtime registration is required.
+                var requestCopy = request.IsolateRequestChain();
+                request.Container.Rules.DependencyResolutionCallExprs.Swap(requestCopy, (x, req) => x.AddOrUpdate(req, null));
+            }
+            else
+            {
+                // Actually calls nested Resolve and stores produced expression in collection inside the container Rules.
+                // Stops on recursive dependency, e.g. 
+                // `new A(new Lazy<B>(r => r.Resolve<B>())` and `new B(new A())`
+                for (var p = request.DirectParent; !p.IsEmpty; p = p.DirectParent)
+                    if (p.FactoryID == request.FactoryID)
+                        return;
+
+                var factory = request.Container.ResolveFactory(request);
+                if (factory == null || factory is FactoryPlaceholder)
                     return;
 
-            var factory = request.Container.ResolveFactory(request);
-            if (factory == null || factory is FactoryPlaceholder)
-                return;
+                // Prevents infinite recursion when generating the resolution dependency #579
+                if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) != 0)
+                    return;
 
-            // Prevents infinite recursion when generating the resolution dependency #579
-            if ((request.Flags & RequestFlags.IsGeneratedResolutionDependencyExpression) != 0)
-                return;
+                request.Flags |= RequestFlags.IsGeneratedResolutionDependencyExpression;
 
-            request.Flags |= RequestFlags.IsGeneratedResolutionDependencyExpression;
+                var factoryExpr = factory.GetExpressionOrDefault(request);
+                if (factoryExpr == null)
+                    return;
 
-            var factoryExpr = factory.GetExpressionOrDefault(request);
-            if (factoryExpr == null)
-                return;
-
-            // we need to isolate request when stored in the key, 
-            // otherwise it maybe reused and the key content will be overriden with the new request, leading to the soup pure! see GHIssue101
-            var requestCopy = request.IsolateRequestChain();
-            request.Container.Rules.DependencyResolutionCallExprs.Swap(
-                requestCopy, factoryExpr, (x, req, facExpr) => x.AddOrUpdate(req, facExpr));
+                // we need to isolate request when stored in the key, 
+                // otherwise it maybe reused and the key content will be overriden with the new request, leading to the soup pure! see GHIssue101
+                var requestCopy = request.IsolateRequestChain();
+                request.Container.Rules.DependencyResolutionCallExprs.Swap(
+                    requestCopy, factoryExpr, (x, req, facExpr) => x.AddOrUpdate(req, facExpr));
+            }
         }
     }
 
@@ -11780,7 +11795,7 @@ namespace DryIoc
                 var paramFactory = container.ResolveFactory(paramRequest);
                 if (paramFactory == null && rules.GenerateResolutionCallForMissingDependency)
                 {
-                    var paramResolutionCall = Resolver.CreateResolutionExpression(paramRequest);
+                    var paramResolutionCall = Resolver.CreateResolutionExpression(paramRequest, generateResolutionCallForMissingDependency: true);
                     if (paramExprs != null)
                         paramExprs[i] = paramResolutionCall;
                     else switch (i)
