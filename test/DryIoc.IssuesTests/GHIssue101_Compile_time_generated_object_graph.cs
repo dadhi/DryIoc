@@ -14,8 +14,9 @@ namespace DryIoc.IssuesTests
             Emulate_compile_time_generated_example_service_in_runtime();
             Can_resolve_the_struct_service_in_runtime_interpreted_and_compiled();
             Can_resolve_the_keyed_struct_service_in_runtime_interpreted_and_compiled();
+            Can_resolve_service_with_injected_dictionary();
             Resolve_compile_time_generated_example_service_with_the_rules();
-            return 5;
+            return 6;
         }
 
         [Test]
@@ -103,7 +104,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Can_resolve_the_keyed_struct_service_in_runtime_interpreted_and_compiled()
         {
-            var c = new Container(Rules.Default.WithCompileTimeContainer(CompileTimeContainer.Instance));
+            var c = new Container();
             c.Register<IA, A>();
             c.Register<BVal>(serviceKey: "1");
 
@@ -120,7 +121,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Can_resolve_service_with_injected_dictionary()
         {
-            var c = new Container();
+            var c = new Container(Rules.Default.WithCompileTimeContainer(CompileTimeContainer.Instance));
 
             var x = c.Resolve<BaseAConsumer>();
 
