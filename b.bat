@@ -8,16 +8,16 @@ if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: RESTORE and BUILD
 echo:
-echo:## Starting: TestRunner... ##
-echo:
+@REM echo:## Starting: TestRunner... ##
+@REM echo:
 
-dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
-if %ERRORLEVEL% neq 0 goto :error
-dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
+@REM dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+@REM if %ERRORLEVEL% neq 0 goto :error
+@REM dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
 
-if %ERRORLEVEL% neq 0 goto :error
-echo:## Finished: TestRunner ##
-echo:
+@REM if %ERRORLEVEL% neq 0 goto :error
+@REM echo:## Finished: TestRunner ##
+@REM echo:
 echo:## Starting: TESTS...
 echo: 
 

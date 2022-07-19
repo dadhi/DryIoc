@@ -13,6 +13,7 @@
     - [Func of A](#func-of-a)
     - [Really "lazy" Lazy and Func](#really-lazy-lazy-and-func)
     - [Func of A with parameters](#func-of-a-with-parameters)
+      - [Func with single argument to resolve service by key](#func-with-single-argument-to-resolve-service-by-key)
     - [KeyValuePair of Service Key and A](#keyvaluepair-of-service-key-and-a)
     - [Meta or Tuple of A with Metadata](#meta-or-tuple-of-a-with-metadata)
       - [Dictionary Metadata](#dictionary-metadata)
@@ -254,6 +255,53 @@ class Func_with_args_with_rule_ignoring_reuse
     }
 }/*md
 ```
+
+#### Func with single argument to resolve service by key
+
+In some IoC libraries `Func<string, IService>` has a special meaning 
+where string argument represents a service key to access `IService` by key. 
+
+This is not true in DryIoc. 
+First, because it more general concept of fulfilling the dependency though the passed argument,
+and no one prevent the dependency to be type of `string`.
+Second, the service keys in DryIoc may be of arbitrary types not restricted to strings, e.g. `int`, `Guid`, enums, etc.
+
+But DryIoc is powerful enough to emulate this feature without much hassle:
+
+```cs md*/
+class Func_with_single_argument_to_resolve_service_by_key
+{
+    [Test] 
+    public void Example()
+    {
+        var container = new Container();
+
+        container.Register<IService, ServiceA>(serviceKey: "A");
+        container.Register<IService, ServiceB>(serviceKey: "B");
+        container.Register<Consumer>();
+
+        // The magic is not: 
+        // DryIoc will inject the IDictionary wrapper of services by key and a string key passed as function argument
+        container.RegisterDelegate<IDictionary<string, IService>, string, IService>((services, key) => services[key]);
+
+        var getConsumer = container.Resolve<Func<string, Consumer>>();
+
+        Assert.IsInstanceOf<ServiceA>(getConsumer("A").Service);
+
+        Assert.IsInstanceOf<ServiceB>(getConsumer("B").Service);
+    }
+
+    interface IService {}
+    class ServiceA : IService {}
+    class ServiceB : IService {}
+    class Consumer 
+    {
+        public readonly IService Service;
+        public Consumer(IService service) => Service = service;
+    }
+}/*md
+```
+
 
 
 ### KeyValuePair of Service Key and A
