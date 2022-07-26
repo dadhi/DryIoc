@@ -6309,7 +6309,7 @@ namespace DryIoc
             closure.AddConstantOrIncrementUsageCount(Func.Target);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
+                EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure) &&
                 EmittingVisitor.EmitMethodCall(il, Method);
     }
 
@@ -6325,7 +6325,7 @@ namespace DryIoc
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
                 && EmittingVisitor.TryEmit(Argument, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.EmitMethodCall(il, Method);
     }
@@ -6343,7 +6343,7 @@ namespace DryIoc
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
+            EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure) &&
             EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent) &&
             EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent) &&
             EmittingVisitor.EmitMethodCall(il, Method);
@@ -6363,7 +6363,7 @@ namespace DryIoc
                 && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
                 && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
@@ -6385,7 +6385,7 @@ namespace DryIoc
                 && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument3, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
                 && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
@@ -6410,7 +6410,7 @@ namespace DryIoc
                 ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument4, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure) &&
+                EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure) &&
                 EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent) &&
                 EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent) &&
                 EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent) &&
@@ -6437,7 +6437,7 @@ namespace DryIoc
                 && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument5, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
                 && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
@@ -6466,7 +6466,7 @@ namespace DryIoc
                 && ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument6, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(
             CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs, ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-                EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, Func.Target, il, ref closure)
+                EmittingVisitor.TryEmitNotNullConstant(true, Func.Target, il, ref closure)
                 && EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, config, parent)
                 && EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, config, parent)
@@ -12564,7 +12564,7 @@ namespace DryIoc
 
         public override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
+            EmittingVisitor.TryEmitNotNullConstant(true, FactoryDelegate, il, ref closure) &&
             EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure) &&
             EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
             il.EmitConvertObjectTo(Type);
@@ -12578,7 +12578,7 @@ namespace DryIoc
 
         public sealed override bool TryEmit(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1) =>
-            EmittingVisitor.TryEmitConstantOfNotNullValue(true, null, FactoryDelegate, il, ref closure) &&
+            EmittingVisitor.TryEmitNotNullConstant(true, FactoryDelegate, il, ref closure) &&
             ResolverContext.RootOrSelfExpr.TryEmit(config, ref closure, paramExprs, il, parent, byRefIndex) &&
             EmittingVisitor.EmitMethodCall(il, FactoryDelegateCompiler.InvokeMethod) &&
             il.EmitConvertObjectTo(Type);

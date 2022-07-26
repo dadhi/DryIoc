@@ -1098,8 +1098,9 @@ namespace DryIoc.FastExpressionCompiler
                 {
                     case ExpressionType.Constant:
 #if LIGHT_EXPRESSION
-                        if (expr is IntConstantExpression n) // todo: @perf use more generic approach
-                            return true;
+                    // todo: @perf @simplify convert to intrinsic
+                    if (expr == NullConstant || expr == FalseConstant || expr == TrueConstant || expr is IntConstantExpression n)
+                        return true;
 #endif
                         var constantExpr = (ConstantExpression)expr;
                         var value = constantExpr.Value;
@@ -1853,26 +1854,7 @@ namespace DryIoc.FastExpressionCompiler
                             return true;
 
                         case ExpressionType.Constant:
-                            if ((parent & ParentFlags.IgnoreResult) != 0)
-                                return true;
-#if LIGHT_EXPRESSION
-                            if (expr is IntConstantExpression n) // todo: convert to intrinsic
-                            {
-                                EmitLoadConstantInt(il, n.IntValue);
-                                return true;
-                            }
-#endif
-                            var constExpr = (ConstantExpression)expr;
-                            if (constExpr.Value == null)
-                            {
-                                if (constExpr.Type.IsValueType)
-                                    return EmitLoadLocalVariable(il, InitValueTypeVariable(il, constExpr.Type)); // yep, this is a proper way to emit the Nullable null
-                                il.Emit(OpCodes.Ldnull);
-                                return true;
-                            }
-
-                            return TryEmitConstantOfNotNullValue(closure.ContainsConstantsOrNestedLambdas(),
-                                constExpr.Type, constExpr.Value, il, ref closure, byRefIndex);
+                            return (parent & ParentFlags.IgnoreResult) != 0 || TryEmitConstant(expr, il, ref closure, byRefIndex);
 
                         case ExpressionType.Call:
                             return TryEmitMethodCall(expr, paramExprs, il, ref closure, setup, parent);
@@ -2371,11 +2353,11 @@ namespace DryIoc.FastExpressionCompiler
                 if (leftType.IsValueType) // Nullable -> It's the only ValueType comparable to null
                 {
                     var varIndex = EmitStoreAndLoadLocalVariableAddress(il, leftType);
-                    il.Emit(OpCodes.Call, leftType.FindNullableHasValueGetterMethod());
+                    EmitMethodCall(il, leftType.FindNullableHasValueGetterMethod());
 
                     il.Emit(OpCodes.Brfalse, labelFalse);
                     EmitLoadLocalVariableAddress(il, varIndex);
-                    il.Emit(OpCodes.Call, leftType.FindNullableGetValueOrDefaultMethod());
+                    EmitMethodCall(il, leftType.FindNullableGetValueOrDefaultMethod());
 
                     il.Emit(OpCodes.Br, labelDone);
                     il.MarkLabel(labelFalse);
@@ -2711,50 +2693,32 @@ namespace DryIoc.FastExpressionCompiler
                 }
                 else if (expr.NodeType == ExpressionType.Increment)
                 {
-                    var typeInfo = exprType.GetTypeInfo();
-                    if (typeInfo.IsPrimitive)
+                    if (exprType.IsPrimitive)
                     {
                         if (!TryEmitNumberOne(il, exprType))
                             return false;
                         il.Emit(OpCodes.Add);
                     }
-                    else
-                    {
-                        var method = typeInfo.GetDeclaredMethod("op_Increment");
-                        if (method == null)
-                            return false;
-                        il.Emit(OpCodes.Call, method);
-                    }
+                    else if (!EmitMethodCallCheckForNull(il, exprType.GetMethod("op_Increment")))
+                        return false;
                 }
                 else if (expr.NodeType == ExpressionType.Decrement)
                 {
-                    var typeInfo = exprType.GetTypeInfo();
-                    if (typeInfo.IsPrimitive)
+                    if (exprType.IsPrimitive)
                     {
                         if (!TryEmitNumberOne(il, exprType))
                             return false;
                         il.Emit(OpCodes.Sub);
                     }
-                    else
-                    {
-                        var method = typeInfo.GetDeclaredMethod("op_Decrement");
-                        if (method == null)
-                            return false;
-                        il.Emit(OpCodes.Call, method);
-                    }
+                    else if (!EmitMethodCallCheckForNull(il, exprType.GetMethod("op_Decrement")))
+                        return false;
                 }
                 else if (expr.NodeType == ExpressionType.Negate || expr.NodeType == ExpressionType.NegateChecked)
                 {
-                    var typeInfo = exprType.GetTypeInfo();
-                    if (typeInfo.IsPrimitive)
+                    if (exprType.IsPrimitive)
                         il.Emit(OpCodes.Neg);
-                    else
-                    {
-                        var method = typeInfo.GetDeclaredMethod("op_UnaryNegation");
-                        if (method == null)
-                            return false;
-                        il.Emit(OpCodes.Call, method);
-                    }
+                    else if (!EmitMethodCallCheckForNull(il, exprType.GetMethod("op_UnaryNegation")))
+                        return false;
                 }
                 else if (expr.NodeType == ExpressionType.OnesComplement)
                     il.Emit(OpCodes.Not);
@@ -2815,18 +2779,10 @@ namespace DryIoc.FastExpressionCompiler
 
                 if ((parent & ParentFlags.IgnoreResult) != 0)
                     il.Emit(OpCodes.Pop);
+                else if (expr.Type == typeof(bool))
+                    EmitEqualToZeroOrNull(il);
                 else
-                {
-                    if (expr.Type == typeof(bool))
-                    {
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Ceq);
-                    }
-                    else
-                    {
-                        il.Emit(OpCodes.Not);
-                    }
-                }
+                    il.Emit(OpCodes.Not);
                 return true;
             }
 
@@ -2863,8 +2819,7 @@ namespace DryIoc.FastExpressionCompiler
                     if (!closure.LastEmitIsAddress)
                         EmitStoreAndLoadLocalVariableAddress(il, sourceType);
 
-                    il.Emit(OpCodes.Call, sourceType.FindValueGetterMethod());
-                    return il.EmitPopIfIgnoreResult(parent);
+                    return EmitMethodCall(il, sourceType.FindValueGetterMethod()) && il.EmitPopIfIgnoreResult(parent);
                 }
 
                 if (!TryEmit(opExpr, paramExprs, il, ref closure, setup, parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess))
@@ -2877,12 +2832,11 @@ namespace DryIoc.FastExpressionCompiler
                     return true;
                 }
 
-                if (sourceType == targetType || targetType == typeof(object))
-                {
-                    if (targetType == typeof(object))
-                        il.TryEmitBoxOf(sourceType);
+                if (sourceType == targetType)
                     return il.EmitPopIfIgnoreResult(parent);
-                }
+
+                if (targetType == typeof(object))
+                    return il.TryEmitBoxOf(sourceType) && il.EmitPopIfIgnoreResult(parent);
 
                 // check implicit / explicit conversion operators on source and target types
                 // for non-primitives and for non-primitive nullable - #73
@@ -2892,7 +2846,7 @@ namespace DryIoc.FastExpressionCompiler
                     var convertOpMethod = method ?? sourceType.FindConvertOperator(sourceType, actualTargetType);
                     if (convertOpMethod != null)
                     {
-                        il.Emit(OpCodes.Call, convertOpMethod);
+                        EmitMethodCall(il, convertOpMethod);
                         if (underlyingNullableTargetType != null)
                             il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
                         return il.EmitPopIfIgnoreResult(parent);
@@ -2901,10 +2855,7 @@ namespace DryIoc.FastExpressionCompiler
                 else if (underlyingNullableTargetType == null) // means sourceType.IsPrimitive
                 {
                     if (method != null && method.DeclaringType == targetType && method.GetParameters()[0].ParameterType == sourceType)
-                    {
-                        il.Emit(OpCodes.Call, method);
-                        return il.EmitPopIfIgnoreResult(parent);
-                    }
+                        return EmitMethodCall(il, method) && il.EmitPopIfIgnoreResult(parent);
 
                     var actualSourceType = underlyingNullableSourceType ?? sourceType;
                     var convertOpMethod = method ?? actualSourceType.FindConvertOperator(actualSourceType, targetType);
@@ -2913,11 +2864,9 @@ namespace DryIoc.FastExpressionCompiler
                         if (underlyingNullableSourceType != null)
                         {
                             EmitStoreAndLoadLocalVariableAddress(il, sourceType);
-                            il.Emit(OpCodes.Call, sourceType.FindValueGetterMethod());
+                            EmitMethodCall(il, sourceType.FindValueGetterMethod());
                         }
-
-                        il.Emit(OpCodes.Call, convertOpMethod);
-                        return il.EmitPopIfIgnoreResult(parent);
+                        return EmitMethodCall(il, convertOpMethod) && il.EmitPopIfIgnoreResult(parent);
                     }
                 }
 
@@ -2926,10 +2875,7 @@ namespace DryIoc.FastExpressionCompiler
                     if (underlyingNullableTargetType == null && !targetType.IsPrimitive)
                     {
                         if (method != null && method.DeclaringType == targetType && method.GetParameters()[0].ParameterType == sourceType)
-                        {
-                            il.Emit(OpCodes.Call, method);
-                            return il.EmitPopIfIgnoreResult(parent);
-                        }
+                            return EmitMethodCall(il, method) && il.EmitPopIfIgnoreResult(parent);
 
                         var actualSourceType = underlyingNullableSourceType ?? sourceType;
                         // ReSharper disable once ConstantNullCoalescingCondition
@@ -2939,11 +2885,9 @@ namespace DryIoc.FastExpressionCompiler
                             if (underlyingNullableSourceType != null)
                             {
                                 EmitStoreAndLoadLocalVariableAddress(il, sourceType);
-                                il.Emit(OpCodes.Call, sourceType.FindValueGetterMethod());
+                                EmitMethodCall(il, sourceType.FindValueGetterMethod());
                             }
-
-                            il.Emit(OpCodes.Call, convertOpMethod);
-                            return il.EmitPopIfIgnoreResult(parent);
+                            return EmitMethodCall(il, convertOpMethod) && il.EmitPopIfIgnoreResult(parent);
                         }
                     }
                     else if (underlyingNullableSourceType == null) // means targetType.IsPrimitive
@@ -2952,10 +2896,9 @@ namespace DryIoc.FastExpressionCompiler
                         var convertOpMethod = method ?? actualTargetType.FindConvertOperator(sourceType, actualTargetType);
                         if (convertOpMethod != null)
                         {
-                            il.Emit(OpCodes.Call, convertOpMethod);
+                            EmitMethodCall(il, convertOpMethod);
                             if (underlyingNullableTargetType != null)
                                 il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
-
                             return il.EmitPopIfIgnoreResult(parent);
                         }
                     }
@@ -2978,7 +2921,7 @@ namespace DryIoc.FastExpressionCompiler
                     else
                     {
                         var sourceVarIndex = EmitStoreAndLoadLocalVariableAddress(il, sourceType);
-                        il.Emit(OpCodes.Call, sourceType.FindNullableHasValueGetterMethod());
+                        EmitMethodCall(il, sourceType.FindNullableHasValueGetterMethod());
 
                         var labelSourceHasValue = il.DefineLabel();
                         il.Emit(OpCodes.Brtrue_S, labelSourceHasValue); // jump where source has a value
@@ -2993,7 +2936,7 @@ namespace DryIoc.FastExpressionCompiler
                         // if source nullable has a value:
                         il.MarkLabel(labelSourceHasValue);
                         EmitLoadLocalVariableAddress(il, sourceVarIndex);
-                        il.Emit(OpCodes.Call, sourceType.FindNullableGetValueOrDefaultMethod());
+                        EmitMethodCall(il, sourceType.FindNullableGetValueOrDefaultMethod());
 
                         if (!TryEmitValueConvert(underlyingNullableTargetType, il,
                             expr.NodeType == ExpressionType.ConvertChecked))
@@ -3001,7 +2944,7 @@ namespace DryIoc.FastExpressionCompiler
                             var convertOpMethod = method ?? underlyingNullableTargetType.FindConvertOperator(underlyingNullableSourceType, underlyingNullableTargetType);
                             if (convertOpMethod == null)
                                 return false; // nor conversion nor conversion operator is found
-                            il.Emit(OpCodes.Call, convertOpMethod);
+                            EmitMethodCall(il, convertOpMethod);
                         }
 
                         il.Emit(OpCodes.Newobj, targetType.GetTypeInfo().DeclaredConstructors.GetFirst());
@@ -3017,7 +2960,7 @@ namespace DryIoc.FastExpressionCompiler
                     if (underlyingNullableSourceType != null)
                     {
                         EmitStoreAndLoadLocalVariableAddress(il, sourceType);
-                        il.Emit(OpCodes.Call, sourceType.FindValueGetterMethod());
+                        EmitMethodCall(il, sourceType.FindValueGetterMethod());
                     }
 
                     // cast as the last resort and let's it fail if unlucky
@@ -3058,30 +3001,54 @@ namespace DryIoc.FastExpressionCompiler
                 return true;
             }
 
-            public static bool TryEmitConstant(
-                bool considerClosure, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1)
+            public static bool TryEmitConstant(Expression expr, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1)
             {
-                if (constantValue == null)
+#if LIGHT_EXPRESSION
+                // todo: @perf @simplify convert to intrinsic
+                if (expr == NullConstant)
                 {
-                    if (exprType.IsValueType)
-                        return EmitLoadLocalVariable(il, InitValueTypeVariable(il, exprType)); // yep, this is a proper way to emit the Nullable null
                     il.Emit(OpCodes.Ldnull);
                     return true;
                 }
-                return TryEmitConstantOfNotNullValue(closure.ContainsConstantsOrNestedLambdas(), exprType, constantValue, il, ref closure, byRefIndex);
+                if (expr == FalseConstant)
+                {
+                    il.Emit(OpCodes.Ldc_I4_0);
+                    return true;
+                }
+                if (expr == TrueConstant)
+                {
+                    il.Emit(OpCodes.Ldc_I4_1);
+                    return true;
+                }
+                if (expr is IntConstantExpression n)
+                {
+                    EmitLoadConstantInt(il, n.IntValue);
+                    return true;
+                }
+#endif
+                var constExpr = (ConstantExpression)expr;
+                var constValue = constExpr.Value;
+                if (constValue != null)
+                    return TryEmitConstant(closure.ContainsConstantsOrNestedLambdas(), expr.Type, constValue.GetType(), constValue, il, ref closure, byRefIndex);
+                if (expr.Type.IsValueType)
+                    return EmitLoadLocalVariable(il, InitValueTypeVariable(il, expr.Type)); // yep, this is a proper way to emit the Nullable null
+                il.Emit(OpCodes.Ldnull);
+                return true;
             }
 
-            public static bool TryEmitConstantOfNotNullValue(
-                bool considerClosure, Type exprType, object constantValue, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1)
+            [MethodImpl((MethodImplOptions)256)]
+            public static bool TryEmitNotNullConstant(bool considerClosure, object consValue, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1) =>
+                TryEmitConstant(considerClosure, null, consValue.GetType(), consValue, il, ref closure, byRefIndex);
+
+            public static bool TryEmitConstant(bool considerClosure, Type exprType, Type constType, object consValue, ILGenerator il, ref ClosureInfo closure, int byRefIndex = -1)
             {
-                var constValueType = constantValue.GetType();
                 if (exprType == null)
-                    exprType = constValueType;
-                if (considerClosure && IsClosureBoundConstant(constantValue, constValueType))
+                    exprType = constType;
+                if (considerClosure && IsClosureBoundConstant(consValue, constType))
                 {
                     var constItems = closure.Constants.Items;
                     var constIndex = closure.Constants.Count - 1;
-                    while (constIndex != -1 && !ReferenceEquals(constItems[constIndex], constantValue))
+                    while (constIndex != -1 && !ReferenceEquals(constItems[constIndex], consValue))
                         --constIndex;
                     if (constIndex == -1)
                         return false;
@@ -3111,152 +3078,123 @@ namespace DryIoc.FastExpressionCompiler
                 }
                 else
                 {
-                    if (constantValue is string s)
+                    if (consValue is string s)
                     {
                         il.Emit(OpCodes.Ldstr, s);
                         return true;
                     }
-
-                    if (constantValue is Type t)
+                    if (consValue is Type t)
                     {
                         il.Emit(OpCodes.Ldtoken, t);
-                        il.Emit(OpCodes.Call, _getTypeFromHandleMethod);
+                        EmitMethodCall(il, _getTypeFromHandleMethod);
                         return true;
                     }
-
-                    if (!TryEmitNumberConstant(il, constantValue, constValueType))
+                    if (!TryEmitPrimitiveOrEnumOrDecimalConstant(il, consValue, constType))
                         return false;
                 }
 
-                // todo: @simplify optimize this together with closure bound constant handling above
-                if (exprType.IsValueType)
-                {
-                    if (exprType.IsNullable())
-                        il.Emit(OpCodes.Newobj, exprType.GetConstructors().GetFirst());
-                }
-                // boxing the value type, otherwise we can get a strange result when 0 is treated as Null.
+                if (exprType.IsValueType && exprType.IsNullable())
+                    il.Emit(OpCodes.Newobj, exprType.GetConstructors().GetFirst());
                 else if (exprType == typeof(object))
-                    return il.TryEmitBoxOf(constValueType); // using normal type for Enum instead of underlying type
+                    return il.TryEmitBoxOf(constType); // using normal type for Enum instead of underlying type
                 return true;
             }
 
-            // todo: @perf can we do something about boxing?
-            private static bool TryEmitNumberConstant(ILGenerator il, object constantValue, Type constValueType)
+            private static bool TryEmitPrimitiveOrEnumOrDecimalConstant(ILGenerator il, object consValue, Type constType)
             {
-                if (constValueType.IsEnum)
-                    constValueType = Enum.GetUnderlyingType(constValueType);
+                if (constType.IsEnum)
+                    constType = Enum.GetUnderlyingType(constType);
 
-                // more "commonly" used constants are higher in comparison
-                if (constValueType == typeof(int))
+                switch (Type.GetTypeCode(constType))
                 {
-                    EmitLoadConstantInt(il, (int)constantValue);
+                    case TypeCode.Boolean:
+                        il.Emit((bool)consValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0); // todo: @perf check for LightExpression
+                        break;
+                    case TypeCode.Char:
+                        EmitLoadConstantInt(il, (char)consValue);
+                        break;
+                    case TypeCode.SByte:
+                        EmitLoadConstantInt(il, (sbyte)consValue);
+                        break;
+                    case TypeCode.Byte:
+                        EmitLoadConstantInt(il, (byte)consValue);
+                        break;
+                    case TypeCode.Int16:
+                        EmitLoadConstantInt(il, (short)consValue);
+                        break;
+                    case TypeCode.Int32: // todo: @perf check for LightExpression
+                        EmitLoadConstantInt(il, (int)consValue);
+                        break;
+                    case TypeCode.Int64:
+                        il.Emit(OpCodes.Ldc_I8, (long)consValue);
+                        break;
+                    case TypeCode.Double:
+                        il.Emit(OpCodes.Ldc_R8, (double)consValue);
+                        break;
+                    case TypeCode.Single:
+                        il.Emit(OpCodes.Ldc_R4, (float)consValue);
+                        break;
+                    case TypeCode.UInt16:
+                        EmitLoadConstantInt(il, (ushort)consValue);
+                        break;
+                    case TypeCode.UInt32:
+                        unchecked
+                        {
+                            EmitLoadConstantInt(il, (int)(uint)consValue);
+                        }
+                        break;
+                    case TypeCode.UInt64:
+                        unchecked
+                        {
+                            il.Emit(OpCodes.Ldc_I8, (long)(ulong)consValue);
+                        }
+                        break;
+                    case TypeCode.Decimal:
+                        EmitDecimalConstant((decimal)consValue, il);
+                        break;
+                    // todo: @feature for net7 add Half, Int128, UInt128
+                    default:
+                        if (constType == typeof(IntPtr))
+                        {
+                            il.Emit(OpCodes.Ldc_I8, ((IntPtr)consValue).ToInt64());
+                            break;
+                        }
+                        else if (constType == typeof(UIntPtr))
+                        {
+                            unchecked
+                            {
+                                il.Emit(OpCodes.Ldc_I8, (long)((UIntPtr)consValue).ToUInt64());
+                            }
+                            break;
+                        }
+                        return false;
                 }
-                else if (constValueType == typeof(bool))
-                {
-                    il.Emit((bool)constantValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
-                }
-                else if (constValueType == typeof(char))
-                {
-                    EmitLoadConstantInt(il, (char)constantValue);
-                }
-                else if (constValueType == typeof(short))
-                {
-                    EmitLoadConstantInt(il, (short)constantValue);
-                }
-                else if (constValueType == typeof(byte))
-                {
-                    EmitLoadConstantInt(il, (byte)constantValue);
-                }
-                else if (constValueType == typeof(ushort))
-                {
-                    EmitLoadConstantInt(il, (ushort)constantValue);
-                }
-                else if (constValueType == typeof(sbyte))
-                {
-                    EmitLoadConstantInt(il, (sbyte)constantValue);
-                }
-                else if (constValueType == typeof(uint))
-                {
-                    unchecked
-                    {
-                        EmitLoadConstantInt(il, (int)(uint)constantValue);
-                    }
-                }
-                else if (constValueType == typeof(long))
-                {
-                    il.Emit(OpCodes.Ldc_I8, (long)constantValue);
-                }
-                else if (constValueType == typeof(ulong))
-                {
-                    unchecked
-                    {
-                        il.Emit(OpCodes.Ldc_I8, (long)(ulong)constantValue);
-                    }
-                }
-                else if (constValueType == typeof(float))
-                {
-                    il.Emit(OpCodes.Ldc_R4, (float)constantValue);
-                }
-                else if (constValueType == typeof(double))
-                {
-                    il.Emit(OpCodes.Ldc_R8, (double)constantValue);
-                }
-                else if (constValueType == typeof(IntPtr))
-                {
-                    il.Emit(OpCodes.Ldc_I8, ((IntPtr)constantValue).ToInt64());
-                }
-                else if (constValueType == typeof(UIntPtr))
-                {
-                    unchecked
-                    {
-                        il.Emit(OpCodes.Ldc_I8, (long)((UIntPtr)constantValue).ToUInt64());
-                    }
-                }
-                else if (constValueType == typeof(decimal))
-                {
-                    EmitDecimalConstant((decimal)constantValue, il);
-                }
-                else
-                {
-                    return false;
-                }
-
                 return true;
             }
 
+            // todo: @perf optimize using Type.TypeCode 
             internal static bool TryEmitNumberOne(ILGenerator il, Type type)
             {
                 if (type == typeof(int) || type == typeof(char) || type == typeof(short) ||
                     type == typeof(byte) || type == typeof(ushort) || type == typeof(sbyte) ||
                     type == typeof(uint))
-                {
                     il.Emit(OpCodes.Ldc_I4_1);
-                }
                 else if (type == typeof(long) || type == typeof(ulong) ||
                          type == typeof(IntPtr) || type == typeof(UIntPtr))
-                {
                     il.Emit(OpCodes.Ldc_I8, (long)1);
-                }
                 else if (type == typeof(float))
-                {
                     il.Emit(OpCodes.Ldc_R4, 1f);
-                }
                 else if (type == typeof(double))
-                {
                     il.Emit(OpCodes.Ldc_R8, 1d);
-                }
                 else
-                {
                     return false;
-                }
-
                 return true;
             }
 
             [MethodImpl((MethodImplOptions)256)]
             private static void EmitLoadClosureArrayItem(ILGenerator il, int i)
             {
-                il.Emit(OpCodes.Ldloc_0);// SHOULD BE always at 0 locaton; load array field variable on the stack
+                il.Emit(OpCodes.Ldloc_0);// SHOULD BE always at 0 location; load array field variable on the stack
                 EmitLoadConstantInt(il, i);
                 il.Emit(OpCodes.Ldelem_Ref);
             }
@@ -3316,6 +3254,14 @@ namespace DryIoc.FastExpressionCompiler
 
             private static void EmitDecimalConstant(decimal value, ILGenerator il)
             {
+                if (value == 0 || value == 1)
+                {
+                    // emit Decimal.Zero or Decimal.One instead of new Decimal(0) or new Decimal(1)
+                    var field = value == 0 ? typeof(Decimal).GetField(nameof(Decimal.Zero)) : typeof(Decimal).GetField(nameof(Decimal.One));
+                    il.Emit(OpCodes.Ldsfld, field);
+                    return;
+                }
+
                 //check if decimal has decimal places, if not use shorter IL code (constructor from int or long)
                 if (value % 1 == 0)
                 {
@@ -4225,7 +4171,7 @@ namespace DryIoc.FastExpressionCompiler
                     {
                         var fieldValue = field.GetValue(null);
                         if (fieldValue != null)
-                            return TryEmitConstantOfNotNullValue(false, field.FieldType, fieldValue, il, ref closure);
+                            return TryEmitConstant(false, null, field.FieldType, fieldValue, il, ref closure);
                         il.Emit(OpCodes.Ldnull);
                     }
                     else
@@ -4539,17 +4485,48 @@ namespace DryIoc.FastExpressionCompiler
                 var leftOpType = exprLeft.Type;
                 var leftIsNullable = leftOpType.IsNullable();
                 var rightOpType = exprRight.Type;
-                if (exprRight is ConstantExpression r && r.Value == null)
+
+                // if on member is `null` object then list its type to match other member
+                var rightIsNull = exprRight is ConstantExpression r && r.Value == null;
+                if (rightIsNull && rightOpType == typeof(object))
+                    rightOpType = leftOpType;
+
+                var leftIsNull = exprLeft is ConstantExpression l && l.Value == null;
+                if (leftIsNull && leftOpType == typeof(object))
+                    leftOpType = rightOpType;
+
+                var operandParent = parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess;
+
+                // short circuit the comparison with null on the right
+                var isEqualityOp = expressionType == ExpressionType.Equal || expressionType == ExpressionType.NotEqual;
+                if (isEqualityOp)
                 {
-                    if (exprRight.Type == typeof(object))
-                        rightOpType = leftOpType;
+                    if (leftIsNullable && rightIsNull)
+                    {
+                        if (!TryEmit(exprLeft, paramExprs, il, ref closure, setup, operandParent))
+                            return false;
+                        EmitStoreAndLoadLocalVariableAddress(il, leftOpType);
+                        EmitMethodCall(il, leftOpType.FindNullableHasValueGetterMethod());
+                        if (expressionType == ExpressionType.Equal)
+                            EmitEqualToZeroOrNull(il);
+                        return il.EmitPopIfIgnoreResult(parent);
+                    }
+                    if (leftIsNull && rightOpType.IsNullable())
+                    {
+                        if (!TryEmit(exprRight, paramExprs, il, ref closure, setup, operandParent))
+                            return false;
+                        EmitStoreAndLoadLocalVariableAddress(il, rightOpType);
+                        EmitMethodCall(il, rightOpType.FindNullableHasValueGetterMethod());
+                        if (expressionType == ExpressionType.Equal)
+                            EmitEqualToZeroOrNull(il);
+                        return il.EmitPopIfIgnoreResult(parent);
+                    }
                 }
 
-                int lVarIndex = -1, rVarIndex = -1;
-                var operandParent = parent & ~ParentFlags.IgnoreResult & ~ParentFlags.InstanceAccess;
                 if (!TryEmit(exprLeft, paramExprs, il, ref closure, setup, operandParent))
                     return false;
 
+                int lVarIndex = -1, rVarIndex = -1;
                 if (leftIsNullable)
                 {
                     lVarIndex = EmitStoreAndLoadLocalVariableAddress(il, leftOpType);
@@ -4560,31 +4537,21 @@ namespace DryIoc.FastExpressionCompiler
                 if (!TryEmit(exprRight, paramExprs, il, ref closure, setup, operandParent))
                     return false;
 
-                if (leftOpType != rightOpType)
+                if (leftOpType != rightOpType && leftOpType.IsClass && rightOpType.IsClass &&
+                    (leftOpType == typeof(object) || rightOpType == typeof(object)))
                 {
-                    if (leftOpType.IsClass && rightOpType.IsClass &&
-                        (leftOpType == typeof(object) || rightOpType == typeof(object)))
-                    {
-                        if (expressionType == ExpressionType.Equal)
-                            il.Emit(OpCodes.Ceq);
-                        else if (expressionType == ExpressionType.NotEqual)
-                        {
-                            il.Emit(OpCodes.Ceq);
-                            il.Emit(OpCodes.Ldc_I4_0); // todo: @perf Currently it produces the same code as a System Compile but I wonder if we can use OpCodes.Not
-                            il.Emit(OpCodes.Ceq);
-                        }
-                        else
-                            return false;
-
-                        return il.EmitPopIfIgnoreResult(parent);
-                    }
+                    if (!isEqualityOp)
+                        return false;
+                    il.Emit(OpCodes.Ceq); // todo: @wip test it why not _objectEqualsMethod 
+                    if (expressionType == ExpressionType.NotEqual)
+                        EmitEqualToZeroOrNull(il);
+                    return il.EmitPopIfIgnoreResult(parent);
                 }
 
                 if (rightOpType.IsNullable())
                 {
                     rVarIndex = EmitStoreAndLoadLocalVariableAddress(il, rightOpType);
                     EmitMethodCall(il, rightOpType.FindNullableGetValueOrDefaultMethod());
-                    // ReSharper disable once AssignNullToNotNullAttribute
                     rightOpType = Nullable.GetUnderlyingType(rightOpType);
                 }
 
@@ -4618,19 +4585,15 @@ namespace DryIoc.FastExpressionCompiler
                         }
                     }
 
-                    if (expressionType != ExpressionType.Equal && expressionType != ExpressionType.NotEqual)
+                    if (!isEqualityOp)
                         return false; // todo: @unclear what is the alternative?
 
                     EmitMethodCall(il, _objectEqualsMethod);
-
                     if (expressionType == ExpressionType.NotEqual) // invert result for not equal
-                    {
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Ceq);
-                    }
+                        EmitEqualToZeroOrNull(il);
 
                     if (leftIsNullable)
-                        goto nullCheck;
+                        goto nullableCheck;
 
                     return il.EmitPopIfIgnoreResult(parent);
                 }
@@ -4641,46 +4604,38 @@ namespace DryIoc.FastExpressionCompiler
                     case ExpressionType.Equal:
                         il.Emit(OpCodes.Ceq);
                         break;
-
                     case ExpressionType.NotEqual:
                         il.Emit(OpCodes.Ceq);
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Ceq);
+                        EmitEqualToZeroOrNull(il);
                         break;
-
                     case ExpressionType.LessThan:
                         il.Emit(OpCodes.Clt);
                         break;
-
                     case ExpressionType.GreaterThan:
                         il.Emit(OpCodes.Cgt);
                         break;
-
                     case ExpressionType.GreaterThanOrEqual:
                         // simplifying by using the LessThen (Clt) and comparing with negative outcome (Ceq 0)
                         if (leftOpType.IsUnsigned() && rightOpType.IsUnsigned())
                             il.Emit(OpCodes.Clt_Un);
                         else
                             il.Emit(OpCodes.Clt);
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Ceq);
+                        EmitEqualToZeroOrNull(il);
                         break;
-
                     case ExpressionType.LessThanOrEqual:
                         // simplifying by using the GreaterThen (Cgt) and comparing with negative outcome (Ceq 0)
                         if (leftOpType.IsUnsigned() && rightOpType.IsUnsigned())
                             il.Emit(OpCodes.Cgt_Un);
                         else
                             il.Emit(OpCodes.Cgt);
-                        il.Emit(OpCodes.Ldc_I4_0);
-                        il.Emit(OpCodes.Ceq);
+                        EmitEqualToZeroOrNull(il);
                         break;
 
                     default:
                         return false;
                 }
 
-            nullCheck:
+            nullableCheck:
                 if (leftIsNullable)
                 {
                     var leftNullableHasValueGetterMethod = exprLeft.Type.FindNullableHasValueGetterMethod();
@@ -4710,8 +4665,7 @@ namespace DryIoc.FastExpressionCompiler
 
                         case ExpressionType.NotEqual:
                             il.Emit(OpCodes.Ceq);
-                            il.Emit(OpCodes.Ldc_I4_0);
-                            il.Emit(OpCodes.Ceq);
+                            EmitEqualToZeroOrNull(il);
                             il.Emit(OpCodes.Or);
                             break;
 
@@ -5154,6 +5108,13 @@ namespace DryIoc.FastExpressionCompiler
                 return testExpr;
             }
 
+            [MethodImpl((MethodImplOptions)256)]
+            public static void EmitEqualToZeroOrNull(ILGenerator il)
+            {
+                il.Emit(OpCodes.Ldc_I4_0); // OpCodes.Not does not work here because it is a bitwise operation
+                il.Emit(OpCodes.Ceq);
+            }
+
             /// Get the advantage of the optimized specialized EmitCall method
             [MethodImpl((MethodImplOptions)256)]
             public static bool EmitMethodCallOrVirtualCall(ILGenerator il, MethodInfo method)
@@ -5189,6 +5150,11 @@ namespace DryIoc.FastExpressionCompiler
 #endif
                 return true;
             }
+
+            /// Same as EmitMethodCall which checks the method for null first, and returns false if it is null. 
+            [MethodImpl((MethodImplOptions)256)]
+            public static bool EmitMethodCallCheckForNull(ILGenerator il, MethodInfo method) =>
+                method != null && EmitMethodCall(il, method);
 
             /// Efficiently emit the int constant
             [MethodImpl((MethodImplOptions)256)]
