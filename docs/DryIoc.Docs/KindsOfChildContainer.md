@@ -96,7 +96,7 @@ The result container will have the following traits:
 - It can be disposed without affecting the parent, disposing the child will dispose only the scoped services and singletons created in the child and not in the parent (can be opt-out with `withDisposables` parameter).
 - The worst child creation performance is O(1) - because the cloning of the registry is O(1).
 
-Let's try it with example:
+Lets try it with example:
 ```cs 
 
 class ChildExample
