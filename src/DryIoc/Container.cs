@@ -5748,47 +5748,62 @@ namespace DryIoc
                 return factory.GetExpressionOrDefault(request.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null ? factory : null;
             };
 
-        /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract.
-        /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
-        /// The resolution creates transient services.</summary>
+        // exclude concrete service types which are pre-defined DryIoc wrapper types
+        private static IEnumerable<Type> GetConcreteServiceType(Type serviceType, object serviceKey) =>
+            serviceType.IsAbstract || serviceType.IsOpenGeneric() ||
+            serviceType.IsGenericType && WrappersSupport.Wrappers.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) != null
+            ? null : serviceType.One(); // use concrete service type as implementation type
+
+        // exclude concrete service types which are pre-defined DryIoc wrapper types
+        private static IEnumerable<Type> GetConcreteServiceType(Type serviceType, object serviceKey, Func<Type, object, bool> serviceCondition) =>
+            serviceType.IsAbstract || serviceType.IsOpenGeneric() ||
+            !serviceCondition(serviceType, serviceKey) ||
+            serviceType.IsGenericType && WrappersSupport.Wrappers.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) != null
+            ? null : serviceType.One(); // use concrete service type as implementation type
+
+        // by default the condition checks that factory is resolvable down to dependencies
+        private static Factory GetConcreteTypeFactory(Type implType, IReuse reuse = null, IfUnresolved ifConcreteTypeIsUnresolved = IfUnresolved.Throw)
+        {
+            if (ifConcreteTypeIsUnresolved == IfUnresolved.Throw)
+                return ReflectionFactory.Of(implType, reuse, DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam);
+            ReflectionFactory factory = null;
+            factory = ReflectionFactory.Of(implType, reuse,
+                DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam, 
+                Setup.With(condition: req => factory?.GetExpressionOrDefault(req.WithIfUnresolved(ifConcreteTypeIsUnresolved)) != null));
+            return factory;
+        }
+
+        /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract, nor registered wrapper type.
+        /// For constructor selection we are using automatic constructor selection.</summary>
         /// <param name="condition">(optional) Condition for requested service type and key.</param>
         /// <param name="reuse">(optional) Reuse for concrete types.</param>
         /// <returns>New rule.</returns>
         public static DynamicRegistrationProvider ConcreteTypeDynamicRegistrations(
             Func<Type, object, bool> condition = null, IReuse reuse = null) =>
-            AutoFallbackDynamicRegistrations((serviceType, serviceKey) =>
-            {
-                if (serviceType.IsAbstract ||
-                    serviceType.IsOpenGeneric() || // service type in principle should be concrete, so should not be open-generic
-                    condition != null && !condition(serviceType, serviceKey))
-                    return null;
+            AutoFallbackDynamicRegistrations(condition == null 
+                ? (Func<Type, object, IEnumerable<Type>>)((serviceType, serviceKey) => GetConcreteServiceType(serviceType, serviceKey))
+                : (Func<Type, object, IEnumerable<Type>>)((serviceType, serviceKey) => GetConcreteServiceType(serviceType, serviceKey, condition)),
+            implType => GetConcreteTypeFactory(implType, reuse, IfUnresolved.ReturnDefault));
 
-                // exclude concrete service types which are pre-defined DryIoc wrapper types
-                var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
-                if (openGenericServiceType != null && WrappersSupport.Wrappers.GetValueOrDefault(openGenericServiceType) != null)
-                    return null;
+        /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract, nor registered wrapper type.
+        /// For constructor selection we are using automatic constructor selection.</summary>
+        public static DynamicRegistrationProvider ConcreteTypeDynamicRegistrations(
+            IfUnresolved ifConcreteTypeIsUnresolved,
+            Func<Type, object, bool> serviceCondition = null, IReuse reuse = null) =>
+            AutoFallbackDynamicRegistrations(serviceCondition == null 
+                ? (Func<Type, object, IEnumerable<Type>>)((serviceType, serviceKey) => GetConcreteServiceType(serviceType, serviceKey))
+                : (Func<Type, object, IEnumerable<Type>>)((serviceType, serviceKey) => GetConcreteServiceType(serviceType, serviceKey, serviceCondition)),
+            implType => GetConcreteTypeFactory(implType, reuse, ifConcreteTypeIsUnresolved));
 
-                return serviceType.One(); // use concrete service type as implementation type
-            },
-            implType =>
-            {
-                ReflectionFactory factory = null;
-
-                // the condition checks that factory is resolvable
-                factory = ReflectionFactory.Of(implType, reuse,
-                    DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam,
-                    Setup.With(condition: req => factory?.GetExpressionOrDefault(req.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null));
-
-                return factory;
-            });
-
-        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
-        /// The resolution creates Transient services.</summary>
-        public Rules WithConcreteTypeDynamicRegistrations(
-            Func<Type, object, bool> condition = null, IReuse reuse = null) =>
+        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.</summary>
+        public Rules WithConcreteTypeDynamicRegistrations(Func<Type, object, bool> condition = null, IReuse reuse = null) =>
             WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
 
-        /// Replaced with `WithConcreteTypeDynamicRegistrations`
+        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.</summary>
+        public Rules WithConcreteTypeDynamicRegistrations(IfUnresolved ifConcreteTypeIsUnresolved, Func<Type, object, bool> condition = null, IReuse reuse = null) =>
+            WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(ifConcreteTypeIsUnresolved, condition, reuse));
+
+        /// [Obsolete("Replaced with `WithConcreteTypeDynamicRegistrations`")]
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null)
         {
             var newRules = Clone();

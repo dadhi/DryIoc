@@ -9,10 +9,8 @@ namespace DryIoc.UnitTests
         public static void Main()
         {
             RunAllTests();
-    
-            // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
 
-            // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
+            // new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution().Run();
         }
 
         public static void RunAllTests()
@@ -57,6 +55,7 @@ namespace DryIoc.UnitTests
                 new GHIssue460_Getting_instance_from_parent_scope_even_if_replaced_by_Use(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
                 new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter(),
+                new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
             };
 
