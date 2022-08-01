@@ -5204,7 +5204,9 @@ namespace DryIoc
                 ? request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request)
                 : request.RequiredServiceType ?? wrapperType.GetGenericArguments()[0];
 
-            request = request.PushServiceType(serviceType);
+            request = request.PushServiceType(serviceType, 
+                RequestFlags.IsWrappedInFunc | RequestFlags.IsDirectlyWrappedInFunc);
+
             var container = request.Container;
             var expr = container.ResolveFactory(request)?.GetExpressionOrDefault(request);
             if (expr == null)

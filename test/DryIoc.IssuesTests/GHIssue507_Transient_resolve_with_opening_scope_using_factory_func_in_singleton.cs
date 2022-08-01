@@ -9,11 +9,11 @@ namespace DryIoc.IssuesTests
         public int Run()
         {
             Test_Simple();
-            Test_Original_issue();
-            return 1;
+            // Test_Original_issue();
+            return 2;
         }
 
-        [Test, Ignore("fixme")]
+        [Test]
         public void Test_Simple()
         {
             var c = new Container();
@@ -25,12 +25,16 @@ namespace DryIoc.IssuesTests
 
             var gf = b.GetFoo;
             Assert.IsNotNull(gf);
+
+            var f = gf(c.OpenScope());
+            Assert.IsNotNull(f);
+
         }
 
         class Bar2
         {
-            public readonly Func<Foo2> GetFoo;
-            public Bar2(Func<Foo2> getFoo) => getFoo = GetFoo;
+            public readonly FactoryDelegate<Foo2> GetFoo;
+            public Bar2(FactoryDelegate<Foo2> getFoo) => GetFoo = getFoo;
         }
 
         class Foo2
