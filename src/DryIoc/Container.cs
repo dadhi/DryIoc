@@ -5787,7 +5787,9 @@ namespace DryIoc
             implType => GetConcreteTypeFactory(implType, reuse, IfUnresolved.ReturnDefault));
 
         /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract, nor registered wrapper type.
-        /// For constructor selection we are using automatic constructor selection.</summary>
+        /// For constructor selection we are using automatic constructor selection.
+        /// Pass `IfUnresolved.ReturnDefault` or `IfUnresolved.ReturnDefaultIfNotRegistered` to `ifConcreteTypeIsUnresolved` 
+        /// to allow fallback to the next rule.</summary>
         public static DynamicRegistrationProvider ConcreteTypeDynamicRegistrations(
             IfUnresolved ifConcreteTypeIsUnresolved,
             Func<Type, object, bool> serviceCondition = null, IReuse reuse = null) =>
@@ -5800,7 +5802,9 @@ namespace DryIoc
         public Rules WithConcreteTypeDynamicRegistrations(Func<Type, object, bool> condition = null, IReuse reuse = null) =>
             WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
 
-        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.</summary>
+        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
+        /// Pass `IfUnresolved.ReturnDefault` or `IfUnresolved.ReturnDefaultIfNotRegistered` to `ifConcreteTypeIsUnresolved` 
+        /// to allow fallback to the next rule.</summary>
         public Rules WithConcreteTypeDynamicRegistrations(IfUnresolved ifConcreteTypeIsUnresolved, Func<Type, object, bool> condition = null, IReuse reuse = null) =>
             WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(ifConcreteTypeIsUnresolved, condition, reuse));
 
