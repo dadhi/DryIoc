@@ -4426,7 +4426,7 @@ namespace DryIoc
         {
             if (request.IsEmpty)
                 return (requestParentFlags & RequestFlags.OpensResolutionScope) != 0
-                    ? Request.EmptyOpensResolutionScopeRequestExpr
+                    ? Field(typeof(Request).GetField(nameof(Request.EmptyOpensResolutionScope))) // we mat not refactor it to readonly field because it is rarely used
                     : Request.EmptyRequestExpr;
 
             var flags = request.Flags | requestParentFlags;
@@ -9363,10 +9363,7 @@ namespace DryIoc
 
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
-            new Request(null, null, 0, 0, null, RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, null, null, null);
-
-        internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
-            Field(typeof(Request).GetField(nameof(EmptyOpensResolutionScope)));
+            new Request(null, null, 0, 0, null, RequestFlags.OpensResolutionScope, null, null, null);
 
         internal static Request CreateForValidation(IContainer container, ServiceInfo serviceInfo, RequestStack stack)
         {
