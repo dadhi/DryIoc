@@ -9503,16 +9503,16 @@ namespace DryIoc
         public bool IsEmpty => DirectParent == null;
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool IsResolutionRoot => !IsEmpty && DirectParent.IsEmpty; // todo: @perf remove check for empty
+        public bool IsResolutionRoot => DirectParent != null && DirectParent.DirectParent == null;
 
         /// <summary>Returns true if request is First in Resolve call.</summary>
-        public bool IsResolutionCall => !IsEmpty && (Flags & RequestFlags.IsResolutionCall) != 0; // todo: @perf remove check for empty
+        public bool IsResolutionCall => (Flags & RequestFlags.IsResolutionCall) != 0;
 
         /// <summary>Not the root resolution call.</summary>
-        public bool IsNestedResolutionCall => IsResolutionCall && !DirectParent.IsEmpty;
+        public bool IsNestedResolutionCall => (Flags & RequestFlags.IsResolutionCall) != 0 && DirectParent?.DirectParent != null;
 
-        /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool OpensResolutionScope => !IsEmpty && (DirectParent.Flags & RequestFlags.OpensResolutionScope) != 0; // todo: @perf remove check for empty
+        /// <summary>Despite its name, returns true if request is first dependency in a service opening the scope</summary>
+        public bool OpensResolutionScope => DirectParent != null && (DirectParent.Flags & RequestFlags.OpensResolutionScope) != 0;
 
         /// <summary>Checks if the request Or its parent is wrapped in Func. Use `IsDirectlyWrappedInFunc` for the direct Func wrapper.</summary>
         public bool IsWrappedInFunc() => (Flags & RequestFlags.IsWrappedInFunc) != 0;

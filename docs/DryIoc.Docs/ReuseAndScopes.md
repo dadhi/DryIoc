@@ -669,7 +669,7 @@ In order to dispose the scope DryIoc or the user code (explained later)
 should track the reference to it otherwise we have an undisposed dangling scope - **which is the bad thing to have**. 
 
 Therefore to avoid dangling scope the resolution scope will be automatically tracked by either the parent scope or by the singleton scope. 
-When the parent scope or container with singletons is disposed - the resolutions scope is disposed to0.
+When the parent scope or container with singletons is disposed - the resolutions scope is disposed too.
 
 ```cs 
 class Scoped_to_service_reuse_with_dispose
