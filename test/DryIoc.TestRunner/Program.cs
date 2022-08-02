@@ -58,6 +58,7 @@ namespace DryIoc.UnitTests
                 new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter(),
                 new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution(),
                 new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton(),
+                new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
             };
 
