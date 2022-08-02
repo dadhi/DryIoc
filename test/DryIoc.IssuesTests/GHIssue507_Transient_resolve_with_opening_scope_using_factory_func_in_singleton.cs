@@ -9,7 +9,7 @@ namespace DryIoc.IssuesTests
         public int Run()
         {
             Test_Simple();
-            // Test_Original_issue();
+            Test_Original_issue();
             return 2;
         }
 
@@ -41,7 +41,7 @@ namespace DryIoc.IssuesTests
         {
         }
 
-        [Test, Ignore("fixme")]
+        [Test]
         public void Test_Original_issue()
         {
             var container = new Container(rules => rules.WithTrackingDisposableTransients());

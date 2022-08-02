@@ -4657,10 +4657,23 @@ namespace DryIoc
         public static Expression GetRootOrSelfExpr(Request request) =>
             request.Reuse is CurrentScopeReuse == false
             && request.DirectParent.IsSingletonOrDependencyOfSingleton
-            && !request.OpensResolutionScope
             && request.Rules.ThrowIfDependencyHasShorterReuseLifespan // see the #378
+            // && !request.OpensResolutionScope
+            && !request.OpensResolutionScopeUpToResolutionCall()
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
+
+        private static bool OpensResolutionScopeUpToResolutionCall(this Request r)
+        {
+            var p = r.DirectParent;
+            while (p != null)
+            {
+                if ((p.Flags & RequestFlags.OpensResolutionScope) != 0)
+                    return true;
+                p = p.DirectParent;
+            }
+            return false;
+        }
 
         /// <summary>Root or the current resolver context (if it is the root).</summary>
         public static readonly Expression RootOrSelfExpr =
@@ -9386,6 +9399,8 @@ namespace DryIoc
 
                 flags |= preResolveParent.Flags & InheritedFlags;
             }
+            else
+                flags |= preResolveParent.Flags; //inherits the OpensResolutionScope flag
 
             var inputArgExprs = inputArgs?.Map(a => Constant(a)); // todo: @check what happens if `a == null`, does the `object` type for is fine
 
@@ -9491,16 +9506,16 @@ namespace DryIoc
         public bool IsEmpty => DirectParent == null;
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool IsResolutionRoot => !IsEmpty && DirectParent.IsEmpty;
+        public bool IsResolutionRoot => !IsEmpty && DirectParent.IsEmpty; // todo: @perf remove check for empty
 
         /// <summary>Returns true if request is First in Resolve call.</summary>
-        public bool IsResolutionCall => !IsEmpty && (Flags & RequestFlags.IsResolutionCall) != 0;
+        public bool IsResolutionCall => !IsEmpty && (Flags & RequestFlags.IsResolutionCall) != 0; // todo: @perf remove check for empty
 
         /// <summary>Not the root resolution call.</summary>
         public bool IsNestedResolutionCall => IsResolutionCall && !DirectParent.IsEmpty;
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool OpensResolutionScope => !IsEmpty && (DirectParent.Flags & RequestFlags.OpensResolutionScope) != 0;
+        public bool OpensResolutionScope => !IsEmpty && (DirectParent.Flags & RequestFlags.OpensResolutionScope) != 0; // todo: @perf remove check for empty
 
         /// <summary>Checks if the request Or its parent is wrapped in Func. Use `IsDirectlyWrappedInFunc` for the direct Func wrapper.</summary>
         public bool IsWrappedInFunc() => (Flags & RequestFlags.IsWrappedInFunc) != 0;
@@ -10824,6 +10839,8 @@ namespace DryIoc
             }
 
             // At last, create the object graph with all of the dependencies created and injected
+            // todo: @perf optimize the code path for IResolverContext Wrapper: ResolverContext.GetRootOrSelfExpr - override GetExpressionOrDefault
+            // todo: @perf for IResolverContext no need to check expression cache at all
             serviceExpr = serviceFactory == null
                 ? CreateExpressionOrDefault(request)
                 : CreateExpressionWithWrappedFactory(request, serviceFactory);
