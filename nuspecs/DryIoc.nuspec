@@ -43,7 +43,7 @@ to control exception information, and rule fallback behavior (#506)
     <files>
         <file src="..\LICENSE.txt" />
         <file src="..\DryIoc.snk" />
-        <file src="..\nuspecs\DryIoc\readme.md" />
+        <!-- <file src="..\nuspecs\DryIoc\readme.md" /> -->
         <file src="..\logo\logo128.png" target="logo.png" />
 
         <!--"build" is the special folder where you can put your .props or .targets files 
