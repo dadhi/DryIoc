@@ -18,7 +18,9 @@
   - [Reuse.ScopedTo(name)](#reusescopedtoname)
     - [Reuse.InWebRequest and Reuse.InThread](#reuseinwebrequest-and-reuseinthread)
   - [Reuse.ScopedTo service type](#reusescopedto-service-type)
-    - [Own the resolution scope disposal](#own-the-resolution-scope-disposal)
+    - [Disposing of resolution scope](#disposing-of-resolution-scope)
+      - [Automatic scope disposal](#automatic-scope-disposal)
+      - [Own the resolution scope disposal](#own-the-resolution-scope-disposal)
   - [Setup.UseParentReuse](#setupuseparentreuse)
   - [Reuse lifespan diagnostics](#reuse-lifespan-diagnostics)
   - [Weakly Referenced reused service](#weakly-referenced-reused-service)
@@ -660,11 +662,18 @@ var foo container.OpenScope(new ResolutionScopeName(typeof(Foo))).Resolve<Foo>()
 
 **Note:** The code also tells that `Foo` itself will be scoped to its scope. It may be important if you want to access `Foo` recursively from its dependency.
 
-But with a such an automatic scoping we still have a problem: how to dispose the scope.
 
-In order to dispose the scope, DryIoc should somehow track the reference to it - **otherwise we are in the memory leak territory**. 
+### Disposing of resolution scope
 
-This is exactly how it works, the new resolution scope will itself be held by either the upper scope or by the singleton scope. When the upper scope or container with singletons is disposed - the resolutions scope is disposed to.
+#### Automatic scope disposal
+
+Having such an implicit opened scope poses a problem - how to dispose the scope?
+
+In order to dispose the scope DryIoc or the user code (explained later) 
+should track the reference to it otherwise we have an undisposed dangling scope - **which is the bad thing to have**. 
+
+Therefore to avoid dangling scope the resolution scope will be automatically tracked by either the parent scope or by the singleton scope. 
+When the parent scope or container with singletons is disposed - the resolutions scope is disposed too.
 
 ```cs md*/
 class Scoped_to_service_reuse_with_dispose
@@ -697,10 +706,14 @@ class Scoped_to_service_reuse_with_dispose
 } /*md
 ```
 
-### Own the resolution scope disposal
 
-You else may get in control of disposing the resolution scope by injecting the `IResolverContext` ([automatically provided for you by Container](RulesAndDefaultConventions.md#implicitly-available-services)) 
-which holds the current scope and then dispose it manually.
+#### Own the resolution scope disposal
+
+The scope tracking is not ideal because it postpones the disposal until parent container or parent scope is disposed
+But we may want to dispose it sooner, e.g. together with the service that opened it.
+
+You may control the disposing of the resolution scope by injecting its `IResolverContext` ([automatically provided by Container](RulesAndDefaultConventions.md#implicitly-available-services)) 
+and then dispose it manually.
 
 ```cs md*/
 class Own_the_resolution_scope_disposal
@@ -717,7 +730,7 @@ class Own_the_resolution_scope_disposal
 
         var foo = container.Resolve<Foo>();
         
-        // Disposing the foo will dispose its scope and the scoped dependencies down the tree
+        // Disposing the foo will dispose its scope and its scoped dependencies down the tree
         foo.Dispose(); 
 
         Assert.IsTrue(foo.Dep.IsDisposed);

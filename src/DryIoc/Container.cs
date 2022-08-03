@@ -4377,7 +4377,7 @@ namespace DryIoc
         {
             if (request.IsEmpty)
                 return (requestParentFlags & RequestFlags.OpensResolutionScope) != 0
-                    ? Request.EmptyOpensResolutionScopeRequestExpr
+                    ? Field(typeof(Request).GetField(nameof(Request.EmptyOpensResolutionScope))) // we mat not refactor it to readonly field because it is rarely used
                     : Request.EmptyRequestExpr;
 
             var flags = request.Flags | requestParentFlags;
@@ -4646,10 +4646,22 @@ namespace DryIoc
         public static Expression GetRootOrSelfExpr(Request request) =>
             request.Reuse is CurrentScopeReuse == false
             && request.DirectParent.IsSingletonOrDependencyOfSingleton
-            && !request.OpensResolutionScope
             && request.Rules.ThrowIfDependencyHasShorterReuseLifespan // see the #378
+            && !request.OpensResolutionScopeUpToResolutionCall()
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
+
+        private static bool OpensResolutionScopeUpToResolutionCall(this Request r)
+        {
+            var p = r.DirectParent;
+            while (p != null)
+            {
+                if ((p.Flags & RequestFlags.OpensResolutionScope) != 0)
+                    return true;
+                p = p.DirectParent;
+            }
+            return false;
+        }
 
         /// <summary>Root or the current resolver context (if it is the root).</summary>
         public static readonly Expression RootOrSelfExpr =
@@ -5769,47 +5781,66 @@ namespace DryIoc
                 return factory.GetExpressionOrDefault(request.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null ? factory : null;
             };
 
-        /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract.
-        /// For constructor selection we are using <see cref="DryIoc.FactoryMethod.ConstructorWithResolvableArguments"/>.
-        /// The resolution creates transient services.</summary>
+        // exclude concrete service types which are pre-defined DryIoc wrapper types
+        private static IEnumerable<Type> GetConcreteServiceType(Type serviceType, object serviceKey) =>
+            serviceType.IsAbstract || serviceType.IsOpenGeneric() ||
+            serviceType.IsGenericType && WrappersSupport.Wrappers.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) != null
+            ? null : serviceType.One(); // use concrete service type as implementation type
+
+        // exclude concrete service types which are pre-defined DryIoc wrapper types
+        private static IEnumerable<Type> GetConcreteServiceType(Type serviceType, object serviceKey, Func<Type, object, bool> serviceCondition) =>
+            serviceType.IsAbstract || serviceType.IsOpenGeneric() ||
+            !serviceCondition(serviceType, serviceKey) ||
+            serviceType.IsGenericType && WrappersSupport.Wrappers.GetValueOrDefault(serviceType.GetGenericTypeDefinition()) != null
+            ? null : serviceType.One(); // use concrete service type as implementation type
+
+        // by default the condition checks that factory is resolvable down to dependencies
+        private static Factory GetConcreteTypeFactory(Type implType, IReuse reuse = null, IfUnresolved ifConcreteTypeIsUnresolved = IfUnresolved.Throw)
+        {
+            if (ifConcreteTypeIsUnresolved == IfUnresolved.Throw)
+                return ReflectionFactory.Of(implType, reuse, DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam);
+            ReflectionFactory factory = null;
+            factory = ReflectionFactory.Of(implType, reuse,
+                DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam, 
+                Setup.With(condition: req => factory?.GetExpressionOrDefault(req.WithIfUnresolved(ifConcreteTypeIsUnresolved)) != null));
+            return factory;
+        }
+
+        /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract, nor registered wrapper type.
+        /// For constructor selection we are using automatic constructor selection.</summary>
         /// <param name="condition">(optional) Condition for requested service type and key.</param>
         /// <param name="reuse">(optional) Reuse for concrete types.</param>
         /// <returns>New rule.</returns>
         public static DynamicRegistrationProvider ConcreteTypeDynamicRegistrations(
             Func<Type, object, bool> condition = null, IReuse reuse = null) =>
-            AutoFallbackDynamicRegistrations((serviceType, serviceKey) =>
-            {
-                if (serviceType.IsAbstract ||
-                    serviceType.IsOpenGeneric() || // service type in principle should be concrete, so should not be open-generic
-                    condition != null && !condition(serviceType, serviceKey))
-                    return null;
+            AutoFallbackDynamicRegistrations(condition == null 
+                ? (Func<Type, object, IEnumerable<Type>>)((serviceType, serviceKey) => GetConcreteServiceType(serviceType, serviceKey))
+                : (Func<Type, object, IEnumerable<Type>>)((serviceType, serviceKey) => GetConcreteServiceType(serviceType, serviceKey, condition)),
+            implType => GetConcreteTypeFactory(implType, reuse, IfUnresolved.ReturnDefault));
 
-                // exclude concrete service types which are pre-defined DryIoc wrapper types
-                var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
-                if (openGenericServiceType != null && WrappersSupport.Wrappers.GetValueOrDefault(openGenericServiceType) != null)
-                    return null;
+        /// <summary>Rule to automatically resolves non-registered service type which is: nor interface, nor abstract, nor registered wrapper type.
+        /// For constructor selection we are using automatic constructor selection.
+        /// Pass `IfUnresolved.ReturnDefault` or `IfUnresolved.ReturnDefaultIfNotRegistered` to `ifConcreteTypeIsUnresolved` 
+        /// to allow fallback to the next rule.</summary>
+        public static DynamicRegistrationProvider ConcreteTypeDynamicRegistrations(
+            IfUnresolved ifConcreteTypeIsUnresolved,
+            Func<Type, object, bool> serviceCondition = null, IReuse reuse = null) =>
+            AutoFallbackDynamicRegistrations(serviceCondition == null 
+                ? (Func<Type, object, IEnumerable<Type>>)((serviceType, serviceKey) => GetConcreteServiceType(serviceType, serviceKey))
+                : (Func<Type, object, IEnumerable<Type>>)((serviceType, serviceKey) => GetConcreteServiceType(serviceType, serviceKey, serviceCondition)),
+            implType => GetConcreteTypeFactory(implType, reuse, ifConcreteTypeIsUnresolved));
 
-                return serviceType.One(); // use concrete service type as implementation type
-            },
-            implType =>
-            {
-                ReflectionFactory factory = null;
-
-                // the condition checks that factory is resolvable
-                factory = ReflectionFactory.Of(implType, reuse,
-                    DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam,
-                    Setup.With(condition: req => factory?.GetExpressionOrDefault(req.WithIfUnresolved(IfUnresolved.ReturnDefault)) != null));
-
-                return factory;
-            });
-
-        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
-        /// The resolution creates Transient services.</summary>
-        public Rules WithConcreteTypeDynamicRegistrations(
-            Func<Type, object, bool> condition = null, IReuse reuse = null) =>
+        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.</summary>
+        public Rules WithConcreteTypeDynamicRegistrations(Func<Type, object, bool> condition = null, IReuse reuse = null) =>
             WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(condition, reuse));
 
-        /// Replaced with `WithConcreteTypeDynamicRegistrations`
+        /// <summary>Automatically resolves non-registered service type which is: nor interface, nor abstract.
+        /// Pass `IfUnresolved.ReturnDefault` or `IfUnresolved.ReturnDefaultIfNotRegistered` to `ifConcreteTypeIsUnresolved` 
+        /// to allow fallback to the next rule.</summary>
+        public Rules WithConcreteTypeDynamicRegistrations(IfUnresolved ifConcreteTypeIsUnresolved, Func<Type, object, bool> condition = null, IReuse reuse = null) =>
+            WithDynamicRegistrationsAsFallback(ConcreteTypeDynamicRegistrations(ifConcreteTypeIsUnresolved, condition, reuse));
+
+        /// [Obsolete("Replaced with `WithConcreteTypeDynamicRegistrations`")]
         public Rules WithAutoConcreteTypeResolution(Func<Request, bool> condition = null)
         {
             var newRules = Clone();
@@ -9319,10 +9350,7 @@ namespace DryIoc
 
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
-            new Request(null, null, 0, 0, null, RequestFlags.OpensResolutionScope | RequestFlags.IsResolutionCall, null, null, null);
-
-        internal static readonly Expression EmptyOpensResolutionScopeRequestExpr =
-            Field(typeof(Request).GetField(nameof(EmptyOpensResolutionScope)));
+            new Request(null, null, 0, 0, null, RequestFlags.OpensResolutionScope, null, null, null);
 
         internal static Request CreateForValidation(Container container, ServiceInfo serviceInfo, Request[] depRequestStack)
         {
@@ -9353,6 +9381,8 @@ namespace DryIoc
 
                 flags |= preResolveParent.Flags & InheritedFlags;
             }
+            else
+                flags |= preResolveParent.Flags; //inherits the OpensResolutionScope flag
 
             var inputArgExprs = inputArgs?.Map(a => Constant(a)); // todo: @check what happens if `a == null`, does the `object` type for is fine
 
@@ -9451,16 +9481,16 @@ namespace DryIoc
         public bool IsEmpty => DirectParent == null;
 
         /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool IsResolutionRoot => !IsEmpty && DirectParent.IsEmpty;
+        public bool IsResolutionRoot => DirectParent != null && DirectParent.DirectParent == null;
 
         /// <summary>Returns true if request is First in Resolve call.</summary>
-        public bool IsResolutionCall => !IsEmpty && (Flags & RequestFlags.IsResolutionCall) != 0;
+        public bool IsResolutionCall => (Flags & RequestFlags.IsResolutionCall) != 0;
 
         /// <summary>Not the root resolution call.</summary>
-        public bool IsNestedResolutionCall => IsResolutionCall && !DirectParent.IsEmpty;
+        public bool IsNestedResolutionCall => (Flags & RequestFlags.IsResolutionCall) != 0 && DirectParent?.DirectParent != null;
 
-        /// <summary>Returns true if request is First in First Resolve call.</summary>
-        public bool OpensResolutionScope => !IsEmpty && (DirectParent.Flags & RequestFlags.OpensResolutionScope) != 0;
+        /// <summary>Despite its name, returns true if request is first dependency in a service opening the scope</summary>
+        public bool OpensResolutionScope => DirectParent != null && (DirectParent.Flags & RequestFlags.OpensResolutionScope) != 0;
 
         /// <summary>Checks if the request Or its parent is wrapped in Func. Use `IsDirectlyWrappedInFunc` for the direct Func wrapper.</summary>
         public bool IsWrappedInFunc() => (Flags & RequestFlags.IsWrappedInFunc) != 0;
@@ -10822,6 +10852,8 @@ namespace DryIoc
             }
 
             // At last, create the object graph with all of the dependencies created and injected
+            // todo: @perf optimize the code path for IResolverContext Wrapper: ResolverContext.GetRootOrSelfExpr - override GetExpressionOrDefault
+            // todo: @perf for IResolverContext no need to check expression cache at all
             serviceExpr = serviceFactory == null
                 ? CreateExpressionOrDefault(request)
                 : CreateExpressionWithWrappedFactory(request, serviceFactory);

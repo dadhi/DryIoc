@@ -12,9 +12,7 @@ namespace DryIoc.UnitTests
             RunAllTests();
 
             // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
-
             // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
-
             // new GHIssue101_Compile_time_generated_object_graph().Run();
         }
 
@@ -79,6 +77,7 @@ namespace DryIoc.UnitTests
                 new Issue_SupportForDynamicKeyword(),
                 new Issue_UsingAsyncMethodAsMadeOf(),
                 new Issue_Value_type_resolution_dependency(),
+                new Issue107_NamedScopesDependingOnResolvedTypes(),
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue497_ConstructorWithResolvableArguments_is_not_working_properly(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
@@ -108,6 +107,9 @@ namespace DryIoc.UnitTests
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
                 new GHIssue495_Automatically_generate_Resolution_calls_for_the_missing_registrations_to_avoid_manual_RegisterPlaceholder(),
                 new GHIssue504_Add_IDictionary_wrapper(),
+                new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution(),
+                new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton(),
+                new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
             };
             // var docsTests = new Func<int>[] 
             // { 
