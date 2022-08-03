@@ -3,7 +3,7 @@
         <TargetFrameworks>net45;netstandard2.0;netstandard2.1</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>5.1.0</VersionPrefix>
+        <VersionPrefix>5.2.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -15,39 +15,17 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-## v5.1.0 Small feature and bug-fix release
+## v5.2.0 Small feature and bug-fix release
 
-- fixed: #486 RegisterInstance in principle does not support non Singleton reuse but InstanceFactory still allows to pass different reuse
-- added: #487 Create CreateChild overload exposing RegistrySharing and childKey arguments
+### Features
 
+- Adding `WithConcreteTypeDynamicRegistrations` overload with `IfUnresolved ifConcreteTypeIsUnresolved` parameter 
+to control exception information, and rule fallback behavior (#506)
+- Small speed-ups 
 
-## v5.0.2 Bug-fix release
+### Fixes
 
-- fixed: #180 Azure Function DI issue - Anonymously Hosted DynamicMethods Assembly. Object reference not set. (Nullable int optional argument with default int value is set to null)
-- fixed: #475 Exception message for WaitForScopedServiceIsCreatedTimeoutExpired misses the tick number output 
-
-## v5.0.1 Bug-fix release
-
-- fixed: #470 Regression in 5.0.0 when resolving `Func<IEnumerable<IService>>` with Parameter
-- fixed: #471 Regression in 5.0 when using `Rules.SelectKeyedOverDefaultFactory`
-- fixed: #472 Func with 4 and more arguments is broken in the Interpreter
-
-## v5.0.0 Major feature release with the breaking changes
-
-Main achievements:
-
-- Performance speed-up and the less memory allocations (check README for the benchmarks)
-- More consistent and full API (highlight is on the RegisterDelegate overloads)
-
-Main breaking changes:
-
-- Removing PCL and .NET 3.5, .NET 4.0 and .NET Standard 1.0 - 1.3 targets
-- Moving ImTools and FastExpressionCompiler sources to the `DryIoc.ImTools` and `DryIoc.FastExpressionCompiler` namespaces
-- Removing `UseInstance` in favour of `Use` and `RegisterInstance` methods
-
-Main "until the next version":
-
-- Improving compile-time capabilities from the current T4 bound solution
+- #507 Transient resolve with opening scope using factory func in singleton
 
 ]]>
     </PackageReleaseNotes>
