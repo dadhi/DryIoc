@@ -4934,17 +4934,14 @@ namespace DryIoc
 
         private static ImHashMap<Type, object> AddContainerInterfaces(this ImHashMap<Type, object> wrappers)
         {
-            var resolverContextExpr = WrapperExpressionFactory.Of(
-                (r, _) => ResolverContext.GetRootOrSelfExpr(r),
-                Setup.WrapperWith(preventDisposal: true));
+            var resolverContextExpr = new WrapperExpressionFactory.OfContainer(
+                (r, _) => ResolverContext.GetRootOrSelfExpr(r));
 
-            var containerExpr = WrapperExpressionFactory.Of(
-                (r, _) => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)),
-                Setup.WrapperWith(preventDisposal: true));
+            var containerExpr = new WrapperExpressionFactory.OfContainer(
+                (r, _) => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)));
 
-            var registratorExpr = WrapperExpressionFactory.Of(
-                (r, _) => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)),
-                Setup.WrapperWith(preventDisposal: true));
+            var registratorExpr = new WrapperExpressionFactory.OfContainer(
+                (r, _) => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)));
 
             return wrappers
                 .AddSureNotPresent(typeof(IContainer), containerExpr)
@@ -9815,16 +9812,14 @@ namespace DryIoc
         public Request WithResolvedFactory(Factory factory,
             bool skipRecursiveDependencyCheck = false, bool skipCaptiveDependencyCheck = false, bool copyRequest = false)
         {
+            // resolving the factory for the second time, usually happens in decorators, FactoryID is 0 for factory resolved for collection item
             var factoryId = factory.FactoryID;
             var decoratedFactoryID = 0;
-            // resolving the factory for the second time, usually happens in decorators, FactoryID is 0 for factory resolved for collection item
             if (Factory != null && FactoryID != 0)
             {
                 if (FactoryID == factoryId)
                     return this; // stop resolving to the same factory twice
-
-                if (FactoryType != FactoryType.Decorator &&
-                    factory.FactoryType == FactoryType.Decorator)
+                if (FactoryType != FactoryType.Decorator && factory.FactoryType == FactoryType.Decorator)
                     decoratedFactoryID = FactoryID;
             }
 
@@ -9905,23 +9900,19 @@ namespace DryIoc
             {
                 flags |= RequestFlags.IsSingletonOrDependencyOfSingleton;
             }
-            else if (reuse == DryIoc.Reuse.Transient)
+            else if (reuse == DryIoc.Reuse.Transient && !setup.PreventDisposal &&
+                (setup.TrackDisposableTransient || !setup.AllowDisposableTransient && Rules.TrackingDisposableTransients) &&
+                typeof(IDisposable).IsAssignableFrom(factory.ImplementationType ?? ActualServiceType))
             {
-                // check for disposable transient
-                if (!setup.PreventDisposal &&
-                    (setup.TrackDisposableTransient || !setup.AllowDisposableTransient && Rules.TrackingDisposableTransients) &&
-                    typeof(IDisposable).IsAssignableFrom(factory.ImplementationType ?? ActualServiceType))
+                if (firstParentNonTransientReuseOrNull != null)
                 {
-                    if (firstParentNonTransientReuseOrNull != null)
-                    {
-                        reuse = firstParentNonTransientReuseOrNull;
-                        flags |= RequestFlags.TracksTransientDisposable;
-                    }
-                    else if (!IsWrappedInFunc())
-                    {
-                        reuse = DryIoc.Reuse.ScopedOrSingleton;
-                        flags |= RequestFlags.TracksTransientDisposable;
-                    }
+                    reuse = firstParentNonTransientReuseOrNull;
+                    flags |= RequestFlags.TracksTransientDisposable;
+                }
+                else if (!IsWrappedInFunc())
+                {
+                    reuse = DryIoc.Reuse.ScopedOrSingleton;
+                    flags |= RequestFlags.TracksTransientDisposable;
                 }
             }
 
@@ -9934,6 +9925,23 @@ namespace DryIoc
 
             Flags = flags;
             SetResolvedFactory(factory, factoryId, factory.FactoryType, reuse, decoratedFactoryID);
+            return this;
+        }
+
+        internal Request WithResolvedFactoryUnsafe(Factory factory)
+        {
+            // resolving the factory for the second time, usually happens in decorators, FactoryID is 0 for factory resolved for collection item
+            var decoratedFactoryID = 0;
+            if (Factory != null && FactoryID != 0)
+            {
+                if (FactoryID == factory.FactoryID)
+                    return this; // stop resolving to the same factory twice
+                if (FactoryType != FactoryType.Decorator && factory.FactoryType == FactoryType.Decorator)
+                    decoratedFactoryID = FactoryID;
+            }
+
+            Flags &= ~RequestFlags.TracksTransientDisposable;
+            SetResolvedFactory(factory, factory.FactoryID, factory.FactoryType, factory.Reuse, decoratedFactoryID);
             return this;
         }
 
@@ -10402,7 +10410,8 @@ namespace DryIoc
         }
 #pragma warning restore CS1591
 
-        private Settings _settings;
+        /// <summary>The settings</summary>
+        protected Settings _settings;
 
         /// <summary>Default setup for service factories.</summary>
         public static readonly Setup Default = new ServiceSetup();
@@ -10435,6 +10444,14 @@ namespace DryIoc
 
         /// <summary>Default setup which will look for wrapped service type as single generic parameter.</summary>
         public static readonly Setup Wrapper = new WrapperSetup();
+
+        private static Setup CreateWrapperWithPreventDisposal() 
+        {
+            var w = new WrapperSetup();
+            w._settings |= Settings.PreventDisposal;
+            return w;
+        }
+        internal static readonly Setup WrapperWithPreventDisposal = CreateWrapperWithPreventDisposal();
 
         // todo: rename to WrapperOf
         /// <summary>Returns generic wrapper setup.
@@ -12341,7 +12358,28 @@ namespace DryIoc
                 : base(getServiceExpression) => Setup = setup;
         }
 
-        private class WrapperExpressionFactoryWithReuseAndSetup : WrapperExpressionFactoryWithSetup
+        internal sealed class OfContainer : WrapperExpressionFactory
+        {
+            // Despite the name, this setup prevents the wrapping of the expression into HiddenDisposable,
+            // instead it will allow to keep the Transient reuse when cheking WithResolvedFactory 
+            public override Setup Setup => Setup.WrapperWithPreventDisposal;
+            public OfContainer(Func<Request, Factory, Expression> getServiceExpression)
+                : base(getServiceExpression) {}
+
+            public override Expression GetExpressionOrDefault(Request request)
+            {
+                request = request.WithResolvedFactoryUnsafe(this);
+                if (request.Container._registry.Value is Container.Registry r && !r.Decorators.IsEmpty)
+                {
+                    var decoratorExpr = request.Container.GetDecoratorExpressionOrDefault(request);
+                    if (decoratorExpr != null)
+                        return decoratorExpr;
+                }
+                return _getServiceExpression(request, null);
+            }
+        }
+
+        private sealed class WrapperExpressionFactoryWithReuseAndSetup : WrapperExpressionFactoryWithSetup
         {
             public override IReuse Reuse { get; }
             public WrapperExpressionFactoryWithReuseAndSetup(Func<Request, Factory, Expression> getServiceExpression, IReuse reuse, Setup setup)

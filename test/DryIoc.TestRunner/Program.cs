@@ -110,6 +110,7 @@ namespace DryIoc.UnitTests
                 new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution(),
                 new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton(),
                 new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
+                new GHIssue512_Optimize_injection_of_IResolverContext(),
             };
             // var docsTests = new Func<int>[] 
             // { 
