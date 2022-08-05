@@ -23,10 +23,20 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 /*
-========================================================================================================
-The code below is generated automatically at compile-time and changes to it will be lost on the next gen.
-========================================================================================================
-Generation is completed successfully.
+======================================================================================================
+The code below is auto-generated at compile-time and changes here will be lost on the next generation.
+======================================================================================================
+Generation is completed without errors.
+
+WARNINGS: Some dependencies are not resolved. 
+Please register them at runtime, or add them to the compile-time generation.
+
+- `RuntimeDependencyC` in Request.Empty.Push(
+                        typeof(IService),
+                        1,
+                        typeof(MyService),
+                        Reuse.Transient,
+                        RequestFlags.IsResolutionCall|RequestFlags.DoNotPoolRequest)
 --------------------------------------------------------------------------------------------------------
 */
 
@@ -60,9 +70,7 @@ namespace DryIoc
                 service = Get_IService_0(r);
                 return true;
             }
-
-            else
-            if (serviceType == typeof(BaseAConsumer))
+          else            if (serviceType == typeof(BaseAConsumer))
             {
                 service = Get_BaseAConsumer_1(r);
                 return true;
@@ -86,7 +94,7 @@ namespace DryIoc
                         Reuse.Transient,
                         RequestFlags.IsResolutionCall|RequestFlags.DoNotPoolRequest)))
                 {
-                    service = GetDependency_DependencyB_0(r);
+                    service = GetDependency_DependencyB_1(r);
                     return true;
                 }
             }
@@ -128,7 +136,7 @@ namespace DryIoc
                         1,
                         typeof(MyService),
                         Reuse.Transient,
-                        RequestFlags.IsResolutionCall|RequestFlags.StopRecursiveDependencyCheck|RequestFlags.DoNotPoolRequest),
+                        RequestFlags.IsResolutionCall|RequestFlags.DoNotPoolRequest),
                     default(object[]))));
 
         internal static BaseAConsumer Get_BaseAConsumer_1(IResolverContext r) =>
@@ -140,7 +148,7 @@ namespace DryIoc
                     DefaultKey.Of(0),
                     new NonKeyedA())}));
 
-        internal static DependencyB<string> GetDependency_DependencyB_0(IResolverContext r) =>
+        internal static DependencyB<string> GetDependency_DependencyB_1(IResolverContext r) =>
             new DependencyB<string>(new DependencyA());
 
     }

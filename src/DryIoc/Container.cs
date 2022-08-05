@@ -8567,7 +8567,7 @@ namespace DryIoc
             bool openResolutionScope = false, bool stopRecursiveDependencyCheck = false, bool generateResolutionCallForMissingDependency = false)
         {
             if (request.Rules.DependencyResolutionCallExprs != null &&
-                request.Factory != null && !request.Factory.HasRuntimeState)
+                (generateResolutionCallForMissingDependency || request.Factory?.HasRuntimeState == false))
                 ResolveAndPopulateDependencyResolutionCallExpressions(request, generateResolutionCallForMissingDependency);
 
             var container = request.Container;

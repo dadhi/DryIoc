@@ -1,1 +1,1 @@
-dotnet build src\DryIoc\DryIoc.csproj
+dotnet build src\DryIoc\DryIoc.csproj -p:SkipCompTimeGen=true

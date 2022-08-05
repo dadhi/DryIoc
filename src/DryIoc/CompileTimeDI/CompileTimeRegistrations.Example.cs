@@ -22,9 +22,7 @@ namespace Example
         public DependencyB(IDependencyA a) => A = a;
     }
 
-    public class RuntimeDependencyC
-    {
-    }
+    public class RuntimeDependencyC {}
 
     public abstract class BaseA { }
     public class KeyedA : BaseA { }

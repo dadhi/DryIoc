@@ -2,6 +2,7 @@ using NUnit.Framework;
 using Example;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace DryIoc.IssuesTests
 {
@@ -37,7 +38,6 @@ namespace DryIoc.IssuesTests
 
             container.Register<IService, MyService>();
             container.Register<IDependencyA, DependencyA>();
-
             container.Register(typeof(DependencyB<>), setup: Setup.With(asResolutionCall: true));
 
             //container.RegisterPlaceholder<RuntimeDependencyC>();
@@ -46,10 +46,15 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(0, exprs.Errors.Count);
             Assert.AreEqual(1, exprs.Roots.Count);
             Assert.AreEqual(typeof(IService), exprs.Roots[0].Key.ServiceType);
-            Assert.AreEqual(1, exprs.ResolveDependencies.Count);
-            Assert.AreEqual(typeof(DependencyB<string>), exprs.ResolveDependencies[0].Key.ServiceType);
+            Assert.AreEqual(2, exprs.ResolveDependencies.Count);
 
-            container.Register<Example.RuntimeDependencyC>(ifAlreadyRegistered: IfAlreadyRegistered.Replace);
+            var resolvedDep = exprs.ResolveDependencies.First(kv => kv.Value != null);
+            Assert.AreEqual(typeof(DependencyB<string>), resolvedDep.Key.ServiceType);
+
+            var unresolvedDep = exprs.ResolveDependencies.First(kv => kv.Value == null);
+            Assert.AreEqual(typeof(RuntimeDependencyC), unresolvedDep.Key.ServiceType);
+
+            container.Register<Example.RuntimeDependencyC>();
             var x = container.Resolve<Example.IService>();
 
             Assert.IsNotNull(x);
