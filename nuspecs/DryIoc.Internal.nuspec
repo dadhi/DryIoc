@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>5.2.0</version>
+        <version>5.2.1</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,6 +14,11 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v5.2.1 Bug-fix release
+
+-fixed: #516 Singleton Decorator to Scoped base shouldn't work, but does
+
+
 ## v5.2.0 Small feature and bug-fix release
 
 ### Features
