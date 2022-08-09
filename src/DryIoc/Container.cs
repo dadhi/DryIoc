@@ -11986,16 +11986,15 @@ namespace DryIoc
 
         internal static Expression TryGetUsedInstanceOrCustomValueExpression(Request request, Request paramRequest, ServiceDetails paramDetails)
         {
+            var serviceType = paramRequest.ServiceType;
             if (paramDetails.HasCustomValue)
             {
-                var serviceType = paramRequest.ServiceType;
                 MethodInfo conversionOperator = null;
                 var customValue = paramDetails.CustomValue;
                 if (customValue != null)
                 {
                     var customTypeValue = customValue.GetType();
-                    if (!customTypeValue.IsArray &&
-                        !customTypeValue.IsAssignableTo(serviceType) &&
+                    if (!customTypeValue.IsArray && !serviceType.IsAssignableFrom(customTypeValue) &&
                         null == (conversionOperator = customTypeValue.GetConversionOperatorOrNull(serviceType)))
                         return Throw.For<Expression>(paramRequest.IfUnresolved != IfUnresolved.ReturnDefault,
                             Error.InjectedCustomValueIsOfDifferentType, customValue, serviceType, paramRequest);
@@ -12006,14 +12005,11 @@ namespace DryIoc
                     : request.Container.GetConstantExpression(customValue, serviceType);
             }
 
-            if (paramDetails == DryIoc.ServiceDetails.Default)
-            {
-                // Generate the fast resolve call for used instances
-                var serviceType = paramRequest.ServiceType;
-                if (request.Container.TryGetUsedInstance(RuntimeHelpers.GetHashCode(serviceType), serviceType, out var instance))
-                    return Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
-                        ConstantOf(serviceType), paramRequest.IfUnresolved.ToConstant());
-            }
+            // Generate the fast resolve call for used instances
+            if (paramDetails == DryIoc.ServiceDetails.Default && 
+                request.Container.TryGetUsedInstance(RuntimeHelpers.GetHashCode(serviceType), serviceType, out var instance))
+                return Call(ResolverContext.GetRootOrSelfExpr(paramRequest), Resolver.ResolveFastMethod,
+                    ConstantOf(serviceType), paramRequest.IfUnresolved.ToConstant());
 
             return null;
         }
