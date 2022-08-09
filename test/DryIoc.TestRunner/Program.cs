@@ -111,6 +111,7 @@ namespace DryIoc.UnitTests
                 new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton(),
                 new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
                 new GHIssue512_Optimize_injection_of_IResolverContext(),
+                new GHIssue516_Singleton_Decorator_to_Scoped_base_should_not_work_but_does(),
             };
             // var docsTests = new Func<int>[] 
             // { 
