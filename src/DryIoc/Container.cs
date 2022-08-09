@@ -9892,7 +9892,7 @@ namespace DryIoc
                             scopedOrSingleton && p.Reuse is SingletonReuse ||
                             p.FactoryType == FactoryType.Wrapper && p._actualServiceType.IsFunc())
                             checkCaptiveDependency = false; // stop the check
-                        else if (p.FactoryType == FactoryType.Service && p.ReuseLifespan > reuseLifespan)
+                        else if (p.FactoryType != FactoryType.Wrapper && p.ReuseLifespan > reuseLifespan)
                             Throw.It(Error.DependencyHasShorterReuseLifespan, PrintCurrent(), reuse, p);
                     }
 
