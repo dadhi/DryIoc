@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v5.2.1 Bug-fix release / 2022-08-09
+
+-fixed: #516 Singleton Decorator to Scoped base shouldn't work, but does
+
 ## v5.2.0 Small feature and bug-fix release / 2022-08-02
 
 ### Features

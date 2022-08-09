@@ -17,8 +17,15 @@
 <![CDATA[
 ## v6.0.0 Major feature release
 
-- Compile-time Dependency Injection
-- Decrease memory footprint
+### Features
+
+- Adding `WithConcreteTypeDynamicRegistrations` overload with `IfUnresolved ifConcreteTypeIsUnresolved` parameter 
+to control exception information, and rule fallback behavior (#506)
+- Small speed-ups 
+
+### Fixes
+
+- #507 Transient resolve with opening scope using factory func in singleton
 
 ]]>
     </PackageReleaseNotes>
