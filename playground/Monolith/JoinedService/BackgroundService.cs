@@ -215,4 +215,13 @@ namespace JoinedService
     {
         public static readonly TimeSpan DaemonRestartDelay = TimeSpan.FromSeconds(5);
     }
+
+    // public static class Services
+    // {
+    //     public static Dictionary<Type, string> DaemonNames = new()
+    //     {
+    //         [typeof(FirstService.Program)] = "first-http",
+    //         [typeof(SecondService.Program)] = "second-http"
+    //     };
+    // }
 }
