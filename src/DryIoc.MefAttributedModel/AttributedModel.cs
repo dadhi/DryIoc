@@ -1261,31 +1261,28 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Prints valid c# Type literal: <c>typeof(Namespace.Type)</c>.</summary>
         public static StringBuilder AppendType(this StringBuilder code, Type x) =>
-            x == null ? code.Append("null") : code.Append("typeof(").Print(x).Append(')');
+            code.AppendTypeOf(x);
 
         /// <summary>Prints valid c# Enum literal: Enum.Value.</summary>
         public static StringBuilder AppendEnum(this StringBuilder code, Type enumType, object x) =>
             code.Append(enumType.ToEnumValueCode(x));
 
         /// <summary>Prints the <see cref="Dictionary{TKey, TValue}"/> where keys are strings.</summary>
-        public static StringBuilder AppendDictionary<TValue>(this StringBuilder code,
-            IDictionary<string, TValue> dictionary, Func<StringBuilder, string, TValue, StringBuilder> appendValue = null)
+        public static StringBuilder AppendDictionary<TKey, TValue>(this StringBuilder code,
+            IDictionary<TKey, TValue> dictionary, Func<StringBuilder, TKey, TValue, StringBuilder> appendValue = null)
         {
             if (appendValue == null)
                 appendValue = (sb, key, value) => sb.AppendCode(value);
-
-            code.Append("new System.Collections.Generic.Dictionary<string, ");
-            code.Print(typeof(TValue));
-            code.AppendLine("> {");
-            foreach (var pair in dictionary.OrderBy(p => p.Key).ThenBy(p => p.Key.Length))
+            code.Append("new ").Print(dictionary.GetType());
+            code.AppendLine(" {");
+            foreach (var pair in dictionary.OrderBy(p => p.Key))
             {
                 code.Append("            { ");
-                code.AppendString(pair.Key);
+                code.Append(pair.Key);
                 code.Append(", ");
                 code = appendValue(code, pair.Key, pair.Value);
                 code.AppendLine(" },");
             }
-
             code.Append("        }");
             return code;
         }
