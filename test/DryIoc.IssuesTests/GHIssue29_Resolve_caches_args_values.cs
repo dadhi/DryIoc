@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue29_Resolve_caches_args_values
+    public class GHIssue29_Resolve_caches_args_values : ITest
     {
+        public int Run()
+        {
+            Resolve_shall_not_cache_args();
+            return 1;
+        }
+
         [Test]
         public void Resolve_shall_not_cache_args()
         {

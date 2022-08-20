@@ -6,6 +6,8 @@ dotnet build -c:Release -v:m -p:DevMode=false
 if %ERRORLEVEL% neq 0 goto :error
 
 echo:
+echo:# Bare build and TestRunner, no NUnit test runner, no docs gen, no comp-time gen
+echo:
 echo:## Finished: RESTORE and BUILD
 echo:
 echo:## Starting: TestRunner... ##
@@ -15,29 +17,7 @@ dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRun
 if %ERRORLEVEL% neq 0 goto :error
 dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
 
-if %ERRORLEVEL% neq 0 goto :error
-echo:## Finished: TestRunner ##
 echo:
-echo:## Starting: TESTS...
-echo: 
-
-dotnet test --no-build -c:Release -p:DevMode=false
-
-
-if %ERRORLEVEL% neq 0 goto :error
-
-echo: 
-echo:## Finished: TESTS
-echo:
-echo:## Starting: DOCUMENTATION GENERATION ##
-echo:
-
-dotnet msbuild -target:MdGenerate docs\DryIoc.Docs\DryIoc.Docs.csproj
-
-echo:
-echo:## Finished: DOCUMENTATION GENERATION ##
-echo:
-
 echo:## Finished: ALL Successful ##
 exit /b 0
 

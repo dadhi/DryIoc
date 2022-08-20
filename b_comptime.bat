@@ -1,0 +1,1 @@
+dotnet build src\DryIoc\DryIoc.csproj -f netstandard2.1 -target:CompileTimeGenerate

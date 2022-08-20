@@ -1,10 +1,21 @@
 Version History
 ---------------
 
-## v5.1.0 Small feature and bug-fix release / 2022-05-20
+## v5.2.1 Bug-fix release / 2022-08-09
 
-- fixed: #486 RegisterInstance in principle does not support non Singleton reuse but InstanceFactory still allows to pass different reuse
-- added: #487 Create CreateChild overload exposing RegistrySharing and childKey arguments
+-fixed: #516 Singleton Decorator to Scoped base shouldn't work, but does
+
+## v5.2.0 Small feature and bug-fix release / 2022-08-02
+
+### Features
+
+- Adding `WithConcreteTypeDynamicRegistrations` overload with `IfUnresolved ifConcreteTypeIsUnresolved` parameter 
+to control exception information, and rule fallback behavior (#506)
+- Small speed-ups 
+
+### Fixes
+
+- #507 Transient resolve with opening scope using factory func in singleton
 
 
 ## v5.0.2 Bug-fix release / 2022-05-10

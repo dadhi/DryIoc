@@ -13,7 +13,7 @@ __DryIoc package__ contains source files: _Container.cs_ and couple of others de
 
 `dotnet add package DryIoc`
 
-There is also a modified source version with all `public` types changed to `internal`. This is maybe useful when you don't want to leak the DryIoc types into other projects in the consuming application.
+There is also a modified source version with all `public` types changed to `internal`. This may be useful when you don't want to leak the DryIoc types into other projects in the consuming application.
 
 `dotnet add package DryIoc.Internal`
 

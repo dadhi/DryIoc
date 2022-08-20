@@ -12,9 +12,7 @@ namespace DryIoc.UnitTests
             RunAllTests();
 
             // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
-
             // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
-
             // new GHIssue101_Compile_time_generated_object_graph().Run();
         }
 
@@ -79,10 +77,16 @@ namespace DryIoc.UnitTests
                 new Issue_SupportForDynamicKeyword(),
                 new Issue_UsingAsyncMethodAsMadeOf(),
                 new Issue_Value_type_resolution_dependency(),
+                new Issue107_NamedScopesDependingOnResolvedTypes(),
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue497_ConstructorWithResolvableArguments_is_not_working_properly(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
                 new GHIssue4_Rule_for_Func_and_Lazy_to_be_resolved_even_without_requested_service_registered(),
+                new GHIssue6_Open_generic_singleton_service_registration_that_satisfies_multiple_interfaces(),
+                new GHIssue7_1_Context_based_injection(),
+                new GHIssue7_2_Context_based_injection(),
+                new GHIssue29_Resolve_caches_args_values(),
+                new GHIssue32_Memory_leak_with_ResolveManyBehavior_AzLazyEnumerable(),
                 new GHIssue80_ScopedOrSingleton_extra_constructor_calls(),
                 new GHIssue101_Compile_time_generated_object_graph(),
                 new GHIssue180_Option_nullable_int_argument_with_not_null_default_value(),
@@ -102,6 +106,13 @@ namespace DryIoc.UnitTests
                 new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
                 new GHIssue495_Automatically_generate_Resolution_calls_for_the_missing_registrations_to_avoid_manual_RegisterPlaceholder(),
+                new GHIssue504_Add_IDictionary_wrapper(),
+                new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution(),
+                new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton(),
+                new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
+                new GHIssue512_Optimize_injection_of_IResolverContext(),
+                new GHIssue516_Singleton_Decorator_to_Scoped_base_should_not_work_but_does(),
+                new GHIssue518_Select_default_then_resolvable_constructor(),
             };
             // var docsTests = new Func<int>[] 
             // { 

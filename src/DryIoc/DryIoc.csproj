@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>net45;netstandard2.0;netstandard2.1</TargetFrameworks>
+        <TargetFrameworks>net45;netstandard2.0;netstandard2.1;net6.0</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>6.0.0-preview-01</VersionPrefix>
-        <VersionSuffix></VersionSuffix>
+        <VersionPrefix>6.0.0</VersionPrefix>
+        <VersionSuffix>preview-02</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -17,8 +17,15 @@
 <![CDATA[
 ## v6.0.0 Major feature release
 
-- Compile-time Dependency Injection
-- Decrease memory footprint
+### Features
+
+- Adding `WithConcreteTypeDynamicRegistrations` overload with `IfUnresolved ifConcreteTypeIsUnresolved` parameter 
+to control exception information, and rule fallback behavior (#506)
+- Small speed-ups 
+
+### Fixes
+
+- #507 Transient resolve with opening scope using factory func in singleton
 
 ]]>
     </PackageReleaseNotes>
@@ -32,7 +39,6 @@
         <T4File Include="CompileTimeDI\Container.Generated.tt" />
     </ItemGroup>
 
-    <!--todo: @wip enable only for the netstandard2.1-->
     <Target Name="CompileTimeGenerate" BeforeTargets="BeforeBuild"
         Condition="'$(SkipCompTimeGen)' != 'true' AND '$(TargetFramework)' == 'netstandard2.1' AND '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
 

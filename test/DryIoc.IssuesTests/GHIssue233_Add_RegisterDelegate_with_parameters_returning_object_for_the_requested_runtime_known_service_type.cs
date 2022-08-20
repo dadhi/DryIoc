@@ -61,7 +61,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void For_expression_generation_Should_be_able_to_register_delegate_with_runtime_service_type_with_two_arguments_returning_object()
         {
-            var container = new Container(Rules.Default.ForExpressionGeneration());
+            var container = new Container(Rules.Default.WithExpressionGenerationSettingsOnly());
 
             container.Register<A>();
             container.Register<B>();

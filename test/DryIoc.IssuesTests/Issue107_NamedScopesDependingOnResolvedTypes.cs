@@ -6,8 +6,21 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue107_NamedScopesDependingOnResolvedTypes
+    public class Issue107_NamedScopesDependingOnResolvedTypes : ITest
     {
+        public int Run()
+        {
+            Can_reuse_and_locate_based_on_object_graph_itself();
+            Can_reuse_based_on_object_graph_itself();
+            Achievable_with_dynamic_dependency_and_resolution_scope();
+            Service_scoped_to_the_correct_resolution_scope_should_be_disposed_even_for_root_singleton_with_resolution_scope();
+            Service_scoped_to_the_correct_resolution_scope_should_be_disposed_even_for_root_singleton_with_resolution_scope_2();
+            Service_scoped_to_resolve_dependency_should_be_disposed_simplified();
+            SingletonWithSeveralInterfaces_ResolveEachInterface_EachResolveReturnsSameInstance();
+            Can_inject_property_of_larger_interface_without_register_delegate();
+            return 8;
+        }
+
         public interface ITwoVariants { }
         internal class FirstVariant : ITwoVariants { }
         internal class SecondVariant : ITwoVariants { }
@@ -251,7 +264,7 @@ namespace DryIoc.IssuesTests
             Assert.AreSame(component.Area1.Database, component.Area1.MainViewModel1.WithChildren.Simple.Database, "Inside of area always the same database");
             Assert.AreNotSame(component.Area1.Database, component.Area2.Database, "Each area with own database");
 
-            // ViewModelPrsenter (LifestyleBoundToNearest): Same in Area1 and Area 2
+            // ViewModelPresenter (LifestyleBoundToNearest): Same in Area1 and Area 2
             Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
             Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
             Assert.AreSame(component.Area1.MainViewModel1.ViewModelPresenter, component.Area1.MainViewModel1.WithChildren.Simple.ViewModelPresenter, "All ViewModelChildren shares with the owning MainViewModel same ViewModelPresenter");
@@ -440,12 +453,12 @@ namespace DryIoc.IssuesTests
             }
         }
 
-        internal class CarefulAreaManager : IDisposable
+        internal class NotCarefulAreaManager : IDisposable
         {
             public AreaWithOneCar[] Areas { get; private set; }
             public ICar ReferenceCar { get; private set; }
 
-            public CarefulAreaManager(AreaWithOneCar[] areas, ICar referenceCar)
+            public NotCarefulAreaManager(AreaWithOneCar[] areas, ICar referenceCar)
             {
                 Areas = areas;
                 ReferenceCar = referenceCar;
@@ -458,19 +471,39 @@ namespace DryIoc.IssuesTests
             }
         }
 
+        internal class CarefulAreaManager : IDisposable
+        {
+            public AreaWithOneCar[] Areas { get; private set; }
+            public ICar ReferenceCar { get; private set; }
+            private IResolverContext _resolutionScope;
+            public CarefulAreaManager(AreaWithOneCar[] areas, ICar referenceCar, IResolverContext resolutionScope)
+            {
+                Areas = areas;
+                ReferenceCar = referenceCar;
+                _resolutionScope = resolutionScope;
+            }
+
+            public void Dispose()
+            {
+                foreach (var area in Areas)
+                    area.Dispose();
+
+                _resolutionScope?.Dispose();
+                _resolutionScope = null;
+            }
+        }
+
         [Test]
-        public void Service_scoped_to_resolve_dependency_should_be_disposed()
+        public void Service_scoped_to_the_correct_resolution_scope_should_be_disposed_even_for_root_singleton_with_resolution_scope()
         {
             var container = new Container();
 
             container.Register<ICar, SmallCar>(Reuse.Scoped);
-            container.Register<AreaWithOneCar>(Reuse.Scoped,
-                setup: Setup.With(openResolutionScope: true));
+            container.Register<AreaWithOneCar>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
             container.Register<SomeTool>();
-            container.Register<CarefulAreaManager>(Reuse.Singleton,
-                setup: Setup.With(openResolutionScope: true));
+            container.Register<NotCarefulAreaManager>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
 
-            var manager = container.Resolve<CarefulAreaManager>();
+            var manager = container.Resolve<NotCarefulAreaManager>();
             var area = manager.Areas.First();
 
             Assert.AreSame(area.Car, area.Tool.Car);
@@ -480,6 +513,38 @@ namespace DryIoc.IssuesTests
 
             Assert.IsTrue(((SmallCar)area.Car).IsDisposed);
             Assert.IsTrue(((SmallCar)area.Tool.Car).IsDisposed);
+
+            // The manager open resolution scope is tracked in the singleton scope (because no other scope available),
+            // therefore the Scope SmallCar injected into manager will be disposed only with singletons/container dispose.
+            // Alternatively, you may inject the scoped IResolverContext into manager and dispose of it in manager Dispose.
+            container.Dispose();
+            Assert.IsTrue(((SmallCar)manager.ReferenceCar).IsDisposed);
+        }
+
+        [Test]
+        public void Service_scoped_to_the_correct_resolution_scope_should_be_disposed_even_for_root_singleton_with_resolution_scope_2()
+        {
+            var container = new Container();
+
+            container.Register<ICar, SmallCar>(Reuse.Scoped);
+            container.Register<AreaWithOneCar>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
+            container.Register<SomeTool>();
+            container.Register<CarefulAreaManager>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
+
+            var manager = container.Resolve<CarefulAreaManager>();
+            var area = manager.Areas.First();
+
+            Assert.AreSame(area.Car, area.Tool.Car);
+            Assert.AreNotSame(manager.ReferenceCar, area.Car);
+
+            // Alternatively, you may inject the scoped IResolverContext into manager and dispose of it in manager Dispose.
+            manager.Dispose();
+
+            Assert.IsTrue(((SmallCar)area.Car).IsDisposed);
+            Assert.IsTrue(((SmallCar)area.Tool.Car).IsDisposed);
+
+            // does not require dispose because our manager is careful to inject its own resolutions scope and dispose of it.
+            // container.Dispose();
             Assert.IsTrue(((SmallCar)manager.ReferenceCar).IsDisposed);
         }
 
@@ -488,11 +553,9 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
-            container.Register<AreaWithOneCarSimplified>(Reuse.Scoped,
-                setup: Setup.With(openResolutionScope: true));
+            container.Register<AreaWithOneCarSimplified>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
 
-            container.Register<CarefulAreaManagerSimplified>(Reuse.Singleton,
-                setup: Setup.With(openResolutionScope: true));
+            container.Register<CarefulAreaManagerSimplified>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
 
             var manager = container.Resolve<CarefulAreaManagerSimplified>();
 

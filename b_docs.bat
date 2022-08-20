@@ -1,0 +1,1 @@
+dotnet build docs\DryIoc.Docs\DryIoc.Docs.csproj -f netcoreapp3.1 -target:MdGenerate

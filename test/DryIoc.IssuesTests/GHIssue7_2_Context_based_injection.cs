@@ -6,8 +6,15 @@ using Validators;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue7_2_Context_based_injection
+    public class GHIssue7_2_Context_based_injection : ITest
     {
+        public int Run()
+        {
+            Option_1_multiple_registrations_with_condition();
+            Option_2_single_generic_registration();
+            return 2;
+        }
+
         [Test]
         public void Option_1_multiple_registrations_with_condition()
         {
