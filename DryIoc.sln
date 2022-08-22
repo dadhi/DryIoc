@@ -124,6 +124,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Microsoft.Dependency
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground", "playground\Playground\Playground.csproj", "{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{38A94225-72AE-4869-88A2-61FCB48ED681}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test", "samples\GHIssue519\test.csproj", "{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -258,6 +262,10 @@ Global
 		{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -295,6 +303,7 @@ Global
 		{400BE898-DF9C-4DE8-9483-1F43F990784B} = {258FA031-1B82-403A-B235-9A25B17A024A}
 		{480C65D7-184D-44E7-9B5D-05E30D857977} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 		{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
+		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73} = {38A94225-72AE-4869-88A2-61FCB48ED681}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}
