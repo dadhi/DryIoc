@@ -1,6 +1,10 @@
 Version History
 ---------------
 
+## v5.2.2 Bug-fix release / 2022-08-23
+
+-fixed: #519 Exception thrown when using WebOptimizer in ASP.NET Core MVC
+
 ## v5.2.1 Bug-fix release / 2022-08-09
 
 -fixed: #516 Singleton Decorator to Scoped base shouldn't work, but does

@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.Microsoft.DependencyInjection.src</id>
-    <version>6.0.2</version>
+    <version>6.1.0</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2022 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,27 +13,18 @@
     <tags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</tags>
     <releaseNotes>
 <![CDATA[
-## v6.0.2
 
-- fixed: #479 IServiceScopeFactory should be a singleton; service scopes should not be nested
-- updated to DryIoc v5.0.2
+## v6.1.0
 
-## v6.0.1
-
-- Fixed the dependencies versions in the source package
-
-## v6.0.0
-
-- Depends on the DryIoc v5
-- Depends on the Microsoft.Extensions.DependencyInjection.Abstractions 6.0.0
-- Provides the implementation of IServiceProviderIsService
-- Provides the implementation of ISupportRequiredService
+- added: RegisterDesciptor overload with IfAlreadyRegistered and optional serviceKey argument
+- fixed: Using the explicit IfAlreadyRegistered.AppendNotKeyed for default RegisterDesciptor in Populate and WithDependencyInjectionAdapter methods
+- fixed: #520 WithDependencyInjectionAdapter / Populate do not work with Default IfAlreadyRegistered.Replace 
 
 ]]>
     </releaseNotes>
     <dependencies>
       <group>
-        <dependency id="DryIoc" version="5.0.2" />
+        <dependency id="DryIoc" version="5.2.2" />
         <dependency id="Microsoft.Extensions.DependencyInjection.Abstractions" version="6.0.0" />
       </group>
     </dependencies>

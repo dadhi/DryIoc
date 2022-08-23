@@ -3533,7 +3533,7 @@ namespace DryIoc
                     return true;
                 }
 
-                if (method == Scope.TrackDisposableMethod)
+                if (method.IsGenericMethod && method.GetGenericMethodDefinition() == Scope.TrackDisposableOpenGenericMethod)
                 {
                     var args = (InstanceTwoArgumentsMethodCallExpression)callExpr;
                     if (!TryInterpret(r, args.Argument0, paramExprs, paramValues, parentArgs, out var service))
@@ -13031,7 +13031,8 @@ namespace DryIoc
             return item;
         }
 
-        internal static readonly MethodInfo TrackDisposableMethod = typeof(IScope).GetMethod(nameof(IScope.TrackDisposable));
+        // todo: @wip use TrackScoped as in Scope Apply instead of TrackDisposable
+        internal static readonly MethodInfo TrackDisposableOpenGenericMethod = typeof(IScope).GetMethod(nameof(IScope.TrackDisposable));
 
         /// <inheritdoc />
         public void SetUsed(int hash, Type type, object instance)
@@ -13217,13 +13218,24 @@ namespace DryIoc
         /// <summary>Returns expression call to GetOrAddItem.</summary>
         public Expression Apply(Request request, Expression serviceFactoryExpr)
         {
-            serviceFactoryExpr = serviceFactoryExpr.NormalizeExpression();
+            // todo: @wip use this line again after replacing TrackDisposableOpenGenericMethod with TrackScoped
+            //serviceFactoryExpr = serviceFactoryExpr.NormalizeExpression();
+
+            // strip the conversion as we are operating with object anyway
+            if (serviceFactoryExpr.NodeType == ExprType.Convert)
+                serviceFactoryExpr = ((UnaryExpression)serviceFactoryExpr).Operand;
 
             var disposalOrder = request.Factory.Setup.DisposalOrder;
+            var serviceExprType = serviceFactoryExpr.Type;
 
             if (request.TracksTransientDisposable)
-                return Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
+                return Call(ResolverContext.SingletonScopeExpr, 
+                    Scope.TrackDisposableOpenGenericMethod.MakeGenericMethod(serviceExprType), // todo: @simplify @perf convert trackdisposable to accepting and returning object
                     serviceFactoryExpr, ConstantInt(disposalOrder));
+
+            // this is required because we cannot use ValueType for the object
+            if (serviceExprType.IsValueType)
+                serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
 
             if (request.DependencyCount > 0)
                 request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
@@ -13399,8 +13411,8 @@ namespace DryIoc
                     return false; // todo: @bug uncomment the FEC NestedLambdaInfo.IsTheSameLambda and check why fallback System compile does not work
 
                 EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
-                EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
-                return il.EmitConvertObjectTo(Type);
+                return EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod)
+                    && il.EmitConvertObjectTo(Type);
             }
         }
 

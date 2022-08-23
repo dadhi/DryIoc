@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="codeessentials.WebOptimizer.Dotless" Version="3.1.0" />
+        <!-- <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="6.0.2" /> -->
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" />
+    </ItemGroup>
+
+</Project>

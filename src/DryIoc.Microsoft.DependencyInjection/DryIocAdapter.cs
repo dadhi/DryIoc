@@ -229,27 +229,34 @@ namespace DryIoc.Microsoft.DependencyInjection
             lifetime == ServiceLifetime.Scoped ? Reuse.ScopedOrSingleton : // see, that we have Reuse.ScopedOrSingleton here instead of Reuse.Scoped
             Reuse.Transient;
 
-        /// <summary>Unpacks the service descriptor to register the service in DryIoc container</summary>
-        public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor)
+        /// <summary>Unpacks the service descriptor to register the service in DryIoc container
+        /// with the default MS.DI convention of `IfAlreadyRegistered.AppendNotKeyed`</summary>
+        public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor) =>
+            container.RegisterDescriptor(descriptor, IfAlreadyRegistered.AppendNotKeyed);
+
+        /// <summary>Unpacks the service descriptor to register the service in DryIoc container
+        /// with the specific `IfAlreadyRegistered` policy and the optional `serviceKey`</summary>
+        public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor, IfAlreadyRegistered ifAlreadyRegistered,
+            object serviceKey = null)
         {
             var serviceType = descriptor.ServiceType;
             var implType = descriptor.ImplementationType;
             if (implType != null)
             {
                 container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType,
-                    null, null, isStaticallyChecked: implType == serviceType || serviceType.IsAssignableFrom(implType));
+                    serviceKey, ifAlreadyRegistered, isStaticallyChecked: implType == serviceType || serviceType.IsAssignableFrom(implType));
             }
             else if (descriptor.ImplementationFactory != null)
             {
                 container.Register(DelegateFactory.Of(descriptor.ImplementationFactory, descriptor.Lifetime.ToReuse()), serviceType,
-                    null, null, isStaticallyChecked: true);
+                    serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
             }
             else
             {
                 var instance = descriptor.ImplementationInstance;
                 container.Register(InstanceFactory.Of(instance), serviceType,
-                    null, null, isStaticallyChecked: true);
-                container.TrackDisposable(instance);
+                    serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+                container.TrackDisposable(instance); // todo: @wip @incompatible calling this method depend on the `ifAlreadyRegistered` policy
             }
         }
     }
