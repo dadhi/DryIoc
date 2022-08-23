@@ -6,7 +6,8 @@
         "HSTS",
         "Initializable",
         "overriden",
-        "Statefully"
+        "Statefully",
+        "typeparamref"
     ],
     "files.watcherExclude": {
         "**/target": true
