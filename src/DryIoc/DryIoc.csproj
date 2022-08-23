@@ -15,6 +15,11 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v5.2.2 Bug-fix release / 2022-08-23
+
+-fixed: #519 Exception thrown when using WebOptimizer in ASP.NET Core MVC
+
+
 ## v5.2.1 Bug-fix release
 
 -fixed: #516 Singleton Decorator to Scoped base shouldn't work, but does
