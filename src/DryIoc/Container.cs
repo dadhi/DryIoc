@@ -3521,7 +3521,7 @@ namespace DryIoc
                     return true;
                 }
 
-                if (method == Scope.TrackDisposableMethod)
+                if (method.IsGenericMethod && method.GetGenericMethodDefinition() == Scope.TrackDisposableOpenGenericMethod)
                 {
                     var args = (InstanceTwoArgumentsMethodCallExpression)callExpr;
                     if (!TryInterpret(r, args.Argument0, paramExprs, paramValues, parentArgs, out var service))
@@ -13035,7 +13035,7 @@ namespace DryIoc
             return item;
         }
 
-        internal static readonly MethodInfo TrackDisposableMethod = typeof(IScope).GetMethod(nameof(IScope.TrackDisposable));
+        internal static readonly MethodInfo TrackDisposableOpenGenericMethod = typeof(IScope).GetMethod(nameof(IScope.TrackDisposable));
 
         /// <inheritdoc />
         public void SetUsed(int hash, Type type, object instance)
@@ -13224,18 +13224,20 @@ namespace DryIoc
             if (serviceFactoryExpr.NodeType == ExprType.Convert)
                 serviceFactoryExpr = ((UnaryExpression)serviceFactoryExpr).Operand;
 
-            // this is required because we cannot use ValueType for the object
-            if (serviceFactoryExpr.Type.IsValueType)
-                serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
-
             var disposalOrder = request.Factory.Setup.DisposalOrder;
+            var serviceExprType = serviceFactoryExpr.Type;
 
             if (request.TracksTransientDisposable)
-                return Call(ResolverContext.SingletonScopeExpr, Scope.TrackDisposableMethod,
+                return Call(ResolverContext.SingletonScopeExpr, 
+                    Scope.TrackDisposableOpenGenericMethod.MakeGenericMethod(serviceExprType), // todo: @simplify @perf convert trackdisposable to accepting and returning object
                     serviceFactoryExpr, ConstantInt(disposalOrder));
 
             var factoryId = request.FactoryType == FactoryType.Decorator
                 ? request.CombineDecoratorWithDecoratedFactoryID() : request.FactoryID;
+
+            // this is required because we cannot use ValueType for the object
+            if (serviceExprType.IsValueType)
+                serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
 
             var lambdaExpr = new FactoryDelegateExpression(serviceFactoryExpr);
 
@@ -13418,6 +13420,7 @@ namespace DryIoc
                     return false;
 
                 EmittingVisitor.TryEmitNonByRefNonValueTypeParameter(FactoryDelegateCompiler.ResolverContextParamExpr, paramExprs, il, ref closure);
+
                 return EmittingVisitor.EmitVirtualMethodCall(il, Scope.GetOrAddViaFactoryDelegateMethod);
             }
         }

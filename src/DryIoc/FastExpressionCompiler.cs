@@ -3645,6 +3645,8 @@ namespace DryIoc.FastExpressionCompiler
 
                 var inits = expr.Initializers;
                 var initCount = inits.Count;
+                var ok = true;
+
                 // see the TryEmitMethodCall for the reason of the callFlags
                 var callFlags = parent & ~ParentFlags.IgnoreResult & ~ParentFlags.MemberAccess & ~ParentFlags.InstanceAccess | ParentFlags.Call;
                 for (var i = 0; i < initCount; ++i)
@@ -3664,29 +3666,24 @@ namespace DryIoc.FastExpressionCompiler
                     var addArgs = elemInit.Arguments;
                     var addArgCount = addArgs.Count;
 #endif
-                    for (var a = 0; a < addArgCount; ++a)
-                    {
-                        var arg = addArgs.GetArgument(a);
-                        if (!TryEmit(addArgs.GetArgument(a), paramExprs, il, ref closure, setup, callFlags, methodParams[a].ParameterType.IsByRef ? a : -1))
-                            return false;
-                    }
+                    for (var a = 0; ok && a < addArgCount; ++a)
+                        ok = TryEmit(addArgs.GetArgument(a), paramExprs, il, ref closure, setup, callFlags, methodParams[a].ParameterType.IsByRef ? a : -1);
 
                     if (!exprType.IsValueType)
-                        EmitMethodCallOrVirtualCall(il, method);
-                    else if (!method.IsVirtual) // #251 - no need for constrain or virtual call because it is already by-ref
-                        EmitMethodCall(il, method);
-                    else if (method.DeclaringType == exprType)
-                        EmitMethodCall(il, method);
+                        ok = EmitMethodCallOrVirtualCall(il, method);
+                    else if (!method.IsVirtual // #251 - no need for constrain or virtual call because it is already by-ref
+                        || method.DeclaringType == exprType)
+                        ok = EmitMethodCall(il, method);
                     else
                     {
                         il.Emit(OpCodes.Constrained, exprType); // todo: @check it is a value type so... can we de-virtualize the call?
-                        EmitVirtualMethodCall(il, method);
+                        ok = EmitVirtualMethodCall(il, method);
                     }
                 }
 
                 if (valueVarIndex != -1)
                     EmitLoadLocalVariable(il, valueVarIndex);
-                return true;
+                return ok;
             }
 
 #if LIGHT_EXPRESSION
@@ -4147,23 +4144,24 @@ namespace DryIoc.FastExpressionCompiler
 #endif
                 }
 
+                var ok = true;
                 if (!objIsValueType)
-                    EmitMethodCallOrVirtualCall(il, method);
-                else if (!method.IsVirtual || objExpr is ParameterExpression p && p.IsByRef)
-                    EmitMethodCall(il, method);
-                else if (method.DeclaringType == objExpr.Type)
-                    EmitMethodCall(il, method);
+                    ok = EmitMethodCallOrVirtualCall(il, method);
+                else if (!method.IsVirtual || 
+                    objExpr is ParameterExpression p && p.IsByRef ||
+                    method.DeclaringType == objExpr.Type)
+                    ok = EmitMethodCall(il, method);
                 else
                 {
                     il.Emit(OpCodes.Constrained, objExpr.Type);
-                    EmitVirtualMethodCall(il, method);
+                    ok = EmitVirtualMethodCall(il, method);
                 }
 
                 if (parent.IgnoresResult() && method.ReturnType != typeof(void))
                     il.Emit(OpCodes.Pop);
 
                 closure.LastEmitIsAddress = false;
-                return true;
+                return ok;
             }
 
 #if LIGHT_EXPRESSION
@@ -4197,8 +4195,7 @@ namespace DryIoc.FastExpressionCompiler
                     }
 
                     closure.LastEmitIsAddress = false;
-                    EmitMethodCallOrVirtualCall(il, prop.GetMethod);
-                    return true;
+                    return EmitMethodCallOrVirtualCall(il, prop.GetMethod);
                 }
 
                 if (expr.Member is FieldInfo field)
@@ -5167,28 +5164,37 @@ namespace DryIoc.FastExpressionCompiler
                 return testExpr;
             }
 
-            // todo: @feature EmitCall is specifically for the varags method and not for normal conventions methods,
-            // for those you need to call Emit(OpCodes.Call|Callvirt, methodInfo).
-            // So for now the varargs methods are not supported yet.
             [MethodImpl((MethodImplOptions)256)]
             public static bool EmitMethodCallOrVirtualCall(ILGenerator il, MethodInfo method)
             {
+                // todo: @feature EmitCall is specifically for the varags method and not for normal conventions methods,
+                // for those you need to call Emit(OpCodes.Call|Callvirt, methodInfo).
+                // So for now the varargs methods are not supported yet.
+                var ok = (method.CallingConvention & CallingConventions.VarArgs) == 0;
                 il.Emit(method.IsVirtual ? OpCodes.Callvirt : OpCodes.Call, method);
-                return true;
+                return ok;
             }
 
             [MethodImpl((MethodImplOptions)256)]
             public static bool EmitVirtualMethodCall(ILGenerator il, MethodInfo method)
             {
+                // todo: @feature EmitCall is specifically for the varags method and not for normal conventions methods,
+                // for those you need to call Emit(OpCodes.Call|Callvirt, methodInfo).
+                // So for now the varargs methods are not supported yet.
+                var ok = (method.CallingConvention & CallingConventions.VarArgs) == 0;
                 il.Emit(OpCodes.Callvirt, method);
-                return true;
+                return ok;
             }
 
             [MethodImpl((MethodImplOptions)256)]
             public static bool EmitMethodCall(ILGenerator il, MethodInfo method)
             {
+                // todo: @feature EmitCall is specifically for the varags method and not for normal conventions methods,
+                // for those you need to call Emit(OpCodes.Call|Callvirt, methodInfo).
+                // So for now the varargs methods are not supported yet.
+                var ok = (method.CallingConvention & CallingConventions.VarArgs) == 0;
                 il.Emit(OpCodes.Call, method);
-                return true;
+                return ok;
             }
 
             /// Efficiently emit the int constant
