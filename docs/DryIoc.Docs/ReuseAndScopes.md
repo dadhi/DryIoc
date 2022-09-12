@@ -17,6 +17,7 @@
   - [Reuse.ScopedTo(name)](#reusescopedtoname)
     - [Reuse.InWebRequest and Reuse.InThread](#reuseinwebrequest-and-reuseinthread)
   - [Reuse.ScopedTo service type](#reusescopedto-service-type)
+    - [Opening resolution scope per dependency](#opening-resolution-scope-per-dependency)
     - [Disposing of resolution scope](#disposing-of-resolution-scope)
       - [Automatic scope disposal](#automatic-scope-disposal)
       - [Own the resolution scope disposal](#own-the-resolution-scope-disposal)
@@ -43,10 +44,8 @@ DryIoc provides following basic types of reuse:
 Variations of basic `Scoped` reuse:
 
 * `ScopedTo(scopeName(s))`
-* `ScopedTo<Service>()`
-* `ScopedTo<Service>(serviceKey)`
-* `InThread`
-* `InWebRequest`
+* `ScopedToService<Service>()`
+* `ScopedToService<Service>(serviceKey)`
 
 Service setup options:
 
@@ -576,10 +575,12 @@ Basically `Reuse.InWebRequest` and `Reuse.InThread` are just a scope reuses:
 
 ## Reuse.ScopedTo service type
 
-`ScopedTo<TService>(object serviceKey = null)` and `ScopedToService(Type serviceType, object serviceKey = null)` 
+**Note:** `ScopedToService` methods are replacing the `ScopeTo` for the service type and the optional service key. The reason is the clash of overloading between the `ScopedTo(Type)` and the `ScopedTo(object)`, so the `ScopedToService(Type)` is added.
+
+`ScopedToService<TService>(object serviceKey = null)` and `ScopedToService(Type serviceType, object serviceKey = null)` 
 define the reuse of the same dependency value in the service sub-graph.
-The concept is similar to the assigning of dependency value to the variable and then passing (re-using) this variable 
-inside the service and its other dependencies.
+The concept is similar to the assigning the dependency value to the variable and then passing (re-using) this variable 
+inside the service and its nested dependencies.
 
 ```cs 
 class Example_of_reusing_dependency_as_variable
@@ -604,7 +605,7 @@ class Example_of_reusing_dependency_as_variable
 } 
 ```
 
-In the example above `SubDependency` has a reuse `Reuse.ScopedTo<Foo>()`:
+In the example above `SubDependency` has a reuse `Reuse.ScopedToService<Foo>()`:
 
 ```cs 
 class Scoped_to_service_reuse
@@ -613,11 +614,11 @@ class Scoped_to_service_reuse
     {
         var container = new Container();
 
-        // `openResolutionScope` option is required to open the scope for the `Foo`
+        // `openResolutionScope` option is required to open the scope for the `Foo`, read the sub-section below to see why.
         container.Register<Foo>(setup: Setup.With(openResolutionScope: true));
 
         container.Register<Dependency>();
-        container.Register<SubDependency>(Reuse.ScopedTo<Foo>());
+        container.Register<SubDependency>(Reuse.ScopedToService<Foo>());
 
         var foo = container.Resolve<Foo>();
         Assert.AreSame(foo.Sub, foo.Dep.Sub);
@@ -647,16 +648,68 @@ class Scoped_to_service_reuse
 } 
 ```
 
-The requirement to use `openResolutionScope: true` explains how things are working for the `ScopedTo<Type>()`. 
-It is no different to `ScopedTo(object someName)` where the `someName` is the special type of `ResolutionScopeName` composed from the `typeof(Foo)` and optional service key.
+### Opening resolution scope per dependency
 
-To satisfy the `ScopedTo` reuse we need an open scope somewhere. Here DryIoc will automatically open the scope when resolving the `Foo` service.
-We may desugar it to something like: 
+In the example above the setup with `openResolutionScope: true` explains how things are working for the `ScopedToService<Type>()`. 
+The method is a thin layer over `ScopedTo(object name)` where the `name` is the type `ResolutionScopeName` wrapping together the `typeof(Foo)` and optional service key.
+
+Next thing is to open scope to satisfy the `ScopedToService` reuse. 
+
+Using the setup with `openResolutionScope: true` we are instructing DryIoc to automatically open the scope when resolving the `Foo` service.
+
+The line `container.Register<Foo>(setup: Setup.With(openResolutionScope: true));` will result in the following resolved object-graph: 
+
 ```cs
 var foo container.OpenScope(new ResolutionScopeName(typeof(Foo))).Resolve<Foo>();
 ```
 
-**Note:** The code also tells that `Foo` itself will be scoped to its scope. It may be important if you want to access `Foo` recursively from its dependency.
+**Note:** The code tells that `Foo` itself will be scoped to its scope.
+
+
+The de-sugared code also tells that the scope may be opened manually without the special setup. It may be useful for testing purposes.
+
+```cs
+```cs 
+class Emulating_openResolutionScope_setup
+{
+    [Test] public void Example()
+    {
+        var container = new Container();
+
+        container.Register<Foo>(Reuse.ScopedToService<Foo>()); // huh, scope to itself explicitly - not needed / implied when using `openResolutionScope: true`  
+        container.Register<Dependency>();
+        container.Register<SubDependency>(Reuse.ScopedToService<Foo>());
+
+        var scopeNameForFoo = ResolutionScopeName.Of<Foo>();
+        using var fooScope = container.OpenScope(scopeNameForFoo);
+
+        var foo = fooScope.Resolve<Foo>();
+        Assert.AreSame(foo.Sub, foo.Dep.Sub);
+    }
+
+    class Foo
+    {
+        public SubDependency Sub { get; }
+        public Dependency Dep { get; }
+        public Foo(SubDependency sub, Dependency dep)
+        {
+            Sub = sub;
+            Dep = dep;
+        }
+    }
+
+    class Dependency
+    {
+        public SubDependency Sub { get; }
+        public Dependency(SubDependency sub)
+        {
+            Sub = sub;
+        }
+    }
+
+    class SubDependency { }
+} 
+```
 
 
 ### Disposing of resolution scope
@@ -680,7 +733,7 @@ class Scoped_to_service_reuse_with_dispose
 
         container.Register<Foo>(setup: Setup.With(openResolutionScope: true));
 
-        container.Register<Dependency>(Reuse.ScopedTo<Foo>());
+        container.Register<Dependency>(Reuse.ScopedToService<Foo>());
 
         var foo = container.Resolve<Foo>();
 
@@ -722,7 +775,7 @@ class Own_the_resolution_scope_disposal
 
         container.Register<Foo>(setup: Setup.With(openResolutionScope: true));
 
-        container.Register<Dependency>(Reuse.ScopedTo<Foo>());
+        container.Register<Dependency>(Reuse.ScopedToService<Foo>());
 
         var foo = container.Resolve<Foo>();
         
@@ -759,7 +812,7 @@ __Note:__ There is a similar reuse (lifestyle) available in other IoC libraries,
 [Castle Winsdor Bound LifeStyle](http://docs.castleproject.org/Default.aspx?Page=LifeStyles&NS=Windsor&AspxAutoDetectCookieSupport=1#Bound_8).
 
 
-There is more to `Reuse.ScopedTo<T>(object serviceKey = null)`:
+There is more to `Reuse.ScopedToService<T>(object serviceKey = null)`:
 
 - You may provide an optional `serviceKey` to match a service registered with this key.
 - You may match not only the exact `TService` but its base class or the implemented interface.
