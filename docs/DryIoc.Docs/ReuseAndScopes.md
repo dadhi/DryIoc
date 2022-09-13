@@ -668,7 +668,6 @@ var foo = container.OpenScope(new ResolutionScopeName(typeof(Foo))).Resolve<Foo>
 
 The de-sugared code also tells that the scope may be opened manually without the special setup. It may be useful for testing purposes.
 
-```cs
 ```cs 
 class Emulating_openResolutionScope_setup
 {
