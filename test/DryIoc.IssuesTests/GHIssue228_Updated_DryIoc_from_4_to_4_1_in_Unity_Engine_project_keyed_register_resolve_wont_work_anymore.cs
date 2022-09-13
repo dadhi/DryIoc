@@ -4,6 +4,7 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
+    [TestFixture]
     public class Test
     {
         [Test]

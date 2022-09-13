@@ -3,6 +3,7 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
+    [TestFixture]
     public class GHIssue233_Add_RegisterDelegate_with_parameters_returning_object_for_the_requested_runtime_known_service_type
     {
         [Test]

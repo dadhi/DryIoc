@@ -13,8 +13,8 @@ namespace DryIoc.IssuesTests
         public int Run()
         {
             Test();
-            Test_memory_allocations();
-            return 2;
+            // Test_memory_allocations();
+            return 1;
         }
 
         [Test]
@@ -67,7 +67,6 @@ namespace DryIoc.IssuesTests
                     Print(info);
                 Print("");
             });
-
 
             var memoryCheckPoint2 = dotMemory.Check();
 
