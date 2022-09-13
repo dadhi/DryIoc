@@ -12,7 +12,7 @@ skip_commits:
 
 build_script:
   - dotnet test -f netcoreapp3.1 -c:Release test/DryIoc.UnitTests/DryIoc.UnitTests.csproj
-  - dotnet test -f netcoreapp3.1 -c:Release test/DryIoc.IssuesTests/DryIoc.IssuesTests.csproj
+  - dotnet test -f net5.0        -c:Release test/DryIoc.IssuesTests/DryIoc.IssuesTests.csproj
   - dotnet test -f netcoreapp3.1 -c:Release test/DryIoc.CommonServiceLocator.UnitTests/DryIoc.CommonServiceLocator.UnitTests.csproj
   - dotnet test -f netcoreapp3.1 -c:Release test/DryIoc.Microsoft.DependencyInjection.Specification.Tests/DryIoc.Microsoft.DependencyInjection.Specification.Tests.csproj
   - dotnet test -f netcoreapp3.1 -c:Release docs/DryIoc.Docs/DryIoc.Docs.csproj
