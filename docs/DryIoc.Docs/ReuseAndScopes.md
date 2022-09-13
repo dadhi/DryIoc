@@ -660,7 +660,7 @@ Using the setup with `openResolutionScope: true` we are instructing DryIoc to au
 The line `container.Register<Foo>(setup: Setup.With(openResolutionScope: true));` will result in the following resolved object-graph: 
 
 ```cs
-var foo container.OpenScope(new ResolutionScopeName(typeof(Foo))).Resolve<Foo>();
+var foo = container.OpenScope(new ResolutionScopeName(typeof(Foo))).Resolve<Foo>();
 ```
 
 **Note:** The code tells that `Foo` itself will be scoped to its scope.
