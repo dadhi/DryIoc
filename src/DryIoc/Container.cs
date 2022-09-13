@@ -23,10 +23,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#if !NET45 && !NET451 && !NET452
+#if !NET45 && !NET451 && !NET452 // todo: @wip try NET452_OR_LESS
 #define SUPPORTS_ASYNC_LOCAL
 #endif
-#if !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47
+#if !NETFRAMEWORK
+#define SUPPORTS_ASYNC_DISPOSABLE
+#endif
+#if !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 // todo: @wip try NET47_OR_LESS
 #define SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
 #endif
 
@@ -151,6 +154,67 @@ namespace DryIoc
                 _scopeContext?.Dispose();
             }
         }
+
+#if SUPPORTS_ASYNC_DISPOSABLE
+        /// <inheritdoc/>
+        public System.Threading.Tasks.ValueTask DisposeAsync()
+        {
+            Dispose(); // todo: @wip async dispose
+            // if (disposableObjects != null && disposableObjects.Count > 0)
+            // {
+            //     HashSet<object> disposedObjects = new HashSet<object>();
+
+            //     for (var i = disposableObjects.Count - 1; i >= 0; i--)
+            //     {
+            //         object objectToDispose = disposableObjects[i];
+            //         if (objectToDispose is IAsyncDisposable asyncDisposable)
+            //         {
+            //             if (!disposedObjects.Add(objectToDispose))
+            //                 continue;
+
+            //             ValueTask valueTask = asyncDisposable.DisposeAsync();
+            //             // If we end up here, it means that the ValueTask is not completed
+            //             if (!valueTask.IsCompletedSuccessfully)
+            //                 return Await(i, valueTask, disposableObjects, disposedObjects);
+
+            //             // If its a IValueTaskSource backed ValueTask, inform it its result has been read so it can reset
+            //             valueTask.GetAwaiter().GetResult();
+            //         }
+            //         else if (disposedObjects.Add(objectToDispose))
+            //             ((IDisposable)objectToDispose).Dispose();
+            //         else
+            //             continue;
+            //     }
+            // }
+            return default;
+
+            // static async ValueTask Await(int i, ValueTask vt, List<object> toDispose, HashSet<object> disposedObjects)
+            // {
+            //     await vt.ConfigureAwait(false);
+
+            //     // vt is acting on the disposable at index i,
+            //     // decrement it and move to the next iteration
+            //     i--;
+
+            //     for (; i >= 0; i--)
+            //     {
+            //         object objectToDispose = toDispose[i];
+            //         if (!disposedObjects.Add(objectToDispose))
+            //         {
+            //             continue;
+            //         }
+            //         if (objectToDispose is IAsyncDisposable asyncDisposable)
+            //         {
+            //             await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+            //         }
+            //         else
+            //         {
+            //             ((IDisposable)objectToDispose).Dispose();
+            //         }
+            //     }
+            // }
+        }
+#endif
 
         #region IRegistrator
 
@@ -4586,6 +4650,9 @@ namespace DryIoc
 
     /// <summary>Extends IResolver to provide an access to scope hierarchy.</summary>
     public interface IResolverContext : IResolver, IDisposable
+#if SUPPORTS_ASYNC_DISPOSABLE
+        , IAsyncDisposable
+#endif
     {
         /// <summary>The rules object defines policies per container for registration and resolution.</summary>
         Rules Rules { get; }

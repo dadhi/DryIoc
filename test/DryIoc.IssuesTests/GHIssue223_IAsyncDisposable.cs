@@ -10,7 +10,7 @@ namespace DryIoc.IssuesTests
     public class GHIssue223_IAsyncDisposable
     {
         // [Test]
-        public void ShouldDisposeAsyncDisposable()
+        public async Task ShouldDisposeAsyncDisposable()
         {
             var container = new Container();
             List<object> disposedObjects = new();
@@ -18,8 +18,7 @@ namespace DryIoc.IssuesTests
             container.RegisterDelegate<AsyncDisposable>(_ => new AsyncDisposable(disposedObject => disposedObjects.Add(disposedObject)), Reuse.Scoped);
 
             AsyncDisposable asyncDisposable = null;
-            // await using (var scope = container.OpenScope())
-            using (var scope = container.OpenScope())
+            await using (var scope = container.OpenScope())
             {
                 asyncDisposable = container.Resolve<AsyncDisposable>();
             }
