@@ -11,6 +11,7 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
+            // new SO_Injecting_the_collection_of_interfaces_implemented_by_decorator().Run();
             // new SO_Child_Container_for_transients().Run();
             // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
             // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
@@ -71,6 +72,7 @@ namespace DryIoc.UnitTests
             {
                 new DotnetWeekBlogExample(),
                 new SO_Child_Container_for_transients(),
+                new SO_Injecting_the_collection_of_interfaces_implemented_by_decorator(),
                 new Issue_Can_resolve_singleton_with_Func_of_scoped_dependency(),
                 new Issue_HandleVariance(),
                 new Issue_InjectingSerilogLogger(),
