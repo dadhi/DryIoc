@@ -82,14 +82,15 @@ class NSubstitute_example
 With above example there is still the problem though - the factory will be created each time when non-registered service is requested.
 It may be also problematic if we want the mock to be a _singleton_. Let's fix it by caching the factory in the dictionary:
 ```cs 
-public class OtherConsumer
-{
-    public INotImplementedService Service { get; }
-    public OtherConsumer(INotImplementedService service) { Service = service; }
-}
 
-class NSubstitute_example_with_singleton_mocks
+public class NSubstitute_example_with_singleton_mocks
 {
+    public class OtherConsumer
+    {
+        public INotImplementedService Service { get; }
+        public OtherConsumer(INotImplementedService service) { Service = service; }
+    }
+
     readonly ConcurrentDictionary<System.Type, DynamicRegistration> _mockRegistrations =
         new ConcurrentDictionary<System.Type, DynamicRegistration>();
 
@@ -101,6 +102,9 @@ class NSubstitute_example_with_singleton_mocks
             if (!serviceType.IsAbstract) // Mock interface or abstract class only.
                 return null;
 
+            if (serviceType.IsGenericTypeDefinition)
+                return null; // we cannot mock open-generic types - we need something concrete here
+
             var d = _mockRegistrations.GetOrAdd(serviceType,
                 type => new DynamicRegistration(
                     DelegateFactory.Of(r => Substitute.For(new[] { serviceType }, Empty<object>()), reuse)));
@@ -111,7 +115,7 @@ class NSubstitute_example_with_singleton_mocks
 
 
     [Test]
-    public void Test()
+    public void Example()
     {
         var container = WithAutoMocking(new Container(), Reuse.Singleton);
 
@@ -123,6 +127,23 @@ class NSubstitute_example_with_singleton_mocks
 
         // Verify that `Service` dependency is indeed a singleton in a different consumers
         Assert.AreSame(consumer1.Service, consumer2.Service);
+    }
+
+    [Test]
+    public void Example_of_mocking_the_open_generic_dependency()
+    {
+        var container = WithAutoMocking(new Container(), Reuse.Singleton);
+
+        container.Register<Foo>();
+
+        var consumer = container.Resolve<Foo>();
+    }
+
+    public interface IOpenGenericDependency<T> { }
+    public class Foo
+    {
+        public readonly IOpenGenericDependency<int> Dependency;
+        public Foo(IOpenGenericDependency<int> dependency) => Dependency = dependency;
     }
 }
 ```
