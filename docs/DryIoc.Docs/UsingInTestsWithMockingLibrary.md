@@ -57,6 +57,9 @@ class NSubstitute_example
             if (!serviceType.IsAbstract) // Mock interface or abstract class only.
                 return null;
 
+            if (serviceType.IsGenericTypeDefinition)
+                return null; // we cannot mock open-generic types - we need something concrete here
+
             var d = _mockRegistrations.GetOrAdd(serviceType,
                 type => new DynamicRegistration(
                     DelegateFactory.Of(r => Substitute.For(new[] { serviceType }, Empty<object>()), reuse)));
@@ -85,12 +88,6 @@ It may be also problematic if we want the mock to be a _singleton_. Let's fix it
 
 public class NSubstitute_example_with_singleton_mocks
 {
-    public class OtherConsumer
-    {
-        public INotImplementedService Service { get; }
-        public OtherConsumer(INotImplementedService service) { Service = service; }
-    }
-
     readonly ConcurrentDictionary<System.Type, DynamicRegistration> _mockRegistrations =
         new ConcurrentDictionary<System.Type, DynamicRegistration>();
 
@@ -113,7 +110,6 @@ public class NSubstitute_example_with_singleton_mocks
         },
         DynamicRegistrationFlags.Service | DynamicRegistrationFlags.AsFallback));
 
-
     [Test]
     public void Example()
     {
@@ -127,6 +123,12 @@ public class NSubstitute_example_with_singleton_mocks
 
         // Verify that `Service` dependency is indeed a singleton in a different consumers
         Assert.AreSame(consumer1.Service, consumer2.Service);
+    }
+
+    public class OtherConsumer
+    {
+        public INotImplementedService Service { get; }
+        public OtherConsumer(INotImplementedService service) { Service = service; }
     }
 
     [Test]

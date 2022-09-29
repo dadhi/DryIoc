@@ -59,6 +59,9 @@ class NSubstitute_example
             if (!serviceType.IsAbstract) // Mock interface or abstract class only.
                 return null;
 
+            if (serviceType.IsGenericTypeDefinition)
+                return null; // we cannot mock open-generic types - we need something concrete here
+
             var d = _mockRegistrations.GetOrAdd(serviceType,
                 type => new DynamicRegistration(
                     DelegateFactory.Of(r => Substitute.For(new[] { serviceType }, Empty<object>()), reuse)));
