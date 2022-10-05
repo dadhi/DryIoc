@@ -30,9 +30,9 @@ services.AddHttpClient<TypedClient>()
 
 Console.WriteLine($"Services ({services.Count}):\n{(string.Join(",\n", services.Select((x, i) => $"{i:000} - {x.ServiceType.Print()}").ToList()))}\n\n");
 
-var container = new Container(r =>
-    r.WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Replace))
-.WithDependencyInjectionAdapter(services);
+var container = new Container(r => r
+    .WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Replace))
+    .WithDependencyInjectionAdapter(services);
 
 var app = builder.Build();
 
@@ -44,19 +44,16 @@ Console.WriteLine("Created client: " + client.GetType().Name);
 
 container.Resolve<ExampleService>();
 
-public class TypedClient {}
+public class TypedClient { }
 
-public class ExampleService 
-{ 
-    public ExampleService(IOptions<TransientFaultHandlingOptions> options) 
+public class ExampleService
+{
+    public ExampleService(IOptions<TransientFaultHandlingOptions> options)
     {
         var json = JsonSerializer.Serialize(options.Value);
-        Console.WriteLine($"Options: `{json}`");
+        Console.WriteLine($"{nameof(TransientFaultHandlingOptions)}: `{json}`");
     }
 }
-
-
-
 public class TransientFaultHandlingOptions
 {
     public bool Enabled { get; set; }
