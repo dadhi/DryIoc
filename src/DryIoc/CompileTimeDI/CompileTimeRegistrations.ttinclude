@@ -43,14 +43,14 @@
     ServiceInfo[] SpecifyResolutionRoots(ServiceRegistrationInfo reg) =>
         reg.AsResolutionRoot ? reg.ToServiceInfo().One() : null;
 
-    // TODO: Specify the resolution roots explicitly
+    // TODO: Alternatively, specify the resolution roots explicitly
     ServiceInfo[] CustomResolutionRoots =
     {
         ServiceInfo.Of<Example.IService>(), 
         ServiceInfo.Of<BaseAConsumer>(), 
     };
 
-    // TODO: Specify the namespace to go into `using` instead of qualifying its types all the times
+    // TODO: Specify the service namespaces to be imported via `using` instead of qualifying their types with the full names.
     // You may generate the Container.Generated.cs first, then look what you want to move to `using`
     string[] NamespaceUsings =
     {
