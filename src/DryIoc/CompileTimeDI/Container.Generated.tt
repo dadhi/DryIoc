@@ -31,7 +31,7 @@ THE SOFTWARE.
 <#@ import Namespace="DryIoc.FastExpressionCompiler.LightExpression" #>
 <#@ include File="CompileTimeDI\CompileTimeRegistrations.ttinclude" #>
 <#
-// todo: @simplify The rules for `WithExpressionGenerationSettingsOnly` are required` here because we the container with generation rules is not returned by `GenerateResolutionExpressions`
+// todo: @simplify The rules for `WithExpressionGenerationSettingsOnly` are required` here because the container with generation rules is not returned by `GenerateResolutionExpressions`
 var container = GetContainerWithRegistrations().With(rules => rules.WithExpressionGenerationSettingsOnly());
 
 var result = container.GenerateResolutionExpressions(x => x.SelectMany(r =>
@@ -78,6 +78,7 @@ var depCodes = result.ResolveDependencies.Select((r, i) =>
           ExpressionObject = r.Value,
           RequiredServiceType = Code(r.Key.RequiredServiceType),
           PreResolveParent = Code(r.Key.Parent, getServiceBodyLineIdent + 8),
+          PreResolveParentObject = r.Key.Parent,
           CreateMethodName = "GetDependency_" + GetTypeNameOnly(r.Key.ServiceType.Name) + "_" + i })
     .ToList();
 
@@ -89,10 +90,7 @@ The code below is auto-generated at compile-time and changes here will be lost o
 ======================================================================================================
 <#  
 var errCount = result.Errors.Count;
-if (errCount == 0) { #>
-Generation is completed without errors.
-
-<# } else { #>
+if (errCount != 0) { #>
 There are <#=errCount#> generation ERRORS:
 
 <#
@@ -111,14 +109,15 @@ foreach (var dc in depCodes)
         if (!hasNotResolvedDeps)
         {
             hasNotResolvedDeps = true;
-            WriteLine(@"WARNINGS: Some dependencies are not resolved. 
-Please register them at runtime, or add them to the compile-time generation.
+            WriteLine(@"WARNINGS: Some dependencies are not resolved.
+
+Please register the dependencies at runtime or add them to the compile-time generation.
 ");
         }
         WriteLine("- `{0}` {1}in {2}", 
             dc.ServiceTypeOnly,
             dc.ServiceKeyObject == null ? "" : "with key " + dc.ServiceKey + " ",
-            dc.PreResolveParent);
+            dc.PreResolveParentObject);
     }
 
 if (hasNotResolvedDeps)
@@ -158,10 +157,9 @@ namespace DryIoc
         var index = 0;
         foreach (var root in rootCodes.Where(f => f.ServiceKeyCode == "null"))
         {
-            if (index++ > 0) {
-#>          else<#
-            }
-#>
+            if (index++ > 0) {#>
+            else<#}#>
+
             if (serviceType == <#=root.ServiceTypeCode#>)
             {
                 service = <#=root.CreateMethodName#>(r);

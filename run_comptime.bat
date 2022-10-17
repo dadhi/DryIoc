@@ -1,1 +1,0 @@
-dotnet msbuild -target:CompileTimeGenerate src\DryIoc\DryIoc.csproj

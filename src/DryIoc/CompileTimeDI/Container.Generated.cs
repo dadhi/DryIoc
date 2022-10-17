@@ -26,17 +26,13 @@ THE SOFTWARE.
 ======================================================================================================
 The code below is auto-generated at compile-time and changes here will be lost on the next generation.
 ======================================================================================================
-Generation is completed without errors.
+WARNINGS: Some dependencies are not resolved.
 
-WARNINGS: Some dependencies are not resolved. 
-Please register them at runtime, or add them to the compile-time generation.
+Please register the dependencies at runtime or add them to the compile-time generation.
 
-- `RuntimeDependencyC` in Request.Empty.Push(
-                        typeof(IService),
-                        1,
-                        typeof(MyService),
-                        Reuse.Transient,
-                        RequestFlags.IsResolutionCall|RequestFlags.DoNotPoolRequest)
+- `RuntimeDependencyC` in resolution root MyService: IService FactoryId=1
+  from container without scope
+ with Rules with {ThrowIfRuntimeStateRequired, UsedForExpressionGeneration, GenerateResolutionCallForMissingDependency} and without {ImplicitCheckForReuseMatchingScope, EagerCachingSingletonForFasterAccess, UseInterpretationForTheFirstResolution}
 --------------------------------------------------------------------------------------------------------
 */
 
@@ -65,12 +61,14 @@ namespace DryIoc
         /// <inheritdoc/>
         public bool TryResolve(out object service, IResolverContext r, Type serviceType)
         {
+
             if (serviceType == typeof(IService))
             {
                 service = Get_IService_0(r);
                 return true;
             }
-          else            if (serviceType == typeof(BaseAConsumer))
+            else
+            if (serviceType == typeof(BaseAConsumer))
             {
                 service = Get_BaseAConsumer_1(r);
                 return true;
