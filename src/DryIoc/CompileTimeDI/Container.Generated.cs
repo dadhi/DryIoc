@@ -26,9 +26,8 @@ THE SOFTWARE.
 ======================================================================================================
 The code below is auto-generated at compile-time and changes here will be lost on the next generation.
 ======================================================================================================
-WARNINGS: Some dependencies are not resolved.
 
-Please register the dependencies at runtime or add them to the compile-time generation.
+WARNINGS: Some dependencies are missing. Register them at runtime or add to the compile-time registrations.
 
 - `RuntimeDependencyC` in resolution root MyService: IService FactoryId=1
   from container without scope
@@ -41,7 +40,7 @@ using System.Collections.Generic;
 using System.Threading;
 using DryIoc.ImTools;
 
-// Provided `NamespaceUsings`:
+// Provided by `NamespaceUsings`:
 using Example;
 
 namespace DryIoc

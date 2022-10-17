@@ -109,15 +109,14 @@ foreach (var dc in depCodes)
         if (!hasNotResolvedDeps)
         {
             hasNotResolvedDeps = true;
-            WriteLine(@"WARNINGS: Some dependencies are not resolved.
-
-Please register the dependencies at runtime or add them to the compile-time generation.
+            WriteLine(@"
+WARNINGS: Some dependencies are missing. Register them at runtime or add to the compile-time registrations.
 ");
         }
         WriteLine("- `{0}` {1}in {2}", 
             dc.ServiceTypeOnly,
             dc.ServiceKeyObject == null ? "" : "with key " + dc.ServiceKey + " ",
-            dc.PreResolveParentObject);
+            dc.PreResolveParentObject); // todo: @wip remove unnecessary info from the output
     }
 
 if (hasNotResolvedDeps)
@@ -131,7 +130,7 @@ using System.Collections.Generic;
 using System.Threading;
 using DryIoc.ImTools;
 
-// Provided `NamespaceUsings`:
+// Provided by `NamespaceUsings`:
 <# foreach (var ns in NamespaceUsings) {#>
 using <#=ns#>;
 <#}#>

@@ -54,7 +54,7 @@
     // You may generate the Container.Generated.cs first, then look what you want to move to `using`
     string[] NamespaceUsings =
     {
-        "Example",
+        nameof(Example),
         //"Foo.Bar.Buzz",
     };
 #>
