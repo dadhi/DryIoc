@@ -29,8 +29,13 @@
     </PackageReleaseNotes>
     </PropertyGroup>
 
-    <ItemGroup>
+    <ItemGroup Label="Packaging build and content files">
         <None Include="..\..\nuspecs\DryIoc\readme.md" Pack="true" PackagePath="\"/>
+
+        <None Include="CompileTimeDI\Container.Generated.tt"              Pack="true" PackagePath="CompileTimeDI" />
+        <None Include="CompileTimeDI\CompileTimeRegistrations.ttinclude"  Pack="true" PackagePath="CompileTimeDI" />
+        <None Include="CompileTimeDI\CompileTimeRegistrations.Example.cs" Pack="true" PackagePath="CompileTimeDI" />
+        <None Include=".config\dotnet-tools.json"                         Pack="true" PackagePath="CompileTimeDI" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
@@ -44,6 +49,7 @@
         <Message Text="TargetDir:  '$(TargetDir)'" Importance="high"/>
         <Message Text="TargetPath: '$(TargetPath)'" Importance="high"/>
         <Message Text="ProjectDir: '$(ProjectDir)'" Importance="high"/>
+
         <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
 
         <Exec WorkingDirectory="$(ProjectDir)" 

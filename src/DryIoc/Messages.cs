@@ -47,7 +47,7 @@ namespace DryIoc.Messages
     public interface IMessageMiddleware<in M, R>
     {
         /// <summary>`0` means the default registration order,
-        /// lesser numbers incuding the `-1`, `-2` mean execute as a first,
+        /// lesser numbers including the `-1`, `-2` mean execute as a first,
         /// bigger numbers mean execute as a last</summary>
         int RelativeOrder { get; }
 

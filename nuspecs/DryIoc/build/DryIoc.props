@@ -29,12 +29,10 @@
 
         <Exec WorkingDirectory="$(ProjectDir)" 
             Command='dotnet tool install --ignore-failed-sources --tool-manifest "$(ProjectDir)\.config\dotnet-tools.json" dotnet-t4' />
-
     </Target>
 
     <Target Name="CompileTimeGenerate" BeforeTargets="BeforeBuild"
         Condition=" '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
-
 
         <Message Text="TargetDir:  '$(TargetDir)'"  Importance="high"/>
         <Message Text="TargetPath: '$(TargetPath)'" Importance="high"/>
@@ -46,6 +44,13 @@
     </Target>
 
     <ItemGroup>
+      <None Update="CompileTimeDI\Container.Generated.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>CompileTimeDI\Container.Generated.cs</LastGenOutput>
+      </None>
+    </ItemGroup>
+
+    <ItemGroup>
       <Compile Update="CompileTimeDI\Container.Generated.cs">
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
@@ -53,10 +58,4 @@
       </Compile>
     </ItemGroup>
 
-    <ItemGroup>
-      <None Update="CompileTimeDI\Container.Generated.tt">
-        <Generator>TextTemplatingFileGenerator</Generator>
-        <LastGenOutput>CompileTimeDI\Container.Generated.cs</LastGenOutput>
-      </None>
-    </ItemGroup>
 </Project>
