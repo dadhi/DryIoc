@@ -1,9 +1,12 @@
 <Project>
     <Target Name="CopyCompileTimeDIToProject" AfterTargets="Restore">
 
-        <Message Text="Package dir: $(MSBuildThisFileDirectory)" Importance="high"/>
-        <Message Text="Project dir: $(ProjectDir)"  Importance="high"/>
-        <Message Text="Copying T4 template, T4 include, example files and T4 CLI-tool manifest to the project..." Importance="high" />
+        <Message Text="MSBuildThisFileDirectory: '$(MSBuildThisFileDirectory)'" Importance="high"/>
+
+        <Message Text="ProjectDir: '$(ProjectDir)'" Importance="high"/>
+        <Message Text="TargetDir:  '$(TargetDir)'" Importance="high"/>
+        <Message Text="TargetPath: '$(TargetPath)'" Importance="high"/>
+        <Message Text="Copying T4 template, T4 include, example files and dotnet-t4 CLI-tool manifest to the project..." Importance="high" />
 
         <Copy
           SourceFiles="$(MSBuildThisFileDirectory)..\CompileTimeDI\Container.Generated.tt" 
@@ -27,24 +30,19 @@
         <Exec WorkingDirectory="$(ProjectDir)" 
             Command='dotnet tool install --ignore-failed-sources --tool-manifest "$(ProjectDir)\.config\dotnet-tools.json" dotnet-t4' />
 
-        <ItemGroup>
-            <T4File Include="$(ProjectDir)\CompileTimeDI\Container.Generated.tt" />
-        </ItemGroup>
-
-        <Message Text="TargetPath=='$(TargetPath)'" Importance="high"/>
     </Target>
-
-    <ItemGroup>
-        <T4File Include="CompileTimeDI\Container.Generated.tt" />
-    </ItemGroup>
 
     <Target Name="CompileTimeGenerate" BeforeTargets="BeforeBuild"
         Condition=" '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
 
-        <Message Text="Generating the object graphs from the compile-time registrations..." Importance="high"/>
-        <Message Text="[TargetPath=$(TargetPath)]" Importance="high"/>
 
-        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) %(T4File.Identity)" />
+        <Message Text="TargetDir:  '$(TargetDir)'"  Importance="high"/>
+        <Message Text="TargetPath: '$(TargetPath)'" Importance="high"/>
+        <Message Text="ProjectDir: '$(ProjectDir)'" Importance="high"/>
+        <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
+
+        <Exec WorkingDirectory="$(ProjectDir)" 
+          Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
     </Target>
 
     <ItemGroup>

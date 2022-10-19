@@ -12,6 +12,9 @@
 
         <PackageId>$(Product).dll</PackageId>
         <Title>$(Product).dll</Title>
+
+        <PackageReadmeFile>readme.md</PackageReadmeFile>
+
         <Description>DryIoc is fast, small, full-featured IoC Container for .NET</Description>
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
@@ -26,22 +29,33 @@
     </PackageReleaseNotes>
     </PropertyGroup>
 
+    <ItemGroup>
+        <None Include="..\..\nuspecs\DryIoc\readme.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
+
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
     </ItemGroup>
 
-    <!-- <ItemGroup>
-        <T4File Include="CompileTimeDI\Container.Generated.tt" />
-    </ItemGroup> -->
-
     <Target Name="CompileTimeGenerate" 
         BeforeTargets="BeforeBuild"
-        Condition="'$(SkipCompTimeGen)' != 'true' AND '$(TargetFramework)' == 'netstandard2.1' AND '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)')">
+        Condition="'$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)') AND ('$(TargetFramework)' == 'netstandard2.1' OR '$(TargetFramework)' == 'net6.0')">
 
+        <Message Text="TargetDir:  '$(TargetDir)'" Importance="high"/>
+        <Message Text="TargetPath: '$(TargetPath)'" Importance="high"/>
+        <Message Text="ProjectDir: '$(ProjectDir)'" Importance="high"/>
         <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
 
-        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
+        <Exec WorkingDirectory="$(ProjectDir)" 
+          Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
     </Target>
+
+    <ItemGroup>
+      <None Update="CompileTimeDI\Container.Generated.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>CompileTimeDI\Container.Generated.cs</LastGenOutput>
+      </None>
+    </ItemGroup>
 
     <ItemGroup>
       <Compile Update="CompileTimeDI\Container.Generated.cs">
@@ -49,13 +63,6 @@
         <AutoGen>True</AutoGen>
         <DependentUpon>CompileTimeDI\Container.Generated.tt</DependentUpon>
       </Compile>
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Update="CompileTimeDI\Container.Generated.tt">
-        <Generator>TextTemplatingFileGenerator</Generator>
-        <LastGenOutput>CompileTimeDI\Container.Generated.cs</LastGenOutput>
-      </None>
     </ItemGroup>
 
 </Project>
