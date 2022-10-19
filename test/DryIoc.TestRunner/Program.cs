@@ -11,6 +11,7 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
+            // new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit().Run();
             // new SO_Injecting_the_collection_of_interfaces_implemented_by_decorator().Run();
             // new SO_Child_Container_for_transients().Run();
             // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
@@ -117,6 +118,7 @@ namespace DryIoc.UnitTests
                 new GHIssue512_Optimize_injection_of_IResolverContext(),
                 new GHIssue516_Singleton_Decorator_to_Scoped_base_should_not_work_but_does(),
                 new GHIssue518_Select_default_then_resolvable_constructor(),
+                new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit(),
             };
             // var docsTests = new Func<int>[] 
             // { 

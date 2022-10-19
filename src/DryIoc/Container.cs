@@ -3041,6 +3041,7 @@ namespace DryIoc
                     {
                         if (expr is NoArgsNewClassIntrinsicExpression defaultCtorExpr)
                         {
+                            // we may use Activator.CreateInstance here which is made 6x faster in .NET 6 than Invoke, but then in the .NET 7 invoke is fast again, so no-op
                             result = defaultCtorExpr.Constructor.Invoke(ArrayTools.Empty<object>());
                             return true;
                         }
@@ -3051,11 +3052,8 @@ namespace DryIoc
                         switch (argCount)
                         {
                             case 0:
-#if NET6_0
-                                result = Activator.CreateInstance(newExpr.Constructor.DeclaringType);
-#else
+                                // we may use Activator.CreateInstance here which is made 6x faster in .NET 6 than Invoke, but then in the .NET 7 invoke is fast again, so no-op
                                 result = newExpr.Constructor.Invoke(ArrayTools.Empty<object>());
-#endif
                                 return true;
                             case 1:
                                 if (newExpr is OneArgumentNewExpression e1)

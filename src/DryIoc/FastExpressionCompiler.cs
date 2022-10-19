@@ -399,6 +399,7 @@ namespace DryIoc.FastExpressionCompiler
 #else
             var closurePlusParamTypes = RentOrNewClosureTypeToParamTypes(lambdaExpr.Parameters);
 #endif
+            // Console.WriteLine("DynamicMethod: FEC402");
             var method = new DynamicMethod(string.Empty, lambdaExpr.ReturnType, closurePlusParamTypes,
                 typeof(ExpressionCompiler), skipVisibility: true);
 
@@ -435,6 +436,7 @@ namespace DryIoc.FastExpressionCompiler
 #else
             var closurePlusParamTypes = RentOrNewClosureTypeToParamTypes(lambdaExpr.Parameters);
 #endif
+            // Console.WriteLine("DynamicMethod: FEC439");
             var method = new DynamicMethod(string.Empty, lambdaExpr.ReturnType, closurePlusParamTypes, typeof(ArrayClosure),
                 skipVisibility: true);
 
@@ -456,8 +458,9 @@ namespace DryIoc.FastExpressionCompiler
             return @delegate;
         }
 
-        private static Delegate CompileNoArgsNew(ConstructorInfo ctor, Type delegateType, Type[] closurePlusParamTypes, Type returnType)
+        private static Delegate CompileNewNoArgs(ConstructorInfo ctor, Type delegateType, Type[] closurePlusParamTypes, Type returnType)
         {
+            // Console.WriteLine("DynamicMethod: FEC463");
             var method = new DynamicMethod(string.Empty, returnType, closurePlusParamTypes, typeof(ArrayClosure), true);
             var il = method.GetILGenerator(16); // 16 is enough for maximum of 3 possible ops
             il.Emit(OpCodes.Newobj, ctor);
@@ -472,7 +475,7 @@ namespace DryIoc.FastExpressionCompiler
             Type[] closurePlusParamTypes, Type returnType, CompilerFlags flags)
         {
             if (bodyExpr is NoArgsNewClassIntrinsicExpression newNoArgs)
-                return CompileNoArgsNew(newNoArgs.Constructor, delegateType, closurePlusParamTypes, returnType);
+                return CompileNewNoArgs(newNoArgs.Constructor, delegateType, closurePlusParamTypes, returnType);
 #else
         internal static object TryCompileBoundToFirstClosureParam(Type delegateType, Expression bodyExpr, IReadOnlyList<PE> paramExprs,
             Type[] closurePlusParamTypes, Type returnType, CompilerFlags flags)
@@ -507,6 +510,7 @@ namespace DryIoc.FastExpressionCompiler
                     : new DebugArrayClosure(closureInfo.GetArrayOfConstantsAndNestedLambdas(), debugExpr);
             }
 
+            // Console.WriteLine("DynamicMethod: FEC513");
             var method = new DynamicMethod(string.Empty, returnType, closurePlusParamTypes, typeof(ArrayClosure), true);
 
             // todo: @perf @mem the default stream capacity is 64, consider to decrease it to 16 for a member or no argument method
@@ -1575,7 +1579,7 @@ namespace DryIoc.FastExpressionCompiler
             if (nestedLambdaBody is NoArgsNewClassIntrinsicExpression newNoArgs)
             {
                 var paramTypes = RentOrNewClosureTypeToParamTypes(nestedLambdaParamExprs);
-                nestedLambdaInfo.Lambda = CompileNoArgsNew(newNoArgs.Constructor, nestedLambdaExpr.Type, paramTypes, nestedReturnType);
+                nestedLambdaInfo.Lambda = CompileNewNoArgs(newNoArgs.Constructor, nestedLambdaExpr.Type, paramTypes, nestedReturnType);
                 ReturnClosureTypeToParamTypesToPool(paramTypes);
                 return true;
             }
@@ -1603,6 +1607,7 @@ namespace DryIoc.FastExpressionCompiler
 
             var closurePlusParamTypes = RentOrNewClosureTypeToParamTypes(nestedLambdaParamExprs);
 
+            // Console.WriteLine("DynamicMethod: FEC1611");
             var method = new DynamicMethod(string.Empty, nestedReturnType, closurePlusParamTypes, typeof(ArrayClosure), true);
             var il = method.GetILGenerator();
 
@@ -5641,6 +5646,7 @@ namespace DryIoc.FastExpressionCompiler
             // our own helper - always available
             var postIncMethod = typeof(ILGeneratorHacks).GetTypeInfo().GetDeclaredMethod(nameof(PostInc));
 
+            // Console.WriteLine("DynamicMethod: FEC5649");
             var efficientMethod = new DynamicMethod(string.Empty,
                 typeof(int), new[] { typeof(ExpressionCompiler.ArrayClosure), typeof(ILGenerator), typeof(Type) },
                 typeof(ExpressionCompiler.ArrayClosure), skipVisibility: true);
