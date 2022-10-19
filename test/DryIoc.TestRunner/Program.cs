@@ -10,6 +10,7 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
+            // new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit().Run();
             // new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution().Run();
         }
 
@@ -60,6 +61,7 @@ namespace DryIoc.UnitTests
                 new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton(),
                 new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
+                new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit(),
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added
