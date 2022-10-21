@@ -37,11 +37,13 @@ namespace DryIoc.IssuesTests
             {
                 switch (foo)
                 {
-                    case Foo1:
+                    case Foo1 foo1FromEnumerable:
                         Assert.AreEqual(testFoo1, foo.Test);
+                        Assert.AreEqual(foo1, foo1FromEnumerable);
                         break;
-                    case Foo2:
+                    case Foo2 foo2FromEnumerable:
                         Assert.AreEqual(testFoo2, foo.Test);
+                        Assert.AreEqual(foo2, foo2FromEnumerable);
                         break;
                 }
             }
