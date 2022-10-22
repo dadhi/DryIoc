@@ -4,8 +4,14 @@ using System.Collections.Generic;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue535_Property_injection_does_not_work_when_appending_implementation_for_multiple_registration_of_same_interface_and_injecting_enumerable_of_interface
+    public class GHIssue535_Property_injection_does_not_work_when_appending_implementation_for_multiple_registration : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         [Ignore("fixme")]
         public void Test()
@@ -18,11 +24,13 @@ namespace DryIoc.IssuesTests
 
             container.RegisterMany(new[] { typeof(Foo1), typeof(IFoo) }, typeof(Foo1), reuse: Reuse.Singleton);
             var propertiesAndFieldsSelector = PropertiesAndFields.Of.Name(nameof(IFoo.Test), _ => testFoo1);
-            container.RegisterMany(new[] { typeof(Foo1), typeof(IFoo) }, typeof(Foo1), reuse: Reuse.Singleton, made: propertiesAndFieldsSelector, ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            container.RegisterMany(new[] { typeof(Foo1), typeof(IFoo) }, typeof(Foo1), reuse: Reuse.Singleton, 
+                made: propertiesAndFieldsSelector, ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
 
             container.RegisterMany(new[] { typeof(Foo2), typeof(IFoo) }, typeof(Foo2), reuse: Reuse.Singleton);
             propertiesAndFieldsSelector = PropertiesAndFields.Of.Name(nameof(IFoo.Test), _ => testFoo2);
-            container.RegisterMany(new[] { typeof(Foo2), typeof(IFoo) }, typeof(Foo2), reuse: Reuse.Singleton, made: propertiesAndFieldsSelector, ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
+            container.RegisterMany(new[] { typeof(Foo2), typeof(IFoo) }, typeof(Foo2), reuse: Reuse.Singleton, 
+                made: propertiesAndFieldsSelector, ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
 
             // ACT
             var foo1 = container.Resolve<Foo1>();
