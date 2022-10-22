@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Property_injection_does_not_work_when_appending_implementation_for_multiple_registration_of_same_interface_and_injecting_enumerable_of_interface
+    public class GHIssue535_Property_injection_does_not_work_when_appending_implementation_for_multiple_registration_of_same_interface_and_injecting_enumerable_of_interface
     {
         [Test]
         [Ignore("fixme")]
