@@ -8,7 +8,8 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Test_root_singleton_should_rethrow_the_exception();
+            // Test_root_singleton_should_rethrow_the_exception();
+            Test_dep_singleton_should_rethrow_the_exception();
             return 2;
         }
 
@@ -24,6 +25,27 @@ namespace DryIoc.IssuesTests
 
             Assert.Throws<ArgumentException>(() =>
                 container.Resolve<IInterfaceA>());
+        }
+
+        [Test]
+        public void Test_dep_singleton_should_rethrow_the_exception()
+        {
+            var container = new Container();
+
+            container.Register<B>();
+            container.Register<IInterfaceA, ClassA>(Reuse.Singleton);
+
+            Assert.Throws<ArgumentException>(() =>
+                container.Resolve<B>());
+
+            Assert.Throws<ArgumentException>(() =>
+                container.Resolve<B>());
+        }
+
+        public class B
+        {
+            public readonly IInterfaceA IntA;
+            public B(IInterfaceA a) => IntA = a;
         }
 
         public interface IInterfaceA { }

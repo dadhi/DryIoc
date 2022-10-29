@@ -425,7 +425,7 @@ namespace DryIoc
                 {
                     var value = constExpr.Value;
                     if (value is ScopedItemException it)
-                        it.TryReThrow();
+                        it.ReThrow();
                     if (factory.CanCache)
                         TryCacheDefaultFactory<FactoryDelegate>(serviceTypeHash, serviceType, value.ToFactoryDelegate);
                     return value;
@@ -3079,7 +3079,11 @@ namespace DryIoc
                         {
                             var argExpr = newExpr.GetArgument(i);
                             if (argExpr is ConstantExpression ac)
+                            {
+                                if (ac.Value is ScopedItemException it)
+                                    it.ReThrow();
                                 args[i] = ac.Value;
+                            }
                             else if (!TryInterpret(r, argExpr, paramExprs, paramValues, parentArgs, out args[i]))
                                 return false;
                         }
@@ -12713,7 +12717,7 @@ namespace DryIoc
     {
         public readonly Exception Ex;
         public ScopedItemException(Exception ex) => Ex = ex;
-        internal void TryReThrow() => throw Ex.TryRethrowWithPreservedStackTrace();
+        internal void ReThrow() => throw Ex.TryRethrowWithPreservedStackTrace();
     }
 
     /// <summary>Lazy object storage that will create object with provided factory on first access,

@@ -8,9 +8,9 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            RunAllTests();
+            // RunAllTests();
 
-            // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
+            new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
 
             // new GHIssue535_Property_injection_does_not_work_when_appending_implementation_for_multiple_registration().Run();
             // new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit().Run();
