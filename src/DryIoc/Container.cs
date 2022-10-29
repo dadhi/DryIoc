@@ -424,6 +424,8 @@ namespace DryIoc
                 if (expr is ConstantExpression constExpr)
                 {
                     var value = constExpr.Value;
+                    if (value is ScopedItemException it)
+                        it.TryReThrow();
                     if (factory.CanCache)
                         TryCacheDefaultFactory<FactoryDelegate>(serviceTypeHash, serviceType, value.ToFactoryDelegate);
                     return value;
@@ -3012,6 +3014,19 @@ namespace DryIoc
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
+                throw tex.InnerException.TryRethrowWithPreservedStackTrace();
+            }
+        }
+
+        internal static bool TryInterpretSingletonAndUnwrapContainerException(IResolverContext r, Expression expr, ImMapEntry<object> itemRef, out object result)
+        {
+            try
+            {
+                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null, out result);
+            }
+            catch (TargetInvocationException tex) when (tex.InnerException != null)
+            {
+                itemRef.Value = new ScopedItemException(tex.InnerException);
                 throw tex.InnerException.TryRethrowWithPreservedStackTrace();
             }
         }
@@ -10936,14 +10951,16 @@ namespace DryIoc
 
                 if (singleton == Scope.NoItem)
                 {
-                    if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, out singleton))
+                    if (!Interpreter.TryInterpretSingletonAndUnwrapContainerException(container, serviceExpr, itemRef, out singleton))
                         singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseInterpretation)(container);
 
                     if (setup.WeaklyReferenced)
                         singleton = new WeakReference(singleton);
                     else if (setup.PreventDisposal)
                         singleton = new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
+
                     itemRef.Value = singleton;
+
                     if (singleton is IDisposable disp && !ReferenceEquals(disp, scope))
                         scope.AddDisposable(disp, setup.DisposalOrder);
                 }
@@ -12690,7 +12707,14 @@ namespace DryIoc
     }
 
     /// Should return value stored in scope
-    public delegate object CreateScopedValue();
+    public delegate object CreateScopedValue(); // todo: @wip remove this thing
+
+    internal sealed class ScopedItemException
+    {
+        public readonly Exception Ex;
+        public ScopedItemException(Exception ex) => Ex = ex;
+        internal void TryReThrow() => throw Ex.TryRethrowWithPreservedStackTrace();
+    }
 
     /// <summary>Lazy object storage that will create object with provided factory on first access,
     /// then will be returning the same object for subsequent access.</summary>
@@ -12919,7 +12943,7 @@ namespace DryIoc
         {
             var tickCount = (uint)Environment.TickCount;
             var tickStart = tickCount;
-            Debug.WriteLine("SpinWaiting!!! ");
+            Debug.WriteLine("Waiting is starting...");
 
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
@@ -12930,7 +12954,7 @@ namespace DryIoc
                 tickCount = (uint)Environment.TickCount;
             }
 
-            Debug.WriteLine("SpinWaiting!!! is Done");
+            Debug.WriteLine("Waiting is done!");
             return itemRef.Value;
         }
 
