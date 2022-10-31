@@ -3014,6 +3014,20 @@ namespace DryIoc
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
+                // When the exception happened, 
+                // in order to prevent waiting for the empty item entry in the subsequent resolutions, 
+                // see #536 for details. So we may:
+                // - assume that the exception happened in the scoped item resolution
+                // - set the exception in the empty item entry for the exceptional dependency, so that exception will be re-thrown on the next resolution
+                // Let's clone the current scope to snapshot the current state and exclude the future service additions.
+                // Then traverse the scope items and find the empty item entry for the exceptional dependency.
+                // If found, then try to set the exception in the entry, if we where interrupted, then lookup for the next empty entry.
+                // If not found in the current scope, go to the parent scope and repeat.
+                // 
+                // In worse case scenario we will set the wrong item reference, but it is not a problem, because it be overriden by the successful resolution.
+                // Or if unsuccessful we may get the wrong exception, but it is even more unlikely case.
+                // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
+                // Comparing to the singletons where it is expected to be concurrent, but it does not addressed here.
                 throw tex.InnerException.TryRethrowWithPreservedStackTrace();
             }
         }
@@ -3806,6 +3820,7 @@ namespace DryIoc
                 result = ((FactoryDelegate)lambdaConstExpr.Value)(r);
             else if (!TryInterpret(r, ((LambdaExpression)lambda).Body, paramExprs, paramValues, parentArgs, out result))
                 result = ((LambdaExpression)lambda).Body.CompileToFactoryDelegate(((IContainer)r).Rules.UseInterpretation)(r);
+
             itemRef.Value = result;
             if (result is IDisposable disp && !ReferenceEquals(disp, scope))
                 scope.AddDisposable(disp, e.DisposalOrder);
