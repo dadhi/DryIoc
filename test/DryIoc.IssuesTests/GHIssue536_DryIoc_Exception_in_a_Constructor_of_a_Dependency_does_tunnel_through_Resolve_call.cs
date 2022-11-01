@@ -8,9 +8,10 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // Test_root_singleton_should_rethrow_the_exception();
+            Test_root_singleton_should_rethrow_the_exception();
             Test_dep_singleton_should_rethrow_the_exception();
-            return 2;
+            Test_dep_scoped_should_rethrow_the_exception();
+            return 3;
         }
 
         [Test]
@@ -40,6 +41,23 @@ namespace DryIoc.IssuesTests
 
             Assert.Throws<ArgumentException>(() =>
                 container.Resolve<B>());
+        }
+
+        [Test]
+        public void Test_dep_scoped_should_rethrow_the_exception()
+        {
+            var container = new Container();
+
+            container.Register<B>();
+            container.Register<IInterfaceA, ClassA>(Reuse.Scoped);
+
+            using var scope = container.OpenScope();
+
+            Assert.Throws<ArgumentException>(() =>
+                scope.Resolve<B>());
+
+            Assert.Throws<ArgumentException>(() =>
+                scope.Resolve<B>());
         }
 
         public class B

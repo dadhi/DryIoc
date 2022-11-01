@@ -6212,6 +6212,7 @@ namespace DryIoc.ImTools
         /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent `Enumerate` calls</summary>
         public static ImMapEnumerable<V> Enumerate<V>(this ImMap<V> map) => new ImMapEnumerable<V>(map);
 
+        // todo: @feature I need to have ForEachUntil with the result of `Func<ImMapEntry<V>, int, S, bool> handler` saying when to stop
         /// <summary>Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
         /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
         /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
@@ -6863,7 +6864,7 @@ namespace DryIoc.ImTools
     /// </summary>
     public static class PartitionedMap
     {
-        /// <summary>The default number of partions</summary>
+        /// <summary>The default number of partitions</summary>
         public const int PARTITION_COUNT_POWER_OF_TWO = 16;
 
         /// <summary>The default mask to partition the key</summary>

@@ -431,13 +431,15 @@ namespace DryIoc
                     return value;
                 }
 
-                // Important to cache expression first before trying to interpret, so that parallel resolutions may already use it.
-                if (factory.CanCache)
-                    TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
-
                 // 1) First try to interpret
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
+                {
+                    // Nope. Important to cache expression first before trying to interpret, so that parallel resolutions may already use it.
+                    // todo: @wip ...but what if exception is thrown, isn't it better to avoid caching the bad expression?
+                    if (factory.CanCache)
+                        TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
                     return instance;
+                }
 
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
@@ -3028,7 +3030,32 @@ namespace DryIoc
                 // Or if unsuccessful we may get the wrong exception, but it is even more unlikely case.
                 // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
                 // Comparing to the singletons where it is expected to be concurrent, but it does not addressed here.
+                TrySetScopedItemException(r, tex.InnerException);
                 throw tex.InnerException.TryRethrowWithPreservedStackTrace();
+            }
+        }
+
+        private static void TrySetScopedItemException(IResolverContext r, Exception ex)
+        {
+            ScopedItemException itemEx = null;
+            var s = r.CurrentScope as Scope;
+            while (s != null)
+            {
+                var itemMaps = s.CloneMaps();
+                foreach (var m in itemMaps)
+                {
+                    if (!m.IsEmpty)
+                        foreach (var it in m.Enumerate())
+                        {
+                            if (it.Value == Scope.NoItem) 
+                            {
+                                itemEx ??= new ScopedItemException(ex);
+                                if (Interlocked.CompareExchange(ref it.Value, itemEx, Scope.NoItem) == Scope.NoItem)
+                                    return; // done
+                            }
+                        }
+                }
+                s = s.Parent as Scope;
             }
         }
 
@@ -3107,7 +3134,10 @@ namespace DryIoc
                     }
                 case ExprType.Call:
                     {
-                        return TryInterpretMethodCall(r, (MethodCallExpression)expr, paramExprs, paramValues, parentArgs, ref result);
+                        var ok = TryInterpretMethodCall(r, (MethodCallExpression)expr, paramExprs, paramValues, parentArgs, ref result);
+                        if (ok && result is ScopedItemException ie)
+                            ie.ReThrow();
+                        return ok;
                     }
                 case ExprType.Convert:
                     {
@@ -3118,6 +3148,8 @@ namespace DryIoc
                         {
                             if (!TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, ref instance))
                                 return false;
+                            if (instance is ScopedItemException ie)
+                                ie.ReThrow();
                         }
                         else if (!TryInterpret(r, operandExpr, paramExprs, paramValues, parentArgs, out instance))
                             return false;
@@ -12835,16 +12867,18 @@ namespace DryIoc
 
         internal static readonly object NoItem = new object();
 
-        private static ImMap<object>[] _emptySlots = CreateEmptyMaps();
+        private static ImMap<object>[] _emptyMaps = CreateEmptyMaps();
 
         private static ImMap<object>[] CreateEmptyMaps()
         {
-            var slots = new ImMap<object>[MAP_COUNT];
+            var maps = new ImMap<object>[MAP_COUNT];
             var empty = ImMap<object>.Empty;
             for (var i = 0; i < MAP_COUNT; ++i)
-                slots[i] = empty;
-            return slots;
+                maps[i] = empty;
+            return maps;
         }
+
+        internal ImMap<object>[] CloneMaps() => _maps.CopyNonEmpty();
 
         ///<summary>Creating</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -13140,7 +13174,7 @@ namespace DryIoc
 
             _disposables = ImMap<ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
             _used = ImHashMap<Type, object>.Empty;
-            _maps = _emptySlots;
+            _maps = _emptyMaps;
         }
 
         private static void SafelyDisposeOrderedDisposables(ImMap<ImList<IDisposable>> disposables)

@@ -8,10 +8,9 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            // RunAllTests();
+            RunAllTests();
 
-            new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
-
+            // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
             // new GHIssue535_Property_injection_does_not_work_when_appending_implementation_for_multiple_registration().Run();
             // new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit().Run();
             // new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution().Run();
@@ -65,6 +64,7 @@ namespace DryIoc.UnitTests
                 new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
                 new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit(),
+                new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call()
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added
