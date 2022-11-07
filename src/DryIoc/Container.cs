@@ -81,9 +81,10 @@ namespace DryIoc
             : this(configure.ThrowIfNull()(Rules.Default) ?? Rules.Default, scopeContext)
         { }
 
+        // todo: @perf: consider to optimize the scope for the memory with a special SingletonScope
         /// <summary>Helper to create singleton scope</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static IScope NewSingletonScope() => new Scope.SingletonScope();
+        public static IScope NewSingletonScope() => Scope.Of("<singletons>");
 
         /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
@@ -12934,7 +12935,6 @@ namespace DryIoc
         internal const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
         internal ImHashMap<int, object>[] _maps;
 
-
         internal static readonly object NoItem = new object();
         private static ImHashMap<int, object>[] _emptyMaps = CreateEmptyMaps();
 
@@ -12976,13 +12976,6 @@ namespace DryIoc
             _maps = maps;
         }
 
-        /// The scope without parent and with the spcific name. 
-        internal sealed class SingletonScope : Scope
-        {
-            public override object Name => "<SingletonScope>";
-            internal SingletonScope() : base() {}
-        }
-
         internal sealed class WithParentAndName : Scope
         {
             public override IScope Parent { get; }
@@ -13000,8 +12993,7 @@ namespace DryIoc
                 Name = name;
             }
 
-            public override IScope Clone(bool withDisposables) =>
-                !withDisposables
+            public override IScope Clone(bool withDisposables) => !withDisposables
                 ? new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, ImHashMap.Entry(0, ImList<IDisposable>.Empty)) // dropping the disposables
                 : new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, _disposables); // Не забыть скопировать папу (коментарий для дочки)
         }
