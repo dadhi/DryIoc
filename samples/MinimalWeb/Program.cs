@@ -3,7 +3,7 @@ using DryIoc.Microsoft.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var container = new Container(Rules.MicrosoftDependencyInjectionRules);
+var container = new MyContainer(Rules.MicrosoftDependencyInjectionRules);
 
 // register natively with DryIoc
 container.Register<Bar>();
@@ -12,6 +12,10 @@ builder.Host.UseServiceProviderFactory(new DryIocServiceProviderFactory(containe
 
 // register via Services collection
 builder.Services.AddTransient<Foo>();
+
+// some fun with container extensibility for #539
+builder.Services.AddScoped<ScopedAutomaticallyResolved>();
+builder.Services.AddSingleton<SingletonAutomaticallyResolved>();
 
 var app = builder.Build();
 
@@ -26,3 +30,45 @@ public class Foo
 }
 
 public class Bar {}
+
+public class ScopedAutomaticallyResolved 
+{
+    public readonly SingletonAutomaticallyResolved Singleton;
+    public ScopedAutomaticallyResolved(SingletonAutomaticallyResolved singleton)
+    {
+        Singleton = singleton;
+        Console.WriteLine("ScopedAutomaticallyResolved created");
+    }
+}
+
+public class SingletonAutomaticallyResolved 
+{
+    public SingletonAutomaticallyResolved()
+    {
+        Console.WriteLine("SingletonAutomaticallyResolved created");
+    }
+}
+
+public class MyContainer : Container
+{
+    public MyContainer(Rules rules) : base(rules) {}
+
+    public override IResolverContext WithNewOpenScope() 
+    {
+        var scope = base.WithNewOpenScope();
+        scope.Resolve<ScopedAutomaticallyResolved>();
+        return scope;
+    }
+}
+
+public class MyDryIocServiceProviderFactory : DryIocServiceProviderFactory
+{
+    public MyDryIocServiceProviderFactory(IContainer container) : base(container) {}
+
+    public override IServiceProvider CreateServiceProvider(IContainer container)
+    {
+        var provider = base.CreateServiceProvider(container);
+        container.Resolve<SingletonAutomaticallyResolved>();
+        return provider;
+    }
+}

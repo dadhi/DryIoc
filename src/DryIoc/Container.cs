@@ -82,7 +82,8 @@ namespace DryIoc
         { }
 
         /// <summary>Helper to create singleton scope</summary>
-        public static IScope NewSingletonScope() => Scope.Of("<singletons>");
+        [MethodImpl((MethodImplOptions)256)]
+        public static IScope NewSingletonScope() => new Scope.SingletonScope();
 
         /// <summary>Pretty prints the container info including the open scope details if any.</summary> 
         public override string ToString()
@@ -714,13 +715,20 @@ namespace DryIoc
             return new Container(Rules, _registry, _singletonScope, _scopeContext, scope, 0, null, parent: this);
         }
 
-        /// <inheritdoc />
-        public IResolverContext WithNewOpenScope()
+        /// <summary>Creates the new scope using the Container's current scope as a parent.
+        /// Made virtual to allow additional code run when scope is opened, e.g. automatically resolve some services, see #539.
+        /// </summary>
+        public virtual IResolverContext WithNewOpenScope()
         {
             if (_singletonScope.IsDisposed)
                 Throw.It(Error.ContainerIsDisposed, ToString());
-            if (_scopeContext == null)
-                return new Container(Rules, _registry, _singletonScope, _scopeContext, Scope.Of(_ownCurrentScope), 0, null, parent: this);
+            return _scopeContext == null
+                ? new Container(Rules, _registry, _singletonScope, _scopeContext, Scope.Of(_ownCurrentScope), 0, null, parent: this)
+                : WithNewOpenScopeInScopeContext();
+        }
+
+        private IResolverContext WithNewOpenScopeInScopeContext() 
+        {
             _scopeContext.SetNewOpen();
             return new Container(Rules, _registry, _singletonScope, _scopeContext, null, 0, null, parent: this);
         }
@@ -12966,6 +12974,13 @@ namespace DryIoc
             _disposables = disposables;
             _used = used;
             _maps = maps;
+        }
+
+        /// The scope without parent and with the spcific name. 
+        internal sealed class SingletonScope : Scope
+        {
+            public override object Name => "<SingletonScope>";
+            internal SingletonScope() : base() {}
         }
 
         internal sealed class WithParentAndName : Scope

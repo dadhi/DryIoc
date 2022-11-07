@@ -90,12 +90,12 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
 
         /// <inheritdoc />
-        public IContainer CreateBuilder(IServiceCollection services) =>
+        public virtual IContainer CreateBuilder(IServiceCollection services) =>
             (_container ?? new Container(Rules.MicrosoftDependencyInjectionRules))
                 .WithDependencyInjectionAdapter(services, _registerDescriptor, _registrySharing);
 
         /// <inheritdoc />
-        public IServiceProvider CreateServiceProvider(IContainer container) =>
+        public virtual IServiceProvider CreateServiceProvider(IContainer container) =>
             container.BuildServiceProvider();
     }
 
