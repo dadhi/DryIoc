@@ -19,6 +19,7 @@
 ## v7.0.0
 
 - breaking: Remove `DryIocServiceScopeFactory` as not used anymore and replaced by `DryIocCapabilities`
+- changing: Make `DryIocServiceProviderFactory.CreateServiceProvider` virtual to allow customizations, see #539
 
 ]]>
         </PackageReleaseNotes>
