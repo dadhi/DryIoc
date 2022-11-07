@@ -11,12 +11,15 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
+            // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
+            // new GHIssue535_Property_injection_does_not_work_when_appending_implementation_for_multiple_registration().Run();
             // new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit().Run();
+            // new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution().Run();
+            // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
+            // new GHIssue101_Compile_time_generated_object_graph().Run();
             // new SO_Injecting_the_collection_of_interfaces_implemented_by_decorator().Run();
             // new SO_Child_Container_for_transients().Run();
-            // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
             // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
-            // new GHIssue101_Compile_time_generated_object_graph().Run();
         }
 
         public static void RunAllTests()
@@ -119,6 +122,7 @@ namespace DryIoc.UnitTests
                 new GHIssue516_Singleton_Decorator_to_Scoped_base_should_not_work_but_does(),
                 new GHIssue518_Select_default_then_resolvable_constructor(),
                 new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit(),
+                new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call()
             };
             // var docsTests = new Func<int>[] 
             // { 

@@ -237,7 +237,7 @@ namespace DryIoc.ImTools
             return copy;
         }
 
-        /// <summary>Array copy without checking the items for the null or the emptyness</summary>
+        /// <summary>Array copy without checking the items for the null or the emptiness</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static T[] CopyNonEmpty<T>(this T[] source)
         {
@@ -2106,7 +2106,7 @@ namespace DryIoc.ImTools
         /// If hash does not match the method returns `null`</summary>
         internal virtual Entry GetEntryOrNull(int hash) => null;
 
-        /// <summary>Assumes the hash is present in the map (because the map is immutable if we know the hash is present then it cannote disappear) 
+        /// <summary>Assumes the hash is present in the map (because the map is immutable if we know the hash is present then it cannot disappear) 
         /// otherwise the result. Returns the Entry with the `hash` though it may be a `HashConflictingEntry`</summary>
         internal virtual Entry GetSurePresentEntry(int hash) => throw new InvalidOperationException("The sure present hash does not exist in the empty map");
 
@@ -5037,6 +5037,7 @@ namespace DryIoc.ImTools
         /// <summary>Enumerates all the map entries in the hash order.</summary>
         public static Enumerable<K, V> Enumerate<K, V>(this ImHashMap<K, V> map) => new Enumerable<K, V>(map);
 
+        // todo: @feature I need to have ForEachUntil with the result of `Func<ImMapEntry<V>, int, S, bool> handler` saying when to stop
         /// <summary>Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
         /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
         /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
@@ -6053,20 +6054,20 @@ namespace DryIoc.ImTools
     }
 
     /// <summary>
-    /// The fixed array of maps (partitions) where the key first (lower) bits are used to locate the partion to lookup into.
+    /// The fixed array of maps (partitions) where the key first (lower) bits are used to locate the partition to lookup into.
     /// Note: The partition array is NOT immutable and operates by swapping the updated partition with the new one.
     /// The number of partitions may be specified by user or you can use the default number 16.
     /// The default number 16 was selected to be not so big to pay for the few items and not so small to diminish the use of partitions.
     /// </summary>
     public static class PartitionedHashMap
     {
-        /// <summary>The default number of partions</summary>
+        /// <summary>The default number of partitions</summary>
         public const int PARTITION_COUNT_POWER_OF_TWO = 16;
 
         /// <summary>The default mask to partition the key</summary>
         public const int PARTITION_HASH_MASK = PARTITION_COUNT_POWER_OF_TWO - 1;
 
-        /// <summary>Creates the new collection with the empty partions</summary>
+        /// <summary>Creates the new collection with the empty partitions</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V>[] CreateEmpty<K, V>(int partitionCountOfPowerOfTwo = PARTITION_COUNT_POWER_OF_TWO)
         {
@@ -6076,7 +6077,7 @@ namespace DryIoc.ImTools
             return parts;
         }
 
-        /// <summary>Creates the new collection with the empty partions</summary>
+        /// <summary>Creates the new collection with the empty partitions</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<int, V>[] CreateEmpty<V>(int partitionCountOfPowerOfTwo = PARTITION_COUNT_POWER_OF_TWO)
         {
@@ -6170,7 +6171,7 @@ namespace DryIoc.ImTools
             int partHashMask = PARTITION_HASH_MASK) where K : class =>
             parts.TryFindByReferenceEquals(key.GetHashCode(), key, out value, partHashMask);
 
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static void AddOrUpdate<V>(this ImHashMap<int, V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK)
         {
@@ -6183,7 +6184,7 @@ namespace DryIoc.ImTools
         private static void RefAddOrUpdatePart<V>(ref ImHashMap<int, V> part, int hash, V value) =>
             Ref.Swap(ref part, hash, value, (x, h, v) => x.AddOrUpdate(h, v));
 
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, int partHashMask = PARTITION_HASH_MASK)
         {
@@ -6193,7 +6194,7 @@ namespace DryIoc.ImTools
                 RefAddOrUpdatePart(ref part, hash, key, value);
         }
 
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, K key, V value, int partHashMask = PARTITION_HASH_MASK) =>
             parts.AddOrUpdate(key.GetHashCode(), key, value, partHashMask);
@@ -6201,7 +6202,7 @@ namespace DryIoc.ImTools
         private static void RefAddOrUpdatePart<K, V>(ref ImHashMap<K, V> part, int hash, K key, V value) =>
             Ref.Swap(ref part, hash, key, value, (x, h, k, v) => x.AddOrUpdate(h, k, v));
 
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static void AddOrUpdate<V>(this ImHashMap<int, V>[] parts, int hash, V value, Update<int, V> update, int partHashMask = PARTITION_HASH_MASK)
         {
@@ -6211,7 +6212,7 @@ namespace DryIoc.ImTools
                 Ref.Swap(ref part, hash, value, update, (x, h, k, u) => x.AddOrUpdate(h, k, u));
         }
 
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, Update<K, V> update, int partHashMask = PARTITION_HASH_MASK)
         {
@@ -6221,12 +6222,12 @@ namespace DryIoc.ImTools
                 Ref.Swap(ref part, hash, key, value, update, (x, h, k, v, u) => x.AddOrUpdate(h, k, v, u));
         }
 
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partion</summary>
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or updated partition</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static void AddOrUpdate<K, V>(this ImHashMap<K, V>[] parts, K key, V value, Update<K, V> update, int partHashMask = PARTITION_HASH_MASK) =>
             parts.AddOrUpdate(key.GetHashCode(), key, value, update);
 
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partion</summary>
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partition</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static void AddOrKeep<V>(this ImHashMap<int, V>[] parts, int hash, V value, int partHashMask = PARTITION_HASH_MASK)
         {
@@ -6239,7 +6240,7 @@ namespace DryIoc.ImTools
         private static void RefAddOrKeepPart<V>(ref ImHashMap<int, V> part, int hash, V value) =>
             Ref.Swap(ref part, hash, value, (x, h, v) => x.AddOrUpdate(h, v));
 
-        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partion</summary>
+        /// <summary>Returns the SAME partitioned maps array instance but with the NEW added or the same kept partition</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static void AddOrKeep<K, V>(this ImHashMap<K, V>[] parts, int hash, K key, V value, int partHashMask = PARTITION_HASH_MASK)
         {

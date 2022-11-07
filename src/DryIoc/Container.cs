@@ -385,18 +385,22 @@ namespace DryIoc
                 if (expr is ConstantExpression constExpr)
                 {
                     var value = constExpr.Value;
+                    if (value is ScopedItemException it)
+                        it.ReThrow();
                     if (factory.CanCache)
                         TryCacheDefaultFactory(serviceTypeHash, serviceType, value.ToCachedResult());
                     return value;
                 }
 
-                // Important to cache expression first before trying to interpret, so that parallel resolutions may already use it.
-                if (factory.CanCache)
-                    TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
-
                 // 1) First try to interpret
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
+                {
+                    // Nope. Important to cache expression first before trying to interpret, so that parallel resolutions may already use it.
+                    // todo: @wip ...but what if exception is thrown, isn't it better to avoid caching the bad expression?
+                    if (factory.CanCache)
+                        TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
                     return instance;
+                }
 
                 // 2) Fallback to expression compilation
                 factoryDelegate = expr.CompileToFactoryDelegate(rules.UseInterpretation);
@@ -3002,6 +3006,58 @@ namespace DryIoc
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
+                // When the exception happened, 
+                // in order to prevent waiting for the empty item entry in the subsequent resolutions, 
+                // see #536 for details. So we may:
+                // - assume that the exception happened in the scoped item resolution
+                // - set the exception in the empty item entry for the exceptional dependency, so that exception will be re-thrown on the next resolution
+                // Let's clone the current scope to snapshot the current state and exclude the future service additions.
+                // Then traverse the scope items and find the empty item entry for the exceptional dependency.
+                // If found, then try to set the exception in the entry, if we where interrupted, then lookup for the next empty entry.
+                // If not found in the current scope, go to the parent scope and repeat.
+                // 
+                // In worse case scenario we will set the wrong item reference, but it is not a problem, because it be overriden by the successful resolution.
+                // Or if unsuccessful we may get the wrong exception, but it is even more unlikely case.
+                // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
+                // Comparing to the singletons where it is expected to be concurrent, but it does not addressed here.
+                TrySetScopedItemException(r, tex.InnerException);
+                throw tex.InnerException.TryRethrowWithPreservedStackTrace();
+            }
+        }
+
+        private static void TrySetScopedItemException(IResolverContext r, Exception ex)
+        {
+            ScopedItemException itemEx = null;
+            var s = r.CurrentScope as Scope;
+            while (s != null)
+            {
+                var itemMaps = s.CloneMaps();
+                foreach (var m in itemMaps)
+                {
+                    if (!m.IsEmpty)
+                        foreach (var it in m.Enumerate())
+                        {
+                            if (it.Value == Scope.NoItem) 
+                            {
+                                itemEx ??= new ScopedItemException(ex);
+                                if (Interlocked.CompareExchange(ref it.Value, itemEx, Scope.NoItem) == Scope.NoItem)
+                                    return; // done
+                            }
+                        }
+                }
+                s = s.Parent as Scope;
+            }
+        }
+
+        internal static bool TryInterpretSingletonAndUnwrapContainerException(IResolverContext r, Expression expr, ImHashMapEntry<int, object> itemRef, out object result)
+        {
+            try
+            {
+                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null, out result);
+            }
+            catch (TargetInvocationException tex) when (tex.InnerException != null)
+            {
+                itemRef.Value = new ScopedItemException(tex.InnerException);
                 throw tex.InnerException.TryRethrowWithPreservedStackTrace();
             }
         }
@@ -3145,7 +3201,11 @@ namespace DryIoc
                         {
                             var argExpr = newExpr.GetArgument(i);
                             if (argExpr is ConstantExpression ac)
+                            {
+                                if (ac.Value is ScopedItemException it)
+                                    it.ReThrow();
                                 args[i] = ac.Value;
+                            }
                             else if (!TryInterpret(r, argExpr, paramExprs, paramValues, parentArgs, out args[i]))
                                 return false;
                         }
@@ -3154,23 +3214,32 @@ namespace DryIoc
                     }
                 case ExprType.Call:
                     {
-                        return TryInterpretMethodCall(r, (MethodCallExpression)expr, paramExprs, paramValues, parentArgs, ref result);
+                        var ok = TryInterpretMethodCall(r, (MethodCallExpression)expr, paramExprs, paramValues, parentArgs, ref result);
+                        if (ok && result is ScopedItemException ie)
+                            ie.ReThrow();
+                        return ok;
                     }
                 case ExprType.Convert:
                     {
                         object instance = null;
                         var convertExpr = (UnaryExpression)expr;
-                        var ok = convertExpr.Operand is MethodCallExpression m
-                            ? TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, ref instance)
-                            : TryInterpret(r, convertExpr.Operand, paramExprs, paramValues, parentArgs, out instance);
+                        var operandExpr = convertExpr.Operand;
+                        if (operandExpr is MethodCallExpression m)
+                        {
+                            if (!TryInterpretMethodCall(r, m, paramExprs, paramValues, parentArgs, ref instance))
+                                return false;
+                            if (instance is ScopedItemException ie)
+                                ie.ReThrow();
+                        }
+                        else if (!TryInterpret(r, operandExpr, paramExprs, paramValues, parentArgs, out instance))
+                            return false;
 
-                        // skip conversion for null and for directly assignable type
-                        if (ok)
-                            result = instance == null || convertExpr.Type == instance.GetType()
-                                || convertExpr.Method == null && convertExpr.Type.IsAssignableFrom(instance.GetType())
-                                ? instance
-                                : Converter.ConvertWithOperator(instance, expr, convertExpr.Type, convertExpr.Method);
-                        return ok;
+                        // skip conversion for the null and for the directly assignable type
+                        result = instance == null || convertExpr.Type == instance.GetType()
+                            || convertExpr.Method == null && convertExpr.Type.IsAssignableFrom(instance.GetType())
+                            ? instance
+                            : Converter.ConvertWithOperator(instance, expr, convertExpr.Type, convertExpr.Method);
+                        return true;
                     }
                 case ExprType.MemberAccess:
                     {
@@ -10987,7 +11056,7 @@ namespace DryIoc
 
                         if (singleton == Scope.NoItem)
                         {
-                            if (!Interpreter.TryInterpretAndUnwrapContainerException(container, serviceExpr, out singleton))
+                            if (!Interpreter.TryInterpretSingletonAndUnwrapContainerException(container, serviceExpr, itemRef, out singleton))
                                 singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseInterpretation)(container);
 
                             if (weaklyReferencedOrPreventDisposal)
@@ -12750,7 +12819,14 @@ namespace DryIoc
     }
 
     /// Should return value stored in scope
-    public delegate object CreateScopedValue();
+    public delegate object CreateScopedValue(); // todo: @wip remove this thing
+
+    internal sealed class ScopedItemException
+    {
+        public readonly Exception Ex;
+        public ScopedItemException(Exception ex) => Ex = ex;
+        internal void ReThrow() => throw Ex.TryRethrowWithPreservedStackTrace();
+    }
 
     /// <summary>Lazy object storage that will create object with provided factory on first access,
     /// then will be returning the same object for subsequent access.</summary>
@@ -12852,7 +12928,7 @@ namespace DryIoc
 
 
         internal static readonly object NoItem = new object();
-        private static ImHashMap<int, object>[] _emptySlots = CreateEmptyMaps();
+        private static ImHashMap<int, object>[] _emptyMaps = CreateEmptyMaps();
 
         private static ImHashMap<int, object>[] CreateEmptyMaps()
         {
@@ -12863,7 +12939,9 @@ namespace DryIoc
             return maps;
         }
 
-        ///<summary>Creating scope with parent and name</summary>
+        internal ImHashMap<int, object>[] CloneMaps() => _maps.CopyNonEmpty();
+
+        ///<summary>Creating</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static IScope Of(IScope parent, object name) =>
             parent == null && name == null ? new Scope() : new WithParentAndName(parent, name);
@@ -12980,7 +13058,7 @@ namespace DryIoc
         {
             var tickCount = (uint)Environment.TickCount;
             var tickStart = tickCount;
-            Debug.WriteLine("SpinWaiting!!! ");
+            Debug.WriteLine("Waiting is starting...");
 
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
@@ -12991,7 +13069,7 @@ namespace DryIoc
                 tickCount = (uint)Environment.TickCount;
             }
 
-            Debug.WriteLine("SpinWaiting!!! is Done");
+            Debug.WriteLine("Waiting is done!");
             return itemRef.Value;
         }
 
@@ -13159,7 +13237,7 @@ namespace DryIoc
 
             _disposables = ImHashMap<int, ImList<IDisposable>>.Empty; // todo: @perf @mem combine used and _factories together
             _used = ImHashMap<Type, object>.Empty;
-            _maps = _emptySlots;
+            _maps = _emptyMaps;
         }
 
         private static void SafelyDisposeOrderedDisposables(ImHashMap<int, ImList<IDisposable>> disposables)
