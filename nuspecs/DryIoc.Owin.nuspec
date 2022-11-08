@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.Owin</id>
-        <version>4.1.0</version>
+        <version>5.0.0</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2014-2022 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,15 +13,17 @@
         <tags>Web ASP OWIN Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
         <![CDATA[
-## v4.1.0:
+## v5.0.0:
+- Support for DryIoc v5
 
+## v4.1.0:
 - Support for DryIoc v4.8.6
 - fixed: #444 Update the dependencies to the latest versions at 14/01/2022
     ]]>
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc" version="4.8.6" />
+            <dependency id="DryIoc" version="5.3.0" />
             <dependency id="Microsoft.Owin" version="4.2.0" />
           </group>
         </dependencies>

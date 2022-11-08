@@ -3,7 +3,7 @@
         <TargetFrameworks>net45;netstandard2.0;netstandard2.1</TargetFrameworks>
 
         <Product>DryIoc</Product>
-        <VersionPrefix>5.2.2</VersionPrefix>
+        <VersionPrefix>5.3.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -15,7 +15,12 @@
         <PackageTags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory FastExpressionCompiler ImTools</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-## v5.2.2 Bug-fix release / 2022-08-23
+## v5.3.0 Small feature and bug-fix release
+
+-fixed: #536 DryIoc Exeption in a Contructor of a Dependecy does tunnel through Resolve call
+
+
+## v5.2.2 Bug-fix release
 
 -fixed: #519 Exception thrown when using WebOptimizer in ASP.NET Core MVC
 

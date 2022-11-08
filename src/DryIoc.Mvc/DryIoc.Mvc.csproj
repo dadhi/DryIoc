@@ -3,7 +3,7 @@
         <TargetFramework>net45</TargetFramework>
 
         <Product>DryIoc.Mvc</Product>
-        <VersionPrefix>4.0.0</VersionPrefix>
+        <VersionPrefix>5.0.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -15,6 +15,8 @@
         <PackageTags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+v5.0.0:
+- Support for DryIoc v5
 v4.0.0:
 - added: Support for DryIoc v4
 - added: Support for optional `controllerReuse` parameter in `WithMvc` method
