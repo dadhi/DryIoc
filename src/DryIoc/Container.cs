@@ -7545,7 +7545,7 @@ namespace DryIoc
             registrator.Register<TService, TService>(made, reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>
-        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegestered`, 
+        /// Registers the instance creating a "normal" DryIoc registration so you can check it via `IsRegistered`, 
         /// apply wrappers and decorators, etc.
         /// Additionally, if instance is `IDisposable`, then it tracks it in a singleton scope.
         /// Look at the `Use` method to put instance directly into current or singleton scope,
