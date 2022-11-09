@@ -15,6 +15,7 @@
             <![CDATA[
 v5.0.0:
 - Support for DryIoc v5
+- Upping the SignalR 2.4.3
 v4.1.0:
 - added: DryIocHubDispatcher
 - fixed: #292 Web Api SignalR. Cannot resolve hub instance on connection timeout.
@@ -35,7 +36,8 @@ v2.0.0:
         <dependencies>
             <group>
                 <dependency id="DryIoc" version="5.3.0" />
-                <dependency id="Microsoft.AspNet.SignalR.Core" version="2.3.0" />
+                <dependency id="Microsoft.AspNet.SignalR.Core" version="2.4.3" />
+                <dependency id="Microsoft.Owin.Security" version="4.2.2" />
             </group>
         </dependencies>
     </metadata>
