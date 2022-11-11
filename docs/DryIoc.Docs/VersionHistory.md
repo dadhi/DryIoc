@@ -1,5 +1,8 @@
 Version History
 ---------------
+## v5.3.0 Small feature and bug-fix release / 2022-11-10
+
+-fixed: #536 DryIoc Exception in a Constructor of a Dependency does tunnel through Resolve call
 
 ## v5.2.2 Bug-fix release / 2022-08-23
 

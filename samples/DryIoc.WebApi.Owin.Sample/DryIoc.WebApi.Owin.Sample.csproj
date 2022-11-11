@@ -29,18 +29,10 @@
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.6" />
-    <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.2.6" />
-    <PackageReference Include="Microsoft.AspNet.WebApi.Owin" Version="5.2.6" />
-    <PackageReference Include="Microsoft.AspNet.WebApi.OwinSelfHost" Version="5.2.6" />
-    <PackageReference Include="Microsoft.Owin" Version="3.0.1" />
-    <PackageReference Include="Microsoft.Owin.Diagnostics" Version="3.0.1" />
-    <PackageReference Include="Microsoft.Owin.Host.HttpListener" Version="3.0.1" />
-    <PackageReference Include="Microsoft.Owin.Hosting" Version="3.0.1" />
-    <PackageReference Include="Microsoft.Owin.SelfHost" Version="3.0.1" />
-    <PackageReference Include="Newtonsoft.Json" Version="6.0.8" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.Client" Version="5.2.9" />
+    <PackageReference Include="Microsoft.AspNet.WebApi.OwinSelfHost" Version="5.2.9" />
+    <PackageReference Include="Microsoft.Owin.SelfHost" Version="4.2.2" />
     <PackageReference Include="NUnit" Version="2.6.4" />
-    <PackageReference Include="Owin" Version="1.0" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Net.Http" />
