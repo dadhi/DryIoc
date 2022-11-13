@@ -5050,7 +5050,6 @@ namespace DryIoc.ImTools
                 singleEntry.ForEach(state, 0, handler);
                 return state;
             }
-
             ImHashMap<K, V>.Branch2Plus b21LeftWasEnumerated = null;
             int count = 0, i = 0;
             while (true)
@@ -5063,7 +5062,6 @@ namespace DryIoc.ImTools
                     map = b2.Left;
                     continue;
                 }
-
                 if (map is ImHashMap<K, V>.Branch3Base b3)
                 {
                     if (parents == null)
@@ -5072,7 +5070,6 @@ namespace DryIoc.ImTools
                     map = b3.Left;
                     continue;
                 }
-
                 if (b21LeftWasEnumerated != null || map is ImHashMap<K, V>.Branch2Plus)
                 {
                     ImHashMap<K, V>.Leaf5PlusPlus l511 = null;
@@ -5117,14 +5114,13 @@ namespace DryIoc.ImTools
                         i = e3.ForEach(state, i, handler);
                         i = e4.ForEach(state, i, handler);
                         i = pp.ForEach(state, i, handler);
-                        i = p.ForEach(state, i, handler);
+                        i =  p.ForEach(state, i, handler);
                         i = pl.ForEach(state, i, handler);
 
                         if (mid != null)
                             i = mid.ForEach(state, i, handler);
                     }
                 }
-
                 if (map is ImHashMap<K, V>.Leaf2 l2)
                 {
                     i = l2.Entry0.ForEach(state, i, handler);
@@ -5152,7 +5148,7 @@ namespace DryIoc.ImTools
                     i = e0.ForEach(state, i, handler);
                     i = e1.ForEach(state, i, handler);
                     i = pp.ForEach(state, i, handler);
-                    i = p.ForEach(state, i, handler);
+                    i =  p.ForEach(state, i, handler);
                 }
                 else if (map is ImHashMap<K, V>.Leaf5 l5)
                 {
@@ -5190,7 +5186,7 @@ namespace DryIoc.ImTools
                     i = e3.ForEach(state, i, handler);
                     i = e4.ForEach(state, i, handler);
                     i = pp.ForEach(state, i, handler);
-                    i = p.ForEach(state, i, handler);
+                    i =  p.ForEach(state, i, handler);
                 }
                 else if (map is ImHashMap<K, V>.Entry l1)
                     i = l1.ForEach(state, i, handler);
@@ -5222,7 +5218,6 @@ namespace DryIoc.ImTools
                     map = pb3.Right;
                 }
             }
-
             return state;
         }
 
