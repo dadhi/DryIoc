@@ -232,17 +232,7 @@ namespace DryIoc
         public Factory[] GetRegisteredFactories(Type serviceType, object serviceKey, FactoryType factoryType) =>
             Registry.GetRegisteredFactories(_registry.Value, serviceType.ThrowIfNull(), serviceKey, factoryType);
 
-        /// <summary>Stores factory into container using <paramref name="serviceType"/> and <paramref name="serviceKey"/> as key
-        /// for later lookup.</summary>
-        /// <param name="factory">Any subtypes of <see cref="Factory"/>.</param>
-        /// <param name="serviceType">Type of service to resolve later.</param>
-        /// <param name="serviceKey">(optional) Service key of any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>
-        /// implemented.</param>
-        /// <param name="ifAlreadyRegistered">(optional) Says how to handle existing registration with the same
-        /// <paramref name="serviceType"/> and <paramref name="serviceKey"/>.</param>
-        /// <param name="isStaticallyChecked">Confirms that service and implementation types are statically checked by compiler.</param>
-        /// <returns>True if factory was added to registry, false otherwise.
-        /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
+        /// <inheritdoc/>
         public void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked)
         {
             ThrowIfRootContainerDisposed();
@@ -255,9 +245,28 @@ namespace DryIoc
             if (!ifAlreadyRegistered.HasValue)
                 ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
 
-            // Improves performance a bit by first attempting to swap the registry while it is still unchanged.
             if (serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition && serviceType.ContainsGenericParameters)
                 serviceType = serviceType.GetGenericTypeDefinition();
+
+            var r = _registry.Value;
+            if (!_registry.TrySwapIfStillCurrent(r, Registry.Register(r, factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
+                RegistrySwap(factory, serviceType, ifAlreadyRegistered.Value, serviceKey);
+        }
+
+        /// <inheritdoc/>
+        public void RegisterWithoutValidation(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered)
+        {
+            ThrowIfRootContainerDisposed();
+
+            if (serviceKey == null)
+                serviceKey = Rules.DefaultRegistrationServiceKey;
+
+            if (!ifAlreadyRegistered.HasValue)
+                ifAlreadyRegistered = Rules.DefaultIfAlreadyRegistered;
+
+            if (serviceType.IsGenericType && !serviceType.IsGenericTypeDefinition && serviceType.ContainsGenericParameters)
+                serviceType = serviceType.GetGenericTypeDefinition();
+
             var r = _registry.Value;
             if (!_registry.TrySwapIfStillCurrent(r, Registry.Register(r, factory, serviceType, ifAlreadyRegistered.Value, serviceKey)))
                 RegistrySwap(factory, serviceType, ifAlreadyRegistered.Value, serviceKey);
@@ -7939,13 +7948,12 @@ namespace DryIoc
                         var k = getServiceKey?.Invoke(implType, t);
                         if (factory.ValidateAndNormalizeRegistration(t, k, false, rules, false))
                         {
-                            registrator.Register(t, factory, ifAlreadyRegistered, k);
+                            registrator.RegisterWithoutValidation(factory, t, k, ifAlreadyRegistered);
                             isSomethingRegistered = true;
                         }
                     }
                 }
             }
-
             if (anyImplTypes && !isSomethingRegistered)
                 Throw.It(Error.NoServicesWereRegisteredByRegisterMany, implTypes);
         }
@@ -13932,17 +13940,21 @@ namespace DryIoc
         /// <summary>Rules for defining resolution/registration behavior throughout container.</summary>
         Rules Rules { get; }
 
-        /// <summary>Registers factory in registry with specified service type and key for lookup.
-        /// Returns true if factory was added to registry, false otherwise. False may be in case of <see cref="IfAlreadyRegistered.Keep"/>
-        /// setting and already existing factory</summary>
-        /// <param name="factory">To register.</param>
-        /// <param name="serviceType">Service type as unique key in registry for lookup.</param>
-        /// <param name="serviceKey">Service key as complementary lookup for the same service type.</param>
-        /// <param name="ifAlreadyRegistered">Policy how to deal with already registered factory with same service type and key.</param>
-        /// <param name="isStaticallyChecked">[performance] Confirms that service and implementation types are statically checked by compiler.</param>
+        /// <summary>Stores factory into container using <paramref name="serviceType"/> and <paramref name="serviceKey"/> as key for later lookup.</summary>
+        /// <param name="factory">Any subtypes of <see cref="Factory"/>.</param>
+        /// <param name="serviceType">Type of service to resolve later.</param>
+        /// <param name="serviceKey">(optional) Service key of any type with <see cref="object.GetHashCode"/> and <see cref="object.Equals(object)"/>
+        /// implemented.</param>
+        /// <param name="ifAlreadyRegistered">(optional) Says how to handle existing registration with the same
+        /// <paramref name="serviceType"/> and <paramref name="serviceKey"/>.</param>
+        /// <param name="isStaticallyChecked">Confirms that service and implementation types are statically checked by compiler.</param>
         /// <returns>True if factory was added to registry, false otherwise.
         /// False may be in case of <see cref="IfAlreadyRegistered.Keep"/> setting and already existing factory.</returns>
         void Register(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered, bool isStaticallyChecked);
+
+        /// <summary>Register without validating factory and its implementation type against 
+        /// the passed <paramref name="serviceType"/> and <paramref name="serviceKey"/></summary>
+        void RegisterWithoutValidation(Factory factory, Type serviceType, object serviceKey, IfAlreadyRegistered? ifAlreadyRegistered);
 
         /// <summary>Returns true if expected factory is registered with specified service key and type.
         /// Not provided or <c>null</c> <paramref name="serviceKey"/> means to check the <paramref name="serviceType"/> 
