@@ -112,6 +112,9 @@ namespace DryIoc.UnitTests.net472
                 new GHIssue512_Optimize_injection_of_IResolverContext(),
                 new GHIssue516_Singleton_Decorator_to_Scoped_base_should_not_work_but_does(),
                 new GHIssue518_Select_default_then_resolvable_constructor(),
+                new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit(),
+                new GHIssue535_Property_injection_does_not_work_when_appending_implementation_for_multiple_registration(),
+                new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call()
             };
             var loadTests = new ITest[]
             {

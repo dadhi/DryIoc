@@ -2678,7 +2678,7 @@ namespace DryIoc
                                     ? n.SetValue((oldImplFacsEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(fac))
                                     : o;
                             }
-                            return n;
+                            return o; // return the old entry unless the implementation type is new 
 
                         default: // IfAlreadyRegisteredKeepDefaultService
                             return o.Value is FactoriesEntry oldFacsEntry && oldFacsEntry.LastDefaultKey == null
@@ -7958,6 +7958,7 @@ namespace DryIoc
                 Throw.It(Error.NoServicesWereRegisteredByRegisterMany, implTypes);
         }
 
+        // todo: @wip do we really need this method?
         /// <summary>
         /// Batch registering the implementations with possibly many service types,
         /// ignoring the case when there are no services types to register.
@@ -7973,7 +7974,6 @@ namespace DryIoc
             IfAlreadyRegistered? ifAlreadyRegistered = null)
         {
             getImplFactory = getImplFactory ?? ToFactory;
-
             foreach (var implType in implTypes)
             {
                 var serviceTypes = getServiceTypes(implType);
@@ -7983,6 +7983,7 @@ namespace DryIoc
                     for (var i = 0; i < serviceTypes.Length; i++)
                     {
                         var t = serviceTypes[i];
+                        // todo: @wip do we need to validate the registration?
                         registrator.Register(t, factory, ifAlreadyRegistered, getServiceKey?.Invoke(implType, t));
                     }
                 }
@@ -7993,9 +7994,23 @@ namespace DryIoc
         public static void RegisterMany(this IRegistrator registrator,
             Type[] serviceTypes, Type implType,
             IReuse reuse = null, Made made = null, Setup setup = null,
-            IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            registrator.RegisterMany(new[] { implType }, serviceTypes.ToFunc<Type, Type[]>,
-                t => t.ToFactory(reuse, made, setup), (_, __) => serviceKey, ifAlreadyRegistered);
+            IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null)
+        {
+            var rules = registrator.Rules;
+            var isSomethingRegistered = false;
+            if (!serviceTypes.IsNullOrEmpty())
+            {
+                var factory = implType.ToFactory(reuse, made, setup);
+                foreach(var t in serviceTypes)
+                    if (factory.ValidateAndNormalizeRegistration(t, serviceKey, false, rules, false))
+                    {
+                        registrator.RegisterWithoutValidation(factory, t, serviceKey, ifAlreadyRegistered);
+                        isSomethingRegistered = true;
+                    }
+            }
+            if (!isSomethingRegistered)
+                Throw.It(Error.NoServicesWereRegisteredByRegisterMany, implType);
+        }
 
         /// <summary>Batch registers assemblies of implementation types with possibly many service types.
         /// The default factory is the <see cref="ReflectionFactory"/> with default reuse.</summary>

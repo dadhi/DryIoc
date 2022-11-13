@@ -5037,7 +5037,7 @@ namespace DryIoc.ImTools
         /// <summary>Enumerates all the map entries in the hash order.</summary>
         public static Enumerable<K, V> Enumerate<K, V>(this ImHashMap<K, V> map) => new Enumerable<K, V>(map);
 
-        // todo: @feature I need to have ForEachUntil with the result of `Func<ImMapEntry<V>, int, S, bool> handler` saying when to stop
+        // todo: @feature I need to have ForEachUntil with the result of `Func<ImMapEntry<V>, int, S, bool> handler` saying when to stop, the implementation will be the same as for FindFirst!
         /// <summary>Depth-first in-order of hash traversal as described in http://en.wikipedia.org/wiki/Tree_traversal.
         /// The `parents` parameter allows to reuse the stack memory used for the traversal between multiple calls.
         /// So you may pass the empty `parents` into the first `Enumerate` and then keep passing the same `parents` into the subsequent calls</summary>
