@@ -37,7 +37,8 @@
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}/test/DryIoc.TestRunner/DryIoc.TestRunner.csproj"
+                "${workspaceFolder}/test/DryIoc.TestRunner/DryIoc.TestRunner.csproj",
+                "-p:SkipCompTimeGen=true"
             ],
             "problemMatcher": "$msCompile",
             "group": {

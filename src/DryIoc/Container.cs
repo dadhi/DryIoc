@@ -12165,27 +12165,37 @@ namespace DryIoc
             if (!CanAccessImplementationType)
                 return true;
 
-            var implType = ImplementationType;
-            var factoryMethod = Made.FactoryMethodOrSelector ?? rules.FactoryMethodOrSelector;
-            if (factoryMethod == null || ReferenceEquals(factoryMethod, FactoryMethod.ConstructorWithResolvableArguments)) // optimizing for one of the common cases with the ConstructorWithResolvableArguments
+            // skip the step if the _implementationTypeOrProviderOrPubCtorOrCtors is already ConstructorInfo or ConstructorInfo[],
+            // so we called the method already, e.g. from the RegisterMany.
+            var ctorsOrType = _implementationTypeOrProviderOrPubCtorOrCtors;
+            var implType = ctorsOrType as Type;
+            if (implType != null) 
             {
-                var ctors = implType.GetConstructors(); // getting all public instance constructors with particular order
-                var ctorCount = ctors.Length;
-                if (ctorCount == 1)
+                var factoryMethod = Made.FactoryMethodOrSelector ?? rules.FactoryMethodOrSelector;
+                if (factoryMethod == null || ReferenceEquals(factoryMethod, FactoryMethod.ConstructorWithResolvableArguments)) // optimizing for one of the common cases with the ConstructorWithResolvableArguments
                 {
-                    // todo: @perf do we need it for the open-generic because we still want to create the closed-generic type and then ask for its constructors again
-                    _implementationTypeOrProviderOrPubCtorOrCtors = ctors[0];
-                }
-                else if (ctorCount == 0) // todo: @feature struct/ValueType without constructor is not supported, because there is no default constructor generated for it
-                    return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromNone, implType);
-                else if (factoryMethod == null)
-                    return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromMultiple, implType, ctors);
-                else
-                {
-                    // todo: @perf do we need it for the open-generic because we still want to create the closed-generic type and then ask for its constructors again
-                    _implementationTypeOrProviderOrPubCtorOrCtors = ctors; // store the constructors to prevent calling the GetConstructors(...) again for ConstructorWithResolvableArguments
+                    var ctors = implType.GetConstructors(); // getting all public instance constructors with particular order
+                    var ctorCount = ctors.Length;
+                    if (ctorCount == 1)
+                    {
+                        // todo: @perf do we need it for the open-generic because we still want to create the closed-generic type and then ask for its constructors again
+                        _implementationTypeOrProviderOrPubCtorOrCtors = ctors[0];
+                    }
+                    else if (ctorCount == 0) // todo: @feature struct/ValueType without constructor is not supported, because there is no default constructor generated for it
+                        return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromNone, implType);
+                    else if (factoryMethod == null)
+                        return Throw.When(throwIfInvalid, Error.UnableToSelectSinglePublicConstructorFromMultiple, implType, ctors);
+                    else
+                    {
+                        // todo: @perf do we need it for the open-generic because we still want to create the closed-generic type and then ask for its constructors again
+                        _implementationTypeOrProviderOrPubCtorOrCtors = ctors; // store the constructors to prevent calling the GetConstructors(...) again for ConstructorWithResolvableArguments
+                    }
                 }
             }
+            else if (ctorsOrType is ConstructorInfo c)
+                implType = c.DeclaringType;
+            else if (ctorsOrType is ConstructorInfo[] cs)
+                implType = cs[0].DeclaringType;
 
             if (isStaticallyChecked || implType == null)
                 return true;

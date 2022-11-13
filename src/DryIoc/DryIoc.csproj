@@ -52,8 +52,7 @@
 
         <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
 
-        <Exec WorkingDirectory="$(ProjectDir)" 
-          Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
+        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
     </Target>
 
     <ItemGroup>
