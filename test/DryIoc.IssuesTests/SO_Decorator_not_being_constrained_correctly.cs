@@ -7,17 +7,19 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class SO_Decorator_not_being_constrained_correctly
+    public class SO_Decorator_not_being_constrained_correctly : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {
             var c = new Container();
-
-
             c.Register(typeof(IRequestHandler<,>), typeof(RetryOnConcurrencyRequestHandlerDecorator<,>), setup: Setup.Decorator);
-
-
         }
     }
 

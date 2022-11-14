@@ -10,8 +10,16 @@ using DryIoc.Messages;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue37_MediatR_Polymorphic_Notification
+    public class GHIssue37_MediatR_Polymorphic_Notification : ITest
     {
+        public int Run()
+        {
+            Publish_Notification_with_MediatR().GetAwaiter().GetResult();
+            Publish_Notification_with_DryIoc_alone();
+            Publish_Notification_manually();
+            return 3;
+        }
+
         [Test]
         public async Task Publish_Notification_with_MediatR()
         {
@@ -24,8 +32,7 @@ namespace DryIoc.IssuesTests
             // User code
             container.RegisterMany<InventoryDenormalizer>(Reuse.Singleton, serviceTypeCondition: Registrator.Interfaces);
 
-            var mediator = container.Resolve<IMediator>();
-            await mediator.Publish(new InventoryNotificationReceived());
+            await container.Resolve<IMediator>().Publish(new InventoryNotificationReceived());
 
             var inventoryDenormalizer = (InventoryDenormalizer)container.Resolve<INotificationHandler<InventoryNotificationReceived>>();
             Assert.AreEqual(2, inventoryDenormalizer.HandledInventoryNotificationReceived);
@@ -89,8 +96,14 @@ namespace DryIoc.IssuesTests
     }
 
     [TestFixture]
-    public class Messages_Test
+    public class Messages_Test : ITest
     {
+        public int Run()
+        {
+            Publish_Message().GetAwaiter().GetResult();
+            return 1;
+        }
+
         [Test]
         public async Task Publish_Message()
         {
