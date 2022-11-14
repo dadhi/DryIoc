@@ -42,17 +42,22 @@
         <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
     </ItemGroup>
 
+    <!-- Run compile-time generation only in debug configuration, 
+      for the one of target frameworks (highest), 
+      when the DryIoc was already build (TargetPath exists) in order to consume its types -->
     <Target Name="CompileTimeGenerate" 
-        BeforeTargets="BeforeBuild"
-        Condition="'$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(TargetPath)') AND ('$(TargetFramework)' == 'netstandard2.1' OR '$(TargetFramework)' == 'net6.0')">
-
-        <Message Text="TargetDir:  '$(TargetDir)'" Importance="high"/>
-        <Message Text="TargetPath: '$(TargetPath)'" Importance="high"/>
-        <Message Text="ProjectDir: '$(ProjectDir)'" Importance="high"/>
+        BeforeTargets="PrepareForBuild"
+        Condition="'$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)') AND '$(TargetFramework)' == 'net6.0'">
 
         <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
+        <Message Text="Env:"                       Importance="high"/>
+        <Message Text="TargetDir='$(TargetDir)'"   Importance="high"/>
+        <Message Text="TargetPath='$(TargetPath)'" Importance="high"/>
+        <Message Text="ProjectDir='$(ProjectDir)'" Importance="high"/>
 
+        <Exec WorkingDirectory="$(ProjectDir)" Command='dotnet tool restore --ignore-failed-sources --tool-manifest "$(ProjectDir)\.config\dotnet-tools.json"' />
         <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 -P=$(TargetDir) -r=$(TargetPath) -o=CompileTimeDI\Container.Generated.cs CompileTimeDI\Container.Generated.tt" />
+        <Message Text="Generated source file is '$(ProjectDir)CompileTimeDI\Container.Generated.cs'" Importance="high"/>
     </Target>
 
     <ItemGroup>
