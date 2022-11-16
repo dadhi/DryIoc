@@ -26,7 +26,7 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             // MediatR setup
-            container.RegisterDelegate<ServiceFactory>(r => r.Resolve);
+            container.RegisterDelegate<IResolverContext, ServiceFactory>(r => r.Resolve);
             container.RegisterMany(typeof(IMediator).GetAssembly().One(), Registrator.Interfaces);
 
             // User code
