@@ -11830,7 +11830,6 @@ namespace DryIoc
 
                 return implTypeArgs;
             }
-
         }
 
         internal sealed class WithTypeProvider : WithAllDetails
@@ -14708,11 +14707,49 @@ namespace DryIoc
             ObjectType = 2
         }
 
+        internal static Type[] GetImplementedTypesExcludingItselfAndObject(this Type sourceType)
+        {
+            Type[] results;
+
+            var interfaces = sourceType.GetInterfaces();
+            var interfaceCount = interfaces.Length;
+
+            var baseType = sourceType.BaseType;
+            if (baseType == null || baseType == typeof(object))
+                results = new Type[interfaceCount];
+            else
+            {
+                List<Type> baseBaseTypes = null; // todo: @perf optimize list away
+                for (var bb = baseType.BaseType; bb != null && bb != typeof(object); bb = bb.BaseType)
+                    (baseBaseTypes ?? (baseBaseTypes = new List<Type>(2))).Add(bb);
+
+                if (baseBaseTypes == null)
+                    results = new Type[interfaceCount + 1];
+                else
+                {
+                    results = new Type[interfaceCount + baseBaseTypes.Count + 1];
+                    baseBaseTypes.CopyTo(results, interfaceCount + 1);
+                }
+
+                results[interfaceCount] = baseType;
+            }
+
+            if (interfaceCount == 1)
+                results[0] = interfaces[0];
+            else if (interfaceCount > 1)
+                Array.Copy(interfaces, 0, results, 0, interfaces.Length);
+
+            return results;
+        }
+
         /// <summary>Returns all interfaces and all base types (in that order) implemented by <paramref name="sourceType"/>.
         /// Specify <paramref name="asImplementedType"/> to include <paramref name="sourceType"/> itself as first item and
         /// <see cref="object"/> type as the last item.</summary>
         public static Type[] GetImplementedTypes(this Type sourceType, AsImplementedType asImplementedType = AsImplementedType.None)
         {
+            if (asImplementedType == AsImplementedType.None)
+                return sourceType.GetImplementedTypesExcludingItselfAndObject();
+
             Type[] results;
 
             var interfaces = sourceType.GetInterfaces();
@@ -14725,7 +14762,7 @@ namespace DryIoc
                 results = new Type[sourcePlusInterfaceCount + includingObjectType];
             else
             {
-                List<Type> baseBaseTypes = null;
+                List<Type> baseBaseTypes = null; // todo: @perf optimize list away
                 for (var bb = baseType.BaseType; bb != null && bb != typeof(object); bb = bb.BaseType)
                     (baseBaseTypes ?? (baseBaseTypes = new List<Type>(2))).Add(bb);
 
@@ -14743,7 +14780,7 @@ namespace DryIoc
             if (interfaces.Length == 1)
                 results[interfaceStartIndex] = interfaces[0];
             else if (interfaces.Length > 1)
-                Array.Copy(interfaces, 0, results, interfaceStartIndex, interfaces.Length); // todo: @perf optimize change to Array.Resize or stick to the single array
+                Array.Copy(interfaces, 0, results, interfaceStartIndex, interfaces.Length);
 
             if (interfaceStartIndex == 1)
                 results[0] = sourceType;
