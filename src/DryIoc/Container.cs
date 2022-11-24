@@ -7820,15 +7820,42 @@ namespace DryIoc
                 ? implementedTypes.Match(t => t.IsServiceType())
                 : implementedTypes.Match(t => t.IsPublicOrNestedPublic() && t.IsServiceType());
 
-            if (type.IsGenericTypeDefinition)
-                serviceTypes = serviceTypes.Match(type.GetGenericArguments(),
-                    (paramsAndArgs, x) => x.ContainsAllGenericTypeParameters(paramsAndArgs),
-                    (_, x) => x.GetGenericDefinitionOrNull());
+            if (type.IsGenericTypeDefinition) // todo: @perf we don't need to check the source type, because it already matches itself
+            {
+                Type[] typeArgs = null;
+                var serviceTypesCount = 0;
+                for (var i = 0; i < serviceTypes.Length; ++i)
+                {
+                    var serviceType = serviceTypes[i];
+                    if (serviceType != type)
+                    {
+                        typeArgs ??= type.GetGenericArguments();
+                        if (!serviceType.ContainsAllGenericTypeParameters(typeArgs))
+                        {
+                            serviceTypes[i] = null;
+                            continue;
+                        }
+                    }
+                    ++serviceTypesCount;
+                    serviceTypes[i] = serviceType.GetGenericTypeDefinition();
+                }
+
+                if (serviceTypesCount == 0)
+                    return ArrayTools.Empty<Type>();
+                if (serviceTypesCount == serviceTypes.Length)
+                    return serviceTypes;
+                var filteredServiceTypes = new Type[serviceTypesCount];
+                var j = 0;
+                foreach (var t in serviceTypes)
+                    if (t != null)
+                        filteredServiceTypes[j++] = t;
+                return filteredServiceTypes;
+            }
 
             return serviceTypes;
         }
 
-        // todo: @bug @perf why don't we just IsAssignableFrom
+        // todo: @bug @perf why don't we just use IsAssignableFrom
         /// <summary>The same `GetImplementedServiceTypes` but instead of collecting the service types just check the <paramref name="serviceType"/> is implemented</summary>
         public static bool IsImplementingServiceType(this Type type, Type serviceType)
         {
@@ -14719,18 +14746,28 @@ namespace DryIoc
                 results = new Type[interfaceCount];
             else
             {
-                List<Type> baseBaseTypes = null; // todo: @perf optimize list away
+                Type baseBaseType = null;
+                List<Type> baseBaseTypes  = null;
                 for (var bb = baseType.BaseType; bb != null && bb != typeof(object); bb = bb.BaseType)
-                    (baseBaseTypes ?? (baseBaseTypes = new List<Type>(2))).Add(bb);
+                    if (baseBaseTypes != null)
+                        baseBaseTypes.Add(bb);
+                    else if (baseBaseType != null)
+                        baseBaseTypes = new List<Type>(2) { baseBaseType, bb };
+                    else
+                        baseBaseType = bb;
 
-                if (baseBaseTypes == null)
+                if (baseBaseType == null)
                     results = new Type[interfaceCount + 1];
-                else
+                else if (baseBaseTypes != null)
                 {
                     results = new Type[interfaceCount + baseBaseTypes.Count + 1];
                     baseBaseTypes.CopyTo(results, interfaceCount + 1);
                 }
-
+                else
+                {
+                    results = new Type[interfaceCount + 2];
+                    results[interfaceCount + 1] = baseBaseType;
+                }
                 results[interfaceCount] = baseType;
             }
 
@@ -14770,7 +14807,7 @@ namespace DryIoc
                     results = new Type[sourcePlusInterfaceCount + includingObjectType + 1];
                 else
                 {
-                    results = new Type[sourcePlusInterfaceCount + baseBaseTypes.Count + includingObjectType + 1];
+                    results = new Type[sourcePlusInterfaceCount + includingObjectType + baseBaseTypes.Count + 1];
                     baseBaseTypes.CopyTo(results, sourcePlusInterfaceCount + 1);
                 }
 
