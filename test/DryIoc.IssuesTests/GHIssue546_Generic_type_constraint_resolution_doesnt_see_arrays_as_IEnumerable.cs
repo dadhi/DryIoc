@@ -8,12 +8,28 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Test();
-            return 1;
+            Test1();
+            Test2();
+            return 2;
         }
 
-        [Test][Ignore("todo: fixme")]
-        public void Test()
+        [Test]
+        public void Test1()
+        {
+            // Works - type is compliant with the generic constraints - would not compile otherwise.
+            var q = new MyThing<int[], int>();
+
+            var container = new Container();
+
+            container.Register(typeof(IMyThing<>), typeof(MyThing<,>), Reuse.ScopedOrSingleton);
+
+            // Fails when we try to resolve it through the container
+            var y = container.Resolve<IMyThing<int[]>>();
+            Assert.IsInstanceOf<MyThing<int[], int>>(y);
+        }
+
+        [Test]
+        public void Test2()
         {
             var container = new Container();
 

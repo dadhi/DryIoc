@@ -7820,13 +7820,14 @@ namespace DryIoc
                 ? implementedTypes.Match(t => t.IsServiceType())
                 : implementedTypes.Match(t => t.IsPublicOrNestedPublic() && t.IsServiceType());
 
-            if (type.IsGenericTypeDefinition) // todo: @perf we don't need to check the source type, because it already matches itself
+            if (type.IsGenericTypeDefinition)
             {
                 Type[] typeArgs = null;
                 var serviceTypesCount = 0;
                 for (var i = 0; i < serviceTypes.Length; ++i)
                 {
                     var serviceType = serviceTypes[i];
+                    // we don't need to check the source type, because it already matches itself
                     if (serviceType != type)
                     {
                         typeArgs ??= type.GetGenericArguments();
@@ -12283,7 +12284,7 @@ namespace DryIoc
         private static bool ValidateImplementationAndServiceTypeParamsMatch(Type implType, Type serviceType, bool throwIfInvalid)
         {
             var implTypeParams = implType.GetGenericArguments();
-            var implementedTypes = implType.GetImplementedTypes();
+            var implementedTypes = implType.GetImplementedTypes(); // todo: @perf we are extracting the implemented types once on validation and then when resolving the open-generic and matching with service type, can we save our work here?
 
             var implementedTypeFound = false;
             var containsAllTypeParams = false;
@@ -12323,7 +12324,10 @@ namespace DryIoc
                     var implTypeParamConstraint = implTypeParamConstraints[j];
                     if (implTypeParamConstraint != implTypeArg && implTypeParamConstraint.IsOpenGeneric())
                     {
-                        var implTypeArgArgs = implTypeArg.IsGenericType ? implTypeArg.GetGenericArguments() : implTypeArg.One();
+                        var implTypeArgArgs = 
+                            implTypeArg.IsGenericType ? implTypeArg.GetGenericArguments() :
+                            implTypeArg.IsArray ? implTypeArg.GetElementType().One() :
+                            implTypeArg.One();
                         var implTypeParamConstraintParams = implTypeParamConstraint.GetGenericArguments();
 
                         constraintMatchFound = MatchServiceWithImplementedTypeParams(
@@ -14843,7 +14847,7 @@ namespace DryIoc
                 return false;
 
             var matchedParams = genericParameters.Copy();
-
+            // todo: @perf @memory replace matchedParams by the bit mask
             ClearGenericParametersReferencedInConstraints(matchedParams);
             ClearMatchesFoundInGenericParameters(matchedParams, openGenericType.GetGenericArguments());
 
