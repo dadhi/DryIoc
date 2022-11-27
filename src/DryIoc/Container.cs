@@ -14846,15 +14846,13 @@ namespace DryIoc
             if (!openGenericType.IsOpenGeneric())
                 return false;
 
-            var matchedParams = genericParameters.Copy();
-            // todo: @perf @memory replace matchedParams by the bit mask
-            ClearGenericParametersReferencedInConstraints(matchedParams);
-            ClearMatchesFoundInGenericParameters(matchedParams, openGenericType.GetGenericArguments());
+            var matchedParamIndexesBitMask = ClearGenericParametersReferencedInConstraints(genericParameters);
+            matchedParamIndexesBitMask = ClearMatchesFoundInGenericParameters(matchedParamIndexesBitMask, genericParameters, openGenericType.GetGenericArguments());
 
-            for (var i = 0; i < matchedParams.Length; i++)
-                if (matchedParams[i] != null)
-                    return false;
-            return true;
+            // to return `true` we expect that bit mask hash all N bits set (where N is generic paramaters count)
+            // e.g. for 2 generic parameters we expect `b11`, and if have `b10` bit mask we check that b10 + 1 >= b1 << 2 -> b11 >= b100 -> false
+            // but for `b11` we have b11 + 1 >= b1 << 2 -> b100 >= b100 -> true
+            return (matchedParamIndexesBitMask + 1) >= (1 << genericParameters.Length);
         }
 
         /// <summary>Where the `T` should be either Type or MethodInfo</summary>
@@ -15216,8 +15214,9 @@ namespace DryIoc
             }
         }
 
-        private static void ClearGenericParametersReferencedInConstraints(Type[] genericParams)
+        private static int ClearGenericParametersReferencedInConstraints(Type[] genericParams)
         {
+            var matchedParamIndexesBitMask = 0;
             for (var i = 0; i < genericParams.Length; i++)
             {
                 var genericParam = genericParams[i];
@@ -15239,7 +15238,7 @@ namespace DryIoc
                                 for (var g = 0; g < genericParams.Length; ++g)
                                     if (genericParams[g] == constraintGenericParam)
                                     {
-                                        genericParams[g] = null; // match
+                                        matchedParamIndexesBitMask |= 1 << g;
                                         break;
                                     }
                             }
@@ -15247,25 +15246,27 @@ namespace DryIoc
                     }
                 }
             }
+            return matchedParamIndexesBitMask;
         }
 
-        private static void ClearMatchesFoundInGenericParameters(Type[] matchedParams, Type[] genericParams)
+        private static int ClearMatchesFoundInGenericParameters(int matchedParamIndexesBitMask, Type[] genericParams, Type[] genericArgs)
         {
-            for (var i = 0; i < genericParams.Length; i++)
+            for (var i = 0; i < genericArgs.Length; i++)
             {
-                var genericParam = genericParams[i];
-                if (genericParam.IsGenericParameter)
+                var genericArg = genericArgs[i];
+                if (genericArg.IsGenericParameter)
                 {
-                    for (var j = 0; j < matchedParams.Length; ++j)
-                        if (matchedParams[j] == genericParam)
+                    for (var j = 0; j < genericParams.Length; ++j)
+                        if (genericParams[j] == genericArg)
                         {
-                            matchedParams[j] = null; // match
+                            matchedParamIndexesBitMask |= 1 << j;
                             break;
                         }
                 }
-                else if (genericParam.IsOpenGeneric())
-                    ClearMatchesFoundInGenericParameters(matchedParams, genericParam.GetGenericArguments());
+                else if (genericArg.IsOpenGeneric())
+                    matchedParamIndexesBitMask = ClearMatchesFoundInGenericParameters(matchedParamIndexesBitMask, genericParams, genericArg.GetGenericArguments());
             }
+            return matchedParamIndexesBitMask;
         }
 
         internal static T GetDefault<T>() => default(T);
