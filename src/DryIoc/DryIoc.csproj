@@ -30,7 +30,8 @@
     </PropertyGroup>
 
     <ItemGroup Label="Packaging build and content files">
-        <None Include="..\..\nuspecs\DryIoc\readme.md" Pack="true" PackagePath="\"/>
+        <None Include="..\..\nuspecs\DryIoc\build\DryIoc.dll.props"       Pack="true" PackagePath="build" />
+        <None Include="..\..\nuspecs\DryIoc\readme.md"                    Pack="true" PackagePath="\"/>
 
         <None Include="CompileTimeDI\Container.Generated.tt"              Pack="true" PackagePath="CompileTimeDI" />
         <None Include="CompileTimeDI\CompileTimeRegistrations.ttinclude"  Pack="true" PackagePath="CompileTimeDI" />
