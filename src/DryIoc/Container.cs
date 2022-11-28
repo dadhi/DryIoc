@@ -12191,7 +12191,10 @@ namespace DryIoc
                     var implTypeParamConstraint = implTypeParamConstraints[j];
                     if (implTypeParamConstraint != implTypeArg && implTypeParamConstraint.IsOpenGeneric())
                     {
-                        var implTypeArgArgs = implTypeArg.IsGenericType ? implTypeArg.GetGenericArguments() : implTypeArg.One();
+                        var implTypeArgArgs = 
+                            implTypeArg.IsGenericType ? implTypeArg.GetGenericArguments() :
+                            implTypeArg.IsArray ? implTypeArg.GetElementType().One() :
+                            implTypeArg.One();
                         var implTypeParamConstraintParams = implTypeParamConstraint.GetGenericArguments();
 
                         constraintMatchFound = MatchServiceWithImplementedTypeParams(
@@ -12202,8 +12205,7 @@ namespace DryIoc
         }
 
         private static bool MatchServiceWithImplementedTypeParams(
-            Type[] resultImplArgs, Type[] implParams, Type[] serviceParams, Type[] serviceArgs,
-            int resultCount = 0)
+            Type[] resultImplArgs, Type[] implParams, Type[] serviceParams, Type[] serviceArgs)
         {
             if (serviceArgs.Length != serviceParams.Length)
                 return false;

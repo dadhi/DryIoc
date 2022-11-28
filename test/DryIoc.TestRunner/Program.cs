@@ -64,7 +64,8 @@ namespace DryIoc.UnitTests
                 new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
                 new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit(),
-                new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call()
+                new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call(),
+                new GHIssue546_Generic_type_constraint_resolution_doesnt_see_arrays_as_IEnumerable()
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added
