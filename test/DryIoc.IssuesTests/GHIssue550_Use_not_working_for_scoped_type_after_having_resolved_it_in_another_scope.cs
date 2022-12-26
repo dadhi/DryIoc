@@ -39,6 +39,7 @@ namespace DryIoc.IssuesTests
                 scope.Use<IScopedTypeDependency>(dependency);
                 scopedTypeObj = scope.Resolve<ScopedType>();
             }
+
             Assert.AreSame(scopedTypeObj.Dependency, dependency);
         }
 
@@ -47,17 +48,21 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
             container.Register<ScopedType>(Reuse.Scoped);
-            container.Register<IScopedTypeDependency, DefaultScopedTypeDependency>(Reuse.Scoped);
+            container.Register<IScopedTypeDependency, DefaultScopedTypeDependency>(
+                Reuse.Scoped,
+                setup: Setup.With(asResolutionCall: true)); // fixes the thing
 
             ScopedType scopedTypeObj;
-            var dependency = new AnotherScopedTypeDependency();
             using (var scope1 = container.OpenScope())
                 scope1.Resolve<ScopedType>();
+
+            var dependency = new AnotherScopedTypeDependency();
             using (var scope2 = container.OpenScope())
             {
                 scope2.Use<IScopedTypeDependency>(dependency);
                 scopedTypeObj = scope2.Resolve<ScopedType>();
             }
+
             Assert.AreSame(scopedTypeObj.Dependency, dependency);
         }
     }
