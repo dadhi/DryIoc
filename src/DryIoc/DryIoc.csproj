@@ -30,13 +30,10 @@
     </PropertyGroup>
 
     <ItemGroup Label="Packaging build and content files">
-        <None Include="..\..\nuspecs\DryIoc\build\DryIoc.dll.props"       Pack="true" PackagePath="build" />
-        <None Include="..\..\nuspecs\DryIoc\readme.md"                    Pack="true" PackagePath="\"/>
-
-        <None Include="CompileTimeDI\Container.Generated.tt"              Pack="true" PackagePath="CompileTimeDI" />
-        <None Include="CompileTimeDI\CompileTimeRegistrations.ttinclude"  Pack="true" PackagePath="CompileTimeDI" />
-        <None Include="CompileTimeDI\CompileTimeRegistrations.Example.cs" Pack="true" PackagePath="CompileTimeDI" />
-        <None Include=".config\dotnet-tools.json"                         Pack="true" PackagePath="CompileTimeDI" />
+        <None Include="..\..\nuspecs\DryIoc\readme.md"                Pack="true" PackagePath="\"/>
+        <None Include="..\..\nuspecs\DryIoc\build\DryIoc.dll.targets" Pack="true" PackagePath="build" />
+        <None Include=".config\dotnet-tools.json"                     Pack="true" PackagePath="tools" />
+        <None Include="CompileTimeDI\**\*"                            Pack="true" PackagePath="CompileTimeDI" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
