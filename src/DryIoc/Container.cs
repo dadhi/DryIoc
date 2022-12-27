@@ -12338,8 +12338,7 @@ namespace DryIoc
         }
 
         private static bool MatchServiceWithImplementedTypeParams(
-            Type[] resultImplArgs, Type[] implParams, Type[] serviceParams, Type[] serviceArgs,
-            int resultCount = 0)
+            Type[] resultImplArgs, Type[] implParams, Type[] serviceParams, Type[] serviceArgs)
         {
             if (serviceArgs.Length != serviceParams.Length)
                 return false;
