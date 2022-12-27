@@ -1328,6 +1328,20 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 | DryIoc_MsDI | 122.30 us | 5.922 us | 17.462 us | 115.89 us |  1.17 |    0.11 | 12.0850 |      - |  37.23 KB |        1.18 |
 |        MsDI | 119.71 us | 2.642 us |  7.580 us | 116.47 us |  1.25 |    0.09 | 23.4375 | 0.3662 |  71.44 KB |        2.26 |
 
+## v6 after update to .NET 7
+
+BenchmarkDotNet=v0.13.3, OS=Windows 10 (10.0.19042.928/20H2/October2020Update)
+Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical cores
+.NET SDK=7.0.100
+  [Host]     : .NET 7.0.0 (7.0.22.51805), X64 RyuJIT AVX2
+  DefaultJob : .NET 7.0.0 (7.0.22.51805), X64 RyuJIT AVX2
+
+|      Method |     Mean |   Error |   StdDev |   Median | Ratio | RatioSD |    Gen0 |   Gen1 | Allocated | Alloc Ratio |
+|------------ |---------:|--------:|---------:|---------:|------:|--------:|--------:|-------:|----------:|------------:|
+|      DryIoc | 138.5 us | 9.07 us | 26.75 us | 129.7 us |  1.00 |    0.00 | 10.2539 |      - |  31.74 KB |        1.00 |
+| DryIoc_MsDI | 150.0 us | 6.67 us | 18.93 us | 147.7 us |  1.12 |    0.24 | 11.9629 |      - |  37.22 KB |        1.17 |
+|        MsDI | 205.2 us | 4.08 us | 11.70 us | 202.9 us |  1.53 |    0.27 | 23.1934 | 0.4883 |  71.36 KB |        2.25 |
+
 */
 
             // [Benchmark]
