@@ -8,7 +8,7 @@ version: 6.0.0-preview-03-{build}
 test: off
 
 skip_commits:
-  message: /skipci .*/
+  message: /noci .*/
 
 build_script:
   - dotnet test -f net6.0 -c:Release test/DryIoc.UnitTests/DryIoc.UnitTests.csproj
