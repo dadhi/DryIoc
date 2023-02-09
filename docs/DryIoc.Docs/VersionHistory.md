@@ -1,5 +1,10 @@
 Version History
 ---------------
+
+## v5.3.2 Bug-fix release / 2023-01-09
+
+- fixed: #554 System.NullReferenceException: Object reference not set to an instance of an object.
+
 ## v5.3.1 Bug-fix release / 2022-11-28
 
 -fixed: #546 Generic type constraint resolution doesn't see arrays as IEnumerable<>
