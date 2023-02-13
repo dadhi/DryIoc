@@ -13009,6 +13009,9 @@ namespace DryIoc
             return maps;
         }
 
+        // Creatres a single entry with an empty list of unordered disposables (the key 0 is reserved for  the unordered disposables)
+        private static ImHashMap<int, ImList<IDisposable>> CreateEmptyDisposables() => ImHashMap.Entry(0, ImList<IDisposable>.Empty);
+
         internal ImHashMap<int, object>[] CloneMaps() => _maps.CopyNonEmpty();
 
         ///<summary>Creating</summary>
@@ -13027,7 +13030,7 @@ namespace DryIoc
             name == null ? new Scope() : new WithParentAndName(null, name);
 
         /// <summary>Creates scope with optional parent and name.</summary>
-        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, ImHashMap.Entry(0, ImList<IDisposable>.Empty)) // todo: @question ты забыл барашка такая зачем ты это сделал, проверь нужно ли нам создавать entry здесь?
+        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, CreateEmptyDisposables()) // todo: @question ты забыл барашка такая зачем ты это сделал, проверь нужно ли нам создавать entry здесь?
         { }
 
         /// <summary>The basic constructor</summary>
@@ -13055,16 +13058,16 @@ namespace DryIoc
                 Name = name;
             }
 
-            public override IScope Clone(bool withDisposables) => !withDisposables
-                ? new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, ImHashMap.Entry(0, ImList<IDisposable>.Empty)) // dropping the disposables
-                : new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used, _disposables); // Не забыть скопировать папу (коментарий для дочки)
+            public override IScope Clone(bool withDisposables) =>
+                new WithParentAndName(Parent?.Clone(withDisposables), Name, _maps.CopyNonEmpty(), _used,
+                    withDisposables ? _disposables : CreateEmptyDisposables()); // Не забыть скопировать папу (коментарий для дочки)
         }
 
         /// <inheritdoc />
         public virtual IScope Clone(bool withDisposables) =>
-            !withDisposables
-            ? new Scope(_maps.CopyNonEmpty(), _used, ImHashMap<int, ImList<IDisposable>>.Empty) // dropping the disposables
-            : new Scope(_maps.CopyNonEmpty(), _used, _disposables);
+            new Scope(_maps.CopyNonEmpty(), _used,
+                withDisposables ? _disposables : CreateEmptyDisposables()); // Не забыть скопировать папу (коментарий для дочки)
+
 
         /// <inheritdoc />
         [MethodImpl((MethodImplOptions)256)]

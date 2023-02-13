@@ -116,7 +116,8 @@ namespace DryIoc.UnitTests.net472
                 new GHIssue535_Property_injection_does_not_work_when_appending_implementation_for_multiple_registration(),
                 new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call(),
                 new GHIssue546_Generic_type_constraint_resolution_doesnt_see_arrays_as_IEnumerable(),
-                new GHIssue550_Use_not_working_for_scoped_type_after_having_resolved_it_in_another_scope()
+                new GHIssue550_Use_not_working_for_scoped_type_after_having_resolved_it_in_another_scope(),
+                new GHIssue554_System_NullReferenceException_Object_reference_not_set_to_an_instance_of_an_object()
             };
             var loadTests = new ITest[]
             {
