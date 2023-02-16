@@ -81,7 +81,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// unless the `registrySharing` is set to the `RegistrySharing.Share` or to `RegistrySharing.CloneButKeepCache`.
         /// `registerDescriptor` is the custom service descriptor handler.
         /// </summary>
-        public DryIocServiceProviderFactory(IContainer container, RegistrySharing registrySharing,
+        public DryIocServiceProviderFactory(
+            IContainer container, 
+            RegistrySharing registrySharing,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
             _container = container;
@@ -94,7 +96,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             (_container ?? new Container(Rules.MicrosoftDependencyInjectionRules))
                 .WithDependencyInjectionAdapter(services, _registerDescriptor, _registrySharing);
 
-        /// <inheritdoc />
+        /// <summary>The <paramref name="container"/> is the container returned by the <see cref="CreateBuilder(IServiceCollection)"/> method.</summary>
         public IServiceProvider CreateServiceProvider(IContainer container) =>
             container.BuildServiceProvider();
     }
