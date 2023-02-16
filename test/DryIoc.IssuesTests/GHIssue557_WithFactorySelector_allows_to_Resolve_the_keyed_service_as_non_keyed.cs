@@ -1,4 +1,3 @@
-using System;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -16,7 +15,7 @@ namespace DryIoc.IssuesTests
         public void Test1()
         {
             var rules = Rules.Default
-                // .WithFactorySelector(Rules.SelectLastRegisteredFactory())
+                .WithFactorySelector(Rules.SelectLastRegisteredFactory())
                 .WithConcreteTypeDynamicRegistrations(reuse: Reuse.Transient)
                 .With(Made.Of(FactoryMethod.ConstructorWithResolvableArguments))
                 .WithFuncAndLazyWithoutRegistration()

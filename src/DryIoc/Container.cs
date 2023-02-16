@@ -1176,7 +1176,7 @@ namespace DryIoc
             // optimize for the case with the single factory
             if (factories.Length == 1)
                 return request.MatchFactoryConditionAndMetadata(details, factories[0].Value)
-                    ? rules.FactorySelector(request, factories[0].Value, null)
+                    ? rules.FactorySelector(request, null, factories)
                     : null;
 
             // Sort in registration order

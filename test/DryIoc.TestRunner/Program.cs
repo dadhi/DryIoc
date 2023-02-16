@@ -69,7 +69,8 @@ namespace DryIoc.UnitTests
                 new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit(),
                 new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call(),
                 new GHIssue546_Generic_type_constraint_resolution_doesnt_see_arrays_as_IEnumerable(),
-                new GHIssue554_System_NullReferenceException_Object_reference_not_set_to_an_instance_of_an_object()
+                new GHIssue554_System_NullReferenceException_Object_reference_not_set_to_an_instance_of_an_object(),
+                new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed(),
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added
