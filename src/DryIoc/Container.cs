@@ -5499,13 +5499,36 @@ namespace DryIoc
             return newRules;
         }
 
+        /// <summary>Checks if the rules include the same settings and conventions as <see cref="MicrosoftDependencyInjectionRules"/>.
+        /// It also means that the rules may include the additional things like `WithConcreteTypeDynamicRegistrations`, etc.</summary>
+        public bool HasMicrosoftDependencyInjectionRules()
+        {
+            var factoryMethod = _made.FactoryMethodOrSelector;
+            var rightFactory = 
+                ReferenceEquals(factoryMethod, DryIoc.FactoryMethod.ConstructorWithResolvableArguments) ||
+                ReferenceEquals(factoryMethod, DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic) ||
+                ReferenceEquals(factoryMethod, DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam);
+
+            return rightFactory &&
+                FactorySelector == SelectLastRegisteredFactory &&
+                (_settings & Settings.SelectLastRegisteredFactory) != 0 &&
+                (_settings & Settings.TrackingDisposableTransients) != 0 &&
+                (_settings & Settings.ThrowOnRegisteringDisposableTransient) == 0 &&
+                (_settings & Settings.VariantGenericTypesInResolvedCollection) == 0;
+        }
+
         /// <summary>The rules implementing the conventions of Microsoft.Extension.DependencyInjection library.</summary>
         public static readonly Rules MicrosoftDependencyInjectionRules = WithMicrosoftDependencyInjectionRules(Default);
 
-        /// <summary>Returns the copy of the rules with the applied conventions of Microsoft.Extension.DependencyInjection library.</summary>
+        /// <summary>Returns the copy of the rules with the applied conventions of Microsoft.Extension.DependencyInjection library.
+        /// Before calling this method to avoid the copying you may consider to check if the rules are already <see cref="HasMicrosoftDependencyInjectionRules"/>.
+        /// </summary>
         public Rules WithMicrosoftDependencyInjectionRules() => WithMicrosoftDependencyInjectionRules(this);
 
-        /// <summary></summary>
+        /// <summary>By default the `IServiceProvider.GetService` is returning `null` if service is not resolved. 
+        /// So you need to call the `GetRequiredService` extension method which in turn requires the implementation of `ISupportRequiredService` underneath.
+        /// To help with this mess you may use this rule to force the `GetService` to throw an exception the same as calling `GetRequiredService`.
+        /// This may help to diagnose the problems in debug or in tests, or in some custom setup.</summary>
         public Rules WithServiceProviderGetServiceShouldThrowIfUnresolved() =>
             WithSettings(_settings | Settings.ServiceProviderGetServiceShouldThrowIfUnresolved);
 

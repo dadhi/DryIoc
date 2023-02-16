@@ -22,10 +22,9 @@ namespace DryIoc.IssuesTests
 
             var container = new Container(rules);
 
-            // container with MS.DI rules should not be cloned
-            var msDi = new DryIocServiceProviderFactory(container);
+            var msDi = new DryIocServiceProviderFactory(container, RegistrySharing.Share);
             var msDiContainer = msDi.CreateBuilder(new ServiceCollection());
-            // Assert.AreSame(container, msDiContainer);            // todo: @fixme 
+            Assert.AreSame(container, msDiContainer);
         }
 
         public interface IServiceA
