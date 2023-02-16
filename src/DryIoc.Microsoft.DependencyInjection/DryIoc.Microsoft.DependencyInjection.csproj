@@ -3,7 +3,7 @@
         <TargetFrameworks>netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
-        <VersionPrefix>6.1.0</VersionPrefix>
+        <VersionPrefix>6.1.1</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -15,6 +15,12 @@
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v6.1.1
+
+- fixed: #555 Avoiding cloning the container that already has the MicrosoftDependencyInjectionRules and RegistrySharing.Share
+- updated DryIoc to v5.3.3
+
+
 ## v6.1.0
 
 - added: RegisterDesciptor overload with IfAlreadyRegistered and optional serviceKey argument

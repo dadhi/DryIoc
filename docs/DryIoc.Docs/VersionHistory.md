@@ -1,6 +1,11 @@
 Version History
 ---------------
 
+## v5.3.3 Bug-fix release / 2023-02-23
+
+- fixed: #555 Is there anyway to apply ConcreteTypeDynamicRegistrations to Rules.MicrosoftDependencyInjectionRules
+- fixed: #557 Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()) allows to Resolve the keyed service as non-keyed
+
 ## v5.3.2 Bug-fix release / 2023-01-09
 
 - fixed: #554 System.NullReferenceException: Object reference not set to an instance of an object.

@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>5.3.2</version>
+        <version>5.3.3</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2023 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,6 +14,12 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v5.3.3 Bug-fix release
+
+- fixed: #555 Is there anyway to apply ConcreteTypeDynamicRegistrations to Rules.MicrosoftDependencyInjectionRules
+- fixed: #557 Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()) allows to Resolve the keyed service as non-keyed
+
+
 ## v5.3.2 Bug-fix release
 
 - fixed: #554 System.NullReferenceException: Object reference not set to an instance of an object.
