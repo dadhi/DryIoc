@@ -5503,6 +5503,9 @@ namespace DryIoc
         /// It also means that the rules may include the additional things like `WithConcreteTypeDynamicRegistrations`, etc.</summary>
         public bool HasMicrosoftDependencyInjectionRules()
         {
+            if (this == MicrosoftDependencyInjectionRules)
+                return true;
+                
             var factoryMethod = _made.FactoryMethodOrSelector;
             var rightFactory = 
                 ReferenceEquals(factoryMethod, DryIoc.FactoryMethod.ConstructorWithResolvableArguments) ||
