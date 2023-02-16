@@ -133,9 +133,11 @@ namespace DryIoc.Microsoft.DependencyInjection
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
             RegistrySharing registrySharing = RegistrySharing.Share)
         {
-            if (container.Rules != Rules.MicrosoftDependencyInjectionRules)
-                container = container.With(container.Rules.WithMicrosoftDependencyInjectionRules(),
-                    container.ScopeContext, registrySharing, container.SingletonScope);
+            var hasMicrosoftDependencyInjectionRules = container.Rules.HasMicrosoftDependencyInjectionRules();
+            if (!hasMicrosoftDependencyInjectionRules)
+                container = container.With(container.Rules.WithMicrosoftDependencyInjectionRules(), container.ScopeContext, registrySharing, container.SingletonScope);
+            else if (registrySharing != RegistrySharing.Share)
+                container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
 
             var capabilities = new DryIocServiceProviderCapabilities(container);
             var singletons = container.SingletonScope;
