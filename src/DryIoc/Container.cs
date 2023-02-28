@@ -1661,11 +1661,7 @@ namespace DryIoc
             {
                 var factory = ((IContainer)this).GetWrapperFactoryOrDefault(serviceType);
                 if (factory != null)
-                {
                     wrappedType = ((Setup.WrapperSetup)factory.Setup).GetWrappedTypeOrNullIfWrapsRequired(serviceType);
-                    if (wrappedType == null)
-                        return null;
-                }
             }
 
             return wrappedType == null ? serviceType : ((IContainer)this).GetWrappedType(wrappedType);
