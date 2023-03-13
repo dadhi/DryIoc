@@ -1,6 +1,11 @@
 Version History
 ---------------
 
+## v5.3.4 Bug-fix release / 2023-03-13
+
+- fixed: #559 Possible inconsistent behaviour of resolving collection of services opening resolution scope
+- fixed: #560 Fix GetWrappedType implementation(s) to not return null
+
 ## v5.3.3 Bug-fix release / 2023-02-23
 
 - fixed: #555 Is there anyway to apply ConcreteTypeDynamicRegistrations to Rules.MicrosoftDependencyInjectionRules

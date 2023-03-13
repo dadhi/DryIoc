@@ -4,9 +4,9 @@ set PACKAGES=..\.dist\packages
 set SOURCE=https://api.nuget.org/v3/index.json
 set /p APIKEY=<"..\..\ApiKey.txt"
 
-dotnet nuget push "%PACKAGES%\DryIoc.dll.5.3.3.nupkg" -k %APIKEY% -s %SOURCE%
-dotnet nuget push "%PACKAGES%\DryIoc.5.3.3.nupkg" -k %APIKEY% -s %SOURCE%
-dotnet nuget push "%PACKAGES%\DryIoc.Internal.5.3.3.nupkg" -k %APIKEY% -s %SOURCE%
+dotnet nuget push "%PACKAGES%\DryIoc.dll.5.3.4.nupkg" -k %APIKEY% -s %SOURCE%
+dotnet nuget push "%PACKAGES%\DryIoc.5.3.4.nupkg" -k %APIKEY% -s %SOURCE%
+dotnet nuget push "%PACKAGES%\DryIoc.Internal.5.3.4.nupkg" -k %APIKEY% -s %SOURCE%
 
 dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.DependencyInjection.6.1.1.nupkg" -k %APIKEY% -s %SOURCE%
 dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.DependencyInjection.src.6.1.1.nupkg" -k %APIKEY% -s %SOURCE%
