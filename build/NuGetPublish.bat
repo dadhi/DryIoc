@@ -8,8 +8,8 @@ dotnet nuget push "%PACKAGES%\DryIoc.dll.5.3.4.nupkg" -k %APIKEY% -s %SOURCE%
 dotnet nuget push "%PACKAGES%\DryIoc.5.3.4.nupkg" -k %APIKEY% -s %SOURCE%
 dotnet nuget push "%PACKAGES%\DryIoc.Internal.5.3.4.nupkg" -k %APIKEY% -s %SOURCE%
 
-dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.DependencyInjection.6.1.1.nupkg" -k %APIKEY% -s %SOURCE%
-dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.DependencyInjection.src.6.1.1.nupkg" -k %APIKEY% -s %SOURCE%
+@REM dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.DependencyInjection.6.1.1.nupkg" -k %APIKEY% -s %SOURCE%
+@REM dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.DependencyInjection.src.6.1.1.nupkg" -k %APIKEY% -s %SOURCE%
 rem dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.DependencyInjection.AspNetCore2_1.3.0.3.nupkg" -k %APIKEY% -s %SOURCE%
 
 rem dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.Hosting.1.0.0-preview-01.nupkg" -k %APIKEY% -s %SOURCE%
