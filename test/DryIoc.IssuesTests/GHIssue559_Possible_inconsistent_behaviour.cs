@@ -9,12 +9,13 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Test1();
-            return 1;
+            Test_scoped_opening_scope();
+            Test_singleton_opening_scope();
+            return 2;
         }
 
         [Test]
-        public void Test1()
+        public void Test_scoped_opening_scope()
         {
             var container = new Container();
             container.Register<Foo>(Reuse.Scoped, setup: Setup.With(openResolutionScope: true));
@@ -23,7 +24,20 @@ namespace DryIoc.IssuesTests
             Assert.IsNotNull(foo);
             
             var actual = container.Resolve<IEnumerable<Foo>>();
-            Assert.AreEqual(0, actual.Count()); // todo: @fixme
+            Assert.AreEqual(1, actual.Count());
+        }
+
+        [Test]
+        public void Test_singleton_opening_scope()
+        {
+            var container = new Container();
+            container.Register<Foo>(Reuse.Singleton, setup: Setup.With(openResolutionScope: true));
+            
+            var foo1 = container.Resolve<Foo>();
+            Assert.IsNotNull(foo1);
+
+            var foo2 = container.Resolve<Foo>();
+            Assert.AreSame(foo1, foo2);
         }
 
         public class Foo {}

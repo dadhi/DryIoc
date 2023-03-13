@@ -4724,7 +4724,6 @@ namespace DryIoc
             request.Reuse is CurrentScopeReuse == false
             && request.DirectParent.IsSingletonOrDependencyOfSingleton
             && request.Rules.ThrowIfDependencyHasShorterReuseLifespan // see the #378
-            // && !request.OpensResolutionScope
             && !request.OpensResolutionScopeUpToResolutionCall()
                 ? RootOrSelfExpr
                 : FactoryDelegateCompiler.ResolverContextParamExpr;
@@ -4822,11 +4821,7 @@ namespace DryIoc
             }
 
             if (s == null)
-            {
-                if (throwIfNotFound)
-                    Throw.It(Error.NoMatchedScopeFound, name, currentScope);
-                return null;
-            }
+                return throwIfNotFound ? Throw.For<Scope>(Error.NoMatchedScopeFound, name, currentScope) : null;
 
             if (s.IsDisposed)
             {
@@ -5131,7 +5126,7 @@ namespace DryIoc
                 var itemRequest = request.Push(itemInfo);
 
                 // For the required service type (not a wrapper) we at least looking at the unwrapped type, so we may check that type factory condition,
-                // or going to resolve the nested wrapper and Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all available information
+                // or going to resolve the nested wrapper and Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all the available information
                 var factory = requiredItemType == itemType
                     ? itemRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(item.Factory)
                     : container.ResolveFactory(itemRequest.WithWrappedServiceFactory(item.Factory));
@@ -9380,8 +9375,7 @@ namespace DryIoc
         /// <summary>Matching things</summary>
         public static Factory MatchGeneratedFactoryByReuseAndConditionOrNull(this Request r, Factory f)
         {
-            var reuse = f.Reuse;
-            if (reuse != null && !reuse.CanApply(r))
+            if (!f.Setup.OpenResolutionScope && !r.MatchFactoryReuse(f))
                 return null;
 
             var condition = f.Setup.Condition;

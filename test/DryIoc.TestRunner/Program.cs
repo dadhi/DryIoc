@@ -11,7 +11,6 @@ namespace DryIoc.UnitTests
             RunAllTests();
 
             // new GHIssue559_Possible_inconsistent_behaviour().Run();
-
             // new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed().Run();
             // new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules().Run();
             // new GHIssue554_System_NullReferenceException_Object_reference_not_set_to_an_instance_of_an_object().Run();
@@ -74,6 +73,7 @@ namespace DryIoc.UnitTests
                 new GHIssue554_System_NullReferenceException_Object_reference_not_set_to_an_instance_of_an_object(),
                 new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules(),
                 new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed(),
+                new GHIssue559_Possible_inconsistent_behaviour(),
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added
