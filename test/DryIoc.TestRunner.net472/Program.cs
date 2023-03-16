@@ -120,6 +120,7 @@ namespace DryIoc.UnitTests.net472
                 new GHIssue554_System_NullReferenceException_Object_reference_not_set_to_an_instance_of_an_object(),
                 new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules(),
                 new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed(),
+                new GHIssue559_Possible_inconsistent_behaviour(),
             };
             var loadTests = new ITest[]
             {

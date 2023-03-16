@@ -4888,11 +4888,7 @@ namespace DryIoc
             }
 
             if (s == null)
-            {
-                if (throwIfNotFound)
-                    Throw.It(Error.NoMatchedScopeFound, name, currentScope);
-                return null;
-            }
+                return throwIfNotFound ? Throw.For<Scope>(Error.NoMatchedScopeFound, name, currentScope) : null;
 
             if (s.IsDisposed)
             {
@@ -9530,7 +9526,7 @@ namespace DryIoc
         public static Factory MatchGeneratedFactoryByReuseAndConditionOrNull(this Request r, Factory f)
         {
             var reuse = f.Reuse;
-            if (reuse != null && !reuse.CanApply(r))
+            if (!f.Setup.OpenResolutionScope && !r.MatchFactoryReuse(f))
                 return null;
 
             var condition = f.Setup.Condition;
