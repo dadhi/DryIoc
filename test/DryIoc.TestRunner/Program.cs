@@ -11,6 +11,7 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
+            // new GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
             // new GHIssue550_Use_not_working_for_scoped_type_after_having_resolved_it_in_another_scope().Run();
             // new GHIssue546_Generic_type_constraint_resolution_doesnt_see_arrays_as_IEnumerable().Run();
             // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
@@ -106,6 +107,7 @@ namespace DryIoc.UnitTests
                 new Messages_Test(),
                 new GHIssue80_ScopedOrSingleton_extra_constructor_calls(),
                 new GHIssue101_Compile_time_generated_object_graph(),
+                new GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution(),
                 new GHIssue180_Option_nullable_int_argument_with_not_null_default_value(),
                 new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service(),
                 new GHIssue198_Open_generics_resolve_fails_if_there_is_a_static_constructor(),

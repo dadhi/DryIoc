@@ -88,6 +88,7 @@ namespace DryIoc.UnitTests.net472
                 new GHIssue29_Resolve_caches_args_values(),
                 new GHIssue32_Memory_leak_with_ResolveManyBehavior_AzLazyEnumerable(),
                 new GHIssue80_ScopedOrSingleton_extra_constructor_calls(),
+                new GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution(),
                 new GHIssue180_Option_nullable_int_argument_with_not_null_default_value(),
                 new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service(),
                 new GHIssue198_Open_generics_resolve_fails_if_there_is_a_static_constructor(),
