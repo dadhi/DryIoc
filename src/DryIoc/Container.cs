@@ -1589,11 +1589,7 @@ namespace DryIoc
             {
                 var factory = GetWrapperFactoryOrDefault(serviceType);
                 if (factory != null)
-                {
                     wrappedType = ((Setup.WrapperSetup)factory.Setup).GetWrappedTypeOrNullIfWrapsRequired(serviceType);
-                    if (wrappedType == null)
-                        return null;
-                }
             }
             return wrappedType == null ? serviceType : GetWrappedType(wrappedType);
         }
@@ -1700,11 +1696,7 @@ namespace DryIoc
             {
                 var factory = GetWrapperFactoryOrDefault(serviceType);
                 if (factory != null)
-                {
                     wrappedType = ((Setup.WrapperSetup)factory.Setup).GetWrappedTypeOrNullIfWrapsRequired(serviceType);
-                    if (wrappedType == null)
-                        return null;
-                }
             }
             return wrappedType == null ? serviceType : GetWrappedType(wrappedType);
         }
