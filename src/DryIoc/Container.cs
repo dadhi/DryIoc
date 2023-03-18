@@ -1383,15 +1383,14 @@ namespace DryIoc
             return factories;
         }
 
-        ///  <inheritdoc />
+        /// <inheritdoc />
         public Expression GetDecoratorExpressionOrDefault(Request request)
         {
-            var container = request.Container;
             // return early if no decorators registered
             var r = _registry.Value as Registry;
             if ((r == null || r.Decorators.IsEmpty) &&
-                (container.Rules.DynamicRegistrationProviders == null ||
-                !container.Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Decorator))) // todo: @perf reuse its result
+                (Rules.DynamicRegistrationProviders == null ||
+                !Rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Decorator))) // todo: @perf reuse its result
                 return null;
 
             var arrayElementType = request.ServiceType.GetArrayElementTypeOrNull();
@@ -1399,14 +1398,13 @@ namespace DryIoc
                 request = request.WithChangedType(arrayElementType, (_, et) => typeof(IEnumerable<>).MakeGenericType(et)); // todo: @simplify try to remove this method
 
             var serviceType = request.ServiceType;
-            var decorators = container.GetDecoratorFactoriesOrDefault(serviceType);
+            var decorators = GetDecoratorFactoriesOrDefault(serviceType);
             var originalDecorators = decorators;
 
             // Combine with required service type if different from service type
             var requiredServiceType = request.ActualServiceType;
             if (requiredServiceType != serviceType)
-                decorators = Container.MergeSortedByLatestOrderOrRegistration(decorators,
-                    container.GetDecoratorFactoriesOrDefault(requiredServiceType));
+                decorators = Container.MergeSortedByLatestOrderOrRegistration(decorators, GetDecoratorFactoriesOrDefault(requiredServiceType));
 
             // Define the list of ids for the already applied decorators
             int[] appliedDecoratorIDs = null;
@@ -1428,7 +1426,7 @@ namespace DryIoc
             var genericDecorators = Empty<Factory>();
             var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
             if (openGenericServiceType != null)
-                genericDecorators = container.GetDecoratorFactoriesOrDefault(openGenericServiceType);
+                genericDecorators = GetDecoratorFactoriesOrDefault(openGenericServiceType);
 
             // Combine with open-generic required type if they are different from service type
             if (requiredServiceType != serviceType)
@@ -1436,13 +1434,13 @@ namespace DryIoc
                 var openGenericRequiredType = requiredServiceType.GetGenericDefinitionOrNull();
                 if (openGenericRequiredType != null && openGenericRequiredType != openGenericServiceType)
                     genericDecorators = Container.MergeSortedByLatestOrderOrRegistration(genericDecorators,
-                        container.GetDecoratorFactoriesOrDefault(openGenericRequiredType));
+                        GetDecoratorFactoriesOrDefault(openGenericRequiredType));
             }
 
             // Append generic type argument decorators, registered as Object
             // Note: the condition for type arguments should be checked before generating the closed generic version
             // Note: the dynamic rules for the object is not supported, sorry - too much of performance hog to be called every time
-            var typeArgDecorators = container.GetDecoratorFactoriesOrDefault(_objectTypeHash, typeof(object)) as Factory[];
+            var typeArgDecorators = GetDecoratorFactoriesOrDefault(_objectTypeHash, typeof(object)) as Factory[];
             if (!typeArgDecorators.IsNullOrEmpty())
                 genericDecorators = Container.MergeSortedByLatestOrderOrRegistration(genericDecorators,
                     typeArgDecorators.Match(request, (r, d) => d.CheckCondition(r)));
@@ -3059,11 +3057,13 @@ namespace DryIoc
             }
         }
 
-        internal static bool TryInterpretSingletonAndUnwrapContainerException(IResolverContext r, Expression expr, ImHashMapEntry<int, object> itemRef, out object result)
+        internal static object InterpretOrCompileSingletonAndUnwrapContainerException(this IResolverContext r, Expression expr, ImHashMapEntry<int, object> itemRef)
         {
             try
             {
-                return Interpreter.TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null, out result);
+                return TryInterpret(r, expr, FactoryDelegateCompiler.FactoryDelegateParamExprs, r, null, out var singleton)
+                    ? singleton
+                    : expr.CompileToFactoryDelegate(r.Rules.UseInterpretation)(r);
             }
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
@@ -9561,7 +9561,7 @@ namespace DryIoc
         {
             var req = RentRequestOrNull();
             return req == null
-                ? req = new Request(container, Empty, 1, 0, depRequestStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null)
+                ? new Request(container, Empty, 1, 0, depRequestStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null)
                 : req.SetServiceInfo(container, Empty, 1, 0, depRequestStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null);
         }
 
@@ -9671,8 +9671,9 @@ namespace DryIoc
         /// <summary>The total dependency count</summary>
         public int DependencyCount; // todo: @perf combine with the DependencyDepth or other fields
 
-        internal void DecreaseTrackedDependencyCountForParents(int dependencyCount)
+        internal void DecreaseTrackedDependencyCountForParents()
         {
+            var dependencyCount = DependencyCount;
             for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
                 p.DependencyCount -= dependencyCount;
         }
@@ -10997,8 +10998,8 @@ namespace DryIoc
         /// Before returning method may transform the expression  by applying <see cref="Reuse"/>, or/and decorators if found any.</summary>
         public virtual Expression GetExpressionOrDefault(Request request)
         {
-            // The factory usually is null unleast it is provided by the collection or other higher wrapper.
-            // Note, that we are storing it in the local variable Here because the follow-up WithResolvedFactorywill override it with "this" factory.
+            // The factory usually is null unless it is provided by the collection or other higher wrapper.
+            // Note, that we are storing it in the local variable Here because the follow-up WithResolvedFactory will override it with "this" factory.
             var serviceFactory = request.FactoryID == 0 ? request.Factory : null;
 
             request = request.WithResolvedFactory(this);
@@ -11130,8 +11131,7 @@ namespace DryIoc
 
                         if (singleton == Scope.NoItem)
                         {
-                            if (!Interpreter.TryInterpretSingletonAndUnwrapContainerException(container, serviceExpr, itemRef, out singleton))
-                                singleton = serviceExpr.CompileToFactoryDelegate(container.Rules.UseInterpretation)(container);
+                            singleton = container.InterpretOrCompileSingletonAndUnwrapContainerException(serviceExpr, itemRef);
 
                             if (weaklyReferencedOrPreventDisposal)
                                 singleton = setup.WeaklyReferenced ? new WeakReference(singleton) : new HiddenDisposable(singleton); // todo: @perf we don't need it here because because instead of wrapping the item into the non-disposable object we may skip adding it to Disposable items collection - just skipping the AddUnorderedDisposable or AddDisposable calls below
@@ -11142,7 +11142,7 @@ namespace DryIoc
                         }
 
                         if (request.DependencyCount > 0)
-                            request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
+                            request.DecreaseTrackedDependencyCountForParents();
 
                         Debug.Assert(singleton != Scope.NoItem, "Should not be the case otherwise I am effing failed");
                         serviceExpr = singleton != null ? Constant(singleton) : Constant(null, serviceExpr.Type); // fixes #258
@@ -11168,9 +11168,9 @@ namespace DryIoc
             else if (!rules.UsedForValidation && !rules.UsedForExpressionGeneration &&
                 request.DependencyCount >= rules.DependencyCountInLambdaToSplitBigObjectGraph)
             {
-                // Split the expression with dependencies bigger than certain threshold by wrapping it in Func which is a
-                // separate compilation unit and invoking it emmediately
-                request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
+                // Split the expression with dependencies bigger than certain threshold by wrapping it in a Func and its Invocation
+                // which is a separate compilation unit
+                request.DecreaseTrackedDependencyCountForParents();
                 serviceExpr = Invoke(serviceExpr.Type, Lambda<Func<object>>(serviceExpr, Empty<ParameterExpression>(), typeof(object)), Empty<Expression>());
             }
 
@@ -11558,6 +11558,7 @@ namespace DryIoc
                 return null;
             }
         }
+
         internal object _implementationTypeOrProviderOrPubCtorOrCtors; // Type or the Func<Type> for the lazy factory initialization
 
         private static Type ValidateImplementationType(Type type)
@@ -13009,16 +13010,15 @@ namespace DryIoc
 
         internal const int MAP_COUNT = 16;
         internal const int MAP_COUNT_SUFFIX_MASK = MAP_COUNT - 1;
-        internal ImHashMap<int, object>[] _maps;
+        internal ImHashMap<int, object>[] _maps; // todo: @rename
 
         internal static readonly object NoItem = new object();
         private static ImHashMap<int, object>[] _emptyMaps = CreateEmptyMaps();
-
         private static ImHashMap<int, object>[] CreateEmptyMaps()
         {
             var maps = new ImHashMap<int, object>[MAP_COUNT];
             var empty = ImHashMap<int, object>.Empty;
-            for (var i = 0; i < MAP_COUNT; ++i)
+            for (var i = 0; i < maps.Length; ++i)
                 maps[i] = empty;
             return maps;
         }
@@ -13031,7 +13031,7 @@ namespace DryIoc
         ///<summary>Creating</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static IScope Of(IScope parent, object name) =>
-            parent == null && name == null ? new Scope() : new WithParentAndName(parent, name);
+            parent == null & name == null ? new Scope() : new WithParentAndName(parent, name);
 
         ///<summary>Creating scope with parent</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -13044,7 +13044,7 @@ namespace DryIoc
             name == null ? new Scope() : new WithParentAndName(null, name);
 
         /// <summary>Creates scope with optional parent and name.</summary>
-        public Scope() : this(CreateEmptyMaps(), ImHashMap<Type, object>.Empty, CreateEmptyDisposables()) // todo: @question ты забыл барашка такая зачем ты это сделал, проверь нужно ли нам создавать entry здесь?
+        public Scope() : this(_emptyMaps.CopyNonEmpty(), ImHashMap<Type, object>.Empty, CreateEmptyDisposables()) // todo: @question ты забыл барашка такая зачем ты это сделал, проверь нужно ли нам создавать entry здесь?
         { }
 
         /// <summary>The basic constructor</summary>
@@ -13144,7 +13144,7 @@ namespace DryIoc
         {
             var tickCount = (uint)Environment.TickCount;
             var tickStart = tickCount;
-            Debug.WriteLine("Waiting is starting...");
+            Debug.WriteLine("Waiting for Scoped service to be set/created is starting...");
 
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
@@ -13155,7 +13155,7 @@ namespace DryIoc
                 tickCount = (uint)Environment.TickCount;
             }
 
-            Debug.WriteLine("Waiting is done!");
+            Debug.WriteLine("Waiting for Scoped service to be set/created is complete.");
             return itemRef.Value;
         }
 
@@ -13467,7 +13467,7 @@ namespace DryIoc
                 serviceFactoryExpr = Convert<object>(serviceFactoryExpr);
 
             if (request.DependencyCount > 0)
-                request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
+                request.DecreaseTrackedDependencyCountForParents();
 
             var factoryId = request.GetCombinedDecoratorAndFactoryID();
             var lambdaExpr = new FactoryDelegateExpression(serviceFactoryExpr);
@@ -13526,7 +13526,7 @@ namespace DryIoc
             {
                 // decrease the dependency count when wrapping into lambda
                 if (serviceFactoryExpr is InvokeFactoryDelegateExpression == false && request.DependencyCount > 0)
-                    request.DecreaseTrackedDependencyCountForParents(request.DependencyCount);
+                    request.DecreaseTrackedDependencyCountForParents();
 
                 var disposalOrder = request.Factory.Setup.DisposalOrder;
                 var factoryId = request.GetCombinedDecoratorAndFactoryID();
