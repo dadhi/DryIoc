@@ -18,36 +18,30 @@ namespace DryIoc.IssuesTests
         class Query<T> : IQuery<T> { };
         class QueryDecorator<T> : IQuery<T>
         {
-            public QueryDecorator(IQuery<T> decoratee) { }
+            public readonly IQuery<T> Decoratee;
+            public QueryDecorator(IQuery<T> decoratee) => Decoratee = decoratee;
         }
 
         public async Task DryIoc_Resolve_parallel_execution_on_repeat(int repeatCount)
         {
             for (var i = 0; i < repeatCount; i++)
-                await DryIoc_Resolve_parallel_execution();
+                await DryIoc_Resolve_parallel_execution(i);
         }
 
         // [Test, Repeat(10)]
-        public async Task DryIoc_Resolve_parallel_execution()
+        public async Task DryIoc_Resolve_parallel_execution(int iter)
         {
-            var container = new Container();
+            var container = new Container(Rules.Default.WithoutInterpretationForTheFirstResolution());
 
-            container.Register(typeof(IQuery<string>), typeof(Query<string>));
+            container.Register(typeof(IQuery<string>), typeof(Query<string>));            
             container.Register(typeof(IQuery<string>), typeof(QueryDecorator<string>), setup: Setup.Decorator);
 
-            IQuery<string> ResolveInScope()
-            {
-                using (var scope = container.OpenScope())
-                {
-                    return scope.Resolve<IQuery<string>>();
-                }
-            }
-
+            // const int tasksCount = 1;
             const int tasksCount = 32;
 
             var tasks = new Task<IQuery<string>>[tasksCount];
             for (var i = 0; i < tasks.Length; i++)
-                tasks[i] = Task.Run(() => ResolveInScope());
+                tasks[i] = Task.Run(() => container.Resolve<IQuery<string>>());
             
             await Task.WhenAll(tasks);
 
@@ -55,12 +49,12 @@ namespace DryIoc.IssuesTests
             var sb = new StringBuilder(tasks.Length);
             for (var i = 0; i < tasks.Length; i++)
             {   
-                var success = tasks[i].Result is QueryDecorator<string>;
-                if (!success) failed = true;
+                var success = tasks[i].Result is QueryDecorator<string> r && r.Decoratee is QueryDecorator<string> == false;
+                failed |= !success;
                 sb.Append(success ? '_' : 'F');
             }
 
-            Assert.IsFalse(failed, $"Some tasks are failed [{sb}]");
+            Assert.IsFalse(failed, $"Some of {tasks.Length} tasks are failed [{sb}] on iteration {iter}");
         }
     }
 }

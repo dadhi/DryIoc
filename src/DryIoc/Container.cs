@@ -9561,7 +9561,7 @@ namespace DryIoc
         {
             var req = RentRequestOrNull();
             return req == null
-                ? new Request(container, Empty, 1, 0, depRequestStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null)
+                ? req =  new Request(container, Empty, 1, 0, depRequestStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null)
                 : req.SetServiceInfo(container, Empty, 1, 0, depRequestStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null);
         }
 
