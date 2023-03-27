@@ -10,7 +10,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            DryIoc_Resolve_parallel_execution_on_repeat(10).GetAwaiter().GetResult();
+            DryIoc_Resolve_parallel_execution_on_repeat(64).GetAwaiter().GetResult();
             return 1;
         }
 
@@ -31,13 +31,13 @@ namespace DryIoc.IssuesTests
         // [Test, Repeat(10)]
         public async Task DryIoc_Resolve_parallel_execution(int iter)
         {
-            var container = new Container(Rules.Default.WithoutInterpretationForTheFirstResolution());
+            var container = new Container(Rules.Default.WithCompileServiceExpressionOnTheFirstResolution());
 
             container.Register(typeof(IQuery<string>), typeof(Query<string>));            
             container.Register(typeof(IQuery<string>), typeof(QueryDecorator<string>), setup: Setup.Decorator);
 
             // const int tasksCount = 1;
-            const int tasksCount = 32;
+            const int tasksCount = 64;
 
             var tasks = new Task<IQuery<string>>[tasksCount];
             for (var i = 0; i < tasks.Length; i++)
@@ -49,9 +49,11 @@ namespace DryIoc.IssuesTests
             var sb = new StringBuilder(tasks.Length);
             for (var i = 0; i < tasks.Length; i++)
             {   
-                var success = tasks[i].Result is QueryDecorator<string> r && r.Decoratee is QueryDecorator<string> == false;
+                var result = tasks[i].Result;
+                var decorator = result as QueryDecorator<string>;
+                var success = decorator != null && decorator.Decoratee is QueryDecorator<string> == false;
                 failed |= !success;
-                sb.Append(success ? '_' : 'F');
+                sb.Append(success ? '_' : result is Query<string> ? 'Q' : '?');
             }
 
             Assert.IsFalse(failed, $"Some of {tasks.Length} tasks are failed [{sb}] on iteration {iter}");

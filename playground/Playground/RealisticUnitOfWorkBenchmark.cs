@@ -1342,6 +1342,14 @@ Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical c
 | DryIoc_MsDI | 150.0 us | 6.67 us | 18.93 us | 147.7 us |  1.12 |    0.24 | 11.9629 |      - |  37.22 KB |        1.17 |
 |        MsDI | 205.2 us | 4.08 us | 11.70 us | 202.9 us |  1.53 |    0.27 | 23.1934 | 0.4883 |  71.36 KB |        2.25 |
 
+## v6 without expression caching
+
+|      Method |     Mean |   Error |   StdDev | Ratio | RatioSD |    Gen0 |   Gen1 | Allocated | Alloc Ratio |
+|------------ |---------:|--------:|---------:|------:|--------:|--------:|-------:|----------:|------------:|
+|      DryIoc | 164.4 us | 6.39 us | 17.91 us |  1.00 |    0.00 | 12.2070 |      - |  37.63 KB |        1.00 |
+| DryIoc_MsDI | 159.9 us | 4.89 us | 13.38 us |  0.98 |    0.13 | 13.9160 |      - |  43.05 KB |        1.14 |
+|        MsDI | 213.8 us | 4.37 us | 12.68 us |  1.31 |    0.16 | 23.1934 | 0.4883 |  71.34 KB |        1.90 |
+
 */
 
             // [Benchmark]
@@ -1717,6 +1725,21 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |   Lamar_MsDI |  6.673 us | 0.0876 us | 0.0732 us |  4.35 |    0.06 |  0.9995 | 0.4959 |     - |   6.16 KB |
 |      Autofac | 47.040 us | 0.7367 us | 0.6531 us | 30.65 |    0.48 |  7.7515 | 0.6104 |     - |  47.73 KB |
 | Autofac_MsDI | 59.566 us | 0.8734 us | 0.7742 us | 38.76 |    0.61 | 11.3525 | 0.9155 |     - |  69.59 KB |
+
+## DryIoc v6
+
+BenchmarkDotNet=v0.13.3, OS=Windows 10 (10.0.19042.928/20H2/October2020Update)
+Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical cores
+.NET SDK=7.0.100
+  [Host]     : .NET 7.0.0 (7.0.22.51805), X64 RyuJIT AVX2
+  DefaultJob : .NET 7.0.0 (7.0.22.51805), X64 RyuJIT AVX2
+
+
+|      Method |     Mean |     Error |    StdDev |   Median | Ratio | RatioSD |   Gen0 | Allocated | Alloc Ratio |
+|------------ |---------:|----------:|----------:|---------:|------:|--------:|-------:|----------:|------------:|
+|      DryIoc | 1.804 us | 0.0361 us | 0.0768 us | 1.787 us |  1.00 |    0.00 | 0.9499 |   2.91 KB |        1.00 |
+| DryIoc_MsDI | 2.698 us | 0.1138 us | 0.3266 us | 2.789 us |  1.50 |    0.16 | 0.9575 |   2.94 KB |        1.01 |
+|        MsDI | 3.911 us | 0.0782 us | 0.1991 us | 3.853 us |  2.18 |    0.18 | 1.5259 |   4.68 KB |        1.61 |
 */
 #pragma warning disable CS0169
             private IServiceProvider _msDi;
@@ -1763,19 +1786,19 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace() => Measure(_grace);
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace_MsDI() => Measure(_graceMsDi);
 
-            [Benchmark]
+            // [Benchmark]
             public object Lamar_MsDI() => Measure(_lamarMsDi);
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac_MsDI() => Measure(_autofacMsDi);
         }
     }

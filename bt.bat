@@ -2,11 +2,15 @@
 setlocal EnableDelayedExpansion
 
 echo:
-echo:# Build and run TestRunner (.NET 6 only)
+echo:# Build the TestRunner (.NET 6 only)
 echo:
 
 dotnet build -c Release test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 if %ERRORLEVEL% neq 0 goto :error
+
+echo:
+echo:# Run the TestRunner
+echo:
 
 dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 if %ERRORLEVEL% neq 0 goto :error
