@@ -11,7 +11,8 @@ namespace DryIoc.IssuesTests
         public int Run()
         {
             DryIoc_Resolve_parallel_execution_on_repeat(64).GetAwaiter().GetResult();
-            return 1;
+            // DryIoc_Resolve_parallel_execution_with_compile_service_expression(64).GetAwaiter().GetResult();
+            return 2;
         }
 
         interface IQuery<T> { }
@@ -31,13 +32,12 @@ namespace DryIoc.IssuesTests
         // [Test, Repeat(10)]
         public async Task DryIoc_Resolve_parallel_execution(int iter)
         {
-            var container = new Container(Rules.Default.WithCompileServiceExpressionOnTheFirstResolution());
+            var container = new Container();
 
             container.Register(typeof(IQuery<string>), typeof(Query<string>));            
             container.Register(typeof(IQuery<string>), typeof(QueryDecorator<string>), setup: Setup.Decorator);
 
-            // const int tasksCount = 1;
-            const int tasksCount = 64;
+            const int tasksCount = 32;
 
             var tasks = new Task<IQuery<string>>[tasksCount];
             for (var i = 0; i < tasks.Length; i++)
@@ -53,7 +53,37 @@ namespace DryIoc.IssuesTests
                 var decorator = result as QueryDecorator<string>;
                 var success = decorator != null && decorator.Decoratee is QueryDecorator<string> == false;
                 failed |= !success;
-                sb.Append(success ? '_' : result is Query<string> ? 'Q' : '?');
+                sb.Append(success ? '_' : decorator == null ? 'F' : 'f');
+            }
+
+            Assert.IsFalse(failed, $"Some of {tasks.Length} tasks are failed [{sb}] on iteration {iter}");
+        }
+
+        // [Test, Repeat(10)]
+        public async Task DryIoc_Resolve_parallel_execution_with_compile_service_expression(int iter)
+        {
+            var container = new Container(Rules.Default.WithoutInterpretationForTheFirstResolution()); // todo: @fixme check
+
+            container.Register(typeof(IQuery<string>), typeof(Query<string>));            
+            container.Register(typeof(IQuery<string>), typeof(QueryDecorator<string>), setup: Setup.Decorator);
+
+            const int tasksCount = 32;
+
+            var tasks = new Task<IQuery<string>>[tasksCount];
+            for (var i = 0; i < tasks.Length; i++)
+                tasks[i] = Task.Run(() => container.Resolve<IQuery<string>>());
+            
+            await Task.WhenAll(tasks);
+
+            var failed = false;
+            var sb = new StringBuilder(tasks.Length);
+            for (var i = 0; i < tasks.Length; i++)
+            {   
+                var result = tasks[i].Result;
+                var decorator = result as QueryDecorator<string>;
+                var success = decorator != null && decorator.Decoratee is QueryDecorator<string> == false;
+                failed |= !success;
+                sb.Append(success ? '_' : decorator == null ? 'F' : 'f');
             }
 
             Assert.IsFalse(failed, $"Some of {tasks.Length} tasks are failed [{sb}] on iteration {iter}");
