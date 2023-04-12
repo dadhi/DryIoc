@@ -29,7 +29,7 @@ var logger = new LoggerConfiguration()
     .MinimumLevel.Verbose()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
-    .WriteTo.File("Errors/Log_.txt", rollingInterval: RollingInterval.Day)
+    .WriteTo.File("Errors/Log_.log", rollingInterval: RollingInterval.Day)
     .CreateLogger();
 builder.Host.UseSerilog(logger);
 
