@@ -1,16 +1,23 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using BlazorServerSide.Data;
+
+// to get the required properties
+using System.Reflection;
+using System.Runtime.CompilerServices;
+
 using Serilog;
 using DryIoc;
 using DryIoc.Microsoft.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var container = new Container(
-    // this is causing the #567 error
-    // Rules.MicrosoftDependencyInjectionRules.With(propertiesAndFields: PropertiesAndFields.Auto)
-);
+// todo: @wip take into account constructor with SetsRequiredMembers attribute
+var requiredProperties = PropertiesAndFields.All(withFields: false, 
+    serviceInfo: (p, _) => p.GetCustomAttribute<RequiredMemberAttribute>() != null ? PropertyOrFieldServiceInfo.Of(p) : null);
+
+var container = new Container(Rules.MicrosoftDependencyInjectionRules.With(propertiesAndFields: requiredProperties));
+
 
 // Here it goes the integration with the existing DryIoc container
 var diFactory = new DryIocServiceProviderFactory(container, RegistrySharing.Share);
@@ -33,6 +40,8 @@ var logger = new LoggerConfiguration()
     .CreateLogger();
 builder.Host.UseSerilog(logger);
 
+
+builder.Services.AddSingleton<WeatherForecast>(); // will be injected as required property
 builder.Services.AddSingleton<WeatherForecastService>();
 
 var app = builder.Build();
