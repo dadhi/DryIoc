@@ -14,7 +14,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // todo: @wip take into account constructor with SetsRequiredMembers attribute
 var requiredProperties = PropertiesAndFields.All(withFields: false, 
-    serviceInfo: (p, _) => p.GetCustomAttribute<RequiredMemberAttribute>() != null ? PropertyOrFieldServiceInfo.Of(p) : null);
+    serviceInfo: (p, _) => p.GetCustomAttribute<RequiredMemberAttribute>() == null  ? null 
+        : PropertyOrFieldServiceInfo.Of(p).WithDetails(ServiceDetails.Of(IfUnresolved.Throw)));
 
 var container = new Container(Rules.MicrosoftDependencyInjectionRules.With(propertiesAndFields: requiredProperties));
 
