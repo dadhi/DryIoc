@@ -11286,25 +11286,23 @@ namespace DryIoc
                 serviceInfo = (GetServiceInfo)((m, r) => PropertyOrFieldServiceInfo.Of(m).WithDetails(details));
             }
 
-            Func<Request, PropertyInfo, bool> isInjectable =
-                withNonPublic && withPrimitive ? ((r, p) => p.IsInjectable(true, true)) :
-                withNonPublic ? ((r, p) => p.IsInjectable(true, false)) :
-                withPrimitive ? ((r, p) => p.IsInjectable(false, true)) :
-                                ((r, p) => p.IsInjectable(false, false));
-
             return req =>
             {
                 var implType = req.ImplementationType;
+                if (implType == null)
+                    return null;
+
+                // todo: @perf optimize allocations and maybe combine with fields below
                 var properties = implType
                     .GetMembers(x => x.DeclaredProperties, includeBase: withBase).ToArrayOrSelf()
-                    .Match(req, isInjectable, (r, p) => serviceInfo(p, r));
+                    .Match(serviceInfo, req, (si, r, p) => p.IsInjectable(withNonPublic, withPrimitive), (si, r, p) => si(p, r));
 
                 if (!withFields)
                     return properties;
 
-                var fields = implType // todo: @perf optimize allocations and maybe combine with properties
+                var fields = implType
                     .GetMembers(x => x.DeclaredFields, includeBase: withBase).ToArrayOrSelf()
-                    .Match(req, (r, f) => f.IsInjectable(withNonPublic, withPrimitive), (r, f) => serviceInfo(f, r));
+                    .Match(serviceInfo, req, (si, r, f) => f.IsInjectable(withNonPublic, withPrimitive), (si, r, f) => si(f, r));
 
                 return properties.Append(fields);
             };
