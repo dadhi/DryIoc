@@ -14178,14 +14178,25 @@ namespace DryIoc
             {
                 var m = Message;
                 var factoryId = (int)Details;
-                var reg = container.GetServiceRegistrations().FirstOrDefault(r => r.Factory.FactoryID == factoryId);
-                if (reg.Factory == null)
-                    return "Unable to get the service registration for the problematic factory with FactoryID=" + factoryId;
-                return "The service registration related to the problem is " + reg;
+                foreach (var reg in container.GetServiceRegistrations()) 
+                {
+                    var f = reg.Factory;
+                    if (f.FactoryID == factoryId)
+                        return "The service registration related to the problem is " + reg;
+                    var genFactories = f.GeneratedFactories;
+                    if (genFactories != null)
+                        foreach (var genEntry in f.GeneratedFactories.Enumerate()) 
+                        {
+                            var genFactory = genEntry.Value;
+                            if (genFactory.FactoryID == factoryId)
+                                return "The service registration related to the problem is " + reg + NewLine +
+                                    ", specifically by its derived closed-generic factory: " + genFactory;
+                        }
+                }
+                return "Unable to find the service registration for the problematic factory with FactoryID=" + factoryId;
             }
             return string.Empty;
         }
-
     }
 
     /// <summary>Defines error codes and error messages for all DryIoc exceptions (DryIoc extensions may define their own.)</summary>
