@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>netstandard2.0;net7.0</TargetFrameworks>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
-        <VersionPrefix>6.1.1</VersionPrefix>
+        <VersionPrefix>6.2.0-preview-01</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -15,6 +15,12 @@
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
+## v6.2.0
+
+- added: .NET 7.0 and MS.Ext.DI.Abstractions 7.0 support
+- updated DryIoc to v5.4.0
+ 
+
 ## v6.1.1
 
 - fixed: #555 Avoiding cloning the container that already has the MicrosoftDependencyInjectionRules and RegistrySharing.Share
@@ -23,7 +29,7 @@
 
 ## v6.1.0
 
-- added: RegisterDesciptor overload with IfAlreadyRegistered and optional serviceKey argument
+- added: RegisterDescriptor overload with IfAlreadyRegistered and optional serviceKey argument
 - fixed: Using the explicit IfAlreadyRegistered.AppendNotKeyed for default RegisterDesciptor in Populate and WithDependencyInjectionAdapter methods
 - fixed: #520 WithDependencyInjectionAdapter / Populate do not work with Default IfAlreadyRegistered.Replace 
 
@@ -35,7 +41,10 @@
         <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' != 'net7.0'">
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'net7.0'">
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0" />
     </ItemGroup>
 </Project>

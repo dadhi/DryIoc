@@ -95,7 +95,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
         }
 
         [Test]
-        public void ServiceScopeFactoryIsSingleton()
+        public void ServiceScopeFactoryIsSingleton_local()
         {
             // Arrange
             var collection = new TestServiceCollection();
@@ -115,7 +115,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
         }
 
         [Test]
-        public void ScopesAreFlatNotHierarchical()
+        public void ScopesAreFlatNotHierarchical_local()
         {
             // Arrange
             var collection = new TestServiceCollection();

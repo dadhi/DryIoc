@@ -10,8 +10,10 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
-            // new PropertyResolutionTests().Run();
-            
+            // todo: @wip
+            // new GHIssue565_Is_ignoring_ReuseScoped_setting_expected_behaviour_when_also_set_to_openResolutionScope().Run();
+
+            // new PropertyResolutionTests().Run();            
             // new GHIssue391_Deadlock_during_Resolve().Run();
             // new GHIssue559_Possible_inconsistent_behaviour().Run();
             // new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed().Run();
