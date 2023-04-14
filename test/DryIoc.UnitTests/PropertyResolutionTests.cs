@@ -7,8 +7,14 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class PropertyResolutionTests
+    public class PropertyResolutionTests : ITest
     {
+        public int Run()
+        {
+            Can_access_the_constructor_when_resolving_the_property();
+            return 1;
+        }
+
         [Test]
         public void Resolving_unregistered_property_should_NOT_throw_and_should_preserve_original_property_value()
         {
@@ -162,6 +168,49 @@ namespace DryIoc.UnitTests
             return import == null ? null : PropertyOrFieldServiceInfo.Of(m)
                 .WithDetails(ServiceDetails.Of(import.ContractType, import.ContractName));
         }
+
+        [Test]
+        public void Can_access_the_constructor_when_resolving_the_property()
+        {
+            var container = new Container(r => r.With(
+                factoryMethod: FactoryMethod.ConstructorWithResolvableArguments,
+                propertiesAndFields: PropertiesAndFields.All(
+                    withFields: false,
+                    serviceInfo: (m, req) => 
+                    {
+                        var import = (ImportAttribute)m.GetAttributes(typeof(ImportAttribute)).FirstOrDefault();
+                        if (import == null)
+                            return null;
+
+                        // if the used constructor already contains (the injected) parameter of the same type as the property,
+                        // then we skip the property injection. 
+                        // In C# 11 (.NET 7) it may be used to determine the constructor.SetsRequiredMembers to avoid injection of the required properties, #563 
+                        var ctor = req.SelectedConstructor;
+                        if (ctor != null) 
+                        {
+                            var ctorParams = ctor.GetParameters();
+                            if (ctorParams.Length != 0) 
+                            {
+                                var propType = m.GetReturnTypeOrDefault();
+                                foreach (var p in ctorParams)
+                                {
+                                    if (p.ParameterType == propType)
+                                        return null;
+                                }
+                            }
+                        }
+
+                        return PropertyOrFieldServiceInfo.Of(m).WithDetails(ServiceDetails.Of(import.ContractType, import.ContractName));
+                    })));
+
+            container.Register<Cuerpo>();
+            container.Register<Guts>();
+            container.Register<Brain>();
+
+            var cuerpo = container.Resolve<Cuerpo>();
+
+            Assert.IsNotNull(cuerpo.Brain);
+        }
     }
 
     #region CUT
@@ -240,6 +289,24 @@ namespace DryIoc.UnitTests
 
     public class Brain
     {
+    }
+
+    public class Cuerpo
+    {
+        [Import]
+        public Brain Brain { get; set; }
+
+        public readonly Guts Guts;
+        public Cuerpo(Guts guts)
+        {
+            Guts = guts;
+        }
+
+        public Cuerpo(Guts guts, Brain brain)
+        {
+            Guts = guts;
+            Brain = brain;
+        }
     }
 
     #endregion

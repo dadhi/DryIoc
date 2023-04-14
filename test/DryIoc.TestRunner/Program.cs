@@ -10,6 +10,9 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
+            // new PropertyResolutionTests().Run();
+            
+            // new GHIssue391_Deadlock_during_Resolve().Run();
             // new GHIssue559_Possible_inconsistent_behaviour().Run();
             // new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed().Run();
             // new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules().Run();
@@ -52,6 +55,7 @@ namespace DryIoc.UnitTests
                 new ContainerTests(),
                 new OpenGenericsTests(),
                 new DynamicRegistrationsTests(),
+                new PropertyResolutionTests(),
                 new SelectConstructorWithAllResolvableArgumentTests(),
                 new Issue107_NamedScopesDependingOnResolvedTypes(),
                 new GHIssue378_InconsistentResolutionFailure(),

@@ -8637,9 +8637,12 @@ namespace DryIoc
         public static Expression CreateResolutionExpression(Request request,
             bool openResolutionScope = false, bool asResolutionCall = false)
         {
-            if (request.Rules.DependencyResolutionCallExprs != null &&
-                request.Factory != null && !request.Factory.HasRuntimeState)
-                PopulateDependencyResolutionCallExpressions(request);
+            if (request.Rules.DependencyResolutionCallExprs != null)
+            {
+                var f = request.Factory;
+                if (f != null && !f.HasRuntimeState)
+                    PopulateDependencyResolutionCallExpressions(request);
+            }
 
             var container = request.Container;
             var serviceType = request.ServiceType;
@@ -9466,18 +9469,18 @@ namespace DryIoc
 
             // inherit some flags and service details from parent (if any)
             preResolveParent = preResolveParent ?? Empty;
-            if (!preResolveParent.IsEmpty)
+            if (preResolveParent.IsEmpty)
+                flags |= preResolveParent.Flags; //inherits the OpensResolutionScope flag in case of Request.EmptyOpensResolutionScope
+            else
             {
                 var parentServiceInfo = preResolveParent.ServiceTypeOrInfo;
                 if (parentServiceInfo is ServiceInfo ps && ps.Details != null && ps.Details != ServiceDetails.Default)
                     serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(ps.ServiceType, ps.Details, container, preResolveParent.FactoryType);
 
-                flags |= preResolveParent.Flags & InheritedFlags;
+                flags |= preResolveParent.Flags & InheritedFlags; // filter out flags which are not inherited
             }
-            else
-                flags |= preResolveParent.Flags; //inherits the OpensResolutionScope flag
 
-            var inputArgExprs = inputArgs?.Map(a => Constant(a)); // todo: @check what happens if `a == null`, does the `object` type for is fine
+            var inputArgExprs = inputArgs?.Map(static a => Constant(a)); // todo: @check what happens if `a == null`, does the `object` type for is fine
 
             // we are re-starting the dependency depth count from `1`
             var stack = RequestStack.Create();
@@ -9513,7 +9516,7 @@ namespace DryIoc
             Request preResolveParent = null, RequestFlags flags = default, object[] inputArgs = null) =>
             Create(container, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey), preResolveParent, flags, inputArgs);
 
-        /// <summary>Available in runtime only, provides access to container initiated the request.</summary>
+        /// <summary>Available at runtime only, provides an access to container initiated the request.</summary>
         public IContainer Container { get; private set; }
 
         /// <summary>Request immediate parent.</summary>
@@ -9521,22 +9524,27 @@ namespace DryIoc
 
         internal RequestStack RequestStack;
 
-        // mutable because of RequestFlags.AddedToResolutionExpressions
-        /// <summary>Persisted request conditions</summary>
-        public RequestFlags Flags; // todo: @perf combine with the FactoryType or other numeric fields
-
-        // todo: @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via Virtual Calls (and it is a lot)
-        // The field is mutable so that the ServiceKey or IfUnresolved can be changed in place.
+        // todo: @perf should we unpack the info to the ServiceType and Details (or at least the Details), because we are accessing them via virtual calls (and there are a lot)
+        // The field is mutable so that the service details ServiceKey or IfUnresolved can be changed in place.
         internal object ServiceTypeOrInfo; // the Type or the ServiceInfo
+        private Type _actualServiceType; // the actual service type may in fact be the same as ServiceTypeOrInfo
 
         /// <summary>Input arguments provided with `Resolve`</summary>
         internal Expression[] InputArgExprs;
 
-        /// <summary>Runtime known resolve factory, otherwise is <c>null</c></summary>
-        internal Factory Factory => _factoryOrImplType as Factory;
+        /// <summary>Service reuse.</summary>
+        public IReuse Reuse { get; private set; }
+
+        internal object _factoryOrImplType;
+        
+        /// <summary>Constructor selected by the reflection factory</summary>
+        public ConstructorInfo SelectedConstructor { get; internal set; }
 
         /// <summary>Resolved factory ID, used to identify applied decorator.</summary>
         public int FactoryID { get; private set; }
+
+        /// <summary>ID of decorated factory in case of decorator factory type</summary>
+        public int DecoratedFactoryID { get; private set; } // todo: @perf can we remove or combine it with the other fields?
 
         // based on the parent(s) and current request FactoryID
         private int _hashCode; // todo: @perf do we need to calculate and store the hash code if it is not used 
@@ -9544,32 +9552,31 @@ namespace DryIoc
         /// <summary>Type of factory: Service, Wrapper, or Decorator.</summary>
         public FactoryType FactoryType { get; private set; }
 
+        // mutable because of RequestFlags.AddedToResolutionExpressions
+        /// <summary>Persisted request conditions</summary>
+        public RequestFlags Flags; // todo: @perf combine with the FactoryType or other numeric fields
+
+        /// <summary>Number of nested dependencies. Set with each new Push.</summary>
+        public int DependencyDepth; // todo: @perf combine with the DependencyCount or other fields, use the ObjectLayoutInspector to check the layout
+
+        /// <summary>The total dependency count</summary>
+        public int DependencyCount; // todo: @perf combine with the DependencyDepth or other fields
+
         /// <summary>Combines decorator and <see cref="DecoratedFactoryID"/></summary>
         public int CombineDecoratorWithDecoratedFactoryID() => FactoryID | (DecoratedFactoryID << 16);
 
+        /// <summary>Runtime known resolve factory, otherwise is <c>null</c></summary>
+        internal Factory Factory => _factoryOrImplType as Factory;
+
         /// <summary>Service implementation type if known.</summary>
-        public Type ImplementationType => _factoryOrImplType as Type ?? Factory?.ImplementationType;
-
-        internal object _factoryOrImplType;
-
+        public Type ImplementationType => _factoryOrImplType as Type ?? (_factoryOrImplType as Factory)?.ImplementationType;
+        
         /// <summary>Sets the service factory already resolved by the wrapper to save for the future factory resolution</summary>
         public Request WithWrappedServiceFactory(Factory f)
         {
             _factoryOrImplType = f;
             return this;
         }
-
-        /// <summary>Service reuse.</summary>
-        public IReuse Reuse { get; private set; }
-
-        /// <summary>ID of decorated factory in case of decorator factory type</summary>
-        public int DecoratedFactoryID { get; private set; } // todo: @perf can we remove or combine it with the other fields?
-
-        /// <summary>Number of nested dependencies. Set with each new Push.</summary>
-        public int DependencyDepth; // todo: @perf combine with theDependencyCount or other fields, use the ObjectLayoutInspector to check the layout
-
-        /// <summary>The total dependency count</summary>
-        public int DependencyCount; // todo: @perf combine with the DependencyDepth or other fields
 
         internal void DecreaseTrackedDependencyCountForParents(int dependencyCount)
         {
@@ -9642,7 +9649,6 @@ namespace DryIoc
 
         /// <summary>Compatible required or service type.</summary>
         public Type GetActualServiceType() => _actualServiceType;
-        private Type _actualServiceType;
 
         /// <summary>Get the details</summary>
         public ServiceDetails GetServiceDetails() => ServiceTypeOrInfo is ServiceInfo i ? i.Details : ServiceDetails.Default;
@@ -9660,7 +9666,7 @@ namespace DryIoc
         public int ReuseLifespan => Reuse?.Lifespan ?? 0;
 
         /// <summary>Known implementation, or otherwise actual service type.</summary>
-        public Type GetKnownImplementationOrServiceType() => _factoryOrImplType as Type ?? Factory?.ImplementationType ?? _actualServiceType;
+        public Type GetKnownImplementationOrServiceType() => ImplementationType ?? _actualServiceType;
 
         private ref Request GetOrPushPooledRequest(RequestStack stack, int indexInStack)
         {
@@ -10120,8 +10126,9 @@ namespace DryIoc
 
             s.Append(ServiceTypeOrInfo is ParameterInfo pi ? ParameterServiceInfo.Of(pi) : ServiceTypeOrInfo);
 
-            if (Factory != null && Factory is ReflectionFactory == false)
-                s.Append(' ').Append(Factory.GetType().Name).Append(' ');
+            var f = Factory;
+            if (f != null && f is ReflectionFactory == false)
+                s.Append(' ').Append(f.GetType().Name).Append(' ');
 
             if (FactoryID != 0)
                 s.Append(" FactoryId=").Append(FactoryID);
@@ -10250,6 +10257,7 @@ namespace DryIoc
             Flags = flags;
             // resets the factory info:
             _factoryOrImplType = null;
+            SelectedConstructor = null;
             Reuse = null;
             FactoryID = 0;
             DecoratedFactoryID = 0;
@@ -10260,6 +10268,7 @@ namespace DryIoc
         private void SetResolvedFactory(object factoryOrImplType, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
         {
             _factoryOrImplType = factoryOrImplType;
+            SelectedConstructor = null;
             FactoryID = factoryID;
             FactoryType = factoryType;
             Reuse = reuse;
@@ -11830,6 +11839,9 @@ namespace DryIoc
                 var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
                 if (factoryMethod.ResolvedParameterExpressions != null)
                 {
+                    ctor = (ConstructorInfo)ctorOrMember;
+                    request.SelectedConstructor = ctor;
+
                     if (rules.UsedForValidation)
                     {
                         TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
@@ -11837,7 +11849,7 @@ namespace DryIoc
                     }
 
                     var assignements = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
-                    var newExpr = New((ConstructorInfo)ctorOrMember, factoryMethod.ResolvedParameterExpressions);
+                    var newExpr = New(ctor, factoryMethod.ResolvedParameterExpressions);
                     return failedToGetMember ? null : assignements == null ? newExpr : (Expression)MemberInit(newExpr, assignements);
                 }
 
@@ -11846,9 +11858,11 @@ namespace DryIoc
                     return ConvertExpressionIfNeeded(
                         ctorOrMember is PropertyInfo p ? Property(factoryExpr, p) : Field(factoryExpr, (FieldInfo)ctorOrMember), request, ctorOrMember);
 
-                ctor = ctorOrMember as ConstructorInfo;
-                method = ctorOrMember as MethodInfo;
+                ctor = ctorOrMethod as ConstructorInfo;
+                method = ctorOrMethod as MethodInfo;
             }
+
+            request.SelectedConstructor = ctor;
 
             var parameters = ctorOrMethod.GetParameters();
             if (parameters.Length == 0)
