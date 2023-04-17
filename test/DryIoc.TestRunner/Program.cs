@@ -13,6 +13,7 @@ namespace DryIoc.UnitTests
             // todo: @wip
             // new GHIssue565_Is_ignoring_ReuseScoped_setting_expected_behaviour_when_also_set_to_openResolutionScope().Run();
 
+            // new IssuesTests.Samples.DefaultReuseTest().Run();
             // new PropertyResolutionTests().Run();            
             // new GHIssue391_Deadlock_during_Resolve().Run();
             // new GHIssue559_Possible_inconsistent_behaviour().Run();

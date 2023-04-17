@@ -1,0 +1,29 @@
+﻿@page "/upload"
+
+<InputFile OnChange="UploadFile" />
+
+@_newDocumentUploadProgress %
+@code {
+    private double _newDocumentUploadProgress;
+    private async Task UploadFile(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        await using var uploadStream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+        var bytesRead = 0;
+        var totalRead = 0;
+        var buffer = new byte[10];
+        await using var memStream = new MemoryStream();
+
+        while ((bytesRead = await uploadStream.ReadAsync(buffer)) != 0)
+        {
+            totalRead += bytesRead;
+
+            await memStream.WriteAsync(buffer, 0, bytesRead);
+
+            _newDocumentUploadProgress = (totalRead / uploadStream.Length) * 100;
+            StateHasChanged();
+        }
+
+        memStream.Position = 0;
+    }
+}

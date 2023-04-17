@@ -10,7 +10,7 @@
   <ItemGroup>  
     <PackageReference Include="Serilog.AspNetCore" Version="6.1.0" />
 
-    <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="6.1.1" />
+    <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="6.2.0-preview-01" />
     <!-- <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" /> -->
   </ItemGroup>
 
