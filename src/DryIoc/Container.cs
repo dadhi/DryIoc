@@ -39,7 +39,7 @@ namespace DryIoc
     using System.Collections;
     using System.Collections.Generic;
     using System.Diagnostics;              // for StackTrace
-    using System.Diagnostics.CodeAnalysis; // for SuppressMessage
+    using System.Diagnostics.CodeAnalysis; // for SuppressMessage, SetsRequiredPropertiesAttribute
     using System.Linq;
     using System.Reflection;
     using System.Reflection.Emit;
