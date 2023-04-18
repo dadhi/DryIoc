@@ -13,8 +13,10 @@ namespace DryIoc.UnitTests
         {
             Can_inject_required_properties();
             Should_throw_for_unresolved_required_property();
-            Should_skip_required_property_injection_when_using_ctor_with_SetsRequiredProperties();
-            return 3;
+            Should_skip_required_property_injection_when_using_ctor_which_SetsRequiredProperties();
+            Works_with_constructor_selector();
+            Works_with_open_generic_registration_and_constructor_selector_which_SetsRequiredProperties();
+            return 5;
         }
 
         [Test]
@@ -49,7 +51,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Should_skip_required_property_injection_when_using_ctor_with_SetsRequiredProperties()
+        public void Should_skip_required_property_injection_when_using_ctor_which_SetsRequiredProperties()
         {
             var c = new Container(Rules.Default.With(propertiesAndFields: PropertiesAndFields.RequiredProperties()));
             
@@ -62,6 +64,44 @@ namespace DryIoc.UnitTests
 
             Assert.Null(x.A);
             Assert.NotNull(x.B);
+        }
+
+        [Test]
+        public void Works_with_constructor_selector()
+        {
+            var c = new Container(
+                Rules.Default.With(
+                    factoryMethod: FactoryMethod.ConstructorWithResolvableArguments,
+                    propertiesAndFields: PropertiesAndFields.RequiredProperties()));
+            
+            c.Register<SSS>();
+            
+            c.Register<A>();
+            c.Register<B>();
+  
+            var x = c.Resolve<SSS>();
+
+            Assert.NotNull(x.A);
+            Assert.NotNull(x.B);
+        }
+
+        [Test]
+        public void Works_with_open_generic_registration_and_constructor_selector_which_SetsRequiredProperties()
+        {
+            var c = new Container(
+                Rules.Default.With(
+                    factoryMethod: FactoryMethod.ConstructorWithResolvableArguments,
+                    propertiesAndFields: PropertiesAndFields.RequiredProperties()));
+
+            c.Register(typeof(SS<>));
+            c.Register(typeof(B<>));
+            c.Register<A>();
+  
+            var x = c.Resolve<SS<A>>();
+
+            Assert.Null(x.A);
+            Assert.NotNull(x.B);
+            Assert.IsInstanceOf<A>(x.B.A);
         }
 
         public class A {}
@@ -89,6 +129,32 @@ namespace DryIoc.UnitTests
 
             [SetsRequiredMembers]
             public SS(B b) => B = b;
+        }
+
+        public class SSS
+        {
+            public required A A { get; init; }
+            public B B { get; private set; }
+
+            public SSS(B b) => B = b;
+
+            public SSS() => B = null;
+        }
+
+        public class B<T> 
+        {
+            public required T A { get; init; }
+        }
+        
+        public class SS<T>
+        {
+            public required A A { get; init; }
+            public B<T> B { get; private set; }
+
+            [SetsRequiredMembers]
+            public SS(B<T> b) => B = b;
+
+            public SS() => B = null;
         }
 #endif
     }
