@@ -577,6 +577,29 @@ namespace DryIoc.ImTools
             return appendedResults;
         }
 
+        private static R[] Copy<T, R>(this T[] source, int sourcePos, int count, Func<T, R> map)
+        {
+            var results = new R[count];
+            if (count == 1)
+                results[0] = map(source[sourcePos]);
+            else
+                for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                    results[i] = map(source[j]);
+            return results;
+        }
+
+        private static R[] AppendTo<T, R>(this T[] source, R[] results, int sourcePos, int count, Func<T, R> map)
+        {
+            var oldResultsCount = results.Length;
+            Array.Resize(ref results, oldResultsCount + count);
+            if (count == 1)
+                results[oldResultsCount] = map(source[sourcePos]);
+            else
+                for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
+                    results[i] = map(source[j]);
+            return results;
+        }
+
         private static R[] AppendTo<S, T, R>(T[] source, S state, int sourcePos, int count, Func<S, T, R> map, R[] results = null)
         {
             if (results == null || results.Length == 0)
@@ -813,21 +836,26 @@ namespace DryIoc.ImTools
             R[] matches = null;
             var matchFound = false;
 
+            // todo: @perf optimize it for the two dissipate slices case to allocate the result matches once, keep the track of startA, endA, startB, endB of the matches.
             var i = 0;
             for (; i < source.Length; ++i)
                 if (!(matchFound = condition(source[i])))
                 {
                     // for accumulated matched items
                     if (i != 0 && i > matchStart)
-                        matches = AppendTo(source, matchStart, i - matchStart, map, matches);
+                        matches = matches == null 
+                            ? source.Copy(matchStart, i - matchStart, map)
+                            : source.AppendTo(matches, matchStart, i - matchStart, map);
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
 
             // when last match was found but not all items are matched (hence matchStart != 0)
             if (matchFound && matchStart != 0)
-                return AppendTo(source, matchStart, i - matchStart, map, matches);
+                return matches == null 
+                    ? source.Copy(matchStart, i - matchStart, map) 
+                    : source.AppendTo(matches, matchStart, i - matchStart, map);
 
-            return matches ?? (matchStart == 0 ? AppendTo(source, 0, source.Length, map) : Empty<R>());
+            return matches ?? (matchStart == 0 ? source.Copy(0, source.Length, map) : Empty<R>());
         }
 
         /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
