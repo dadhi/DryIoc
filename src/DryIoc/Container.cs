@@ -29,6 +29,9 @@ THE SOFTWARE.
 #if !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47
 #define SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
 #endif
+#if NET7_0_OR_GREATER
+#define SUPPORTS_REQUIRED_PROPERTIES
+#endif
 
 namespace DryIoc
 {
@@ -9271,9 +9274,18 @@ namespace DryIoc
         /// <param name="holder">Holder of property or field.</param> <param name="value">Value to set.</param>
         public abstract void SetValue(object holder, object value);
 
-        /// <summary>Create member info out of provide property or field.</summary>
+        /// <summary>Create property or field service info out of provided member.</summary>
         public static PropertyOrFieldServiceInfo Of(MemberInfo member) =>
             member.ThrowIfNull() is PropertyInfo ? new Property((PropertyInfo)member) : (PropertyOrFieldServiceInfo)new Field((FieldInfo)member);
+
+        /// <summary>Create property service info out of provided property.</summary>
+        public static PropertyOrFieldServiceInfo Of(PropertyInfo property) => new Property(property);
+
+        /// <summary>Create property service info out of provided property with the details of `IfUnresolved.Throw`.</summary>
+        public static PropertyOrFieldServiceInfo OfRequiredProperty(PropertyInfo property) => new Property.RequiredProperty(property);
+
+        /// <summary>Create field service info out of provided property.</summary>
+        public static PropertyOrFieldServiceInfo Of(FieldInfo field) => new Field(field);
 
         private class Property : PropertyOrFieldServiceInfo
         {
@@ -9296,6 +9308,12 @@ namespace DryIoc
                 public override ServiceDetails Details { get; }
                 public WithDetails(PropertyInfo property, ServiceDetails details) : base(property) => Details = details;
                 public WithDetails(PropertyInfo property, Type serviceType, ServiceDetails details) : base(property, serviceType) => Details = details;
+            }
+
+            internal sealed class RequiredProperty : Property
+            {
+                public override ServiceDetails Details => ServiceDetails.Default; // with IfUnresolved.Throw
+                public RequiredProperty(PropertyInfo property) : base(property) {}
             }
         }
 
@@ -11275,6 +11293,35 @@ namespace DryIoc
             bool withNonPublic = false, bool withBase = false,
             IfUnresolved ifUnresolved = IfUnresolved.ReturnDefaultIfNotRegistered) =>
             All(withNonPublic: withNonPublic, withPrimitive: false, withFields: false, withBase: withBase, ifUnresolved: ifUnresolved);
+
+#if SUPPORTS_REQUIRED_PROPERTIES
+        /// <summary>The rule to discover and inject the `required properties` introduced in C# 11 and .NET 7.
+        /// The properties are only injected if the constructor selected for the injection is NOT marked with `SetsRequiredMembers`,
+        /// because it says the constuctor is reponsible for the setting of required properties.</summary>
+        public static PropertiesAndFieldsSelector RequiredProperties() => _requiredProperties;
+
+        // We are keeping it as the field internally 
+        // and still using the public accessor method to be consistent with the rest of the PropertiesAndFields API.
+        private static readonly PropertiesAndFieldsSelector _requiredProperties = req =>
+        {
+            var implType = req.ImplementationType;
+            if (implType == null)
+                return null;
+
+            var ctor = req.SelectedConstructor;
+            if (ctor != null && ctor.GetCustomAttribute<SetsRequiredMembersAttribute>() != null)
+                return null;
+
+            var props = implType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (props.Length == 0)
+                return null;
+
+            var requiredProps = props.Match(
+                p => p.GetCustomAttribute<RequiredMemberAttribute>() != null,
+                p => PropertyOrFieldServiceInfo.OfRequiredProperty(p));
+            return requiredProps;
+        };
+#endif
 
         /// <summary>Should return service info for input member (property or field).</summary>
         public delegate PropertyOrFieldServiceInfo GetServiceInfo(MemberInfo member, Request request);
@@ -14836,9 +14883,9 @@ namespace DryIoc
         {
             var typeInfo = type.GetTypeInfo();
             var members = getMembers(typeInfo);
-            if (!includeBase || typeInfo.BaseType == null || typeInfo.BaseType == typeof(object))
-                return members;
-            return members.Append(typeInfo.BaseType.GetMembers(getMembers, true));
+            return !includeBase || typeInfo.BaseType == null || typeInfo.BaseType == typeof(object)
+                ? members
+                : members.Append(typeInfo.BaseType.GetMembers(getMembers, true));
         }
 
         /// <summary>Returns all public instance constructors for the type</summary>
