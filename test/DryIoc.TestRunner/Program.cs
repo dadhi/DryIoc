@@ -8,9 +8,9 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            RunAllTests();
+            // RunAllTests();
 
-            // new RequiredPropertiesTests().Run();            
+            new RequiredPropertiesTests().Run();            
 
             // todo: @wip
             // new GHIssue565_Is_ignoring_ReuseScoped_setting_expected_behaviour_when_also_set_to_openResolutionScope().Run();

@@ -11,7 +11,8 @@ namespace DryIoc.UnitTests
         public int Run()
         {
             Can_inject_required_properties();
-            return 1;
+            Should_throw_for_unresolved_required_property();
+            return 2;
         }
 
         [Test]
@@ -32,6 +33,17 @@ namespace DryIoc.UnitTests
             Assert.NotNull(x.B);
             Assert.NotNull(x.C);
             Assert.NotNull(x.DD);
+        }
+
+        [Test]
+        public void Should_throw_for_unresolved_required_property()
+        {
+            var c = new Container(Rules.Default.With(propertiesAndFields: PropertiesAndFields.RequiredProperties()));
+            
+            c.Register<BS>();
+  
+            var ex = Assert.Throws<ContainerException>(() => c.Resolve<BS>());
+            Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), ex.ErrorName);
         }
 
         public class A {}
