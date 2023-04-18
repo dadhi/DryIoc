@@ -2,7 +2,7 @@
 setlocal EnableDelayedExpansion
 
 dotnet clean -v:m
-dotnet build -c:Release -v:m -p:DevMode=false
+dotnet build -c:Release -v:m
 if %ERRORLEVEL% neq 0 goto :error
 
 echo:
@@ -19,7 +19,7 @@ echo:
 echo:## Starting: TESTS...
 echo: 
 
-dotnet test --no-build -c:Release -p:DevMode=false
+dotnet test --no-build -c:Release
 
 
 if %ERRORLEVEL% neq 0 goto :error

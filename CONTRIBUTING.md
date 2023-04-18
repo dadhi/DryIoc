@@ -55,10 +55,8 @@ Make sure that there are no project build errors or failing tests.
 Open `DryIoc.sln` solution and re-build it. If something is failing you may try to close VS, run `build.bat` in the root folder, open VS and try to build again.
 
 __Note:__ DryIoc targets multiple platforms (via msbuild project multi-targeting) which makes it slower to build. 
-To speedup the development DryIoc has `<DevMode>true</DevMode>` (TODO: Point to change) MSBuild property set to `true` in `Directory.Build.props` file in the root folder. 
-This setting minimizes the number of platforms to build - that's why you need to run `build.bat` to test your work for all platforms.
 
-__Productivity hint:__ I am using [NCrunch](http://www.ncrunch.net/) extension to build and run the tests continuously to get an immediate feedback, quickly find regressions, and generally experiment with the code.
+__Productivity hint:__ I am using [NCrunch](http://www.ncrunch.net/) extension for the MS Visual Studio to build and run the tests continuously and to get the immediate feedback, quickly find regressions, and generally experiment with the code.
 
 ### Develop in Visual Studio Code
 
