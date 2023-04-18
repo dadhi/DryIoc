@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using Castle.Core.Internal;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -30,7 +29,7 @@ namespace DryIoc.IssuesTests
 
         public static ISomeServiceClient CreateClient(DataStore dataStore, string forceToken = null)
         {
-            if (!forceToken.IsNullOrEmpty())
+            if (!string.IsNullOrEmpty(forceToken))
                 return new MyClient(forceToken);
             var defaultClient = dataStore.Accounts.First(a => a.IsDefault);
             return new MyClient(defaultClient.Token);
