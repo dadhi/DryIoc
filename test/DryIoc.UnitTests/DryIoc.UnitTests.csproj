@@ -1,8 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-      <TargetFrameworks Condition="'$(DevMode)' == 'true'">netcoreapp3.1</TargetFrameworks>
-      <TargetFrameworks Condition="'$(DevMode)' != 'true'">netcoreapp3.1;net45</TargetFrameworks>
+      <TargetFrameworks>net45;net7.0</TargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>

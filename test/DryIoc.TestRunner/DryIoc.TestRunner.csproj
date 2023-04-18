@@ -2,14 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <IsTestProject>false</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj" />
-    <PackageReference Include="ObjectLayoutInspector" Version="0.1.2" />
+    <PackageReference Include="ObjectLayoutInspector" Version="0.1.4" />
   </ItemGroup>
 
 </Project>
