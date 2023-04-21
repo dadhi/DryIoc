@@ -517,64 +517,15 @@ namespace DryIoc.ImTools
                     action(source[i]);
         }
 
-        /// Appends source to results
-        public static T[] AppendTo<T>(T[] source, int sourcePos, int count, T[] results = null)
+        /// <summary>Copies the slice to the new array, just a sugar extension method</summary>
+        public static T[] Copy<T>(this T[] source, int sourcePos, int count)
         {
-            if (results == null)
-            {
-                var newResults = new T[count];
-                if (count == 1)
-                    newResults[0] = source[sourcePos];
-                else
-                    for (int i = 0, j = sourcePos; i < count; ++i, ++j)
-                        newResults[i] = source[j];
-                return newResults;
-            }
-
-            var matchCount = results.Length;
-            var appendedResults = new T[matchCount + count];
-            if (matchCount == 1)
-                appendedResults[0] = results[0];
-            else
-                Array.Copy(results, 0, appendedResults, 0, matchCount);
-
+            var results = new T[count];
             if (count == 1)
-                appendedResults[matchCount] = source[sourcePos];
+                results[0] = source[sourcePos];
             else
-                Array.Copy(source, sourcePos, appendedResults, matchCount, count);
-
-            return appendedResults;
-        }
-
-        private static R[] AppendTo<T, R>(T[] source, int sourcePos, int count, Func<T, R> map, R[] results = null)
-        {
-            if (results == null || results.Length == 0)
-            {
-                var newResults = new R[count];
-                if (count == 1)
-                    newResults[0] = map(source[sourcePos]);
-                else
-                    for (int i = 0, j = sourcePos; i < count; ++i, ++j)
-                        newResults[i] = map(source[j]);
-                return newResults;
-            }
-
-            var oldResultsCount = results.Length;
-            var appendedResults = new R[oldResultsCount + count];
-            if (oldResultsCount == 1)
-                appendedResults[0] = results[0];
-            else
-                Array.Copy(results, 0, appendedResults, 0, oldResultsCount);
-
-            if (count == 1)
-                appendedResults[oldResultsCount] = map(source[sourcePos]);
-            else
-            {
-                for (int i = oldResultsCount, j = sourcePos; i < appendedResults.Length; ++i, ++j)
-                    appendedResults[i] = map(source[j]);
-            }
-
-            return appendedResults;
+                Array.Copy(source, sourcePos, results, 0, count);
+            return results;
         }
 
         private static R[] Copy<T, R>(this T[] source, int sourcePos, int count, Func<T, R> map)
@@ -585,6 +536,40 @@ namespace DryIoc.ImTools
             else
                 for (int i = 0, j = sourcePos; i < count; ++i, ++j)
                     results[i] = map(source[j]);
+            return results;
+        }
+
+        private static R[] Copy<S, T, R>(this T[] source, S state, int sourcePos, int count, Func<S, T, R> map)
+        {
+            var results = new R[count];
+            if (count == 1)
+                results[0] = map(state, source[sourcePos]);
+            else
+                for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                    results[i] = map(state, source[j]);
+            return results;
+        }
+
+        private static R[] Copy<A, B, T, R>(this T[] source, A a, B b, int sourcePos, int count, Func<A, B, T, R> map)
+        {
+            var results = new R[count];
+            if (count == 1)
+                results[0] = map(a, b, source[sourcePos]);
+            else
+                for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                    results[i] = map(a, b, source[j]);
+            return results;
+        }
+
+        /// <summary>Appends the slice from the source to the end of the results array possibly the resizing the results to accomodate the slice</summary>
+        public static T[] AppendTo<T>(this T[] source, T[] results, int sourcePos, int count)
+        {
+            var oldResultsCount = results.Length;
+            Array.Resize(ref results, oldResultsCount + count);
+            if (count == 1)
+                results[oldResultsCount] = source[sourcePos];
+            else
+                Array.Copy(source, sourcePos, results, oldResultsCount, count);
             return results;
         }
 
@@ -600,68 +585,31 @@ namespace DryIoc.ImTools
             return results;
         }
 
-        private static R[] AppendTo<S, T, R>(T[] source, S state, int sourcePos, int count, Func<S, T, R> map, R[] results = null)
+        private static R[] AppendTo<S, T, R>(this T[] source, S state, R[] results, int sourcePos, int count, Func<S, T, R> map)
         {
-            if (results == null || results.Length == 0)
-            {
-                var newResults = new R[count];
-                if (count == 1)
-                    newResults[0] = map(state, source[sourcePos]);
-                else
-                    for (int i = 0, j = sourcePos; i < count; ++i, ++j)
-                        newResults[i] = map(state, source[j]);
-                return newResults;
-            }
-
             var oldResultsCount = results.Length;
-            var appendedResults = new R[oldResultsCount + count];
-            if (oldResultsCount == 1)
-                appendedResults[0] = results[0];
-            else
-                Array.Copy(results, 0, appendedResults, 0, oldResultsCount);
-
+            Array.Resize(ref results, oldResultsCount + count);
             if (count == 1)
-                appendedResults[oldResultsCount] = map(state, source[sourcePos]);
+                results[oldResultsCount] = map(state, source[sourcePos]);
             else
-            {
-                for (int i = oldResultsCount, j = sourcePos; i < appendedResults.Length; ++i, ++j)
-                    appendedResults[i] = map(state, source[j]);
-            }
-
-            return appendedResults;
+                for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
+                    results[i] = map(state, source[j]);
+            return results;
         }
 
-        private static R[] AppendTo<A, B, T, R>(T[] source, A a, B b, int sourcePos, int count, Func<A, B, T, R> map, R[] results = null)
+        private static R[] AppendTo<A, B, T, R>(this T[] source, A a, B b, R[] results, int sourcePos, int count, Func<A, B, T, R> map)
         {
-            if (results == null || results.Length == 0)
-            {
-                var newResults = new R[count];
-                if (count == 1)
-                    newResults[0] = map(a, b, source[sourcePos]);
-                else
-                    for (int i = 0, j = sourcePos; i < count; ++i, ++j)
-                        newResults[i] = map(a, b, source[j]);
-                return newResults;
-            }
-
             var oldResultsCount = results.Length;
-            var appendedResults = new R[oldResultsCount + count];
-            if (oldResultsCount == 1)
-                appendedResults[0] = results[0];
-            else
-                Array.Copy(results, 0, appendedResults, 0, oldResultsCount);
-
+            Array.Resize(ref results, oldResultsCount + count);
             if (count == 1)
-                appendedResults[oldResultsCount] = map(a, b, source[sourcePos]);
+                results[oldResultsCount] = map(a, b, source[sourcePos]);
             else
-            {
-                for (int i = oldResultsCount, j = sourcePos; i < appendedResults.Length; ++i, ++j)
-                    appendedResults[i] = map(a, b, source[j]);
-            }
-
-            return appendedResults;
+                for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
+                    results[i] = map(a, b, source[j]);
+            return results;
         }
 
+        // todo: @perf look into MatchExperiments.cs and the benchmarks there
         /// <summary>Where method similar to Enumerable.Where but more performant and non necessary allocating.
         /// It returns source array and does Not create new one if all items match the condition.</summary>
         public static T[] Match<T>(this T[] source, Func<T, bool> condition)
@@ -700,13 +648,17 @@ namespace DryIoc.ImTools
                 {
                     // for accumulated matched items
                     if (i != 0 && i > matchStart)
-                        matches = AppendTo(source, matchStart, i - matchStart, matches);
+                        matches = matches == null 
+                            ? source.Copy(matchStart, i - matchStart)
+                            : source.AppendTo(matches, matchStart, i - matchStart);
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
 
             // when last match was found but not all items are matched (hence matchStart != 0)
             if (matchFound && matchStart != 0)
-                return AppendTo(source, matchStart, i - matchStart, matches);
+                return matches == null 
+                    ? source.Copy(matchStart, i - matchStart) 
+                    : source.AppendTo(matches, matchStart, i - matchStart);
 
             return matches ?? (matchStart != 0 ? Empty<T>() : source);
         }
@@ -749,13 +701,17 @@ namespace DryIoc.ImTools
                 {
                     // for accumulated matched items
                     if (i != 0 && i > matchStart)
-                        matches = AppendTo(source, matchStart, i - matchStart, matches);
+                        matches = matches == null 
+                            ? source.Copy(matchStart, i - matchStart)
+                            : source.AppendTo(matches, matchStart, i - matchStart);
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
 
             // when last match was found but not all items are matched (hence matchStart != 0)
             if (matchFound && matchStart != 0)
-                return AppendTo(source, matchStart, i - matchStart, matches);
+                return matches == null 
+                    ? source.Copy(matchStart, i - matchStart) 
+                    : source.AppendTo(matches, matchStart, i - matchStart);
 
             return matches ?? (matchStart != 0 ? Empty<T>() : source);
         }
@@ -786,13 +742,17 @@ namespace DryIoc.ImTools
                 {
                     // for accumulated matched items
                     if (i != 0 && i > matchStart)
-                        matches = AppendTo(source, matchStart, i - matchStart, matches);
+                        matches = matches == null 
+                            ? source.Copy(matchStart, i - matchStart)
+                            : source.AppendTo(matches, matchStart, i - matchStart);
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
 
             // when last match was found but not all items are matched (hence matchStart != 0)
             if (matchFound && matchStart != 0)
-                return AppendTo(source, matchStart, i - matchStart, matches);
+                return matches == null 
+                    ? source.Copy(matchStart, i - matchStart) 
+                    : source.AppendTo(matches, matchStart, i - matchStart);
 
             return matches ?? (matchStart != 0 ? Empty<T>() : source);
         }
@@ -837,6 +797,7 @@ namespace DryIoc.ImTools
             var matchFound = false;
 
             // todo: @perf optimize it for the two dissipate slices case to allocate the result matches once, keep the track of startA, endA, startB, endB of the matches.
+            // todo: @perf can we allocate +1, +2 items in the array and avoid the allocation?
             var i = 0;
             for (; i < source.Length; ++i)
                 if (!(matchFound = condition(source[i])))
@@ -905,15 +866,19 @@ namespace DryIoc.ImTools
                 {
                     // for accumulated matched items
                     if (i != 0 && i > matchStart)
-                        matches = AppendTo(source, state, matchStart, i - matchStart, map, matches);
+                        matches = matches == null 
+                            ? source.Copy(state, matchStart, i - matchStart, map)
+                            : source.AppendTo(state, matches, matchStart, i - matchStart, map);
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
 
             // when last match was found but not all items are matched (hence matchStart != 0)
             if (matchFound && matchStart != 0)
-                return AppendTo(source, state, matchStart, i - matchStart, map, matches);
+                return matches == null
+                    ? source.Copy(state, matchStart, i - matchStart, map) 
+                    : source.AppendTo(state, matches, matchStart, i - matchStart, map);
 
-            return matches ?? (matchStart == 0 ? AppendTo(source, state, 0, source.Length, map) : Empty<R>());
+            return matches ?? (matchStart == 0 ? source.Copy(state, 0, source.Length, map) : Empty<R>());
         }
 
         /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
@@ -951,15 +916,20 @@ namespace DryIoc.ImTools
                 {
                     // for accumulated matched items
                     if (i != 0 && i > matchStart)
-                        matches = AppendTo(source, a, b, matchStart, i - matchStart, map, matches);
+                        matches = matches == null 
+                            ? source.Copy(a, b, matchStart, i - matchStart, map)
+                            : source.AppendTo(a, b, matches, matchStart, i - matchStart, map);
+
                     matchStart = i + 1; // guess the next match start will be after the non-matched item
                 }
 
             // when last match was found but not all items are matched (hence matchStart != 0)
             if (matchFound && matchStart != 0)
-                return AppendTo(source, a, b, matchStart, i - matchStart, map, matches);
+                return matches == null
+                    ? source.Copy(a, b, matchStart, i - matchStart, map) 
+                    : source.AppendTo(a, b, matches, matchStart, i - matchStart, map);
 
-            return matches ?? (matchStart == 0 ? AppendTo(source, a, b, 0, source.Length, map) : Empty<R>());
+            return matches ?? (matchStart == 0 ? source.Copy(a, b, 0, source.Length, map) : Empty<R>());
         }
 
         /// <summary>Maps all items from source to result array.</summary>
