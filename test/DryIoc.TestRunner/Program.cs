@@ -10,15 +10,13 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
-            // todo: @wip
-            // new GHIssue565_Is_ignoring_ReuseScoped_setting_expected_behaviour_when_also_set_to_openResolutionScope().Run();
-
             // new RequiredPropertiesTests().Run();            
             // new PropertyResolutionTests().Run();            
             // new IssuesTests.Samples.DefaultReuseTest().Run();
             // new GHIssue391_Deadlock_during_Resolve().Run();
             // new GHIssue559_Possible_inconsistent_behaviour().Run();
             // new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed().Run();
+            // new GHIssue565_Is_ignoring_ReuseScoped_setting_expected_behaviour_when_also_set_to_openResolutionScope().Run();
             // new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules().Run();
             // new GHIssue554_System_NullReferenceException_Object_reference_not_set_to_an_instance_of_an_object().Run();
             // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
@@ -81,6 +79,7 @@ namespace DryIoc.UnitTests
                 new GHIssue546_Generic_type_constraint_resolution_doesnt_see_arrays_as_IEnumerable(),
                 new GHIssue554_System_NullReferenceException_Object_reference_not_set_to_an_instance_of_an_object(),
                 new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules(),
+                new GHIssue565_Is_ignoring_ReuseScoped_setting_expected_behaviour_when_also_set_to_openResolutionScope(),
                 new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed(),
                 new GHIssue559_Possible_inconsistent_behaviour(),
             };
