@@ -61,6 +61,14 @@ namespace DryIoc.IssuesTests
             });
         }
 
+        public sealed class ToAnyScopeExceptResolutionScopeOf<T> : IScopeName
+        {
+            public static readonly IScopeName Instance = new ToAnyScopeExceptResolutionScopeOf<T>();
+            private ToAnyScopeExceptResolutionScopeOf() {}
+            public bool Match(object scopeName) => 
+                scopeName is not ResolutionScopeName rn || rn.ServiceType != typeof(T);
+        }
+
         [Test]
         public void TestScope_One()
         {
@@ -70,7 +78,7 @@ namespace DryIoc.IssuesTests
             /// even though it has opened a new scope internally.
             var container = new Container();
             container.Register<ICar, Car>(setup: Setup.With(openResolutionScope: true), reuse: Reuse.Transient);
-            container.Register<IBar, Bar>(setup: Setup.With(openResolutionScope: true), reuse: Reuse.ScopedTo<ICar>());
+            container.Register<IBar, Bar>(setup: Setup.With(openResolutionScope: true), reuse: Reuse.ScopedTo(ToAnyScopeExceptResolutionScopeOf<IBar>.Instance));
             container.Register<IFoo, Foo>(Reuse.Singleton);
             container.Resolve<ICar>().GetId();
             var car = container.Resolve<ICar>();
@@ -241,7 +249,7 @@ namespace DryIoc.IssuesTests
             _guidArray[3] = (nameof(ICar), _id);
             _guidArray[4] = (nameof(IBar), container.Resolve<IBar>().GetId());
             _guidArray[5] = (nameof(IFoo), container.Resolve<IBar>().GetFooId());
-            using (var scope = container.OpenScope(ResolutionScopeName.Of<ICar>()))
+            using (var scope = container.OpenScope())
             {
                 //// 3 in new scope. IBar should have new id and be the same instance for each resolution.
                 _guidArray[6] = (nameof(ICar), _id);
