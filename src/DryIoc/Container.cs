@@ -13661,6 +13661,21 @@ namespace DryIoc
         bool Match(object scopeName);
     }
 
+    /// <summary>Custom name matcher via the provided function. 
+    /// It may be used as a negative check, e.g. to avoid cirtain scopes and proceed to search for the specific parent scope.</summary>
+    public sealed class ScopeName : IScopeName
+    {
+        /// <summary>Constucts the scope name matches based on the user-provided predicate</summary>
+        public static ScopeName Of(Func<object, bool> matchPredicate) => new ScopeName(matchPredicate);
+
+        /// <summary>The match precicate</summary>
+        public readonly Func<object, bool> MatchPredicate;
+        private ScopeName(Func<object, bool> matchPredicate) => MatchPredicate = matchPredicate;
+
+        /// <inheritdoc />
+        public bool Match(object scopeName) => MatchPredicate(scopeName);
+    }
+
     /// <summary>Represents multiple names</summary>
     public sealed class CompositeScopeName : IScopeName
     {
@@ -13714,16 +13729,11 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
-        public bool Match(object scopeName)
-        {
-            var name = scopeName as ResolutionScopeName;
-            return name != null &&
-                   (ServiceType == null ||
-                   name.ServiceType.IsAssignableTo(ServiceType) ||
-                   ServiceType.IsOpenGeneric() &&
-                   name.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) &&
-                   (ServiceKey == null || ServiceKey.Equals(name.ServiceKey));
-        }
+        public bool Match(object scopeName) => 
+            scopeName is ResolutionScopeName name &&
+                (ServiceType == null || name.ServiceType.IsAssignableTo(ServiceType) ||
+                ServiceType.IsOpenGeneric() && name.ServiceType.GetGenericDefinitionOrNull().IsAssignableTo(ServiceType)) &&
+                (ServiceKey == null || ServiceKey.Equals(name.ServiceKey));
 
         /// <summary>String representation for easy debugging and understood error messages.</summary>
         public override string ToString()

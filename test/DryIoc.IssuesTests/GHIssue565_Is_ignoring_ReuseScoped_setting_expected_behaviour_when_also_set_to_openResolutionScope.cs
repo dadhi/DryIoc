@@ -10,8 +10,9 @@ namespace DryIoc.IssuesTests
         {
             TestScope_Zero();
             TestScope_One();
+            TestScope_One_WithScopeNameOf();
             TestScope_Two();
-            return 3;
+            return 4;
         }
 
         [Test]
@@ -61,10 +62,10 @@ namespace DryIoc.IssuesTests
             });
         }
 
-        public sealed class ToAnyScopeExceptResolutionScopeOf<T> : IScopeName
+        public sealed class AnyScopeExceptResolutionScopeOf<T> : IScopeName
         {
-            public static readonly IScopeName Instance = new ToAnyScopeExceptResolutionScopeOf<T>();
-            private ToAnyScopeExceptResolutionScopeOf() {}
+            public static readonly IScopeName Instance = new AnyScopeExceptResolutionScopeOf<T>();
+            private AnyScopeExceptResolutionScopeOf() {}
             public bool Match(object scopeName) => 
                 scopeName is not ResolutionScopeName rn || rn.ServiceType != typeof(T);
         }
@@ -78,7 +79,61 @@ namespace DryIoc.IssuesTests
             /// even though it has opened a new scope internally.
             var container = new Container();
             container.Register<ICar, Car>(setup: Setup.With(openResolutionScope: true), reuse: Reuse.Transient);
-            container.Register<IBar, Bar>(setup: Setup.With(openResolutionScope: true), reuse: Reuse.ScopedTo(ToAnyScopeExceptResolutionScopeOf<IBar>.Instance));
+            container.Register<IBar, Bar>(setup: Setup.With(openResolutionScope: true), reuse: Reuse.ScopedTo(AnyScopeExceptResolutionScopeOf<IBar>.Instance));
+            container.Register<IFoo, Foo>(Reuse.Singleton);
+            container.Resolve<ICar>().GetId();
+            var car = container.Resolve<ICar>();
+            // Get guid id for each class and guid store array
+            var iCarId = (nameof(ICar), car.GetId());
+            var iBarId = (nameof(IBar), car.GetBarId());
+            var iFooId = (nameof(IFoo), car.GetFooId());
+            var IdArray = car.GetIdArray();
+            Assert.Multiple(() =>
+            {
+                // Assert that each name id pair matches with that stored
+                // in the first three elements of the array
+                Assert.That(IdArray[0], Is.EqualTo(iCarId));
+                Assert.That(IdArray[1], Is.EqualTo(iBarId));
+                Assert.That(IdArray[2], Is.EqualTo(iFooId));
+                // Assert that each name id pair matches with each again.
+                // IBar and IFoo have been resolved from container in ICar class.
+                // IBar should be the same: Fail!!
+                Assert.That(IdArray[3], Is.EqualTo(iCarId));
+                Assert.That(IdArray[4], Is.EqualTo(iBarId));
+                Assert.That(IdArray[5], Is.EqualTo(iFooId));
+                // New Scope is opened in ICar. Check if ICar and IFoo is the Same
+                // but IBar should be new ID. 
+                Assert.That(IdArray[6], Is.EqualTo(iCarId));
+                Assert.That(IdArray[7], !Is.EqualTo(iBarId));
+                Assert.That(IdArray[8], Is.EqualTo(iFooId));
+                // Assert that each name id pair matches with each again.
+                // IBar should still be new ID. but should resolve twice
+                // and be the same as the id from Array index 7 : Fail!!
+                Assert.That(IdArray[9], Is.EqualTo(iCarId));
+                Assert.That(IdArray[10], !Is.EqualTo(iBarId));
+                Assert.That(IdArray[10], Is.EqualTo(IdArray[7]));
+                Assert.That(IdArray[11], Is.EqualTo(iFooId));
+                // Assert that each name id pair matches with each again.
+                // IBar Should match the original Ibar Id. Fail!!
+                Assert.That(IdArray[12], Is.EqualTo(iCarId));
+                Assert.That(IdArray[13], Is.EqualTo(iBarId));
+                Assert.That(IdArray[14], Is.EqualTo(iFooId));
+            });
+        }
+
+        [Test]
+        public void TestScope_One_WithScopeNameOf()
+        {
+            /// This Test Fails when IBar is registered with openResolutionScope: true.
+            /// When iBar is Resolved it is resolved with a new instance each time.
+            /// My expectation is that is is still scoped to which ever scope it was resolved to
+            /// even though it has opened a new scope internally.
+            var container = new Container();
+            container.Register<ICar, Car>(setup: Setup.With(openResolutionScope: true), reuse: Reuse.Transient);
+
+            var anyScopeExceptBar = ScopeName.Of(n => n is not ResolutionScopeName rn || rn.ServiceType != typeof(IBar));
+            container.Register<IBar, Bar>(setup: Setup.With(openResolutionScope: true), reuse: Reuse.ScopedTo(anyScopeExceptBar));
+
             container.Register<IFoo, Foo>(Reuse.Singleton);
             container.Resolve<ICar>().GetId();
             var car = container.Resolve<ICar>();
