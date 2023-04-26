@@ -26,7 +26,7 @@ The reason for that is the singletons are created once and the one-time interpre
 - Delegate compilation is 100x slower than the interpretation.
 
 That's mean you need **once** to spend 100x more time than interpretation to get 10x boost, 
-and DryIoc by default is not paying this price.
+and DryIoc **by default **is not paying this price for the first resolution (assuming that you may not even require the second resolution, and if the second one happens, that's fine, let's pay the price).
 
 
 ## Rules.WithUseInterpretation
