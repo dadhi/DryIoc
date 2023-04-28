@@ -10,7 +10,9 @@ namespace DryIoc.UnitTests
         public static void Main()
         {
             RunAllTests();
-
+            
+            // new ActionTests().Run();
+            // new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
             // new GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
             // new GHIssue550_Use_not_working_for_scoped_type_after_having_resolved_it_in_another_scope().Run();
             // new GHIssue546_Generic_type_constraint_resolution_doesnt_see_arrays_as_IEnumerable().Run();
