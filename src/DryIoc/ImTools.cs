@@ -242,7 +242,7 @@ namespace DryIoc.ImTools
         public static T[] CopyNonEmpty<T>(this T[] source)
         {
             var copy = new T[source.Length];
-            Array.Copy(source, 0, copy, 0, source.Length);
+            Array.Copy(source, copy, source.Length);
             return copy;
         }
 
