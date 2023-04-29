@@ -1,9 +1,6 @@
 using System;
 using NUnit.Framework;
 
-#nullable enable
-using JetBrains.Lifetimes;
-
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
@@ -22,8 +19,7 @@ namespace DryIoc.IssuesTests
 
             // Resolver should receive type name of original requester
             c.Register<LifetimeResolver>(
-                made: Parameters.Of.Type<string>(r => 
-                    r.Parent.Parent.ImplementationType.Name),
+                made: Parameters.Of.Type<string>(r => r.Parent.Parent.ImplementationType.Name),
                 setup: Setup.With(trackDisposableTransient: true));
 
             c.Register<Lifetime>(Reuse.Scoped,
@@ -47,25 +43,25 @@ namespace DryIoc.IssuesTests
 
         public class LifetimeResolver : IDisposable
         {
-            private string? _id;
-            private LifetimeDefinition? _def;
+            private string _id;
+            public LifetimeResolver(string id) => _id = id;
 
-            public LifetimeResolver(string? id)
-            {
-                _id = id;
-            }
-
+            private Lifetime _lifetime;
             public Lifetime GetValue()
             {
-                if (_def is null)
-                {
-                    _def = Lifetime.Define(Lifetime.Eternal, _id, (Action<LifetimeDefinition>?)default);
-                }
-
-                return _def.Lifetime;
+                if (_lifetime is null)
+                    _lifetime = new Lifetime(_id);
+                return _lifetime;
             }
 
-            public void Dispose() => _def?.Terminate();
+            public void Dispose() => _lifetime?.Terminate();
+        }
+
+        public class Lifetime
+        {
+            public string Id;
+            public Lifetime(string id) => Id = id;
+            internal void Terminate() {}
         }
 
         public abstract class L

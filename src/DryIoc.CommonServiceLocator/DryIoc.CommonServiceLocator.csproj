@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>netstandard2.0</TargetFramework>
+        <TargetFrameworks>netstandard2.0;net7.0</TargetFrameworks>
 
         <Product>DryIoc.CommonServiceLocator</Product>
         <VersionPrefix>5.0.0</VersionPrefix>
@@ -24,7 +24,7 @@ v5.0.0:
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="CommonServiceLocator" Version="2.0.5" />
+        <PackageReference Include="CommonServiceLocator" Version="2.0.7" />
     </ItemGroup>
 
     <ItemGroup>

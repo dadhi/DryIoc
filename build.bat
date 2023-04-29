@@ -2,26 +2,27 @@
 setlocal EnableDelayedExpansion
 
 dotnet clean -v:m
-dotnet build -c:Release -v:m -p:DevMode=false
+dotnet build -c:Release -v:m
 if %ERRORLEVEL% neq 0 goto :error
 
 echo:
 echo:## Finished: RESTORE and BUILD
 echo:
-@REM echo:## Starting: TestRunner... ##
-@REM echo:
+echo:## Starting: TestRunner...
+echo:
 
-@REM dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
-@REM if %ERRORLEVEL% neq 0 goto :error
-@REM dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
+dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+if %ERRORLEVEL% neq 0 goto :error
+dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
+if %ERRORLEVEL% neq 0 goto :error
 
-@REM if %ERRORLEVEL% neq 0 goto :error
-@REM echo:## Finished: TestRunner ##
-@REM echo:
+echo:
+echo:## Finished: TestRunner
+echo:
 echo:## Starting: TESTS...
 echo: 
 
-dotnet test --no-build -c:Release -p:DevMode=false
+dotnet test --no-build -c:Release
 
 
 if %ERRORLEVEL% neq 0 goto :error

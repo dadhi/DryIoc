@@ -2,7 +2,7 @@
 setlocal EnableDelayedExpansion
 
 echo:
-echo:# Build the TestRunner (.NET 6 only)
+echo:# Build the TestRunner (.NET 7 only)
 echo:
 
 dotnet build -c Release test/DryIoc.TestRunner/DryIoc.TestRunner.csproj

@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ObjectLayoutInspector" Version="0.1.2" />
+    <PackageReference Include="ObjectLayoutInspector" Version="0.1.4" />
   </ItemGroup>
 
 </Project>

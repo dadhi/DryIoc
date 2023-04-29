@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>netstandard2.0;net6.0</TargetFrameworks>
+        <TargetFrameworks>netstandard2.0;net6.0;net7.0</TargetFrameworks>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
 
-        <VersionPrefix>7.0.0-preview-01</VersionPrefix>
+        <VersionPrefix>7.0.0-preview-02</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -18,6 +18,7 @@
 <![CDATA[
 ## v7.0.0
 
+- directly supporting .NET 6.0 and .NET 7.0
 - updated to Ms.Extensions.DependencyInjection.Abstractions to v7.0.0
 - breaking: Remove `DryIocServiceScopeFactory` as not used anymore and replaced by `DryIocCapabilities`
 - changing: Make `DryIocServiceProviderFactory.CreateServiceProvider` virtual to allow customizations, see #539

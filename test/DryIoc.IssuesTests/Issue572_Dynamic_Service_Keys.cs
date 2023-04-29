@@ -1,13 +1,18 @@
 using System.Collections.Generic;
 using System.Linq;
-using Castle.Core.Internal;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue572_Dynamic_Service_Keys
+    public class Issue572_Dynamic_Service_Keys : ITest
     {
+        public int Run()
+        {
+            Can_provide_argument_both_with_the_factory_and_via_Resolve();
+            return 1;
+        }
+
         [Test]
         public void Can_provide_argument_both_with_the_factory_and_via_Resolve()
         {
@@ -30,7 +35,7 @@ namespace DryIoc.IssuesTests
 
         public static ISomeServiceClient CreateClient(DataStore dataStore, string forceToken = null)
         {
-            if (!forceToken.IsNullOrEmpty())
+            if (!string.IsNullOrEmpty(forceToken))
                 return new MyClient(forceToken);
             var defaultClient = dataStore.Accounts.First(a => a.IsDefault);
             return new MyClient(defaultClient.Token);

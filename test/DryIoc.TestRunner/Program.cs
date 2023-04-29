@@ -11,6 +11,8 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
             
+            // new GHIssue169_Decorators().Run();
+            
             // new ActionTests().Run();
             // new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
             // new GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
@@ -98,7 +100,9 @@ namespace DryIoc.UnitTests
                 new Issue446_Select_single_open_generic_impl_based_on_matching_closed_service_type(),
                 new Issue497_ConstructorWithResolvableArguments_is_not_working_properly(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
+                new Issue572_Dynamic_Service_Keys(),
 
+                new Messages_Test(),
                 new GHIssue4_Rule_for_Func_and_Lazy_to_be_resolved_even_without_requested_service_registered(),
                 new GHIssue6_Open_generic_singleton_service_registration_that_satisfies_multiple_interfaces(),
                 new GHIssue7_1_Context_based_injection(),
@@ -106,10 +110,12 @@ namespace DryIoc.UnitTests
                 new GHIssue29_Resolve_caches_args_values(),
                 new GHIssue32_Memory_leak_with_ResolveManyBehavior_AzLazyEnumerable(),
                 new GHIssue37_MediatR_Polymorphic_Notification(),
-                new Messages_Test(),
                 new GHIssue80_ScopedOrSingleton_extra_constructor_calls(),
                 new GHIssue101_Compile_time_generated_object_graph(),
+                new GHIssue114_Resolve_Action_T(),
                 new GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution(),
+                new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution(),
+                new GHIssue169_Decorators(),
                 new GHIssue180_Option_nullable_int_argument_with_not_null_default_value(),
                 new GHIssue191_Optional_IResolverContext_argument_in_Func_of_service(),
                 new GHIssue198_Open_generics_resolve_fails_if_there_is_a_static_constructor(),

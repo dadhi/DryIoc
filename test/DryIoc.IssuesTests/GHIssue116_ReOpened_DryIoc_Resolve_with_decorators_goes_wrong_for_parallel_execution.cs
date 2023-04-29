@@ -8,7 +8,7 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    // [TestFixture]
+    [TestFixture]
     public class GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution : ITest
     {
         const int IterCount = 64;
@@ -16,8 +16,8 @@ namespace DryIoc.IssuesTests
 
         public int Run()
         {
-            DryIoc_Resolve_parallel_execution_on_repeat().GetAwaiter().GetResult();
-            DryIoc_Resolve_parallel_execution_with_compile_service_expression_on_repeat().GetAwaiter().GetResult();
+            DryIoc_Resolve_parallel_execution_on_repeat();
+            DryIoc_Resolve_parallel_execution_with_compile_service_expression_on_repeat();
             return 2;
         }
 
@@ -29,28 +29,20 @@ namespace DryIoc.IssuesTests
             public QueryDecorator(IQuery<T> decoratee) => Decoratee = decoratee;
         }
 
-        public async Task DryIoc_Resolve_parallel_execution_on_repeat()
+        public void DryIoc_Resolve_parallel_execution_on_repeat()
         {
-            // for single threading debugging
-            // using var singleThreadContext = new SingleThreadSynchronizationContext();
-            // SynchronizationContext.SetSynchronizationContext(singleThreadContext);
-
             for (var i = 0; i < IterCount; i++)
-                await DryIoc_Resolve_parallel_execution(i);
+                DryIoc_Resolve_parallel_execution();
         }
 
-        public async Task DryIoc_Resolve_parallel_execution_with_compile_service_expression_on_repeat()
+        public void DryIoc_Resolve_parallel_execution_with_compile_service_expression_on_repeat()
         {
-            // for single threading debugging
-            // using var singleThreadContext = new SingleThreadSynchronizationContext();
-            // SynchronizationContext.SetSynchronizationContext(singleThreadContext);
-
             for (var i = 0; i < IterCount; i++)
-                await DryIoc_Resolve_parallel_execution_with_compile_service_expression(i);
+                DryIoc_Resolve_parallel_execution_with_compile_service_expression();
         }
 
         [Test]
-        public async Task DryIoc_Resolve_parallel_execution(int iter)
+        public void DryIoc_Resolve_parallel_execution()
         {
             var container = new Container();
 
@@ -61,7 +53,7 @@ namespace DryIoc.IssuesTests
             for (var i = 0; i < tasks.Length; i++)
                 tasks[i] = Task.Run(() => container.Resolve<IQuery<string>>());
 
-            await Task.WhenAll(tasks);
+            Task.WaitAll(tasks);
 
             var failed = false;
             var sb = new StringBuilder(tasks.Length);
@@ -74,11 +66,11 @@ namespace DryIoc.IssuesTests
                 sb.Append(success ? '_' : decorator == null ? 'F' : 'f');
             }
 
-            Assert.IsFalse(failed, $"Some of {tasks.Length} tasks are failed [{sb}] on iteration {iter}");
+            Assert.IsFalse(failed, $"Some of {tasks.Length} tasks are failed [{sb}]");
         }
 
         [Test]
-        public async Task DryIoc_Resolve_parallel_execution_with_compile_service_expression(int iter)
+        public void DryIoc_Resolve_parallel_execution_with_compile_service_expression()
         {
             var container = new Container(Rules.Default.WithoutInterpretationForTheFirstResolution());
 
@@ -86,13 +78,11 @@ namespace DryIoc.IssuesTests
             container.Register(typeof(IQuery<>), typeof(Query<>));
             container.Register(typeof(IQuery<>), typeof(QueryDecorator<>), setup: Setup.Decorator);
 
-            const int tasksCount = 64;
-
-            var tasks = new Task<IQuery<string>>[tasksCount];
+            var tasks = new Task<IQuery<string>>[TaskCount];
             for (var i = 0; i < tasks.Length; i++)
                 tasks[i] = Task.Run(() => container.Resolve<IQuery<string>>());
 
-            await Task.WhenAll(tasks);
+            Task.WaitAll(tasks);
 
             var failed = false;
             var sb = new StringBuilder(tasks.Length);
@@ -105,7 +95,7 @@ namespace DryIoc.IssuesTests
                 sb.Append(success ? '_' : decorator == null ? 'F' : 'f');
             }
 
-            Assert.IsFalse(failed, $"Some of {tasks.Length} tasks are failed [{sb}] on iteration {iter}");
+            Assert.IsFalse(failed, $"Some of {tasks.Length} tasks are failed [{sb}]");
         }
     }
 
