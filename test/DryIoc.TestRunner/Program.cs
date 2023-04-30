@@ -10,6 +10,7 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
+            // new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
             // new RequiredPropertiesTests().Run();            
             // new PropertyResolutionTests().Run();            
             // new IssuesTests.Samples.DefaultReuseTest().Run();
@@ -61,6 +62,7 @@ namespace DryIoc.UnitTests
                 new RequiredPropertiesTests(),
                 new SelectConstructorWithAllResolvableArgumentTests(),
                 new Issue107_NamedScopesDependingOnResolvedTypes(),
+                new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
                 new GHIssue391_Deadlock_during_Resolve(),

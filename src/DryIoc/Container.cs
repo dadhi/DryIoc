@@ -1966,8 +1966,9 @@ namespace DryIoc
             if (registry == null ? registryOrServices.IsEmpty : registry.Services.IsEmpty)
                 return;
 
-            var withCache = registry as Registry.AndCache ??
-                (Registry.AndCache)_registry.SwapAndGetNewValue(0, (r, _) => (r as Registry ?? new Registry(r)).WithDefaultFactoryCache()); // todo: @perf optimize
+            var withCache = (Registry.AndCache)(
+                (registry as Registry.AndCache)?.WithDefaultFactoryCache() ??
+                (Registry.AndCache)_registry.SwapAndGetNewValue(0, (r, _) => (r as Registry ?? new Registry(r)).WithDefaultFactoryCache()));
 
             withCache.TryCacheDefaultFactory(serviceTypeHash, serviceType, factory);
         }
@@ -1980,16 +1981,18 @@ namespace DryIoc
             if (registry == null ? registryOrServices.IsEmpty : registry.Services.IsEmpty)
                 return;
 
-            var withCache = registry as Registry.AndCache ??
-                (Registry.AndCache)_registry.SwapAndGetNewValue(0, (r, _) => (r as Registry ?? new Registry(r)).WithKeyedFactoryCache()); // todo: @perf optimize
+            var withCache = (Registry.AndCache)( 
+                (registry as Registry.AndCache)?.WithKeyedFactoryCache() ??
+                (Registry.AndCache)_registry.SwapAndGetNewValue(0, (r, _) => (r as Registry ?? new Registry(r)).WithKeyedFactoryCache()));
 
             withCache.TryCacheKeyedFactory(serviceTypeHash, serviceType, key, factory);
         }
 
         internal void CacheFactoryExpression(int factoryId, Expression expr, IReuse reuse, int dependencyCount, ImMapEntry<object> entry = null)
         {
-            var withCache = _registry.Value as Registry.AndCache ??
-                (Registry.AndCache)_registry.SwapAndGetNewValue(0, (r, _) => (r as Registry ?? new Registry(r)).WithFactoryExpressionCache()); // todo: @perf optimize
+            var withCache = (Registry.AndCache)(
+                (_registry.Value as Registry.AndCache)?.WithFactoryExpressionCache() ??
+                (Registry.AndCache)_registry.SwapAndGetNewValue(0, (r, _) => (r as Registry ?? new Registry(r)).WithFactoryExpressionCache()));
 
             withCache.CacheFactoryExpression(factoryId, expr, reuse, dependencyCount, entry);
         }
@@ -2206,6 +2209,27 @@ namespace DryIoc
                     isChangePermitted == _isChangePermitted ? this :
                     new AndCache(Services, _defaultFactoryCache, _keyedFactoryCache, _factoryExpressionCache, isChangePermitted);
 
+                public override Registry WithDefaultFactoryCache()
+                {
+                    if (_defaultFactoryCache != null)
+                        Interlocked.CompareExchange(ref _defaultFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
+                    return this;
+                }
+
+                public override Registry WithKeyedFactoryCache()
+                {
+                    if (_keyedFactoryCache != null)
+                        Interlocked.CompareExchange(ref _keyedFactoryCache, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null);
+                    return this;
+                }
+
+                public override Registry WithFactoryExpressionCache()
+                {
+                    if (_factoryExpressionCache != null)
+                        Interlocked.CompareExchange(ref _factoryExpressionCache, new ImMap<object>[CACHE_SLOT_COUNT], null);
+                    return this;
+                }
+
                 public void TryCacheDefaultFactory<T>(int serviceTypeHash, Type serviceType, T factory)
                 {
                     if (_defaultFactoryCache == null)
@@ -2374,7 +2398,6 @@ namespace DryIoc
 
             public virtual Registry WithoutCache() => this;
 
-            // todo: @perf optimize to avoid creating the new Registry instance when called in WithCache and descendants
             public virtual Registry WithDefaultFactoryCache() =>
                 new AndCache(Services, new ImHashMap<Type, object>[CACHE_SLOT_COUNT], null, null, default);
 
