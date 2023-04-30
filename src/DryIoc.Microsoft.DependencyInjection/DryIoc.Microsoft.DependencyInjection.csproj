@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>netstandard2.0;net7.0</TargetFrameworks>
+        <TargetFrameworks>netstandard2.0;net6.0;net7.0</TargetFrameworks>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
         <VersionPrefix>6.2.0-preview-01</VersionPrefix>
@@ -41,10 +41,10 @@
         <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
     </ItemGroup>
 
-    <ItemGroup Condition="'$(TargetFramework)' != 'net7.0'">
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
     </ItemGroup>
-    <ItemGroup Condition="'$(TargetFramework)' == 'net7.0'">
+    <ItemGroup Condition="'$(TargetFramework)' != 'netstandard2.0'">
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0" />
     </ItemGroup>
 </Project>
