@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>DryIoc.Microsoft.DependencyInjection.src</id>
-    <version>6.1.1</version>
+    <version>6.2.0</version>
     <authors>Maksim Volkau</authors>
     <copyright>Copyright © 2013-2023 Maksim Volkau</copyright>
     <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,14 @@
     <tags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</tags>
     <releaseNotes>
 <![CDATA[
+## v6.2.0
+
+- updated DryIoc to v5.4.0
+- added: NET 6.0, NET 7.0 and MS.Ext.DI.Abstractions 7.0 support
+- fixed: #547 Blazor File Upload issue with Net 7 and MS DI Package
+- fixed: #567 Using DryIoc causes Blazor to crash
+ 
+
 ## v6.1.1
 
 - fixed: #555 Avoiding cloning the container that already has the MicrosoftDependencyInjectionRules and RegistrySharing.Share

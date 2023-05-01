@@ -1,6 +1,16 @@
 Version History
 ---------------
 
+## v5.4.0 Small feature and bug-fix release / 2023-05-01
+
+- added: #572 Add DryIoc targets for NET 6.0, NET 7.0
+- added: #571 Add the rule for the injection of C#11 required properties via the rule PropertiesAndFields.RequiredProperties
+- added: #544 Add .NET 7 target and up MS dependency version for DryIoc.MS.DI
+- added: #565 Add ScopeName.Of to simplify the custom scope name matching logic
+- fixed: #116 DryIoc Resolve with decorators goes wrong for parallel execution
+- fixed: #547 Blazor File Upload issue with Net 7 and MS DI Package
+- fixed: #567 Using DryIoc causes Blazor to crash
+
 ## v5.3.4 Bug-fix release / 2023-03-13
 
 - fixed: #559 Possible inconsistent behaviour of resolving collection of services opening resolution scope

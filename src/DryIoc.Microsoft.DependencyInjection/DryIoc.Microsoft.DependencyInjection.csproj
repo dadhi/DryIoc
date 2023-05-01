@@ -3,7 +3,7 @@
         <TargetFrameworks>netstandard2.0;net6.0;net7.0</TargetFrameworks>
 
         <Product>DryIoc.Microsoft.DependencyInjection</Product>
-        <VersionPrefix>6.2.0-preview-01</VersionPrefix>
+        <VersionPrefix>6.2.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -17,8 +17,10 @@
 <![CDATA[
 ## v6.2.0
 
-- added: .NET 7.0 and MS.Ext.DI.Abstractions 7.0 support
+- added: NET 6.0, NET 7.0 and MS.Ext.DI.Abstractions 7.0 support
 - updated DryIoc to v5.4.0
+- fixed: #547 Blazor File Upload issue with Net 7 and MS DI Package
+- fixed: #567 Using DryIoc causes Blazor to crash
  
 
 ## v6.1.1
