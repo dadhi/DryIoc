@@ -5826,7 +5826,7 @@ namespace DryIoc
         /// Help to override default registrations in Open Scope scenarios:
         /// I may register service with key and resolve it as default in current scope.</summary>
         public static FactorySelectorRule SelectKeyedOverDefaultFactory(object serviceKey) =>
-            (r, singleFac, keyedFacs) => singleFac // select a singlet default factory if it is the only one registered
+            (r, singleFac, keyedFacs) => singleFac // select a single default factory if it is the only one registered
                 ?? keyedFacs.FindFirst(serviceKey, (key, f) => Equals(f.Key, key))?.Value // or try to find the factory with equal key
                 ?? keyedFacs.FindFirst(f => f.Key == null || f.Key.Equals(null))?.Value;  // or try to find the factory with null/default key
 
