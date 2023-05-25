@@ -6654,7 +6654,10 @@ namespace DryIoc
             }
 
             if (factoryInfo != null)
-                Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, ctorOrMethodOrMember, factoryInfo);
+            {
+                return new WithFactoryServiceInfo(ctorOrMethodOrMember, factoryInfo);
+                // Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, ctorOrMethodOrMember, factoryInfo); // todo: @wip
+            }
             return new FactoryMethod(ctorOrMethodOrMember);
         }
 
@@ -7306,8 +7309,13 @@ namespace DryIoc
             for (var i = 0; i < argExprs.Count; i++)
             {
                 var paramInfo = paramInfos[i];
-                var methodCallExpr = argExprs[i] as System.Linq.Expressions.MethodCallExpression;
-                if (methodCallExpr != null)
+                var argExpr = argExprs[i];
+                
+                // skip the parameter expression passed from the lambda argument, e.g. for the static and extension methods
+                if (argExpr is System.Linq.Expressions.ParameterExpression)
+                    continue;
+
+                if (argExpr is System.Linq.Expressions.MethodCallExpression methodCallExpr)
                 {
                     if (methodCallExpr.Method.DeclaringType != typeof(Arg))
                         Throw.It(Error.UnexpectedExpressionInsteadOfArgMethodInMadeOf, methodCallExpr, wholeServiceExpr);
