@@ -11,7 +11,6 @@ namespace DryIoc.UnitTests
             RunAllTests();
 
             // new GHIssue576_Extension_methods_not_being_handled_correctly_in_MadeOf_service_returning_expression().Run();
-
             // new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
             // new RequiredPropertiesTests().Run();            
             // new PropertyResolutionTests().Run();            
@@ -64,6 +63,7 @@ namespace DryIoc.UnitTests
                 new RequiredPropertiesTests(),
                 new SelectConstructorWithAllResolvableArgumentTests(),
                 new Issue107_NamedScopesDependingOnResolvedTypes(),
+                new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
                 new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution(),
                 new GHIssue378_InconsistentResolutionFailure(),
                 new GHIssue380_ExportFactory_throws_Container_disposed_exception(),
@@ -72,20 +72,20 @@ namespace DryIoc.UnitTests
                 new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made(),
                 new GHIssue406_Allow_the_registration_of_the_partially_closed_implementation_type(),
                 new GHIssue460_Getting_instance_from_parent_scope_even_if_replaced_by_Use(),
-                new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
                 new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter(),
+                new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
                 new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution(),
                 new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton(),
                 new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
-                new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
                 new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit(),
                 new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call(),
                 new GHIssue546_Generic_type_constraint_resolution_doesnt_see_arrays_as_IEnumerable(),
                 new GHIssue554_System_NullReferenceException_Object_reference_not_set_to_an_instance_of_an_object(),
                 new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules(),
-                new GHIssue565_Is_ignoring_ReuseScoped_setting_expected_behaviour_when_also_set_to_openResolutionScope(),
                 new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed(),
                 new GHIssue559_Possible_inconsistent_behaviour(),
+                new GHIssue565_Is_ignoring_ReuseScoped_setting_expected_behaviour_when_also_set_to_openResolutionScope(),
+                new GHIssue576_Extension_methods_not_being_handled_correctly_in_MadeOf_service_returning_expression(),
             };
 
             // Parallel.ForEach(tests, x => Run(x.Run)); // todo: @perf enable and test when more tests are added

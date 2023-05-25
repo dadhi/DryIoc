@@ -438,7 +438,7 @@ namespace DryIoc
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
                 {
                     // Nope. Important to cache expression first before trying to interpret, so that parallel resolutions may already use it.
-                    // todo: @wip ...but what if exception is thrown, isn't it better to avoid caching the bad expression?
+                    // todo: @check ...but what if exception is thrown, isn't it better to avoid caching the bad expression?
                     if (factory.CanCache)
                         TryCacheDefaultFactory(serviceTypeHash, serviceType, expr);
                     return instance;
@@ -6654,10 +6654,8 @@ namespace DryIoc
             }
 
             if (factoryInfo != null)
-            {
-                return new WithFactoryServiceInfo(ctorOrMethodOrMember, factoryInfo);
-                // Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, ctorOrMethodOrMember, factoryInfo); // todo: @wip
-            }
+                Throw.It(Error.PassedMemberIsStaticButInstanceFactoryIsNotNull, ctorOrMethodOrMember, factoryInfo);
+
             return new FactoryMethod(ctorOrMethodOrMember);
         }
 
@@ -7159,7 +7157,7 @@ namespace DryIoc
         public static TypedMade<TService> Of<TService>(
             System.Linq.Expressions.Expression<Func<TService>> serviceReturningExpr,
             params Func<Request, object>[] argValues) =>
-            FromExpression<TService>(member => _ => DryIoc.FactoryMethod.Of(member), serviceReturningExpr, argValues);
+            FromExpression<object, TService>(member => _ => DryIoc.FactoryMethod.Of(member), null, serviceReturningExpr, argValues);
 
         /// <summary>Defines creation info from factory method call Expression without using strings.
         /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
@@ -7172,12 +7170,8 @@ namespace DryIoc
             Func<Request, ServiceInfo.Typed<TFactory>> getFactoryInfo,
             System.Linq.Expressions.Expression<Func<TFactory, TService>> serviceReturningExpr,
             params Func<Request, object>[] argValues)
-            where TFactory : class
-        {
-            getFactoryInfo.ThrowIfNull();
-            return FromExpression<TService>(member => request => DryIoc.FactoryMethod.Of(member, getFactoryInfo(request)),
-                serviceReturningExpr, argValues);
-        }
+            where TFactory : class =>
+            FromExpression<TFactory, TService>(null, getFactoryInfo.ThrowIfNull(), serviceReturningExpr, argValues);
 
         /// <summary>Composes Made.Of expression with known factory instance and expression to get a service</summary>
         public static TypedMade<TService> Of<TFactory, TService>(
@@ -7187,18 +7181,20 @@ namespace DryIoc
             where TFactory : class
         {
             factoryInstance.ThrowIfNull();
-            return FromExpression<TService>(
+            return FromExpression<TFactory, TService>(
                 member => request => DryIoc.FactoryMethod.Of(member, factoryInstance),
-                serviceReturningExpr, argValues);
+                null, serviceReturningExpr, argValues);
         }
 
-        private static TypedMade<TService> FromExpression<TService>(
-            Func<MemberInfo, FactoryMethodSelector> getFactoryMethodSelector,
-            System.Linq.Expressions.LambdaExpression serviceReturningExpr, params Func<Request, object>[] argValues)
+        private static TypedMade<TService> FromExpression<TFactory, TService>(
+            Func<MemberInfo, FactoryMethodSelector> eitherGetFactoryMethodSelector,
+            Func<Request, ServiceInfo.Typed<TFactory>> orGetFactoryInfo,
+            System.Linq.Expressions.LambdaExpression serviceReturningExpr, 
+            params Func<Request, object>[] argValues)
         {
             var callExpr = serviceReturningExpr.ThrowIfNull().Body;
             if (callExpr.NodeType == ExprType.Convert) // proceed without Cast expression.
-                return FromExpression<TService>(getFactoryMethodSelector,
+                return FromExpression<TFactory, TService>(eitherGetFactoryMethodSelector, orGetFactoryInfo,
                     System.Linq.Expressions.Expression.Lambda(((System.Linq.Expressions.UnaryExpression)callExpr).Operand,
                         Empty<System.Linq.Expressions.ParameterExpression>()),
                     argValues);
@@ -7245,16 +7241,25 @@ namespace DryIoc
             else return Throw.For<TypedMade<TService>>(Error.NotSupportedMadeOfExpression, callExpr);
 
             var hasCustomValue = false;
+            var hasUsedFactoryInfoForParameter = false;
 
             var parameterSelector = parameters.IsNullOrEmpty() ? null :
-                ComposeParameterSelectorFromArgs(ref hasCustomValue, serviceReturningExpr, parameters, argExprs, argValues);
+                ComposeParameterSelectorFromArgs(ref hasCustomValue, ref hasUsedFactoryInfoForParameter,
+                    orGetFactoryInfo, serviceReturningExpr, parameters, argExprs, argValues);
 
             var propertiesAndFieldsSelector = memberBindingExprs == null || memberBindingExprs.Count == 0 ? null :
                 ComposePropertiesAndFieldsSelector(ref hasCustomValue, serviceReturningExpr, memberBindingExprs, argValues);
 
+            var factoryMethodSelector = 
+                eitherGetFactoryMethodSelector != null 
+                    ? eitherGetFactoryMethodSelector(ctorOrMethodOrMember) :
+                hasUsedFactoryInfoForParameter 
+                    ? (FactoryMethodSelector)(_ => DryIoc.FactoryMethod.Of(ctorOrMethodOrMember))
+                    : (FactoryMethodSelector)(r => DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, orGetFactoryInfo(r)));
+
             if (!hasCustomValue && parameterSelector == null && propertiesAndFieldsSelector == null)
-                return new TypedMade<TService>(getFactoryMethodSelector(ctorOrMethodOrMember));
-            return new WithDetails<TService>(getFactoryMethodSelector(ctorOrMethodOrMember),
+                return new TypedMade<TService>(factoryMethodSelector);
+            return new WithDetails<TService>(factoryMethodSelector,
                 parameterSelector, propertiesAndFieldsSelector, hasCustomValue);
         }
 
@@ -7300,7 +7305,9 @@ namespace DryIoc
                 : new WithDetails(FactoryMethodOrSelector, t, Parameters, PropertiesAndFields, _details);
         }
 
-        private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
+        private static ParameterSelector ComposeParameterSelectorFromArgs<TFactory>(
+            ref bool hasCustomValue, ref bool hasUsedFactoryInfoForParameter, 
+            Func<Request, ServiceInfo.Typed<TFactory>> nullOrGetFactoryInfo,
             System.Linq.Expressions.Expression wholeServiceExpr, ParameterInfo[] paramInfos,
             IList<System.Linq.Expressions.Expression> argExprs,
             params Func<Request, object>[] argValues)
@@ -7311,9 +7318,23 @@ namespace DryIoc
                 var paramInfo = paramInfos[i];
                 var argExpr = argExprs[i];
                 
-                // skip the parameter expression passed from the lambda argument, e.g. for the static and extension methods
-                if (argExpr is System.Linq.Expressions.ParameterExpression)
+                // If the parameter expression passed from the lambda argument, e.g. for the static and extension methods,
+                // Then we will be using the argument factory info as a parameter info, 
+                // so for the extension method `f => f.Create()` the factory info for the `f` will be used for the parameter `f` in `Exts.Create(f)`.
+                if (argExpr is System.Linq.Expressions.ParameterExpression paramExpr)
+                {
+                    if (nullOrGetFactoryInfo != null &&
+                        typeof(TFactory).IsAssignableTo(paramExpr.Type))
+                    {
+                        hasUsedFactoryInfoForParameter = true;
+                        paramSelector = paramSelector.OverrideWith(req => 
+                            p => p.Equals(paramInfo)
+                                ? nullOrGetFactoryInfo(req)?.Details?.To(ParameterServiceInfo.Of(p).WithDetails)
+                                : null);
+                    }
+                    else Throw.It(Error.MadeOfCallExpressionParameterDoesNotCorrespondToTheFactoryInfo, paramExpr, typeof(TFactory));
                     continue;
+                }
 
                 if (argExpr is System.Linq.Expressions.MethodCallExpression methodCallExpr)
                 {
@@ -12862,7 +12883,7 @@ namespace DryIoc
     }
 
     /// Should return value stored in scope
-    public delegate object CreateScopedValue(); // todo: @wip remove this thing
+    public delegate object CreateScopedValue();
 
     internal sealed class ScopedItemException
     {
@@ -14482,6 +14503,8 @@ namespace DryIoc
                 "The member info {0} passed to `Made.Of` or `FactoryMethod.Of` is NOT static, but instance factory is not provided or null"),
             PassedMemberIsStaticButInstanceFactoryIsNotNull = Of(
                 "You are passing constructor or STATIC member info {0} to `Made.Of` or `FactoryMethod.Of`, but then why are you passing factory INSTANCE: {1}"),
+            MadeOfCallExpressionParameterDoesNotCorrespondToTheFactoryInfo = Of(
+                "Made.Of factory method uses parameter expression `{0}` which is not corresponding to the factory info for that parameter: {1}"),
             UndefinedMethodWhenGettingTheSingleMethod = Of(
                 "Undefined Method '{0}' in Type {1} (including non-public={2})"),
             UndefinedMethodWhenGettingMethodWithSpecifiedParameters = Of(

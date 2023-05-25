@@ -304,7 +304,7 @@ namespace DryIoc.UnitTests
             Assert.AreSame(Error.NameOf(Error.PassedCtorOrMemberIsNull), Error.NameOf(ex.Error));
         }
 
-        // [Test] // todo: @wip @fixme
+        [Test]
         public void MadeOf_should_inform_on_presence_of_factory_info_for_static_member()
         {
             var c = new Container();

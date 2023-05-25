@@ -9,7 +9,8 @@ namespace DryIoc.IssuesTests
         public int Run()
         {
             Test_factory_extension_method();
-            return 1;
+            Test_factory_extension_method_for_the_factory_with_the_service_key();
+            return 2;
         }
 
         [Test]
@@ -23,6 +24,27 @@ namespace DryIoc.IssuesTests
 
             container.Register(
                 Made.Of(_ => ServiceInfo.Of<ILoggerFactory>(),
+                    f => f.CreateLogger(Arg.Index<Type>(0)),
+                    r => r.Parent.ImplementationType),
+                setup: Setup.With(condition: r => r.Parent.ImplementationType != null));
+
+            container.Register<Foo>();
+            var foo = container.Resolve<Foo>();
+            
+            Assert.AreEqual(typeof(Foo).FullName, ((SerilogLogger)foo.Logger).TypeName);
+        }
+
+        [Test]
+        public void Test_factory_extension_method_for_the_factory_with_the_service_key()
+        {
+            var container = new Container();
+
+            var loggerFactory = new SerilogLoggerFactory();
+
+            container.RegisterInstance<ILoggerFactory>(loggerFactory, serviceKey: "obscured");
+
+            container.Register(
+                Made.Of(_ => ServiceInfo.Of<ILoggerFactory>(serviceKey: "obscured"),
                     f => f.CreateLogger(Arg.Index<Type>(0)),
                     r => r.Parent.ImplementationType),
                 setup: Setup.With(condition: r => r.Parent.ImplementationType != null));
