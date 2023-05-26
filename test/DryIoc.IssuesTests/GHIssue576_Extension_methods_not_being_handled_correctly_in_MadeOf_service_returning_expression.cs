@@ -12,6 +12,7 @@ namespace DryIoc.IssuesTests
             Test_factory_extension_method_for_the_factory_with_the_service_key();
 
             Test_factory_extension_method_GHIssue577();
+            
             return 3;
         }
 
@@ -79,8 +80,11 @@ namespace DryIoc.IssuesTests
 
             container.Register<Foo>();
 
-            var errors = container.Validate();
-            // Assert.IsEmpty(errors); // todo: @fixme fails here with the root ILogger
+            var errorsAllAreRoots = container.Validate();
+            Assert.AreEqual(1, errorsAllAreRoots.Length); // fails for the non-root logger
+
+            var errorsForLogger = container.Validate(typeof(ILogger));
+            Assert.IsEmpty(errorsForLogger); // fine to validate a specific service
 
             var log = container.Resolve<ILogger>();
             Assert.IsNull(((SerilogLogger)log).TypeName);
