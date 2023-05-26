@@ -4442,20 +4442,34 @@ namespace DryIoc
         /// <summary>Excluding open-generic registrations, cause you need to provide type arguments to actually create these types.</summary>
         public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
 
+        // todo: @vNext instead of `condition` we may use a transformer to close the open-generic types. But may be having `roots` parameters covers it as well.
         /// <summary>Helps to find potential problems in service registration setup. Method tries to resolve the specified registrations, collects exceptions, 
         /// and returns them to user. Does not create any actual service objects. You must specify <paramref name="condition"/> to define your resolution roots,
         /// otherwise container will try to resolve all registrations, which usually is not realistic case to validate.</summary>
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, Func<ServiceRegistrationInfo, bool> condition = null)
         {
-            var noOpenGenericsWithCondition = condition == null
-                ? (Func<ServiceRegistrationInfo, bool>)DefaultValidateCondition
-                : (r => condition(r) && DefaultValidateCondition(r));
+            var roots = ArrayTools.Empty<ServiceRegistrationInfo>();
+            if (condition == null)
+            {
+                var allNonGenericRegistrations = container.GetServiceRegistrations().Where(DefaultValidateCondition).ToArray();
+                if (allNonGenericRegistrations.Length == 0)
+                    Throw.It(Error.FoundNoRootsToValidate, container);
+                
+                // We try to find the registrations marked by `Setup.With(asResolutionRoot: true)` and if nothing found, fallback to the all found.
+                // This allow to make asResolutionRoot marking to be optional for validate, but if used - provide the convinient validation by convention. 
+                roots = allNonGenericRegistrations.Match(r => r.Factory.Setup.AsResolutionRoot);
+                if (roots.Length == 0)
+                    roots = allNonGenericRegistrations;
+            }
+            else
+            {
+                // condition overrides whatever resolution roots are marked in registrations 
+                roots = container.GetServiceRegistrations().Where(r => condition(r) && DefaultValidateCondition(r)).ToArray();
+                if (roots.Length == 0)
+                    Throw.It(Error.FoundNoRootsToValidate, container);
+            }
 
-            var roots = container.GetServiceRegistrations().Where(noOpenGenericsWithCondition).Select(r => r.ToServiceInfo()).ToArray();
-            if (roots.Length == 0)
-                Throw.It(Error.FoundNoRootsToValidate, container);
-
-            return container.Validate(roots);
+            return container.Validate(roots.Map(r => r.ToServiceInfo()));
         }
 
         /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
@@ -14529,7 +14543,8 @@ namespace DryIoc
                 "The `serviceTypes` passed to Validate method is null or empty. Please pass the type(s) you want to Validate."),
             ValidateFoundErrors = Of(
                 "Validate method found the errors, please check the ContainerException.CollectedExceptions for the details." + NewLine +
-                "If you see too many (unexpected) errors, try narrowing the resolution roots by passing the selected service types or the condition to the Validate(AndThrow) method."),
+                "If you see too many (unexpected) errors, try narrowing the resolution roots by passing the selected service types or the condition to the Validate(AndThrow) method." + NewLine +
+                "Or alternatively, mark the service registrations with `setup: Setup.With(asResolutionRoot: true)`."),
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(

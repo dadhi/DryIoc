@@ -15,7 +15,9 @@ namespace DryIoc.IssuesTests
             Test_factory_extension_method_GHIssue577();
             Test_factory_extension_method_GHIssue577_exclude_from_Validate_via_metadata();
             
-            return 4;
+            Test_factory_extension_method_GHIssue578_respect_Setup_AsResolutionRoot();
+            
+            return 5;
         }
 
         [Test]
@@ -126,6 +128,39 @@ namespace DryIoc.IssuesTests
                     || metadata is IDictionary<string, object> d && !d.ContainsKey(excludeFromValidation)
                     || !Equals(metadata, excludeFromValidation);
             });
+
+            Assert.IsEmpty(errors);
+
+            var log = container.Resolve<ILogger>();
+            Assert.IsNull(((SerilogLogger)log).TypeName);
+
+            var foo = container.Resolve<Foo>();
+            Assert.AreEqual(typeof(Foo).FullName, ((SerilogLogger)foo.Logger).TypeName);
+        }
+
+        [Test]
+        public void Test_factory_extension_method_GHIssue578_respect_Setup_AsResolutionRoot()
+        {
+            var container = new Container();
+
+            var loggerFactory = new SerilogLoggerFactory();
+
+            container.RegisterInstance<ILoggerFactory>(loggerFactory);
+
+            container.Register(
+                Made.Of(_ => ServiceInfo.Of<ILoggerFactory>(),
+                    f => f.CreateLogger(null)),
+                setup: Setup.With(condition: r => r.Parent.ImplementationType == null, asResolutionRoot: true));
+
+            container.Register(
+                Made.Of(_ => ServiceInfo.Of<ILoggerFactory>(),
+                    f => f.CreateLogger(Arg.Index<Type>(0)),
+                    r => r.Parent.ImplementationType),
+                setup: Setup.With(condition: r => r.Parent.ImplementationType != null));
+
+            container.Register<Foo>();
+
+            var errors = container.Validate();
 
             Assert.IsEmpty(errors);
 
