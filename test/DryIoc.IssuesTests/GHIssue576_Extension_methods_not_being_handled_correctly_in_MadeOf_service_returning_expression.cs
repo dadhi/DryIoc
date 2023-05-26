@@ -10,7 +10,9 @@ namespace DryIoc.IssuesTests
         {
             Test_factory_extension_method();
             Test_factory_extension_method_for_the_factory_with_the_service_key();
-            return 2;
+
+            Test_factory_extension_method_GHIssue577();
+            return 3;
         }
 
         [Test]
@@ -52,6 +54,38 @@ namespace DryIoc.IssuesTests
             container.Register<Foo>();
             var foo = container.Resolve<Foo>();
             
+            Assert.AreEqual(typeof(Foo).FullName, ((SerilogLogger)foo.Logger).TypeName);
+        }
+
+        [Test]
+        public void Test_factory_extension_method_GHIssue577()
+        {
+            var container = new Container();
+
+            var loggerFactory = new SerilogLoggerFactory();
+
+            container.RegisterInstance<ILoggerFactory>(loggerFactory);
+
+            container.Register(
+                Made.Of(_ => ServiceInfo.Of<ILoggerFactory>(),
+                    f => f.CreateLogger(null)),
+                setup: Setup.With(condition: r => r.Parent.ImplementationType == null));
+
+            container.Register(
+                Made.Of(_ => ServiceInfo.Of<ILoggerFactory>(),
+                    f => f.CreateLogger(Arg.Index<Type>(0)),
+                    r => r.Parent.ImplementationType),
+                setup: Setup.With(condition: r => r.Parent.ImplementationType != null));
+
+            container.Register<Foo>();
+
+            var errors = container.Validate();
+            // Assert.IsEmpty(errors); // todo: @fixme fails here with the root ILogger
+
+            var log = container.Resolve<ILogger>();
+            Assert.IsNull(((SerilogLogger)log).TypeName);
+
+            var foo = container.Resolve<Foo>();
             Assert.AreEqual(typeof(Foo).FullName, ((SerilogLogger)foo.Logger).TypeName);
         }
 
