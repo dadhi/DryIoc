@@ -10,6 +10,7 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
+            // new GHIssue574_Cannot_register_multiple_impls_in_child_container_with_default_service_key().Run();
             // new GHIssue576_Extension_methods_not_being_handled_correctly_in_MadeOf_service_returning_expression().Run();
             // new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
             // new RequiredPropertiesTests().Run();            
