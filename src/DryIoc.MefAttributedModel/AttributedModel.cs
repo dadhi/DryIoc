@@ -175,13 +175,13 @@ namespace DryIoc.MefAttributedModel
 
                 if (serviceKey != null)
                 {
-                    factories = factories.Match(serviceKey, (key, f) => key.Equals(f.Key));
+                    factories = factories.Match(serviceKey, static (key, f) => key.Equals(f.Key));
                     if (factories.Length == 0)
                         return null;
                 }
 
                 // if the service keys for some reason are not unique
-                factories = factories.Match(metadataType, (mType, f) => f.Value.MatchMetadataType(mType));
+                factories = factories.Match(metadataType, static (mType, f) => f.Value.MatchMetadataType(mType));
                 if (factories.Length == 0)
                     return null;
 
@@ -230,6 +230,7 @@ namespace DryIoc.MefAttributedModel
                 metadataExpr);
         }
 
+        // todo: @perf create the variant with IDisposable part, so we don't need the Action
         /// <summary>Proxy for the tuple parameter to <see cref="ExportFactory{T}"/>.
         /// Required to cover for missing Tuple in .NET 4.0 and lower.
         /// Provides implicit conversion in both <see cref="KeyValuePair{TKey,TValue}"/> and <see cref="Tuple{T1,T2}"/>.</summary>
@@ -266,7 +267,7 @@ namespace DryIoc.MefAttributedModel
                 return null;
 
             if (container.Rules.DefaultReuse != Reuse.Scoped)
-                container = container.With(r => r.WithDefaultReuse(Reuse.Scoped));
+                container = container.With(static r => r.WithDefaultReuse(Reuse.Scoped));
 
             return new ExportFactory<T>(() =>
             {
@@ -292,7 +293,7 @@ namespace DryIoc.MefAttributedModel
             Meta<KeyValuePair<object, Func<T>>, TMetadata> metaFactory, IContainer container) =>
             new ExportFactory<T, TMetadata>(() =>
             {
-                var scope = container.With(r => r.WithDefaultReuse(Reuse.Scoped)).OpenScope();
+                var scope = container.With(static r => r.WithDefaultReuse(Reuse.Scoped)).OpenScope();
                 try
                 {
                     var result = scope.Resolve<T>(serviceKey: metaFactory.Value.Key);
@@ -329,27 +330,22 @@ namespace DryIoc.MefAttributedModel
 
             var filterCollectionByMultiKey = Made.Of(
                 typeof(AttributedModel).SingleMethod(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
-                parameters: Parameters.Of.Type(r => r.ServiceKey));
+                parameters: Parameters.Of.Type(static r => r.ServiceKey));
 
             // decorator to filter in a presence of multiple same keys
             // note: it is explicitly set to Transient to produce new results for new filtered collection,
             // otherwise it may be set to Singleton by container wide rules and always produce the results for the first resolved collection
             container.Register(typeof(IEnumerable<>), Reuse.Transient, filterCollectionByMultiKey,
-                Setup.DecoratorWith(condition: r => r.ServiceKey != null));
+                Setup.DecoratorWith(condition: static r => r.ServiceKey != null));
 
             return container;
         }
 
         internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey) =>
-            source.Match(x =>
-            {
-                if (x.Key is DefaultKey || x.Key is DefaultDynamicKey)
-                    return false;
-                if (serviceKey.Equals(x.Key))
-                    return true;
-                var multiKey = x.Key as KV<object, int>;
-                return multiKey != null && serviceKey.Equals(multiKey.Key);
-            }, x => x.Value);
+            source.Match(serviceKey,
+                static (k, x) => x.Key is not DefaultKey && x.Key is not DefaultDynamicKey &&
+                    (k.Equals(x.Key) || x.Key is KV<object, int> multiKey && k.Equals(multiKey.Key)), 
+                static (k, x) => x.Value);
 
         #endregion
 
