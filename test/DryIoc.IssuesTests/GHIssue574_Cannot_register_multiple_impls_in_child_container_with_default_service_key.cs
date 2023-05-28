@@ -9,17 +9,18 @@ using System.ComponentModel.Composition;
 
 namespace DryIoc.IssuesTests
 {
-    // [TestFixture]
+    [TestFixture]
     public class GHIssue574_Cannot_register_multiple_impls_in_child_container_with_default_service_key : ITest
     {
         public int Run()
         {
             // ResolveEnumerableFromChild();
-            ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys();
-            return 2;
+            // ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys();
+            ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys_2();
+            return 1;
         }
 
-        [Ignore("fixme")]
+        //[Ignore("fixme")]
         public void ResolveEnumerableFromChild()
         {
             var services = new ServiceCollection();
@@ -79,18 +80,48 @@ namespace DryIoc.IssuesTests
                 Is.EqualTo(4));
         }
 
+        [Test]
+        public void ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys_2()
+        {
+            var container = new Container(Rules.MicrosoftDependencyInjectionRules)
+                .WithMef(); // <-- this is the key, LOL ;-)
+
+            // here use RegisterExport instead of the RegisterDescriptor
+            container.RegisterExports(
+                typeof(Printer),
+                typeof(PrinterA),
+                typeof(PrinterB),
+                typeof(NeighborPrinter)
+            );
+
+            // all printers with and without the name, this is the default behavior of the Collection wrapper
+            var ps = container.Resolve<IPrinter[]>();  
+            CollectionAssert.AreEquivalent(
+                new[] { typeof(Printer), typeof(PrinterA), typeof(PrinterB), 
+                    typeof(NeighborPrinter) }, 
+                ps.Select(p => p.GetType()));
+
+            // only printers with the specific StampName
+            var psStamped = container.Resolve<IPrinter[]>(serviceKey: StampName);
+            CollectionAssert.AreEquivalent(
+                new[] { typeof(Printer), typeof(PrinterA), typeof(PrinterB) },
+                psStamped.Select(p => p.GetType()));
+        }
+
+        private const string StampName = "child-stamp";
+
         private interface IPrinter { }
 
-        [Export("child-stamp", typeof(IPrinter))]
+        [Export(StampName, typeof(IPrinter))]
         private class Printer : IPrinter { }
 
-        [Export("child-stamp", typeof(IPrinter))]
+        [Export(StampName, typeof(IPrinter))]
         private class PrinterA : IPrinter { }
 
-        [Export("child-stamp", typeof(IPrinter))]
+        [Export(StampName, typeof(IPrinter))]
         private class PrinterB : IPrinter { }
 
-        [Export("child-stamp", typeof(IPrinter))]
+        [Export(typeof(IPrinter))] // No name
         private class NeighborPrinter : IPrinter { }
     }
 }
