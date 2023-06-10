@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc.Internal</id>
-        <version>5.4.0</version>
+        <version>5.4.1</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2023 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -14,6 +14,13 @@
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
+## v5.4.1 Bug-fix release
+
+- fixed: #576 Extension methods not being handled correctly in Made.Of service returning expression
+- fixed: #577 False positive validation error when using service setup with certain conditions
+- fixed: #578 asResolutionRoot does not affect validation
+
+
 ## v5.4.0 Small feature and bug-fix release
 
 - added: #572 Add DryIoc targets for NET 6.0, NET 7.0

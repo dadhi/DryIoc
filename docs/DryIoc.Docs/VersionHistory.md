@@ -1,6 +1,13 @@
 Version History
 ---------------
 
+## v5.4.1 Bug-fix release / 2023-06-10
+
+- fixed: #576 Extension methods not being handled correctly in Made.Of service returning expression
+- fixed: #577 False positive validation error when using service setup with certain conditions
+- fixed: #578 asResolutionRoot does not affect validation
+
+
 ## v5.4.0 Small feature and bug-fix release / 2023-05-01
 
 - added: #572 Add DryIoc targets for NET 6.0, NET 7.0
