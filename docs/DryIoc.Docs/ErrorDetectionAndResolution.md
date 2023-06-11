@@ -349,7 +349,7 @@ class Validate_CaptiveDependency_example
         message: Dependency Buz as parameter "buz" (IsSingletonOrDependencyOfSingleton) with reuse Scoped {Lifespan=100} has a shorter lifespan than its parent's Singleton Bar as parameter "bar" FactoryId=145 (IsSingletonOrDependencyOfSingleton)
             in resolution root Scoped Foo FactoryId=144
             from container without scope
-            with Rules with {UsedForValidation} and without {ImplicitCheckForReuseMatchingScope, EagerCachingSingletonForFasterAccess} with TotalDependencyCountInLambdaToSplitBigObjectGraph=2147483647
+            with Rules with {UsedForValidation} and without {ImplicitCheckForReuseMatchingScope, EagerCachingSingletonForFasterAccess} with DependencyCountInLambdaToSplitBigObjectGraph=2147483647
         If you know what you're doing you may disable this error with the rule `new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan())`.
         */
     }
