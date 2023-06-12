@@ -398,7 +398,7 @@ namespace DryIoc
                 // 1) First try to interpret
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
                 {
-                    // todo: @fixme problem that the service factory is not aware that the expression is produced by decorator factory which should not be cached
+                    // todo: @check ...but what if exception is thrown, isn't it better to avoid caching the bad expression?
                     if (factory.CanCache) 
                         TryCacheDefaultFactoryDelegateOrExprOrResult(serviceTypeHash, serviceType, expr);
                     return instance;
@@ -573,9 +573,9 @@ namespace DryIoc
 
             var requiredItemType = requiredServiceType ?? serviceType;
             if (serviceKey != null)
-                generatedFactories = generatedFactories.Where(x => serviceKey.Equals(x.ServiceKey));
+                generatedFactories = generatedFactories.Match(serviceKey, static (sk, x) => sk.Equals(x.ServiceKey));
             if (requiredServiceType != null)
-                generatedFactories = generatedFactories.Where(x => requiredServiceType == x.RequiredServiceType);
+                generatedFactories = generatedFactories.Match(requiredServiceType, static (rst, x) => rst == x.RequiredServiceType);
 
             foreach (var generated in generatedFactories)
                 yield return generated.FactoryDelegate(this);
@@ -593,15 +593,16 @@ namespace DryIoc
 
             var items = GetServiceRegisteredAndDynamicFactories(requiredItemType)
                 .Match(requiredServiceType,
-                    (_, x) => x.Value != null, // filter out unregistered services
-                    (t, f) => new ServiceRegistrationInfo(f.Value, t, f.Key));
+                    static (_, x) => x.Value != null, // filter out unregistered services
+                    static (t, f) => new ServiceRegistrationInfo(f.Value, t, f.Key));
 
             ServiceRegistrationInfo[] openGenericItems = null;
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
                 openGenericItems = GetAllServiceFactories(requiredItemOpenGenericType).Match(requiredItemOpenGenericType, requiredServiceType,
-                    (_, __, x) => x.Value != null, (gt, t, x) => new ServiceRegistrationInfo(x.Value, t, new OpenGenericTypeKey(gt, x.Key)));
+                    static (_, __, x) => x.Value != null, 
+                    static (gt, t, x) => new ServiceRegistrationInfo(x.Value, t, new OpenGenericTypeKey(gt, x.Key)));
             }
 
             // Append registered generic types with compatible variance,
@@ -610,20 +611,20 @@ namespace DryIoc
             if (requiredItemType.IsGenericType && Rules.VariantGenericTypesInResolvedCollection)
             {
                 variantGenericItems = GetServiceRegistrations()
-                    .Where(x => x.ServiceType.IsGenericType
-                        && x.ServiceType.GetGenericTypeDefinition() == requiredItemType.GetGenericTypeDefinition()
-                        && x.ServiceType != requiredItemType
-                        && x.ServiceType.IsAssignableTo(requiredItemType))
-                    .ToArray();
+                    .Match(requiredItemType, static (rit, x) => x.ServiceType.IsGenericType
+                        && x.ServiceType.GetGenericTypeDefinition() == rit.GetGenericTypeDefinition()
+                        && x.ServiceType != rit
+                        && x.ServiceType.IsAssignableTo(rit))
+                    .ToArrayOrSelf();
             }
 
             if (serviceKey != null) // include only single item matching key.
             {
                 items = items.Match(serviceKey, (k, x) => k.Equals(x.OptionalServiceKey));
                 if (openGenericItems != null)
-                    openGenericItems = openGenericItems.Match(serviceKey, (k, x) => k.Equals(((OpenGenericTypeKey)x.OptionalServiceKey).ServiceKey));
+                    openGenericItems = openGenericItems.Match(serviceKey, static (k, x) => k.Equals(((OpenGenericTypeKey)x.OptionalServiceKey).ServiceKey));
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Match(serviceKey, (k, x) => k.Equals(x.OptionalServiceKey));
+                    variantGenericItems = variantGenericItems.Match(serviceKey, static (k, x) => k.Equals(x.OptionalServiceKey));
             }
 
             var d = preResolveParent.GetServiceDetails();
@@ -631,11 +632,11 @@ namespace DryIoc
             var metadata = d.Metadata;
             if (metadataKey != null || metadata != null)
             {
-                items = items.Match(metadataKey, metadata, (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
+                items = items.Match(metadataKey, metadata, static (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
                 if (openGenericItems != null)
-                    openGenericItems = openGenericItems.Match(metadataKey, metadata, (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
+                    openGenericItems = openGenericItems.Match(metadataKey, metadata, static (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Match(metadataKey, metadata, (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
+                    variantGenericItems = variantGenericItems.Match(metadataKey, metadata, static (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
             }
 
             // Exclude composite parent service from items, skip decorators
@@ -645,12 +646,12 @@ namespace DryIoc
 
             if (!parent.IsEmpty && parent.ActualServiceType == requiredItemType)
             {
-                items = items.Match(parent.FactoryID, (id, x) => x.Factory.FactoryID != id);
+                items = items.Match(parent.FactoryID, static (id, x) => x.Factory.FactoryID != id);
                 if (openGenericItems != null)
                     openGenericItems = openGenericItems.Match(parent.FactoryID,
-                        (id, x) => x.Factory.GeneratedFactories?.ToArray().FindFirst(id, (i, f) => f.Value.FactoryID == id) == null);
+                        static (id, x) => x.Factory.GeneratedFactories?.ToArray().FindFirst(id, static (i, f) => f.Value.FactoryID == i) == null);
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Match(parent.FactoryID, (id, x) => x.Factory.FactoryID != id);
+                    variantGenericItems = variantGenericItems.Match(parent.FactoryID, static (id, x) => x.Factory.FactoryID != id);
             }
 
             var allItems = openGenericItems == null && variantGenericItems == null ? items
@@ -834,16 +835,17 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
-        public KeyValuePair<ServiceInfo, ContainerException>[] Validate(params ServiceInfo[] roots)
+        public KeyValuePair<ServiceInfo, ContainerException>[] Validate(IEnumerable<ServiceInfo> roots)
         {
+            Throw.ThrowIfNull(roots, Error.FoundNoRootsToValidate, this);
+
             var validatingContainer = this.With(rules => rules.ForValidate());
 
             var depRequestStack = new Request[8];
 
             List<KeyValuePair<ServiceInfo, ContainerException>> errors = null;
-            for (var i = 0; i < roots.Length; i++)
+            foreach (var root in roots)
             {
-                var root = roots[i];
                 try
                 {
                     var request = Request.CreateForValidation(validatingContainer, root, depRequestStack);
@@ -858,15 +860,6 @@ namespace DryIoc
             }
 
             return errors?.ToArray() ?? ArrayTools.Empty<KeyValuePair<ServiceInfo, ContainerException>>();
-        }
-
-        /// <inheritdoc />
-        public KeyValuePair<ServiceInfo, ContainerException>[] Validate()
-        {
-            var roots = GetServiceRegistrations().Where(ContainerTools.DefaultValidateCondition).Select(r => r.ToServiceInfo()).ToArray();
-            if (roots.Length == 0)
-                Throw.It(Error.FoundNoRootsToValidate, this);
-            return Validate(roots);
         }
 
         /// <inheritdoc />
@@ -4558,26 +4551,64 @@ namespace DryIoc
         /// <summary>Excluding open-generic registrations, cause you need to provide type arguments to actually create these types.</summary>
         public static bool DefaultValidateCondition(ServiceRegistrationInfo reg) => !reg.ServiceType.IsOpenGeneric();
 
+        // todo: @vNext instead of `condition` we may use a transformer to close the open-generic types. But may be having `roots` parameters covers it as well.
         /// <summary>Helps to find potential problems in service registration setup. Method tries to resolve the specified registrations, collects exceptions, 
         /// and returns them to user. Does not create any actual service objects. You must specify <paramref name="condition"/> to define your resolution roots,
-        /// otherwise container will try to resolve all registrations, which usually is not realistic case to validate.</summary>
+        /// otherwise container will try to resolve the registrations marked with `Setup.With(asResolutionRoot: true)` 
+        /// or the all registrations (which usually is not realistic case to validate).</summary>
         public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, Func<ServiceRegistrationInfo, bool> condition = null)
         {
-            var theCondition = condition == null || condition == DefaultValidateCondition
-                ? DefaultValidateCondition
-                : (Func<ServiceRegistrationInfo, bool>)(r => condition(r) && DefaultValidateCondition(r));
-            var roots = container.GetServiceRegistrations().Where(theCondition).Select(r => r.ToServiceInfo()).ToArray();
-            if (roots.Length == 0)
-                Throw.It(Error.FoundNoRootsToValidate, container);
-            return container.Validate(roots);
+            var roots = ArrayTools.Empty<ServiceRegistrationInfo>();
+            if (condition == null)
+            {
+                var allNonGenericRegistrations = container.GetServiceRegistrations().Match(DefaultValidateCondition).ToArrayOrSelf();
+                if (allNonGenericRegistrations.Length == 0)
+                    Throw.It(Error.FoundNoRootsToValidate, container);
+                
+                // We try to find the registrations marked by `Setup.With(asResolutionRoot: true)` and if nothing found, fallback to the all found.
+                // This allow to make asResolutionRoot marking to be optional for validate, but if used - provide the convinient validation by convention. 
+                roots = allNonGenericRegistrations.Match(r => r.Factory.Setup.AsResolutionRoot);
+                if (roots.Length == 0)
+                    roots = allNonGenericRegistrations;
+            }
+            else
+            {
+                // condition overrides whatever resolution roots are marked in registrations 
+                roots = container.GetServiceRegistrations().Match(condition, static (cond, r) => cond(r) && DefaultValidateCondition(r)).ToArrayOrSelf();
+                if (roots.Length == 0)
+                    Throw.It(Error.FoundNoRootsToValidate, container);
+            }
+            return container.Validate(roots.Map(static r => r.ToServiceInfo()));
         }
+
+        /// <summary>Helps to find potential problems in service registration setup by trying to resolve the <paramref name="serviceTypes"/> and 
+        /// returning the found errors. This method does not throw the errors but collects and returns them.</summary>
+        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, params Type[] serviceTypes)
+        {
+            if (serviceTypes.IsNullOrEmpty())
+                Throw.It(Error.NoServiceTypesToValidate, container);
+            return container.Validate(serviceTypes.Map(static t => ServiceInfo.Of(t)));
+        }
+
+        /// <summary>Helps to find potential problems in service registration setup by trying to resolve the <paramref name="roots"/> and 
+        /// returning the found errors. This method does not throw the errors but collects and returns them.</summary>
+        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, params ServiceInfo[] roots) =>
+            container.Validate(roots);
 
         /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
         public static void ValidateAndThrow(this IContainer container, Func<ServiceRegistrationInfo, bool> condition = null)
         {
             var errors = container.Validate(condition);
             if (!errors.IsNullOrEmpty())
-                Throw.Many(Error.ValidateFoundErrors, errors.Map(x => x.Value));
+                Throw.Many(Error.ValidateFoundErrors, errors.Map(static x => x.Value));
+        }
+
+        /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
+        public static void ValidateAndThrow(this IContainer container, params Type[] serviceTypes)
+        {
+            var errors = container.Validate(serviceTypes);
+            if (!errors.IsNullOrEmpty())
+                Throw.Many(Error.ValidateFoundErrors, errors.Map(static x => x.Value));
         }
 
         /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
@@ -4585,7 +4616,7 @@ namespace DryIoc
         {
             var errors = container.Validate(roots);
             if (!errors.IsNullOrEmpty())
-                Throw.Many(Error.ValidateFoundErrors, errors.Map(x => x.Value));
+                Throw.Many(Error.ValidateFoundErrors, errors.Map(static x => x.Value));
         }
 
         /// <summary>Re-constructs the whole request chain as request creation expression.</summary>
@@ -4618,7 +4649,7 @@ namespace DryIoc
             var serviceTypeExpr = Constant(serviceType);
             var factoryIdExpr = ConstantInt(factoryID);
             var implTypeExpr = implementationType.ToConstant();
-            // todo: @mem @perf avoid capture
+            // todo: @mem @perf avoid closure
             var reuseExpr = r.Reuse == null ? ConstantNull<IReuse>() : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
 
             if (d.IfUnresolved == IfUnresolved.Throw && d.RequiredServiceType == null && d.ServiceKey == null && d.MetadataKey == null && d.Metadata == null &&
@@ -4652,27 +4683,10 @@ namespace DryIoc
                 factoryIdExpr, factoryTypeExpr, implTypeExpr, reuseExpr, flagsExpr, decoratedFactoryIDExpr);
         }
 
-        /// <summary>Same as the Validate with the same parameters but throws the exception with all collected errors</summary>
-        public static void ValidateAndThrow(this IContainer container, params Type[] serviceTypes)
-        {
-            var errors = container.Validate(serviceTypes);
-            if (!errors.IsNullOrEmpty())
-                Throw.Many(Error.ValidateFoundErrors, errors.Map(x => x.Value));
-        }
-
         /// <summary>Clears delegate and expression cache for specified <typeparamref name="T"/>.
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
         public static bool ClearCache<T>(this IContainer container, FactoryType? factoryType = null, object serviceKey = null) =>
             container.ClearCache(typeof(T), factoryType, serviceKey);
-
-        /// <summary>Helps to find potential problems in service registration setup by trying to resolve the <paramref name="serviceTypes"/> and 
-        /// returning the found errors. This method does not throw.</summary>
-        public static KeyValuePair<ServiceInfo, ContainerException>[] Validate(this IContainer container, params Type[] serviceTypes)
-        {
-            if (serviceTypes.IsNullOrEmpty())
-                Throw.It(Error.NoServiceTypesToValidate, container);
-            return container.Validate(serviceTypes.Map(t => ServiceInfo.Of(t)));
-        }
 
         /// <summary>Clears delegate and expression cache for specified service.
         /// But does not clear instances of already resolved/created singletons and scoped services!</summary>
@@ -7316,7 +7330,7 @@ namespace DryIoc
         public static TypedMade<TService> Of<TService>(
             System.Linq.Expressions.Expression<Func<TService>> serviceReturningExpr,
             params Func<Request, object>[] argValues) =>
-            FromExpression<TService>(member => _ => DryIoc.FactoryMethod.Of(member), serviceReturningExpr, argValues);
+            FromExpression<object, TService>(member => _ => DryIoc.FactoryMethod.Of(member), null, serviceReturningExpr, argValues);
 
         /// <summary>Defines creation info from factory method call Expression without using strings.
         /// You can supply any/default arguments to factory method, they won't be used, it is only to find the <see cref="MethodInfo"/>.</summary>
@@ -7329,12 +7343,8 @@ namespace DryIoc
             Func<Request, ServiceInfo.Typed<TFactory>> getFactoryInfo,
             System.Linq.Expressions.Expression<Func<TFactory, TService>> serviceReturningExpr,
             params Func<Request, object>[] argValues)
-            where TFactory : class
-        {
-            getFactoryInfo.ThrowIfNull();
-            return FromExpression<TService>(member => request => DryIoc.FactoryMethod.Of(member, getFactoryInfo(request)),
-                serviceReturningExpr, argValues);
-        }
+            where TFactory : class =>
+            FromExpression<TFactory, TService>(null, getFactoryInfo.ThrowIfNull(), serviceReturningExpr, argValues);
 
         /// <summary>Composes Made.Of expression with known factory instance and expression to get a service</summary>
         public static TypedMade<TService> Of<TFactory, TService>(
@@ -7344,18 +7354,20 @@ namespace DryIoc
             where TFactory : class
         {
             factoryInstance.ThrowIfNull();
-            return FromExpression<TService>(
+            return FromExpression<TFactory, TService>(
                 member => request => DryIoc.FactoryMethod.Of(member, factoryInstance),
-                serviceReturningExpr, argValues);
+                null, serviceReturningExpr, argValues);
         }
 
-        private static TypedMade<TService> FromExpression<TService>(
-            Func<MemberInfo, FactoryMethodSelector> getFactoryMethodSelector,
-            System.Linq.Expressions.LambdaExpression serviceReturningExpr, params Func<Request, object>[] argValues)
+        private static TypedMade<TService> FromExpression<TFactory, TService>(
+            Func<MemberInfo, FactoryMethodSelector> eitherGetFactoryMethodSelector,
+            Func<Request, ServiceInfo.Typed<TFactory>> orGetFactoryInfo,
+            System.Linq.Expressions.LambdaExpression serviceReturningExpr, 
+            params Func<Request, object>[] argValues)
         {
             var callExpr = serviceReturningExpr.ThrowIfNull().Body;
             if (callExpr.NodeType == ExprType.Convert) // proceed without Cast expression.
-                return FromExpression<TService>(getFactoryMethodSelector,
+                return FromExpression<TFactory, TService>(eitherGetFactoryMethodSelector, orGetFactoryInfo,
                     System.Linq.Expressions.Expression.Lambda(((System.Linq.Expressions.UnaryExpression)callExpr).Operand,
                         Empty<System.Linq.Expressions.ParameterExpression>()),
                     argValues);
@@ -7402,16 +7414,25 @@ namespace DryIoc
             else return Throw.For<TypedMade<TService>>(Error.NotSupportedMadeOfExpression, callExpr);
 
             var hasCustomValue = false;
+            var hasUsedFactoryInfoForParameter = false;
 
             var parameterSelector = parameters.IsNullOrEmpty() ? null :
-                ComposeParameterSelectorFromArgs(ref hasCustomValue, serviceReturningExpr, parameters, argExprs, argValues);
+                ComposeParameterSelectorFromArgs(ref hasCustomValue, ref hasUsedFactoryInfoForParameter,
+                    orGetFactoryInfo, serviceReturningExpr, parameters, argExprs, argValues);
 
             var propertiesAndFieldsSelector = memberBindingExprs == null || memberBindingExprs.Count == 0 ? null :
                 ComposePropertiesAndFieldsSelector(ref hasCustomValue, serviceReturningExpr, memberBindingExprs, argValues);
 
+            var factoryMethodSelector = 
+                eitherGetFactoryMethodSelector != null 
+                    ? eitherGetFactoryMethodSelector(ctorOrMethodOrMember) :
+                hasUsedFactoryInfoForParameter 
+                    ? (FactoryMethodSelector)(_ => DryIoc.FactoryMethod.Of(ctorOrMethodOrMember))
+                    : (FactoryMethodSelector)(r => DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, orGetFactoryInfo(r)));
+
             if (!hasCustomValue && parameterSelector == null && propertiesAndFieldsSelector == null)
-                return new TypedMade<TService>(getFactoryMethodSelector(ctorOrMethodOrMember));
-            return new WithDetails<TService>(getFactoryMethodSelector(ctorOrMethodOrMember),
+                return new TypedMade<TService>(factoryMethodSelector);
+            return new WithDetails<TService>(factoryMethodSelector,
                 parameterSelector, propertiesAndFieldsSelector, hasCustomValue);
         }
 
@@ -7457,7 +7478,9 @@ namespace DryIoc
                 : new WithDetails(FactoryMethodOrSelector, t, Parameters, PropertiesAndFields, _details);
         }
 
-        private static ParameterSelector ComposeParameterSelectorFromArgs(ref bool hasCustomValue,
+        private static ParameterSelector ComposeParameterSelectorFromArgs<TFactory>(
+            ref bool hasCustomValue, ref bool hasUsedFactoryInfoForParameter, 
+            Func<Request, ServiceInfo.Typed<TFactory>> nullOrGetFactoryInfo,
             System.Linq.Expressions.Expression wholeServiceExpr, ParameterInfo[] paramInfos,
             IList<System.Linq.Expressions.Expression> argExprs,
             params Func<Request, object>[] argValues)
@@ -7466,8 +7489,27 @@ namespace DryIoc
             for (var i = 0; i < argExprs.Count; i++)
             {
                 var paramInfo = paramInfos[i];
-                var methodCallExpr = argExprs[i] as System.Linq.Expressions.MethodCallExpression;
-                if (methodCallExpr != null)
+                var argExpr = argExprs[i];
+
+                // If the parameter expression passed from the lambda argument, e.g. for the static and extension methods,
+                // Then we will be using the argument factory info as a parameter info, 
+                // so for the extension method `f => f.Create()` the factory info for the `f` will be used for the parameter `f` in `Exts.Create(f)`.
+                if (argExpr is System.Linq.Expressions.ParameterExpression paramExpr)
+                {
+                    if (nullOrGetFactoryInfo != null &&
+                        typeof(TFactory).IsAssignableTo(paramExpr.Type))
+                    {
+                        hasUsedFactoryInfoForParameter = true;
+                        paramSelector = paramSelector.OverrideWith(req => 
+                            p => p.Equals(paramInfo)
+                                ? nullOrGetFactoryInfo(req)?.Details?.To(ParameterServiceInfo.Of(p).WithDetails)
+                                : null);
+                    }
+                    else Throw.It(Error.MadeOfCallExpressionParameterDoesNotCorrespondToTheFactoryInfo, paramExpr, typeof(TFactory));
+                    continue;
+                }
+
+                if (argExpr is System.Linq.Expressions.MethodCallExpression methodCallExpr)
                 {
                     if (methodCallExpr.Method.DeclaringType != typeof(Arg))
                         Throw.It(Error.UnexpectedExpressionInsteadOfArgMethodInMadeOf, methodCallExpr, wholeServiceExpr);
@@ -8017,7 +8059,7 @@ namespace DryIoc
         /// <summary>Returns the types suitable to be an implementation types for <see cref="ReflectionFactory"/>:
         /// actually a non abstract and not compiler generated classes.</summary>
         public static IEnumerable<Type> GetImplementationTypes(this Assembly assembly, Func<Type, bool> condition) =>
-            Portable.GetAssemblyTypes(assembly).Where(t => condition(t) && t.IsImplementationType());
+            Portable.GetAssemblyTypes(assembly).Match(condition, static (cond, t) => cond(t) && t.IsImplementationType());
 
         /// <summary>Sugar, so you can say <code lang="cs"><![CDATA[r.RegisterMany<X>(Registrator.Interfaces)]]></code></summary>
         public static Func<Type, bool> Interfaces = x => x.IsInterface;
@@ -14154,13 +14196,7 @@ namespace DryIoc
         /// Method will collect the exceptions when resolving or injecting the specific root. Does not create any actual service objects.
         /// You must specify <paramref name="roots"/> to define your resolution roots, otherwise container will try to resolve all registrations, 
         /// which usually is not realistic case to validate.</summary>
-        KeyValuePair<ServiceInfo, ContainerException>[] Validate(params ServiceInfo[] roots);
-
-        /// <summary>Helps to find potential problems in service registration setup. Method tries to resolve the specified registrations, collects exceptions, 
-        /// and returns them to user. Does not create any actual service objects. 
-        /// When called without condition parameter, the method will try to resolve all registrations. Use the method overload with `condition` or `roots`
-        /// to narrow down the resolution roots.</summary>
-        KeyValuePair<ServiceInfo, ContainerException>[] Validate();
+        KeyValuePair<ServiceInfo, ContainerException>[] Validate(IEnumerable<ServiceInfo> roots);
 
         /// <summary>Generates expressions for specified roots and their "Resolve-call" dependencies.
         /// Wraps exceptions into errors. The method does not create any actual services.
@@ -14588,6 +14624,8 @@ namespace DryIoc
                 "The member info {0} passed to `Made.Of` or `FactoryMethod.Of` is NOT static, but instance factory is not provided or null"),
             PassedMemberIsStaticButInstanceFactoryIsNotNull = Of(
                 "You are passing constructor or STATIC member info {0} to `Made.Of` or `FactoryMethod.Of`, but then why are you passing factory INSTANCE: {1}"),
+            MadeOfCallExpressionParameterDoesNotCorrespondToTheFactoryInfo = Of(
+                "Made.Of factory method uses parameter expression `{0}` which is not corresponding to the factory info for that parameter: {1}"),
             UndefinedMethodWhenGettingTheSingleMethod = Of(
                 "Undefined Method '{0}' in Type {1} (including non-public={2})"),
             UndefinedMethodWhenGettingMethodWithSpecifiedParameters = Of(
@@ -14611,7 +14649,9 @@ namespace DryIoc
             NoServiceTypesToValidate = Of(
                 "The `serviceTypes` passed to Validate method is null or empty. Please pass the type(s) you want to Validate."),
             ValidateFoundErrors = Of(
-                "Validate found the errors, please check the ContainerException.CollectedExceptions for details."),
+                "Validate method found the errors, please check the ContainerException.CollectedExceptions for the details." + NewLine +
+                "If you see too many (unexpected) errors, try narrowing the resolution roots by passing the selected service types or the condition to the Validate(AndThrow) method." + NewLine +
+                "Or alternatively, mark the service registrations with `setup: Setup.With(asResolutionRoot: true)`."),
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(

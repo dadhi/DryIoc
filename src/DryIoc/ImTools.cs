@@ -996,20 +996,39 @@ namespace DryIoc.ImTools
         public static IEnumerable<T> Match<T>(this IEnumerable<T> source, Func<T, bool> condition) =>
             source is T[] arr ? arr.Match(condition) : source?.Where(condition);
 
-        /// <summary>If <paramref name="source"/> is array than uses more effective Match for array,
-        /// otherwise just calls Where, Select</summary>
-        /// <typeparam name="T">Type of source items.</typeparam> <typeparam name="R">Type of result items.</typeparam>
-        /// <param name="source">If null, the null will be returned.</param>
-        /// <param name="condition">Condition to keep items.</param>  <param name="map">Converter from source to result item.</param>
-        /// <returns>Result items, may be an array.</returns>
+        /// <summary>If <paramref name="source"/> is array than it uses more effective Match for array avoiding the closure over the state `S`,
+        /// otherwise calls Where on the Enumerator avoiding the closure over `S`.
+        /// Should be called mostly when you have an arrays.</summary>
+        public static IEnumerable<T> Match<S, T>(this IEnumerable<T> source, S s, Func<S, T, bool> condition) =>
+            source is T[] arr ? arr.Match(s, condition) : source == null ? null : Where(source, s, condition);
+
+        // todo: @wip benchmark it
+        /// <summary>Calls Where on the Enumerator avoiding the closure over `S`.</summary>
+        public static IEnumerable<T> Where<S, T>(this IEnumerable<T> source, S s, Func<S, T, bool> condition)
+        { 
+            var e = source.GetEnumerator();
+            while (e.MoveNext())
+            {
+                var current = e.Current;
+                if (condition(s, current))
+                    yield return current;
+            }
+        }
+
+        /// <summary>If <paramref name="source"/> is array than uses more effective Match for array avoiding the closure over the state `S`,
+        /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `S`.
+        /// Should be called mostly when you have an arrays.</summary>
         public static IEnumerable<R> Match<T, R>(this IEnumerable<T> source, Func<T, bool> condition, Func<T, R> map) =>
             source is T[] arr ? arr.Match(condition, map) : source?.Where(condition).Select(map);
 
         /// <summary>If <paramref name="source"/> is array than it uses more effective Match for array,
-        /// otherwise just calls Where, Select. Should be called mostly when you have an arrays</summary>
+        /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `S`. 
+        /// Should be called mostly when you have an arrays</summary>
         public static IEnumerable<R> Match<S, T, R>(this IEnumerable<T> source, S s, Func<S, T, bool> condition, Func<S, T, R> map) =>
-            source is T[] arr ? arr.Match(s, condition, map) : s == null ? null : WhereSelect(source, s, condition, map);
-        private static IEnumerable<R> WhereSelect<S, T, R>(this IEnumerable<T> source, S s, Func<S, T, bool> condition, Func<S, T, R> map)
+            source is T[] arr ? arr.Match(s, condition, map) : source == null ? null : WhereSelect(source, s, condition, map);
+
+        /// <summary>Calls combined Where and Select on the Enumerator avoiding the closure over `S`</summary>
+        public static IEnumerable<R> WhereSelect<S, T, R>(this IEnumerable<T> source, S s, Func<S, T, bool> condition, Func<S, T, R> map)
         { 
             var e = source.GetEnumerator();
             while (e.MoveNext())

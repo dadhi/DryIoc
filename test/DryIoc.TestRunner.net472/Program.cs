@@ -128,6 +128,8 @@ namespace DryIoc.UnitTests.net472
                 new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules(),
                 new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed(),
                 new GHIssue559_Possible_inconsistent_behaviour(),
+                new GHIssue574_Cannot_register_multiple_impls_in_child_container_with_default_service_key(),
+                new GHIssue576_Extension_methods_not_being_handled_correctly_in_MadeOf_service_returning_expression(),
             };
             var loadTests = new ITest[]
             {
