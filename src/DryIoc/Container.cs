@@ -4570,7 +4570,7 @@ namespace DryIoc
                 
                 // We try to find the registrations marked by `Setup.With(asResolutionRoot: true)` and if nothing found, fallback to the all found.
                 // This allow to make asResolutionRoot marking to be optional for validate, but if used - provide the convinient validation by convention. 
-                roots = allNonGenericRegistrations.Match(r => r.Factory.Setup.AsResolutionRoot);
+                roots = allNonGenericRegistrations.Match(static r => r.Factory.Setup.AsResolutionRoot);
                 if (roots.Length == 0)
                     roots = allNonGenericRegistrations;
             }
