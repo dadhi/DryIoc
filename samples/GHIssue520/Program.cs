@@ -6,6 +6,19 @@ using System.Net.Http;
 
 var services = new ServiceCollection();
 
+// test gh issue 584
+services.AddOptions();
+
+// Will not work because the container is not conformed to the MS.DI rules!
+// var containerIssue584 = new Container();
+
+// Instead use this:
+var containerIssue584_1 = new Container(Rules.MicrosoftDependencyInjectionRules);
+containerIssue584_1.Populate(services);
+
+// or better this:
+var containerIssue584_2 = new Container().WithDependencyInjectionAdapter(services);
+
 services.AddHttpClient(Options.DefaultName)
 .ConfigurePrimaryHttpMessageHandler(c =>
 {
@@ -24,7 +37,7 @@ Console.WriteLine($"Services ({services.Count}):\n" + string.Join(",\n", service
 
 var container = new Container(r =>
     r.WithDefaultIfAlreadyRegistered(IfAlreadyRegistered.Replace))
-.WithDependencyInjectionAdapter(services);
+     .WithDependencyInjectionAdapter(services);
 
 
 var factory = container.Resolve<IHttpClientFactory>();

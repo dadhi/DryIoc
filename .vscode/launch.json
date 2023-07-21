@@ -31,6 +31,21 @@
             "requireExactSource": false // allows to for moderate code editing while debugging
         },
         {
+            "name": "GHIssue520",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build_testrunner",
+            // If you have changed target frameworks, make sure to update the program path.
+            "program": "${workspaceFolder}/samples/GHIssue520/bin/Debug/net7.0/test.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/samples/GHIssue520",
+            // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
+            "console": "internalConsole",
+            "stopAtEntry": false,
+            "internalConsoleOptions": "openOnSessionStart",
+            "requireExactSource": false // allows to for moderate code editing while debugging
+        },
+        {
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach",
