@@ -882,10 +882,10 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<object> slot)
+        internal Expression GetCachedFactoryExpression(Request request, out ImMapEntry<object> slot)
         {
             if (_registry.Value is Registry r)
-                return r.GetCachedFactoryExpression(factoryId, reuse, out slot);
+                return r.GetCachedFactoryExpression(request, out slot);
             slot = null;
             return null;
         }
@@ -2102,18 +2102,22 @@ namespace DryIoc
             }
 
 
-            internal Expression GetCachedFactoryExpression(int factoryId, IReuse reuse, out ImMapEntry<object> entry)
+            internal Expression GetCachedFactoryExpression(Request request, out ImMapEntry<object> entry)
             {
+                var factoryId = request.FactoryID;
                 entry = FactoryExpressionCache?[factoryId & CACHE_SLOT_COUNT_MASK]?.GetEntryOrDefault(factoryId);
                 if (entry == null)
                     return null;
 
+                var reuse = request.Reuse;
                 var expr = entry.Value;
                 if (expr is Expression e)
                     return reuse is SingletonReuse || reuse is CurrentScopeReuse sr && sr.Name == null ? e : null;
 
                 if (expr is ExprCacheOfTransientWithDepCount t)
+                {
                     return reuse == Reuse.Transient ? t.Expr : null;
+                }
 
                 if (expr is ExprCacheOfScopedWithName s)
                     return reuse.Name != null && reuse.Name.Equals(s.Name) ? s.Expr : null;
@@ -10949,7 +10953,7 @@ namespace DryIoc
             ImMapEntry<object> cacheEntry = null;
             if (cacheExpression)
             {
-                var cachedExpr = ((Container)container).GetCachedFactoryExpression(request.FactoryID, reuse, out cacheEntry);
+                var cachedExpr = ((Container)container).GetCachedFactoryExpression(request, out cacheEntry);
                 if (cachedExpr != null)
                 {
                     if (reuse == DryIoc.Reuse.Transient &&

@@ -7,7 +7,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Test_scope_inside_the_transient_dependency_of_the_scoped_service();
+            // Test_scope_inside_the_transient_dependency_of_the_scoped_service();
             Test_scope_inside_the_transient_dependency_of_the_scoped_service_But_injected_first_in_singleton();
             return 2;
         }
@@ -17,9 +17,10 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
+            container.Register<ServiceResolver>(reuse: Reuse.Transient);
+            
             container.Register<ServiceSingleton>(reuse: Reuse.Singleton);
             container.Register<ServiceTransient>(reuse: Reuse.Transient);
-            container.Register<ServiceResolver>(reuse: Reuse.Transient);
             container.Register<ServiceScoped>(reuse: Reuse.Scoped);
 
             using var scope = container.OpenScope();
@@ -33,9 +34,10 @@ namespace DryIoc.IssuesTests
         {
             var container = new Container();
 
+            container.Register<ServiceResolver>(reuse: Reuse.Transient);
+
             container.Register<ServiceSingleton>(reuse: Reuse.Singleton);
             container.Register<ServiceTransient>(reuse: Reuse.Transient);
-            container.Register<ServiceResolver>(reuse: Reuse.Transient);
             container.Register<ServiceScoped>(reuse: Reuse.Scoped);
 
             // resolving singleton first breaks the resolution in the Do below

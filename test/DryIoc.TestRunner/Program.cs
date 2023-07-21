@@ -10,13 +10,13 @@ namespace DryIoc.UnitTests
         {
             RunAllTests();
 
-            // new GHIssue579_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run();
+            // new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run();
 
             // new GHIssue574_Cannot_register_multiple_impls_in_child_container_with_default_service_key().Run();
             // new GHIssue576_Extension_methods_not_being_handled_correctly_in_MadeOf_service_returning_expression().Run();
             // new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
-            // new RequiredPropertiesTests().Run();            
-            // new PropertyResolutionTests().Run();            
+            // new RequiredPropertiesTests().Run();
+            // new PropertyResolutionTests().Run();
             // new IssuesTests.Samples.DefaultReuseTest().Run();
             // new GHIssue391_Deadlock_during_Resolve().Run();
             // new GHIssue559_Possible_inconsistent_behaviour().Run();
@@ -57,7 +57,7 @@ namespace DryIoc.UnitTests
             Console.WriteLine("Running UnitTests and IssueTests (.NET Core) ...");
             Console.WriteLine();
 
-            var tests = new ITest[] 
+            var tests = new ITest[]
             {
                 new ContainerTests(),
                 new OpenGenericsTests(),
