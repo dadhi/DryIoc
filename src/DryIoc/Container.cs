@@ -812,7 +812,7 @@ namespace DryIoc
         public IScope OwnCurrentScope => _ownCurrentScope;
 
         /// <summary>Indicates that container is disposed.</summary>
-        public bool IsDisposed => _disposed == 1 || _singletonScope.IsDisposed;
+        public bool IsDisposed => _disposed == 1 || _singletonScope.IsDisposed || _ownCurrentScope?.IsDisposed == true;
 
         /// <inheritdoc />
         public object DisposeInfo => _disposeStackTrace;
