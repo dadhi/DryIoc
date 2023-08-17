@@ -130,6 +130,7 @@ namespace DryIoc.UnitTests.net472
                 new GHIssue559_Possible_inconsistent_behaviour(),
                 new GHIssue574_Cannot_register_multiple_impls_in_child_container_with_default_service_key(),
                 new GHIssue576_Extension_methods_not_being_handled_correctly_in_MadeOf_service_returning_expression(),
+                new GHIssue588_Container_IsDisposed_property_not_reflecting_own_scope_disposed_state(),
             };
             var loadTests = new ITest[]
             {
