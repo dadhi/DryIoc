@@ -9,8 +9,10 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
+            new GHIssue243_Delegate_Factory_Resolving_Incremental_Improvement_over_Func_Wrapper().Run();
+
             RunAllTests();
-            
+
             // new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run(); // todo: @fixme
             // new GHIssue169_Decorators().Run();
             

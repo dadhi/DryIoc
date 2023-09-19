@@ -655,15 +655,15 @@ In addition you can use the rule to [select constructor with all resolvable para
 
 **Obsolete** - please use the the `WithDynamicRegistrations` and `WithDynamicRegistrationsAsFallback` instead.
 
-The `UnknownServiceResolvers` is **obsolete** Today because they did not support the other DryIoc features,
-(e.g. wrappers, decorators, `ResolveMany`) comparing to the normal registrations.
-The reason is because the `UnknownServiceResolvers` were implemented as a mechanism different from the registration resolution pipeline.
-The newer alternative is the `WithDynamicRegistrations` and the features based on it. See below.
+The `UnknownServiceResolvers` are **obsolete** Today because they do not support the other DryIoc features,
+(e.g. [Wrappers](Wrappers.md), [Decorators](Decorators.md), `ResolveMany`) comparing to the normal registrations.
+The reason is because the `UnknownServiceResolvers` were implemented via different mechanism comparing to the normal resolution pipeline.
+The better alternative is the `WithDynamicRegistrations` - see below for details.
 
 
 ### DynamicRegistrationProvider 
 
-Example of how `ResolveMany` is not working with the `UnknownServiceResolvers` and working with the `WithDynamicRegistration`:
+Example of how `ResolveMany` is  working with the `WithDynamicRegistration` and not working with the `UnknownServiceResolvers`:
 
 ```cs md*/
 class ResolveMany_does_not_work_WithUnknownResolvers 
@@ -697,11 +697,12 @@ class ResolveMany_does_not_work_WithUnknownResolvers
                     serviceKey is DefaultDynamicKey dk ? DefaultKey.Of(dk.RegistrationOrder) : null))) 
             };
         
-        // we need a double dynamic registrations here because we have a two default services and 
-        // the service key translation is the "key" to distinguish between the services
+        // we need the double dynamic registrations here because we have a two default services and 
+        // the service key translation is the key ;-) to distinguish between the services
         var child = new Container(Rules.Default.WithDynamicRegistrations(
             DynamicRegistrationFlags.AsFallback | DynamicRegistrationFlags.Service,
-            dynamicRegistration, dynamicRegistration));
+            dynamicRegistration,
+            dynamicRegistration));
 
         // works
         var actual = child.ResolveMany<IService>().ToArray();

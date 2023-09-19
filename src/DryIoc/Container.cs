@@ -4340,11 +4340,15 @@ namespace DryIoc
             container.With(configure?.Invoke(container.Rules) ?? container.Rules, scopeContext ?? container.ScopeContext,
                 RegistrySharing.CloneAndDropCache, container.SingletonScope);
 
+        /// <summary>Shares all of container state except the cache and the new rules.</summary>
+        public static T With<T, S>(this T container, S state,
+            Func<Rules, S, Rules> configure = null, IScopeContext scopeContext = null) where T : IContainer =>
+            container.With(configure?.Invoke(container.Rules, state) ?? container.Rules, scopeContext ?? container.ScopeContext,
+                RegistrySharing.CloneAndDropCache, container.SingletonScope);
+
         /// <summary>Prepares container for expression generation.</summary>
         public static T WithExpressionGeneration<T>(this T container, bool allowRuntimeState = false) where T : IContainer =>
-            container.With(allowRuntimeState
-                ? (Func<Rules, Rules>)(rules => rules.WithExpressionGeneration(true))
-                : (Func<Rules, Rules>)(rules => rules.WithExpressionGeneration(false)));
+            container.With(allowRuntimeState, (rules, allow) => rules.WithExpressionGeneration(allow));
 
         /// <summary>Returns new container with all expression, delegate, items cache removed/reset.
         /// But it will preserve resolved services in Singleton/Current scope.</summary>
@@ -4450,9 +4454,9 @@ namespace DryIoc
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             Func<Type, object, IEnumerable<Type>> getImplTypes, Func<Type, Factory> factory = null) =>
-            container.ThrowIfNull()
-                .With(rules => rules.WithDynamicRegistrationsAsFallback(
-                    Rules.AutoFallbackDynamicRegistrations(getImplTypes, factory)));
+            factory == null
+                ? container.ThrowIfNull().With(getImplTypes, (r, git) => r.WithDynamicRegistrationsAsFallback(Rules.AutoFallbackDynamicRegistrations(git)))
+                : container.ThrowIfNull().With(getImplTypes, (r, git) => r.WithDynamicRegistrationsAsFallback(Rules.AutoFallbackDynamicRegistrations(git, factory)));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
@@ -4479,7 +4483,7 @@ namespace DryIoc
         public static IContainer WithAutoFallbackDynamicRegistrations(this IContainer container,
             IReuse reuse, Setup setup, params Type[] implTypes) =>
             container.WithAutoFallbackDynamicRegistrations(
-                (ignoredServiceType, ignoredServiceKey) => implTypes, implType => ReflectionFactory.Of(implType, reuse, setup: setup));
+                (_, __) => implTypes, implType => ReflectionFactory.Of(implType, reuse, setup: setup));
 
         /// <summary>Provides automatic fallback resolution mechanism for not normally registered
         /// services. Underneath it uses the `WithDynamicRegistrations`.</summary>
@@ -6127,20 +6131,24 @@ namespace DryIoc
 
                 var implementationTypes = getImplementationTypes(serviceType, serviceKey);
 
-                return implementationTypes.Match(
-                    implType => implType.IsImplementingServiceType(serviceType),
-                    implType =>
+                return implementationTypes.Match(factories, serviceType,
+                    (fsRef, st, implType) => implType.IsImplementingServiceType(st),
+                    (fsRef, _, implType) =>
                     {
                         var implTypeHash = RuntimeHelpers.GetHashCode(implType);
-                        var implFactory = factories.Value.GetValueOrDefault(implTypeHash, implType);
+                        var implFactory = fsRef.Value.GetValueOrDefault(implTypeHash, implType);
                         if (implFactory == null)
                         {
                             if (factory == null)
-                                factories.Swap(fs => (implFactory = fs.GetValueOrDefault(implTypeHash, implType)) != null ? fs
-                                    : fs.AddOrUpdate(implTypeHash, implType, implFactory = ReflectionFactory.Of(implType)));
+                                fsRef.Swap(implType, implTypeHash,
+                                    (fs, it, ith) => (implFactory = fs.GetValueOrDefault(ith, it)) != null
+                                        ? fs
+                                        : fs.AddOrUpdate(ith, it, implFactory = ReflectionFactory.Of(it)));
                             else
-                                factories.Swap(fs => (implFactory = fs.GetValueOrDefault(implTypeHash, implType)) != null ? fs
-                                    : fs.AddOrUpdate(implTypeHash, implType, implFactory = factory.Invoke(implType).ThrowIfNull()));
+                                fsRef.Swap(implType, implTypeHash,
+                                    (fs, it, ith) => (implFactory = fs.GetValueOrDefault(ith, it)) != null
+                                        ? fs
+                                        : fs.AddOrUpdate(ith, it, implFactory = factory.Invoke(it).ThrowIfNull()));
                         }
 
                         // We nullify default keys (usually passed by ResolveMany to resolve the specific factory in order)
@@ -6148,8 +6156,7 @@ namespace DryIoc
                         // Given that the implementation types are unchanged then the new keys assignment will be the same the last one,
                         // so that the factory resolution will correctly match the required factory by key.
                         // e.g. bitbucket issue #396
-                        var theKey = serviceKey is DefaultDynamicKey ? null : serviceKey;
-                        return new DynamicRegistration(implFactory, IfAlreadyRegistered.Keep, theKey);
+                        return new DynamicRegistration(implFactory, IfAlreadyRegistered.Keep, serviceKey is DefaultDynamicKey ? null : serviceKey);
                     });
             };
         }

@@ -1038,6 +1038,24 @@ namespace DryIoc.ImTools
                     yield return map(s, current);
             }
         }
+
+        /// <summary>If <paramref name="source"/> is array than it uses more effective Match for array,
+        /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `A` and `B`. 
+        /// Should be called mostly when you have an arrays</summary>
+        public static IEnumerable<R> Match<A, B, T, R>(this IEnumerable<T> source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map) =>
+            source is T[] arr ? arr.Match(a, b, condition, map) : source == null ? null : WhereSelect(source, a, b, condition, map);
+
+        /// <summary>Calls combined Where and Select on the Enumerator avoiding the closure over `S`</summary>
+        public static IEnumerable<R> WhereSelect<A, B, T, R>(this IEnumerable<T> source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map)
+        { 
+            var e = source.GetEnumerator();
+            while (e.MoveNext())
+            {
+                var current = e.Current;
+                if (condition(a, b, current))
+                    yield return map(a, b, current);
+            }
+        }
     }
 
     /// <summary>Wrapper that provides optimistic-concurrency Swap operation implemented using <see cref="Ref.Swap{T}"/>.</summary>
