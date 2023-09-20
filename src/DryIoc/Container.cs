@@ -8268,7 +8268,6 @@ namespace DryIoc
         private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7, TService>(this Func<D1, D2, D3, D4, D5, D6, D7, TService> f,
             object d1, object d2, object d3, object d4, object d5, object d6, object d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7);
 
-
         private static void RegisterFunc(this IRegistrator r,
             Type serviceType, Type sourceFuncType, Delegate funcWithObjParams,
             IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
@@ -8304,7 +8303,7 @@ namespace DryIoc
         public static void RegisterDelegate(
             this IRegistrator r, Type serviceType, Type depType, Func<object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.RegisterFunc(serviceType, typeof(Func<,>).MakeGenericType(depType, typeof(object)), (Func<object, object>)factory.ToFuncWithObjParams,
+            r.RegisterFunc(serviceType, typeof(Func<,>).MakeGenericType(depType, typeof(object)), factory,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -8324,10 +8323,9 @@ namespace DryIoc
         /// <summary>Registers delegate with the explicit arguments to be injected by container.
         /// The delegate accepts the object parameters with the runtime known types</summary>
         public static void RegisterDelegate(
-            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type,
-            Func<object, object, object> factory,
+            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type, Func<object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.RegisterFunc(serviceType, typeof(Func<,,>).MakeGenericType(dep1Type, dep2Type, typeof(object)), (Func<object, object, object>)factory.ToFuncWithObjParams,
+            r.RegisterFunc(serviceType, typeof(Func<,,>).MakeGenericType(dep1Type, dep2Type, typeof(object)), factory,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -8347,10 +8345,9 @@ namespace DryIoc
         /// <summary>Registers delegate with the explicit arguments to be injected by container.
         /// The delegate accepts the object parameters with the runtime known types</summary>
         public static void RegisterDelegate(
-            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type, Type dep3Type,
-            Func<object, object, object, object> factory,
+            this IRegistrator r, Type serviceType, Type dep1Type, Type dep2Type, Type dep3Type, Func<object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.RegisterFunc(serviceType, typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, typeof(object)), (Func<object, object, object, object>)factory.ToFuncWithObjParams,
+            r.RegisterFunc(serviceType, typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, typeof(object)), factory,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -8376,8 +8373,7 @@ namespace DryIoc
             Func<object, object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.RegisterFunc(serviceType,
-                typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, typeof(object)),
-                (Func<object, object, object, object, object>)factory.ToFuncWithObjParams,
+                typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, typeof(object)), factory,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -8403,8 +8399,7 @@ namespace DryIoc
             Func<object, object, object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.RegisterFunc(serviceType,
-                typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, typeof(object)),
-                (Func<object, object, object, object, object, object>)factory.ToFuncWithObjParams,
+                typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, typeof(object)), factory,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -8430,8 +8425,7 @@ namespace DryIoc
             Func<object, object, object, object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.RegisterFunc(serviceType,
-                typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, dep6Type, typeof(object)),
-                (Func<object, object, object, object, object, object, object>)factory.ToFuncWithObjParams,
+                typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, dep6Type, typeof(object)), factory,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with explicit arguments to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -8457,8 +8451,7 @@ namespace DryIoc
             Func<object, object, object, object, object, object, object, object> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
             r.RegisterFunc(serviceType,
-                typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, dep6Type, dep7Type, typeof(object)),
-                (Func<object, object, object, object, object, object, object, object>)factory.ToFuncWithObjParams,
+                typeof(Func<,,,>).MakeGenericType(dep1Type, dep2Type, dep3Type, dep4Type, dep5Type, dep6Type, dep7Type, typeof(object)), factory,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers a factory delegate for creating an instance of <paramref name="serviceType"/>.
@@ -12659,6 +12652,8 @@ namespace DryIoc
     /// <summary>Creates service expression using client provided expression factory delegate.</summary>
     public sealed class ExpressionFactory : Factory
     {
+
+
         /// <inheritdoc/>
         public override IReuse Reuse { get; }
         /// <inheritdoc/>
