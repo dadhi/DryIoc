@@ -20,10 +20,15 @@ namespace DryIoc.IssuesTests
             var container = new Container();
 
             container.RegisterDelegate<Func<Hey>, HeyFactory>(f => f.Invoke, Reuse.Scoped);
-            // container.RegisterFunc(
-            //     typeof(HeyFactory), typeof(Func<,>).MakeGenericType(typeof(Func<Hey>), typeof(object)),
-            //     (Func<object, object>)(f => f.Invoke).ToFuncWithObjParams,
-            //     Reuse.Scoped);
+
+            // var serviceType = typeof(HeyFactory);
+            // var funcType = typeof(Func<,>).MakeGenericType(typeof(Func<Hey>), typeof(object));
+
+            // var method = Made.Of(FactoryMethod.OfFunc(funcType.GetMethod("Invoke"), (object f) => ((Func<Hey>)f).Invoke));
+
+            // var factory = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, method, Reuse.Scoped);
+
+            // container.Register(factory, serviceType, null, null, isStaticallyChecked: true);
 
             container.Register<Hey>(Reuse.Scoped);
 

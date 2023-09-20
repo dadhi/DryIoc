@@ -3319,10 +3319,11 @@ namespace DryIoc
                             return false;
 
                         // skip conversion for the null and for the directly assignable type
-                        result = instance == null || convertExpr.Type == instance.GetType()
-                            || convertExpr.Method == null && convertExpr.Type.IsAssignableFrom(instance.GetType())
+                        var targetType = convertExpr.Type;
+                        result = instance == null || targetType == instance.GetType()
+                            || convertExpr.Method == null && targetType.IsAssignableFrom(instance.GetType())
                             ? instance
-                            : Converter.ConvertWithOperator(instance, expr, convertExpr.Type, convertExpr.Method);
+                            : Converter.ConvertWithOperator(instance, expr, targetType, convertExpr.Method);
                         return true;
                     }
                 case ExprType.MemberAccess:
@@ -4099,7 +4100,7 @@ namespace DryIoc
 
         public static R[] DoConvertMany<R>(object[] items)
         {
-            if (items == null && items.Length == 0)
+            if (items == null || items.Length == 0)
                 return ArrayTools.Empty<R>();
 
             var results = new R[items.Length];
@@ -6824,6 +6825,11 @@ namespace DryIoc
                 ResolvedParameterExpressions = resolvedParameterExpressions;
         }
 
+        /// <summary>Constructs the factory method from the typed Invoke method to understand the type of dependencies,
+        /// and the delegate with object parameters and result type.</summary>
+        public static FactoryMethod OfFunc<D>(MethodInfo funcTypedInvokeMethod, D funcOfObjParamsAndResult) where D : Delegate =>
+            new WithFunc(funcTypedInvokeMethod, funcOfObjParamsAndResult);
+
         /// <summary>Wraps method and factory instance.
         /// Where <paramref name="ctorOrMethodOrMember"/> is constructor, static or instance method, property or field.</summary>
         public static FactoryMethod Of(MemberInfo ctorOrMethodOrMember, ServiceInfo factoryInfo = null)
@@ -7255,7 +7261,7 @@ namespace DryIoc
         }
 
         /// <summary>Container will use some sensible defaults for service creation.</summary>
-        public static readonly Made Default = new Made(null);
+        public static readonly Made Default = new Made();
 
         /// <summary>Creates rules with only <see cref="FactoryMethodOrSelector"/> specified.</summary>
         public static implicit operator Made(FactoryMethodSelector factoryMethod) => new Made(factoryMethod);
@@ -7289,11 +7295,13 @@ namespace DryIoc
 
             // Normalizes open-generic type to open-generic definition,
             // because for base classes and return types it may not be the case (they may be partially closed).
-            if (methodReturnType != null && methodReturnType.IsOpenGeneric())
+            var methodReturnTypeIsDefined = methodReturnType != null & methodReturnType != typeof(object);
+            if (methodReturnTypeIsDefined && methodReturnType.IsOpenGeneric())
                 methodReturnType = methodReturnType.GetGenericTypeDefinition();
 
-            return parameters == null && propertiesAndFields == null
-                ? new WithFactoryMethodKnownResultType(factoryMethod, methodReturnType)
+            return parameters == null & propertiesAndFields == null
+                ? (!methodReturnTypeIsDefined ? new Made(factoryMethod)
+                : new WithFactoryMethodKnownResultType(factoryMethod, methodReturnType))
                 : new WithDetails(factoryMethod, methodReturnType, parameters, propertiesAndFields);
         }
 
@@ -8272,9 +8280,9 @@ namespace DryIoc
             Type serviceType, Type sourceFuncType, Delegate funcWithObjParams,
             IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
         {
-            var m = new Made(new FactoryMethod.WithFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams));
-            var f = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, m, reuse, setup);
-            r.Register(f, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+            var made = new Made(FactoryMethod.OfFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams));
+            var factory = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, made, reuse, setup);
+            r.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
 
         /// <summary>Registers delegate to be injected by container avoiding the ServiceLocator anti-pattern</summary>
@@ -11802,7 +11810,8 @@ namespace DryIoc
                     : new WithAllDetails(validatedImplType, reuse, made, setup);
         }
 
-        internal static ReflectionFactory OfTypeAndMadeNoValidation(Type implementationType, Made made, IReuse reuse = null, Setup setup = null) =>
+        /// <summary>Creates the factory out of `implementationType` and `made`</summary>
+        public static ReflectionFactory OfTypeAndMadeNoValidation(Type implementationType, Made made, IReuse reuse = null, Setup setup = null) =>
             setup == null || setup == Setup.Default
                 ? (reuse == null ? new WithMade(implementationType, made) : new WithMadeAndReuse(implementationType, reuse, made))
                 : new WithAllDetails(implementationType, reuse, made, setup ?? Setup.Default);
@@ -15323,9 +15332,9 @@ namespace DryIoc
         /// <see cref="MethodInfo.ReturnType"/>.</summary>
         public static Type GetReturnTypeOrDefault(this MemberInfo member) =>
             member is ConstructorInfo ? member.DeclaringType
-            : (member as MethodInfo)?.ReturnType
-            ?? (member as PropertyInfo)?.PropertyType
-            ?? (member as FieldInfo)?.FieldType;
+            : member is MethodInfo m ? m.ReturnType
+            : member is PropertyInfo p ? p.PropertyType
+            : ((FieldInfo)member).FieldType;
 
         /// <summary>Returns true if field is backing field for property.</summary>
         public static bool IsBackingField(this FieldInfo field) =>
