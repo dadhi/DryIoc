@@ -11353,7 +11353,10 @@ namespace DryIoc
     public static partial class PropertiesAndFields
     {
         /// <summary>Say to not resolve any properties or fields.</summary>
-        public static PropertiesAndFieldsSelector Of = request => null;
+        public static PropertiesAndFieldsSelector Off = request => null;
+        
+        /// <summary>Deprecated - typo in name. Say to not resolve any properties or fields.</summary>
+        public static PropertiesAndFieldsSelector Of = Off;
 
         /// <summary>Public assignable instance members of any type except object, string, primitives types, and arrays of those.</summary>
         public static PropertiesAndFieldsSelector Auto = All(withNonPublic: false, withPrimitive: false);
@@ -11396,8 +11399,7 @@ namespace DryIoc
         /// <summary>Should return service info for input member (property or field).</summary>
         public delegate PropertyOrFieldServiceInfo GetServiceInfo(MemberInfo member, Request request);
 
-        /// <summary>Generates selector property and field selector with settings specified by parameters.
-        /// If all parameters are omitted the return all public not primitive members.</summary>
+        /// <summary>Generates selector property and field selector with settings specified by parameters.</summary>
         public static PropertiesAndFieldsSelector All(
             bool withNonPublic = true,
             bool withPrimitive = true,
