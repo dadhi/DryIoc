@@ -3,7 +3,7 @@
         <TargetFrameworks>net45;netstandard2.0</TargetFrameworks>
 
         <Product>DryIoc.MefAttributedModel</Product>
-        <VersionPrefix>7.0.1</VersionPrefix>
+        <VersionPrefix>7.0.2</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -15,12 +15,17 @@
         <PackageTags>MEF Composition IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-## v7.0.1 
+## v7.0.2 Bug-fix release
+
+- fixed: #599 Breaking changes in MefAttributedModel
+
+
+## v7.0.1 Bug-fix release
 
 - Fixed the dependencies versions in the source package, but upping the version here to be consistent
 
 
-v7.0.0:
+## v7.0.0 Major release
 
 Improving:
 
