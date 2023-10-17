@@ -1368,77 +1368,78 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Specifies the reuse information</summary>
         public ReuseInfo Reuse;
 
-        private Setup.Settings _flags;
+        /// <summary>Specifies all <see cref="Setup"/> flags.</summary>
+        public Setup.Settings Flags;
 
         /// <summary>Corresponds to <see cref="Setup.OpenResolutionScope"/>.</summary>
         public bool OpenResolutionScope
         {
-            get => (_flags & Setup.Settings.OpenResolutionScope) != 0;
-            internal set => _flags = value ? _flags | Setup.Settings.OpenResolutionScope : _flags & ~Setup.Settings.OpenResolutionScope;
+            get => (Flags & Setup.Settings.OpenResolutionScope) != 0;
+            set => Flags = value ? Flags | Setup.Settings.OpenResolutionScope : Flags & ~Setup.Settings.OpenResolutionScope;
         }
 
         /// <summary>Corresponds to <see cref="Setup.AsResolutionCall"/>.</summary>
         public bool AsResolutionCall
         {
-            get => (_flags & Setup.Settings.AsResolutionCall) != 0;
-            internal set => _flags = value ? _flags | Setup.Settings.AsResolutionCall : _flags & ~Setup.Settings.AsResolutionCall;
+            get => (Flags & Setup.Settings.AsResolutionCall) != 0;
+            set => Flags = value ? Flags | Setup.Settings.AsResolutionCall : Flags & ~Setup.Settings.AsResolutionCall;
         }
 
         /// <summary>Corresponds to <see cref="Setup.AsResolutionRoot"/>.</summary>
         public bool AsResolutionRoot
         {
-            get => (_flags & Setup.Settings.AsResolutionRoot) != 0;
-            internal set => _flags = value ? _flags | Setup.Settings.AsResolutionRoot : _flags & ~Setup.Settings.AsResolutionRoot;
+            get => (Flags & Setup.Settings.AsResolutionRoot) != 0;
+            set => Flags = value ? Flags | Setup.Settings.AsResolutionRoot : Flags & ~Setup.Settings.AsResolutionRoot;
         }
 
         /// <summary>Specifies to prevent disposal of reused instance if it is disposable</summary>
         public bool PreventDisposal
         {
-            get => (_flags & Setup.Settings.PreventDisposal) != 0;
-            internal set => _flags = value ? _flags | Setup.Settings.PreventDisposal : _flags & ~Setup.Settings.PreventDisposal;
+            get => (Flags & Setup.Settings.PreventDisposal) != 0;
+            set => Flags = value ? Flags | Setup.Settings.PreventDisposal : Flags & ~Setup.Settings.PreventDisposal;
         }
 
         /// <summary>Specifies to store reused instance as WeakReference.</summary>
         public bool WeaklyReferenced
         {
-            get => (_flags & Setup.Settings.WeaklyReferenced) != 0;
-            internal set => _flags = value ? _flags | Setup.Settings.WeaklyReferenced : _flags & ~Setup.Settings.WeaklyReferenced;
+            get => (Flags & Setup.Settings.WeaklyReferenced) != 0;
+            set => Flags = value ? Flags | Setup.Settings.WeaklyReferenced : Flags & ~Setup.Settings.WeaklyReferenced;
         }
 
         /// <summary>Allows registering transient disposable. But the disposal is up to you.</summary>
         public bool AllowDisposableTransient
         {
-            get => (_flags & Setup.Settings.AllowDisposableTransient) != 0;
-            internal set => _flags = value ? _flags | Setup.Settings.AllowDisposableTransient : _flags & ~Setup.Settings.AllowDisposableTransient;
+            get => (Flags & Setup.Settings.AllowDisposableTransient) != 0;
+            set => Flags = value ? Flags | Setup.Settings.AllowDisposableTransient : Flags & ~Setup.Settings.AllowDisposableTransient;
         }
 
         /// <summary>Turns On tracking of disposable transient dependency in parent scope or in open scope if resolved directly.</summary>
         public bool TrackDisposableTransient
         {
-            get => (_flags & Setup.Settings.TrackDisposableTransient) != 0;
-            internal set => _flags = value ? _flags | Setup.Settings.TrackDisposableTransient : _flags & ~Setup.Settings.TrackDisposableTransient;
+            get => (Flags & Setup.Settings.TrackDisposableTransient) != 0;
+            set => Flags = value ? Flags | Setup.Settings.TrackDisposableTransient : Flags & ~Setup.Settings.TrackDisposableTransient;
         }
 
         /// <summary>Instructs to use parent reuse. Applied only if Reuse is not specified.</summary>
         public bool UseParentReuse
         {
-            get => (_flags & Setup.Settings.UseParentReuse) != 0;
-            internal set => _flags = value ? _flags | Setup.Settings.UseParentReuse : _flags & ~Setup.Settings.UseParentReuse;
+            get => (Flags & Setup.Settings.UseParentReuse) != 0;
+            set => Flags = value ? Flags | Setup.Settings.UseParentReuse : Flags & ~Setup.Settings.UseParentReuse;
         }
 
         /// <summary>When single service is resolved, but multiple candidates found, this setting will be used to prefer this one.</summary>
         public bool PreferInSingleServiceResolve
         {
-            get => (_flags & Setup.Settings.PreferInSingleServiceResolve) != 0;
-            internal set => _flags = value ? _flags | Setup.Settings.PreferInSingleServiceResolve : _flags & ~Setup.Settings.PreferInSingleServiceResolve;
+            get => (Flags & Setup.Settings.PreferInSingleServiceResolve) != 0;
+            set => Flags = value ? Flags | Setup.Settings.PreferInSingleServiceResolve : Flags & ~Setup.Settings.PreferInSingleServiceResolve;
         }
 
         /// <summary>Does not add the resolution scope into the parent or singleton scope,
         /// preventing possibly unwanted holding of the scope (and its services) for the lifespan of the container.</summary>
         public bool AvoidResolutionScopeTracking
         {
-            get => (_flags & Setup.Settings.AvoidResolutionScopeTracking) != 0;
-            internal set => _flags = value ? _flags | Setup.Settings.AvoidResolutionScopeTracking : _flags & ~Setup.Settings.AvoidResolutionScopeTracking;
+            get => (Flags & Setup.Settings.AvoidResolutionScopeTracking) != 0;
+            set => Flags = value ? Flags | Setup.Settings.AvoidResolutionScopeTracking : Flags & ~Setup.Settings.AvoidResolutionScopeTracking;
         }
 
         /// <summary>True if exported type has metadata.</summary>
