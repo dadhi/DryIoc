@@ -1,6 +1,12 @@
 Version History
 ---------------
 
+## v5.4.2 Bug-fix release / 2023-10-17
+
+- fixed: #588 Container.IsDisposed property not reflecting own scope disposed state.
+- fixed: #598 How to diagnose Error.WaitForScopedServiceIsCreatedTimeoutExpired?
+
+
 ## v5.4.1 Bug-fix release / 2023-06-10
 
 - fixed: #576 Extension methods not being handled correctly in Made.Of service returning expression
