@@ -4,9 +4,9 @@ set PACKAGES=..\.dist\packages
 set SOURCE=https://api.nuget.org/v3/index.json
 set /p APIKEY=<"..\..\ApiKey.txt"
 
-dotnet nuget push "%PACKAGES%\DryIoc.dll.5.4.1.nupkg" -k %APIKEY% -s %SOURCE%
-dotnet nuget push "%PACKAGES%\DryIoc.5.4.1.nupkg" -k %APIKEY% -s %SOURCE%
-dotnet nuget push "%PACKAGES%\DryIoc.Internal.5.4.1.nupkg" -k %APIKEY% -s %SOURCE%
+dotnet nuget push "%PACKAGES%\DryIoc.dll.5.4.2.nupkg" -k %APIKEY% -s %SOURCE%
+dotnet nuget push "%PACKAGES%\DryIoc.5.4.2.nupkg" -k %APIKEY% -s %SOURCE%
+dotnet nuget push "%PACKAGES%\DryIoc.Internal.5.4.2.nupkg" -k %APIKEY% -s %SOURCE%
 
 @REM dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.DependencyInjection.6.2.0.nupkg" -k %APIKEY% -s %SOURCE%
 @REM dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.DependencyInjection.src.6.2.0.nupkg" -k %APIKEY% -s %SOURCE%
@@ -17,8 +17,8 @@ rem dotnet nuget push "%PACKAGES%\DryIoc.Microsoft.Hosting.1.0.0-preview-01.nupk
 rem dotnet nuget push "%PACKAGES%\DryIocAttributes.dll.5.0.0.nupkg" -k %APIKEY% -s %SOURCE%
 rem dotnet nuget push "%PACKAGES%\DryIocAttributes.5.0.0.nupkg" -k %APIKEY% -s %SOURCE%
 
-rem dotnet nuget push "%PACKAGES%\DryIoc.MefAttributedModel.dll.5.0.0.nupkg" -k %APIKEY% -s %SOURCE%
-rem dotnet nuget push "%PACKAGES%\DryIoc.MefAttributedModel.5.0.0.nupkg" -k %APIKEY% -s %SOURCE%
+dotnet nuget push "%PACKAGES%\DryIoc.MefAttributedModel.dll.7.0.2.nupkg" -k %APIKEY% -s %SOURCE%
+dotnet nuget push "%PACKAGES%\DryIoc.MefAttributedModel.7.0.2.nupkg" -k %APIKEY% -s %SOURCE%
 
 rem dotnet nuget push "%PACKAGES%\DryIoc.CommonServiceLocator.dll.4.0.0.nupkg" -k %APIKEY% -s %SOURCE%
 rem dotnet nuget push "%PACKAGES%\DryIoc.CommonServiceLocator.4.0.0.nupkg" -k %APIKEY% -s %SOURCE%
