@@ -8,6 +8,8 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
+            // new GHIssue391_Deadlock_during_Resolve().Run();
+
             RunAllTests();
 
             // new GHIssue588_Container_IsDisposed_property_not_reflecting_own_scope_disposed_state().Run();
@@ -18,7 +20,6 @@ namespace DryIoc.UnitTests
             // new RequiredPropertiesTests().Run();
             // new PropertyResolutionTests().Run();
             // new IssuesTests.Samples.DefaultReuseTest().Run();
-            // new GHIssue391_Deadlock_during_Resolve().Run();
             // new GHIssue559_Possible_inconsistent_behaviour().Run();
             // new GHIssue557_WithFactorySelector_allows_to_Resolve_the_keyed_service_as_non_keyed().Run();
             // new GHIssue565_Is_ignoring_ReuseScoped_setting_expected_behaviour_when_also_set_to_openResolutionScope().Run();
