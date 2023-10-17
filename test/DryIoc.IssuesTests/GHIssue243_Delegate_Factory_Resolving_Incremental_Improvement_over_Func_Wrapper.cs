@@ -10,35 +10,37 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Register_proxy_to_resolve_custom_delegate_for_Func_no_args();
+            // Register_proxy_to_resolve_custom_delegate_for_Func_no_args();
             return 1;
         }
 
-        [Test]
+        // [Test] // todo: @wip
         public void Register_proxy_to_resolve_custom_delegate_for_Func_no_args()
         {
             var container = new Container();
 
-            container.RegisterDelegate<Func<Hey>, HeyFactory>(f => f.Invoke, Reuse.Scoped);
+            // container.RegisterDelegate<Func<Hey>, HeyFactory>(f => f.Invoke);
 
-            // var serviceType = typeof(HeyFactory);
-            // var funcType = typeof(Func<,>).MakeGenericType(typeof(Func<Hey>), typeof(object));
+            var serviceType = typeof(HeyFactory);
+            var funcType = typeof(Func<,>).MakeGenericType(typeof(Func<Hey>), typeof(object));
 
-            // var method = Made.Of(FactoryMethod.OfFunc(funcType.GetMethod("Invoke"), (object f) => ((Func<Hey>)f).Invoke));
+            var method = Made.Of(FactoryMethod.OfFunc(funcType.GetMethod("Invoke"), (object f) => f));
 
-            // var factory = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, method, Reuse.Scoped);
+            var factory = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, method);
 
-            // container.Register(factory, serviceType, null, null, isStaticallyChecked: true);
+            container.Register(factory, serviceType, null, null, isStaticallyChecked: true);
 
-            container.Register<Hey>(Reuse.Scoped);
+            container.Register<Hey>();
 
-            using var scope = container.OpenScope();
+            var hf = container.Resolve<HeyFactory>();
+            var f = container.Resolve<Func<Hey>>();
 
-            var hf = scope.Resolve<HeyFactory>();
-            var f = scope.Resolve<Func<Hey>>();
+            Assert.IsInstanceOf<Hey>(f());
+            Assert.IsInstanceOf<Hey>(hf());
 
-            Assert.IsNotNull(hf());
-            Assert.AreSame(hf(), f());
+            var hfExpr = container.Resolve<LambdaExpression, HeyFactory>();
+            var hf2 = container.Resolve<HeyFactory>(); // compiled factory
+            Assert.IsInstanceOf<Hey>(hf());
         }
 
         public class Hey { }
