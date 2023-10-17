@@ -14315,24 +14315,32 @@ namespace DryIoc
             var e = Error;
             if (e == DryIoc.Error.WaitForScopedServiceIsCreatedTimeoutExpired)
             {
-                var m = Message;
                 var factoryId = (int)Details;
+
+                // check `Request.CombineDecoratorWithDecoratedFactoryID()` for why is this logic
+                // var decoratorFactoryId = 0; // todo: @wip #598 add search for the `decoratorFactoryId`
+                if (factoryId > ushort.MaxValue)
+                {
+                    // decoratorFactoryId = factoryId & ushort.MaxValue;
+                    factoryId = factoryId >> 16;
+                }
+
                 foreach (var reg in container.GetServiceRegistrations()) 
                 {
                     var f = reg.Factory;
                     if (f.FactoryID == factoryId)
-                        return "The service registration related to the problem is " + reg;
+                        return $"The service registration related to the problem is:{NewLine}{reg}";
                     var genFactories = f.GeneratedFactories;
                     if (genFactories != null)
                         foreach (var genEntry in f.GeneratedFactories.Enumerate()) 
                         {
-                            var genFactory = genEntry.Value;
-                            if (genFactory.FactoryID == factoryId)
-                                return "The service registration related to the problem is " + reg + NewLine +
-                                    ", specifically by its derived closed-generic factory: " + genFactory;
+                            var generatedFactory = genEntry.Value;
+                            if (generatedFactory.FactoryID == factoryId)
+                                return $"The service registration related to the problem is:{NewLine}{reg}{NewLine}Specifically, its closed-generic factory is:{NewLine}{generatedFactory}";
                         }
                 }
-                return "Unable to find the service registration for the problematic factory with FactoryID=" + factoryId;
+
+                return "Unable to find the service registration for the problematic factory with FactoryID={factoryId}";
             }
             return string.Empty;
         }
@@ -14552,7 +14560,7 @@ namespace DryIoc
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(
-                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {0} ticks without the completion. " + NewLine +
+                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {0} time ticks without the completion. " + NewLine +
                 "You may call `exception.TryGetDetails(container)` to get the details of the problematic service registration." + NewLine +
                 "The error means that either the \"other party\" is the parallel thread which has started but is unable to finish the creation of the service in the provided amount of time. " + NewLine +
                 "Or more likely the \"other party\"  is the same thread and there is an undetected recursive dependency or " + NewLine +
