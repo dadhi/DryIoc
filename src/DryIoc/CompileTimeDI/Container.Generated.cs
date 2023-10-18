@@ -29,7 +29,7 @@ The code below is auto-generated at compile-time and changes here will be lost o
 
 WARNINGS: Some dependencies are missing. Register them at runtime or add to the compile-time registrations.
 
-- `RuntimeDependencyC` in resolution root MyService: IService FactoryId=1
+- `RuntimeDependencyC` in resolution root MyService: IService FactoryID=1
   from container without scope
  with Rules with {ThrowIfRuntimeStateRequired, UsedForExpressionGeneration, GenerateResolutionCallForMissingDependency} and without {ImplicitCheckForReuseMatchingScope, EagerCachingSingletonForFasterAccess, UseInterpretationForTheFirstResolution}
 --------------------------------------------------------------------------------------------------------

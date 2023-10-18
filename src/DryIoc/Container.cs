@@ -3945,7 +3945,7 @@ namespace DryIoc
             else
                 scope = (Scope)r.CurrentOrSingletonScope; // todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope
 
-            var id = e.FactoryId;
+            var id = e.FactoryID;
             var noItem = Scope.NoItem;
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
@@ -3998,7 +3998,7 @@ namespace DryIoc
             else
                 scope = (Scope)r.CurrentOrSingletonScope;// todo: @perf cast IResolverContext and avoid virtual calls, @unsafe cast to Scope,
 
-            var id = e.FactoryId;
+            var id = e.FactoryID;
 
             ref var map = ref scope._maps[id & Scope.MAP_COUNT_SUFFIX_MASK];
             var itemRef = map.GetEntryOrDefault(id);
@@ -10415,7 +10415,7 @@ namespace DryIoc
             s.Print(ServiceTypeOrInfo is ParameterInfo pi ? ParameterServiceInfo.Of(pi) : ServiceTypeOrInfo);
 
             if (FactoryID != 0)
-                s.Append(" FactoryId=").Append(FactoryID);
+                s.Append(" FactoryID=").Append(FactoryID);
 
             if (DecoratedFactoryID != 0)
                 s.Append(" DecoratedFactoryId=").Append(DecoratedFactoryID);
@@ -13775,8 +13775,8 @@ namespace DryIoc
             public override Type Type => ServiceOrInvokeExpr.Type;
             public override Expression Object => ResolverContext.CurrentOrSingletonScopeExpr;
             public override MethodInfo Method => Scope.GetOrAddViaFactoryDelegateMethod;
-            public readonly int FactoryId;
-            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryId);
+            public readonly int FactoryID;
+            public ConstantExpression FactoryIdExpr => ConstantInt(FactoryID);
             public readonly Expression ServiceOrInvokeExpr;
             public Expression FactoryDelegateExpr =>
                 ServiceOrInvokeExpr is InvokeFactoryDelegateExpression i ? i.Expression : new FactoryDelegateExpression(ServiceOrInvokeExpr);
@@ -13787,7 +13787,7 @@ namespace DryIoc
                 i == 0 ? FactoryIdExpr : i == 1 ? FactoryDelegateExpr : FactoryDelegateCompiler.ResolverContextParamExpr;
             internal GetScopedOrSingletonViaFactoryDelegateExpression(int factoryId, Expression serviceOrInvokeExpr)
             {
-                FactoryId = factoryId;
+                FactoryID = factoryId;
                 ServiceOrInvokeExpr = serviceOrInvokeExpr;
             }
 
@@ -13803,7 +13803,7 @@ namespace DryIoc
                 ILGenerator il, ParentFlags parent, int byRefIndex = -1)
             {
                 EmittingVisitor.TryEmit(Object, paramExprs, il, ref closure, config, parent);
-                EmittingVisitor.EmitLoadConstantInt(il, FactoryId);
+                EmittingVisitor.EmitLoadConstantInt(il, FactoryID);
 
                 // todo: @perf more intelligent emit?
                 if (!EmittingVisitor.TryEmit(FactoryDelegateExpr, paramExprs, il, ref closure, config, parent))
