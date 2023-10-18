@@ -4180,7 +4180,8 @@ namespace DryIoc
                 if (operandExpr.Type == typeof(object))
                     return operandExpr;
             }
-            return expr.Type != typeof(void) && expr.Type.IsValueType ? new ConvertIntrinsicExpression<object>(expr) : expr;
+            var exprType = expr.Type;
+            return exprType != typeof(void) & exprType.IsValueType ? new ConvertIntrinsicExpression<object>(expr) : expr;
         }
 
         /// <summary>Wraps service creation expression (body) into `Func{IResolverContext, object}` and returns result lambda expression.</summary>
@@ -5092,7 +5093,7 @@ namespace DryIoc
         internal static bool TryGetUsedInstance(this IResolverContext r, int serviceTypeHash, Type serviceType, out object instance) =>
             r.TryGetUsedInstance((Scope)r.CurrentScope, (Scope)r.SingletonScope, serviceTypeHash, serviceType, out instance); // todo @unsafe @perf remove cast to Scope
 
-        // todo: @unsafe assuming that the IScope is Scope
+        // todo: @unsafe @improve assuming that the IScope is Scope
         internal static bool TryGetUsedInstance(this IResolverContext r, Scope scope, Scope singletons, int serviceTypeHash, Type serviceType, out object instance)
         {
             ImHashMapEntry<Type, object> e = null;
