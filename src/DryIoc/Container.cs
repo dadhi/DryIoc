@@ -12208,7 +12208,7 @@ namespace DryIoc
                     }
                 }
 
-                hasByRefParams = hasByRefParams || paramType.IsByRef;
+                hasByRefParams |= paramType.IsByRef;
                 var paramServiceInfo = paramSelector == null ? ParameterServiceInfo.OrNull(param) : paramSelector(param) ?? ParameterServiceInfo.OrNull(param);
                 var paramRequest = paramServiceInfo == null ? request.Push(param) : request.Push(paramServiceInfo);
                 var paramDetails = paramServiceInfo == null ? ServiceDetails.Default : paramServiceInfo.Details;

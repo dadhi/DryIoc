@@ -10,6 +10,9 @@ namespace Playground
     {
         public static void Main()
         {
+            var di = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
+            RealisticUnitOfWorkBenchmark.Measure(di);
+
             // BenchmarkRunner.Run<ZeroArgs_CtorInvoke_Vs_ActivatorCreate>();
 
             // var x = new InvokeVsInvokeUnsafeBenchmark().InvokeUnsafe();
@@ -51,7 +54,7 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
             // todo: @wip
-            BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+            // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
 
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
@@ -70,9 +73,6 @@ namespace Playground
             // var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);
             // var sms = ems.ToCSharpString();
 
-            var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
-            bm.WarmUp();
-            bm.DryIoc();
             // Console.WriteLine("WarmUp finished!");
             // Console.ReadKey();
             // bm.DryIoc_MsDI();

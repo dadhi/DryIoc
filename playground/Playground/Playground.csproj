@@ -5,6 +5,7 @@
         <Description>Benchmarks, sandbox for experiments.</Description>
         <NoWarn>1701;1702;AD0001;NU1608</NoWarn>
         <TieredCompilation>false</TieredCompilation>
+        <SkipDocGen>true</SkipDocGen>
     </PropertyGroup>
     <ItemGroup>
         <Compile Remove="ImHashMapBenchmarks.cs" />
@@ -16,14 +17,14 @@
     <ItemGroup>
         <PackageReference Include="Autofac" Version="7.1.0" />
         <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="8.0.0" />
-        <PackageReference Include="BenchmarkDotNet" Version="0.13.7" />
+        <PackageReference Include="BenchmarkDotNet" Version="0.13.9" />
         <PackageReference Include="Grace" Version="7.2.1" />
         <PackageReference Include="Grace.DependencyInjection.Extensions" Version="7.1.0" />
         <PackageReference Include="LightInject" Version="6.6.4" />
         <PackageReference Include="Microsoft.Experimental.Collections" Version="1.0.6-e190117-3" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
         <PackageReference Include="SimpleInjector" Version="5.4.1" />
-        <PackageReference Include="Lamar" Version="12.0.0" />
+        <PackageReference Include="Lamar" Version="12.0.2" />
     </ItemGroup>
 
     <ItemGroup>

@@ -5367,10 +5367,11 @@ namespace DryIoc.FastExpressionCompiler
         }
     }
 
-    // Helpers targeting the performance. Extensions method names may be a bit funny (non standard), 
-    // in order to prevent conflicts with YOUR helpers with standard names
+    /// Helpers targeting the performance. Extensions method names may be a bit funny (non standard), 
+    /// in order to prevent conflicts with YOUR helpers with standard names
     internal static class Tools
     {
+        [MethodImpl((MethodImplOptions)256)]
         public static Expression AsExpr(this object obj) => obj as Expression ?? Constant(obj);
         public static Expression[] AsExprs(this object[] obj)
         {

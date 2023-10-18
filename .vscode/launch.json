@@ -4,27 +4,30 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-    {
-        "name": "MediatR comptime",
-        "type": "coreclr",
-        "request": "launch",
-        "preLaunchTask": "build_mediatr_comptime",
-        "program": "${workspaceFolder}/playground/DryIoc.Messages.MediatRLikeExample.CompileTimeDI/bin/Debug/net6.0/DryIoc.Messages.MediatRLikeExample.CompileTimeDI.exe",
-        "args": [],
-        "cwd": "${workspaceFolder}",
-        "stopAtEntry": false,
-        "console": "internalConsole"
-    },
         {
-            "name": "Benchmarks",
+            "name": "MediatR comptime",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build_mediatr_comptime",
+            "program": "${workspaceFolder}/playground/DryIoc.Messages.MediatRLikeExample.CompileTimeDI/bin/Debug/net6.0/DryIoc.Messages.MediatRLikeExample.CompileTimeDI.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "internalConsole"
+        },
+        {
+            "name": "Playground+Benchmarks",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build_benchmark",
-            "program": "${workspaceFolder}/playground/Playground/bin/Debug/net7.0/Playground.exe",
+            "program": "${workspaceFolder}/playground/Playground/bin/Debug/net7.0/Playground.dll",
             "args": [],
             "cwd": "${workspaceFolder}/playground/Playground",
+            // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
+            "console": "internalConsole",
             "stopAtEntry": false,
-            "console": "internalConsole"
+            "internalConsoleOptions": "openOnSessionStart",
+            "requireExactSource": false // allows to for moderate code editing while debugging
         },
         {
             "name": "TestRunner",

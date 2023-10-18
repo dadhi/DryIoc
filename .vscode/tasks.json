@@ -23,7 +23,8 @@
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}/playground/Playground/Playground.csproj"
+                "${workspaceFolder}/playground/Playground/Playground.csproj",
+                "-p:SkipCompTimeGen=true"
             ],
             "problemMatcher": "$msCompile",
             "group": {
