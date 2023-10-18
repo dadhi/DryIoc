@@ -42,7 +42,7 @@ namespace DryIoc.IssuesTests
             Assert.AreSame(Error.NameOf(Error.WaitForScopedServiceIsCreatedTimeoutExpired), ex.ErrorName);
 
             var m = ex.TryGetDetails(container);
-            StringAssert.Contains("A`", m);
+            StringAssert.Contains("IA`", m);
         }
 
         public interface IA {}

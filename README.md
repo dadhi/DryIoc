@@ -155,8 +155,6 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 
 ## Features
 
-### [Feature matrix](http://featuretests.apphb.com/DependencyInjection.html)
-
 ### Incomplete feature list 
 
 * Registration of service to implementation type mapping (additionally supported: registering once, registration replace, registration removal). 

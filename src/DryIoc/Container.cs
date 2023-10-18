@@ -220,10 +220,13 @@ namespace DryIoc
 
         #region IRegistrator
 
-        /// <summary>Returns all registered service factories with their Type and optional Key.</summary>
-        /// <remarks>Decorator and Wrapper types are not included.</remarks>
+        /// <inheritdoc />
         public IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations() =>
              Registry.GetServiceRegistrations(_registry.Value);
+
+        /// <inheritdoc />
+        public IEnumerable<DecoratorRegistrationInfo> GetDecoratorRegistrations() =>
+             Registry.GetDecoratorRegistrations(_registry.Value);
 
         // todo: @api Make `serviceKey` and `factoryType` optional
         /// <summary>Searches for registered factories by type, and key (if specified),
@@ -2503,6 +2506,20 @@ namespace DryIoc
                         foreach (var f in factories.Enumerate())
                             if ((result = match(entry.Key, f.Key, f.Value)) != null)
                                 yield return result;
+                    }
+                }
+            }
+
+            public static IEnumerable<DecoratorRegistrationInfo> GetDecoratorRegistrations(ImHashMap<Type, object> registryOrServices)
+            {
+                if (registryOrServices is Registry r)
+                {
+                    var ds = r.Decorators;
+                    if (!ds.IsEmpty)
+                    {
+                        foreach (var entry in ds.Enumerate())
+                            foreach (var f in (Factory[])entry.Value)
+                                yield return new DecoratorRegistrationInfo(f, entry.Key);
                     }
                 }
             }
@@ -14093,7 +14110,32 @@ namespace DryIoc
         AppendNewImplementation
     }
 
-    /// <summary>Existing registration info.</summary>
+    /// <summary>Decorator registration info.</summary>
+
+    public struct DecoratorRegistrationInfo
+    {
+        /// <summary>Registered factory.</summary>
+        public Factory Factory;
+
+        /// <summary>Decorator type.</summary>
+        public Type DecoratorType;
+
+        /// <summary>Creates info.</summary>
+        public DecoratorRegistrationInfo(Factory factory, Type decoratorType)
+        {
+            Factory = factory;
+            DecoratorType = decoratorType;
+        }
+
+        /// <summary>Pretty-prints info into the string.</summary>
+        public override string ToString()
+        {
+            var sb = new StringBuilder("DecoratorType=`").Print(DecoratorType).Append('`');
+            return sb.Append(" with Factory=`").Append(Factory).Append('`').ToString();
+        }
+    }
+
+    /// <summary>Service registration info.</summary>
     public struct ServiceRegistrationInfo : IComparable<ServiceRegistrationInfo>
     {
         /// <summary>Registered factory.</summary>
@@ -14138,13 +14180,13 @@ namespace DryIoc
         /// <summary>Orders by registration</summary>
         public int CompareTo(ServiceRegistrationInfo other) => Factory.FactoryID - other.Factory.FactoryID;
 
-        /// <summary>Pretty-prints info to string.</summary>
+        /// <summary>Pretty-prints info into the string.</summary>
         public override string ToString()
         {
-            var s = new StringBuilder("ServiceType=`").Print(ServiceType).Append('`');
+            var sb = new StringBuilder("ServiceType=`").Print(ServiceType).Append('`');
             if (OptionalServiceKey != null)
-                s.Append(" with ServiceKey=`").Print(OptionalServiceKey).Append('`');
-            return s.Append(" with Factory=`").Append(Factory).Append('`').ToString();
+                sb.Append(" with ServiceKey=`").Print(OptionalServiceKey).Append('`');
+            return sb.Append(" with Factory=`").Append(Factory).Append('`').ToString();
         }
     }
 
@@ -14183,6 +14225,9 @@ namespace DryIoc
         /// <summary>Returns all registered service factories with their Type and optional Key.
         /// Decorator and Wrapper types are not included.</summary>
         IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations();
+
+        /// <summary>Returns the curretnly registered decorators. There maybe multiple entries for a specific DecoratorRegistrationInfo.DecoratorTy`pe`</summary>
+        IEnumerable<DecoratorRegistrationInfo> GetDecoratorRegistrations();
 
         /// <summary>Searches for registered factories by type, and key (if specified),
         /// and by factory type (by default uses <see cref="FactoryType.Service"/>).
@@ -14454,12 +14499,56 @@ namespace DryIoc
             var e = Error;
             if (e == DryIoc.Error.WaitForScopedServiceIsCreatedTimeoutExpired)
             {
-                var m = Message;
                 var factoryId = (int)Details;
-                var reg = container.GetServiceRegistrations().FirstOrDefault(r => r.Factory.FactoryID == factoryId);
-                if (reg.Factory == null)
-                    return "Unable to get the service registration for the problematic factory with FactoryID=" + factoryId;
-                return "The service registration related to the problem is " + reg;
+                string decoratorMessage = null;
+
+                // check `Request.CombineDecoratorWithDecoratedFactoryID()` for why is this logic
+                if (factoryId > ushort.MaxValue)
+                {
+                    var decoratorFactoryId = factoryId & ushort.MaxValue;
+                    factoryId >>>= 16;
+                    decoratorMessage = GetDecoratorMessage(container, decoratorFactoryId);
+                    static string GetDecoratorMessage(IRegistrator container, int decoratorFactoryId)
+                    {
+                        foreach (var decoratorReg in container.GetDecoratorRegistrations())
+                        {
+                            var f = decoratorReg.Factory;
+                            if (f.FactoryID == decoratorFactoryId)
+                                return $"Decorator registration related to the problem is:{NewLine}{decoratorReg}";
+                            var genFactories = f.GeneratedFactories;
+                            if (genFactories != null)
+                                foreach (var genEntry in f.GeneratedFactories.Enumerate())
+                                {
+                                    var generatedFactory = genEntry.Value;
+                                    if (generatedFactory.FactoryID == decoratorFactoryId)
+                                        return $"Decorator registration related to the problem is:{NewLine}{decoratorReg}{NewLine}Specifically, the generated closed-generic factory is:{NewLine}{generatedFactory}";
+                                }
+                        }
+                        return $"Unable to find the Decorator registration for the problematic factory with FactoryID={decoratorFactoryId}";
+                    }
+                }
+
+                var serviceMessage = GetServiceMessage(container, factoryId);
+                static string GetServiceMessage(IRegistrator container, int factoryId)
+                {
+                    foreach (var serviceReg in container.GetServiceRegistrations())
+                    {
+                        var f = serviceReg.Factory;
+                        if (f.FactoryID == factoryId)
+                            return $"Service registration related to the problem is:{NewLine}{serviceReg}";
+                        var genFactories = f.GeneratedFactories;
+                        if (genFactories != null)
+                            foreach (var genEntry in f.GeneratedFactories.Enumerate())
+                            {
+                                var generatedFactory = genEntry.Value;
+                                if (generatedFactory.FactoryID == factoryId)
+                                    return $"Service registration related to the problem is:{NewLine}{serviceReg}{NewLine}Specifically, the generated closed-generic factory is:{NewLine}{generatedFactory}";
+                            }
+                    }
+                    return $"Unable to find the Service registration for the problematic factory with FactoryID={factoryId}";
+                }
+
+                return decoratorMessage == null ? serviceMessage : decoratorMessage + NewLine + serviceMessage;
             }
             return string.Empty;
         }
@@ -14679,7 +14768,7 @@ namespace DryIoc
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(
-                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {0} ticks without the completion. " + NewLine +
+                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {0} time ticks without the completion. " + NewLine +
                 "You may call `exception.TryGetDetails(container)` to get the details of the problematic service registration." + NewLine +
                 "The error means that either the \"other party\" is the parallel thread which has started but is unable to finish the creation of the service in the provided amount of time. " + NewLine +
                 "Or more likely the \"other party\"  is the same thread and there is an undetected recursive dependency or " + NewLine +
