@@ -38,7 +38,7 @@ namespace Playground
             // Console.WriteLine(cs.Length);
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
 
-            //var x = RealisticUnitOfWorkWithBigObjectGraphBenchmark.Measure(
+            // var x = RealisticUnitOfWorkWithBigObjectGraphBenchmark.Measure(
             //    RealisticUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIoc());
             //Debug.Assert(x != null);
 
@@ -50,7 +50,9 @@ namespace Playground
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
+            // todo: @wip
             BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
@@ -68,8 +70,9 @@ namespace Playground
             // var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);
             // var sms = ems.ToCSharpString();
 
-            // var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
-            // bm.WarmUp();
+            var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
+            bm.WarmUp();
+            bm.DryIoc();
             // Console.WriteLine("WarmUp finished!");
             // Console.ReadKey();
             // bm.DryIoc_MsDI();

@@ -1379,9 +1379,9 @@ namespace DryIoc.ImTools
     public struct SmallArrayPool<T>
     {
         /// <summary>The max length of array and the number of arrays that can be rented from the pool</summary>
-        public const byte MaxArrayLength = 7;
+        public const byte MaxSmallArrayLength = 7;
 
-        private readonly static T[][] Arrays = new T[MaxArrayLength][]
+        private readonly static T[][] SmallArrays = new T[MaxSmallArrayLength][]
         {
             new T[1],
             new T[2],
@@ -1396,7 +1396,7 @@ namespace DryIoc.ImTools
         /// The method does not check the `requiredLength` is in the pool bounds to avoid performance cost.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static T[] RentOrNew(int requiredLength) =>
-            Interlocked.Exchange(ref Arrays[requiredLength - 1], null) ?? new T[requiredLength];
+            Interlocked.Exchange(ref SmallArrays[requiredLength - 1], null) ?? new T[requiredLength];
 
         /// <summary>Returns the array back. If array length is greater than `MaxArrayLength` then we will do nothing.
         /// Also to avoid memory leaks the passed array will be cleared before returning to the pool.
@@ -1406,7 +1406,7 @@ namespace DryIoc.ImTools
         {
             for (var i = 0; (uint)i < arr.Length; ++i)
                 arr[i] = default;
-            Arrays[arr.Length - 1] = arr;
+            SmallArrays[arr.Length - 1] = arr;
         }
     }
 

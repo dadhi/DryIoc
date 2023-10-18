@@ -3184,6 +3184,7 @@ namespace DryIoc
             }
         }
 
+        // todo: @perf take into consideration that at the root call ` paramExprs, paramValues` are `FactoryDelegateParamExprs, r`!
         /// <summary>Interprets the expression producing the `result`. If it fails then it returns `false`.</summary>
         public static bool TryInterpret(IResolverContext r, Expression expr,
             IParameterProvider paramExprs, object paramValues, ParentLambdaArgs parentArgs, out object result)
@@ -3223,8 +3224,9 @@ namespace DryIoc
                             case 2:
                                 if (newExpr is TwoArgumentsNewExpression e2)
                                 {
-                                    k = TryInterpret(r, e2.Argument0, paramExprs, paramValues, parentArgs, out var a0) &
-                                        TryInterpret(r, e2.Argument1, paramExprs, paramValues, parentArgs, out var a1);
+                                    object a0 = null, a1 = null;
+                                    k = TryInterpret(r, e2.Argument0, paramExprs, paramValues, parentArgs, out a0) &&
+                                        TryInterpret(r, e2.Argument1, paramExprs, paramValues, parentArgs, out a1);
                                     args = SmallArrayPool<object>.RentOrNew(2);
                                     args[0] = a0; args[1] = a1;
                                 }
@@ -3232,9 +3234,10 @@ namespace DryIoc
                             case 3:
                                 if (newExpr is ThreeArgumentsNewExpression e3)
                                 {
-                                    k = TryInterpret(r, e3.Argument0, paramExprs, paramValues, parentArgs, out var a0) &
-                                        TryInterpret(r, e3.Argument1, paramExprs, paramValues, parentArgs, out var a1) &
-                                        TryInterpret(r, e3.Argument2, paramExprs, paramValues, parentArgs, out var a2);
+                                    object a0 = null, a1 = null, a2 = null;
+                                    k = TryInterpret(r, e3.Argument0, paramExprs, paramValues, parentArgs, out a0) &&
+                                        TryInterpret(r, e3.Argument1, paramExprs, paramValues, parentArgs, out a1) &&
+                                        TryInterpret(r, e3.Argument2, paramExprs, paramValues, parentArgs, out a2);
                                     args = SmallArrayPool<object>.RentOrNew(3);
                                     args[0] = a0; args[1] = a1; args[2] = a2;
                                 }
@@ -3242,10 +3245,11 @@ namespace DryIoc
                             case 4:
                                 if (newExpr is FourArgumentsNewExpression e4)
                                 {
-                                    k = TryInterpret(r, e4.Argument0, paramExprs, paramValues, parentArgs, out var a0) &
-                                        TryInterpret(r, e4.Argument1, paramExprs, paramValues, parentArgs, out var a1) &
-                                        TryInterpret(r, e4.Argument2, paramExprs, paramValues, parentArgs, out var a2) &
-                                        TryInterpret(r, e4.Argument3, paramExprs, paramValues, parentArgs, out var a3);
+                                    object a0 = null, a1 = null, a2 = null, a3 = null;
+                                    k = TryInterpret(r, e4.Argument0, paramExprs, paramValues, parentArgs, out a0) &&
+                                        TryInterpret(r, e4.Argument1, paramExprs, paramValues, parentArgs, out a1) &&
+                                        TryInterpret(r, e4.Argument2, paramExprs, paramValues, parentArgs, out a2) &&
+                                        TryInterpret(r, e4.Argument3, paramExprs, paramValues, parentArgs, out a3);
                                     args = SmallArrayPool<object>.RentOrNew(4);
                                     args[0] = a0; args[1] = a1; args[2] = a2; args[3] = a3;
                                 }
@@ -3253,11 +3257,12 @@ namespace DryIoc
                             case 5:
                                 if (newExpr is FiveArgumentsNewExpression e5)
                                 {
-                                    k = TryInterpret(r, e5.Argument0, paramExprs, paramValues, parentArgs, out var a0) &
-                                        TryInterpret(r, e5.Argument1, paramExprs, paramValues, parentArgs, out var a1) &
-                                        TryInterpret(r, e5.Argument2, paramExprs, paramValues, parentArgs, out var a2) &
-                                        TryInterpret(r, e5.Argument3, paramExprs, paramValues, parentArgs, out var a3) &
-                                        TryInterpret(r, e5.Argument4, paramExprs, paramValues, parentArgs, out var a4);
+                                    object a0 = null, a1 = null, a2 = null, a3 = null, a4 = null;
+                                    k = TryInterpret(r, e5.Argument0, paramExprs, paramValues, parentArgs, out a0) &&
+                                        TryInterpret(r, e5.Argument1, paramExprs, paramValues, parentArgs, out a1) &&
+                                        TryInterpret(r, e5.Argument2, paramExprs, paramValues, parentArgs, out a2) &&
+                                        TryInterpret(r, e5.Argument3, paramExprs, paramValues, parentArgs, out a3) &&
+                                        TryInterpret(r, e5.Argument4, paramExprs, paramValues, parentArgs, out a4);
                                     args = SmallArrayPool<object>.RentOrNew(5);
                                     args[0] = a0; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4;
                                 }
@@ -3265,12 +3270,13 @@ namespace DryIoc
                             case 6:
                                 if (newExpr is SixArgumentsNewExpression e6)
                                 {
-                                    k = TryInterpret(r, e6.Argument0, paramExprs, paramValues, parentArgs, out var a0) &
-                                        TryInterpret(r, e6.Argument1, paramExprs, paramValues, parentArgs, out var a1) &
-                                        TryInterpret(r, e6.Argument2, paramExprs, paramValues, parentArgs, out var a2) &
-                                        TryInterpret(r, e6.Argument3, paramExprs, paramValues, parentArgs, out var a3) &
-                                        TryInterpret(r, e6.Argument4, paramExprs, paramValues, parentArgs, out var a4) &
-                                        TryInterpret(r, e6.Argument5, paramExprs, paramValues, parentArgs, out var a5);
+                                    object a0 = null, a1 = null, a2 = null, a3 = null, a4 = null, a5 = null;
+                                    k = TryInterpret(r, e6.Argument0, paramExprs, paramValues, parentArgs, out a0) &&
+                                        TryInterpret(r, e6.Argument1, paramExprs, paramValues, parentArgs, out a1) &&
+                                        TryInterpret(r, e6.Argument2, paramExprs, paramValues, parentArgs, out a2) &&
+                                        TryInterpret(r, e6.Argument3, paramExprs, paramValues, parentArgs, out a3) &&
+                                        TryInterpret(r, e6.Argument4, paramExprs, paramValues, parentArgs, out a4) &&
+                                        TryInterpret(r, e6.Argument5, paramExprs, paramValues, parentArgs, out a5);
                                     args = SmallArrayPool<object>.RentOrNew(6);
                                     args[0] = a0; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5;
                                 }
@@ -3278,13 +3284,14 @@ namespace DryIoc
                             case 7:
                                 if (newExpr is SevenArgumentsNewExpression e7)
                                 {
-                                    k = TryInterpret(r, e7.Argument0, paramExprs, paramValues, parentArgs, out var a0) &
-                                        TryInterpret(r, e7.Argument1, paramExprs, paramValues, parentArgs, out var a1) &
-                                        TryInterpret(r, e7.Argument2, paramExprs, paramValues, parentArgs, out var a2) &
-                                        TryInterpret(r, e7.Argument3, paramExprs, paramValues, parentArgs, out var a3) &
-                                        TryInterpret(r, e7.Argument4, paramExprs, paramValues, parentArgs, out var a4) &
-                                        TryInterpret(r, e7.Argument5, paramExprs, paramValues, parentArgs, out var a5) &
-                                        TryInterpret(r, e7.Argument6, paramExprs, paramValues, parentArgs, out var a6);
+                                    object a0 = null, a1 = null, a2 = null, a3 = null, a4 = null, a5 = null, a6 = null;
+                                    k = TryInterpret(r, e7.Argument0, paramExprs, paramValues, parentArgs, out a0) &&
+                                        TryInterpret(r, e7.Argument1, paramExprs, paramValues, parentArgs, out a1) &&
+                                        TryInterpret(r, e7.Argument2, paramExprs, paramValues, parentArgs, out a2) &&
+                                        TryInterpret(r, e7.Argument3, paramExprs, paramValues, parentArgs, out a3) &&
+                                        TryInterpret(r, e7.Argument4, paramExprs, paramValues, parentArgs, out a4) &&
+                                        TryInterpret(r, e7.Argument5, paramExprs, paramValues, parentArgs, out a5) &&
+                                        TryInterpret(r, e7.Argument6, paramExprs, paramValues, parentArgs, out a6);
                                     args = SmallArrayPool<object>.RentOrNew(7);
                                     args[0] = a0; args[1] = a1; args[2] = a2; args[3] = a3; args[4] = a4; args[5] = a5; args[6] = a6;
                                 }
