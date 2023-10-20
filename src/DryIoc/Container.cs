@@ -8971,7 +8971,7 @@ namespace DryIoc
             var parentFlags = default(RequestFlags);
             if (openResolutionScope)
                 parentFlags |= RequestFlags.OpensResolutionScope;
-            if (stopRecursiveDependencyCheck || (request.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
+            if (stopRecursiveDependencyCheck | (request.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
                 parentFlags |= RequestFlags.StopRecursiveDependencyCheck;
 
             // Only parent is converted to be passed to Resolve.
@@ -11251,7 +11251,7 @@ namespace DryIoc
                         singleton = Scope.WaitForItemIsSet(itemRef);
                     if (singleton != Scope.NoItem)
                     {
-                        var e = singleton != null ? Constant(singleton) : Constant(null, request.ActualServiceType); // fixes #258
+                        var e = singleton != null ? Constant(singleton) : ConstantNull(request.ActualServiceType); // fixes #258
                         return !setup.WeaklyReferencedOrPreventDisposal ? e : GetWrappedSingletonAccessExpression(e, setup);
                     }
                 }

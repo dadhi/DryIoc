@@ -9,7 +9,8 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            new GHIssue243_Delegate_Factory_Resolving_Incremental_Improvement_over_Func_Wrapper().Run();
+            // new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton().Run();
+            // new GHIssue243_Delegate_Factory_Resolving_Incremental_Improvement_over_Func_Wrapper().Run();
 
             RunAllTests();
 

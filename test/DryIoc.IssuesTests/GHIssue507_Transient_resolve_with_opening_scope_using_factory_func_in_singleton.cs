@@ -8,8 +8,8 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Test_Simple();
             Test_Original_issue();
+            Test_Simple();
             return 2;
         }
 
