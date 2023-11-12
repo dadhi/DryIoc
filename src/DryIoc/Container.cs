@@ -10234,7 +10234,7 @@ namespace DryIoc
             else if (ServiceTypeOrInfo is Type t)
                 s.Print(t);
             else
-                s.Print(ServiceTypeOrInfo);
+                s.Append(ServiceTypeOrInfo);
 
             var f = Factory;
             if (f != null && f is ReflectionFactory == false)
