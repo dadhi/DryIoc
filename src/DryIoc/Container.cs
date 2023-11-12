@@ -14367,7 +14367,7 @@ namespace DryIoc
                 if (factoryId > ushort.MaxValue)
                 {
                     var decoratorFactoryId = factoryId & ushort.MaxValue;
-                    factoryId >>>= 16;
+                    factoryId >>= 16;
                     decoratorMessage = GetDecoratorMessage(container, decoratorFactoryId);
                     static string GetDecoratorMessage(IContainer container, int decoratorFactoryId)
                     {
