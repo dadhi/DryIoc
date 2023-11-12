@@ -10229,7 +10229,10 @@ namespace DryIoc
                     s.Print(implType).Append(": ");
             }
 
-            s.Append(ServiceTypeOrInfo is ParameterInfo pi ? ParameterServiceInfo.Of(pi) : ServiceTypeOrInfo);
+            if (ServiceTypeOrInfo is ParameterInfo pi)
+                s.Append(ParameterServiceInfo.Of(pi));
+            else
+                s.Print((Type)ServiceTypeOrInfo);
 
             var f = Factory;
             if (f != null && f is ReflectionFactory == false)
