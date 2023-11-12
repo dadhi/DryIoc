@@ -7,7 +7,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // Test_scope_inside_the_transient_dependency_of_the_scoped_service();
+            Test_scope_inside_the_transient_dependency_of_the_scoped_service();
             Test_scope_inside_the_transient_dependency_of_the_scoped_service_But_injected_first_in_singleton();
             return 2;
         }
@@ -29,19 +29,19 @@ namespace DryIoc.IssuesTests
             transient.Do();
         }
 
-        // [Test] // todo: @fixme
+        [Test]
         public void Test_scope_inside_the_transient_dependency_of_the_scoped_service_But_injected_first_in_singleton()
         {
             var container = new Container();
 
-            container.Register<ServiceResolver>(reuse: Reuse.Transient);
+            container.Register<ServiceResolver>(setup: Setup.With(useParentReuse: true)); // THIS IS THE FIX!
 
             container.Register<ServiceSingleton>(reuse: Reuse.Singleton);
             container.Register<ServiceTransient>(reuse: Reuse.Transient);
             container.Register<ServiceScoped>(reuse: Reuse.Scoped);
 
             // resolving singleton first breaks the resolution in the Do below
-            var singleton = container.Resolve<ServiceSingleton>();
+            container.Resolve<ServiceSingleton>();
 
             using var scope = container.OpenScope();
 
@@ -51,34 +51,34 @@ namespace DryIoc.IssuesTests
 
         public class ServiceSingleton
         {
-            private readonly ServiceResolver _serviceResolver;
+            public readonly ServiceResolver ServiceResolver;
 
             public ServiceSingleton(ServiceResolver serviceResolver) =>
-                _serviceResolver = serviceResolver;
+                ServiceResolver = serviceResolver;
         }
 
         public class ServiceTransient
         {
-            private readonly ServiceResolver _serviceResolver;
+            public readonly ServiceResolver ServiceResolver;
 
             public ServiceTransient(ServiceResolver serviceResolver) =>
-                _serviceResolver = serviceResolver;
+                ServiceResolver = serviceResolver;
 
             public void Do()
             {
-                _ = _serviceResolver.GetService<ServiceScoped>();
+                _ = ServiceResolver.GetService<ServiceScoped>();
             }
         }
 
         public class ServiceResolver
         {
-            private readonly IResolver _resolver;
+            public readonly IResolver Resolver;
 
             public ServiceResolver(IResolver resolver) =>
-                _resolver = resolver;
+                Resolver = resolver;
 
             public TService GetService<TService>() =>
-                _resolver.Resolve<TService>();
+                Resolver.Resolve<TService>();
         }
 
         public class ServiceScoped
