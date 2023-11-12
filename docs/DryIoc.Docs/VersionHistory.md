@@ -1,6 +1,11 @@
 Version History
 ---------------
 
+## v5.4.3 Bug-fix release / 2023-11-12
+
+- fixed: Release 5.4.2 is Broken for Framework 4.8
+
+
 ## v5.4.2 Bug-fix release / 2023-10-17
 
 - fixed: #588 Container.IsDisposed property not reflecting own scope disposed state.
