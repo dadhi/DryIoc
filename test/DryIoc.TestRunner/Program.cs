@@ -16,7 +16,7 @@ namespace DryIoc.UnitTests
 
             // new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run(); // todo: @fixme
             // new GHIssue169_Decorators().Run();
-            
+
             // new ActionTests().Run();
             // new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
             // new GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
@@ -173,17 +173,26 @@ namespace DryIoc.UnitTests
 
             int Run(Func<int> run, string name = null)
             {
-                var testsName = name ?? run.Method.DeclaringType.FullName;
                 int testsPassed;
                 try
                 {
                     testsPassed = run();
+#if DEBUG
+                    // we don't need to list the tests one-by-one on CI, and it makes avoiding it saves 30% of time
+                    var testsName = name ?? run.Method.DeclaringType.FullName;
                     Console.WriteLine($"{testsPassed,-4} of {testsName}");
+#endif
                 }
                 catch (Exception ex)
                 {
                     testsPassed = 0;
-                    Console.WriteLine($"ERROR: Tests `{testsName}` failed with '{ex}'");
+                    var testsName = name ?? run.Method.DeclaringType.FullName;
+                    Console.WriteLine($"""
+                    --------------------------------------------
+                    ERROR: Tests `{testsName}` failed with
+                    {ex}
+                    --------------------------------------------
+                    """);
                 }
                 return testsPassed;
             }

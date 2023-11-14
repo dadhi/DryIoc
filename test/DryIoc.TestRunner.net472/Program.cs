@@ -153,17 +153,27 @@ namespace DryIoc.UnitTests.net472
 
             int Run(Func<int> run, string name = null)
             {
-                var testsName = name ?? run.Method.DeclaringType.FullName;
+
                 int testsPassed;
                 try
                 {
                     testsPassed = run();
+#if DEBUG
+                    // we don't need to list the tests one-by-one on CI, and it makes avoiding it saves 30% of time
+                    var testsName = name ?? run.Method.DeclaringType.FullName;
                     Console.WriteLine($"{testsPassed,-4} of {testsName}");
+#endif
                 }
                 catch (Exception ex)
                 {
                     testsPassed = 0;
-                    Console.WriteLine($"ERROR: Tests `{testsName}` failed with '{ex}'");
+                    var testsName = name ?? run.Method.DeclaringType.FullName;
+                    Console.WriteLine($"""
+                    --------------------------------------------
+                    ERROR: Tests `{testsName}` failed with
+                    {ex}
+                    --------------------------------------------
+                    """);
                 }
                 return testsPassed;
             }

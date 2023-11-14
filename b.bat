@@ -10,12 +10,12 @@ echo:# Bare build and TestRunner, no NUnit test runner, no docs gen, no comp-tim
 echo:
 echo:## Finished: RESTORE and BUILD
 echo:
-echo:## Starting: TestRunner... ##
+echo:## Starting: TestRunner...
 echo:
 
-dotnet run --no-build -f net7.0 -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet run --no-build -c:Release -f:net8.0 --project test/DryIoc.TestRunner
 if %ERRORLEVEL% neq 0 goto :error
-dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
+dotnet run --no-build -c:Release --project test/DryIoc.TestRunner.net472
 if %ERRORLEVEL% neq 0 goto :error
 
 echo:
