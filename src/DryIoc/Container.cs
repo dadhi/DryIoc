@@ -10420,7 +10420,10 @@ namespace DryIoc
                     s.Print(implType).Append(": ");
             }
 
-            s.Print(ServiceTypeOrInfo is ParameterInfo pi ? ParameterServiceInfo.Of(pi) : ServiceTypeOrInfo);
+            if (ServiceTypeOrInfo is ParameterInfo pi)
+                s.Append(ParameterServiceInfo.Of(pi));
+            else
+                s.Print(ServiceTypeOrInfo);
 
             if (FactoryID != 0)
                 s.Append(" FactoryID=").Append(FactoryID);
@@ -14514,7 +14517,7 @@ namespace DryIoc
                 if (factoryId > ushort.MaxValue)
                 {
                     var decoratorFactoryId = factoryId & ushort.MaxValue;
-                    factoryId >>>= 16;
+                    factoryId >>= 16; // should be logical `>>>` but C# <- 11 does not support it yet
                     decoratorMessage = GetDecoratorMessage(container, decoratorFactoryId);
                     static string GetDecoratorMessage(IRegistrator container, int decoratorFactoryId)
                     {
