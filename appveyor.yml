@@ -11,11 +11,11 @@ skip_commits:
   message: /noci .*/
 
 build_script:
-  - dotnet test -f net7.0 -c Release --project test/DryIoc.UnitTests/DryIoc.UnitTests.csproj
-  - dotnet test -f net7.0 -c Release --project test/DryIoc.IssuesTests/DryIoc.IssuesTests.csproj
-  - dotnet test -f net7.0 -c Release --project test/DryIoc.CommonServiceLocator.UnitTests/DryIoc.CommonServiceLocator.UnitTests.csproj
-  - dotnet test -f net7.0 -c Release --project test/DryIoc.Microsoft.DependencyInjection.Specification.Tests/DryIoc.Microsoft.DependencyInjection.Specification.Tests.csproj
-  - dotnet test -f net7.0 -c Release --project docs/DryIoc.Docs/DryIoc.Docs.csproj
+  - dotnet test -f:net7.0 -c:Release test/DryIoc.UnitTests
+  - dotnet test -f:net7.0 -c:Release test/DryIoc.IssuesTests
+  - dotnet test -f:net7.0 -c:Release test/DryIoc.CommonServiceLocator.UnitTests
+  - dotnet test -f:net7.0 -c:Release test/DryIoc.Microsoft.DependencyInjection.Specification.Tests
+  - dotnet test -f:net7.0 -c:Release docs/DryIoc.Docs
 
 for:
   - matrix:
