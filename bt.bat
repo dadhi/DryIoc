@@ -5,14 +5,14 @@ echo:
 echo:# Build the TestRunner (.NET 7 only)
 echo:
 
-dotnet build -c Release test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet build  -f net7.0 -c Release test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 if %ERRORLEVEL% neq 0 goto :error
 
 echo:
 echo:# Run the TestRunner
 echo:
 
-dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet run --no-build -f net7.0 -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 if %ERRORLEVEL% neq 0 goto :error
 
 echo:

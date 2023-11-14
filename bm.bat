@@ -1,1 +1,1 @@
-dotnet run -c Release --project playground/Playground
+dotnet run -f net8.0 -c Release --project playground/Playground

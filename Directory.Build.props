@@ -7,6 +7,9 @@
 
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
         <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+
+        <DevMode>true</DevMode><!-- Hey, indicates the use of the new .NET frameworks -->
+
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">

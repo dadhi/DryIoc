@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net8.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net7.0</TargetFrameworks>
+
         <Description>Benchmarks, sandbox for experiments.</Description>
         <NoWarn>1701;1702;AD0001;NU1608</NoWarn>
         <TieredCompilation>false</TieredCompilation>
@@ -17,7 +19,7 @@
     <ItemGroup>
         <PackageReference Include="Autofac" Version="7.1.0" />
         <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="8.0.0" />
-        <PackageReference Include="BenchmarkDotNet" Version="0.13.9" />
+        <PackageReference Include="BenchmarkDotNet" Version="0.13.10" />
         <PackageReference Include="Grace" Version="7.2.1" />
         <PackageReference Include="Grace.DependencyInjection.Extensions" Version="7.1.0" />
         <PackageReference Include="LightInject" Version="6.6.4" />
