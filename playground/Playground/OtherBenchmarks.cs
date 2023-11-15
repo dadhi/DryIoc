@@ -5,7 +5,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.Serialization;
+using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using DryIoc.ImTools;
 
@@ -33,7 +33,7 @@ public class OtherBenchmarks
         [Benchmark]
         public K CtorInvoke()
         {
-            var uninitializedX = FormatterServices.GetUninitializedObject(typeof(K));
+            var uninitializedX = RuntimeHelpers.GetUninitializedObject(typeof(K));
             return (K)typeof(K).GetConstructors()[0].Invoke(uninitializedX, new object[] { _m });
         }
     }
