@@ -1,17 +1,14 @@
 using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.DependencyInjection.Specification;
 
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     [TestFixture]
-    public class GHIssue435_hangfire_use_dryioc_report_ContainerIsDisposed : DependencyInjectionSpecificationTests
+    public class GHIssue435_hangfire_use_dryioc_report_ContainerIsDisposed
     {
-        protected override IServiceProvider CreateServiceProvider(IServiceCollection services) => 
-            services.CreateServiceProvider(); 
+        protected static IServiceProvider CreateServiceProvider(IServiceCollection services) =>
+            new DryIocServiceProviderFactory().CreateBuilder(services).BuildServiceProvider();
 
         [Test]
         public void SingletonFactory_Test()

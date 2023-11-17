@@ -39,7 +39,7 @@ namespace DryIoc.IssuesTests
                 childContainer.RegisterDescriptor(service, IfAlreadyRegistered.AppendNewImplementation, "child-stamp");
             }
 
-            var msContainer = childContainer.GetServiceProvider();
+            var msContainer = childContainer.BuildServiceProvider();
 
             Assert.That(
                 childContainer.Resolve<IEnumerable<IPrinter>>().Count(),
@@ -69,7 +69,7 @@ namespace DryIoc.IssuesTests
                 typeof(NeighborPrinter)
             );
 
-            var msContainer = childContainer.GetServiceProvider();
+            var msContainer = childContainer.BuildServiceProvider();
 
             Assert.That(
                 childContainer.Resolve<IEnumerable<IPrinter>>().Count(),

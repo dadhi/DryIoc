@@ -122,8 +122,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         ///     // applies the MS.DI rules and registers the infrastructure helpers and service collection to the container
         ///     var adaptedContainer = container.WithDependencyInjectionAdapter(services); 
         ///
-        ///     // the container implements IServiceProvider
-        ///     IServiceProvider serviceProvider = adaptedContainer;
+        ///     var serviceProvider = adaptedContainer.GetServiceProvider();
         ///
         ///]]></code>
         /// </example>
@@ -139,11 +138,17 @@ namespace DryIoc.Microsoft.DependencyInjection
             else if (registrySharing != RegistrySharing.Share)
                 container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
 
-            var capabilities = new DryIocServiceProviderCapabilities(container);
+            var serviceProvider = new DryIocServiceProvider(container);
+
+            // those are singletons
             var singletons = container.SingletonScope;
-            singletons.Use<IServiceProviderIsService>(capabilities);
-            singletons.Use<ISupportRequiredService>(capabilities);
-            singletons.Use<IServiceScopeFactory>(capabilities);
+            singletons.Use<IServiceProvider>(serviceProvider);
+            singletons.Use<ISupportRequiredService>(serviceProvider);
+            singletons.Use<IKeyedServiceProvider>(serviceProvider);
+
+            singletons.Use<IServiceScopeFactory>(serviceProvider);
+            singletons.Use<IServiceProviderIsService>(serviceProvider);
+            singletons.Use<IServiceProviderIsKeyedService>(serviceProvider);
 
             if (descriptors != null)
                 container.Populate(descriptors, registerDescriptor);
@@ -153,7 +158,7 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Sugar to create the DryIoc container and adapter populated with services</summary>
         public static IServiceProvider CreateServiceProvider(this IServiceCollection services) =>
-            new Container(DryIoc.Rules.MicrosoftDependencyInjectionRules).WithDependencyInjectionAdapter(services);
+            new Container(Rules.MicrosoftDependencyInjectionRules).WithDependencyInjectionAdapter(services);
 
         /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
         public static IContainer WithCompositionRoot(this IContainer container, Type compositionRootType)
@@ -167,13 +172,13 @@ namespace DryIoc.Microsoft.DependencyInjection
         public static IContainer WithCompositionRoot<TCompositionRoot>(this IContainer container) =>
             container.WithCompositionRoot(typeof(TCompositionRoot));
 
-        /// <summary>It does not really build anything, it just gets the `IServiceProvider` from the container.</summary>
+        /// <summary>Wraps the container in the service provider implementation.</summary>
         public static IServiceProvider BuildServiceProvider(this IContainer container) =>
-            container.GetServiceProvider();
+            new DryIocServiceProvider(container);
 
-        /// <summary>Just gets the `IServiceProvider` from the container.</summary>
-        public static IServiceProvider GetServiceProvider(this IResolver container) =>
-            container;
+        /// <summary>Gets the service provider.</summary>
+        public static IServiceProvider GetServiceProvider(this IContainer container) =>
+            container.BuildServiceProvider();
 
         /// <summary>Facade to consolidate DryIoc registrations in <typeparamref name="TCompositionRoot"/></summary>
         /// <typeparam name="TCompositionRoot">The class will be created by container on Startup 
@@ -194,7 +199,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// ]]></code>
         /// </example>
         public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this IContainer container) =>
-            container.WithCompositionRoot<TCompositionRoot>().GetServiceProvider();
+            container.WithCompositionRoot<TCompositionRoot>().BuildServiceProvider();
 
         /// <summary>Registers service descriptors into container. May be called multiple times with different service collections.</summary>
         /// <param name="container">The container.</param>
@@ -242,47 +247,118 @@ namespace DryIoc.Microsoft.DependencyInjection
             object serviceKey = null)
         {
             var serviceType = descriptor.ServiceType;
-            var implType = descriptor.ImplementationType;
-            if (implType != null)
+            if (descriptor.IsKeyedService)
             {
-                container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType,
-                    serviceKey, ifAlreadyRegistered, isStaticallyChecked: implType == serviceType || serviceType.IsAssignableFrom(implType));
-            }
-            else if (descriptor.ImplementationFactory != null)
-            {
-                container.Register(DelegateFactory.Of(descriptor.ImplementationFactory, descriptor.Lifetime.ToReuse()), serviceType,
-                    serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+                serviceKey = descriptor.ServiceKey;
+                if (serviceKey == KeyedService.AnyKey)
+                    serviceKey = Registrator.AnyServiceKey;
+
+                var implType = descriptor.KeyedImplementationType;
+                if (implType != null)
+                {
+                    container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType,
+                        serviceKey, ifAlreadyRegistered, isStaticallyChecked: implType == serviceType || serviceType.IsAssignableFrom(implType));
+                }
+                else if (descriptor.KeyedImplementationFactory != null)
+                {
+                    var fac = descriptor.KeyedImplementationFactory;
+                    container.RegisterFuncWithParameters(serviceType,
+                        fac.GetType(), (Func<object, object, object>)fac.ToFuncWithObjParams, ParameterSelectorForServiceKeyAttribute,
+                        descriptor.Lifetime.ToReuse(), Setup.Default, ifAlreadyRegistered, serviceKey);
+                }
+                else
+                {
+                    var instance = descriptor.KeyedImplementationInstance;
+                    container.Register(InstanceFactory.Of(instance), serviceType,
+                        serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+                    container.TrackDisposable(instance); // todo: @wip @incompatible calling this method depends on the `ifAlreadyRegistered` policy
+                }
             }
             else
             {
-                var instance = descriptor.ImplementationInstance;
-                container.Register(InstanceFactory.Of(instance), serviceType,
-                    serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-                container.TrackDisposable(instance); // todo: @wip @incompatible calling this method depend on the `ifAlreadyRegistered` policy
+                var implType = descriptor.ImplementationType;
+                if (implType != null)
+                {
+                    container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType,
+                        serviceKey, ifAlreadyRegistered, isStaticallyChecked: implType == serviceType || serviceType.IsAssignableFrom(implType));
+                }
+                else if (descriptor.ImplementationFactory != null)
+                {
+                    container.Register(DelegateFactory.Of(descriptor.ImplementationFactory, descriptor.Lifetime.ToReuse()), serviceType,
+                        serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+                }
+                else
+                {
+                    var instance = descriptor.ImplementationInstance;
+                    container.Register(InstanceFactory.Of(instance), serviceType,
+                        serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+                    container.TrackDisposable(instance); // todo: @wip @incompatible calling this method depends on the `ifAlreadyRegistered` policy
+                }
             }
         }
+
+        public static ParameterSelector ParameterSelectorForServiceKeyAttribute =
+            req =>
+            param =>
+            {
+                if (param.Position != 1 && !param.IsDefined(typeof(ServiceKeyAttribute), false))
+                    return null;
+                var serviceKey = req.ServiceKey;
+                if (serviceKey == null)
+                    return null;
+                    // throw new InvalidOperationException($"Unable to inject service key `null` into parameter `{param}`");
+                if (!param.ParameterType.IsAssignableFrom(serviceKey.GetType()))
+                    throw new InvalidOperationException($"Unable to inject service key `{serviceKey.Print()}` into parameter `{param}` because of incompatible type.");
+                return ParameterServiceInfo.Of(param, ServiceDetails.OfValue(serviceKey));
+            };
     }
 
-    /// <summary>Bare-bones IServiceScope implementations</summary>
-    public sealed class DryIocServiceScope : IServiceScope
-    {
-        /// <inheritdoc />
-        public IServiceProvider ServiceProvider => _resolverContext;
-        private readonly IResolverContext _resolverContext;
+    // todo: @wip @remove
+    // /// <summary>Bare-bones IServiceScope implementations</summary>
+    // public sealed class DryIocServiceScope : IServiceScope
+    // {
+    //     /// <inheritdoc />
+    //     public IServiceProvider ServiceProvider => _resolverContext;
+    //     private readonly IResolverContext _resolverContext;
 
-        /// <summary>Creating from resolver context</summary>
-        public DryIocServiceScope(IResolverContext resolverContext) => _resolverContext = resolverContext;
+    //     /// <summary>Creating from resolver context</summary>
+    //     public DryIocServiceScope(IResolverContext resolverContext) => 
+    //         _resolverContext = resolverContext;
 
-        /// <summary>Disposes the underlying resolver context</summary>
-        public void Dispose() => _resolverContext.Dispose();
-    }
+    //     /// <summary>Disposes the underlying resolver context</summary>
+    //     public void Dispose() => _resolverContext.Dispose();
+    // }
 
     /// <summary>Impl of `IsRegistered`, `GetRequiredService`, `CreateScope`.</summary>
-    public sealed class DryIocServiceProviderCapabilities : IServiceProviderIsService, ISupportRequiredService, IServiceScopeFactory
+    public sealed class DryIocServiceProvider : IDisposable,
+        IServiceProvider, IServiceScopeFactory, IServiceScope,
+        IServiceProviderIsService, ISupportRequiredService,
+        IKeyedServiceProvider, IServiceProviderIsKeyedService
     {
-        private readonly IContainer _container;
+        /// <summary>Exposes underlying (possible scoped) DryIoc container</summary>
+        public readonly IContainer Container;
+
         /// <summary>Statefully wraps the passed <paramref name="container"/></summary>
-        public DryIocServiceProviderCapabilities(IContainer container) => _container = container;
+        public DryIocServiceProvider(IContainer container) =>
+            Container = container;
+
+        IServiceScope IServiceScopeFactory.CreateScope()
+        {
+            var scopedContainer = Container.WithNewOpenScope();
+            var scopedProvider = new DryIocServiceProvider(scopedContainer);
+            var currentScope = scopedContainer.CurrentScope;
+            currentScope.Use<IServiceProvider>(scopedProvider);
+            currentScope.Use<ISupportRequiredService>(scopedProvider);
+            currentScope.Use<IKeyedServiceProvider>(scopedProvider);
+            return scopedProvider;
+        }
+
+        IServiceProvider IServiceScope.ServiceProvider => this;
+
+        /// <inheritdoc />
+        public object GetService(Type serviceType) =>
+            Container.Resolve(serviceType,
+                Container.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered);
 
         /// <inheritdoc />
         public bool IsService(Type serviceType)
@@ -293,26 +369,54 @@ namespace DryIoc.Microsoft.DependencyInjection
             if (serviceType.IsGenericTypeDefinition)
                 return false;
 
-            if (serviceType == typeof(IServiceProviderIsService) ||
-                serviceType == typeof(ISupportRequiredService) ||
-                serviceType == typeof(IServiceScopeFactory) ||
-                serviceType == typeof(IServiceProvider))
+            if (serviceType == typeof(IServiceProviderIsService) |
+                serviceType == typeof(ISupportRequiredService) |
+                serviceType == typeof(IServiceScopeFactory) |
+                serviceType == typeof(IServiceProvider) |
+                serviceType == typeof(IKeyedServiceProvider) |
+                serviceType == typeof(IServiceProviderIsKeyedService))
                 return true;
 
-            if (_container.IsRegistered(serviceType))
+            if (Container.IsRegistered(serviceType))
                 return true;
 
             if (serviceType.IsGenericType &&
-                _container.IsRegistered(serviceType.GetGenericTypeDefinition()))
+                Container.IsRegistered(serviceType.GetGenericTypeDefinition()))
                 return true;
 
-            return _container.IsRegistered(serviceType, factoryType: FactoryType.Wrapper);
+            return Container.IsRegistered(serviceType, factoryType: FactoryType.Wrapper);
         }
 
         /// <inheritdoc />
-        public object GetRequiredService(Type serviceType) => _container.Resolve(serviceType);
+        public object GetRequiredService(Type serviceType) =>
+            Container.Resolve(serviceType, IfUnresolved.Throw);
 
         /// <inheritdoc />
-        public IServiceScope CreateScope() => new DryIocServiceScope(_container.WithNewOpenScope());
+        public object GetKeyedService(Type serviceType, object serviceKey) =>
+            Container.Resolve(serviceType, serviceKey,
+                Container.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered);
+
+        /// <inheritdoc />
+        public object GetRequiredKeyedService(Type serviceType, object serviceKey) =>
+            Container.Resolve(serviceType, serviceKey, IfUnresolved.Throw);
+
+        /// <inheritdoc />
+        public bool IsKeyedService(Type serviceType, object serviceKey)
+        {
+            if (serviceType.IsGenericTypeDefinition)
+                return false;
+
+            if (Container.IsRegistered(serviceType, serviceKey))
+                return true;
+
+            if (serviceType.IsGenericType &&
+                Container.IsRegistered(serviceType.GetGenericTypeDefinition(), serviceKey))
+                return true;
+
+            return Container.IsRegistered(serviceType, serviceKey, factoryType: FactoryType.Wrapper);
+        }
+
+        /// <inheritdoc />
+        public void Dispose() => Container.Dispose();
     }
 }

@@ -27,10 +27,21 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             var providerFactory = new DryIocServiceProviderFactory();
             var provider = providerFactory.CreateServiceProvider(providerFactory.CreateBuilder(services));
 
-            Assert.Throws<InvalidOperationException>(() =>
-                provider.GetRequiredService<Buz>());
+            try
+            {
+                provider.GetRequiredService<Buz>();
+                Assert.Fail("Expected InvalidOperationException but got none.");
+            }
+            catch (InvalidOperationException e)
+            {
+                Assert.IsInstanceOf<ContainerException>(e);
+            }
+            catch (Exception e)
+            {
+                Assert.Fail($"Expected {nameof(InvalidOperationException)} but got {e.GetType().Name}");
+            }
         }
 
-        public class Buz {}
+        public class Buz { }
     }
 }

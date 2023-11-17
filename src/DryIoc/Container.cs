@@ -730,7 +730,7 @@ namespace DryIoc
         /// <summary>Creates the new scope using the Container's current scope as a parent.
         /// Made virtual to allow additional code run when scope is opened, e.g. automatically resolve some services, see #539.
         /// </summary>
-        public virtual IResolverContext WithNewOpenScope()
+        public virtual IContainer WithNewOpenScope()
         {
             if (_singletonScope.IsDisposed)
                 Throw.It(Error.ContainerIsDisposed, ToString());
@@ -739,7 +739,7 @@ namespace DryIoc
                 : WithNewOpenScopeInScopeContext();
         }
 
-        private IResolverContext WithNewOpenScopeInScopeContext()
+        private IContainer WithNewOpenScopeInScopeContext()
         {
             _scopeContext.SetNewOpen();
             return new Container(Rules, _registry, _singletonScope, _scopeContext, null, 0, null, parent: this);
@@ -4900,7 +4900,7 @@ namespace DryIoc
         IResolverContext WithCurrentScope(IScope scope);
 
         /// <summary>Combines `WithCurrentScope` and `OwnCurrentScope` for the hot-path case to avoid two virtual calls</summary>
-        IResolverContext WithNewOpenScope();
+        IContainer WithNewOpenScope();
 
         /// <summary>Puts instance created via the passed factory on demand into the current or singleton scope</summary>
         void Use(Type serviceType, object instance);
@@ -7207,6 +7207,12 @@ namespace DryIoc
             internal WithFactoryMethodKnownResultType(FactoryMethod factoryMethod, Type factoryReturnType)
                 : base(factoryMethod) => FactoryMethodKnownResultType = factoryReturnType;
         }
+        internal class WithFactoryMethodAndParameters : Made
+        {
+            public override ParameterSelector Parameters { get; }
+            internal WithFactoryMethodAndParameters(FactoryMethod factoryMethod, ParameterSelector parameters)
+                : base(factoryMethod) => Parameters = parameters;
+        }
 
         internal sealed class WithDetails : WithFactoryMethodKnownResultType
         {
@@ -7229,7 +7235,7 @@ namespace DryIoc
             {
                 var details = default(MadeDetails);
 
-                if (parameters != null || propertiesAndFields != null)
+                if (parameters != null | propertiesAndFields != null)
                     details |= MadeDetails.ImplMemberDependsOnRequest;
                 if (hasCustomValue)
                     details |= MadeDetails.HasCustomDependencyValue;
@@ -7315,8 +7321,8 @@ namespace DryIoc
         internal static Made Create(object factoryMethodOrSelector,
             ParameterSelector parameters, PropertiesAndFieldsSelector propertiesAndFields, bool isConditionalImplementation)
         {
-            bool withDetails = parameters != null || propertiesAndFields != null || isConditionalImplementation;
-            return factoryMethodOrSelector == null && !withDetails
+            bool withDetails = parameters != null | propertiesAndFields != null | isConditionalImplementation;
+            return factoryMethodOrSelector == null & !withDetails
                 ? Default
                 : !withDetails ? new Made(factoryMethodOrSelector)
                 : new WithDetails(factoryMethodOrSelector, null, parameters, propertiesAndFields, isConditionalImplementation: isConditionalImplementation);
@@ -7785,6 +7791,16 @@ namespace DryIoc
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
     public static class Registrator
     {
+        /// <summary>When registered with it, the the service can be resolved any service key provided</summary>
+        public static readonly object AnyServiceKey = new AnyServiceKeyObject();
+
+        private class AnyServiceKeyObject
+        {
+            public override bool Equals(object obj) => true;
+            public override int GetHashCode() => -1;
+            public override string ToString() => "*";
+        }
+
         /// <summary>The base method for registering service with its implementation factory. Allows to specify all possible options.</summary>
         public static void Register(this IRegistrator registrator, Type serviceType, Factory factory,
             IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
@@ -8298,7 +8314,8 @@ namespace DryIoc
         private const string InvokeMethodName = "Invoke";
         private static object ToFuncWithObjResult<TService>(this Func<TService> f) => f();
         private static object ToFuncWithObjParams<D1, TService>(this Func<D1, TService> f, object d1) => f((D1)d1);
-        private static object ToFuncWithObjParams<D1, D2, TService>(this Func<D1, D2, TService> f,
+        /// <summary>Exposed for the MS.DI DryIocAdapter</summary>
+        public static object ToFuncWithObjParams<D1, D2, TService>(this Func<D1, D2, TService> f,
             object d1, object d2) => f((D1)d1, (D2)d2);
         private static object ToFuncWithObjParams<D1, D2, D3, TService>(this Func<D1, D2, D3, TService> f,
             object d1, object d2, object d3) => f((D1)d1, (D2)d2, (D3)d3);
@@ -8316,6 +8333,17 @@ namespace DryIoc
             IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
         {
             var made = new Made(FactoryMethod.OfFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams));
+            var factory = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, made, reuse, setup);
+            r.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+        }
+
+        /// <summary>Know what you're doing</summary>
+        public static void RegisterFuncWithParameters(this IRegistrator r,
+            Type serviceType, Type sourceFuncType, Delegate funcWithObjParams, ParameterSelector parameters,
+            IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
+        {
+            var factoryMethod = FactoryMethod.OfFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams);
+            var made = new Made.WithFactoryMethodAndParameters(factoryMethod, parameters);
             var factory = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, made, reuse, setup);
             r.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
@@ -9093,9 +9121,15 @@ namespace DryIoc
                 serviceKey, metadataKey, metadata, defaultValue, hasCustomValue: false);
         }
 
-        /// <summary>Sets custom value for service. This setting is orthogonal to the rest.
-        /// Using default value with invalid ifUnresolved.Throw option to indicate custom value.</summary>
+        /// <summary>Obsolete: please use <see cref="OfValue"/> instead.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static ServiceDetails Of(object value) =>
+            new ServiceDetails(null, IfUnresolved.Throw, null, null, null, value, hasCustomValue: true);
+
+        /// <summary>Sets custom value for service. This setting is orthogonal to the rest of the details.
+        /// Using default value with invalid ifUnresolved.Throw option to indicate custom value.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ServiceDetails OfValue(object value) =>
             new ServiceDetails(null, IfUnresolved.Throw, null, null, null, value, hasCustomValue: true);
 
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
@@ -9539,6 +9573,11 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public static ParameterServiceInfo Of(ParameterInfo parameter) =>
             OrNull(parameter) ?? new ParameterServiceInfo(parameter);
+
+        /// <summary>Creates service info from the parameter and the details</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ParameterServiceInfo Of(ParameterInfo parameter, ServiceDetails details) =>
+            new WithDetails(parameter, details);
 
         /// <summary>Creates service info from the parameter, type and the details</summary>
         [MethodImpl((MethodImplOptions)256)]

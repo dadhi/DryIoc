@@ -49,11 +49,11 @@ public class SingletonAutomaticallyResolved
     }
 }
 
-public class MyContainer : Container
+public sealed class MyContainer : Container
 {
     public MyContainer(Rules rules) : base(rules) {}
 
-    public override IResolverContext WithNewOpenScope() 
+    public override IContainer WithNewOpenScope() 
     {
         var scope = base.WithNewOpenScope();
         scope.Resolve<ScopedAutomaticallyResolved>();
