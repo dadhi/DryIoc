@@ -1,11 +1,11 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <ProductVersion>8.0.30703</ProductVersion>
     <TargetFramework>net45</TargetFramework>
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
     <AssemblyTitle>DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests</AssemblyTitle>
     <Product>DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests</Product>
-    <Copyright>Copyright � 2013-2021 Maksim Volkau</Copyright>
+    <Copyright>Copyright � 2013-2023 Maksim Volkau</Copyright>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -22,7 +22,6 @@
     <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
   </Target>
   <ItemGroup>
-    <PackageReference Include="NUnit" Version="2.6.4" />
     <PackageReference Include="Wire" Version="0.8.0" />
   </ItemGroup>
   <ItemGroup>
@@ -42,12 +41,10 @@
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj" />
-    <ProjectReference Include="..\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj" />
-    <ProjectReference Include="..\DryIocAttributes\DryIocAttributes.csproj" />
-    <ProjectReference Include="..\DryIoc\DryIoc.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Remove="CompileTimeGeneratedRegistrator.cs" />
+    <ProjectReference Include="..\..\src\DryIoc.MefAttributedModel\DryIoc.MefAttributedModel.csproj" />
+    <ProjectReference Include="..\..\src\DryIocAttributes\DryIocAttributes.csproj" />
+    <ProjectReference Include="..\..\src\DryIoc\DryIoc.csproj" />
+    <ProjectReference Include="..\..\test_sut\DryIoc.MefAttributedModel.UnitTests.CUT\DryIoc.MefAttributedModel.UnitTests.CUT.csproj" />
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.csproj" />
   </ItemGroup>
 </Project>
