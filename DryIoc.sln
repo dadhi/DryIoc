@@ -116,17 +116,19 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DryIoc", "DryIoc", "{1858EE
 		nuspecs\DryIoc\readme.md = nuspecs\DryIoc\readme.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.TestRunner", "test\DryIoc.TestRunner\DryIoc.TestRunner.csproj", "{755CC987-E7B6-46CD-B612-D33B28EBD1A8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.TestRunner", "test\DryIoc.TestRunner\DryIoc.TestRunner.csproj", "{755CC987-E7B6-46CD-B612-D33B28EBD1A8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AzureFunctions", "src\DryIoc.AzureFunctions\DryIoc.AzureFunctions.csproj", "{400BE898-DF9C-4DE8-9483-1F43F990784B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.AzureFunctions", "src\DryIoc.AzureFunctions\DryIoc.AzureFunctions.csproj", "{400BE898-DF9C-4DE8-9483-1F43F990784B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Microsoft.DependencyInjection.Specification.Tests", "test\DryIoc.Microsoft.DependencyInjection.Specification.Tests\DryIoc.Microsoft.DependencyInjection.Specification.Tests.csproj", "{480C65D7-184D-44E7-9B5D-05E30D857977}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.Microsoft.DependencyInjection.Specification.Tests", "test\DryIoc.Microsoft.DependencyInjection.Specification.Tests\DryIoc.Microsoft.DependencyInjection.Specification.Tests.csproj", "{480C65D7-184D-44E7-9B5D-05E30D857977}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground", "playground\Playground\Playground.csproj", "{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "playground\Playground\Playground.csproj", "{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{38A94225-72AE-4869-88A2-61FCB48ED681}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test", "samples\GHIssue519\test.csproj", "{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "test", "samples\GHIssue519\test.csproj", "{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests", "test\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests.csproj", "{91671AB0-0788-4912-94B9-386F3EA820B2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -266,6 +268,10 @@ Global
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Release|Any CPU.Build.0 = Release|Any CPU
+		{91671AB0-0788-4912-94B9-386F3EA820B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{91671AB0-0788-4912-94B9-386F3EA820B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{91671AB0-0788-4912-94B9-386F3EA820B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{91671AB0-0788-4912-94B9-386F3EA820B2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -304,6 +310,7 @@ Global
 		{480C65D7-184D-44E7-9B5D-05E30D857977} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 		{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73} = {38A94225-72AE-4869-88A2-61FCB48ED681}
+		{91671AB0-0788-4912-94B9-386F3EA820B2} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}

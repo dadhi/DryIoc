@@ -1,4 +1,4 @@
-﻿namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
+namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 {
     using System;
 
@@ -159,7 +159,7 @@
     new ExportedRegistrationInfo {
         ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.OneTransientService),
         Exports = new[] {
-            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplementations), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
         },
         Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.Transient },
         OpenResolutionScope = false,
@@ -175,7 +175,7 @@
         ConditionType = null,
         Metadata = new System.Collections.Generic.Dictionary<string, Object> {
             { "DisplayName", "One" },
-            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), "One") },
+            { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute", new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplementations), "One") },
             { "DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute.ToCode()", "new DryIoc.MefAttributedModel.UnitTests.CUT.ExportWithDisplayNameAttribute(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), \"One\")" },
         }
     },
@@ -183,7 +183,7 @@
     new ExportedRegistrationInfo {
         ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.AnotherTransientService),
         Exports = new[] {
-            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplentations), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IServiceWithMultipleImplementations), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
         },
         Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.Transient },
         OpenResolutionScope = false,
@@ -271,9 +271,9 @@
     },
 
     new ExportedRegistrationInfo {
-        ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleCostructors),
+        ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleConstructors),
         Exports = new[] {
-            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleCostructors), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleConstructors), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
         },
         OpenResolutionScope = false,
         AsResolutionCall = false,
@@ -289,9 +289,9 @@
     },
 
     new ExportedRegistrationInfo {
-        ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleCostructorsAndOneImporting),
+        ImplementationType = typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleConstructorsAndOneImporting),
         Exports = new[] {
-            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleCostructorsAndOneImporting), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
+            new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.ServiceWithMultipleConstructorsAndOneImporting), null, DryIoc.IfAlreadyRegistered.AppendNotKeyed),
         },
         OpenResolutionScope = false,
         AsResolutionCall = false,
