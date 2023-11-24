@@ -110,7 +110,7 @@ namespace DryIoc.Microsoft.DependencyInjection
     {
         /// <summary>ParameterSelector to inject the service key into the parameter marked with [ServiceKey] attribute</summary>
         public static readonly ParameterSelector SelectServiceKeyForParameterWithServiceKeyAttribute =
-            req => par =>
+            static req => par =>
             {
                 if (!par.IsDefined(typeof(ServiceKeyAttribute), false))
                     return null;
@@ -119,9 +119,9 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>ParameterSelector to inject the service key into the parameter marked with [ServiceKey] attribute</summary>
         public static readonly ParameterSelector SelectServiceKeyFor2ndParameterOfKeyedImplementationFactory =
-            req => par =>
+            static req => par =>
             {
-                if (par.Position == 1)
+                if (par.Position != 1)
                     return null;
                 return GetServiceKeyAsParameterValue(req, par);
             };

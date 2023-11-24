@@ -41,7 +41,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 
             public Service([ServiceKey] string id) => _id = id;
 
-            public override string? ToString() => _id;
+            public override string ToString() => _id;
         }
 
     }

@@ -6956,11 +6956,11 @@ namespace DryIoc
         {
             if (mostResolvable)
                 return includeNonPublic
-                    ? (request => MostResolvableConstructor(request, BindingFlags.NonPublic))
-                    : (FactoryMethodSelector)(request => MostResolvableConstructor(request));
+                    ? (static request => MostResolvableConstructor(request, BindingFlags.NonPublic))
+                    : (FactoryMethodSelector)(static request => MostResolvableConstructor(request));
             return includeNonPublic
-                ? (request => Constructor(request, BindingFlags.NonPublic))
-                : (FactoryMethodSelector)(request => Constructor(request));
+                ? (static request => Constructor(request, BindingFlags.NonPublic))
+                : (FactoryMethodSelector)(static request => Constructor(request));
         }
 
         private static FactoryMethod MostResolvableConstructor(Request request,
