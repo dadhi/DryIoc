@@ -52,7 +52,7 @@ namespace DryIoc.MefAttributedModel
             PropertiesAndFields.All(serviceInfo: GetImportedPropertiesAndFieldsOnly);
 
         private static readonly Made _defaultImportMadeOf = Made.Of(
-            request => GetImportingConstructor(request),
+            static request => GetImportingConstructor(request),
             GetImportedParameter,
             _getImportedPropertiesAndFields);
 
@@ -60,8 +60,10 @@ namespace DryIoc.MefAttributedModel
         public static Rules WithMefRules(this Rules rules)
         {
             var importMadeOf = rules.FactoryMethodOrSelector == null ? _defaultImportMadeOf :
-                Made.Of(request => GetImportingConstructor(request, rules.FactoryMethodOrSelector),
-                    GetImportedParameter, _getImportedPropertiesAndFields);
+                Made.Of(
+                    static request => GetImportingConstructor(request, request.Rules.FactoryMethodOrSelector),
+                    GetImportedParameter,
+                    _getImportedPropertiesAndFields);
 
             return rules.With(importMadeOf)
                 .WithDefaultReuse(Reuse.Singleton)

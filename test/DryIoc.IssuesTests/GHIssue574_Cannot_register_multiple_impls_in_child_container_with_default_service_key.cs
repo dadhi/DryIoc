@@ -53,7 +53,7 @@ namespace DryIoc.IssuesTests
         // [Test]
         public void ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys()
         {
-            var container = new Container(Rules.MicrosoftDependencyInjectionRules)
+            var container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
                 .WithMef(); // <-- this is the key, LOL ;-)
 
             var spf = new DryIocServiceProviderFactory(container);
@@ -83,7 +83,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys_2()
         {
-            var container = new Container(Rules.MicrosoftDependencyInjectionRules)
+            var container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
                 .WithMef(); // <-- this is the key, LOL ;-)
 
             // here use RegisterExport instead of the RegisterDescriptor

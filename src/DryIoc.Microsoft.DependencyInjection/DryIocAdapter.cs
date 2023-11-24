@@ -25,6 +25,7 @@ THE SOFTWARE.
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;  // for MethodImplAttribute
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DryIoc.Microsoft.DependencyInjection
@@ -54,7 +55,7 @@ namespace DryIoc.Microsoft.DependencyInjection
     /// 
     /// DON'T try to change the container rules there - they will be lost, 
     /// instead pass the pre-configured container to `DryIocServiceProviderFactory` as in example above.
-    /// By default container will use <see href="DryIoc.Rules.MicrosoftDependencyInjectionRules" />
+    /// By default container will use <see href="DryIocAdapter.MicrosoftDependencyInjectionRules" />
     /// 
     /// DON'T forget to add `services.AddControllers().AddControllersAsServices()` in `Startup.ConfigureServices` 
     /// in order to access DryIoc diagnostics for controllers, property-injection, etc.
@@ -90,9 +91,13 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
 
         /// <inheritdoc />
-        public virtual IContainer CreateBuilder(IServiceCollection services) =>
-            (_container ?? new Container(Rules.MicrosoftDependencyInjectionRules))
-                .WithDependencyInjectionAdapter(services, _registerDescriptor, _registrySharing);
+        public virtual IContainer CreateBuilder(IServiceCollection services)
+        {
+            if (_container != null)
+                return _container.WithDependencyInjectionAdapter(services, _registerDescriptor, _registrySharing);
+            return new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
+                .WithDependencyInjectionAdapter(services, _registerDescriptor, _registrySharing, skipRulesCheck: true);
+        }
 
         /// <inheritdoc />
         public virtual IServiceProvider CreateServiceProvider(IContainer container) =>
@@ -103,6 +108,49 @@ namespace DryIoc.Microsoft.DependencyInjection
     /// to simplify work with adapted container.</summary>
     public static class DryIocAdapter
     {
+        /// <summary>ParameterSelector to inject the service key into the parameter marked with [ServiceKey] attribute</summary>
+        public static readonly ParameterSelector SelectServiceKeyForParameterWithServiceKeyAttribute =
+            req => par =>
+            {
+                if (!par.IsDefined(typeof(ServiceKeyAttribute), false))
+                    return null;
+                return GetServiceKeyAsParameterValue(req, par);
+            };
+
+        /// <summary>ParameterSelector to inject the service key into the parameter marked with [ServiceKey] attribute</summary>
+        public static readonly ParameterSelector SelectServiceKeyFor2ndParameterOfKeyedImplementationFactory =
+            req => par =>
+            {
+                if (par.Position == 1)
+                    return null;
+                return GetServiceKeyAsParameterValue(req, par);
+            };
+
+        private static ParameterServiceInfo GetServiceKeyAsParameterValue(Request req, ParameterInfo par)
+        {
+            var serviceKey = req.ServiceKey;
+            if (serviceKey == null)
+                return null;
+            if (!par.ParameterType.IsAssignableFrom(serviceKey.GetType()))
+                throw new InvalidOperationException(
+                    $"Unable to inject service key `{serviceKey.Print()}` into the #{par.Position} parameter `{par}` because of incompatible type.");
+            return ParameterServiceInfo.Of(par, ServiceDetails.OfValue(serviceKey));
+        }
+
+        /// <summary>Creates the conforming rules for the Microsoft.Extension.DependencyInjection.</summary>
+        public static Rules WithMicrosoftDependencyInjectionRules(this Rules rules) =>
+            rules.WithBaseMicrosoftDependencyInjectionRules(SelectServiceKeyForParameterWithServiceKeyAttribute);
+
+        /// <summary>The rules implementing the conventions of Microsoft.Extension.DependencyInjection</summary>
+        public static readonly Rules MicrosoftDependencyInjectionRules =
+            WithMicrosoftDependencyInjectionRules(Rules.Default);
+
+        /// <summary>Checks if the rules "include" the same settings and conventions as the basic MicrosoftDependencyInjectionRules.
+        /// It means that the rules may "include" other things, e.g. `WithConcreteTypeDynamicRegistrations`, etc.</summary>
+        public static bool HasMicrosoftDependencyInjectionRules(this Rules rules) =>
+            rules.HasBaseMicrosoftDependencyInjectionRules(MicrosoftDependencyInjectionRules) &&
+            rules.Parameters == SelectServiceKeyForParameterWithServiceKeyAttribute;
+
         /// <summary>Adapts passed <paramref name="container"/> to Microsoft.DependencyInjection conventions,
         /// registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>,
         /// and returns NEW container.
@@ -111,6 +159,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <param name="descriptors">(optional) Specify service descriptors or use <see cref="Populate"/> later.</param>
         /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
         /// <param name="registrySharing">(optional) Use DryIoc <see cref="RegistrySharing"/> capability.</param>
+        /// <param name="skipRulesCheck">(optional) Skip the check if the container already has the MicrosoftDependencyInjectionRules.</param>
         /// <example>
         /// <code><![CDATA[
         /// 
@@ -130,13 +179,25 @@ namespace DryIoc.Microsoft.DependencyInjection
         public static IContainer WithDependencyInjectionAdapter(this IContainer container,
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
-            RegistrySharing registrySharing = RegistrySharing.Share)
+            RegistrySharing registrySharing = RegistrySharing.Share,
+            bool skipRulesCheck = false)
         {
-            var hasMicrosoftDependencyInjectionRules = container.Rules.HasMicrosoftDependencyInjectionRules();
-            if (!hasMicrosoftDependencyInjectionRules)
-                container = container.With(container.Rules.WithMicrosoftDependencyInjectionRules(), container.ScopeContext, registrySharing, container.SingletonScope);
-            else if (registrySharing != RegistrySharing.Share)
-                container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
+            if (skipRulesCheck)
+            {
+                if (registrySharing != RegistrySharing.Share)
+                    container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
+            }
+            else
+            {
+                var hasRules = HasMicrosoftDependencyInjectionRules(container.Rules);
+                if (!hasRules)
+                {
+                    var newRules = WithMicrosoftDependencyInjectionRules(container.Rules);
+                    container = container.With(newRules, container.ScopeContext, registrySharing, container.SingletonScope);
+                }
+                else if (registrySharing != RegistrySharing.Share)
+                    container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
+            }
 
             var serviceProvider = new DryIocServiceProvider(container);
 
@@ -158,7 +219,7 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Sugar to create the DryIoc container and adapter populated with services</summary>
         public static IServiceProvider CreateServiceProvider(this IServiceCollection services) =>
-            new Container(Rules.MicrosoftDependencyInjectionRules).WithDependencyInjectionAdapter(services);
+            new Container(MicrosoftDependencyInjectionRules).WithDependencyInjectionAdapter(services);
 
         /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
         public static IContainer WithCompositionRoot(this IContainer container, Type compositionRootType)
@@ -263,7 +324,8 @@ namespace DryIoc.Microsoft.DependencyInjection
                 {
                     var fac = descriptor.KeyedImplementationFactory;
                     container.RegisterFuncWithParameters(serviceType,
-                        fac.GetType(), (Func<object, object, object>)fac.ToFuncWithObjParams, ParameterSelectorForServiceKeyAttribute,
+                        fac.GetType(), (Func<object, object, object>)fac.ToFuncWithObjParams,
+                        SelectServiceKeyFor2ndParameterOfKeyedImplementationFactory,
                         descriptor.Lifetime.ToReuse(), Setup.Default, ifAlreadyRegistered, serviceKey);
                 }
                 else
@@ -296,21 +358,6 @@ namespace DryIoc.Microsoft.DependencyInjection
                 }
             }
         }
-
-        public static ParameterSelector ParameterSelectorForServiceKeyAttribute =
-            req =>
-            param =>
-            {
-                if (param.Position != 1 && !param.IsDefined(typeof(ServiceKeyAttribute), false))
-                    return null;
-                var serviceKey = req.ServiceKey;
-                if (serviceKey == null)
-                    return null;
-                    // throw new InvalidOperationException($"Unable to inject service key `null` into parameter `{param}`");
-                if (!param.ParameterType.IsAssignableFrom(serviceKey.GetType()))
-                    throw new InvalidOperationException($"Unable to inject service key `{serviceKey.Print()}` into parameter `{param}` because of incompatible type.");
-                return ParameterServiceInfo.Of(param, ServiceDetails.OfValue(serviceKey));
-            };
     }
 
     // todo: @wip @remove

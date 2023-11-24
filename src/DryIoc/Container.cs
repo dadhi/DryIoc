@@ -5685,10 +5685,14 @@ namespace DryIoc
         /// <summary>Default rules as a staring point.</summary>
         public static readonly Rules Default = new Rules();
 
-        private static Rules WithMicrosoftDependencyInjectionRules(Rules rules)
+        private static Rules WithMicrosoftDependencyInjectionRules(Rules rules, ParameterSelector parameters)
         {
-            var newRules = rules.Clone(cloneMade: true);
-            newRules._made.FactoryMethodOrSelector = DryIoc.FactoryMethod.ConstructorWithResolvableArguments;
+            var made = rules._made;
+            var newMade = made.With(
+                DryIoc.FactoryMethod.ConstructorWithResolvableArguments,
+                made.Parameters.OverrideWith(parameters));
+
+            var newRules = rules.With(newMade);
 
             newRules._settings = (rules._settings
                 | Settings.TrackingDisposableTransients | Settings.SelectLastRegisteredFactory)
@@ -5699,11 +5703,22 @@ namespace DryIoc
             return newRules;
         }
 
-        /// <summary>Checks if the rules include the same settings and conventions as <see cref="MicrosoftDependencyInjectionRules"/>.
-        /// It also means that the rules may include the additional things like `WithConcreteTypeDynamicRegistrations`, etc.</summary>
-        public bool HasMicrosoftDependencyInjectionRules()
+        /// <summary>Returns the basic rules for the Microsoft.Extension.DependencyInjection 
+        /// EXCEPT for ParameterSelector for the keyed services, which should be provided as parameter.
+        /// That's why you should use the `DryIocAdapter.WithMicrosoftDependencyInjectionRules` instead.</summary>
+        [Obsolete("Please use DryIoc.Microsoft.DependencyInjection.DryIocAdapter.MicrosoftDependencyInjectionRules")]
+        public static readonly Rules MicrosoftDependencyInjectionRules = WithMicrosoftDependencyInjectionRules(Default, null);
+
+        /// <summary>Checks if the rules "include" the same settings and conventions as the basic MicrosoftDependencyInjectionRules.
+        /// It means that the rules may "include" other things, e.g. `WithConcreteTypeDynamicRegistrations`, etc.</summary>
+        [Obsolete("Please use DryIoc.Microsoft.DependencyInjection.DryIocAdapter.HasMicrosoftDependencyInjectionRules")]
+        public bool HasMicrosoftDependencyInjectionRules() => HasBaseMicrosoftDependencyInjectionRules(MicrosoftDependencyInjectionRules); 
+
+        /// <summary>Checks if the rules "include" the same settings and conventions as the basic MicrosoftDependencyInjectionRules.
+        /// It means that the rules may "include" other things, e.g. `WithConcreteTypeDynamicRegistrations`, etc.</summary>
+        public bool HasBaseMicrosoftDependencyInjectionRules(Rules exactRulesToCompare)
         {
-            if (this == MicrosoftDependencyInjectionRules)
+            if (this == exactRulesToCompare)
                 return true;
 
             var factoryMethod = _made.FactoryMethodOrSelector;
@@ -5720,13 +5735,15 @@ namespace DryIoc
                 (_settings & Settings.VariantGenericTypesInResolvedCollection) == 0;
         }
 
-        /// <summary>The rules implementing the conventions of Microsoft.Extension.DependencyInjection library.</summary>
-        public static readonly Rules MicrosoftDependencyInjectionRules = WithMicrosoftDependencyInjectionRules(Default);
-
-        /// <summary>Returns the copy of the rules with the applied conventions of Microsoft.Extension.DependencyInjection library.
-        /// Before calling this method to avoid the copying you may consider to check if the rules are already <see cref="HasMicrosoftDependencyInjectionRules"/>.
-        /// </summary>
-        public Rules WithMicrosoftDependencyInjectionRules() => WithMicrosoftDependencyInjectionRules(this);
+        /// <summary>Create the basic rules for the Microsoft.Extension.DependencyInjection 
+        /// EXCEPT for ParameterSelector for the keyed services, which should be provided as parameter.
+        /// That's why you should use the `DryIocAdapter.WithMicrosoftDependencyInjectionRules` instead.</summary>
+        [Obsolete("Please use DryIoc.Microsoft.DependencyInjection.DryIocAdapter.WithMicrosoftDependencyInjectionRules")]
+        public Rules WithMicrosoftDependencyInjectionRules() => WithBaseMicrosoftDependencyInjectionRules(null);
+     
+        /// <summary>Creates the rules for the Microsoft.Extension.DependencyInjection 
+        /// together with the ParameterSelector for the keyed services, which should be provided as parameter</summary>
+        public Rules WithBaseMicrosoftDependencyInjectionRules(ParameterSelector parameters) => WithMicrosoftDependencyInjectionRules(this, parameters);
 
         /// <summary>By default the `IServiceProvider.GetService` is returning `null` if service is not resolved. 
         /// So you need to call the `GetRequiredService` extension method which in turn requires the implementation of `ISupportRequiredService` underneath.
@@ -5812,10 +5829,10 @@ namespace DryIoc
                 rules._settings = _settings | Settings.OverrideRegistrationMade;
             rules._made = _made == Made.Default ? made :
                 Made.Create( // todo: @bug @unclear should we replace it with override?
-                made.FactoryMethodOrSelector ?? _made.FactoryMethodOrSelector,
-                made.Parameters ?? _made.Parameters,
-                made.PropertiesAndFields ?? _made.PropertiesAndFields,
-                made.IsConditionalImplementation || _made.IsConditionalImplementation);
+                    made.FactoryMethodOrSelector ?? _made.FactoryMethodOrSelector,
+                    made.Parameters ?? _made.Parameters,
+                    made.PropertiesAndFields ?? _made.PropertiesAndFields,
+                    made.IsConditionalImplementation || _made.IsConditionalImplementation);
             return rules;
         }
 
@@ -5884,8 +5901,8 @@ namespace DryIoc
         /// I may register service with key and resolve it as default in current scope.</summary>
         public static FactorySelectorRule SelectKeyedOverDefaultFactory(object serviceKey) =>
             (r, singleFac, keyedFacs) => singleFac // select a single default factory if it is the only one registered
-                ?? keyedFacs.FindFirst(serviceKey, (key, f) => Equals(f.Key, key))?.Value // or try to find the factory with equal key
-                ?? keyedFacs.FindFirst(f => f.Key == null || f.Key.Equals(null))?.Value;  // or try to find the factory with null/default key
+                ?? keyedFacs.FindFirst(serviceKey, static (key, f) => Equals(f.Key, key))?.Value // or try to find the factory with equal key
+                ?? keyedFacs.FindFirst(static f => f.Key == null || f.Key.Equals(null))?.Value;  // or try to find the factory with null/default key
 
         private static Factory SelectFactoryWithTheMinReuseLifespan(Request request, Factory singleDefaultFactory, KV<object, Factory>[] orManyDefaultAndKeyedFactories)
         {
@@ -5928,13 +5945,13 @@ namespace DryIoc
             DynamicRegistrationFlags withoutFlags = DryIoc.DynamicRegistrationFlags.NoFlags)
         {
             var allFlags = DynamicRegistrationFlags;
-            if (allFlags == null || allFlags.Length == 0)
+            if (allFlags == null | allFlags.Length == 0)
                 return false;
 
             for (var i = 0; i < allFlags.Length; ++i)
             {
                 var f = allFlags[i];
-                if ((f & withFlags) == withFlags && (f & withoutFlags) == 0)
+                if ((f & withFlags) == withFlags & (f & withoutFlags) == 0)
                     return true;
             }
 
@@ -6558,10 +6575,20 @@ namespace DryIoc
             DefaultRegistrationServiceKey = defaultRegistrationServiceKey;
         }
 
-        private Rules Clone(bool cloneMade = false) =>
+        /// <summary>Clones the Rules, with optionally cloning the `Made` part of the rules.</summary>
+        public Rules Clone(bool cloneMade = false) =>
             new Rules(
                 _settings, FactorySelector, DefaultReuse,
                 cloneMade ? _made.Clone() : _made,
+                DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
+                DependencyResolutionCallExprs, ItemToExpressionConverter, DynamicRegistrationProviders,
+                DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
+
+        /// <summary>Clones the Rules with the new Made.</summary>
+        public Rules With(Made newMade) =>
+            new Rules(
+                _settings, FactorySelector, DefaultReuse,
+                newMade,
                 DefaultIfAlreadyRegistered, DependencyCountInLambdaToSplitBigObjectGraph,
                 DependencyResolutionCallExprs, ItemToExpressionConverter, DynamicRegistrationProviders,
                 DynamicRegistrationFlags, UnknownServiceResolvers, DefaultRegistrationServiceKey);
@@ -6608,7 +6635,7 @@ namespace DryIoc
             AutoConcreteTypeResolution = 1 << 14, // informational flag // todo: @clarify consider for the obsoleting
             SelectLastRegisteredFactory = 1 << 15,// informational flag
             UsedForExpressionGeneration = 1 << 16,
-            // UseFastExpressionCompilerIfPlatformSupported = 1 << 17, // the default in V5 without opt-out because of complexity, but the System.Compile(preferInterpretation?) is still used as a fallback  
+            // UseFastExpressionCompilerIfPlatformSupported = 1 << 17, // todo: the default in V5 without opt-out because of complexity, but the System.Compile(preferInterpretation?) is still used as a fallback  
             UseInterpretationForTheFirstResolution = 1 << 18,
             UseInterpretation = 1 << 19,
             UseDecorateeReuseForDecorators = 1 << 20,
@@ -7159,13 +7186,13 @@ namespace DryIoc
         /// <summary>Easy way to specify default constructor to be used for resolution.</summary>
         public static FactoryMethodSelector DefaultConstructor(bool includeNonPublic = false) => request =>
             request.ImplementationType.ThrowIfNull(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request)
-                .GetConstructorOrNull(includeNonPublic, Empty<Type>())?.To(ctor => new FactoryMethod(ctor));
+                .GetConstructorOrNull(includeNonPublic, Empty<Type>())?.To(static ctor => new FactoryMethod(ctor));
 
         /// <summary>Searches for a single constructor excluding the ones with the same implementation type as parameter.
         /// Used by the AutoConcrete type resolution to avoid selection of recursive constructors like `Foo(Foo f)`</summary>
         public static readonly FactoryMethodSelector ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam =
-            request => MostResolvableConstructor(request, BindingFlags.NonPublic,
-                (implType, ps) => ps.FindFirst(implType, (t, p) => t == p.ParameterType) == null);
+            static request => MostResolvableConstructor(request, BindingFlags.NonPublic,
+                static (implType, ps) => ps.FindFirst(implType, static (t, p) => t == p.ParameterType) == null);
 
         /// <summary>Better be named `ConstructorWithMostResolvableArguments`.
         /// Searches for public constructor with most resolvable parameters or throws <see cref="ContainerException"/> if not found.
@@ -7207,6 +7234,7 @@ namespace DryIoc
             internal WithFactoryMethodKnownResultType(FactoryMethod factoryMethod, Type factoryReturnType)
                 : base(factoryMethod) => FactoryMethodKnownResultType = factoryReturnType;
         }
+
         internal class WithFactoryMethodAndParameters : Made
         {
             public override ParameterSelector Parameters { get; }
@@ -7216,7 +7244,8 @@ namespace DryIoc
 
         internal sealed class WithDetails : WithFactoryMethodKnownResultType
         {
-            public override ParameterSelector Parameters { get; }
+            public override ParameterSelector Parameters => _parameters;
+            internal ParameterSelector _parameters;
             public override PropertiesAndFieldsSelector PropertiesAndFields { get; }
             internal override MadeDetails _details { get; }
             public WithDetails(object factoryMethodOrSelector, Type factoryMethodKnownResultType,
@@ -7224,7 +7253,7 @@ namespace DryIoc
                 base(factoryMethodOrSelector, factoryMethodKnownResultType)
             {
                 _details = details;
-                Parameters = parameters;
+                _parameters = parameters;
                 PropertiesAndFields = propertiesAndFields;
             }
 
@@ -7245,7 +7274,7 @@ namespace DryIoc
                     details |= MadeDetails.ImplMemberDependsOnRequest;
 
                 _details = details;
-                Parameters = parameters;
+                _parameters = parameters;
                 PropertiesAndFields = propertiesAndFields;
             }
         }
@@ -7327,6 +7356,10 @@ namespace DryIoc
                 : !withDetails ? new Made(factoryMethodOrSelector)
                 : new WithDetails(factoryMethodOrSelector, null, parameters, propertiesAndFields, isConditionalImplementation: isConditionalImplementation);
         }
+
+        /// <summary>Adds the parameter selector to the mix</summary>
+        public Made With(FactoryMethodSelector factoryMethod, ParameterSelector parameters) =>
+            new WithDetails(factoryMethod, FactoryMethodKnownResultType, parameters, PropertiesAndFields);
 
         /// <summary>Specifies injections rules for Constructor, Parameters, Properties and Fields. If no rules specified returns <see cref="Default"/> rules.</summary>
         public static Made Of(FactoryMethod factoryMethod,

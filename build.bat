@@ -1,8 +1,8 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-dotnet clean -v:m -p:DevMode=false
-dotnet build -c:Release -v:m -p:DevMode=false
+dotnet clean -v:m
+dotnet build -c:Release -v:m
 if %ERRORLEVEL% neq 0 goto :error
 
 echo:
@@ -11,9 +11,9 @@ echo:
 echo:## Starting: TestRunner...
 echo:
 
-dotnet run --no-build -f net7.0 -c Release -p:DevMode=false --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet run --no-build -f net8.0 -c Release --project test/DryIoc.TestRunner
 if %ERRORLEVEL% neq 0 goto :error
-dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
+dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472
 if %ERRORLEVEL% neq 0 goto :error
 
 echo:
@@ -22,7 +22,7 @@ echo:
 echo:## Starting: TESTS...
 echo: 
 
-dotnet test --no-build -c:Release -p:DevMode=false
+dotnet test --no-build -c:Release
 
 if %ERRORLEVEL% neq 0 goto :error
 
@@ -32,7 +32,7 @@ echo:
 echo:## Starting: DOCUMENTATION GENERATION ##
 echo:
 
-dotnet build docs\DryIoc.Docs\DryIoc.Docs.csproj -f net6.0 -target:MdGenerate -p:DevMode=false
+dotnet build docs\DryIoc.Docs\DryIoc.Docs.csproj -f net6.0 -target:MdGenerate
 
 echo:
 echo:## Finished: DOCUMENTATION GENERATION ##

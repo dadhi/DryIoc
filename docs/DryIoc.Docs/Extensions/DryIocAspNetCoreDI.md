@@ -26,7 +26,7 @@ The best way to learn is to play with the samples in the *samples* folder:
 ## Conforming to the rules
 
 To conform to the behavior of Microsoft.DependencyInjection the DryIoc applies a set of rules to the new or the **existing** container 
-via `WithMicrosoftDependencyInjectionRules` method.
+via `DryIocAdapter.WithMicrosoftDependencyInjectionRules` method.
 
 Comparing to the default DryIoc rules the MS.DI rules differ in following:
 

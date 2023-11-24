@@ -16,7 +16,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test1()
         {
-            var rules = Rules
+            var rules = DryIocAdapter
                 .MicrosoftDependencyInjectionRules
                 .WithConcreteTypeDynamicRegistrations(reuse: Reuse.Transient);
 

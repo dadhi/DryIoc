@@ -3,7 +3,7 @@ using DryIoc.Microsoft.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var container = new MyContainer(Rules.MicrosoftDependencyInjectionRules);
+var container = new MyContainer(DryIocAdapter.MicrosoftDependencyInjectionRules);
 
 // register natively with DryIoc
 container.Register<Bar>();

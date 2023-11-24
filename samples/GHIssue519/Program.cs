@@ -2,7 +2,7 @@ using DryIoc;
 using DryIoc.Microsoft.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
-var container = new Container(Rules.MicrosoftDependencyInjectionRules);
+var container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules);
 var dependencyInjectionFactory = new DryIocServiceProviderFactory(container);
 builder.Host.UseServiceProviderFactory(dependencyInjectionFactory);
 builder.Services.AddControllersWithViews();

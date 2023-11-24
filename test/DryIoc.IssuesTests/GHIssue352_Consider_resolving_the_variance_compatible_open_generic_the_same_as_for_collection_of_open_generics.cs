@@ -3,6 +3,7 @@ using DryIoc.Messages;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Linq;
+using DryIoc.Microsoft.DependencyInjection;
 
 namespace DryIoc.IssuesTests
 {
@@ -34,8 +35,8 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Contravariant_handler_can_be_Resolved_with_a_single_Resolve_even_with_MS_DI_rules()
         {
-            var container = new Container(rules => rules
-                .WithMicrosoftDependencyInjectionRules()
+            var container = new Container(rules =>
+                DryIocAdapter.WithMicrosoftDependencyInjectionRules(rules)
                 .WithVariantGenericTypesInResolve());
 
             container.RegisterMany(new[] { typeof(GetInformationHandler).Assembly }, Registrator.Interfaces, made: PropertiesAndFields.Auto);
