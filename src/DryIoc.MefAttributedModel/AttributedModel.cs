@@ -654,7 +654,7 @@ namespace DryIoc.MefAttributedModel
         private static Func<ParameterInfo, ParameterServiceInfo> GetImportedParameter(DryIoc.Request request) => parameter =>
         {
             var serviceInfo = ParameterServiceInfo.Of(parameter);
-            var attrs = parameter.GetAttributes().ToArray();
+            var attrs = parameter.GetAttributes().ToArrayOrSelf();
             return attrs.Length == 0 ? serviceInfo :
                 serviceInfo.WithDetails(GetFirstImportDetailsOrNull(parameter.ParameterType, attrs, request));
         };

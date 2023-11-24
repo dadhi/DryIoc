@@ -6982,7 +6982,7 @@ namespace DryIoc
                 Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
 
             if (ctors.Length != 0 && condition != null)
-                ctors = ctors.Match(condition, (cond, c) => cond(c.DeclaringType, c.GetParameters()));
+                ctors = ctors.Match(condition, static (cond, c) => cond(c.DeclaringType, c.GetParameters()));
             if (ctors.Length == 0)
                 return null;
 
@@ -9164,6 +9164,11 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public static ServiceDetails OfValue(object value) =>
             new ServiceDetails(null, IfUnresolved.Throw, null, null, null, value, hasCustomValue: true);
+
+        /// <summary>Sets the service key as a detials of the service resolution.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ServiceDetails OfServiceKey(object serviceKey) =>
+            new ServiceDetails(null, IfUnresolved.Throw, serviceKey, null, null, null, false);
 
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
         public readonly Type RequiredServiceType;

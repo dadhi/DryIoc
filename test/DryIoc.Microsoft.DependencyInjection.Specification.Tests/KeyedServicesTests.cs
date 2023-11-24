@@ -14,7 +14,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             new DryIocServiceProviderFactory().CreateBuilder(collection).BuildServiceProvider();
 
         [Fact]
-        public void ResolveKeyedServiceTransientFactory_DEBUG()
+        public void ResolveKeyedServiceTransientFactory_COPY()
         {
             var serviceCollection = new ServiceCollection();
             serviceCollection.AddKeyedTransient<IService>("service1", (sp, key) => new Service(key as string));
@@ -31,6 +31,23 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             Assert.Equal("service1", second.ToString());
         }
 
+        [Fact]
+        public void ResolveKeyedServiceSingletonInstanceWithKeyedParameter_COPY()
+        {
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddKeyedSingleton<IService, Service>("service1");
+            serviceCollection.AddKeyedSingleton<IService, Service>("service2");
+            serviceCollection.AddSingleton<OtherService>();
+
+            var provider = CreateServiceProvider(serviceCollection);
+
+            Assert.Null(provider.GetService<IService>());
+            var svc = provider.GetService<OtherService>();
+            Assert.NotNull(svc);
+            Assert.Equal("service1", svc.Service1.ToString());
+            Assert.Equal("service2", svc.Service2.ToString());
+        }
+
         internal interface IService { }
 
         internal class Service : IService
@@ -44,5 +61,19 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             public override string ToString() => _id;
         }
 
+        internal class OtherService
+        {
+            public OtherService(
+                [FromKeyedServices("service1")] IService service1,
+                [FromKeyedServices("service2")] IService service2)
+            {
+                Service1 = service1;
+                Service2 = service2;
+            }
+
+            public IService Service1 { get; }
+
+            public IService Service2 { get; }
+        }
     }
 }
