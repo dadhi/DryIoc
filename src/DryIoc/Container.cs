@@ -11792,30 +11792,7 @@ namespace DryIoc
             }
         }
 
-        /// <summary>Implementation type of public constructor(s), or the Func{Type} for the lazy factory initialization.</summary>
-        protected object _implementationTypeOrProviderOrPubCtorOrCtors;
-
-        /// <summary>Gets the constructor info.</summary>
-        public virtual ConstructorInfo[] GetConstructors(Request request,
-            BindingFlags additionalToPublicAndInstance = 0, Func<Type, ParameterInfo[], bool> condition = null)
-        {
-            var ctorsOrCtorOrType = _implementationTypeOrProviderOrPubCtorOrCtors;
-            ConstructorInfo[] ctors = null;
-            if (ctorsOrCtorOrType is ConstructorInfo ci)
-            {
-                if (additionalToPublicAndInstance == 0)
-                    return condition == null || condition(ci.DeclaringType, ci.GetParameters()) ? new[] { ci } : null; // todo: @perf we pack the ctor into array and then unpack it on the calling side
-                ctors = ci.DeclaringType.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
-            }
-            else if (ctorsOrCtorOrType is ConstructorInfo[] cs)
-                ctors = cs;
-            else if (ctorsOrCtorOrType is Type t)
-                ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
-            else
-                Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
-
-            return ctors;
-        }
+        internal object _implementationTypeOrProviderOrPubCtorOrCtors; // Type or the Func<Type> for the lazy factory initialization
 
         private static Type ValidateImplementationType(Type type)
         {
@@ -12145,16 +12122,6 @@ namespace DryIoc
                     return validatedImplType;
                 }
             }
-
-            public override ConstructorInfo[] GetConstructors(Request request,
-                BindingFlags additionalToPublicAndInstance = 0, Func<Type, ParameterInfo[], bool> condition = null)
-            {
-                if (_implementationTypeOrProviderOrPubCtorOrCtors is Func<Type> typeProvider && typeProvider() is Type it)
-                    return it.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
-
-                return base.GetConstructors(request, additionalToPublicAndInstance, condition);
-            }
-
             public WithTypeProvider(Func<Type> implementationTypeProvider, IReuse reuse, Made made, Setup setup)
                 : base(implementationTypeProvider.ThrowIfNull(), reuse, made, setup) { }
         }
