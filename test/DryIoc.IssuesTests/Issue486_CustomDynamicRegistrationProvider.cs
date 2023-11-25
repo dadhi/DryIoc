@@ -40,7 +40,7 @@ namespace DryIoc.IssuesTests
             Assert.NotNull(commands[1].Metadata);
             Assert.AreEqual(3, commands[0].Metadata.ScriptID + commands[1].Metadata.ScriptID); // should be 1 and 2, in any order
 
-            // instantiation fails with Error.ImplTypeIsNotSpecifiedForAutoCtorSelection
+            // instantiation should also work now:
             Assert.IsNotNull(commands[0].Value);
         }
 
