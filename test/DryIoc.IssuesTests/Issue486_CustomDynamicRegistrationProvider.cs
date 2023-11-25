@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
@@ -32,12 +32,15 @@ namespace DryIoc.IssuesTests
             Assert.NotNull(commands);
             Assert.AreEqual(2, commands.Length);
 
-            // these tests fail:
+            // these tests work fine:
             Assert.NotNull(commands[0]);
             Assert.NotNull(commands[1]);
             Assert.NotNull(commands[0].Metadata);
             Assert.NotNull(commands[1].Metadata);
             Assert.AreEqual(3, commands[0].Metadata.ScriptID + commands[1].Metadata.ScriptID); // should be 1 and 2, in any order
+
+            // and instantiation also works fine:
+            Assert.IsNotNull(commands[0].Value);
         }
 
         // index: ServiceTypeFullName -> list of ServiceRegistrations
@@ -112,12 +115,12 @@ namespace DryIoc.IssuesTests
         }
 
         [Export(typeof(ICommand)), Script(1)]
-        public class Command1
+        public class Command1 : ICommand
         {
         }
 
         [Export(typeof(ICommand)), Script(2)]
-        public class Command2
+        public class Command2 : ICommand
         {
         }
     }
