@@ -25,21 +25,22 @@ namespace DryIoc.IssuesTests
 
             // attach the dynamic registration provider and try resolving the services
             var container = new Container().WithMef()
-                .With(r => r.WithDynamicRegistrations(GetDynamicRegistrations));
+                .With(r => r.WithDynamicRegistrations(GetDynamicRegistrations)
+                .With(FactoryMethod.ConstructorWithResolvableArguments));
 
             // resolve the commands lazily
             var commands = container.Resolve<Lazy<ICommand, IScriptMetadata>[]>();
             Assert.NotNull(commands);
             Assert.AreEqual(2, commands.Length);
 
-            // these tests work fine:
+            // lazy resolution part works fine:
             Assert.NotNull(commands[0]);
             Assert.NotNull(commands[1]);
             Assert.NotNull(commands[0].Metadata);
             Assert.NotNull(commands[1].Metadata);
             Assert.AreEqual(3, commands[0].Metadata.ScriptID + commands[1].Metadata.ScriptID); // should be 1 and 2, in any order
 
-            // and instantiation also works fine:
+            // instantiation fails with Error.ImplTypeIsNotSpecifiedForAutoCtorSelection
             Assert.IsNotNull(commands[0].Value);
         }
 
