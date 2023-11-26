@@ -6762,6 +6762,8 @@ namespace DryIoc
                 ctors = cs;
             else if (ctorsOrCtorOrType is Type t)
                 ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
+            else if (ctorsOrCtorOrType is Func<Type> typeProvider && typeProvider() is Type it)
+                ctors = it.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
             else
                 Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
 
@@ -6962,6 +6964,8 @@ namespace DryIoc
                 ctors = cs;
             else if (ctorsOrCtorOrType is Type t)
                 ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
+            else if (ctorsOrCtorOrType is Func<Type> typeProvider && typeProvider() is Type it)
+                ctors = it.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
             else
                 Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
             return ctors.Length == 1 ? new FactoryMethod(ctors[0]) : null;
