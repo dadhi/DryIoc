@@ -102,6 +102,8 @@ namespace DryIoc.UnitTests
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue416_Adding_always_true_condition_to_decorator_changes_the_decorated_outcome(),
                 new Issue446_Select_single_open_generic_impl_based_on_matching_closed_service_type(),
+                new Issue486_CustomDynamicRegistrationProvider(),
+                new Issue488_DryIoc_ContainerException_if_using_WithDependencies(),
                 new Issue497_ConstructorWithResolvableArguments_is_not_working_properly(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
                 new Issue572_Dynamic_Service_Keys(),
@@ -157,6 +159,7 @@ namespace DryIoc.UnitTests
                 new GHIssue576_Extension_methods_not_being_handled_correctly_in_MadeOf_service_returning_expression(),
                 new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton(),
                 new GHIssue588_Container_IsDisposed_property_not_reflecting_own_scope_disposed_state(),
+                new GHIssue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments(),
             };
             // var docsTests = new Func<int>[] 
             // { 
