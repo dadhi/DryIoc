@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue486_CustomDynamicRegistrationProvider
+    public class Issue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments
     {
         [Test]
         public void Test()
@@ -25,7 +25,8 @@ namespace DryIoc.IssuesTests
 
             // attach the dynamic registration provider and try resolving the services
             var container = new Container().WithMef()
-                .With(r => r.WithDynamicRegistrations(GetDynamicRegistrations));
+                .With(r => r.WithDynamicRegistrations(GetDynamicRegistrations)
+                .With(FactoryMethod.ConstructorWithResolvableArguments));
 
             // resolve the commands lazily
             var commands = container.Resolve<Lazy<ICommand, IScriptMetadata>[]>();
@@ -52,7 +53,7 @@ namespace DryIoc.IssuesTests
             // index only registrations related to this issue
             var lazyRegistrations = AttributedModel.Scan(new[] { typeof(Command1).Assembly })
                 .MakeLazyAndEnsureUniqueServiceKeys()
-                .Where(r => r.ImplementationTypeFullName.IndexOf("Issue486") >= 0)
+                .Where(r => r.ImplementationTypeFullName.IndexOf("Issue610") >= 0)
                 .ToArray();
 
             // Command1 and Command2
@@ -73,29 +74,13 @@ namespace DryIoc.IssuesTests
 
         private IEnumerable<DynamicRegistration> GetDynamicRegistrations(Type serviceType, object serviceKey)
         {
-            List<DynamicRegistration> regs;
-            if (!DynamicRegistrations.TryGetValue(serviceType.FullName, out regs))
+            if (DynamicRegistrations.TryGetValue(serviceType.FullName, out var regs))
             {
-                return null;
+                // You may rely on DryIoc to find the dynamic registration by key.
+                return regs;
             }
 
-            // NOTE:
-            // 1. You may rely on DryIoc to find the dynamic registration by key.
-            // Therefore the below code can be removed and replaced by `return regs;`
-            //
-            // 2. You should know that to for default (null) keys the `DefaultDynamicKey` will be generated.
-            // So the `serviceKey` parameter will be generated `DefaultDynamicKey` instead of `null`.
-            // The thing is `DefaultDynamicKey.Equals(object obj)` will return true for null `obj`.
-            // BUT the `Object.Equals(object a, object b)` will fail, because it explicitly check for null and returns false.
-
-            var registrations = regs.Where(reg => serviceKey == null || serviceKey.Equals(reg.ServiceKey)).ToArray();
-            if (!registrations.Any())
-            {
-                return null;
-            }
-
-            return registrations.ToArray();
-
+            return null;
         }
 
         public interface IScriptMetadata
