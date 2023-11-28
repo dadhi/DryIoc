@@ -3,8 +3,16 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue488_DryIoc_ContainerException_if_using_WithDependencies
+    public class Issue488_DryIoc_ContainerException_if_using_WithDependencies : ITest
     {
+        public int Run()
+        {
+            Can_combine_WithDependency_parameter_spec_and_registration_parameter_spec();
+            Can_combine_WithDependency_with_optional_parameter();
+            Can_combine_WithDependency_property_spec_and_registration_property_spec();
+            return 3;
+        }
+
         [Test]
         public void Can_combine_WithDependency_parameter_spec_and_registration_parameter_spec()
         {

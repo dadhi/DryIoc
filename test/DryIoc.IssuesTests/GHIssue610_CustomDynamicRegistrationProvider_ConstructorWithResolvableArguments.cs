@@ -9,8 +9,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments
+    public class GHIssue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {
