@@ -6750,23 +6750,7 @@ namespace DryIoc
         private static FactoryMethod MostResolvableConstructor(Request request,
             BindingFlags additionalToPublicAndInstance = 0, Func<Type, ParameterInfo[], bool> condition = null)
         {
-            var ctorsOrCtorOrType = ((ReflectionFactory)request.Factory)._implementationTypeOrProviderOrPubCtorOrCtors;
-            ConstructorInfo[] ctors = null;
-            if (ctorsOrCtorOrType is ConstructorInfo ci)
-            {
-                if (additionalToPublicAndInstance == 0)
-                    return condition == null || condition(ci.DeclaringType, ci.GetParameters()) ? new FactoryMethod(ci) : null;
-                ctors = ci.DeclaringType.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
-            }
-            else if (ctorsOrCtorOrType is ConstructorInfo[] cs)
-                ctors = cs;
-            else if (ctorsOrCtorOrType is Type t)
-                ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
-            else if (ctorsOrCtorOrType is Func<Type> typeProvider && typeProvider() is Type it)
-                ctors = it.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
-            else
-                Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
-
+            var ctors = ((ReflectionFactory)request.Factory).GetConstructors(request, additionalToPublicAndInstance, condition);
             if (ctors.Length != 0 && condition != null)
                 ctors = ctors.Match(condition, (cond, c) => cond(c.DeclaringType, c.GetParameters()));
             if (ctors.Length == 0)
@@ -6952,22 +6936,7 @@ namespace DryIoc
 
         private static FactoryMethod Constructor(Request request, BindingFlags additionalToPublicAndInstance = 0)
         {
-            var ctorsOrCtorOrType = ((ReflectionFactory)request.Factory)._implementationTypeOrProviderOrPubCtorOrCtors;
-            ConstructorInfo[] ctors = null;
-            if (ctorsOrCtorOrType is ConstructorInfo ci)
-            {
-                if (additionalToPublicAndInstance == 0)
-                    return new FactoryMethod(ci);
-                ctors = ci.DeclaringType.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
-            }
-            else if (ctorsOrCtorOrType is ConstructorInfo[] cs)
-                ctors = cs;
-            else if (ctorsOrCtorOrType is Type t)
-                ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
-            else if (ctorsOrCtorOrType is Func<Type> typeProvider && typeProvider() is Type it)
-                ctors = it.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
-            else
-                Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+            var ctors = ((ReflectionFactory)request.Factory).GetConstructors(request, additionalToPublicAndInstance);
             return ctors.Length == 1 ? new FactoryMethod(ctors[0]) : null;
         }
 
@@ -11583,7 +11552,31 @@ namespace DryIoc
                 return null;
             }
         }
-        internal object _implementationTypeOrProviderOrPubCtorOrCtors; // Type or the Func<Type> for the lazy factory initialization
+        private object _implementationTypeOrProviderOrPubCtorOrCtors;
+
+        /// <summary>Gets the constructor info.</summary>
+        public ConstructorInfo[] GetConstructors(Request request,
+            BindingFlags additionalToPublicAndInstance = 0, Func<Type, ParameterInfo[], bool> condition = null)
+        {
+            var ctorsOrCtorOrType = _implementationTypeOrProviderOrPubCtorOrCtors;
+            ConstructorInfo[] ctors = null;
+            if (ctorsOrCtorOrType is ConstructorInfo ci)
+            {
+                if (additionalToPublicAndInstance == 0)
+                    return condition == null || condition(ci.DeclaringType, ci.GetParameters()) ? new[] { ci } : null;
+                ctors = ci.DeclaringType.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
+            }
+            else if (ctorsOrCtorOrType is ConstructorInfo[] cs)
+                ctors = cs;
+            else if (ctorsOrCtorOrType is Type t)
+                ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
+            else if (ctorsOrCtorOrType is Func<Type> typeProvider && typeProvider() is Type it)
+                ctors = it.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
+            else
+                Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+
+            return ctors;
+        }
 
         private static Type ValidateImplementationType(Type type)
         {
