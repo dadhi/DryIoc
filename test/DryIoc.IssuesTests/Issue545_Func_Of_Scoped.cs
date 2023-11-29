@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue545_Func_Of_Scoped
+    public class Issue545_Func_Of_Scoped : ITest
     {
+        public int Run()
+        {
+            Func_of_scoped_thing_should_return_object_from_a_new_scope_when_singleton_is_resolved_within_the_scope();
+            Func_of_scoped_thing_should_return_object_from_a_new_scope_when_singleton_is_resolved_out_of_the_scope();
+            return 2;
+        }
+
         public interface IScopedComponent {}
 
         public class ScopedComponent : IScopedComponent {}

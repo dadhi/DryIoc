@@ -3,8 +3,15 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue566_Named_service_not_replaced
+    public class Issue566_Named_service_not_replaced : ITest
     {
+        public int Run()
+        {
+            Can_be_replaced();
+            Can_be_unregistered();
+            return 2;
+        }
+
         [Test]
         public void Can_be_replaced()
         {

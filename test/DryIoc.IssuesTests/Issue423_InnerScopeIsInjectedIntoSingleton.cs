@@ -3,8 +3,15 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue423_InnerScopeIsInjectedIntoSingleton
+    public class Issue423_InnerScopeIsInjectedIntoSingleton : ITest
     {
+        public int Run()
+        {
+            Original_test();
+            Test_with_IFactory_wrapper();
+            return 2;
+        }
+
         [Test]
         public void Original_test()
         {

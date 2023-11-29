@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue407_Cannot_resolve_MadeOf_params_explicitly
+    public class Issue407_Cannot_resolve_MadeOf_params_explicitly : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

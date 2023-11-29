@@ -7,8 +7,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue541_Dynamic_Registrations_dont_detect_circular_dependencies
+    public class Issue541_Dynamic_Registrations_dont_detect_circular_dependencies : ITest
     {
+        public int Run()
+        {
+            Lazy_import_should_detect_circular_dependencies();
+            return 1;
+        }
+
         [Test]
         public void Lazy_import_should_detect_circular_dependencies()
         {

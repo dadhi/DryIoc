@@ -8,8 +8,16 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue543_Dynamic_Registrations_dont_respect_shared_creation_policy
+    public class Issue543_Dynamic_Registrations_dont_respect_shared_creation_policy : ITest
     {
+        public int Run()
+        {
+            DryIoc_normal_import_respects_shared_creation_policy();
+            DryIoc_lazy_import_should_respect_shared_creation_policy_via_Resolve();
+            DryIoc_lazy_import_should_respect_shared_creation_policy_via_InjectPropertiesAndFields();
+            return 3;
+        }
+
         [Test]
         public void DryIoc_normal_import_respects_shared_creation_policy()
         {

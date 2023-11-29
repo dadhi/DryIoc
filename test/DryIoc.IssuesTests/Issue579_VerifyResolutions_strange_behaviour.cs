@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue579_VerifyResolutions_strange_behaviour
+    public class Issue579_VerifyResolutions_strange_behaviour : ITest
     {
+        public int Run()
+        {
+            Minimal_test();
+            Close_to_real_test();
+            return 2;
+        }
+
         [Test]
         public void Minimal_test()
         {
