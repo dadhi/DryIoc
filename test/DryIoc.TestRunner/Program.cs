@@ -9,15 +9,13 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
+            RunAllTests();
+
             // new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules().Run();
             // new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton().Run();
             // new GHIssue243_Delegate_Factory_Resolving_Incremental_Improvement_over_Func_Wrapper().Run();
-
-            RunAllTests();
-
             // new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run(); // todo: @fixme
             // new GHIssue169_Decorators().Run();
-
             // new ActionTests().Run();
             // new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
             // new GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();

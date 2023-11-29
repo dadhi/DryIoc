@@ -11792,7 +11792,25 @@ namespace DryIoc
             }
         }
 
-        internal object _implementationTypeOrProviderOrPubCtorOrCtors; // Type or the Func<Type> for the lazy factory initialization
+        private object _implementationTypeOrProviderOrPubCtorOrCtors;
+
+        /// <summary>Gets the constructors.</summary>
+        public ConstructorInfo[] GetConstructors(Request request, BindingFlags additionalToPublicAndInstance = 0)
+        {
+            var ctorsOrCtorOrType = _implementationTypeOrProviderOrPubCtorOrCtors;
+            ConstructorInfo[] ctors = null;
+            if (ctorsOrCtorOrType is ConstructorInfo ci)
+                ctors = ci.DeclaringType.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
+            else if (ctorsOrCtorOrType is ConstructorInfo[] cs)
+                ctors = cs;
+            else if (ctorsOrCtorOrType is Type t)
+                ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
+            else if (ctorsOrCtorOrType is Func<Type> typeProvider && typeProvider() is Type providedType)
+                ctors = providedType.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
+            else
+                Throw.It(Error.ImplTypeIsNotSpecifiedForAutoCtorSelection, request);
+            return ctors;
+        }
 
         private static Type ValidateImplementationType(Type type)
         {
@@ -11974,7 +11992,7 @@ namespace DryIoc
             public override IReuse Reuse { get; }
             public override Made Made { get; }
             public override Setup Setup { get; }
-            public WithAllDetails(object implementationType, IReuse reuse, Made made, Setup setup,
+            internal WithAllDetails(object implementationType, IReuse reuse, Made made, Setup setup,
                 ImHashMap<KV<Type, object>, ReflectionFactory> generatedFactories = null) : base()
             {
                 _implementationTypeOrProviderOrPubCtorOrCtors = implementationType;
@@ -12122,6 +12140,7 @@ namespace DryIoc
                     return validatedImplType;
                 }
             }
+
             public WithTypeProvider(Func<Type> implementationTypeProvider, IReuse reuse, Made made, Setup setup)
                 : base(implementationTypeProvider.ThrowIfNull(), reuse, made, setup) { }
         }
