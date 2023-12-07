@@ -118,7 +118,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 {
                     var attr = par.GetCustomAttribute<FromKeyedServicesAttribute>(false);
                     if (attr.Key == null)
-                        return null;
+                        return ParameterServiceInfo.DefinitelyUnresolvedParameter;
                     return ParameterServiceInfo.Of(par, ServiceDetails.OfServiceKey(attr.Key));
                 };
                 return null;
@@ -132,7 +132,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         {
             var serviceKey = req.ServiceKey;
             if (serviceKey == null)
-                return null;
+                return ParameterServiceInfo.DefinitelyUnresolvedParameter;
+            if (serviceKey is Registrator.AnyServiceKey anyKey)
+                serviceKey = anyKey.ResolutionKey;
             if (!par.ParameterType.IsAssignableFrom(serviceKey.GetType()))
                 throw new InvalidOperationException(
                     $"Unable to inject service key `{serviceKey.Print()}` into the #{par.Position} parameter `{par}` because of incompatible type.");
@@ -304,6 +306,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor) =>
             container.RegisterDescriptor(descriptor, IfAlreadyRegistered.AppendNotKeyed);
 
+        internal static readonly MethodInfo KeyedImplementationFactoryInvokeMethod =
+            typeof(Func<IServiceProvider, object, object>).GetMethod("Invoke");
+
         /// <summary>Unpacks the service descriptor to register the service in DryIoc container
         /// with the specific `IfAlreadyRegistered` policy and the optional `serviceKey`</summary>
         public static void RegisterDescriptor(this IContainer container, ServiceDescriptor descriptor, IfAlreadyRegistered ifAlreadyRegistered,
@@ -314,28 +319,36 @@ namespace DryIoc.Microsoft.DependencyInjection
             {
                 serviceKey = descriptor.ServiceKey;
                 if (serviceKey == KeyedService.AnyKey)
-                    serviceKey = Registrator.AnyServiceKey;
+                    serviceKey = Registrator.AnyKey;
 
                 var implType = descriptor.KeyedImplementationType;
                 if (implType != null)
                 {
-                    container.Register(ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse()), serviceType,
-                        serviceKey, ifAlreadyRegistered, isStaticallyChecked: implType == serviceType || serviceType.IsAssignableFrom(implType));
+                    var keyedFactory = ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse());
+                    if (serviceKey == Registrator.AnyKey)
+                        keyedFactory.DoNotCache();
+
+                    container.Register(keyedFactory, serviceType, serviceKey, ifAlreadyRegistered,
+                        isStaticallyChecked: implType == serviceType || serviceType.IsAssignableFrom(implType));
                 }
                 else if (descriptor.KeyedImplementationFactory != null)
                 {
-                    var fac = descriptor.KeyedImplementationFactory;
-                    container.RegisterFuncWithParameters(serviceType,
-                        fac.GetType(), (Func<object, object, object>)fac.ToFuncWithObjParams,
-                        SelectServiceKeyFor2ndParameterOfKeyedImplementationFactory,
-                        descriptor.Lifetime.ToReuse(), Setup.Default, ifAlreadyRegistered, serviceKey);
+                    var keyedFunc = descriptor.KeyedImplementationFactory;
+                    var factoryMethod = FactoryMethod.OfFunc(KeyedImplementationFactoryInvokeMethod, (Func<object, object, object>)keyedFunc.ToFuncWithObjParams);
+                    var made = Made.OfFactoryMethodAndParameters(factoryMethod, SelectServiceKeyFor2ndParameterOfKeyedImplementationFactory);
+
+                    var factory = serviceKey == Registrator.AnyKey 
+                        ? ReflectionFactory.OfAnyKey(serviceType, made, descriptor.Lifetime.ToReuse(), Setup.Default).DoNotCache()
+                        : ReflectionFactory.OfConcreteTypeAndMadeNoValidation(serviceType, made, descriptor.Lifetime.ToReuse(), Setup.Default);
+
+                    container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
                 }
                 else
                 {
-                    var instance = descriptor.KeyedImplementationInstance;
-                    container.Register(InstanceFactory.Of(instance), serviceType,
+                    var keyedInstance = descriptor.KeyedImplementationInstance;
+                    container.Register(InstanceFactory.Of(keyedInstance), serviceType,
                         serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-                    container.TrackDisposable(instance); // todo: @wip @incompatible calling this method depends on the `ifAlreadyRegistered` policy
+                    container.TrackDisposable(keyedInstance); // todo: @wip @incompatible calling this method depends on the `ifAlreadyRegistered` policy
                 }
             }
             else
@@ -441,9 +454,17 @@ namespace DryIoc.Microsoft.DependencyInjection
             Container.Resolve(serviceType, IfUnresolved.Throw);
 
         /// <inheritdoc />
-        public object GetKeyedService(Type serviceType, object serviceKey) =>
-            Container.Resolve(serviceType, serviceKey,
-                Container.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered);
+        public object GetKeyedService(Type serviceType, object serviceKey)
+        {
+            var ifUnresolved = Container.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
+            if (serviceKey == KeyedService.AnyKey)
+                return Container.Resolve(serviceType, Registrator.AnyKey, ifUnresolved);
+
+            var keyedService = Container.Resolve(serviceType, serviceKey, IfUnresolved.ReturnDefaultIfNotRegistered);
+            if (keyedService != null)
+                return keyedService;
+            return Container.Resolve(serviceType, Registrator.AnyKeyOf(serviceKey), ifUnresolved);
+        }
 
         /// <inheritdoc />
         public object GetRequiredKeyedService(Type serviceType, object serviceKey) =>

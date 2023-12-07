@@ -48,6 +48,27 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             Assert.Equal("service2", svc.Service2.ToString());
         }
 
+        // todo: @wip test with open-generic keyed service
+        [Fact]
+        public void ResolveKeyedServiceSingletonFactoryWithAnyKey_COPY()
+        {
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddKeyedSingleton<IService>(KeyedService.AnyKey, (_, key) => new Service((string)key));
+
+            var provider = CreateServiceProvider(serviceCollection);
+
+            Assert.Null(provider.GetService<IService>());
+
+            for (var i = 0; i < 3; i++)
+            {
+                var key = "service" + i;
+                var s1 = provider.GetKeyedService<IService>(key);
+                var s2 = provider.GetKeyedService<IService>(key);
+                Assert.Same(s1, s2);
+                Assert.Equal(key, s1.ToString());
+            }
+        }
+
         internal interface IService { }
 
         internal class Service : IService

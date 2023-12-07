@@ -1192,7 +1192,7 @@ namespace DryIoc.ImTools
             }
         }
 
-        private static void ThrowRetryCountExceeded(int retryCountExceeded) =>
+        internal static void ThrowRetryCountExceeded(int retryCountExceeded) =>
             throw new InvalidOperationException(
                 $"Ref retried to Update for {retryCountExceeded} times But there is always someone else intervened.");
 

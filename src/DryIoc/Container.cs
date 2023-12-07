@@ -367,7 +367,7 @@ namespace DryIoc
 
             // todo: @perf Should we in the first place create the request here, or later in CreateExpression because it may be faster for the root service without dependency or with the delegate factory? 
             var request = Request.CreateResolutionRoot(this, serviceType, ifUnresolved);
-            var factory = ResolveFactory(request); // HACK: may mutate request, but it should be safe
+            var factory = ResolveFactory(request); // note: ResolveFactory may mutate request, but it should be safe because it is not shared between threads.
 
             // Delegate to full blown Resolve aware of service key, open scope, etc.
             var serviceKey = request.ServiceKey;
@@ -430,7 +430,7 @@ namespace DryIoc
         {
             var scopeName = CurrentScope?.Name;
             // fallback to simple Resolve and its default cache if no keys are passed
-            return serviceKey == null && requiredServiceType == null && scopeName == null &&
+            return serviceKey == null & requiredServiceType == null & scopeName == null &&
                 (preResolveParent == null || preResolveParent.IsEmpty) && args.IsNullOrEmpty()
                 ? Resolve(serviceType, ifUnresolved)
                 : ResolveAndCacheKeyed(RuntimeHelpers.GetHashCode(serviceType), serviceType,
@@ -447,16 +447,16 @@ namespace DryIoc
 
             // #288 - ignoring the parent, `args`, `scopeName`seems OK because Use is supposed to overwrite anything with args,
             // and TryGetUsedInstance will look into scope with the specified `scopeName` anyway
-            if (serviceKey == null && requiredServiceType == null)
+            if (serviceKey == null & requiredServiceType == null)
                 if (ResolverContext.TryGetUsedInstance(this, serviceTypeHash, serviceType, out var usedInstance))
                     return usedInstance;
 
             object cacheKey = null;
-            if (requiredServiceType == null && preResolveParent.IsEmpty && args.IsNullOrEmpty())
+            if (requiredServiceType == null & preResolveParent.IsEmpty && args.IsNullOrEmpty())
             {
                 cacheKey = scopeName == null ? serviceKey
                     : serviceKey == null ? scopeName
-                    : KV.Of(scopeName, serviceKey);
+                    : KV.Of(scopeName, serviceKey); // using the KV class and not some struct here because the object anyway and struct will be boxed anyway.
 
                 if (Registry.GetCachedKeyedFactoryOrDefault(_registry.Value, serviceTypeHash, serviceType, cacheKey, out var cacheEntry))
                 {
@@ -5712,7 +5712,7 @@ namespace DryIoc
         /// <summary>Checks if the rules "include" the same settings and conventions as the basic MicrosoftDependencyInjectionRules.
         /// It means that the rules may "include" other things, e.g. `WithConcreteTypeDynamicRegistrations`, etc.</summary>
         [Obsolete("Please use DryIoc.Microsoft.DependencyInjection.DryIocAdapter.HasMicrosoftDependencyInjectionRules")]
-        public bool HasMicrosoftDependencyInjectionRules() => HasBaseMicrosoftDependencyInjectionRules(MicrosoftDependencyInjectionRules); 
+        public bool HasMicrosoftDependencyInjectionRules() => HasBaseMicrosoftDependencyInjectionRules(MicrosoftDependencyInjectionRules);
 
         /// <summary>Checks if the rules "include" the same settings and conventions as the basic MicrosoftDependencyInjectionRules.
         /// It means that the rules may "include" other things, e.g. `WithConcreteTypeDynamicRegistrations`, etc.</summary>
@@ -5740,7 +5740,7 @@ namespace DryIoc
         /// That's why you should use the `DryIocAdapter.WithMicrosoftDependencyInjectionRules` instead.</summary>
         [Obsolete("Please use DryIoc.Microsoft.DependencyInjection.DryIocAdapter.WithMicrosoftDependencyInjectionRules")]
         public Rules WithMicrosoftDependencyInjectionRules() => WithBaseMicrosoftDependencyInjectionRules(null);
-     
+
         /// <summary>Creates the rules for the Microsoft.Extension.DependencyInjection 
         /// together with the ParameterSelector for the keyed services, which should be provided as parameter</summary>
         public Rules WithBaseMicrosoftDependencyInjectionRules(ParameterSelector parameters) => WithMicrosoftDependencyInjectionRules(this, parameters);
@@ -7320,6 +7320,11 @@ namespace DryIoc
             ParameterSelector parameters = null, PropertiesAndFieldsSelector propertiesAndFields = null, bool isConditionalImplementation = false) =>
             Create(factoryMethodSelector, parameters, propertiesAndFields, isConditionalImplementation);
 
+        /// <summary>Specifies injections rules for FactoryMethod and Parameters.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static Made OfFactoryMethodAndParameters(FactoryMethod factoryMethod, ParameterSelector parameters) =>
+            new Made.WithFactoryMethodAndParameters(factoryMethod, parameters);
+
         internal static Made Create(object factoryMethodOrSelector,
             ParameterSelector parameters, PropertiesAndFieldsSelector propertiesAndFields, bool isConditionalImplementation)
         {
@@ -7798,13 +7803,22 @@ namespace DryIoc
     public static class Registrator
     {
         /// <summary>When registered with it, the the service can be resolved any service key provided</summary>
-        public static readonly object AnyServiceKey = new AnyServiceKeyObject();
+        public static readonly object AnyKey = new AnyServiceKey();
+        /// <summary>Wrap the resolution key</summary>
+        public static object AnyKeyOf(object key) => new AnyServiceKey(key);
 
-        private class AnyServiceKeyObject
+        /// <summary>Represents the key that you may resolve with any resolution service key</summary>
+        public class AnyServiceKey
         {
+            /// <summary>The resolution key supplied in the Resolve</summary>
+            public readonly object ResolutionKey;
+            internal AnyServiceKey(object resolutionKey = null) => ResolutionKey = resolutionKey;
+            /// <inheritdoc />
             public override bool Equals(object obj) => true;
+            /// <inheritdoc />
             public override int GetHashCode() => -1;
-            public override string ToString() => "*";
+            /// <inheritdoc />
+            public override string ToString() => ResolutionKey == null ? "AnyKey(*)" : $"AnyKey(resolutionKey: {ResolutionKey})";
         }
 
         /// <summary>The base method for registering service with its implementation factory. Allows to specify all possible options.</summary>
@@ -8339,18 +8353,7 @@ namespace DryIoc
             IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
         {
             var made = new Made(FactoryMethod.OfFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams));
-            var factory = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, made, reuse, setup);
-            r.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
-        }
-
-        /// <summary>Know what you're doing</summary>
-        public static void RegisterFuncWithParameters(this IRegistrator r,
-            Type serviceType, Type sourceFuncType, Delegate funcWithObjParams, ParameterSelector parameters,
-            IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
-        {
-            var factoryMethod = FactoryMethod.OfFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams);
-            var made = new Made.WithFactoryMethodAndParameters(factoryMethod, parameters);
-            var factory = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, made, reuse, setup);
+            var factory = ReflectionFactory.OfConcreteTypeAndMadeNoValidation(serviceType, made, reuse, setup);
             r.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
 
@@ -8841,6 +8844,7 @@ namespace DryIoc
             typeof(IResolver).GetMethod(nameof(IResolver.ResolveMany));
 
         /// <summary>Resolves instance of service type from container. Throws exception if unable to resolve.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static object Resolve(this IResolver resolver, Type serviceType) =>
             resolver.Resolve(serviceType, IfUnresolved.Throw);
 
@@ -8849,6 +8853,7 @@ namespace DryIoc
             resolver.Resolve(serviceType, ifUnresolved);
 
         /// <summary>Resolves instance of type TService from container.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static TService Resolve<TService>(this IResolver resolver, IfUnresolved ifUnresolved = IfUnresolved.Throw) =>
             (TService)resolver.Resolve(typeof(TService), ifUnresolved);
 
@@ -8878,6 +8883,7 @@ namespace DryIoc
         ///     container.Register<IService, Service>();
         ///     var services = container.Resolve<IEnumerable<object>>(typeof(IService));
         /// ]]></code></example>
+        [MethodImpl((MethodImplOptions)256)]
         public static TService Resolve<TService>(this IResolver resolver, Type requiredServiceType,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object[] args = null, object serviceKey = null) =>
             (TService)resolver.Resolve(typeof(TService), serviceKey, ifUnresolved, requiredServiceType, Request.Empty, args);
@@ -8901,6 +8907,7 @@ namespace DryIoc
         ///     container.Register<IService, Service>();
         ///     var services = container.Resolve(typeof(Lazy<object>), "someKey", requiredServiceType: typeof(IService));
         /// ]]></code></example>
+        [MethodImpl((MethodImplOptions)256)]
         public static object Resolve(this IResolver resolver, Type serviceType, object serviceKey,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             object[] args = null) =>
@@ -8910,6 +8917,7 @@ namespace DryIoc
         /// <typeparam name="TService">The type of the requested service.</typeparam>
         /// <returns>The requested service instance.</returns>
         /// <remarks>Using <paramref name="requiredServiceType"/> implicitly support Covariance for generic wrappers even in .Net 3.5.</remarks>
+        [MethodImpl((MethodImplOptions)256)]
         public static TService Resolve<TService>(this IResolver resolver, object serviceKey,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, Type requiredServiceType = null,
             object[] args = null) =>
@@ -9594,6 +9602,11 @@ namespace DryIoc
         [MethodImpl((MethodImplOptions)256)]
         public static ParameterServiceInfo Of(ParameterInfo parameter, Type serviceType, ServiceDetails details) =>
             new Typed.WithDetails(parameter, serviceType, details);
+
+        /// <summary>Represents the failing selector without the fallback, 
+        /// in order to skip all further attempts to resolve the parameter, e.g. parameter is marked with attribute which does not match the correst resolution request</summary>
+        public static readonly ParameterServiceInfo DefinitelyUnresolvedParameter = 
+            new ParameterServiceInfo(null);
 
         /// <summary>Creates info from service type and details.</summary>
         public override ServiceInfo Create(Type serviceType, ServiceDetails details) =>
@@ -10617,7 +10630,7 @@ namespace DryIoc
         internal static Request RentRequestOrNull() => Interlocked.Exchange(ref _pooledRequest, null);
         internal void ReturnToPool()
         {
-            if (_pooledRequest == null && (Flags & RequestFlags.DoNotPoolRequest) == 0)
+            if (_pooledRequest == null & (Flags & RequestFlags.DoNotPoolRequest) == 0)
                 _pooledRequest = CleanBeforePool();
         }
 
@@ -11207,7 +11220,7 @@ namespace DryIoc
         public bool AsResolutionCall => (Flags & FactoryFlags.AsResolutionCall) != 0 || Setup.AsResolutionCall;
 
         ///<summary>Closed generic factories</summary> 
-        public virtual ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => null;
+        public virtual ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories => null; // todo: @perf use struct for the key
 
         ///<summary>Open-generic parent factory</summary> 
         public virtual ReflectionFactory GeneratorFactory => null;
@@ -11258,12 +11271,14 @@ namespace DryIoc
                 return Resolver.CreateResolutionExpression(request, setup.OpenResolutionScope, asResolutionCall);
 
             var reuse = request.Reuse;
+            var requestFlags = request.Flags;
             var cacheExpression =
                 CanCache & FactoryType == FactoryType.Service &&
 
                 // todo: @perf call !request.AvoidExpressionCaching instead
                 !request.IsResolutionRoot &&
-                !request.IsDirectlyWrappedInFunc() &&
+                (requestFlags & RequestFlags.IsDirectlyWrappedInFunc) == 0 &&
+                // !request.IsDirectlyWrappedInFunc() &&
                 !request.IsWrappedInFuncWithArgs() &&
 
                 !(reuse.Name is IScopeName) && // avoid caching of scoped services with the custom scope name and possibly the scope name matching rule
@@ -11300,7 +11315,7 @@ namespace DryIoc
                     // and proceed to the normal Expression creation.
                     //
                     var singleton = itemRef.Value;
-                    if (singleton == Scope.NoItem && !request.TracksTransientDisposable && !request.IsWrappedInFunc())
+                    if (singleton == Scope.NoItem && (requestFlags & (RequestFlags.TracksTransientDisposable | RequestFlags.IsWrappedInFunc)) == 0)
                         singleton = Scope.WaitForItemIsSet(itemRef);
                     if (singleton != Scope.NoItem)
                     {
@@ -11812,6 +11827,7 @@ namespace DryIoc
             return ctors;
         }
 
+        [MethodImpl((MethodImplOptions)256)]
         private static Type ValidateImplementationType(Type type)
         {
             if (type == null)
@@ -11831,7 +11847,7 @@ namespace DryIoc
             var knownImplType = implType;
 
             var factoryMethodResultType = made.FactoryMethodKnownResultType;
-            if (implType == null ||
+            if (implType == null |
                 implType == typeof(object) || // required as currently object represents the open-generic type argument T registrations
                 implType.IsAbstract)
             {
@@ -11841,14 +11857,15 @@ namespace DryIoc
                 knownImplType = null; // Ensure that we do not have abstract implementation type
 
                 // Using non-abstract factory method result type is safe for conditions and diagnostics
-                if (factoryMethodResultType != null &&
+                if (factoryMethodResultType != null &
                     factoryMethodResultType != typeof(object) &&
                     !factoryMethodResultType.IsAbstract)
                     knownImplType = factoryMethodResultType;
             }
-            else if (factoryMethodResultType != null && factoryMethodResultType != implType)
+            else if (factoryMethodResultType != null & factoryMethodResultType != implType)
             {
-                if (!implType.IsAssignableFrom(factoryMethodResultType) && !factoryMethodResultType.HasConversionOperatorTo(implType))
+                if (!implType.IsAssignableFrom(factoryMethodResultType) && 
+                    !factoryMethodResultType.HasConversionOperatorTo(implType))
                     Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType, implType, factoryMethodResultType);
             }
 
@@ -11877,7 +11894,7 @@ namespace DryIoc
         {
             ValidateImplementationType(implementationType);
             return IsFactoryGenerator(implementationType)
-                ? new WithAllDetails(implementationType, null, Made.Default, Setup.Default, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty)
+                ? WithAllDetails.OfOpenGenericType(implementationType, null, Made.Default, Setup.Default)
                 : new ReflectionFactory(implementationType);
         }
 
@@ -11887,7 +11904,7 @@ namespace DryIoc
         {
             ValidateImplementationType(implementationType);
             return IsFactoryGenerator(implementationType)
-                ? new WithAllDetails(implementationType, reuse, Made.Default, Setup.Default, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty)
+                ? WithAllDetails.OfOpenGenericType(implementationType, reuse, Made.Default, Setup.Default)
                 : OfReuse(implementationType, reuse);
         }
 
@@ -11908,19 +11925,23 @@ namespace DryIoc
 
             var validatedImplType = ValidateImplementationType(implementationType, made);
             return IsFactoryGenerator(validatedImplType ?? implementationType, made)
-                ? new WithAllDetails(validatedImplType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty)
+                ? WithAllDetails.OfOpenGenericType(validatedImplType, reuse, made, setup)
                 : setup == Setup.Default
                     ? (made == Made.Default ? OfReuse(validatedImplType, reuse)
                         : reuse == null ? new WithMade(validatedImplType, made)
                         : new WithMadeAndReuse(validatedImplType, reuse, made))
-                    : new WithAllDetails(validatedImplType, reuse, made, setup);
+                    : WithAllDetails.OfConcreteType(validatedImplType, reuse, made, setup);
         }
 
-        /// <summary>Creates the factory out of `implementationType` and `made`</summary>
-        public static ReflectionFactory OfTypeAndMadeNoValidation(Type implementationType, Made made, IReuse reuse = null, Setup setup = null) =>
-            setup == null || setup == Setup.Default
-                ? (reuse == null ? new WithMade(implementationType, made) : new WithMadeAndReuse(implementationType, reuse, made))
-                : new WithAllDetails(implementationType, reuse, made, setup ?? Setup.Default);
+        /// <summary>Creates the factory out of concrete or closed-generic `knownImplOrServiceType` and other details</summary>
+        public static ReflectionFactory OfConcreteTypeAndMadeNoValidation(Type knownImplOrServiceType, Made made, IReuse reuse = null, Setup setup = null) =>
+            setup == null | setup == Setup.Default
+                ? (reuse == null ? new WithMade(knownImplOrServiceType, made) : new WithMadeAndReuse(knownImplOrServiceType, reuse, made))
+                : WithAllDetails.OfConcreteType(knownImplOrServiceType, reuse, made, setup ?? Setup.Default);
+
+        /// <summary>Creates the factory, that will generate a new factory for each new resolution service key or for the default key resolution</summary>
+        public static ReflectionFactory OfAnyKey(Type knownImplOrServiceType, Made made, IReuse reuse, Setup setup) =>
+            new WithAnyKeyGeneratorAndAllDetails(knownImplOrServiceType, reuse, made, setup ?? Setup.Default);
 
         /// <summary>Creates the factory based on arguments</summary>
         public static ReflectionFactory Of(Func<Type> implementationTypeProvider, IReuse reuse = null, Made made = null, Setup setup = null) =>
@@ -11992,8 +12013,8 @@ namespace DryIoc
             public override IReuse Reuse { get; }
             public override Made Made { get; }
             public override Setup Setup { get; }
-            internal WithAllDetails(object implementationType, IReuse reuse, Made made, Setup setup,
-                ImHashMap<KV<Type, object>, ReflectionFactory> generatedFactories = null) : base()
+            protected WithAllDetails(object implementationType, IReuse reuse, Made made, Setup setup,
+                ImHashMap<KV<Type, object>, ReflectionFactory> generatedFactories) : base()
             {
                 _implementationTypeOrProviderOrPubCtorOrCtors = implementationType;
                 Reuse = reuse;
@@ -12002,8 +12023,15 @@ namespace DryIoc
                 _generatedFactoriesOrFactoryGenerator = generatedFactories;
             }
 
-            internal WithAllDetails(Type implementationType, IReuse reuse, Made made, Setup setup,
-                ReflectionFactory factoryGenerator) : base()
+            [MethodImpl((MethodImplOptions)256)]
+            internal static ReflectionFactory OfConcreteType(Type implType, IReuse reuse, Made made, Setup setup) =>
+                new WithAllDetails(implType, reuse, made, setup, null);
+
+            [MethodImpl((MethodImplOptions)256)]
+            internal static ReflectionFactory OfOpenGenericType(Type implType, IReuse reuse, Made made, Setup setup) =>
+                new WithAllDetails(implType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
+
+            private WithAllDetails(ReflectionFactory factoryGenerator, Type implementationType, IReuse reuse, Made made, Setup setup) : base()
             {
                 _implementationTypeOrProviderOrPubCtorOrCtors = implementationType;
                 Reuse = reuse;
@@ -12070,11 +12098,12 @@ namespace DryIoc
                         return generatedFactory;
                 }
 
-                ReflectionFactory closedGenericFactory = new WithAllDetails(implType, Reuse, made, Setup, this) { Flags = Flags };
+                ReflectionFactory closedGenericFactory = new WithAllDetails(this, implType, Reuse, made, Setup) { Flags = Flags };
 
                 Ref.Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryKey, closedGenericFactory,
                     (x, genFacKey, closedGenFac) =>
                     {
+                        // todo: @perf @mem move the entry outside as it is always created with the same values
                         var newEntry = ImHashMap.Entry(genFacKey.GetHashCode(), genFacKey, closedGenFac);
                         var mapOrOldEntry = ((ImHashMap<KV<Type, object>, ReflectionFactory>)x).AddOrGetEntry(newEntry);
                         if (mapOrOldEntry is ImHashMapEntry<KV<Type, object>, ReflectionFactory> oldEntry && oldEntry != newEntry)
@@ -12125,6 +12154,110 @@ namespace DryIoc
             }
         }
 
+        internal class WithAnyKeyGeneratorAndAllDetails : ReflectionFactory
+        {
+            internal object _generatedFactoriesOrFactoryGenerator; // ImHashMap<KV<Type, object>, ReflectionFactory> or Factory
+            ///<inheritdoc />
+            public override ImHashMap<KV<Type, object>, ReflectionFactory> GeneratedFactories =>
+                _generatedFactoriesOrFactoryGenerator as ImHashMap<KV<Type, object>, ReflectionFactory>;
+            ///<inheritdoc />
+            public override ReflectionFactory GeneratorFactory =>
+                _generatedFactoriesOrFactoryGenerator as ReflectionFactory;
+
+            public override IReuse Reuse { get; }
+            public override Made Made { get; }
+            public override Setup Setup { get; }
+            internal WithAnyKeyGeneratorAndAllDetails(Type knownImplOrServiceType, IReuse reuse, Made made, Setup setup) : base()
+            {
+                _implementationTypeOrProviderOrPubCtorOrCtors = knownImplOrServiceType;
+                Reuse = reuse;
+                Made = made;
+                Setup = setup;
+                _generatedFactoriesOrFactoryGenerator = ImHashMap<KV<Type, object>, ReflectionFactory>.Empty;
+            }
+
+            private WithAnyKeyGeneratorAndAllDetails(ReflectionFactory factoryGenerator,
+                Type knownImplOrServiceType, IReuse reuse, Made made, Setup setup) : base()
+            {
+                _implementationTypeOrProviderOrPubCtorOrCtors = knownImplOrServiceType;
+                Reuse = reuse;
+                Made = made;
+                Setup = setup;
+                _generatedFactoriesOrFactoryGenerator = factoryGenerator;
+            }
+
+            /// <inheritdoc />
+            public override Factory GetGeneratedFactoryOrDefault(Request request, bool ifErrorReturnDefault = false)
+            {
+                var implOrServiceType = request.GetKnownImplementationOrServiceType();
+                var serviceKey = request.ServiceKey;
+                serviceKey = serviceKey is Registrator.AnyServiceKey anyKey ? anyKey.ResolutionKey : serviceKey ?? DefaultKey.Value;
+                var generatedFactoryKey = KV.Of(implOrServiceType, serviceKey);
+
+                ReflectionFactory resultFactory = null;
+                var generatedFactories = GeneratedFactories;
+                if (!generatedFactories.IsEmpty)
+                {
+                    resultFactory = generatedFactories.GetValueOrDefault(generatedFactoryKey);
+                    if (resultFactory != null)
+                        return resultFactory.GeneratedFactories != null
+                            ? resultFactory.GetGeneratedFactoryOrDefault(request)
+                            : resultFactory;
+                }
+
+                resultFactory = new WithAnyKeyGeneratorAndAllDetails(this, implOrServiceType, Reuse, Made, Setup) { Flags = Flags };
+
+                var generatedFactoryEntry = ImHashMap.Entry(generatedFactoryKey.GetHashCode(), generatedFactoryKey, resultFactory);
+                resultFactory = Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryEntry, resultFactory,
+                    static (map, ne, _) => ((ImHashMap<KV<Type, object>, ReflectionFactory>)map).AddOrGetEntry(ne),
+                    static (_, newMap, ne, rf) =>
+                        newMap is ImHashMapEntry<KV<Type, object>, ReflectionFactory> existingEntry && existingEntry != ne 
+                            ? existingEntry.Value
+                            : rf);
+
+                // todo: @wip @remove
+                // Ref.Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryEntry,
+                //     (map, ne) =>
+                //     {
+                //         var newMapOrExistingEntry = ((ImHashMap<KV<Type, object>, ReflectionFactory>)map).AddOrGetEntry(ne);
+                //         if (newMapOrExistingEntry is ImHashMapEntry<KV<Type, object>, ReflectionFactory> existingEntry && existingEntry != ne)
+                //         {
+                //             resultFactory = existingEntry.Value;
+                //             return map;
+                //         }
+                //         return newMapOrExistingEntry;
+                //     });
+
+                return resultFactory != null && resultFactory.GeneratedFactories != null
+                    ? resultFactory.GetGeneratedFactoryOrDefault(request)
+                    : resultFactory;
+            }
+        }
+
+        delegate R IsUpdated<T, A, R>(T oldValue, T newValue, A a, R result);
+
+        static R Swap<T, A, R>(ref T value, A a, R result,
+            Func<T, A, R, T> update, IsUpdated<T, A, R> getInterrupted) 
+                where T : class
+                where R : class
+        {
+            var spinWait = new SpinWait();
+            var retryCount = 0;
+            while (true)
+            {
+                var oldValue = value;
+                var newValue = update(oldValue, a, result);
+                var existingResult = getInterrupted(oldValue, newValue, a, result);
+                if (existingResult != result)
+                    return existingResult;
+                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                    return result;
+                if (++retryCount > Ref.RETRY_COUNT_UNTIL_THROW)
+                    Ref.ThrowRetryCountExceeded(Ref.RETRY_COUNT_UNTIL_THROW);
+                spinWait.SpinOnce();
+            }
+        }
+
         internal sealed class WithTypeProvider : WithAllDetails
         {
             public override bool CanAccessImplementationType => false;
@@ -12142,7 +12275,7 @@ namespace DryIoc
             }
 
             public WithTypeProvider(Func<Type> implementationTypeProvider, IReuse reuse, Made made, Setup setup)
-                : base(implementationTypeProvider.ThrowIfNull(), reuse, made, setup) { }
+                : base(implementationTypeProvider.ThrowIfNull(), reuse, made, setup, null) { }
         }
 
         /// <summary>Creates service expression.</summary>
@@ -12281,31 +12414,48 @@ namespace DryIoc
                 }
 
                 hasByRefParams |= paramType.IsByRef;
-                var paramServiceInfo = paramSelector == null ? ParameterServiceInfo.OrNull(param) : paramSelector(param) ?? ParameterServiceInfo.OrNull(param);
-                var paramRequest = paramServiceInfo == null ? request.Push(param) : request.Push(paramServiceInfo);
-                var paramDetails = paramServiceInfo == null ? ServiceDetails.Default : paramServiceInfo.Details;
-                var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
-                if (usedOrCustomValExpr != null)
+
+                var paramServiceInfo = paramSelector == null
+                    ? ParameterServiceInfo.OrNull(param)
+                    : (paramSelector(param) ?? ParameterServiceInfo.OrNull(param));
+
+                Factory paramFactory = null;
+                Request paramRequest = null;
+                var paramDetails = ServiceDetails.Default;
+                if (paramServiceInfo != ParameterServiceInfo.DefinitelyUnresolvedParameter)
                 {
-                    if (paramExprs != null)
-                        paramExprs[i] = usedOrCustomValExpr;
-                    else switch (i)
-                        {
-                            case 0: a0 = usedOrCustomValExpr; break;
-                            case 1: a1 = usedOrCustomValExpr; break;
-                            case 2: a2 = usedOrCustomValExpr; break;
-                            case 3: a3 = usedOrCustomValExpr; break;
-                            case 4: a4 = usedOrCustomValExpr; break;
-                            case 5: a5 = usedOrCustomValExpr; break;
-                            case 6: a6 = usedOrCustomValExpr; break;
-                        }
-                    continue;
+                    if (paramServiceInfo == null)
+                        paramRequest = request.Push(param);
+                    else 
+                    {
+                        paramRequest = request.Push(paramServiceInfo);
+                        paramDetails = paramServiceInfo.Details;
+                    }
+
+                    var usedOrCustomValExpr = TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
+                    if (usedOrCustomValExpr != null)
+                    {
+                        if (paramExprs != null)
+                            paramExprs[i] = usedOrCustomValExpr;
+                        else switch (i)
+                            {
+                                case 0: a0 = usedOrCustomValExpr; break;
+                                case 1: a1 = usedOrCustomValExpr; break;
+                                case 2: a2 = usedOrCustomValExpr; break;
+                                case 3: a3 = usedOrCustomValExpr; break;
+                                case 4: a4 = usedOrCustomValExpr; break;
+                                case 5: a5 = usedOrCustomValExpr; break;
+                                case 6: a6 = usedOrCustomValExpr; break;
+                            }
+                        continue;
+                    }
+
+                    paramFactory = container.ResolveFactory(paramRequest);
                 }
 
-                var paramFactory = container.ResolveFactory(paramRequest);
                 if (paramFactory == null && rules.GenerateResolutionCallForMissingDependency)
                 {
-                    var paramResolutionCall = Resolver.CreateResolutionExpression(paramRequest, generateResolutionCallForMissingDependency: true);
+                    var paramResolutionCall = Resolver.CreateResolutionExpression(paramRequest ?? request.Push(param), generateResolutionCallForMissingDependency: true);
                     if (paramExprs != null)
                         paramExprs[i] = paramResolutionCall;
                     else switch (i)
