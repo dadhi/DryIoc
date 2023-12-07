@@ -48,7 +48,6 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             Assert.Equal("service2", svc.Service2.ToString());
         }
 
-        // todo: @wip test with open-generic keyed service
         [Fact]
         public void ResolveKeyedServiceSingletonFactoryWithAnyKey_COPY()
         {
@@ -69,6 +68,26 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             }
         }
 
+        [Fact]
+        public void ResolveKeyedServiceSingletonFactoryWithAnyKey_OpenGenericService()
+        {
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddKeyedSingleton<IOGService<string>>(KeyedService.AnyKey, (_, key) => new OGService<string>((string)key));
+
+            var provider = CreateServiceProvider(serviceCollection);
+
+            Assert.Null(provider.GetService<IOGService<string>>());
+
+            for (var i = 0; i < 3; i++)
+            {
+                var key = "service" + i;
+                var s1 = provider.GetKeyedService<IOGService<string>>(key);
+                var s2 = provider.GetKeyedService<IOGService<string>>(key);
+                Assert.Same(s1, s2);
+                Assert.Equal(key, s1.ToString());
+            }
+        }
+
         internal interface IService { }
 
         internal class Service : IService
@@ -78,6 +97,19 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             public Service() => _id = Guid.NewGuid().ToString();
 
             public Service([ServiceKey] string id) => _id = id;
+
+            public override string ToString() => _id;
+        }
+
+        internal interface IOGService<T> { }
+
+        internal class OGService<T> : IOGService<T>
+        {
+            private readonly string _id;
+
+            public OGService() => _id = Guid.NewGuid().ToString();
+
+            public OGService([ServiceKey] string id) => _id = id;
 
             public override string ToString() => _id;
         }
