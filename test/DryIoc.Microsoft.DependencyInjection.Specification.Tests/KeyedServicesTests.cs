@@ -72,11 +72,12 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
         public void ResolveKeyedServiceSingletonFactoryWithAnyKey_OpenGenericService()
         {
             var serviceCollection = new ServiceCollection();
-            serviceCollection.AddKeyedSingleton<IOGService<string>>(KeyedService.AnyKey, (_, key) => new OGService<string>((string)key));
+            serviceCollection.AddKeyedSingleton(typeof(IOGService<>), KeyedService.AnyKey, typeof(OGService<>));
 
             var provider = CreateServiceProvider(serviceCollection);
 
-            Assert.Null(provider.GetService<IOGService<string>>());
+            var s0 = provider.GetService<IOGService<string>>();
+            Assert.Same("*", s0.ToString());
 
             for (var i = 0; i < 3; i++)
             {
@@ -85,6 +86,11 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
                 var s2 = provider.GetKeyedService<IOGService<string>>(key);
                 Assert.Same(s1, s2);
                 Assert.Equal(key, s1.ToString());
+
+                var s3 = provider.GetKeyedService<IOGService<int>>(key);
+                var s4 = provider.GetKeyedService<IOGService<int>>(key);
+                Assert.Same(s3, s4);
+                Assert.Equal(key, s3.ToString());
             }
         }
 
@@ -107,7 +113,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
         {
             private readonly string _id;
 
-            public OGService() => _id = Guid.NewGuid().ToString();
+            public OGService() => _id = "*";
 
             public OGService([ServiceKey] string id) => _id = id;
 

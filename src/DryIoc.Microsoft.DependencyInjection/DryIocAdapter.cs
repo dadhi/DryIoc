@@ -324,22 +324,27 @@ namespace DryIoc.Microsoft.DependencyInjection
                 var implType = descriptor.KeyedImplementationType;
                 if (implType != null)
                 {
-                    var keyedFactory = ReflectionFactory.Of(implType, descriptor.Lifetime.ToReuse());
-                    if (serviceKey == Registrator.AnyKey)
-                        keyedFactory.DoNotCache();
+                    var reuse = descriptor.Lifetime.ToReuse();
 
-                    container.Register(keyedFactory, serviceType, serviceKey, ifAlreadyRegistered,
-                        isStaticallyChecked: implType == serviceType || serviceType.IsAssignableFrom(implType));
+                    var keyedFactory = serviceKey == Registrator.AnyKey
+                        ? ReflectionFactory.OfAnyKey(implType, Made.Default, reuse, Setup.Default).DoNotCache()
+                        : ReflectionFactory.Of(implType, reuse);
+
+                    var assignableTypes = implType == serviceType || serviceType.IsAssignableFrom(implType);
+                    container.Register(keyedFactory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: assignableTypes);
                 }
                 else if (descriptor.KeyedImplementationFactory != null)
                 {
                     var keyedFunc = descriptor.KeyedImplementationFactory;
+    
                     var factoryMethod = FactoryMethod.OfFunc(KeyedImplementationFactoryInvokeMethod, (Func<object, object, object>)keyedFunc.ToFuncWithObjParams);
                     var made = Made.OfFactoryMethodAndParameters(factoryMethod, SelectServiceKeyFor2ndParameterOfKeyedImplementationFactory);
 
-                    var factory = serviceKey == Registrator.AnyKey 
-                        ? ReflectionFactory.OfAnyKey(serviceType, made, descriptor.Lifetime.ToReuse(), Setup.Default).DoNotCache()
-                        : ReflectionFactory.OfConcreteTypeAndMadeNoValidation(serviceType, made, descriptor.Lifetime.ToReuse(), Setup.Default);
+                    var reuse = descriptor.Lifetime.ToReuse();
+
+                    var factory = serviceKey == Registrator.AnyKey
+                        ? ReflectionFactory.OfAnyKey(serviceType, made, reuse, Setup.Default).DoNotCache()
+                        : ReflectionFactory.OfConcreteTypeAndMadeNoValidation(serviceType, made, reuse, Setup.Default);
 
                     container.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
                 }

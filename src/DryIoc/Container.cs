@@ -6982,7 +6982,8 @@ namespace DryIoc
             if (ctors.Length == 1)
                 return new FactoryMethod(firstCtor);
 
-            var paramSelector = request.Rules.TryGetParameterSelector(request.Made)(request);
+            var container = request.Container;
+            var paramSelector = container.Rules.TryGetParameterSelector(request.Made)(request);
 
             var throwIfCtorNotFound = request.IfUnresolved != IfUnresolved.ReturnDefault;
             if (throwIfCtorNotFound)
@@ -7110,18 +7111,33 @@ namespace DryIoc
                         }
                     }
 
-                    var paramInfo = paramSelector(param) ?? ParameterServiceInfo.Of(param);
-                    var paramRequest = request.Push(paramInfo);
-                    var paramDetails = paramInfo.Details;
-                    var usedOrCustomValExpr = ReflectionFactory.TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
-                    if (usedOrCustomValExpr != null)
+                    Factory paramFactory = null;
+                    Request paramRequest = null;
+                    var paramDetails = ServiceDetails.Default;
+
+                    var paramServiceInfo = paramSelector(param);
+                    if (paramServiceInfo != ParameterServiceInfo.DefinitelyUnresolvedParameter)
                     {
-                        ++usedInputArgOrUsedOrCustomValueCount;
-                        paramExprs[i] = usedOrCustomValExpr;
-                        continue;
+                        if (paramServiceInfo == null)
+                            paramRequest = request.Push(param);
+                        else 
+                        {
+                            paramRequest = request.Push(paramServiceInfo);
+                            paramDetails = paramServiceInfo.Details;
+                        }
+
+                        var usedOrCustomValExpr = ReflectionFactory.TryGetUsedInstanceOrCustomValueExpression(request, paramRequest, paramDetails);
+                        if (usedOrCustomValExpr != null)
+                        {
+                            ++usedInputArgOrUsedOrCustomValueCount;
+                            paramExprs[i] = usedOrCustomValExpr;
+                            continue;
+                        }
+
+                        paramFactory = container.ResolveFactory(paramRequest);
                     }
 
-                    var injectedExpr = request.Container.ResolveFactory(paramRequest)?.GetExpressionOrDefault(paramRequest);
+                    var injectedExpr = paramFactory?.GetExpressionOrDefault(paramRequest);
                     if (injectedExpr == null ||
                         // When param is an empty array / collection, then we may use a default value instead (#581)
                         paramDetails.DefaultValue != null && injectedExpr.NodeType == ExprType.NewArrayInit && ((NewArrayExpression)injectedExpr).ArgumentCount == 0)
@@ -9311,7 +9327,7 @@ namespace DryIoc
                 if (serviceKey == null)
                     serviceKey = ownerDetails.ServiceKey;
 
-                if (metadataKey == null && metadata == null)
+                if (metadataKey == null & metadata == null)
                 {
                     metadataKey = ownerDetails.MetadataKey;
                     metadata = ownerDetails.Metadata;
@@ -9368,10 +9384,10 @@ namespace DryIoc
             if (serviceType == requiredServiceType)
                 requiredServiceType = null;
 
-            if (serviceKey == null &&
-                metadataKey == null &&
-                metadata == null &&
-                ifUnresolved == IfUnresolved.Throw &&
+            if (serviceKey == null &
+                metadataKey == null &
+                metadata == null &
+                ifUnresolved == IfUnresolved.Throw &
                 requiredServiceType == null)
                 return serviceType;
 
@@ -12014,13 +12030,14 @@ namespace DryIoc
             public override Made Made { get; }
             public override Setup Setup { get; }
             protected WithAllDetails(object implementationType, IReuse reuse, Made made, Setup setup,
-                ImHashMap<KV<Type, object>, ReflectionFactory> generatedFactories) : base()
+                ImHashMap<KV<Type, object>, ReflectionFactory> generatedFactories, FactoryFlags flags = default) : base()
             {
                 _implementationTypeOrProviderOrPubCtorOrCtors = implementationType;
                 Reuse = reuse;
                 Made = made;
                 Setup = setup;
                 _generatedFactoriesOrFactoryGenerator = generatedFactories;
+                Flags = flags;
             }
 
             [MethodImpl((MethodImplOptions)256)]
@@ -12028,8 +12045,9 @@ namespace DryIoc
                 new WithAllDetails(implType, reuse, made, setup, null);
 
             [MethodImpl((MethodImplOptions)256)]
-            internal static ReflectionFactory OfOpenGenericType(Type implType, IReuse reuse, Made made, Setup setup) =>
-                new WithAllDetails(implType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty);
+            internal static ReflectionFactory OfOpenGenericType(Type implType, IReuse reuse, Made made, Setup setup,
+                FactoryFlags flags = default) =>
+                new WithAllDetails(implType, reuse, made, setup, ImHashMap<KV<Type, object>, ReflectionFactory>.Empty, flags);
 
             private WithAllDetails(ReflectionFactory factoryGenerator, Type implementationType, IReuse reuse, Made made, Setup setup) : base()
             {
@@ -12189,7 +12207,7 @@ namespace DryIoc
             /// <inheritdoc />
             public override Factory GetGeneratedFactoryOrDefault(Request request, bool ifErrorReturnDefault = false)
             {
-                var implOrServiceType = request.GetKnownImplementationOrServiceType();
+                var implOrServiceType = ImplementationType;
                 var serviceKey = request.ServiceKey;
                 serviceKey = serviceKey is Registrator.AnyServiceKey anyKey ? anyKey.ResolutionKey : serviceKey ?? DefaultKey.Value;
                 var generatedFactoryKey = KV.Of(implOrServiceType, serviceKey);
@@ -12205,7 +12223,10 @@ namespace DryIoc
                             : resultFactory;
                 }
 
-                resultFactory = new WithAnyKeyGeneratorAndAllDetails(this, implOrServiceType, Reuse, Made, Setup) { Flags = Flags };
+                if (IsFactoryGenerator(implOrServiceType, Made))
+                    resultFactory = WithAllDetails.OfOpenGenericType(implOrServiceType, Reuse, Made, Setup, Flags);
+                else
+                    resultFactory = new WithAnyKeyGeneratorAndAllDetails(this, implOrServiceType, Reuse, Made, Setup) { Flags = Flags };
 
                 var generatedFactoryEntry = ImHashMap.Entry(generatedFactoryKey.GetHashCode(), generatedFactoryKey, resultFactory);
                 resultFactory = Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryEntry, resultFactory,
