@@ -76,8 +76,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 
             var provider = CreateServiceProvider(serviceCollection);
 
-            var s0 = provider.GetService<IOGService<string>>();
-            Assert.Same("*", s0.ToString());
+            Assert.Null(provider.GetService<IOGService<string>>());
 
             for (var i = 0; i < 3; i++)
             {
@@ -92,6 +91,27 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
                 Assert.Same(s3, s4);
                 Assert.Equal(key, s3.ToString());
             }
+        }
+
+        [Fact]
+        public void ResolveKeyedServiceSingletonInstanceWithAnyKey_COPY()
+        {
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddKeyedSingleton<IService, Service>(KeyedService.AnyKey);
+
+            var provider = CreateServiceProvider(serviceCollection);
+
+            Assert.Null(provider.GetService<IService>());
+
+            var serviceKey1 = "some-key";
+            var svc1 = provider.GetKeyedService<IService>(serviceKey1);
+            Assert.NotNull(svc1);
+            Assert.Equal(serviceKey1, svc1.ToString());
+
+            var serviceKey2 = "some-other-key";
+            var svc2 = provider.GetKeyedService<IService>(serviceKey2);
+            Assert.NotNull(svc2);
+            Assert.Equal(serviceKey2, svc2.ToString());
         }
 
         internal interface IService { }

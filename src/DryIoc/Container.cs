@@ -1137,7 +1137,8 @@ namespace DryIoc
             if (entry is Factory defaultFactory &&
                 (rules.DynamicRegistrationProviders == null ||
                 !rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)))
-                return !request.MatchFactoryConditionAndMetadata(details, defaultFactory) ? null
+                return !request.MatchFactoryConditionAndMetadata(details, defaultFactory)
+                    ? null
                     : rules.IsSelectLastRegisteredFactory ? defaultFactory
                     : rules.FactorySelector(request, defaultFactory, null);
 
@@ -1145,12 +1146,16 @@ namespace DryIoc
             KV<object, Factory>[] factories;
             if (entry is Factory singleFactory)
             {
-                factories = new[] { new KV<object, Factory>(DefaultKey.Value, singleFactory) };
+                factories = new[] { new KV<object, Factory>(DefaultKey.Value, singleFactory) }; // todo: @perf avoid packing into array
             }
             else if (entry is FactoriesEntry e)
             {
-                // todo: @perf combine in one method
-                factories = e.Factories.ToArray(static x => KV.Of(x.Key, x.Value)).Match(static x => x.Value != null); // filter out the Unregistered factories
+                if (e.Factories is ImHashMapEntry<object, Factory> singleKeyedFactory)
+                    factories = new[] { KV.Of(singleKeyedFactory.Key, singleKeyedFactory.Value) }; // todo: @perf avoid packing into array
+                else
+                    factories = e.Factories
+                        .ToArray(static x => KV.Of(x.Key, x.Value))
+                        .Match(static x => x.Value != null); // filter out the Unregistered factories
             }
             else
             {
@@ -7830,7 +7835,8 @@ namespace DryIoc
             public readonly object ResolutionKey;
             internal AnyServiceKey(object resolutionKey = null) => ResolutionKey = resolutionKey;
             /// <inheritdoc />
-            public override bool Equals(object obj) => true;
+            public override bool Equals(object obj) =>
+                obj != null && obj is DefaultKey == false && obj is DefaultDynamicKey == false;
             /// <inheritdoc />
             public override int GetHashCode() => -1;
             /// <inheritdoc />

@@ -5523,7 +5523,7 @@ namespace DryIoc.ImTools
         public static S[] ToArray<K, V, S>(this ImHashMap<K, V> map, Func<ImHashMapEntry<K, V>, S> selector) =>
             map == ImHashMap<K, V>.Empty
                 ? ArrayTools.Empty<S>()
-                : map.ForEach(St.Rent(new S[map.Count()], selector), (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
+                : map.ForEach(St.Rent(new S[map.Count()], selector), static (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
 
         /// <summary>Converts the map to an array with the minimum allocations</summary>
         public static VEntry<V>[] ToArray<V>(this ImHashMap<int, V> map) =>
