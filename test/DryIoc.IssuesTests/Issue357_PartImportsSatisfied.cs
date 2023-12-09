@@ -8,8 +8,15 @@ namespace DryIoc.IssuesTests
     /// Issue #357: IPartImportsSatisfiedNotification support fails for interfaces
     /// </summary>
     [TestFixture]
-    public class Issue357_PartImportsSatisfied
+    public class Issue357_PartImportsSatisfied : ITest
     {
+        public int Run()
+        {
+            PartImportsSatisfiedNotification_is_supported_for_classes();
+            PartImportsSatisfiedNotification_is_supported_for_interfaces();
+            return 2;
+        }
+
         private IContainer Container { get; } = CreateContainer();
 
         private static IContainer CreateContainer()

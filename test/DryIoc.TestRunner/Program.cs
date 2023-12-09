@@ -99,6 +99,7 @@ namespace DryIoc.UnitTests
                 new Issue_Value_type_resolution_dependency(),
                 new Issue107_NamedScopesDependingOnResolvedTypes(),
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
+                new Issue357_PartImportsSatisfied(),
                 new Issue404_ConstructorWithResolvableArguments_does_not_take_into_account_parameter_service_key(),
                 new Issue407_Cannot_resolve_MadeOf_params_explicitly(),
                 new Issue416_Adding_always_true_condition_to_decorator_changes_the_decorated_outcome(),
@@ -193,6 +194,7 @@ namespace DryIoc.UnitTests
                 new GHIssue576_Extension_methods_not_being_handled_correctly_in_MadeOf_service_returning_expression(),
                 new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton(),
                 new GHIssue588_Container_IsDisposed_property_not_reflecting_own_scope_disposed_state(),
+                new GHIssue608_Multiple_same_type_same_keyed(),
                 new GHIssue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments(),
             };
             // var docsTests = new Func<int>[] 

@@ -1,4 +1,5 @@
 using System;
+using DryIoc.ImTools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Specification;
 
@@ -112,6 +113,22 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             var svc2 = provider.GetKeyedService<IService>(serviceKey2);
             Assert.NotNull(svc2);
             Assert.Equal(serviceKey2, svc2.ToString());
+        }
+
+        [Fact]
+        public void ResolveKeyedServicesSingletonInstanceWithAnyKey_COPY()
+        {
+            var service1 = new FakeService();
+            var service2 = new FakeService();
+
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>(KeyedService.AnyKey, service1);
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>("some-key", service2);
+
+            var provider = CreateServiceProvider(serviceCollection);
+
+            var services = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>("some-key").ToArrayOrSelf();
+            Assert.Equal(new[] { service1, service2 }, services);
         }
 
         internal interface IService { }
