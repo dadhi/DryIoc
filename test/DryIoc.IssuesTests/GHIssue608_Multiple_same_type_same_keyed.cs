@@ -18,18 +18,18 @@ namespace DryIoc.IssuesTests
         {
            var c = new Container().WithMef();
 
-            c.RegisterExports(new[] { typeof(Consumer), typeof(A), typeof(B) });
+            c.RegisterExports(new[] { typeof(Consumer), typeof(A), typeof(B), typeof(C) });
 
             var consumer = c.Resolve<Consumer>();
             Assert.IsNotNull(consumer);
-            Assert.IsInstanceOf<A>(consumer.Keyed);
+            Assert.AreEqual(2, consumer.Keyed.Length);
         }
 
         [Export]
         public class Consumer
         {
-            public IKeyed Keyed { get; }
-            public Consumer([Import("the key")] IKeyed keyed) => Keyed = keyed;
+            public IKeyed[] Keyed { get; }
+            public Consumer([Import("the key")] IKeyed[] keyed) => Keyed = keyed;
         }
 
         public interface IKeyed {}
@@ -41,6 +41,11 @@ namespace DryIoc.IssuesTests
 
         [Export("the key", typeof(IKeyed))]
         public class B : IKeyed
+        {
+        }
+
+        [Export(typeof(IKeyed))]
+        public class C : IKeyed
         {
         }
     }
