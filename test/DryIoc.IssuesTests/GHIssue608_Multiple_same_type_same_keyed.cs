@@ -23,13 +23,19 @@ namespace DryIoc.IssuesTests
             var consumer = c.Resolve<Consumer>();
             Assert.IsNotNull(consumer);
             Assert.AreEqual(2, consumer.Keyed.Length);
+            Assert.AreEqual(3, consumer.All.Length);
         }
 
         [Export]
         public class Consumer
         {
             public IKeyed[] Keyed { get; }
-            public Consumer([Import("the key")] IKeyed[] keyed) => Keyed = keyed;
+            public IKeyed[] All { get; }
+            public Consumer([Import("the key")] IKeyed[] keyed, IKeyed[] all)
+            {
+                Keyed = keyed;
+                All = all;
+            }
         }
 
         public interface IKeyed {}
