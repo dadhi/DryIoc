@@ -31,6 +31,9 @@ namespace DryIoc.MefAttributedModel
     using System.Reflection;
     using System.Text;
     using System.Threading;
+    using System.Runtime.CompilerServices;
+    using System.Diagnostics;
+
     using DryIocAttributes;
     using DryIoc.ImTools;
     using DryIoc.FastExpressionCompiler.LightExpression;
@@ -169,7 +172,7 @@ namespace DryIoc.MefAttributedModel
                     return null;
             }
             else // todo: @simplify factor this section both here and in the Container into the standalone method
-            {   
+            {
                 // todo: @perf use the GetServiceRegisteredAndDynamicFactories
                 var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true);
                 if (factories.Length == 0)
@@ -346,7 +349,7 @@ namespace DryIoc.MefAttributedModel
         internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey) =>
             source.Match(serviceKey,
                 static (k, x) => x.Key is not DefaultKey && x.Key is not DefaultDynamicKey &&
-                    (k.Equals(x.Key) || x.Key is KV<object, int> multiKey && k.Equals(multiKey.Key)), 
+                    (k.Equals(x.Key) || x.Key is KV<object, int> multiKey && k.Equals(multiKey.Key)),
                 static (k, x) => x.Value);
 
         #endregion
@@ -405,8 +408,10 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Registers factories into registrator/container based on single provided info, which could
         /// contain multiple exported services with single implementation.</summary>
         public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info,
-            Lazy<ServiceKeyStore> serviceKeyStore = null)
+            Lazy<ServiceKeyStore> serviceKeyStore)
         {
+            Throw.ThrowIfNull(serviceKeyStore);
+
             // factory is used for all exports of implementation
             var factory = info.CreateFactory();
 
@@ -419,13 +424,13 @@ namespace DryIoc.MefAttributedModel
                 var serviceKey = export.ServiceKey;
                 if (serviceKey != null)
                 {
-                    var store = serviceKeyStore?.Value ?? ((IResolver)registrator).Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault);
+                    var store = serviceKeyStore.Value;
                     if (store != null)
                         serviceKey = store.EnsureUniqueServiceKey(serviceType, serviceKey);
                 }
 
                 registrator.Register(factory, serviceType, serviceKey, export.IfAlreadyRegistered,
-                    isStaticallyChecked: true); // may be set to true, cause we're reflecting from the compiler checked code
+                    isStaticallyChecked: true); // set to true, because we're reflecting from the compiler checked code
             }
         }
 
@@ -729,23 +734,28 @@ namespace DryIoc.MefAttributedModel
             // required when importing the wrappers
             var unwrappedType = request.Container.GetWrappedType(type, null);
 
+            // todo: @improve @feature today, we are not considering the Names of types (produced by MakeLazy).
             // first filter out non compatible / assignable types
-            if (serviceTypes.Length != 1)
+            if (serviceTypes is Type singleType)
             {
-                serviceTypes = serviceTypes.Match(t => t.Key.IsAssignableTo(unwrappedType));
-                if (serviceTypes.Length > 1)
-                    Throw.It(Error.UnableToSelectFromMultipleTypes, serviceTypes, KV.Of(serviceKey, type));
+                return unwrappedType.IsAssignableFrom(singleType) ? singleType : null;
             }
+            else if (serviceTypes is KV<object, int> singleTypeWithCount)
+            {
+                return singleTypeWithCount.Key is Type t && unwrappedType.IsAssignableFrom(t) ? t : null;
+            }
+            else if (serviceTypes is object[] manyTypes)
+            {
+                Debug.Assert(manyTypes.Length > 2, "we use array only for 2 or more types/pairs with count");
 
-            if (serviceTypes.Length == 1)
-            {
-                var exportedType = serviceTypes[0].Key;
-                if (exportedType.IsAssignableTo(unwrappedType))
-                    return exportedType;
-            }
-            else if (serviceTypes.Length > 1)
-            {
-                Throw.It(Error.MultipleRequiredTypesAreNotSupported, serviceTypes);
+                manyTypes = manyTypes.Match(unwrappedType, static (ut, x) =>
+                    x is Type t && ut.IsAssignableFrom(t) ||
+                    x is KV<object, int> kv && kv.Key is Type kt && ut.IsAssignableFrom(kt));
+
+                if (manyTypes.Length > 1)
+                    Throw.It(Error.UnableToSelectFromMultipleTypes, manyTypes, KV.Of(serviceKey, type));
+
+                return (manyTypes[0] as Type) ?? (((KV<object, int>)manyTypes[0]).Key as Type);
             }
 
             return null;
@@ -820,7 +830,7 @@ namespace DryIoc.MefAttributedModel
         private static TAttribute GetSingleAttributeOrDefault<TAttribute>(Attribute[] attributes) where TAttribute : Attribute
         {
             TAttribute attr = null;
-            for (var i = 0; i < attributes.Length && attr == null; i++)
+            for (var i = 0; i < attributes.Length & attr == null; i++)
                 attr = attributes[i] as TAttribute;
             return attr;
         }
@@ -1109,43 +1119,76 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Enables de-duplication of service key by putting key into the pair with index. </summary>
     public sealed class ServiceKeyStore
     {
-        /// Mapping of ServiceKey/ContractName to { ContractType, count }[]
-        private readonly Ref<ImHashMap<object, KV<Type, int>[]>>
-            _store = Ref.Of(ImHashMap<object, KV<Type, int>[]>.Empty);
+        // Mapping of ServiceKey/ContractName to { ContractType, count of the same ContractTypes per key }[] <summary>
+        // where the Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
+        private ImHashMap<object, object> _store = ImHashMap<object, object>.Empty;
 
         /// <summary>Stores the key with respective type,
-        /// incrementing type count for multiple registrations with same key  and type.</summary>
-        /// <param name="serviceType">Type</param> <param name="serviceKey">Key</param>
-        /// <returns>The key combined with index, if the key has same type more than once,
-        /// otherwise (for single or nu types) returns passed key as-is..</returns>
-        public object EnsureUniqueServiceKey(Type serviceType, object serviceKey)
+        /// incrementing type count for multiple registrations with same key  and type.
+        /// </summary>
+        public object EnsureUniqueServiceKey(object serviceTypeOrName, object serviceKey)
         {
-            _store.Swap(serviceType, (x, t) => x.AddOrUpdate(serviceKey, new[] { KV.Of(t, 1) }, 
-                (sk, types, newTypes) =>
-                {
-                    var newType = newTypes[0].Key;
-                    var typeAndCountIndex = types.IndexOf(newType, (n, t) => t.Key == n);
-                    if (typeAndCountIndex != -1)
+            Ref.Swap(ref _store, serviceTypeOrName, serviceKey,
+                (x, t, k) => x.AddOrUpdate(k, t,
+                    (originalKey, typeOrTypes, newTypeOrName) =>
                     {
-                        var typeAndCount = types[typeAndCountIndex];
+                        if (typeOrTypes is Type || typeOrTypes is string)
+                        {
+                            if (ReferenceEquals(typeOrTypes, newTypeOrName) || Equals(typeOrTypes, newTypeOrName))
+                            {
+                                serviceKey = KV.Of(originalKey, 1);
+                                return KV.Of(typeOrTypes, 2);
+                            }
+                            return new[] { typeOrTypes, newTypeOrName };
+                        }
+                        else if (typeOrTypes is KV<object, int> singleTypeWithCount)
+                        {
+                            var typeOrName = singleTypeWithCount.Key;
+                            if (ReferenceEquals(typeOrName, newTypeOrName) || Equals(typeOrName, newTypeOrName))
+                            {
+                                serviceKey = KV.Of(originalKey, singleTypeWithCount.Value);
+                                return singleTypeWithCount.WithValue(singleTypeWithCount.Value + 1);
+                            }
+                            return new[] { typeOrTypes, newTypeOrName };
+                        }
+                        else
+                        {
+                            var types = (object[])typeOrTypes;
+                            Debug.Assert(types.Length > 2, "we use array only for 2 or more types/pairs with count");
 
-                        // Change the serviceKey only when multiple same types are registered with the same key
-                        serviceKey = KV.Of(serviceKey, typeAndCount.Value);
+                            var foundTypeIndex = types.IndexOf(newTypeOrName, static (nt, t) =>
+                                ReferenceEquals(t, nt) || Equals(t, nt) ||
+                                (t is KV<object, int> kv && (ReferenceEquals(kv.Key, nt) || Equals(kv.Key, nt))));
 
-                        typeAndCount = typeAndCount.WithValue(typeAndCount.Value + 1);
-                        return types.AppendOrUpdate(typeAndCount, typeAndCountIndex);
-                    }
+                            if (foundTypeIndex != -1)
+                            {
+                                var foundTypeOrTypeWithCount = types[foundTypeIndex];
+                                if (foundTypeOrTypeWithCount is Type || foundTypeOrTypeWithCount is string)
+                                {
+                                    serviceKey = KV.Of(originalKey, 1);
+                                    return types.UpdateNonEmpty(KV.Of(foundTypeOrTypeWithCount, 2), foundTypeIndex);
+                                }
+                                else
+                                {
+                                    var foundTypeWithCount = (KV<object, int>)foundTypeOrTypeWithCount;
+                                    var typeCount = foundTypeWithCount.Value;
+                                    serviceKey = KV.Of(originalKey, typeCount);
+                                    return types.UpdateNonEmpty(foundTypeWithCount.WithValue(typeCount + 1), foundTypeIndex);
+                                }
+                            }
 
-                    return types.Append(newTypes);
-                }));
+                            return types.AppendToNonEmpty(newTypeOrName);
+                        }
+                    }));
             return serviceKey;
         }
 
         /// <summary>Retrieves types and their count used with specified <paramref name="serviceKey"/>.</summary>
         /// <param name="serviceKey">Service key to get info.</param>
         /// <returns>Types and their count for the specified key, if key is not stored - returns null.</returns>
-        public KV<Type, int>[] GetServiceTypesOrDefault(object serviceKey) =>
-            _store.Value.GetValueOrDefault(serviceKey);
+        [MethodImpl((MethodImplOptions)256)]
+        public object GetServiceTypesOrDefault(object serviceKey) =>
+            _store.GetValueOrDefault(serviceKey);
     }
 
     /// <summary>Names used by Attributed Model to mark the special exports.</summary>
@@ -1187,10 +1230,7 @@ namespace DryIoc.MefAttributedModel
             UnsupportedReuseWrapperType = Of(
                 "Attributed model does not support reuse wrapper type {0}."),
             UnableToSelectFromMultipleTypes = Of(
-                "Unable to select from multiple exported types {0} for the import {1}"),
-            MultipleRequiredTypesAreNotSupported = Of(
-                "Multiple required types are not supported at the moment: {0}");
-
+                "Unable to select from multiple exported types {0} for the import {1}");
 #pragma warning restore 1591
 
         private static int Of(string message)
@@ -1474,12 +1514,13 @@ namespace DryIoc.MefAttributedModel
         /// <returns>Modifies this, and return this just for fluency.</returns>
         public ExportedRegistrationInfo EnsureUniqueExportServiceKeys(ServiceKeyStore keyStore)
         {
-            for (var i = 0; i < Exports.Length; i++)
+            var exports = Exports;
+            for (var i = 0; i < exports.Length; i++)
             {
-                var e = Exports[i];
+                var e = exports[i];
                 var key = e.ServiceKey;
                 if (key != null)
-                    e.ServiceKey = keyStore.EnsureUniqueServiceKey(e.ServiceType, key);
+                    e.ServiceKey = keyStore.EnsureUniqueServiceKey((object)e.ServiceType ?? e.ServiceTypeFullName, key);
             }
 
             return this;

@@ -9,6 +9,8 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
+            // new Issue486_CustomDynamicRegistrationProvider().Run();
+
             RunAllTests();
 
             // new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules().Run();

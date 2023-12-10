@@ -12235,53 +12235,16 @@ namespace DryIoc
                     resultFactory = new WithAnyKeyGeneratorAndAllDetails(this, implOrServiceType, Reuse, Made, Setup) { Flags = Flags };
 
                 var generatedFactoryEntry = ImHashMap.Entry(generatedFactoryKey.GetHashCode(), generatedFactoryKey, resultFactory);
-                resultFactory = Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryEntry, resultFactory,
+                resultFactory = Ref.Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryEntry, resultFactory,
                     static (map, ne, _) => ((ImHashMap<KV<Type, object>, ReflectionFactory>)map).AddOrGetEntry(ne),
                     static (_, newMap, ne, rf) =>
                         newMap is ImHashMapEntry<KV<Type, object>, ReflectionFactory> existingEntry && existingEntry != ne 
                             ? existingEntry.Value
                             : rf);
 
-                // todo: @wip @remove
-                // Ref.Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryEntry,
-                //     (map, ne) =>
-                //     {
-                //         var newMapOrExistingEntry = ((ImHashMap<KV<Type, object>, ReflectionFactory>)map).AddOrGetEntry(ne);
-                //         if (newMapOrExistingEntry is ImHashMapEntry<KV<Type, object>, ReflectionFactory> existingEntry && existingEntry != ne)
-                //         {
-                //             resultFactory = existingEntry.Value;
-                //             return map;
-                //         }
-                //         return newMapOrExistingEntry;
-                //     });
-
                 return resultFactory != null && resultFactory.GeneratedFactories != null
                     ? resultFactory.GetGeneratedFactoryOrDefault(request)
                     : resultFactory;
-            }
-        }
-
-        delegate R IsUpdated<T, A, R>(T oldValue, T newValue, A a, R result);
-
-        static R Swap<T, A, R>(ref T value, A a, R result,
-            Func<T, A, R, T> update, IsUpdated<T, A, R> getInterrupted) 
-                where T : class
-                where R : class
-        {
-            var spinWait = new SpinWait();
-            var retryCount = 0;
-            while (true)
-            {
-                var oldValue = value;
-                var newValue = update(oldValue, a, result);
-                var existingResult = getInterrupted(oldValue, newValue, a, result);
-                if (existingResult != result)
-                    return existingResult;
-                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
-                    return result;
-                if (++retryCount > Ref.RETRY_COUNT_UNTIL_THROW)
-                    Ref.ThrowRetryCountExceeded(Ref.RETRY_COUNT_UNTIL_THROW);
-                spinWait.SpinOnce();
             }
         }
 

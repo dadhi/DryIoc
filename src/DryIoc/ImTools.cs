@@ -1257,6 +1257,37 @@ namespace DryIoc.ImTools
             }
         }
 
+        /// <summary>Get the interrupted result</summary>
+        public delegate R GetInterrupted<T, A, R>(T oldValue, T newValue, A a, R result);
+
+        /// <summary>
+        /// If interrupted (is checked by the <paramref name="getInterrupted"/> delegate),
+        /// then avoid the swap completely and returns the interrupted result.
+        /// Otherwise, tries to swap with the new value and returns the origina result.
+        /// See the usages to understand the purpose.
+        /// </summary>
+        public static R Swap<T, A, R>(ref T value, A a, R result,
+            Func<T, A, R, T> update, GetInterrupted<T, A, R> getInterrupted) 
+                where T : class
+                where R : class
+        {
+            var spinWait = new SpinWait();
+            var retryCount = 0;
+            while (true)
+            {
+                var oldValue = value;
+                var newValue = update(oldValue, a, result);
+                var existingResult = getInterrupted(oldValue, newValue, a, result);
+                if (existingResult != result)
+                    return existingResult;
+                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                    return result;
+                if (++retryCount > Ref.RETRY_COUNT_UNTIL_THROW)
+                    Ref.ThrowRetryCountExceeded(Ref.RETRY_COUNT_UNTIL_THROW);
+                spinWait.SpinOnce();
+            }
+        }
+
         /// <summary>Swap with the additional state a, b required for the delegate.
         /// Helps to avoid closure creation for the delegate</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -1414,7 +1445,7 @@ namespace DryIoc.ImTools
     /// which is different from System value type <see cref="KeyValuePair{TKey,TValue}"/>.
     /// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
     /// <typeparam name="K">Type of Key.</typeparam><typeparam name="V">Type of Value.</typeparam>
-    public class KV<K, V> : IPrintable
+    public sealed class KV<K, V> : IPrintable
     {
         /// <summary>Key.</summary>
         public readonly K Key;
@@ -1431,14 +1462,68 @@ namespace DryIoc.ImTools
         }
 
         /// <inheritdoc />
-        public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer) =>
-            s.Append("(").To(b => Key == null ? b : printer(b, Key))
-                .Append(", ").To(b => Value == null ? b : printer(b, Value))
-                .Append(')');
+        public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer)
+        {
+            s.Append("(");
+            if (Key != null)
+                s = printer(s, Key);
+            s.Append(", ");
+            if (Value != null)
+                s = printer(s, Value);
+            return s.Append(')');
+        }
 
         /// <summary>Creates nice string view.</summary><returns>String representation.</returns>
         public override string ToString() =>
-            Print(new StringBuilder(), (s, x) => s.Append(x)).ToString();
+            Print(new StringBuilder(), static (s, x) => s.Append(x)).ToString();
+
+        /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
+        public override bool Equals(object obj)
+        {
+            var other = obj as KV<K, V>;
+            return other != null
+                   && (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key))
+                   && (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
+        }
+
+        /// <summary>Combines key and value hash code</summary>
+        public override int GetHashCode() => Hasher.Combine(Key, Value);
+    }
+
+    /// <summary>Immutable Key-Value pair. The value type with the mutable Value comparing to the `KV` type.
+    /// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
+    /// <typeparam name="K">Type of Key.</typeparam><typeparam name="V">Type of Value.</typeparam>
+    public struct KVar<K, V> : IPrintable
+    {
+        /// <summary>Key.</summary>
+        public readonly K Key;
+
+        /// <summary>Value.</summary>
+        public V Value;
+
+        /// <summary>Creates Key-Value object by providing key and value. Does Not check either one for null.</summary>
+        /// <param name="key">key.</param><param name="value">value.</param>
+        public KVar(K key, V value)
+        {
+            Key = key;
+            Value = value;
+        }
+
+        /// <inheritdoc />
+        public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer)
+        {
+            s.Append("(");
+            if (Key != null)
+                s = printer(s, Key);
+            s.Append(", ");
+            if (Value != null)
+                s = printer(s, Value);
+            return s.Append(')');
+        }
+
+        /// <summary>Creates nice string view.</summary><returns>String representation.</returns>
+        public override string ToString() =>
+            Print(new StringBuilder(), static (s, x) => s.Append(x)).ToString();
 
         /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
         public override bool Equals(object obj)
@@ -1457,10 +1542,22 @@ namespace DryIoc.ImTools
     public static class KV
     {
         /// <summary>Creates the key value pair.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static KV<K, V> Of<K, V>(K key, V value) => new KV<K, V>(key, value);
 
         /// <summary>Creates the pair with the new value</summary>
         public static KV<K, V> WithValue<K, V>(this KV<K, V> kv, V value) => new KV<K, V>(kv.Key, value);
+    }
+
+    /// <summary>Helpers for <see cref="KVar{K,V}"/>.</summary>
+    public static class KVar
+    {
+        /// <summary>Creates the key value pair.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static KVar<K, V> Of<K, V>(K key, V value) => new KVar<K, V>(key, value);
+
+        /// <summary>Creates the pair with the new value</summary>
+        public static KVar<K, V> WithValue<K, V>(this KVar<K, V> kv, V value) => new KVar<K, V>(kv.Key, value);
     }
 
     /// Simple helper for creation of the pair of two parts.
