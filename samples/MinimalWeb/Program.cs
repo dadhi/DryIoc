@@ -65,10 +65,10 @@ public class MyDryIocServiceProviderFactory : DryIocServiceProviderFactory
 {
     public MyDryIocServiceProviderFactory(IContainer container) : base(container) {}
 
-    public override IServiceProvider CreateServiceProvider(IContainer container)
+    public override IServiceProvider CreateServiceProvider(DryIocServiceProviderFactory factory)
     {
-        var provider = base.CreateServiceProvider(container);
-        container.Resolve<SingletonAutomaticallyResolved>();
+        var provider = base.CreateServiceProvider(factory);
+        factory.GetContainer().Resolve<SingletonAutomaticallyResolved>();
         return provider;
     }
 }

@@ -576,7 +576,7 @@ namespace DryIoc
 
             var requiredItemType = requiredServiceType ?? serviceType;
             if (serviceKey != null)
-                generatedFactories = generatedFactories.Match(serviceKey, static (sk, x) => sk.Equals(x.ServiceKey));
+                generatedFactories = generatedFactories.Match(serviceKey, static (sk, x) => Registrator.MatchNonNullServiceKey(sk, x.ServiceKey));
             if (requiredServiceType != null)
                 generatedFactories = generatedFactories.Match(requiredServiceType, static (rst, x) => rst == x.RequiredServiceType);
 
@@ -591,7 +591,7 @@ namespace DryIoc
                     WrappersSupport.CollectionWrapperID, FactoryType.Wrapper, null, null, 0, 0);
 
             var unwrappedType = GetWrappedType(requiredItemType, null);
-            if (unwrappedType != null && unwrappedType != typeof(void)) // accounting for the resolved action GH#114
+            if (unwrappedType != null & unwrappedType != typeof(void)) // accounting for the resolved action GH#114
                 requiredItemType = unwrappedType;
 
             var items = GetServiceRegisteredAndDynamicFactories(requiredItemType)
@@ -603,9 +603,10 @@ namespace DryIoc
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
-                openGenericItems = GetAllServiceFactories(requiredItemOpenGenericType).Match(requiredItemOpenGenericType, requiredServiceType,
-                    static (_, __, x) => x.Value != null,
-                    static (gt, t, x) => new ServiceRegistrationInfo(x.Value, t, new OpenGenericTypeKey(gt, x.Key)));
+                openGenericItems = GetAllServiceFactories(requiredItemOpenGenericType)
+                    .Match(requiredItemOpenGenericType, requiredServiceType,
+                        static (_, __, x) => x.Value != null,
+                        static (gt, t, x) => new ServiceRegistrationInfo(x.Value, t, new OpenGenericTypeKey(gt, x.Key)));
             }
 
             // Append registered generic types with compatible variance,
@@ -621,24 +622,24 @@ namespace DryIoc
                     .ToArrayOrSelf();
             }
 
-            if (serviceKey != null) // include only single item matching key.
+            if (serviceKey != null)
             {
-                items = items.Match(serviceKey, static (k, x) => k.Equals(x.OptionalServiceKey));
-                if (openGenericItems != null)
-                    openGenericItems = openGenericItems.Match(serviceKey, static (k, x) => k.Equals(((OpenGenericTypeKey)x.OptionalServiceKey).ServiceKey));
-                if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Match(serviceKey, static (k, x) => k.Equals(x.OptionalServiceKey));
+                items = items.Match(serviceKey, static (k, x) => Registrator.MatchNonNullServiceKey(k, x.OptionalServiceKey));
+                if (openGenericItems != null && openGenericItems.Length != 0)
+                    openGenericItems = openGenericItems.Match(serviceKey, static (k, x) => Registrator.MatchNonNullServiceKey(k, ((OpenGenericTypeKey)x.OptionalServiceKey).ServiceKey));
+                if (variantGenericItems != null && variantGenericItems.Length != 0)
+                    variantGenericItems = variantGenericItems.Match(serviceKey, static (k, x) => Registrator.MatchNonNullServiceKey(k, x.OptionalServiceKey));
             }
 
             var d = preResolveParent.GetServiceDetails();
             var metadataKey = d.MetadataKey;
             var metadata = d.Metadata;
-            if (metadataKey != null || metadata != null)
+            if (metadataKey != null | metadata != null)
             {
                 items = items.Match(metadataKey, metadata, static (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
-                if (openGenericItems != null)
+                if (openGenericItems != null && openGenericItems.Length != 0)
                     openGenericItems = openGenericItems.Match(metadataKey, metadata, static (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
-                if (variantGenericItems != null)
+                if (variantGenericItems != null && variantGenericItems.Length != 0)
                     variantGenericItems = variantGenericItems.Match(metadataKey, metadata, static (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
             }
 
@@ -652,9 +653,10 @@ namespace DryIoc
                 items = items.Match(parent.FactoryID, static (id, x) => x.Factory.FactoryID != id);
                 if (openGenericItems != null)
                     openGenericItems = openGenericItems.Match(parent.FactoryID,
-                        static (id, x) => x.Factory.GeneratedFactories?.ToArray().FindFirst(id, static (i, f) => f.Value.FactoryID == i) == null);
+                        static (pfid, x) => x.Factory.GeneratedFactories?.ToArray().FindFirst(pfid, static (i, f) => f.Value.FactoryID == i) == null);
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Match(parent.FactoryID, static (id, x) => x.Factory.FactoryID != id);
+                    variantGenericItems = variantGenericItems.Match(parent.FactoryID, 
+                        static (pfid, x) => x.Factory.FactoryID != pfid);
             }
 
             var allItems = openGenericItems == null && variantGenericItems == null ? items
@@ -663,9 +665,13 @@ namespace DryIoc
                 : items.Append(openGenericItems).Append(variantGenericItems);
 
             // Resolve in registration order
-            foreach (var item in allItems.OrderBy(x => x.FactoryRegistrationOrder))
+            foreach (var item in allItems.OrderBy(static x => x.FactoryRegistrationOrder))
             {
-                var service = Resolve(serviceType, item.OptionalServiceKey,
+                var itemServiceKey = item.OptionalServiceKey;
+                if (serviceKey != null && itemServiceKey is Registrator.AnyServiceKey)
+                    itemServiceKey = Registrator.AnyKeyOf(serviceKey);
+
+                var service = Resolve(serviceType, itemServiceKey,
                     IfUnresolved.ReturnDefaultIfNotRegistered, item.ServiceType, preResolveParent, args);
                 if (service != null) // skip unresolved items
                     yield return service;
@@ -1018,7 +1024,7 @@ namespace DryIoc
                         else
                         {
                             foreach (var kf in ((FactoriesEntry)e.Value).Factories.Enumerate())
-                                if (kf.Key.Equals(serviceKey) &&
+                                if (kf.Key.Equals(serviceKey) && // todo: @wip take AnyKey into account?
                                     serviceType.IsAssignableVariantGenericTypeFrom(e.Key) &&
                                     request.MatchFactoryConditionAndMetadata(details, kf.Value))
                                 {
@@ -1052,12 +1058,23 @@ namespace DryIoc
                 return null;
 
             // For requested keyed service (which may be a `DefaultKey` or `DefaultDynamicKey`)
-            // just lookup for the key and return whatever the result
+            // just lookup for the key and return whatever the .
+            // Another thing that if there is as two factories, one with exactly matched key and another one with the AnyServiceKey,
+            // it make sense to select the one with the exactly matched key. Moreover, it is allows to deterministically select the
+            // correct factory for the ResolveMany.
             if (serviceKey != null)
             {
+                Factory nonExactMatch = null;
                 foreach (var f in factories)
-                    if (serviceKey.Equals(f.Key) && f.Value.CheckCondition(request))
+                {
+                    if (serviceKey is not Registrator.AnyServiceKey && f.Key is Registrator.AnyServiceKey ||
+                        serviceKey is Registrator.AnyServiceKey && f.Key is not Registrator.AnyServiceKey)
+                        nonExactMatch = f.Value;
+                    else if (serviceKey.Equals(f.Key) && f.Value.CheckCondition(request))
                         return f.Value;
+                }
+                if (nonExactMatch != null && nonExactMatch.CheckCondition(request))
+                    return nonExactMatch;
                 return null;
             }
 
@@ -5251,13 +5268,14 @@ namespace DryIoc
             var requiredItemType = container.GetWrappedType(itemType, details.RequiredServiceType);
 
             var items = container.GetServiceRegisteredAndDynamicFactories(requiredItemType) // todo: @bug check for the unregistered values 
-                .Map(requiredItemType, (t, x) => new ServiceRegistrationInfo(x.Value, t, x.Key));
+                .Map(requiredItemType, static (t, x) => new ServiceRegistrationInfo(x.Value, t, x.Key));
 
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
                 var openGenericItems = container.GetServiceRegisteredAndDynamicFactories(requiredItemOpenGenericType)  // todo: @bug check for the unregistered values
-                    .Map(requiredItemOpenGenericType, requiredItemType, (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new OpenGenericTypeKey(gt, f.Key)));
+                    .Map(requiredItemOpenGenericType, requiredItemType, 
+                        static (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new OpenGenericTypeKey(gt, f.Key)));
                 items = items.Append(openGenericItems);
             }
 
@@ -5266,33 +5284,35 @@ namespace DryIoc
             if (requiredItemType.IsGenericType && rules.VariantGenericTypesInResolvedCollection)
             {
                 var variantGenericItems = container.GetServiceRegistrations().ToArrayOrSelf()
-                    .Match(requiredItemType, (t, x) => t.IsAssignableVariantGenericTypeFrom(x.ServiceType));
+                    .Match(requiredItemType, static (t, x) => t.IsAssignableVariantGenericTypeFrom(x.ServiceType));
                 items = items.Append(variantGenericItems);
             }
 
             // Composite pattern support: filter out composite parent service skip wrappers and decorators
             var parent = request.Parent;
             if (parent.FactoryType != FactoryType.Service)
-                parent = parent.FirstOrDefault(p => p.FactoryType == FactoryType.Service) ?? Request.Empty;
+                parent = parent.FirstOrDefault(static p => p.FactoryType == FactoryType.Service) ?? Request.Empty;
 
             // check fast for the parent of the same type
             if (!parent.IsEmpty && parent.ActualServiceType == requiredItemType)
             {
-                items = items.Match(parent.FactoryID, (pID, x) => x.Factory.FactoryID != pID); // todo: @perf replace the Match with the in-place replacement with the `null` without reallocating the arrays
+                items = items.Match(parent.FactoryID, static (pfid, x) => x.Factory.FactoryID != pfid); // todo: @perf replace the Match with the in-place replacement with the `null` without reallocating the arrays
                 if (requiredItemType.IsGenericType)
                     items = items.Match(parent.FactoryID,
-                        (pID, x) => x.Factory.GeneratedFactories?.Enumerate().FindFirst(f => f.Value.FactoryID == pID) == null);
+                        static (pfid, x) => x.Factory.GeneratedFactories?.Enumerate()
+                            .FindFirst(pfid, static (fid, f) => f.Value.FactoryID == fid) == null);
             }
 
             // Return collection of single matched item if key is specified.
             var serviceKey = details.ServiceKey;
             if (serviceKey != null)
-                items = items.Match(serviceKey, (key, x) => key.Equals(x.OptionalServiceKey));
+                items = items.Match(serviceKey, static (key, x) => 
+                    Registrator.MatchNonNullServiceKey(key, x.OptionalServiceKey));
 
             var metadataKey = details.MetadataKey;
             var metadata = details.Metadata;
             if (metadataKey != null || metadata != null)
-                items = items.Match(metadataKey, metadata, (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
+                items = items.Match(metadataKey, metadata, static (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
 
             if (items.IsNullOrEmpty())
                 return NewArrayInit(itemType, Empty<Expression>());
@@ -7823,7 +7843,7 @@ namespace DryIoc
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
     public static class Registrator
     {
-        // todo: @wip We not supporting the AnyKey outside of the MS.DI, so that's confusing
+        // todo: @wip We are not supporting the AnyKey outside of the MS.DI, so that's confusing
         // todo: @feature We may need the paired DefaultKey to request/filter collections by default key, because AnyKey does not include DefaultKey
         /// <summary>When registered with it, the the service can be resolved any service key provided</summary>
         public static readonly object AnyKey = new AnyServiceKey();
@@ -7843,6 +7863,14 @@ namespace DryIoc
             public override int GetHashCode() => -1;
             /// <inheritdoc />
             public override string ToString() => ResolutionKey == null ? "AnyKey(*)" : $"AnyKey(resolutionKey: {ResolutionKey})";
+        }
+
+        internal static bool MatchNonNullServiceKey(object requestedKey, object registeredKey)
+        {
+            if  (registeredKey == null)
+                return false;
+            return registeredKey is AnyServiceKey && requestedKey is not DefaultKey && requestedKey is not DefaultDynamicKey
+                || requestedKey.Equals(registeredKey);
         }
 
         /// <summary>The base method for registering service with its implementation factory. Allows to specify all possible options.</summary>

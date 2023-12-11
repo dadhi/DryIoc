@@ -8,7 +8,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
     public class GHIssue435_hangfire_use_dryioc_report_ContainerIsDisposed
     {
         protected static IServiceProvider CreateServiceProvider(IServiceCollection services) =>
-            new DryIocServiceProviderFactory().CreateBuilder(services).BuildServiceProvider();
+            new DryIocServiceProviderFactory().CreateBuilder(services).GetServiceProvider();
 
         [Test]
         public void SingletonFactory_Test()

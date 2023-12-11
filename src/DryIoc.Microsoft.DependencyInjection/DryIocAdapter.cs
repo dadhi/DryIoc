@@ -61,11 +61,18 @@ namespace DryIoc.Microsoft.DependencyInjection
     /// in order to access DryIoc diagnostics for controllers, property-injection, etc.
     /// 
     /// </summary>
-    public class DryIocServiceProviderFactory : IServiceProviderFactory<IContainer>
+    public class DryIocServiceProviderFactory : IServiceProviderFactory<DryIocServiceProviderFactory>
     {
-        private readonly IContainer _container;
         private readonly Func<IRegistrator, ServiceDescriptor, bool> _registerDescriptor;
         private readonly RegistrySharing _registrySharing;
+        private IContainer _container;
+        private IServiceProvider _provider;
+
+        /// <summary>Gets the built service provider.</summary>
+        public IServiceProvider GetServiceProvider() => _provider;
+
+        /// <summary>Gets the built container.</summary>
+        public IContainer GetContainer() => _container;
 
         /// <summary>
         /// We won't initialize the container here because it is logically expected to be done in `CreateBuilder`,
@@ -91,17 +98,25 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
 
         /// <inheritdoc />
-        public virtual IContainer CreateBuilder(IServiceCollection services)
+        public virtual DryIocServiceProviderFactory CreateBuilder(IServiceCollection services)
         {
+            // todo: @wip review this stuff and make it more clear, or we can just create the new transietn DryIocProvider every time?
+            IServiceProvider provider;
             if (_container != null)
-                return _container.WithDependencyInjectionAdapter(services, _registerDescriptor, _registrySharing);
-            return new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
-                .WithDependencyInjectionAdapter(services, _registerDescriptor, _registrySharing, skipRulesCheck: true);
+            {
+                _container = _container.WithDependencyInjectionAdapter(out provider, true,
+                    services, _registerDescriptor, _registrySharing);
+                _provider = provider;
+                return this;
+            }
+            _container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
+                .WithDependencyInjectionAdapter(out provider, false, services, _registerDescriptor, _registrySharing);
+            _provider = provider;
+            return this;
         }
 
         /// <inheritdoc />
-        public virtual IServiceProvider CreateServiceProvider(IContainer container) =>
-            container.BuildServiceProvider();
+        public virtual IServiceProvider CreateServiceProvider(DryIocServiceProviderFactory builder) => builder._provider;
     }
 
     /// <summary>Adapts DryIoc container to be used as MS.DI service provider, plus provides the helpers
@@ -163,7 +178,6 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <param name="descriptors">(optional) Specify service descriptors or use <see cref="Populate"/> later.</param>
         /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
         /// <param name="registrySharing">(optional) Use DryIoc <see cref="RegistrySharing"/> capability.</param>
-        /// <param name="skipRulesCheck">(optional) Skip the check if the container already has the MicrosoftDependencyInjectionRules.</param>
         /// <example>
         /// <code><![CDATA[
         /// 
@@ -180,11 +194,17 @@ namespace DryIoc.Microsoft.DependencyInjection
         ///]]></code>
         /// </example>
         /// <remarks>You still need to Dispose adapted container at the end / application shutdown.</remarks>
-        public static IContainer WithDependencyInjectionAdapter(this IContainer container,
+        public static IContainer WithDependencyInjectionAdapter(this IContainer container, // todo: @wip can we return the ServiceProvider instead, because the service provider implemented in the Container is not compatible with the MS.DI, so returning the DryIocServiceProvider and breaking the client will indicate the problem to the user. Moreover the provider has the latest container stored in a field! 
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
-            RegistrySharing registrySharing = RegistrySharing.Share,
-            bool skipRulesCheck = false)
+            RegistrySharing registrySharing = RegistrySharing.Share) =>
+            container.WithDependencyInjectionAdapter(out _, false, descriptors, registerDescriptor, registrySharing);
+
+        internal static IContainer WithDependencyInjectionAdapter(
+            this IContainer container, out IServiceProvider serviceProvider, bool skipRulesCheck,
+            IEnumerable<ServiceDescriptor> descriptors = null,
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
+            RegistrySharing registrySharing = RegistrySharing.Share)
         {
             if (skipRulesCheck)
             {
@@ -203,7 +223,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                     container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
             }
 
-            var serviceProvider = new DryIocServiceProvider(container);
+            serviceProvider = new DryIocServiceProvider(container);
 
             // those are singletons
             var singletons = container.SingletonScope;
@@ -223,7 +243,7 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Sugar to create the DryIoc container and adapter populated with services</summary>
         public static IServiceProvider CreateServiceProvider(this IServiceCollection services) =>
-            new Container(MicrosoftDependencyInjectionRules).WithDependencyInjectionAdapter(services);
+            new DryIocServiceProviderFactory().CreateBuilder(services).GetServiceProvider();
 
         /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
         public static IContainer WithCompositionRoot(this IContainer container, Type compositionRootType)
@@ -237,13 +257,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         public static IContainer WithCompositionRoot<TCompositionRoot>(this IContainer container) =>
             container.WithCompositionRoot(typeof(TCompositionRoot));
 
-        /// <summary>Wraps the container in the service provider implementation.</summary>
-        public static IServiceProvider BuildServiceProvider(this IContainer container) =>
-            new DryIocServiceProvider(container);
-
-        /// <summary>Gets the service provider.</summary>
+        /// <summary>Gets the service provider from the container.</summary>
         public static IServiceProvider GetServiceProvider(this IContainer container) =>
-            container.BuildServiceProvider();
+            container.Resolve<IServiceProvider>(IfUnresolved.ReturnDefault);
 
         /// <summary>Facade to consolidate DryIoc registrations in <typeparamref name="TCompositionRoot"/></summary>
         /// <typeparam name="TCompositionRoot">The class will be created by container on Startup 
@@ -264,7 +280,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// ]]></code>
         /// </example>
         public static IServiceProvider ConfigureServiceProvider<TCompositionRoot>(this IContainer container) =>
-            container.WithCompositionRoot<TCompositionRoot>().BuildServiceProvider();
+            container.WithCompositionRoot<TCompositionRoot>().GetServiceProvider();
 
         /// <summary>Registers service descriptors into container. May be called multiple times with different service collections.</summary>
         /// <param name="container">The container.</param>
@@ -336,7 +352,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                 else if (descriptor.KeyedImplementationFactory != null)
                 {
                     var keyedFunc = descriptor.KeyedImplementationFactory;
-    
+
                     var factoryMethod = FactoryMethod.OfFunc(KeyedImplementationFactoryInvokeMethod, (Func<object, object, object>)keyedFunc.ToFuncWithObjParams);
                     var made = Made.OfFactoryMethodAndParameters(factoryMethod, SelectServiceKeyFor2ndParameterOfKeyedImplementationFactory);
 

@@ -11,8 +11,11 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     public class KeyedServicesTests : KeyedDependencyInjectionSpecificationTests
     {
-        protected override IServiceProvider CreateServiceProvider(IServiceCollection collection) =>
-            new DryIocServiceProviderFactory().CreateBuilder(collection).BuildServiceProvider();
+        private static DryIocServiceProviderFactory CreateFactory(IServiceCollection collection) => 
+            new DryIocServiceProviderFactory().CreateBuilder(collection);
+
+        protected override IServiceProvider CreateServiceProvider(IServiceCollection collection) => 
+            CreateFactory(collection).GetServiceProvider();
 
         [Fact]
         public void ResolveKeyedServiceTransientFactory_COPY()
@@ -128,6 +131,22 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             var provider = CreateServiceProvider(serviceCollection);
 
             var services = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>("some-key").ToArrayOrSelf();
+            Assert.Equal(new[] { service1, service2 }, services);
+        }
+
+        [Fact]
+        public void ResolveKeyedServicesSingletonInstanceWithAnyKey_ResolveMany()
+        {
+            var service1 = new FakeService();
+            var service2 = new FakeService();
+
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>(KeyedService.AnyKey, service1);
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>("some-key", service2);
+
+            var container = CreateFactory(serviceCollection).GetContainer();
+
+            var services = container.ResolveMany<IFakeOpenGenericService<PocoClass>>(serviceKey: "some-key");
             Assert.Equal(new[] { service1, service2 }, services);
         }
 

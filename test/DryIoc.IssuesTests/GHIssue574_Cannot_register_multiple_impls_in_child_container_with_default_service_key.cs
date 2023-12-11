@@ -31,7 +31,7 @@ namespace DryIoc.IssuesTests
             services.AddScoped<IPrinter, NeighborPrinter>();
 
             var spf = new DryIocServiceProviderFactory();
-            var rootContainer = spf.CreateBuilder(new ServiceCollection());
+            var rootContainer = spf.CreateBuilder(new ServiceCollection()).GetContainer();
             var childContainer = rootContainer.CreateChild(RegistrySharing.Share, "child-stamp", IfAlreadyRegistered.AppendNewImplementation);
 
             foreach (var service in services)
@@ -39,7 +39,7 @@ namespace DryIoc.IssuesTests
                 childContainer.RegisterDescriptor(service, IfAlreadyRegistered.AppendNewImplementation, "child-stamp");
             }
 
-            var msContainer = childContainer.BuildServiceProvider();
+            var msContainer = childContainer.GetServiceProvider();
 
             Assert.That(
                 childContainer.Resolve<IEnumerable<IPrinter>>().Count(),
@@ -57,7 +57,7 @@ namespace DryIoc.IssuesTests
                 .WithMef(); // <-- this is the key, LOL ;-)
 
             var spf = new DryIocServiceProviderFactory(container);
-            var rootContainer = spf.CreateBuilder(new ServiceCollection());
+            var rootContainer = spf.CreateBuilder(new ServiceCollection()).GetContainer();
             var childContainer = rootContainer
                 .CreateChild(RegistrySharing.Share, "child-stamp", IfAlreadyRegistered.AppendNewImplementation);
 
@@ -69,7 +69,7 @@ namespace DryIoc.IssuesTests
                 typeof(NeighborPrinter)
             );
 
-            var msContainer = childContainer.BuildServiceProvider();
+            var msContainer = childContainer.GetServiceProvider();
 
             Assert.That(
                 childContainer.Resolve<IEnumerable<IPrinter>>().Count(),

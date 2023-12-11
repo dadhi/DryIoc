@@ -498,6 +498,24 @@ namespace DryIoc.ImTools
         public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate) =>
             source is T[] sourceArr ? sourceArr.FindFirst(predicate) : source.FirstOrDefault(predicate);
 
+        internal static T FirstOrDefault<S, T>(this IEnumerable<T> source, S state, Func<S, T, bool> condition)
+        { 
+            var e = source.GetEnumerator();
+            while (e.MoveNext())
+            {
+                var current = e.Current;
+                if (condition(state, current))
+                    return current;
+            }
+            return default;
+        }
+
+        /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
+        public static T FindFirst<T, S>(this IEnumerable<T> source, S state, Func<S, T, bool> predicate) =>
+            source is T[] sourceArr 
+                ? sourceArr.FindFirst(state, predicate) 
+                : source.FirstOrDefault(state, predicate);
+
         /// <summary>Returns element if collection consist on single element, otherwise returns default value.
         /// It does not throw for collection with many elements</summary>
         public static T SingleOrDefaultIfMany<T>(this IEnumerable<T> source)
@@ -1032,15 +1050,14 @@ namespace DryIoc.ImTools
         public static IEnumerable<T> Match<S, T>(this IEnumerable<T> source, S s, Func<S, T, bool> condition) =>
             source is T[] arr ? arr.Match(s, condition) : source == null ? null : Where(source, s, condition);
 
-        // todo: @wip benchmark it
         /// <summary>Calls Where on the Enumerator avoiding the closure over `S`.</summary>
-        public static IEnumerable<T> Where<S, T>(this IEnumerable<T> source, S s, Func<S, T, bool> condition)
+        public static IEnumerable<T> Where<S, T>(this IEnumerable<T> source, S state, Func<S, T, bool> condition)
         { 
             var e = source.GetEnumerator();
             while (e.MoveNext())
             {
                 var current = e.Current;
-                if (condition(s, current))
+                if (condition(state, current))
                     yield return current;
             }
         }
@@ -5615,7 +5632,7 @@ namespace DryIoc.ImTools
         public static S[] ToArray<V, S>(this ImHashMap<int, V> map, Func<VEntry<V>, S> selector) =>
             map == ImHashMap<int, V>.Empty ? ArrayTools.Empty<S>() :
                 map.ForEach(St.Rent(new S[map.Count()], selector), (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
-
+        // todo: @perf accept the check for the selector result
         /// <summary>Converts the map to an array with the minimum allocations</summary>
         public static S[] ToArray<K, V, S>(this ImHashMap<K, V> map, Func<ImHashMapEntry<K, V>, S> selector) =>
             map == ImHashMap<K, V>.Empty

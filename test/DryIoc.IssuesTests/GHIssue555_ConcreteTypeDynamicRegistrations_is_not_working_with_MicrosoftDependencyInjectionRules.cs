@@ -22,8 +22,8 @@ namespace DryIoc.IssuesTests
 
             var container = new Container(rules);
 
-            var msDi = new DryIocServiceProviderFactory(container, RegistrySharing.Share);
-            var msDiContainer = msDi.CreateBuilder(new ServiceCollection());
+            var factory = new DryIocServiceProviderFactory(container, RegistrySharing.Share);
+            var msDiContainer = factory.CreateBuilder(new ServiceCollection()).GetContainer();
             Assert.AreSame(container, msDiContainer);
         }
 
