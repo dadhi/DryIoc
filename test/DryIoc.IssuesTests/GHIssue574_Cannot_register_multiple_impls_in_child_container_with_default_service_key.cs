@@ -31,7 +31,7 @@ namespace DryIoc.IssuesTests
             services.AddScoped<IPrinter, NeighborPrinter>();
 
             var spf = new DryIocServiceProviderFactory();
-            var rootContainer = spf.CreateBuilder(new ServiceCollection()).GetContainer();
+            var rootContainer = spf.CreateBuilder(new ServiceCollection()).Container;
             var childContainer = rootContainer.CreateChild(RegistrySharing.Share, "child-stamp", IfAlreadyRegistered.AppendNewImplementation);
 
             foreach (var service in services)
@@ -57,7 +57,7 @@ namespace DryIoc.IssuesTests
                 .WithMef(); // <-- this is the key, LOL ;-)
 
             var spf = new DryIocServiceProviderFactory(container);
-            var rootContainer = spf.CreateBuilder(new ServiceCollection()).GetContainer();
+            var rootContainer = spf.CreateBuilder(new ServiceCollection()).Container;
             var childContainer = rootContainer
                 .CreateChild(RegistrySharing.Share, "child-stamp", IfAlreadyRegistered.AppendNewImplementation);
 

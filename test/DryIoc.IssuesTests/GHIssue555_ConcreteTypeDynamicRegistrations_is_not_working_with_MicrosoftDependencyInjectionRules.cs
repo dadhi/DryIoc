@@ -23,7 +23,7 @@ namespace DryIoc.IssuesTests
             var container = new Container(rules);
 
             var factory = new DryIocServiceProviderFactory(container, RegistrySharing.Share);
-            var msDiContainer = factory.CreateBuilder(new ServiceCollection()).GetContainer();
+            var msDiContainer = factory.CreateBuilder(new ServiceCollection()).Container;
             Assert.AreSame(container, msDiContainer);
         }
 

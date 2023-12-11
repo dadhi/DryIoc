@@ -15,7 +15,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
     public class ServicesTests : DependencyInjectionSpecificationTests
     {
         protected override IServiceProvider CreateServiceProvider(IServiceCollection services) =>
-            new DryIocServiceProviderFactory().CreateBuilder(services).GetServiceProvider();
+            new DryIocServiceProviderFactory().CreateBuilder(services);
 
         internal class TestServiceCollection : List<ServiceDescriptor>, IServiceCollection
         {

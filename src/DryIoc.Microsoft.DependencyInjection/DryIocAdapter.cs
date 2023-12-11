@@ -61,18 +61,11 @@ namespace DryIoc.Microsoft.DependencyInjection
     /// in order to access DryIoc diagnostics for controllers, property-injection, etc.
     /// 
     /// </summary>
-    public class DryIocServiceProviderFactory : IServiceProviderFactory<DryIocServiceProviderFactory>
+    public class DryIocServiceProviderFactory : IServiceProviderFactory<DryIocServiceProvider>
     {
         private readonly Func<IRegistrator, ServiceDescriptor, bool> _registerDescriptor;
         private readonly RegistrySharing _registrySharing;
         private IContainer _container;
-        private IServiceProvider _provider;
-
-        /// <summary>Gets the built service provider.</summary>
-        public IServiceProvider GetServiceProvider() => _provider;
-
-        /// <summary>Gets the built container.</summary>
-        public IContainer GetContainer() => _container;
 
         /// <summary>
         /// We won't initialize the container here because it is logically expected to be done in `CreateBuilder`,
@@ -85,7 +78,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         { }
 
         /// <summary>
-        /// `container` is the existing container which will be cloned with the MS.DI rules and its cache will be dropped,
+        /// `container` is the existing container which might be cloned with the MS.DI rules and its cache will be dropped,
         /// unless the `registrySharing` is set to the `RegistrySharing.Share` or to `RegistrySharing.CloneButKeepCache`.
         /// `registerDescriptor` is the custom service descriptor handler.
         /// </summary>
@@ -98,25 +91,16 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
 
         /// <inheritdoc />
-        public virtual DryIocServiceProviderFactory CreateBuilder(IServiceCollection services)
+        public virtual DryIocServiceProvider CreateBuilder(IServiceCollection services)
         {
-            // todo: @wip review this stuff and make it more clear, or we can just create the new transietn DryIocProvider every time?
-            IServiceProvider provider;
-            if (_container != null)
-            {
-                _container = _container.WithDependencyInjectionAdapter(out provider, true,
-                    services, _registerDescriptor, _registrySharing);
-                _provider = provider;
-                return this;
-            }
-            _container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
-                .WithDependencyInjectionAdapter(out provider, false, services, _registerDescriptor, _registrySharing);
-            _provider = provider;
-            return this;
+            var skipRulesCheck = _container == null;
+            var c = _container ?? new Container(DryIocAdapter.MicrosoftDependencyInjectionRules);
+            _container = c.WithDependencyInjectionAdapter(out var provider, skipRulesCheck, services, _registerDescriptor, _registrySharing);
+            return provider;
         }
 
         /// <inheritdoc />
-        public virtual IServiceProvider CreateServiceProvider(DryIocServiceProviderFactory builder) => builder._provider;
+        public virtual IServiceProvider CreateServiceProvider(DryIocServiceProvider provider) => provider;
     }
 
     /// <summary>Adapts DryIoc container to be used as MS.DI service provider, plus provides the helpers
@@ -201,7 +185,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             container.WithDependencyInjectionAdapter(out _, false, descriptors, registerDescriptor, registrySharing);
 
         internal static IContainer WithDependencyInjectionAdapter(
-            this IContainer container, out IServiceProvider serviceProvider, bool skipRulesCheck,
+            this IContainer container, out DryIocServiceProvider serviceProvider, bool skipRulesCheck,
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
             RegistrySharing registrySharing = RegistrySharing.Share)
@@ -243,7 +227,7 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Sugar to create the DryIoc container and adapter populated with services</summary>
         public static IServiceProvider CreateServiceProvider(this IServiceCollection services) =>
-            new DryIocServiceProviderFactory().CreateBuilder(services).GetServiceProvider();
+            new DryIocServiceProviderFactory().CreateBuilder(services);
 
         /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
         public static IContainer WithCompositionRoot(this IContainer container, Type compositionRootType)
