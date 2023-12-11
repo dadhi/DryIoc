@@ -7823,6 +7823,8 @@ namespace DryIoc
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
     public static class Registrator
     {
+        // todo: @wip We not supporting the AnyKey outside of the MS.DI, so that's confusing
+        // todo: @feature We may need the paired DefaultKey to request/filter collections by default key, because AnyKey does not include DefaultKey
         /// <summary>When registered with it, the the service can be resolved any service key provided</summary>
         public static readonly object AnyKey = new AnyServiceKey();
         /// <summary>Wrap the resolution key</summary>

@@ -334,6 +334,7 @@ namespace DryIoc.MefAttributedModel
             container.Use(new ServiceKeyStore());
 
             var filterCollectionByMultiKey = Made.Of(
+                // todo: @perf use UnsafeAccessAttribute for NET8_0
                 typeof(AttributedModel).SingleMethod(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
                 parameters: Parameters.Of.Type(static r => r.ServiceKey));
 
@@ -1119,8 +1120,8 @@ namespace DryIoc.MefAttributedModel
     /// <summary>Enables de-duplication of service key by putting key into the pair with index. </summary>
     public sealed class ServiceKeyStore
     {
-        // Mapping of ServiceKey/ContractName to { ContractType, count of the same ContractTypes per key }[] <summary>
-        // where the Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
+        // Mapping of ContractName (ServiceKey) to the pair of { ContractType, count of the same ContractTypes per key }[]
+        // The actual Map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
         private ImHashMap<object, object> _store = ImHashMap<object, object>.Empty;
 
         /// <summary>Stores the key with respective type,
