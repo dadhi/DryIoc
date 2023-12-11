@@ -65,7 +65,7 @@ namespace DryIoc.Microsoft.DependencyInjection
     {
         private readonly Func<IRegistrator, ServiceDescriptor, bool> _registerDescriptor;
         private readonly RegistrySharing _registrySharing;
-        private IContainer _container;
+        private readonly IContainer _initialContainer;
 
         /// <summary>
         /// We won't initialize the container here because it is logically expected to be done in `CreateBuilder`,
@@ -85,7 +85,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         public DryIocServiceProviderFactory(IContainer container, RegistrySharing registrySharing,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
-            _container = container;
+            _initialContainer = container;
             _registrySharing = registrySharing;
             _registerDescriptor = registerDescriptor;
         }
@@ -93,10 +93,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <inheritdoc />
         public virtual DryIocServiceProvider CreateBuilder(IServiceCollection services)
         {
-            var skipRulesCheck = _container == null;
-            var c = _container ?? new Container(DryIocAdapter.MicrosoftDependencyInjectionRules);
-            _container = c.WithDependencyInjectionAdapter(out var provider, skipRulesCheck, services, _registerDescriptor, _registrySharing);
-            return provider;
+            var skipRulesCheck = _initialContainer == null;
+            var c = _initialContainer ?? new Container(DryIocAdapter.MicrosoftDependencyInjectionRules);
+            return c.WithDependencyInjectionAdapter(skipRulesCheck, services, _registerDescriptor, _registrySharing);
         }
 
         /// <inheritdoc />
@@ -182,10 +181,10 @@ namespace DryIoc.Microsoft.DependencyInjection
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
             RegistrySharing registrySharing = RegistrySharing.Share) =>
-            container.WithDependencyInjectionAdapter(out _, false, descriptors, registerDescriptor, registrySharing);
+            container.WithDependencyInjectionAdapter(false, descriptors, registerDescriptor, registrySharing).Container;
 
-        internal static IContainer WithDependencyInjectionAdapter(
-            this IContainer container, out DryIocServiceProvider serviceProvider, bool skipRulesCheck,
+        internal static DryIocServiceProvider WithDependencyInjectionAdapter(
+            this IContainer container, bool skipRulesCheck,
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
             RegistrySharing registrySharing = RegistrySharing.Share)
@@ -207,7 +206,7 @@ namespace DryIoc.Microsoft.DependencyInjection
                     container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
             }
 
-            serviceProvider = new DryIocServiceProvider(container);
+            var serviceProvider = new DryIocServiceProvider(container);
 
             // those are singletons
             var singletons = container.SingletonScope;
@@ -222,7 +221,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             if (descriptors != null)
                 container.Populate(descriptors, registerDescriptor);
 
-            return container;
+            return serviceProvider;
         }
 
         /// <summary>Sugar to create the DryIoc container and adapter populated with services</summary>
