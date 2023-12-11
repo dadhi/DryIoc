@@ -170,7 +170,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         ///     container.Register<IMyService, MyService>(Reuse.Scoped)
         /// 
         ///     // applies the MS.DI rules and registers the infrastructure helpers and service collection to the container
-        ///     var adaptedContainer = container.WithDependencyInjectionAdapter(services); 
+        ///     var adaptedContainer = container.WithDependencyInjectionAdapter(services);
         ///
         ///     var serviceProvider = adaptedContainer.GetServiceProvider();
         ///
@@ -240,7 +240,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         public static IContainer WithCompositionRoot<TCompositionRoot>(this IContainer container) =>
             container.WithCompositionRoot(typeof(TCompositionRoot));
 
-        /// <summary>Gets the service provider from the container.</summary>
+        /// <summary>The method resolves the provider from the container.</summary>
         public static IServiceProvider GetServiceProvider(this IContainer container) =>
             container.Resolve<IServiceProvider>(IfUnresolved.ReturnDefault);
 
