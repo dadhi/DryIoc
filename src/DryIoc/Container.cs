@@ -2688,8 +2688,9 @@ namespace DryIoc
                                     : false;
 
                             var factories = ((FactoriesEntry)entry).Factories;
-                            if (serviceKey == null) // todo: @perf @memory avoid lambda allocations
-                                return condition == null || factories.Enumerate().FirstOrDefault(f => condition(f.Value)) != null; // todo: @perf optimize allocations and speedup as it is used by MS.DI now
+                            if (serviceKey == null)
+                                return condition == null ||
+                                    factories.Enumerate().FirstOrDefault(condition, static (cond, f) => cond(f.Value)) != null;
 
                             factory = factories.GetValueOrDefault(serviceKey);
                             return factory != null && (condition == null || condition(factory));
@@ -4313,13 +4314,19 @@ namespace DryIoc
         /// <summary>Add support for using the same service key for the multiple possibly the same service types.</summary>
         public static IContainer WithMultipleSameServiceKeyForTheServiceType<C>(this C container) where C : IContainer
         {
+            // don't apply the rule if it is already applied
+            if ((container.Rules._settings & Rules.Settings.MultipleSameServiceKeyForTheServiceType) != 0)
+                return container;
+
+            var newRules = container.Rules.Clone();
+            newRules._settings |= Rules.Settings.MultipleSameServiceKeyForTheServiceType;
+
             // Use the index storage to register and convert non-unique keys into the unique ones: ServiceKey to ServiceTypes with their registration count
             container.Use(new ServiceKeyToTypeIndex());
 
-            var filterCollectionByMultiKey = Made.Of(
-                // todo: @perf use UnsafeAccessAttribute for NET8_0
-                typeof(ContainerTools).GetMethod(nameof(FilterCollectionByMultiKey), BindingFlags.Static | BindingFlags.NonPublic),
-                parameters: Parameters.Of.Type(static r => r.ServiceKey));
+            // todo: @perf use UnsafeAccessAttribute for NET8_0
+            var filterCollectionByMultiKeyMethod = typeof(ContainerTools).GetMethod(nameof(FilterCollectionByMultiKey), BindingFlags.Static | BindingFlags.NonPublic);
+            var filterCollectionByMultiKey = Made.Of(filterCollectionByMultiKeyMethod, parameters: Parameters.Of.Type(static r => r.ServiceKey));
 
             // Decorator to filter the services in a presence of multiple same keys. 
             // The decorator will be used ONLY when collection is requested with the non-null service key, 
@@ -6743,7 +6750,7 @@ namespace DryIoc
         internal Made _made;
 
         [Flags]
-        private enum Settings
+        internal enum Settings
         {
             Empty = 0,
             ThrowIfDependencyHasShorterReuseLifespan = 1 << 1,
@@ -6771,9 +6778,10 @@ namespace DryIoc
             ThrowIfScopedOrSingletonHasTransientDependency = 1 << 23,
             VariantGenericTypesInResolve = 1 << 24,
             GenerateResolutionCallForMissingDependency = 1 << 25,
+            MultipleSameServiceKeyForTheServiceType = 1 << 26,
         }
 
-        private const Settings DEFAULT_SETTINGS
+        internal const Settings DEFAULT_SETTINGS
             = Settings.ThrowIfDependencyHasShorterReuseLifespan
             | Settings.ThrowOnRegisteringDisposableTransient
             | Settings.ImplicitCheckForReuseMatchingScope
@@ -6781,7 +6789,7 @@ namespace DryIoc
             | Settings.EagerCachingSingletonForFasterAccess
             | Settings.UseInterpretationForTheFirstResolution;
 
-        private Settings _settings;
+        internal Settings _settings;
 
         #endregion
     }

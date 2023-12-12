@@ -498,7 +498,9 @@ namespace DryIoc.ImTools
         public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate) =>
             source is T[] sourceArr ? sourceArr.FindFirst(predicate) : source.FirstOrDefault(predicate);
 
-        internal static T FirstOrDefault<S, T>(this IEnumerable<T> source, S state, Func<S, T, bool> condition)
+        /// <summary>Returns first item matching the <paramref name="condition"/>,
+        /// given the <paramref name="state"/> without putting the state into the closure and allocating the unnecessary memory.</summary>
+        public static T FirstOrDefault<S, T>(this IEnumerable<T> source, S state, Func<S, T, bool> condition)
         { 
             var e = source.GetEnumerator();
             while (e.MoveNext())

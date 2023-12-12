@@ -480,6 +480,9 @@ namespace DryIoc.Microsoft.DependencyInjection
             if (serviceType.IsGenericTypeDefinition)
                 return false;
 
+            if (serviceKey == KeyedService.AnyKey)
+                serviceKey = Registrator.AnyKey;
+
             if (Container.IsRegistered(serviceType, serviceKey))
                 return true;
 
