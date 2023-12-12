@@ -325,39 +325,10 @@ namespace DryIoc.MefAttributedModel
 
         #endregion
 
-        /// <summary>Add support for using the same contract name for the same multiple exported types.</summary>
-        public static IContainer WithMultipleSameServiceKeyForTheServiceType(this IContainer container)
-        {
-            // map to convert the non-unique keys into an unique ones: ContractName/Key -> { ContractType, count }[]
-            container.Use(new ServiceKeyToTypeIndex());
-
-            var filterCollectionByMultiKey = Made.Of(
-                // todo: @perf use UnsafeAccessAttribute for NET8_0
-                typeof(AttributedModel).GetMethod(nameof(FilterCollectionByMultiKey), BindingFlags.Static | BindingFlags.NonPublic),
-                parameters: Parameters.Of.Type(static r => r.ServiceKey));
-
-            // Decorator to filter the services in a presence of multiple same keys. 
-            // The decorator will be used ONLY when collection is requested with the non-null service key, 
-            // and won't be applied or hinder performance otherwise, though DryIoc is still be checking the condition for non-null service key when resolving.
-            // note: it is explicitly set to Transient to produce new results for new filtered collection,
-            // otherwise it may be set to Singleton by container wide rules and always produce the results for the first resolved collection
-            container.Register(typeof(IEnumerable<>), Reuse.Transient, filterCollectionByMultiKey,
-                Setup.DecoratorWith(condition: static r => r.ServiceKey != null));
-
-            return container;
-        }
-
-        internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey) =>
-            source.Match(serviceKey,
-                static (k, x) => x.Key is not DefaultKey && x.Key is not DefaultDynamicKey &&
-                    (k.Equals(x.Key) || x.Key is KV<object, int> multiKey && k.Equals(multiKey.Key)),
-                static (k, x) => x.Value);
-
-
         /// <summary>Registers implementation type(s) with provided registrator/container.
         /// Expects the implementation type with the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> types) =>
-            registrator.RegisterExports(types.ThrowIfNull().SelectMany(t => GetExportedRegistrations(t)));
+            registrator.RegisterExports(types.ThrowIfNull().SelectMany(GetExportedRegistrations));
 
         /// <summary>Registers implementation type(s) with provided registrator/container.
         /// Expects the implementation type with or without the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>

@@ -655,7 +655,7 @@ namespace DryIoc
                     openGenericItems = openGenericItems.Match(parent.FactoryID,
                         static (pfid, x) => x.Factory.GeneratedFactories?.ToArray().FindFirst(pfid, static (i, f) => f.Value.FactoryID == i) == null);
                 if (variantGenericItems != null)
-                    variantGenericItems = variantGenericItems.Match(parent.FactoryID, 
+                    variantGenericItems = variantGenericItems.Match(parent.FactoryID,
                         static (pfid, x) => x.Factory.FactoryID != pfid);
             }
 
@@ -4310,6 +4310,34 @@ namespace DryIoc
             ifUnresolved == IfUnresolved.ReturnDefault ? IfUnresolvedThrowConstant :
             IfUnresolvedReturnDefaultIfNotRegisteredConstant;
 
+        /// <summary>Add support for using the same service key for the multiple possibly the same service types.</summary>
+        public static IContainer WithMultipleSameServiceKeyForTheServiceType<C>(this C container) where C : IContainer
+        {
+            // Use the index storage to register and convert non-unique keys into the unique ones: ServiceKey to ServiceTypes with their registration count
+            container.Use(new ServiceKeyToTypeIndex());
+
+            var filterCollectionByMultiKey = Made.Of(
+                // todo: @perf use UnsafeAccessAttribute for NET8_0
+                typeof(ContainerTools).GetMethod(nameof(FilterCollectionByMultiKey), BindingFlags.Static | BindingFlags.NonPublic),
+                parameters: Parameters.Of.Type(static r => r.ServiceKey));
+
+            // Decorator to filter the services in a presence of multiple same keys. 
+            // The decorator will be used ONLY when collection is requested with the non-null service key, 
+            // and won't be applied or hinder performance otherwise, though DryIoc is still be checking the condition for non-null service key when resolving.
+            // note: it is explicitly set to Transient to produce new results for new filtered collection,
+            // otherwise it may be set to Singleton by container wide rules and always produce the results for the first resolved collection
+            container.Register(typeof(IEnumerable<>), Reuse.Transient, filterCollectionByMultiKey,
+                Setup.DecoratorWith(condition: static r => r.ServiceKey != null));
+
+            return container;
+        }
+
+        internal static IEnumerable<T> FilterCollectionByMultiKey<T>(IEnumerable<KeyValuePair<object, T>> source, object serviceKey) =>
+            source.Match(serviceKey,
+                static (k, x) => x.Key is not DefaultKey && x.Key is not DefaultDynamicKey &&
+                    (k.Equals(x.Key) || x.Key is KV<object, int> multiKey && k.Equals(multiKey.Key)),
+                static (k, x) => x.Value);
+
         /// <summary>Creates new container from the current one by specifying the listed parameters.
         /// If the null or default values are provided then the default or new values will be applied.
         /// Nothing will be inherited from the current container. If you want to inherit something you need to provide it as parameter.</summary>
@@ -5274,7 +5302,7 @@ namespace DryIoc
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
                 var openGenericItems = container.GetServiceRegisteredAndDynamicFactories(requiredItemOpenGenericType)  // todo: @bug check for the unregistered values
-                    .Map(requiredItemOpenGenericType, requiredItemType, 
+                    .Map(requiredItemOpenGenericType, requiredItemType,
                         static (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new OpenGenericTypeKey(gt, f.Key)));
                 items = items.Append(openGenericItems);
             }
@@ -5306,7 +5334,7 @@ namespace DryIoc
             // Return collection of single matched item if key is specified.
             var serviceKey = details.ServiceKey;
             if (serviceKey != null)
-                items = items.Match(serviceKey, static (key, x) => 
+                items = items.Match(serviceKey, static (key, x) =>
                     Registrator.MatchNonNullServiceKey(key, x.OptionalServiceKey));
 
             var metadataKey = details.MetadataKey;
@@ -5707,8 +5735,8 @@ namespace DryIoc
     /// <summary>Enables de-duplication of service key by putting key into the pair with index of its paire service type.</summary>
     public sealed class ServiceKeyToTypeIndex
     {
-        // Mapping of ContractName (ServiceKey) to the pair of { ContractType, count of the same ContractTypes per key }[]
-        // The actual Map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
+        // Logically, it is a mapping of ServiceKey to the List of pairs of { ServiceType, Count of the ServiceType registration with this key }
+        // Practically, it is the map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
         private ImHashMap<object, object> _index = ImHashMap<object, object>.Empty;
 
         /// <summary>Stores the key with respective type,
@@ -7219,7 +7247,7 @@ namespace DryIoc
                     {
                         if (paramServiceInfo == null)
                             paramRequest = request.Push(param);
-                        else 
+                        else
                         {
                             paramRequest = request.Push(paramServiceInfo);
                             paramDetails = paramServiceInfo.Details;
@@ -7941,7 +7969,7 @@ namespace DryIoc
 
         internal static bool MatchNonNullServiceKey(object requestedKey, object registeredKey)
         {
-            if  (registeredKey == null)
+            if (registeredKey == null)
                 return false;
             return registeredKey is AnyServiceKey && requestedKey is not DefaultKey && requestedKey is not DefaultDynamicKey
                 || requestedKey.Equals(registeredKey);
@@ -9731,7 +9759,7 @@ namespace DryIoc
 
         /// <summary>Represents the failing selector without the fallback, 
         /// in order to skip all further attempts to resolve the parameter, e.g. parameter is marked with attribute which does not match the correst resolution request</summary>
-        public static readonly ParameterServiceInfo DefinitelyUnresolvedParameter = 
+        public static readonly ParameterServiceInfo DefinitelyUnresolvedParameter =
             new ParameterServiceInfo(null);
 
         /// <summary>Creates info from service type and details.</summary>
@@ -11990,7 +12018,7 @@ namespace DryIoc
             }
             else if (factoryMethodResultType != null & factoryMethodResultType != implType)
             {
-                if (!implType.IsAssignableFrom(factoryMethodResultType) && 
+                if (!implType.IsAssignableFrom(factoryMethodResultType) &&
                     !factoryMethodResultType.HasConversionOperatorTo(implType))
                     Throw.It(Error.RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType, implType, factoryMethodResultType);
             }
@@ -12342,7 +12370,7 @@ namespace DryIoc
                 resultFactory = Ref.Swap(ref _generatedFactoriesOrFactoryGenerator, generatedFactoryEntry, resultFactory,
                     static (map, ne, _) => ((ImHashMap<KV<Type, object>, ReflectionFactory>)map).AddOrGetEntry(ne),
                     static (_, newMap, ne, rf) =>
-                        newMap is ImHashMapEntry<KV<Type, object>, ReflectionFactory> existingEntry && existingEntry != ne 
+                        newMap is ImHashMapEntry<KV<Type, object>, ReflectionFactory> existingEntry && existingEntry != ne
                             ? existingEntry.Value
                             : rf);
 
@@ -12520,7 +12548,7 @@ namespace DryIoc
                 {
                     if (paramServiceInfo == null)
                         paramRequest = request.Push(param);
-                    else 
+                    else
                     {
                         paramRequest = request.Push(paramServiceInfo);
                         paramDetails = paramServiceInfo.Details;
