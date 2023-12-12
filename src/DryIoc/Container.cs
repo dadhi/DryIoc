@@ -662,7 +662,7 @@ namespace DryIoc
             var allItems = openGenericItems == null && variantGenericItems == null ? items
                 : variantGenericItems == null ? items.Append(openGenericItems)
                 : openGenericItems == null ? items.Append(variantGenericItems)
-                : items.Append(openGenericItems).Append(variantGenericItems);
+                : items.Append(openGenericItems).Append(variantGenericItems); // todo: @perf combine into one append
 
             // Resolve in registration order
             foreach (var item in allItems.OrderBy(static x => x.FactoryRegistrationOrder))
