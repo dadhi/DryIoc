@@ -5704,6 +5704,80 @@ namespace DryIoc
         DecoratorOfAnyTypeViaObjectServiceType = 1 << 3,
     }
 
+    /// <summary>Enables de-duplication of service key by putting key into the pair with index of its paire service type.</summary>
+    public sealed class ServiceKeyToTypeIndex
+    {
+        // Mapping of ContractName (ServiceKey) to the pair of { ContractType, count of the same ContractTypes per key }[]
+        // The actual Map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
+        private ImHashMap<object, object> _index = ImHashMap<object, object>.Empty;
+
+        /// <summary>Stores the key with respective type,
+        /// incrementing type count for multiple registrations with same key  and type.</summary>
+        public object EnsureUniqueServiceKey(object serviceTypeOrName, object serviceKey)
+        {
+            Ref.Swap(ref _index, serviceTypeOrName, serviceKey,
+                (x, t, k) => x.AddOrUpdate(k, t,
+                    (originalKey, typeOrTypes, newTypeOrName) =>
+                    {
+                        if (typeOrTypes is Type || typeOrTypes is string)
+                        {
+                            if (ReferenceEquals(typeOrTypes, newTypeOrName) || Equals(typeOrTypes, newTypeOrName))
+                            {
+                                serviceKey = KV.Of(originalKey, 1);
+                                return KV.Of(typeOrTypes, 2);
+                            }
+                            return new[] { typeOrTypes, newTypeOrName };
+                        }
+                        else if (typeOrTypes is KV<object, int> singleTypeWithCount)
+                        {
+                            var typeOrName = singleTypeWithCount.Key;
+                            if (ReferenceEquals(typeOrName, newTypeOrName) || Equals(typeOrName, newTypeOrName))
+                            {
+                                serviceKey = KV.Of(originalKey, singleTypeWithCount.Value);
+                                return singleTypeWithCount.WithValue(singleTypeWithCount.Value + 1);
+                            }
+                            return new[] { typeOrTypes, newTypeOrName };
+                        }
+                        else
+                        {
+                            var types = (object[])typeOrTypes;
+                            Debug.Assert(types.Length > 2, "we use array only for 2 or more types/pairs with count");
+
+                            var foundTypeIndex = types.IndexOf(newTypeOrName, static (nt, t) =>
+                                ReferenceEquals(t, nt) || Equals(t, nt) ||
+                                (t is KV<object, int> kv && (ReferenceEquals(kv.Key, nt) || Equals(kv.Key, nt))));
+
+                            if (foundTypeIndex != -1)
+                            {
+                                var foundTypeOrTypeWithCount = types[foundTypeIndex];
+                                if (foundTypeOrTypeWithCount is Type || foundTypeOrTypeWithCount is string)
+                                {
+                                    serviceKey = KV.Of(originalKey, 1);
+                                    return types.UpdateNonEmpty(KV.Of(foundTypeOrTypeWithCount, 2), foundTypeIndex);
+                                }
+                                else
+                                {
+                                    var foundTypeWithCount = (KV<object, int>)foundTypeOrTypeWithCount;
+                                    var typeCount = foundTypeWithCount.Value;
+                                    serviceKey = KV.Of(originalKey, typeCount);
+                                    return types.UpdateNonEmpty(foundTypeWithCount.WithValue(typeCount + 1), foundTypeIndex);
+                                }
+                            }
+
+                            return types.AppendToNonEmpty(newTypeOrName);
+                        }
+                    }));
+            return serviceKey;
+        }
+
+        /// <summary>Retrieves types and their count used with specified <paramref name="serviceKey"/>.</summary>
+        /// <param name="serviceKey">Service key to get info.</param>
+        /// <returns>Types and their count for the specified key, if key is not stored - returns null.</returns>
+        [MethodImpl((MethodImplOptions)256)]
+        public object GetServiceTypesOrDefault(object serviceKey) =>
+            _index.GetValueOrDefault(serviceKey);
+    }
+
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
     {

@@ -325,8 +325,6 @@ namespace DryIoc.MefAttributedModel
 
         #endregion
 
-        #region Support for multiple same (non-unique) contract names for the same exported type
-
         /// <summary>Add support for using the same contract name for the same multiple exported types.</summary>
         public static IContainer WithMultipleSameServiceKeyForTheServiceType(this IContainer container)
         {
@@ -355,7 +353,6 @@ namespace DryIoc.MefAttributedModel
                     (k.Equals(x.Key) || x.Key is KV<object, int> multiKey && k.Equals(multiKey.Key)),
                 static (k, x) => x.Value);
 
-        #endregion
 
         /// <summary>Registers implementation type(s) with provided registrator/container.
         /// Expects the implementation type with the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
@@ -394,27 +391,27 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<ExportedRegistrationInfo> registrations)
         {
             // Resolve the store only if there are some keys, if there are no keys - no need to resolve the store
-            var serviceKeyStore = new Lazy<ServiceKeyToTypeIndex>(() =>
+            var serviceKeyToTypeIndex = new Lazy<ServiceKeyToTypeIndex>(() =>
                 ((IResolver)registrator).Resolve<ServiceKeyToTypeIndex>(DryIoc.IfUnresolved.ReturnDefault));
 
             foreach (var info in registrations)
-                RegisterInfo(registrator, info, serviceKeyStore);
+                RegisterInfo(registrator, info, serviceKeyToTypeIndex);
         }
 
         /// <summary>Helper to apply laziness to provided registrations.</summary>
         public static IEnumerable<ExportedRegistrationInfo> MakeLazyAndEnsureUniqueServiceKeys(
             this IEnumerable<ExportedRegistrationInfo> registrations)
         {
-            var serviceKeyStore = new ServiceKeyToTypeIndex();
-            return registrations.Select(info => info.MakeLazy().EnsureUniqueExportServiceKeys(serviceKeyStore));
+            var keyIndex = new ServiceKeyToTypeIndex();
+            return registrations.Select(info => info.MakeLazy().EnsureUniqueExportServiceKeys(keyIndex));
         }
 
         /// <summary>Registers factories into registrator/container based on single provided info, which could
         /// contain multiple exported services with single implementation.</summary>
         public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info,
-            Lazy<ServiceKeyToTypeIndex> serviceKeyStore)
+            Lazy<ServiceKeyToTypeIndex> serviceKeyToTypeIndex)
         {
-            Throw.ThrowIfNull(serviceKeyStore);
+            Throw.ThrowIfNull(serviceKeyToTypeIndex);
 
             // factory is used for all exports of implementation
             var factory = info.CreateFactory();
@@ -428,7 +425,7 @@ namespace DryIoc.MefAttributedModel
                 var serviceKey = export.ServiceKey;
                 if (serviceKey != null) // check the key index store only if the key is not null
                 {
-                    var store = serviceKeyStore.Value;
+                    var store = serviceKeyToTypeIndex.Value;
                     if (store != null)
                         serviceKey = store.EnsureUniqueServiceKey(serviceType, serviceKey);
                 }
@@ -575,8 +572,7 @@ namespace DryIoc.MefAttributedModel
             IfAlreadyRegistered ifAlreadyRegistered = IfAlreadyRegistered.Keep,
             IDictionary<string, IList<KeyValuePair<object, ExportedRegistrationInfo>>> otherServiceExports = null)
         {
-            otherServiceExports = otherServiceExports
-                ?? new Dictionary<string, IList<KeyValuePair<object, ExportedRegistrationInfo>>>();
+            otherServiceExports ??= new Dictionary<string, IList<KeyValuePair<object, ExportedRegistrationInfo>>>();
 
             // Creating index or adding new registrations to the index.
             foreach (var reg in lazyRegistrations)
@@ -1118,80 +1114,6 @@ namespace DryIoc.MefAttributedModel
         }
 
         #endregion
-    }
-
-    /// <summary>Enables de-duplication of service key by putting key into the pair with index. </summary>
-    public sealed class ServiceKeyToTypeIndex
-    {
-        // Mapping of ContractName (ServiceKey) to the pair of { ContractType, count of the same ContractTypes per key }[]
-        // The actual Map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
-        private ImHashMap<object, object> _store = ImHashMap<object, object>.Empty;
-
-        /// <summary>Stores the key with respective type,
-        /// incrementing type count for multiple registrations with same key  and type.</summary>
-        public object EnsureUniqueServiceKey(object serviceTypeOrName, object serviceKey)
-        {
-            Ref.Swap(ref _store, serviceTypeOrName, serviceKey,
-                (x, t, k) => x.AddOrUpdate(k, t,
-                    (originalKey, typeOrTypes, newTypeOrName) =>
-                    {
-                        if (typeOrTypes is Type || typeOrTypes is string)
-                        {
-                            if (ReferenceEquals(typeOrTypes, newTypeOrName) || Equals(typeOrTypes, newTypeOrName))
-                            {
-                                serviceKey = KV.Of(originalKey, 1);
-                                return KV.Of(typeOrTypes, 2);
-                            }
-                            return new[] { typeOrTypes, newTypeOrName };
-                        }
-                        else if (typeOrTypes is KV<object, int> singleTypeWithCount)
-                        {
-                            var typeOrName = singleTypeWithCount.Key;
-                            if (ReferenceEquals(typeOrName, newTypeOrName) || Equals(typeOrName, newTypeOrName))
-                            {
-                                serviceKey = KV.Of(originalKey, singleTypeWithCount.Value);
-                                return singleTypeWithCount.WithValue(singleTypeWithCount.Value + 1);
-                            }
-                            return new[] { typeOrTypes, newTypeOrName };
-                        }
-                        else
-                        {
-                            var types = (object[])typeOrTypes;
-                            Debug.Assert(types.Length > 2, "we use array only for 2 or more types/pairs with count");
-
-                            var foundTypeIndex = types.IndexOf(newTypeOrName, static (nt, t) =>
-                                ReferenceEquals(t, nt) || Equals(t, nt) ||
-                                (t is KV<object, int> kv && (ReferenceEquals(kv.Key, nt) || Equals(kv.Key, nt))));
-
-                            if (foundTypeIndex != -1)
-                            {
-                                var foundTypeOrTypeWithCount = types[foundTypeIndex];
-                                if (foundTypeOrTypeWithCount is Type || foundTypeOrTypeWithCount is string)
-                                {
-                                    serviceKey = KV.Of(originalKey, 1);
-                                    return types.UpdateNonEmpty(KV.Of(foundTypeOrTypeWithCount, 2), foundTypeIndex);
-                                }
-                                else
-                                {
-                                    var foundTypeWithCount = (KV<object, int>)foundTypeOrTypeWithCount;
-                                    var typeCount = foundTypeWithCount.Value;
-                                    serviceKey = KV.Of(originalKey, typeCount);
-                                    return types.UpdateNonEmpty(foundTypeWithCount.WithValue(typeCount + 1), foundTypeIndex);
-                                }
-                            }
-
-                            return types.AppendToNonEmpty(newTypeOrName);
-                        }
-                    }));
-            return serviceKey;
-        }
-
-        /// <summary>Retrieves types and their count used with specified <paramref name="serviceKey"/>.</summary>
-        /// <param name="serviceKey">Service key to get info.</param>
-        /// <returns>Types and their count for the specified key, if key is not stored - returns null.</returns>
-        [MethodImpl((MethodImplOptions)256)]
-        public object GetServiceTypesOrDefault(object serviceKey) =>
-            _store.GetValueOrDefault(serviceKey);
     }
 
     /// <summary>Names used by Attributed Model to mark the special exports.</summary>
