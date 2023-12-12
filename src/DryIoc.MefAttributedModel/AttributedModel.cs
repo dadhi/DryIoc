@@ -80,7 +80,7 @@ namespace DryIoc.MefAttributedModel
                 .With(WithMefRules)
                 .WithImportsSatisfiedNotification()
                 .WithMefSpecificWrappers()
-                .WithMultipleSameContractNamesSupport();
+                .WithMultipleSameServiceKeyForTheServiceType();
 
         // hello, Max!!! we are Martians.
         /// <summary>The basic rules to support MEF/DryIoc Attributes for
@@ -328,17 +328,19 @@ namespace DryIoc.MefAttributedModel
         #region Support for multiple same (non-unique) contract names for the same exported type
 
         /// <summary>Add support for using the same contract name for the same multiple exported types.</summary>
-        public static IContainer WithMultipleSameContractNamesSupport(this IContainer container)
+        public static IContainer WithMultipleSameServiceKeyForTheServiceType(this IContainer container)
         {
             // map to convert the non-unique keys into an unique ones: ContractName/Key -> { ContractType, count }[]
-            container.Use(new ServiceKeyStore());
+            container.Use(new ServiceKeyToTypeIndex());
 
             var filterCollectionByMultiKey = Made.Of(
                 // todo: @perf use UnsafeAccessAttribute for NET8_0
-                typeof(AttributedModel).SingleMethod(nameof(FilterCollectionByMultiKey), includeNonPublic: true),
+                typeof(AttributedModel).GetMethod(nameof(FilterCollectionByMultiKey), BindingFlags.Static | BindingFlags.NonPublic),
                 parameters: Parameters.Of.Type(static r => r.ServiceKey));
 
-            // decorator to filter in a presence of multiple same keys
+            // Decorator to filter the services in a presence of multiple same keys. 
+            // The decorator will be used ONLY when collection is requested with the non-null service key, 
+            // and won't be applied or hinder performance otherwise, though DryIoc is still be checking the condition for non-null service key when resolving.
             // note: it is explicitly set to Transient to produce new results for new filtered collection,
             // otherwise it may be set to Singleton by container wide rules and always produce the results for the first resolved collection
             container.Register(typeof(IEnumerable<>), Reuse.Transient, filterCollectionByMultiKey,
@@ -391,8 +393,9 @@ namespace DryIoc.MefAttributedModel
         /// is serializable DTO for registration.</summary>
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<ExportedRegistrationInfo> registrations)
         {
-            var serviceKeyStore = new Lazy<ServiceKeyStore>(() =>
-                ((IResolver)registrator).Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault));
+            // Resolve the store only if there are some keys, if there are no keys - no need to resolve the store
+            var serviceKeyStore = new Lazy<ServiceKeyToTypeIndex>(() =>
+                ((IResolver)registrator).Resolve<ServiceKeyToTypeIndex>(DryIoc.IfUnresolved.ReturnDefault));
 
             foreach (var info in registrations)
                 RegisterInfo(registrator, info, serviceKeyStore);
@@ -402,14 +405,14 @@ namespace DryIoc.MefAttributedModel
         public static IEnumerable<ExportedRegistrationInfo> MakeLazyAndEnsureUniqueServiceKeys(
             this IEnumerable<ExportedRegistrationInfo> registrations)
         {
-            var serviceKeyStore = new ServiceKeyStore();
+            var serviceKeyStore = new ServiceKeyToTypeIndex();
             return registrations.Select(info => info.MakeLazy().EnsureUniqueExportServiceKeys(serviceKeyStore));
         }
 
         /// <summary>Registers factories into registrator/container based on single provided info, which could
         /// contain multiple exported services with single implementation.</summary>
         public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info,
-            Lazy<ServiceKeyStore> serviceKeyStore)
+            Lazy<ServiceKeyToTypeIndex> serviceKeyStore)
         {
             Throw.ThrowIfNull(serviceKeyStore);
 
@@ -423,7 +426,7 @@ namespace DryIoc.MefAttributedModel
 
                 var serviceType = export.ServiceType;
                 var serviceKey = export.ServiceKey;
-                if (serviceKey != null)
+                if (serviceKey != null) // check the key index store only if the key is not null
                 {
                     var store = serviceKeyStore.Value;
                     if (store != null)
@@ -723,7 +726,7 @@ namespace DryIoc.MefAttributedModel
 
         private static Type FindRequiredServiceTypeByServiceKey(Type type, DryIoc.Request request, object serviceKey)
         {
-            var contractNameStore = request.Container.Resolve<ServiceKeyStore>(DryIoc.IfUnresolved.ReturnDefault);
+            var contractNameStore = request.Container.Resolve<ServiceKeyToTypeIndex>(DryIoc.IfUnresolved.ReturnDefault);
             if (contractNameStore == null)
                 return null;
 
@@ -1118,15 +1121,14 @@ namespace DryIoc.MefAttributedModel
     }
 
     /// <summary>Enables de-duplication of service key by putting key into the pair with index. </summary>
-    public sealed class ServiceKeyStore
+    public sealed class ServiceKeyToTypeIndex
     {
         // Mapping of ContractName (ServiceKey) to the pair of { ContractType, count of the same ContractTypes per key }[]
         // The actual Map where Key is ServiceKey and the Value is Type | string | (KV<object, int> where object is Type | String) | (object[] where object is one of the mentioned before) 
         private ImHashMap<object, object> _store = ImHashMap<object, object>.Empty;
 
         /// <summary>Stores the key with respective type,
-        /// incrementing type count for multiple registrations with same key  and type.
-        /// </summary>
+        /// incrementing type count for multiple registrations with same key  and type.</summary>
         public object EnsureUniqueServiceKey(object serviceTypeOrName, object serviceKey)
         {
             Ref.Swap(ref _store, serviceTypeOrName, serviceKey,
@@ -1513,7 +1515,7 @@ namespace DryIoc.MefAttributedModel
         /// The result key would be a pair of original key and index. If key is already unique it will be returned as-is.</summary>
         /// <param name="keyStore">Place to track and check the key uniqueness.</param>
         /// <returns>Modifies this, and return this just for fluency.</returns>
-        public ExportedRegistrationInfo EnsureUniqueExportServiceKeys(ServiceKeyStore keyStore)
+        public ExportedRegistrationInfo EnsureUniqueExportServiceKeys(ServiceKeyToTypeIndex keyStore)
         {
             var exports = Exports;
             for (var i = 0; i < exports.Length; i++)
