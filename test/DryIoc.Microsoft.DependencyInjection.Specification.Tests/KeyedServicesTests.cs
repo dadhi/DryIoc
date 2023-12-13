@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using DryIoc.ImTools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Specification;
@@ -148,6 +149,46 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 
             var services = container.ResolveMany<IFakeOpenGenericService<PocoClass>>(serviceKey: "some-key");
             Assert.Equal(new[] { service1, service2 }, services);
+        }
+
+        [Fact]
+        public void ResolveKeyedServicesSingletonInstanceWithAnyKey_AnyKey()
+        {
+            var service1 = new FakeService();
+            var service2 = new FakeService();
+
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>(KeyedService.AnyKey, service1);
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>("some-key", service2);
+
+            var provider = CreateServiceProvider(serviceCollection);
+
+            var services = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>(KeyedService.AnyKey).ToArrayOrSelf();
+
+            Assert.Equal(new[] { service1, service2 }, services);
+        }
+
+        [Fact]
+        public void ResolveKeyedGenericServices_COPY()
+        {
+            var service1 = new FakeService();
+            var service2 = new FakeService();
+            var service3 = new FakeService();
+            var service4 = new FakeService();
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>("first-service", service1);
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>("service", service2);
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>("service", service3);
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>("service", service4);
+
+            var provider = CreateServiceProvider(serviceCollection);
+
+            var firstSvc = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>("first-service").ToList();
+            Assert.Single(firstSvc);
+            Assert.Same(service1, firstSvc[0]);
+
+            var services = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>("service").ToList();
+            Assert.Equal(new[] { service2, service3, service4 }, services);
         }
 
         internal interface IService { }

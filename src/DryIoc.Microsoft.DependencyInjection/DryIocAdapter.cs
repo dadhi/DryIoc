@@ -117,7 +117,12 @@ namespace DryIoc.Microsoft.DependencyInjection
                     var attr = par.GetCustomAttribute<FromKeyedServicesAttribute>(false);
                     if (attr.Key == null)
                         return ParameterServiceInfo.DefinitelyUnresolvedParameter;
-                    return ParameterServiceInfo.Of(par, ServiceDetails.OfServiceKey(attr.Key));
+
+                    var theKey = attr.Key;
+                    if (theKey == KeyedService.AnyKey)
+                        theKey = Registrator.AnyKey;
+
+                    return ParameterServiceInfo.Of(par, ServiceDetails.OfServiceKey(theKey));
                 };
                 return null;
             };
@@ -155,7 +160,7 @@ namespace DryIoc.Microsoft.DependencyInjection
 
         /// <summary>Adapts passed <paramref name="container"/> to Microsoft.DependencyInjection conventions,
         /// registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>,
-        /// and returns NEW container.
+        /// and returns the unchanged container (if its Rules where already conformed to MS.DI) or the new adapted container.
         /// </summary>
         /// <param name="container">Source container to adapt.</param>
         /// <param name="descriptors">(optional) Specify service descriptors or use <see cref="Populate"/> later.</param>
@@ -460,6 +465,9 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// <inheritdoc />
         public object GetKeyedService(Type serviceType, object serviceKey)
         {
+            if (serviceKey == null)
+                return GetService(serviceType);
+
             var ifUnresolved = Container.Rules.ServiceProviderGetServiceShouldThrowIfUnresolved ? IfUnresolved.Throw : IfUnresolved.ReturnDefaultIfNotRegistered;
             if (serviceKey == KeyedService.AnyKey)
                 return Container.Resolve(serviceType, Registrator.AnyKey, ifUnresolved);
@@ -471,8 +479,19 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
 
         /// <inheritdoc />
-        public object GetRequiredKeyedService(Type serviceType, object serviceKey) =>
-            Container.Resolve(serviceType, serviceKey, IfUnresolved.Throw);
+        public object GetRequiredKeyedService(Type serviceType, object serviceKey)
+        {
+            if (serviceKey == null)
+                return GetRequiredService(serviceType);
+
+            if (serviceKey == KeyedService.AnyKey)
+                return Container.Resolve(serviceType, Registrator.AnyKey, IfUnresolved.Throw);
+
+            var keyedService = Container.Resolve(serviceType, serviceKey, IfUnresolved.ReturnDefaultIfNotRegistered);
+            if (keyedService != null)
+                return keyedService;
+            return Container.Resolve(serviceType, Registrator.AnyKeyOf(serviceKey), IfUnresolved.Throw);
+        }
 
         /// <inheritdoc />
         public bool IsKeyedService(Type serviceType, object serviceKey)

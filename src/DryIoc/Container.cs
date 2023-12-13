@@ -242,6 +242,9 @@ namespace DryIoc
 
             if (serviceKey == null)
                 serviceKey = Rules.DefaultRegistrationServiceKey;
+            // todo: @wip
+            // if (serviceKey != null & Rules.MultipleSameServiceKeyForTheServiceType)
+            //     serviceKey = Rules.EnsureUniqueServiceKey(serviceKey);
 
             factory.ThrowIfNull().ValidateAndNormalizeRegistration(serviceType, serviceKey, isStaticallyChecked, Rules, throwIfInvalid: true);
 
@@ -2725,7 +2728,7 @@ namespace DryIoc
                 if (oldEntry == null)
                     return r == null ? mapOrOldEntry : r.WithServices(mapOrOldEntry);
 
-                var updatedEntry = oldEntry.AppendOrUpdateInPlaceOrKeepByReferenceEquals(ifAlreadyRegistered, newEntry, (i, o, n) =>
+                var updatedEntry = oldEntry.AppendOrUpdateInPlaceOrKeepByReferenceEquals(ifAlreadyRegistered, newEntry, static (i, o, n) =>
                 {
                     var fac = (Factory)n.Value;
                     switch (i)
@@ -4314,9 +4317,10 @@ namespace DryIoc
         /// <summary>Add support for using the same service key for the multiple possibly the same service types.</summary>
         public static IContainer WithMultipleSameServiceKeyForTheServiceType<C>(this C container) where C : IContainer
         {
+            // todo: @wip
             // don't apply the rule if it is already applied
-            if ((container.Rules._settings & Rules.Settings.MultipleSameServiceKeyForTheServiceType) != 0)
-                return container;
+            // if ((container.Rules._settings & Rules.Settings.MultipleSameServiceKeyForTheServiceType) != 0)
+            //     return container;
 
             var newRules = container.Rules.Clone();
             newRules._settings |= Rules.Settings.MultipleSameServiceKeyForTheServiceType;
@@ -5229,17 +5233,17 @@ namespace DryIoc
         private static ImHashMap<Type, object> BuildSupportedWrappers()
         {
             var wrappers = ImHashMap.BuildFromDifferent(
-                typeof(LazyEnumerable<>).Entry(WrapperExpressionFactory.Of((r, _) => GetLazyEnumerableExpressionOrDefault(r, itemType: null), setup: Setup.Wrapper)),
-                typeof(Lazy<>).Entry(WrapperExpressionFactory.Of((r, f) => GetLazyExpressionOrDefault(r, f))),
-                typeof(KeyValuePair<,>).Entry(WrapperExpressionFactory.Of((r, f) => GetKeyValuePairExpressionOrDefault(r, f), Setup.WrapperWith(1))),
-                typeof(Meta<,>).Entry(WrapperExpressionFactory.Of((r, f) => GetMetaExpressionOrDefault(r, f), Setup.WrapperWith(0))),
-                typeof(Tuple<,>).Entry(WrapperExpressionFactory.Of((r, f) => GetMetaExpressionOrDefault(r, f), Setup.WrapperWith(0))),
-                typeof(System.Linq.Expressions.LambdaExpression).Entry(WrapperExpressionFactory.Of((r, _) => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
-                typeof(LambdaExpression).Entry(WrapperExpressionFactory.Of((r, _) => GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
-                typeof(Func<>).Entry(WrapperExpressionFactory.Of((r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.Wrapper))
+                typeof(LazyEnumerable<>).Entry(WrapperExpressionFactory.Of(static (r, _) => GetLazyEnumerableExpressionOrDefault(r, itemType: null), setup: Setup.Wrapper)),
+                typeof(Lazy<>).Entry(WrapperExpressionFactory.Of(static (r, f) => GetLazyExpressionOrDefault(r, f))),
+                typeof(KeyValuePair<,>).Entry(WrapperExpressionFactory.Of(static (r, f) => GetKeyValuePairExpressionOrDefault(r, f), Setup.WrapperWith(1))),
+                typeof(Meta<,>).Entry(WrapperExpressionFactory.Of(static (r, f) => GetMetaExpressionOrDefault(r, f), Setup.WrapperWith(0))),
+                typeof(Tuple<,>).Entry(WrapperExpressionFactory.Of(static (r, f) => GetMetaExpressionOrDefault(r, f), Setup.WrapperWith(0))),
+                typeof(System.Linq.Expressions.LambdaExpression).Entry(WrapperExpressionFactory.Of(static (r, _) => GetLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
+                typeof(LambdaExpression).Entry(WrapperExpressionFactory.Of(static (r, _) => GetFastExpressionCompilerLambdaExpressionExpressionOrDefault(r), setup: Setup.Wrapper)),
+                typeof(Func<>).Entry(WrapperExpressionFactory.Of(static (r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.Wrapper))
             );
 
-            var arrayExpr = WrapperExpressionFactory.Of((r, _) => GetArrayExpression(r), setup: Setup.Wrapper);
+            var arrayExpr = WrapperExpressionFactory.Of(static (r, _) => GetArrayExpression(r), setup: Setup.Wrapper);
             CollectionWrapperID = arrayExpr.FactoryID;
 
             var arrayInterfaces = SupportedCollectionTypes;
@@ -5249,14 +5253,14 @@ namespace DryIoc
             // Skip the `i == 0` because `Func<>` type was added above
             for (var i = 1; i < FuncTypes.Length; i++)
                 wrappers = wrappers.AddSureNotPresent(FuncTypes[i],
-                    WrapperExpressionFactory.Of((r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.WrapperWith(i)));
+                    WrapperExpressionFactory.Of(static (r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.WrapperWith(i)));
 
             for (var i = 0; i < ActionTypes.Length; i++)
                 wrappers = wrappers.AddSureNotPresent(ActionTypes[i],
-                    WrapperExpressionFactory.Of((r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
+                    WrapperExpressionFactory.Of(static (r, f) => GetFuncOrActionExpressionOrDefault(r, f), Setup.WrapperWith(unwrap: typeof(void).ToFunc<Type, Type>)));
 
             wrappers = wrappers.AddSureNotPresent(typeof(IDictionary<,>),
-                WrapperExpressionFactory.Of((r, _) => GetDictionaryExpressionOrDefault(r), Setup.WrapperWith(1)));
+                WrapperExpressionFactory.Of(static (r, _) => GetDictionaryExpressionOrDefault(r), Setup.WrapperWith(1)));
 
             wrappers = wrappers.AddContainerInterfaces();
             return wrappers;
@@ -5265,13 +5269,13 @@ namespace DryIoc
         private static ImHashMap<Type, object> AddContainerInterfaces(this ImHashMap<Type, object> wrappers)
         {
             var resolverContextExpr = new WrapperExpressionFactory.OfContainer(
-                (r, _) => ResolverContext.GetRootOrSelfExpr(r));
+                static (r, _) => ResolverContext.GetRootOrSelfExpr(r));
 
             var containerExpr = new WrapperExpressionFactory.OfContainer(
-                (r, _) => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)));
+                static (r, _) => TryConvertIntrinsic<IContainer>(ResolverContext.GetRootOrSelfExpr(r)));
 
             var registratorExpr = new WrapperExpressionFactory.OfContainer(
-                (r, _) => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)));
+                static (r, _) => TryConvertIntrinsic<IRegistrator>(ResolverContext.GetRootOrSelfExpr(r)));
 
             return wrappers
                 .AddSureNotPresent(typeof(IContainer), containerExpr)
@@ -5308,7 +5312,7 @@ namespace DryIoc
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
-                var openGenericItems = container.GetServiceRegisteredAndDynamicFactories(requiredItemOpenGenericType)  // todo: @bug check for the unregistered values
+                var openGenericItems = container.GetServiceRegisteredAndDynamicFactories(requiredItemOpenGenericType) // todo: @bug check for the unregistered values
                     .Map(requiredItemOpenGenericType, requiredItemType,
                         static (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new OpenGenericTypeKey(gt, f.Key)));
                 items = items.Append(openGenericItems);
@@ -5829,7 +5833,9 @@ namespace DryIoc
             var newRules = rules.With(newMade);
 
             newRules._settings = (rules._settings
-                | Settings.TrackingDisposableTransients | Settings.SelectLastRegisteredFactory)
+                | Settings.TrackingDisposableTransients
+                | Settings.SelectLastRegisteredFactory
+                |  Settings.MultipleSameServiceKeyForTheServiceType)
                 & ~Settings.ThrowOnRegisteringDisposableTransient
                 & ~Settings.VariantGenericTypesInResolvedCollection;
 
@@ -5856,15 +5862,16 @@ namespace DryIoc
                 return true;
 
             var factoryMethod = _made.FactoryMethodOrSelector;
-            var rightFactory =
+            var theRightFactoryMethod =
                 ReferenceEquals(factoryMethod, DryIoc.FactoryMethod.ConstructorWithResolvableArguments) ||
                 ReferenceEquals(factoryMethod, DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublic) ||
                 ReferenceEquals(factoryMethod, DryIoc.FactoryMethod.ConstructorWithResolvableArgumentsIncludingNonPublicWithoutSameTypeParam);
 
-            return rightFactory &&
+            return theRightFactoryMethod &&
                 FactorySelector == SelectLastRegisteredFactory &&
                 (_settings & Settings.SelectLastRegisteredFactory) != 0 &&
                 (_settings & Settings.TrackingDisposableTransients) != 0 &&
+                (_settings & Settings.MultipleSameServiceKeyForTheServiceType) != 0 &&
                 (_settings & Settings.ThrowOnRegisteringDisposableTransient) == 0 &&
                 (_settings & Settings.VariantGenericTypesInResolvedCollection) == 0;
         }
@@ -5873,11 +5880,13 @@ namespace DryIoc
         /// EXCEPT for ParameterSelector for the keyed services, which should be provided as parameter.
         /// That's why you should use the `DryIocAdapter.WithMicrosoftDependencyInjectionRules` instead.</summary>
         [Obsolete("Please use DryIoc.Microsoft.DependencyInjection.DryIocAdapter.WithMicrosoftDependencyInjectionRules")]
-        public Rules WithMicrosoftDependencyInjectionRules() => WithBaseMicrosoftDependencyInjectionRules(null);
+        public Rules WithMicrosoftDependencyInjectionRules() =>
+            WithBaseMicrosoftDependencyInjectionRules(null);
 
         /// <summary>Creates the rules for the Microsoft.Extension.DependencyInjection 
         /// together with the ParameterSelector for the keyed services, which should be provided as parameter</summary>
-        public Rules WithBaseMicrosoftDependencyInjectionRules(ParameterSelector parameters) => WithMicrosoftDependencyInjectionRules(this, parameters);
+        public Rules WithBaseMicrosoftDependencyInjectionRules(ParameterSelector parameters) => 
+            WithMicrosoftDependencyInjectionRules(this, parameters);
 
         /// <summary>By default the `IServiceProvider.GetService` is returning `null` if service is not resolved. 
         /// So you need to call the `GetRequiredService` extension method which in turn requires the implementation of `ISupportRequiredService` underneath.
@@ -6319,7 +6328,7 @@ namespace DryIoc
                 var implementationTypes = getImplementationTypes(serviceType, serviceKey);
 
                 return implementationTypes.Match(factories, serviceType,
-                    (fsRef, st, implType) => implType.IsImplementingServiceType(st),
+                    static (fsRef, st, implType) => implType.IsImplementingServiceType(st),
                     (fsRef, _, implType) =>
                     {
                         var implTypeHash = RuntimeHelpers.GetHashCode(implType);
@@ -6532,6 +6541,11 @@ namespace DryIoc
         /// <summary>Flag instructs to exclude covariant compatible types into the resolved generic.</summary>
         public Rules WithoutVariantGenericTypesInResolve() =>
             WithSettings(_settings & ~Settings.VariantGenericTypesInResolve);
+
+        /// <summary>Says if the rules support the multiple same service keys for the same service type. 
+        /// Note, that this setting overrides the <seealso cref="IfAlreadyRegistered.AppendNotKeyed"/> for the keyed services</summary>
+        public bool MultipleSameServiceKeyForTheServiceType =>
+            (_settings & Settings.MultipleSameServiceKeyForTheServiceType) != 0;
 
         /// <summary>If the dependency factory is not found (including the dynamic factories) generate the `Resolve` call for it, 
         /// so it may be resolved from the compile-time registrations</summary>
@@ -14457,7 +14471,7 @@ namespace DryIoc
     /// <summary>Specifies options to handle situation when registered service is already present in the registry.</summary>
     public enum IfAlreadyRegistered : byte
     {
-        /// <summary>Appends new default registration or throws registration with the same key.</summary>
+        /// <summary>Appends new default registration or throws for registration with the same key.</summary>
         AppendNotKeyed,
         /// <summary>Throws if default or registration with the same key is already exist.</summary>
         Throw,
@@ -15289,7 +15303,7 @@ namespace DryIoc
             throw GetMatchedException(ErrorCheck.Unspecified, error, arg0, arg1, arg2, arg3, null);
         }
 
-        /// <summary>Throws if contidion is true, otherwise returns the `default(T)` value</summary>
+        /// <summary>Throws if contidion is true, and returns the false if not throwing</summary>
         public static bool When(bool throwIfInvalid, int error, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
         {
             if (!throwIfInvalid) return false;

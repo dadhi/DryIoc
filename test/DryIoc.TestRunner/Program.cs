@@ -88,17 +88,21 @@ namespace DryIoc.UnitTests
             var issueTests = new ITest[]
             {
                 new DotnetWeekBlogExample(),
+                new ParameterResolutionFixture(),
+                new Messages_Test(),
+
                 new SO_Child_Container_for_transients(),
                 new SO_Injecting_the_collection_of_interfaces_implemented_by_decorator(),
                 new SO_Decorator_not_being_constrained_correctly(),
+
                 new Issue_Can_resolve_singleton_with_Func_of_scoped_dependency(),
                 new Issue_HandleVariance(),
                 new Issue_InjectingSerilogLogger(),
-                new ParameterResolutionFixture(),
                 new Issue_Register_null_string(),
                 new Issue_SupportForDynamicKeyword(),
                 new Issue_UsingAsyncMethodAsMadeOf(),
                 new Issue_Value_type_resolution_dependency(),
+                
                 new Issue107_NamedScopesDependingOnResolvedTypes(),
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue357_PartImportsSatisfied(),
@@ -145,7 +149,6 @@ namespace DryIoc.UnitTests
                 new Issue596_RegisterMany_with_Factory(),
                 new Issue603_async_actions_in_MVC(),
 
-                new Messages_Test(),
                 new GHIssue4_Rule_for_Func_and_Lazy_to_be_resolved_even_without_requested_service_registered(),
                 new GHIssue6_Open_generic_singleton_service_registration_that_satisfies_multiple_interfaces(),
                 new GHIssue7_1_Context_based_injection(),
@@ -181,6 +184,7 @@ namespace DryIoc.UnitTests
                 new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton(),
                 new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
                 new GHIssue512_Optimize_injection_of_IResolverContext(),
+                new GHIssue514_Avoid_using_the_Func_arguments_for_recursive_service_first_found_outside_the_Func(),
                 new GHIssue516_Singleton_Decorator_to_Scoped_base_should_not_work_but_does(),
                 new GHIssue518_Select_default_then_resolvable_constructor(),
                 new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit(),
