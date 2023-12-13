@@ -1388,8 +1388,8 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Not null for exported members.</summary>
         public FactoryMethodInfo FactoryMethodInfo;
 
-        /// <summary>Returns new info with type representation as type full name string, instead of
-        /// actual type.</summary> <returns>New lazy ExportInfo for not lazy this, otherwise - this one.</returns>
+        /// <summary>Returns new info with type representation as type full name string, instead of actual type.</summary>
+        /// <returns>New lazy ExportInfo for not lazy this, otherwise - this one.</returns>
         public ExportedRegistrationInfo MakeLazy()
         {
             if (IsLazy) return this;
@@ -1418,7 +1418,6 @@ namespace DryIoc.MefAttributedModel
                 if (key != null)
                     e.ServiceKey = keyStore.EnsureUniqueServiceKey((object)e.ServiceType ?? e.ServiceTypeFullName, key);
             }
-
             return this;
         }
 
@@ -1608,9 +1607,9 @@ namespace DryIoc.MefAttributedModel
             Dictionary<string, object> metaDict = null;
 
             var metadataAttributes = attributes
-                .Where(a => a is ExportMetadataAttribute || a is WithMetadataAttribute
+                .Where(static a => a is ExportMetadataAttribute || a is WithMetadataAttribute
                     || a.GetType().GetAttributes(typeof(MetadataAttributeAttribute), true).Any())
-                .OrderBy(a => a.GetType().FullName);
+                .OrderBy(static a => a.GetType().FullName);
 
             foreach (var metaAttr in metadataAttributes)
             {
@@ -1640,7 +1639,7 @@ namespace DryIoc.MefAttributedModel
                 if (metaDict != null && metaDict.ContainsKey(metaKey))
                     Throw.It(Error.DuplicateMetadataKey, metaKey, metaDict);
 
-                metaDict = metaDict ?? new Dictionary<string, object>();
+                metaDict ??= new Dictionary<string, object>();
                 metaDict.Add(metaKey, metaValue);
 
                 if (addProperties)

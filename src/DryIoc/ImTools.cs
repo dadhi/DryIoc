@@ -1092,7 +1092,11 @@ namespace DryIoc.ImTools
         /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `A` and `B`. 
         /// Should be called mostly when you have an arrays</summary>
         public static IEnumerable<R> Match<A, B, T, R>(this IEnumerable<T> source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map) =>
-            source is T[] arr ? arr.Match(a, b, condition, map) : source == null ? null : WhereSelect(source, a, b, condition, map);
+            source is T[] arr
+                ? arr.Match(a, b, condition, map)
+                : source == null
+                    ? null
+                    : WhereSelect(source, a, b, condition, map);
 
         /// <summary>Calls combined Where and Select on the Enumerator avoiding the closure over `S`</summary>
         public static IEnumerable<R> WhereSelect<A, B, T, R>(this IEnumerable<T> source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map)
