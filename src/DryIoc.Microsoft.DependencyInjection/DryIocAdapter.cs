@@ -65,7 +65,11 @@ namespace DryIoc.Microsoft.DependencyInjection
     {
         private readonly Func<IRegistrator, ServiceDescriptor, bool> _registerDescriptor;
         private readonly RegistrySharing _registrySharing;
-        private readonly IContainer _initialContainer;
+
+        /// <summary>Initial container passed to the factory constructor.
+        /// The factory may produce the new container via `CreateBuilder` and it may be retrieved from 
+        /// the `CreateBuilder` result <seealso cref="DryIocServiceProvider.Container"/>.</summary>
+        public readonly IContainer InitialContainer;
 
         /// <summary>
         /// We won't initialize the container here because it is logically expected to be done in `CreateBuilder`,
@@ -73,9 +77,12 @@ namespace DryIoc.Microsoft.DependencyInjection
         /// </summary>
         public DryIocServiceProviderFactory(
             IContainer container = null,
-            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null) :
-            this(container, RegistrySharing.CloneAndDropCache, registerDescriptor)
-        { }
+            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
+        { 
+            InitialContainer = container;
+            _registerDescriptor = registerDescriptor;
+            _registrySharing = RegistrySharing.CloneAndDropCache;
+        }
 
         /// <summary>
         /// `container` is the existing container which might be cloned with the MS.DI rules and its cache will be dropped,
@@ -85,17 +92,22 @@ namespace DryIoc.Microsoft.DependencyInjection
         public DryIocServiceProviderFactory(IContainer container, RegistrySharing registrySharing,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
         {
-            _initialContainer = container;
+            InitialContainer = container;
             _registrySharing = registrySharing;
             _registerDescriptor = registerDescriptor;
         }
 
-        /// <inheritdoc />
+        /// <summary>Creates the builder with the initial container or creates the new container if initial is null.
+        /// Return the result <seealso cref="DryIocServiceProvider"/> which stores the conforming container as
+        /// <seealso cref="DryIocServiceProvider.Container"/>.</summary>
         public virtual DryIocServiceProvider CreateBuilder(IServiceCollection services)
         {
-            var skipRulesCheck = _initialContainer == null;
-            var c = _initialContainer ?? new Container(DryIocAdapter.MicrosoftDependencyInjectionRules);
-            return c.WithDependencyInjectionAdapter(skipRulesCheck, services, _registerDescriptor, _registrySharing);
+            if (InitialContainer == null)
+                return new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
+                    .WithDependencyInjectionAdapter(false, services, _registerDescriptor, 
+                        RegistrySharing.Share); // we use share because new container does not have any registrations or cache yet
+            return InitialContainer.WithDependencyInjectionAdapter(true, services, _registerDescriptor, 
+                _registrySharing); // use the user-provided registry sharing
         }
 
         /// <inheritdoc />
@@ -189,12 +201,12 @@ namespace DryIoc.Microsoft.DependencyInjection
             container.WithDependencyInjectionAdapter(false, descriptors, registerDescriptor, registrySharing).Container;
 
         internal static DryIocServiceProvider WithDependencyInjectionAdapter(
-            this IContainer container, bool skipRulesCheck,
+            this IContainer container, bool checkTheRulesAreConforming,
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
             RegistrySharing registrySharing = RegistrySharing.Share)
         {
-            if (skipRulesCheck)
+            if (!checkTheRulesAreConforming)
             {
                 if (registrySharing != RegistrySharing.Share)
                     container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
