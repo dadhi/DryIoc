@@ -198,7 +198,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
             RegistrySharing registrySharing = RegistrySharing.Share) =>
-            container.WithDependencyInjectionAdapter(false, descriptors, registerDescriptor, registrySharing).Container;
+            container.WithDependencyInjectionAdapter(true, descriptors, registerDescriptor, registrySharing).Container;
 
         internal static DryIocServiceProvider WithDependencyInjectionAdapter(
             this IContainer container, bool checkTheRulesAreConforming,

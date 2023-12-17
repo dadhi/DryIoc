@@ -14,7 +14,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // ResolveEnumerableFromChild();
+            ResolveEnumerableFromChild();
             // ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys();
             // ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys_2();
             return 1;

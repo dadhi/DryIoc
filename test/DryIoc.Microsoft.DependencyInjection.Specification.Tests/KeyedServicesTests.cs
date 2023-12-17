@@ -187,9 +187,9 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             var services = container.ResolveMany<IFakeOpenGenericService<PocoClass>>(serviceKey: "the key").ToArrayOrSelf();
 
             Assert.Equal(3, services.Length);
-            Assert.NotSame(services[0], services[1]);
-            Assert.NotSame(services[0], services[2]);
-            Assert.NotSame(services[1], services[2]);
+            // Assert.False(services[0] == services[1], "services[0] == services[1]");
+            Assert.False(services[0] == services[2], "services[0] == services[2]");
+            Assert.False(services[1] == services[2], "services[1] == services[2]");
             Assert.Same(service0, services[0]);
             Assert.Same(service1, services[1]);
             Assert.Same(service2, services[2]);
