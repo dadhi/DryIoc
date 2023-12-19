@@ -198,7 +198,7 @@ namespace DryIoc
             //     // decrement it and move to the next iteration
             //     i--;
 
-            //     for (; i >= 0; i--)
+            //     for (; i >= 0; --i)
             //     {
             //         object objectToDispose = toDispose[i];
             //         if (!disposedObjects.Add(objectToDispose))
@@ -290,7 +290,7 @@ namespace DryIoc
         public void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition)
         {
             ThrowIfRootContainerDisposed();
-            _registry.Swap(r => Registry.Unregister(r, factoryType, serviceType, serviceKey, condition));
+            _registry.Swap(r => Registry.Unregister(r, factoryType, serviceType, serviceKey, condition)); // todo: @perf @mem reduce closure allocation
         }
 
         #endregion
@@ -671,7 +671,7 @@ namespace DryIoc
             foreach (var item in allItems.OrderBy(static x => x.FactoryRegistrationOrder))
             {
                 var itemServiceKey = item.OptionalServiceKey;
-                if (serviceKey != null && serviceKey is not Registrator.AnyServiceKey && itemServiceKey is Registrator.AnyServiceKey) // todo: @wip consider the multiple keys of AnyServicekey
+                if (serviceKey != null && serviceKey is not Registrator.AnyServiceKey && itemServiceKey is Registrator.AnyServiceKey)
                     itemServiceKey = Registrator.AnyKeyOf(serviceKey);
 
                 var service = Resolve(serviceType, itemServiceKey,
@@ -1006,8 +1006,8 @@ namespace DryIoc
             {
                 if (entry == null ||
                     serviceKey != null && (
-                    entry is Factory && !serviceKey.Equals(DefaultKey.Value) ||
-                    entry is FactoriesEntry factoriesEntry && factoriesEntry.Factories.GetValueOrDefault(serviceKey) == null))
+                    entry is Factory && !DefaultKey.Value.Equals(serviceKey) || // todo: @wip check for AnyServiceKey
+                    entry is FactoriesEntry factoriesEntry && factoriesEntry.GetFirstKeyedOrDefault(serviceKey) == null))
                     entry = serviceFactories.GetValueOrDefault(openGenericServiceType) ?? entry;
 
                 if (entry == null && rules.VariantGenericTypesInResolve)
@@ -1026,7 +1026,7 @@ namespace DryIoc
                         }
                         else
                         {
-                            foreach (var kf in ((FactoriesEntry)e.Value).Factories.Enumerate())
+                            foreach (var kf in ((FactoriesEntry)e.Value).Factories)
                                 if (kf.Key.Equals(serviceKey) && // todo: @wip take AnyKey into account?
                                     serviceType.IsAssignableVariantGenericTypeFrom(e.Key) &&
                                     request.MatchFactoryConditionAndMetadata(details, kf.Value))
@@ -1047,11 +1047,7 @@ namespace DryIoc
                     && request.MatchFactoryConditionAndMetadata(details, defaultFactory)
                     ? defaultFactory : null;
 
-            var factories = entry == null ? Empty<KV<object, Factory>>()
-                : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
-                : entry.To<FactoriesEntry>().Factories
-                    .ToArray(static x => KV.Of(x.Key, x.Value))
-                    .Match(static x => x.Value != null); // filter out the Unregistered factories (see #390)
+            var factories = FactoriesEntry.ToServiceKeyFactory(entry);
 
             if (rules.DynamicRegistrationProviders != null &&
                 !serviceType.IsExcludedGeneralPurposeServiceType() && !IsWrapper(serviceType, openGenericServiceType))
@@ -1060,6 +1056,7 @@ namespace DryIoc
             if (factories.Length == 0)
                 return null;
 
+            // todo: @wip sort the factories by the reverse order of registration
             // For requested keyed service (which may be a `DefaultKey` or `DefaultDynamicKey`)
             // just lookup for the key and return whatever the .
             // Another thing that if there is as two factories, one with exactly matched key and another one with the AnyServiceKey,
@@ -1162,12 +1159,7 @@ namespace DryIoc
             }
             else if (entry is FactoriesEntry e)
             {
-                if (e.Factories is ImHashMapEntry<object, Factory> singleKeyedFactory)
-                    factories = new[] { KV.Of(singleKeyedFactory.Key, singleKeyedFactory.Value) }; // todo: @perf avoid packing into array
-                else
-                    factories = e.Factories
-                        .ToArray(static x => KV.Of(x.Key, x.Value))
-                        .Match(static x => x.Value != null); // filter out the Unregistered factories
+                factories = e.Factories.Match(static x => x.Value != null); // todo: @perf filter out the Unregistered factories
             }
             else
             {
@@ -1179,9 +1171,7 @@ namespace DryIoc
                     if (openGenericEntry != null)
                         factories = openGenericEntry is Factory gf
                             ? new[] { new KV<object, Factory>(DefaultKey.Value, gf) }
-                            : ((FactoriesEntry)openGenericEntry).Factories
-                                .ToArray(static x => KV.Of(x.Key, x.Value))
-                                .Match(static x => x.Value != null); // filter out the Unregistered factories
+                            : ((FactoriesEntry)openGenericEntry).Factories.Match(static x => x.Value != null); // filter out the Unregistered factories
 
                     if (openGenericEntry == null && rules.VariantGenericTypesInResolve)
                     {
@@ -1198,7 +1188,7 @@ namespace DryIoc
                             }
                             else
                             {
-                                foreach (var kf in ((FactoriesEntry)sf.Value).Factories.Enumerate())
+                                foreach (var kf in ((FactoriesEntry)sf.Value).Factories) // todo: @perf use Match
                                     if (serviceType.IsAssignableVariantGenericTypeFrom(sf.Key) &&
                                         request.MatchFactoryConditionAndMetadata(details, kf.Value))
                                     {
@@ -1300,9 +1290,7 @@ namespace DryIoc
 
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-            var factories = entry == null ? Empty<KV<object, Factory>>()
-                : entry is Factory f ? new[] { new KV<object, Factory>(DefaultKey.Value, f) }
-                : ((FactoriesEntry)entry).Factories.ToArray(static x => KV.Of(x.Key, x.Value)).Match(static x => x.Value != null); // filter out the Unregistered factories
+            var factories = FactoriesEntry.ToServiceKeyFactory(entry);
 
             var openGenericServiceType = bothClosedAndOpenGenerics && serviceType.IsClosedGeneric() ? serviceType.GetGenericTypeDefinition() : null;
             if (openGenericServiceType != null)
@@ -1311,7 +1299,7 @@ namespace DryIoc
                 if (openGenericEntry != null)
                     factories = openGenericEntry is Factory gf
                         ? factories.Append(new KV<object, Factory>(DefaultKey.Value, gf))
-                        : factories.Append(((FactoriesEntry)openGenericEntry).Factories.ToArray(static x => KV.Of(x.Key, x.Value)).Match(static x => x.Value != null)); // filter out the Unregistered factories
+                        : factories.Append(((FactoriesEntry)openGenericEntry).Factories.Match(static x => x.Value != null)); // filter out the Unregistered factories
             }
 
             if (Rules.DynamicRegistrationProviders != null &&
@@ -1388,9 +1376,7 @@ namespace DryIoc
             var serviceFactories = r == null ? registryOrServices : r.Services;
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-            var factories = entry == null ? Empty<KV<object, Factory>>()
-                : entry is Factory factory ? new KV<object, Factory>(DefaultKey.Value, factory).One()
-                : entry.To<FactoriesEntry>().Factories.ToArray(static x => KV.Of(x.Key, x.Value)).Match(static x => x.Value != null); // filter out the Unregistered factories (see #390)
+            var factories = FactoriesEntry.ToServiceKeyFactory(entry);
 
             if (Rules.DynamicRegistrationProviders != null &&
                 !serviceType.IsExcludedGeneralPurposeServiceType())
@@ -1668,38 +1654,108 @@ namespace DryIoc
 
         internal sealed class FactoriesEntry
         {
+            public static KV<object, Factory>[] ToServiceKeyFactory(object factoryOrFactoryEntry)
+            {
+                return factoryOrFactoryEntry == null ? Empty<KV<object, Factory>>()
+                    : factoryOrFactoryEntry is Factory factory ? new[] { new KV<object, Factory>(DefaultKey.Value, factory) }
+                    : ((FactoriesEntry)factoryOrFactoryEntry).Factories
+                        // filter out the Unregistered factories (see #390)
+                        .Match(static x => x.Value != null); // // @perf here?
+            }
+
             public readonly DefaultKey LastDefaultKey;
-            public readonly ImHashMap<object, Factory> Factories;
+            public readonly KV<object, Factory>[] Factories; // todo: @perf convert to KVar[], SmallMap?
 
             // lastDefaultKey may be null
-            public FactoriesEntry(DefaultKey lastDefaultKey, ImHashMap<object, Factory> factories)
+            public FactoriesEntry(DefaultKey lastDefaultKey, KV<object, Factory>[] factories)
             {
                 LastDefaultKey = lastDefaultKey;
                 Factories = factories;
             }
 
-            public static readonly FactoriesEntry Empty =
-                new FactoriesEntry(null, ImHashMap<object, Factory>.Empty);
+            public static readonly FactoriesEntry Empty = new FactoriesEntry(null, null);
 
-            public FactoriesEntry With(Factory factory)
+            [MethodImpl((MethodImplOptions)256)]
+            public FactoriesEntry WithDefault(Factory factory, DefaultKey newLastDefaultKey) =>
+                new FactoriesEntry(newLastDefaultKey, Factories.Append(new KV<object, Factory>(newLastDefaultKey, factory)));
+
+            [MethodImpl((MethodImplOptions)256)]
+            public FactoriesEntry WithDefault(Factory factory) =>
+                WithDefault(factory, LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next());
+
+            public FactoriesEntry WithTwoDefault(Factory oldFactory, Factory newFactory)
             {
                 var lastDefaultKey = LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next();
-                // todo: @bug we need a method `Add` which throws for found key, e.g. based on `GetOrAdd`, 
-                // todo: @bug because `AddSureNotPresent` does not work for the same hash, for example `X.A` of `enum X { A = 0 }` and `DefaultKey.Value` have the same hash
-                return new FactoriesEntry(lastDefaultKey, Factories.AddOrUpdate(lastDefaultKey, factory));
+                var keyFac0 = new KV<object, Factory>(lastDefaultKey, oldFactory);
+                var keyFac1 = new KV<object, Factory>(lastDefaultKey = lastDefaultKey.Next(), newFactory);
+                return new FactoriesEntry(lastDefaultKey, Factories.Append(new[] { keyFac0, keyFac1 }));
             }
 
-            public FactoriesEntry WithTwo(Factory oldFactory, Factory newFactory)
+            // todo: @perf
+            public FactoriesEntry With(Factory factory, object serviceKey)
             {
-                var lastDefaultKey = LastDefaultKey == null ? DefaultKey.Value : LastDefaultKey.Next();
-                var factories = Factories
-                    .AddOrUpdate(lastDefaultKey, oldFactory)
-                    .AddOrUpdate(lastDefaultKey = lastDefaultKey.Next(), newFactory);
-                return new FactoriesEntry(lastDefaultKey, factories);
+                var keyFac = KV.Of(serviceKey, factory);
+
+                if (Factories == null || Factories.Length == 0)
+                    return new FactoriesEntry(serviceKey as DefaultKey, new[] { keyFac });
+
+                // starting from the last added factories...
+                for (var i = Factories.Length - 1; i >= 0; --i)
+                {
+                    var f = Factories[i];
+                    if (f.Key is not Registrator.AnyServiceKey && f.Key.Equals(serviceKey))
+                        return new FactoriesEntry(LastDefaultKey, Factories.UpdateNonEmpty(keyFac, i));
+                }
+
+                var ldk = LastDefaultKey;
+                if (serviceKey is DefaultKey dk)
+                    ldk = ldk == null ? dk : dk.RegistrationOrder > ldk.RegistrationOrder ? dk : ldk;
+                return new FactoriesEntry(ldk, Factories.AppendToNonEmpty(keyFac));
             }
 
-            public FactoriesEntry With(Factory factory, object serviceKey) =>
-                new FactoriesEntry(LastDefaultKey, Factories.AddOrUpdate(serviceKey, factory));
+            public KV<object, Factory> GetFirstKeyedOrDefault(object serviceKey)
+            {
+                var isAnyServiceKey = serviceKey is Registrator.AnyServiceKey;
+                if (Factories != null)
+                    foreach (var f in Factories)
+                    {
+                        if (f.Key is Registrator.AnyServiceKey)
+                        {
+                            if (isAnyServiceKey)
+                                return f;
+                            continue;
+                        }
+                        if (f.Key.Equals(serviceKey))
+                            return f;
+                    }
+                return default;
+            }
+
+            public int GetLastKeyedIndex(object serviceKey)
+            {
+                var isAnyServiceKey = serviceKey is Registrator.AnyServiceKey;
+                if (Factories != null)
+                    for (var i = Factories.Length - 1; i >= 0; --i)
+                    {
+                        var f = Factories[i];
+                        if (f.Key is Registrator.AnyServiceKey)
+                        {
+                            if (isAnyServiceKey)
+                                return i;
+                            continue;
+                        }
+                        if (f.Key.Equals(serviceKey))
+                            return i;
+                    }
+                return -1;
+            }
+
+            [MethodImpl((MethodImplOptions)256)]
+            public KV<object, Factory> GetLastKeyedOrDefault(object serviceKey)
+            {
+                var i = GetLastKeyedIndex(serviceKey);
+                return i != -1 ? Factories[i] : default;
+            }
         }
 
         /// <inheritdoc />
@@ -2386,7 +2442,7 @@ namespace DryIoc
                     if (factory == null)
                         return; // filter out Unregistered factory (see #390)
 
-                    if (_defaultFactoryCache != null || _keyedFactoryCache != null)
+                    if (_defaultFactoryCache != null | _keyedFactoryCache != null)
                     {
                         if (factory.GeneratedFactories == null)
                         {
@@ -2502,7 +2558,7 @@ namespace DryIoc
                     else if (entry.Value != null) // maybe `null` for the unregistered service, see #412
                     {
                         var factories = ((FactoriesEntry)entry.Value).Factories;
-                        foreach (var f in factories.Enumerate())
+                        foreach (var f in factories)
                             yield return new ServiceRegistrationInfo(f.Value, entry.Key, f.Key);
                     }
                 }
@@ -2522,7 +2578,7 @@ namespace DryIoc
                     else
                     {
                         var factories = ((FactoriesEntry)entry.Value).Factories;
-                        foreach (var f in factories.Enumerate())
+                        foreach (var f in factories)
                             if ((result = match(entry.Key, f.Key, f.Value)) != null)
                                 yield return result;
                     }
@@ -2613,11 +2669,11 @@ namespace DryIoc
                             if (entry is Factory factory)
                                 return serviceKey == null || DefaultKey.Value.Equals(serviceKey) ? factory.One() : null;
 
-                            var factories = ((FactoriesEntry)entry).Factories;
+                            var factoriesEntry = (FactoriesEntry)entry;
                             if (serviceKey == null) // get all the factories
-                                return factories.ToArray(static x => x.Value);
+                                return factoriesEntry.Factories.Map(static x => x.Value);
 
-                            return factories.GetValueOrDefault(serviceKey)?.One();
+                            return factoriesEntry.GetFirstKeyedOrDefault(serviceKey)?.Value?.One(); // todo: @wip return multiple factories
                         }
                 }
             }
@@ -2684,12 +2740,12 @@ namespace DryIoc
                                     ? condition == null || condition(factory)
                                     : false;
 
-                            var factories = ((FactoriesEntry)entry).Factories;
+                            var factoriesEntry = (FactoriesEntry)entry;
                             if (serviceKey == null)
                                 return condition == null ||
-                                    factories.Enumerate().FirstOrDefault(condition, static (cond, f) => cond(f.Value)) != null;
+                                    factoriesEntry.Factories.FindFirst(condition, static (cond, f) => cond(f.Value)) != null;
 
-                            factory = factories.GetValueOrDefault(serviceKey);
+                            factory = factoriesEntry.GetFirstKeyedOrDefault(serviceKey)?.Value; // todo: @wip return multiple factories
                             return factory != null && (condition == null || condition(factory));
                         }
                 }
@@ -2729,57 +2785,57 @@ namespace DryIoc
                     {
                         case IfAlreadyRegistered.AppendNotKeyed:
                             return n.SetValue(o.Value is FactoriesEntry fe
-                                ? fe.With(fac)
-                                : FactoriesEntry.Empty.WithTwo((Factory)o.Value, fac));
+                                ? fe.WithDefault(fac)
+                                : FactoriesEntry.Empty.WithTwoDefault((Factory)o.Value, fac));
 
                         case IfAlreadyRegistered.Throw:
                             return n.SetValue(o.Value is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey == null
-                                ? oldFactoriesEntry.With(fac)
+                                ? oldFactoriesEntry.WithDefault(fac)
                                 : Throw.For<object>(Error.UnableToRegisterDuplicateDefault, n.Key, fac, o));
 
                         case IfAlreadyRegistered.Replace:
                             if (o.Value is FactoriesEntry facEntryToReplace)
                             {
                                 if (facEntryToReplace.LastDefaultKey == null)
-                                    return n.SetValue(facEntryToReplace.With(fac));
-                                // remove defaults but keep keyed (issue #569) by collecting the only keyed factories
-                                // and using them in a new factory entry
-                                var keyedFactories = facEntryToReplace.Factories.Fold(ImHashMap<object, Factory>.Empty,
-                                    static (x, _, map) => x.Key is DefaultKey == false ? map.AddOrUpdate(x.Key, x.Value) : map);
-                                if (!keyedFactories.IsEmpty)
-                                    return n.SetValue(new FactoriesEntry(DefaultKey.Value, keyedFactories.AddOrUpdate(DefaultKey.Value, fac)));
+                                    return n.SetValue(facEntryToReplace.WithDefault(fac, DefaultKey.Value));
+
+                                // remove defaults but keep keyed (issue #569) by collecting the only keyed factories and using them in a new factory entry
+                                var keyedFactories = facEntryToReplace.Factories.Match(static x => x.Key is not DefaultKey);
+                                if (keyedFactories.Length != 0)
+                                    return n.SetValue(new FactoriesEntry(DefaultKey.Value,
+                                        keyedFactories.AppendToNonEmpty(new KV<object, Factory>(DefaultKey.Value, fac))));
                             }
                             return n;
 
                         case IfAlreadyRegistered.AppendNewImplementation:
                             var oldImplFacsEntry = o.Value as FactoriesEntry;
                             if (oldImplFacsEntry != null && oldImplFacsEntry.LastDefaultKey == null)
-                                return n.SetValue(oldImplFacsEntry.With(fac));
+                                return n.SetValue(oldImplFacsEntry.WithDefault(fac, DefaultKey.Value));
 
                             var oldFactory = o.Value as Factory;
                             var implementationType = fac.ImplementationType;
                             if (implementationType == null ||
                                 oldFactory != null && oldFactory.ImplementationType != implementationType)
-                                return n.SetValue((oldImplFacsEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(fac));
+                                return n.SetValue((oldImplFacsEntry ?? FactoriesEntry.Empty.WithDefault(oldFactory)).WithDefault(fac));
 
                             if (oldImplFacsEntry != null)
                             {
                                 var isNewImplType = true;
-                                foreach (var f in oldImplFacsEntry.Factories.Enumerate())
+                                foreach (var f in oldImplFacsEntry.Factories)
                                     if (f.Value.ImplementationType == implementationType)
                                     {
                                         isNewImplType = false;
                                         break;
                                     }
                                 return isNewImplType
-                                    ? n.SetValue((oldImplFacsEntry ?? FactoriesEntry.Empty.With(oldFactory)).With(fac))
+                                    ? n.SetValue((oldImplFacsEntry ?? FactoriesEntry.Empty.WithDefault(oldFactory)).WithDefault(fac))
                                     : o;
                             }
                             return o; // return the old entry unless the implementation type is new 
 
                         default: // IfAlreadyRegisteredKeepDefaultService
                             return o.Value is FactoriesEntry oldFacsEntry && oldFacsEntry.LastDefaultKey == null
-                                ? n.SetValue(oldFacsEntry.With(fac))
+                                ? n.SetValue(oldFacsEntry.WithDefault(fac))
                                 : o;
                     }
                 });
@@ -2805,12 +2861,12 @@ namespace DryIoc
             {
                 if (entryValue is Factory oldFactory)
                     r.DropFactoryCache(oldFactory, serviceTypeHash, serviceType);
-                else if (entryValue is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry?.LastDefaultKey != null)
-                    oldFactoriesEntry.Factories.ForEach(new { r, serviceTypeHash, serviceType }, (x, _, s) =>
-                    {
-                        if (x.Key is DefaultKey)
-                            s.r.DropFactoryCache(x.Value, s.serviceTypeHash, s.serviceType);
-                    });
+                else if (entryValue is FactoriesEntry oldFactoriesEntry && oldFactoriesEntry.LastDefaultKey != null)
+                {
+                    foreach (var f in oldFactoriesEntry.Factories)
+                        if (f.Key is DefaultKey)
+                            r.DropFactoryCache(f.Value, serviceTypeHash, serviceType, f.Key);
+                }
             }
 
             private static ImHashMap<Type, object> WithKeyedService(Registry r, ImHashMap<Type, object> registryOrServices,
@@ -2823,35 +2879,33 @@ namespace DryIoc
                 {
                     switch (ifAlreadyRegistered)
                     {
-                        case IfAlreadyRegistered.Keep:
-                            if (oldEntry is Factory factoryToKeep)
-                                newEntry = FactoriesEntry.Empty.With(factory, serviceKey).With(factoryToKeep);
-                            else
-                            {
-                                var oldFacs = (FactoriesEntry)oldEntry;
-                                if (oldFacs.Factories.Contains(serviceKey))
-                                    return registryOrServices; // keep the old registry
-                                newEntry = new FactoriesEntry(oldFacs.LastDefaultKey, oldFacs.Factories.AddOrUpdate(serviceKey, factory));
-                            }
-                            break;
                         case IfAlreadyRegistered.Replace:
-                            if (oldEntry is Factory factoryToReplace)
-                                newEntry = FactoriesEntry.Empty.With(factory, serviceKey).With(factoryToReplace);
+                            if (oldEntry is Factory singleDefaultFactory)
+                                newEntry = DefaultKey.Value.Equals(serviceKey)
+                                    ? factory
+                                    : FactoriesEntry.Empty.WithDefault(singleDefaultFactory, DefaultKey.Value).With(factory, serviceKey);
                             else
-                                newEntry = new FactoriesEntry(((FactoriesEntry)oldEntry).LastDefaultKey,
-                                    ((FactoriesEntry)oldEntry).Factories.AddOrUpdate(serviceKey, factory));
+                                newEntry = ((FactoriesEntry)oldEntry).With(factory, serviceKey);
                             break;
-                        default:
-                            if (oldEntry is Factory defaultFactory)
-                                newEntry = FactoriesEntry.Empty.With(factory, serviceKey).With(defaultFactory);
+                        default: // covers all other cases in the presence of service key
+                            // case IfAlreadyRegistered.Throw
+                            // case IfAlreadyRegistered.AppendNotKeyed:
+                            // case IfAlreadyRegistered.Keep:
+                            // case IfAlreadyRegistered.AppendNewImplementation:
+
+                            if (oldEntry is Factory factoryToKeep)
+                                newEntry = FactoriesEntry.Empty.WithDefault(factoryToKeep, DefaultKey.Value).With(factory, serviceKey);
                             else
                             {
                                 var oldFacs = (FactoriesEntry)oldEntry;
-                                var oldFac = oldFacs.Factories.GetValueOrDefault(serviceKey);
+                                var oldFac = oldFacs.GetLastKeyedOrDefault(serviceKey);
                                 if (oldFac != null)
-                                    Throw.It(Error.UnableToRegisterDuplicateKey, serviceKey, serviceKey, oldFac);
-                                newEntry = new FactoriesEntry(oldFacs.LastDefaultKey,
-                                    ((FactoriesEntry)oldEntry).Factories.AddOrUpdate(serviceKey, factory));
+                                {
+                                    if (ifAlreadyRegistered != IfAlreadyRegistered.Keep)
+                                        Throw.It(Error.UnableToRegisterDuplicateKey, serviceKey, oldFac.Key, oldFac.Value);
+                                    return registryOrServices; // keep the old registry only for the explicit .Keep case
+                                }
+                                newEntry = oldFacs.With(factory, serviceKey);
                             }
                             break;
                     }
@@ -2866,10 +2920,10 @@ namespace DryIoc
 
                 r = r.WithServices(newServices);
 
-                if (oldEntry != null && ifAlreadyRegistered == IfAlreadyRegistered.Replace &&
+                if (oldEntry != null & ifAlreadyRegistered == IfAlreadyRegistered.Replace &&
                     oldEntry is FactoriesEntry updatedOldFactories &&
-                    updatedOldFactories.Factories.TryFind(serviceKey, out var droppedFactory))
-                    r.DropFactoryCache(droppedFactory, serviceTypeHash, serviceType, serviceKey);
+                    updatedOldFactories.GetFirstKeyedOrDefault(serviceKey) is { } droppedFactory)
+                    r.DropFactoryCache(droppedFactory.Value, serviceTypeHash, serviceType, serviceKey);
 
                 return r;
             }
@@ -2948,22 +3002,23 @@ namespace DryIoc
 
                 object removed = null; // Factory or FactoriesEntry or Factory[]
                 var hash = RuntimeHelpers.GetHashCode(serviceType);
-                if (serviceKey == null && condition == null) // simplest case with simplest handling
+                if (serviceKey == null & condition == null) // simplest case with simplest handling
                     services = services.Update(hash, serviceType, null, (_, entry, _null) =>
                     {
                         removed = entry;
                         return null;
                     });
                 else
+                    // todo: @perf @mem
                     services = services.Update(hash, serviceType, null, (_, entry, _null) =>
                     {
                         if (entry == null)
                             return null;
 
-                        if (entry is Factory)
+                        if (entry is Factory defaultFac)
                         {
-                            if ((serviceKey != null && !DefaultKey.Value.Equals(serviceKey)) ||
-                                (condition != null && !condition((Factory)entry)))
+                            if ((serviceKey != null && !DefaultKey.Value.Equals(serviceKey)) || // todo: @wip check for AnyKey scenario
+                                (condition != null && !condition(defaultFac)))
                                 return entry; // keep entry
                             removed = entry; // otherwise remove it (the only case if serviceKey == DefaultKey.Value)
                             return null;
@@ -2971,45 +3026,31 @@ namespace DryIoc
 
                         var factoriesEntry = (FactoriesEntry)entry;
                         var oldFactories = factoriesEntry.Factories;
-                        var remainingFactories = ImHashMap<object, Factory>.Empty;
-                        if (serviceKey == null) // automatically means condition != null
-                        {
-                            // keep factories for which condition is true
-                            remainingFactories = oldFactories.Fold(remainingFactories,
-                                (oldFac, _, remainingFacs) => condition != null && !condition(oldFac.Value)
-                                    ? remainingFacs.AddOrUpdate(oldFac.Key, oldFac.Value)
-                                    : remainingFacs);
-                        }
-                        else // serviceKey is not default, which automatically means condition == null
-                        {
-                            // set to null factory with specified key if its found
-                            remainingFactories = oldFactories;
-                            var factory = oldFactories.GetValueOrDefault(serviceKey);
-                            if (factory != null)
-                                remainingFactories = oldFactories.Count() > 1
-                                    ? oldFactories.UpdateToDefault(serviceKey.GetHashCode(), serviceKey)
-                                    : ImHashMap<object, Factory>.Empty;
-                        }
 
-                        if (remainingFactories.IsEmpty)
+                        var remainingFactories = serviceKey == null // automatically means condition != null and vise versa
+                            ? oldFactories.Match(condition, static (c, oldFac) => !c(oldFac.Value))
+                            : oldFactories.RemoveAt(factoriesEntry.GetLastKeyedIndex(serviceKey));
+
+                        if (remainingFactories.Length == 0)
                         {
-                            // if no more remaining factories, then delete the whole entry
-                            removed = entry;
+                            removed = entry; // if nothing remained then delete the whole entry
                             return null;
                         }
 
-                        // todo: @perf huh - no perf here?
-                        removed = oldFactories.Enumerate().Except(remainingFactories.Enumerate()).Select(static x => x.Value).ToArray();
+                        if (remainingFactories.Length == oldFactories.Length)
+                            return entry; // keep entry - nothing was removed
 
-                        if (remainingFactories is ImHashMapEntry<object, Factory> e && DefaultKey.Value.Equals(e.Key))
-                            return e.Value; // replace entry with single remaining default factory
+                        removed = oldFactories.Except(remainingFactories).Select(static x => x.Value).ToArray();
 
-                        // update last default key if current default key was removed
-                        var newDefaultKey = factoriesEntry.LastDefaultKey;
-                        if (newDefaultKey != null && remainingFactories.GetValueOrDefault(newDefaultKey) == null)
-                            newDefaultKey = remainingFactories.Enumerate().Select(static x => x.Key)
-                                .OfType<DefaultKey>().OrderByDescending(static key => key.RegistrationOrder).FirstOrDefault();
-                        return new FactoriesEntry(newDefaultKey, remainingFactories);
+                        if (remainingFactories.Length == 1 && DefaultKey.Value.Equals(remainingFactories[0].Key))
+                            return remainingFactories[0].Value; // replace entry with single remaining default factory
+
+                        // update the last default key if the current last default key was removed
+                        var newLastDefaultKey = factoriesEntry.LastDefaultKey;
+                        if (newLastDefaultKey != null && remainingFactories.FindLast(newLastDefaultKey, static (dk, x) => x.Key.Equals(dk)) == null)
+                            newLastDefaultKey = (DefaultKey)remainingFactories.FindLast(static x => x.Key is DefaultKey).Key;
+
+                        return new FactoriesEntry(newLastDefaultKey, remainingFactories);
                     });
 
                 if (removed == null)
@@ -3019,13 +3060,14 @@ namespace DryIoc
                     return services;
 
                 r = r.WithServices(services);
+
                 if (removed is Factory f)
                     r.DropFactoryCache(f, hash, serviceType, serviceKey);
                 else if (removed is Factory[] fs)
                     foreach (var rf in fs)
                         r.DropFactoryCache(rf, hash, serviceType, serviceKey);
                 else
-                    foreach (var e in ((FactoriesEntry)removed).Factories.Enumerate())
+                    foreach (var e in ((FactoriesEntry)removed).Factories)
                         r.DropFactoryCache(e.Value, hash, serviceType, serviceKey);
                 return r;
             }
@@ -5718,7 +5760,7 @@ namespace DryIoc
 
         /// <summary>Returns true if both key and the index are equal.</summary>
         public override bool Equals(object obj) =>
-            obj is UniqueRegisteredServiceKey other && other.Index == Index && 
+            obj is UniqueRegisteredServiceKey other && other.Index == Index &&
             (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key));
 
         /// <summary>Combines key and index</summary>
@@ -5896,7 +5938,7 @@ namespace DryIoc
 
         /// <summary>Creates the rules for the Microsoft.Extension.DependencyInjection 
         /// together with the ParameterSelector for the keyed services, which should be provided as parameter</summary>
-        public Rules WithBaseMicrosoftDependencyInjectionRules(ParameterSelector parameters) => 
+        public Rules WithBaseMicrosoftDependencyInjectionRules(ParameterSelector parameters) =>
             WithMicrosoftDependencyInjectionRules(this, parameters);
 
         /// <summary>By default the `IServiceProvider.GetService` is returning `null` if service is not resolved. 
@@ -6018,8 +6060,8 @@ namespace DryIoc
         {
             var rules = Clone();
             rules.FactorySelector = rule;
-            rules._settings = rule == SelectLastRegisteredFactory 
-                ? (_settings |  Settings.SelectLastRegisteredFactory) 
+            rules._settings = rule == SelectLastRegisteredFactory
+                ? (_settings | Settings.SelectLastRegisteredFactory)
                 : (_settings & ~Settings.SelectLastRegisteredFactory);
             return rules;
         }
@@ -15094,8 +15136,8 @@ namespace DryIoc
             UnableToRegisterDuplicateDefault = Of(
                 "The default service {0} without key {1} is already registered as {2}."),
             UnableToRegisterDuplicateKey = Of(
-                "Unable to register service with duplicate key '{0}': {1}" + NewLine +
-                " There is already registered service with the same key {2}."),
+                "Unable to register service with duplicate service key '{0}' for the already present service key '{1}'" + NewLine +
+                " The already present factory is: {2}."),
             NoCurrentScope = Of(
                 "No current scope is available - probably you are registering to or resolving from outside of the scope. " + NewLine +
                 "It also may be because of the scoped dependency has singletons in its parent chain so the dependency is resolved from the root container resolver." + NewLine +
