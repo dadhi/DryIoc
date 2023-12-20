@@ -5,8 +5,15 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class CodeGenerationTests
+    public class CodeGenerationTests : ITest
     {
+        public int Run()
+        {
+            Should_properly_print_registration_info_with_Singleton_reuse_type();
+            Should_properly_print_registration_info_with_default_reuse_type();
+            return 2;
+        }
+
         [Test]
         public void Should_properly_print_registration_info_with_Singleton_reuse_type()
         {

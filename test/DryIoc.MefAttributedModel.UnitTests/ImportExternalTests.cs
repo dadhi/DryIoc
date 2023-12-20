@@ -4,8 +4,19 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ImportExternalTests
+    public class ImportExternalTests : ITest
     {
+        public int Run()
+        {
+            I_can_export_ctor_param_service_on_resolve();
+            I_can_specify_Reuse_for_export_ctor_param_service_on_resolve();
+            I_can_specify_constructor_while_exporting_once_a_ctor_param_service();
+            I_can_import_or_export_fields_and_properties_as_well();
+            When_non_Import_attribute_used_It_should_throw();
+            Can_use_arbitrary_contract_key_type_for_ImportExternal_same_as_for_Export();
+            return 6;
+        }
+
         [Test]
         public void I_can_export_ctor_param_service_on_resolve()
         {

@@ -5,8 +5,18 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ExportManyTests
+    public class ExportManyTests : ITest
     {
+        public int Run()
+        {
+            When_class_public_types_exported_as_singleton_Then_resolving_types_will_return_the_same_instance();
+            ExportMany_should_respect_ContractName();
+            Individual_Export_is_simply_added_to_ExportMany_settings();
+            If_both_export_and_export_all_specifying_the_same_setup_Then_only_single_will_be_registered();
+            Can_specify_to_throw_on_second_register_many_of_the_same_service();
+            return 5;
+        }
+
         [Test]
         public void When_class_public_types_exported_as_singleton_Then_resolving_types_will_return_the_same_instance()
         {

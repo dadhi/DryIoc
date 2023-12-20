@@ -7,8 +7,18 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ExportAsWrapperTests
-    {
+    public class ExportAsWrapperTests : ITest
+    {   
+        public int Run()
+        {
+            Exporting_IFactory_as_generic_wrapper_should_work();
+            Exporting_IFactory_with_arguments_as_generic_wrapper_should_work();
+            Exporting_as_non_generic_wrapper_should_work();
+            Exporting_non_generic_wrapper_with_generic_index_should_just_ignore_the_index();
+            Exporting_generic_wrapper_with_wrong_generic_arg_index_should_throw_meaningful_exception();
+            return 5;
+        }
+
         [Test]
         public void Exporting_IFactory_as_generic_wrapper_should_work()
         {

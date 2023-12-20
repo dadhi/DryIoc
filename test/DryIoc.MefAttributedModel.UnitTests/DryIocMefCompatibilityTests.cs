@@ -5,8 +5,34 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class DryIocMefCompatibilityTests
+    public class DryIocMefCompatibilityTests : ITest
     {
+        public int Run()
+        {
+            DryIoc_supports_importing_static_factory_method();
+            DryIoc_supports_importing_named_static_factory_method();
+            DryIoc_supports_exporting_instance_member_of_not_exported_type();
+            DryIoc_supports_named_value_imports_and_exports();
+            DryIoc_supports_multiple_contract_names_on_same_service_type();
+            DryIoc_supports_importing_service_as_untyped_property();
+            DryIoc_supports_importing_services_as_untyped_array();
+            DryIoc_chooses_the_default_constructor_if_no_constructors_are_marked_with_ImportingConstructorAttribute();
+            DryIoc_supports_ExportFactory_for_non_shared_parts();
+            DryIoc_supports_ExportFactory_for_parts_with_unspecified_creation_policy();
+            DryIoc_supports_ExportFactory_for_shared_parts();
+            DryIoc_supports_ExportFactoryWithMetadata_for_non_shared_parts();
+            DryIoc_can_import_many_lazy_services_with_metadata();
+            DryIoc_optional_imports_of_nonexisting_service_are_null();
+            DryIoc_required_import_of_nonexisting_service_cannot_be_resolved();
+            DryIoc_supports_multiple_metadata_attributes();
+            DryIoc_allows_importing_untyped_metadata();
+            DryIoc_supports_metadata_attribute_hierarchy_properly();
+            DryIoc_calls_ImportSatisfied_for_non_shared_parts_once();
+            DryIoc_calls_ImportSatisfied_for_shared_parts_once();
+            DryIoc_can_import_member_with_metadata();
+            return 21;
+        }
+
         private IContainer Container => CreateContainer();
 
         private static IContainer CreateContainer()

@@ -5,8 +5,17 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class AllowDefaultTests
+    public class AllowDefaultTests : ITest
     {
+        public int Run()
+        {
+            AllowDefault_could_be_applied_to_parameter();
+            AllowDefault_could_be_applied_to_property();
+            AllowDefault_false_applied_to_property_should_Throw();
+            AllowDefault_dependencies_could_be_nested();
+            return 4;
+        }
+
         [Test]
         public void AllowDefault_could_be_applied_to_parameter()
         {
