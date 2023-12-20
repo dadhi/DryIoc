@@ -104,14 +104,28 @@ namespace DryIoc.Microsoft.DependencyInjection
         {
             if (InitialContainer == null)
                 return new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
-                    .WithDependencyInjectionAdapter(false, services, _registerDescriptor, 
-                        RegistrySharing.Share); // we use share because new container does not have any registrations or cache yet
-            return InitialContainer.WithDependencyInjectionAdapter(true, services, _registerDescriptor, 
-                _registrySharing); // use the user-provided registry sharing
+                    .WithDependencyInjectionAdapter(AdaptingExistingContainer.AvoidCheckNoAdapting, 
+                        services, _registerDescriptor, RegistrySharing.Share); // we use share because new container does not have any registrations or cache yet
+            return InitialContainer.WithDependencyInjectionAdapter(
+                    AdaptingExistingContainer.CheckAndAdaptIfNeeded, services, _registerDescriptor, _registrySharing); // use the user-provided registry sharing
         }
 
         /// <inheritdoc />
         public virtual IServiceProvider CreateServiceProvider(DryIocServiceProvider provider) => provider;
+    }
+
+    /// <summary>Specifies the behavior of the <see cref="DryIocServiceProviderFactory"/> when adapting the existing container.
+    /// Based on this settings thr factory may create a new container from the initial one with the conforming rules,
+    /// or keep the initial container intact, if it is fully conformed. 
+    /// Being conformed means it passes the check <see cref="DryIocAdapter.HasMicrosoftDependencyInjectionRules(Rules)"/>
+    /// but may include additional orthogonal rules as well.</summary>
+    public enum AdaptingExistingContainer
+    {
+        /// <summary>Check the container rules, and adapt them if needed (add the missing rules and removing the non-compatible rules)
+        /// and producing the new container with the adapted rules</summary>
+        CheckAndAdaptIfNeeded = 0,
+        /// <summary>Does not check the container rules and use them as-is, keep the existing container intact</summary>
+        AvoidCheckNoAdapting,
     }
 
     /// <summary>Adapts DryIoc container to be used as MS.DI service provider, plus provides the helpers
@@ -198,29 +212,31 @@ namespace DryIoc.Microsoft.DependencyInjection
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
             RegistrySharing registrySharing = RegistrySharing.Share) =>
-            container.WithDependencyInjectionAdapter(true, descriptors, registerDescriptor, registrySharing).Container;
+            container.WithDependencyInjectionAdapter(AdaptingExistingContainer.CheckAndAdaptIfNeeded, 
+                descriptors, registerDescriptor, registrySharing).Container;
 
         internal static DryIocServiceProvider WithDependencyInjectionAdapter(
-            this IContainer container, bool checkTheRulesAreConforming,
+            this IContainer container, AdaptingExistingContainer adaptingExistingContainer,
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
             RegistrySharing registrySharing = RegistrySharing.Share)
         {
-            if (!checkTheRulesAreConforming)
+            switch (adaptingExistingContainer)
             {
-                if (registrySharing != RegistrySharing.Share)
-                    container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
-            }
-            else
-            {
-                var hasRules = HasMicrosoftDependencyInjectionRules(container.Rules);
-                if (!hasRules)
-                {
-                    var newRules = WithMicrosoftDependencyInjectionRules(container.Rules);
-                    container = container.With(newRules, container.ScopeContext, registrySharing, container.SingletonScope);
-                }
-                else if (registrySharing != RegistrySharing.Share)
-                    container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
+                case AdaptingExistingContainer.AvoidCheckNoAdapting: 
+                    if (registrySharing != RegistrySharing.Share)
+                        container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
+                    break;
+                case AdaptingExistingContainer.CheckAndAdaptIfNeeded:
+                    var rules = container.Rules;
+                    if (!HasMicrosoftDependencyInjectionRules(rules))
+                    {
+                        var newRules = WithMicrosoftDependencyInjectionRules(rules);
+                        container = container.With(newRules, container.ScopeContext, registrySharing, container.SingletonScope);
+                    }
+                    else if (registrySharing != RegistrySharing.Share)
+                        container = container.With(rules, container.ScopeContext, registrySharing, container.SingletonScope);
+                    break;
             }
 
             var serviceProvider = new DryIocServiceProvider(container);

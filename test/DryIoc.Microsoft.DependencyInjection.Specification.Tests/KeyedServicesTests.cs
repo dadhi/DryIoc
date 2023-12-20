@@ -12,10 +12,10 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     public class KeyedServicesTests : KeyedDependencyInjectionSpecificationTests
     {
-        private static DryIocServiceProvider BuildProvider(IServiceCollection collection) => 
+        private static DryIocServiceProvider BuildProvider(IServiceCollection collection) =>
             new DryIocServiceProviderFactory().CreateBuilder(collection);
 
-        protected override IServiceProvider CreateServiceProvider(IServiceCollection collection) => 
+        protected override IServiceProvider CreateServiceProvider(IServiceCollection collection) =>
             BuildProvider(collection);
 
         [Fact]
@@ -170,8 +170,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             Assert.Same(service2, services[1]);
         }
 
-        // [Fact] // todo: @wip @fixme
-        public void ResolveKeyedServicesSingletonInstanceWithAnyKey_ResolveMany_3_services()
+        [Fact]
+        public void ResolveKeyedServicesSingletonInstanceWithAnyKey_3_services_ResolveMany()
         {
             var service0 = new FakeService();
             var service1 = new FakeService();
@@ -182,12 +182,37 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>("the key", service1);
             serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>(KeyedService.AnyKey, service2);
 
-            var container = BuildProvider(serviceCollection).Container;
+            var provider = BuildProvider(serviceCollection);
 
-            var services = container.ResolveMany<IFakeOpenGenericService<PocoClass>>(serviceKey: "the key").ToArrayOrSelf();
+            var services = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>("the key").ToArrayOrSelf();
 
             Assert.Equal(3, services.Length);
-            // Assert.False(services[0] == services[1], "services[0] == services[1]");
+            Assert.False(services[0] == services[1], "services[0] == services[1]");
+            Assert.False(services[0] == services[2], "services[0] == services[2]");
+            Assert.False(services[1] == services[2], "services[1] == services[2]");
+            Assert.Same(service0, services[0]);
+            Assert.Same(service1, services[1]);
+            Assert.Same(service2, services[2]);
+        }
+
+        [Fact]
+        public void ResolveKeyedServicesSingletonInstanceWithAnyKey_3_services()
+        {
+            var service0 = new FakeService();
+            var service1 = new FakeService();
+            var service2 = new FakeService();
+
+            var serviceCollection = new ServiceCollection();
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>("the key", service0);
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>("the key", service1);
+            serviceCollection.AddKeyedSingleton<IFakeOpenGenericService<PocoClass>>(KeyedService.AnyKey, service2);
+
+            var provider = BuildProvider(serviceCollection);
+
+            var services = provider.GetKeyedServices<IFakeOpenGenericService<PocoClass>>(serviceKey: "the key").ToArrayOrSelf();
+
+            Assert.Equal(3, services.Length);
+            Assert.False(services[0] == services[1], "services[0] == services[1]");
             Assert.False(services[0] == services[2], "services[0] == services[2]");
             Assert.False(services[1] == services[2], "services[1] == services[2]");
             Assert.Same(service0, services[0]);
