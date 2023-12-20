@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2013-2021 Maksim Volkau
+Copyright (c) 2013-2023 Maksim Volkau
 Copyright (c) Autofac Project. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +27,6 @@ THE SOFTWARE.
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Diagnostics.CodeAnalysis;
 using Autofac.Core;
 using Autofac.Features.OwnedInstances;
 using DryIoc;
@@ -91,7 +90,7 @@ namespace Autofac
                     if (r.Parameters != null)
                     {
                         var ps = Parameters.Of;
-                        foreach (var p in r.Parameters) 
+                        foreach (var p in r.Parameters)
                         {
                             switch (p)
                             {
@@ -105,7 +104,7 @@ namespace Autofac
 
                                 case ResolvedParameter _:
                                 default:
-                                    ps = ps.Details((ctx, x) => 
+                                    ps = ps.Details((ctx, x) =>
                                         p.CanSupplyValue(x, new ContainerAdapter(ctx.Container), out var fac)
                                             ? ServiceDetails.Of(fac())
                                             : null);
@@ -114,7 +113,7 @@ namespace Autofac
                         }
                         made = ps;
                     }
-                    
+
                     Container.Register(r.ServiceType, r.ImplementationType, r.Reuse, made);
                 }
             }
@@ -178,7 +177,7 @@ namespace Autofac
             var info = new RegistrationInfo
             {
                 ServiceType = serviceType,
-                ImplementationType = implementationType  ?? serviceType,
+                ImplementationType = implementationType ?? serviceType,
                 Factory = factory,
                 Instance = instance
             };
@@ -289,7 +288,7 @@ namespace Autofac
         }
 
         /// <summary>Adds the parameter specification</summary>
-        public static RegistrationInfo WithParameter(this RegistrationInfo info, Parameter parameter) 
+        public static RegistrationInfo WithParameter(this RegistrationInfo info, Parameter parameter)
         {
             if (info.Parameters == null)
                 info.Parameters = new List<Parameter>();
@@ -372,7 +371,7 @@ namespace Autofac.Core
         /// <summary>Initializes a new instance of the class.</summary>
         public KeyedService(object serviceKey, Type serviceType)
         {
-            ServiceKey  = serviceKey  ?? throw new ArgumentNullException(nameof(serviceKey));
+            ServiceKey = serviceKey ?? throw new ArgumentNullException(nameof(serviceKey));
             ServiceType = serviceType ?? throw new ArgumentNullException(nameof(serviceType));
         }
 
@@ -475,7 +474,7 @@ namespace Autofac.Core
         }
 
         ///<summary>Factory method</summary>
-        public static ResolvedParameter ForNamed<TService>(string serviceName) => 
+        public static ResolvedParameter ForNamed<TService>(string serviceName) =>
             ForKeyed<TService>(serviceName);
 
         ///<summary>Factory method</summary>
@@ -520,6 +519,6 @@ namespace Autofac.Core.Registration
     public class ComponentNotRegisteredException : DependencyResolutionException
     {
         /// Constructor
-        public ComponentNotRegisteredException(string message) : base(message) {}
+        public ComponentNotRegisteredException(string message) : base(message) { }
     }
 }

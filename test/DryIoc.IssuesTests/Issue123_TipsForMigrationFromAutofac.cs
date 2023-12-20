@@ -9,8 +9,44 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue123_TipsForMigrationFromAutofac
+    public class Issue123_TipsForMigrationFromAutofac : ITest
     {
+        public int Run()
+        {
+            Transient_disposable_is_tracked_in_container();
+            Transient_disposable_is_tracked_in_open_scope();
+            How_to_get_all_registrations_in_registration_order();
+            Auto_activated_with_metadata();
+            AsImplementedInterfaces();
+            IDisposable_should_be_excluded_from_register_many();
+            AutofacDisposalOrder();
+            Autofac_disposes_in_reverse_resolution_order_SO_I_can_break_it_by_deferring_dependency_injection();
+            Can_register_many_services_produced_by_factory();
+            Autofac_as_self();
+            How_Autofac_Owned_works();
+            How_Autofac_handles_service_with_missing_dependency();
+            How_Autofac_IEnumerable_handles_missing_service();
+            How_Autofac_IEnumerable_handles_service_with_missing_dependency();
+            How_DryIoc_handles_missing_service();
+            How_DryIoc_handles_service_with_missing_dependency();
+            How_DryIoc_IEnumerable_handles_missing_service();
+            How_DryIoc_IEnumerable_handles_service_with_missing_dependency();
+            DryIoc_IEnumerable_may_exclude_service_with_missing_dependency();
+            Autofac_default_constructor_selection_policy();
+            DryIoc_constructor_selection_plus_specs();
+            Module_Autofac();
+            Module_DryIoc();
+            Single_implementation_multiple_interfaces_dont_share_lifetime();
+            Resolve_all_services_implementing_the_interface();
+            Resolve_all_registered_interface_services();
+            Autofac_Func_of_non_registered_dependency_should_throw();
+            Autofac_Lazy_of_non_registered_dependency_should_throw();
+            DryIoc_Lazy_of_non_registered_dependency_should_throw();
+            Implement_Owned_in_DryIoc();
+
+            return 30;
+        }
+
         [Test]
         public void Transient_disposable_is_tracked_in_container()
         {

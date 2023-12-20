@@ -131,6 +131,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test", "samples\GHIssue519\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MinimalWeb", "samples\MinimalWeb\MinimalWeb.csproj", "{D9B3581F-F4E5-4225-82FE-5AAC1779B63B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests", "test\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests.csproj", "{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -277,6 +279,10 @@ Global
 		{D9B3581F-F4E5-4225-82FE-5AAC1779B63B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D9B3581F-F4E5-4225-82FE-5AAC1779B63B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D9B3581F-F4E5-4225-82FE-5AAC1779B63B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -317,6 +323,7 @@ Global
 		{4B7B7E57-3975-448A-B79A-9315DDC3DB38} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73} = {38A94225-72AE-4869-88A2-61FCB48ED681}
 		{D9B3581F-F4E5-4225-82FE-5AAC1779B63B} = {38A94225-72AE-4869-88A2-61FCB48ED681}
+		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}
