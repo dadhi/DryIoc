@@ -10,8 +10,8 @@ namespace DryIoc.MefAttributedModel.UnitTests
         public int Run()
         {
             Can_export_and_resolve_composite();
-            Can_export_and_resolve_composite_as_lazy_enumerable();
             Works_together_with_ConstructorWithResolvableArguments();
+            Can_export_and_resolve_composite_as_lazy_enumerable();
             Resolving_with_metadata_with_duplicate_key_should_throw();
             Can_specify_to_throw_on_second_registration();
             Importing_LazyEnumerable();

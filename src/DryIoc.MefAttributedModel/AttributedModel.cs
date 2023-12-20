@@ -61,10 +61,13 @@ namespace DryIoc.MefAttributedModel
         /// <summary>Adjusts the rules to provide the full MEF compatibility.</summary>
         public static Rules WithMefRules(this Rules rules)
         {
-            var importMadeOf = rules.FactoryMethodOrSelector == null
+            var prevFactorySelector = rules.FactoryMethodOrSelector;
+            var importMadeOf = prevFactorySelector == null
                 ? _defaultImportMadeOf
                 : Made.Of(
-                    static request => GetImportingConstructor(request, request.Rules.FactoryMethodOrSelector),
+                    // don't make this lambda static because we need the prevoius factory selector, 
+                    // and not the current one from the `request.Rules`, otherwise it will be recursive call to the fall back method.
+                    request => GetImportingConstructor(request, prevFactorySelector),
                     GetImportedParameter,
                     _getImportedPropertiesAndFields);
 
@@ -581,16 +584,21 @@ namespace DryIoc.MefAttributedModel
         private static FactoryMethod GetImportingConstructor(DryIoc.Request request, object fallbackMethodOrSelector = null)
         {
             var implType = request.ImplementationType;
-            var ctors = implType.PublicAndInternalConstructors().ToArrayOrSelf();
-            var ctor = ctors.SingleOrDefault(it => it.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
+            var allCtors = implType.PublicAndNonPublicInstanceConstructors().ToArrayOrSelf();
+            var importingCtors = allCtors.Match(static it => it.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
 
-            if (ctor == null)
+            ConstructorInfo selectedCtor = null;
+            if (importingCtors.Length == 1)
             {
-                ctors = ctors.Where(it => it.IsPublic).ToArrayOrSelf();
-                ctor = ctors.Length == 1 ? ctors[0] : null;
+                selectedCtor = importingCtors[0];
+            }
+            else if (importingCtors.Length > 1)
+            {
+                var publicCtors = allCtors.Match(static c => c.IsPublic);
+                selectedCtor = publicCtors.Length == 1 ? publicCtors[0] : null;
             }
 
-            if (ctor == null)
+            if (selectedCtor == null)
             {
                 // next try to fallback defined constructor, it may be defined as ConstructorWithResolvableArguments
                 if (fallbackMethodOrSelector != null)
@@ -600,12 +608,22 @@ namespace DryIoc.MefAttributedModel
                         return fallbackMethod;
                 }
 
-                // at the end try default constructor
-                ctor = ctors.SingleOrDefault(it => it.GetParameters().Length == 0);
+                if (allCtors.Length == 1)
+                {
+                    selectedCtor = allCtors[0];
+                }
+                else if (allCtors.Length > 1)
+                {
+                    // at the end try the default constructor,
+                    // it possible to have only one independent of whether it is public or not
+                    var defaultCtors = allCtors.Match(static c => c.GetParameters().Length == 0);
+                    if (defaultCtors.Length == 1)
+                        selectedCtor = defaultCtors[0];
+                }
             }
 
-            ctor.ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType, request);
-            return FactoryMethod.Of(ctor);
+            selectedCtor.ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType, request);
+            return FactoryMethod.Of(selectedCtor);
         }
 
         private static Func<ParameterInfo, ParameterServiceInfo> GetImportedParameter(DryIoc.Request request) => parameter =>

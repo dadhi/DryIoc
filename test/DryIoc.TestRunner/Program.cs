@@ -9,6 +9,7 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
+            // new MefAttributedModel.UnitTests.MoreAttributedModelTests().Run();
             // new Issue486_CustomDynamicRegistrationProvider().Run();
 
             RunAllTests();
@@ -100,7 +101,7 @@ namespace DryIoc.UnitTests
                 new MefAttributedModel.UnitTests.ImportWithMetadataTests(),
                 new MefAttributedModel.UnitTests.InheritedExportTests(),
                 new MefAttributedModel.UnitTests.ReuseAttributeTests(),
-                // new MefAttributedModel.UnitTests.MoreAttributedModelTests(), // todo: @wip
+                new MefAttributedModel.UnitTests.MoreAttributedModelTests(),
             };
             var issueTests = new ITest[]
             {

@@ -15719,9 +15719,9 @@ namespace DryIoc
         public static ConstructorInfo[] PublicConstructors(this Type type) =>
             type.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
 
-        /// <summary>Returns all public instance constructors for the type</summary>
+        /// <summary>Returns all instance constructors for the type</summary>
         [MethodImpl((MethodImplOptions)256)]
-        public static IEnumerable<ConstructorInfo> PublicAndInternalConstructors(this Type type) =>
+        public static IEnumerable<ConstructorInfo> PublicAndNonPublicInstanceConstructors(this Type type) =>
             type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
         /// <summary>Enumerates all constructors from input type.</summary>

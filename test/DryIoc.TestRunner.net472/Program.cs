@@ -81,7 +81,7 @@ namespace DryIoc.UnitTests.net472
                 new MefAttributedModel.UnitTests.ImportWithMetadataTests(),
                 new MefAttributedModel.UnitTests.InheritedExportTests(),
                 new MefAttributedModel.UnitTests.ReuseAttributeTests(),
-                // new MefAttributedModel.UnitTests.MoreAttributedModelTests(), // todo: @wip
+                new MefAttributedModel.UnitTests.MoreAttributedModelTests(),
             };
             var issueTests = new ITest[]
             {

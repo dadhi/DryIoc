@@ -559,13 +559,11 @@ namespace DryIoc.ImTools
             if (source == null)
                 return default(T);
 
-            using (var e = source.GetEnumerator())
-            {
-                if (!e.MoveNext())
-                    return default(T);
-                var it = e.Current;
-                return !e.MoveNext() ? it : default(T);
-            }
+            var e = source.GetEnumerator();
+            if (!e.MoveNext())
+                return default(T);
+            var it = e.Current;
+            return !e.MoveNext() ? it : default(T);
         }
 
         /// <summary>Does <paramref name="action"/> for each item</summary>
