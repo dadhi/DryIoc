@@ -584,44 +584,43 @@ namespace DryIoc.MefAttributedModel
         private static FactoryMethod GetImportingConstructor(DryIoc.Request request, object fallbackMethodOrSelector = null)
         {
             var implType = request.ImplementationType;
+
             var allCtors = implType.PublicAndNonPublicInstanceConstructors().ToArrayOrSelf();
-            var importingCtors = allCtors.Match(static it => it.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
 
-            ConstructorInfo selectedCtor = null;
-            if (importingCtors.Length == 1)
-            {
-                selectedCtor = importingCtors[0];
-            }
-            else if (importingCtors.Length > 1)
-            {
-                var publicCtors = allCtors.Match(static c => c.IsPublic);
-                selectedCtor = publicCtors.Length == 1 ? publicCtors[0] : null;
-            }
+            // 1. Find any single importing constructor
+            var selectedCtor = allCtors.FindFirstSingle(out var nextCtorIndex,
+                static c => c.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
+            if (selectedCtor != null)
+                return FactoryMethod.Of(selectedCtor);
 
-            if (selectedCtor == null)
+            // 2. The rare case if we still have more importing constructors found, 
+            // it is rare because multiple importing constructors probably a mistake
+            if (nextCtorIndex != -1)
             {
-                // next try to fallback defined constructor, it may be defined as ConstructorWithResolvableArguments
-                if (fallbackMethodOrSelector != null)
-                {
-                    var fallbackMethod = fallbackMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)fallbackMethodOrSelector)(request);
-                    if (fallbackMethod != null)
-                        return fallbackMethod;
-                }
-
-                if (allCtors.Length == 1)
-                {
-                    selectedCtor = allCtors[0];
-                }
-                else if (allCtors.Length > 1)
-                {
-                    // at the end try the default constructor,
-                    // it possible to have only one independent of whether it is public or not
-                    var defaultCtors = allCtors.Match(static c => c.GetParameters().Length == 0);
-                    if (defaultCtors.Length == 1)
-                        selectedCtor = defaultCtors[0];
-                }
+                // 2.1. Find any public single importing constructor
+                selectedCtor = allCtors.FindFirstSingle(out _,
+                    static c => c.IsPublic && c.GetAttributes(typeof(ImportingConstructorAttribute)).Any());
+                if (selectedCtor != null)
+                    return FactoryMethod.Of(selectedCtor);
             }
 
+            // 3. Try to fallback to constructor or method selector, it may be defined as ConstructorWithResolvableArguments
+            if (fallbackMethodOrSelector != null)
+            {
+                var fallbackMethod = fallbackMethodOrSelector as FactoryMethod ?? ((FactoryMethodSelector)fallbackMethodOrSelector)(request);
+                if (fallbackMethod != null)
+                    return fallbackMethod;
+            }
+
+            // 4. Find a single public constructor
+            selectedCtor = allCtors.FindFirstSingle(out _, static c => c.IsPublic);
+            if (selectedCtor != null)
+                return FactoryMethod.Of(selectedCtor);
+
+            // 5. Find a single default constructor
+            selectedCtor = allCtors.FindFirstSingle(out _, static c => c.GetParameters().Length == 0);
+
+            // Search is failed - give up
             selectedCtor.ThrowIfNull(Error.NoSingleCtorWithImportingAttr, implType, request);
             return FactoryMethod.Of(selectedCtor);
         }

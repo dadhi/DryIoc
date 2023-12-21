@@ -551,7 +551,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Returns element if collection consist on single element, otherwise returns default value.
         /// It does not throw for collection with many elements</summary>
-        public static T SingleOrDefaultIfMany<T>(this IEnumerable<T> source)
+        public static T FindSingle<T>(this IEnumerable<T> source)
         {
             if (source is IList<T> list)
                 return list.Count == 1 ? list[0] : default(T);
@@ -564,6 +564,58 @@ namespace DryIoc.ImTools
                 return default(T);
             var it = e.Current;
             return !e.MoveNext() ? it : default(T);
+        }
+
+        /// <summary>Returns a single item matching the <paramref name="condition"/>, or default item value if no or many.</summary>
+        public static T FindFirstSingle<T>(this T[] source, out int nextFoundIndex, Func<T, bool> condition)
+        {
+            nextFoundIndex = -1;
+            if (source == null)
+                return default;
+
+            T found = default;
+            var isAlreadyFound = false;
+            for (var i = 0; i < source.Length; ++i)
+            {
+                var item = source[i];
+                if (condition(item))
+                {
+                    if (isAlreadyFound)
+                    {
+                        nextFoundIndex = i;
+                        return default;
+                    }
+                    found = item;
+                    isAlreadyFound = true;
+                }
+            }
+            return found;
+        }
+
+        /// <summary>Version of FindSingle with the passed state used by condition to prevent the allocations by condition lambda closure.</summary>
+        public static T FindFirstSingle<T, S>(this T[] source, out int nextFoundIndex, S state, Func<S, T, bool> condition)
+        {
+            nextFoundIndex = -1;
+            if (source == null)
+                return default;
+
+            T found = default;
+            var isAlreadyFound = false;
+            for (var i = 0; i < source.Length; ++i)
+            {
+                var item = source[i];
+                if (condition(state, item))
+                {
+                    if (isAlreadyFound)
+                    {
+                        nextFoundIndex = i;
+                        return default;
+                    }
+                    found = item;
+                    isAlreadyFound = true;
+                }
+            }
+            return found;
         }
 
         /// <summary>Does <paramref name="action"/> for each item</summary>
@@ -2492,7 +2544,7 @@ namespace DryIoc.ImTools
             public override string ToString()
             {
                 var sb = new System.Text.StringBuilder("HashConflictingEntry: [");
-                foreach (var x in Conflicts) 
+                foreach (var x in Conflicts)
                     sb.Append(x.ToString()).Append(", ");
                 return sb.Append("]").ToString();
             }
@@ -2915,7 +2967,7 @@ namespace DryIoc.ImTools
             public override int Count() => Entry0.Count() + Entry1.Count() + Entry2.Count() + Entry3.Count() + Entry4.Count();
 
 #if !DEBUG
-            public override string ToString() => 
+            public override string ToString() =>
                 "{L2:{E0:" + Entry0 + ",E1:" + Entry1 + ",E2:" + Entry2 + ",E3:" + Entry3 + ",E4:" + Entry4 + "}}";
 #endif
 
