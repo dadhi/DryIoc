@@ -9,8 +9,7 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            // new MefAttributedModel.UnitTests.MoreAttributedModelTests().Run();
-            // new Issue486_CustomDynamicRegistrationProvider().Run();
+            new GHIssue619_FaultySingletonDependency().Run();
 
             RunAllTests();
 
