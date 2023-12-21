@@ -221,7 +221,7 @@ namespace DryIoc.UnitTests
                 new GHIssue608_Multiple_same_type_same_keyed(),
                 new GHIssue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments(),
             };
-            // var docsTests = new Func<int>[] 
+            // var docsTests = new Func<int>[] // todo: @docs
             // { 
             //     () => { new Nested_decorators_order().Example(); return 1; }
             // };

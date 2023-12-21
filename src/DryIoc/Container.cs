@@ -7193,9 +7193,10 @@ namespace DryIoc
         private static FactoryMethod MostResolvableConstructor(Request request,
             BindingFlags additionalToPublicAndInstance = 0, Func<Type, ParameterInfo[], bool> condition = null)
         {
-            var ctors = ((ReflectionFactory)request.Factory).GetConstructors(request, additionalToPublicAndInstance);
+            var ctors = ((ReflectionFactory)request.Factory).GetConstructors(request, additionalToPublicAndInstance); // todo: @wip what with condition here in GetConstructors 
             if (ctors.Length != 0 & condition != null)
                 ctors = ctors.Match(condition, static (cond, c) => cond(c.DeclaringType, c.GetParameters()));
+
             if (ctors.Length == 0)
                 return null;
 
@@ -7391,6 +7392,12 @@ namespace DryIoc
                 return Throw.For<FactoryMethod>(throwIfCtorNotFound, Error.UnableToFindCtorWithAllResolvableArgs, request.InputArgExprs, request);
 
             return new WithResolvedParameterExpressions(resolvedCtor, resolvedCtorParamExprs);
+        }
+
+        private static FactoryMethod Constructor(Request request, BindingFlags additionalToPublicAndInstance = 0)
+        {   // todo: @perf return ctor or ctors
+            var ctors = ((ReflectionFactory)request.Factory).GetConstructors(request, additionalToPublicAndInstance);
+            return ctors.Length == 1 ? new FactoryMethod(ctors[0]) : null;
         }
 
         /// <summary>Easy way to specify default constructor to be used for resolution.</summary>
