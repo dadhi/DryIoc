@@ -7184,12 +7184,6 @@ namespace DryIoc
                 : (FactoryMethodSelector)(static request => Constructor(request));
         }
 
-        private static FactoryMethod Constructor(Request request, BindingFlags additionalToPublicAndInstance = 0)
-        {
-            var ctors = ((ReflectionFactory)request.Factory).GetConstructors(request, additionalToPublicAndInstance);
-            return ctors.Length == 1 ? new FactoryMethod(ctors[0]) : null;
-        }
-
         private static FactoryMethod MostResolvableConstructor(Request request,
             BindingFlags additionalToPublicAndInstance = 0, Func<Type, ParameterInfo[], bool> condition = null)
         {
