@@ -4,8 +4,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue429_Resolve_instance_from_named_scope_with_Func
+    public class Issue429_Resolve_instance_from_named_scope_with_Func : ITest
     {
+        public int Run()
+        {
+            Original_test();
+            Ok_to_resolve_one_scoped_service_wrapped_in_func_before_the_scope_is_opened();
+            Unable_to_resolve_one_scoped_service_wrapped_in_func_before_the_not_matched_scope_is_opened();
+            Unable_to_select_from_two_services_Resolved_in_func_before_scope_is_opened();
+            return 4;
+        }
+
         [Test]
         public void Original_test()
         {

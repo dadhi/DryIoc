@@ -6,8 +6,18 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class InheritedExportTests
+    public class InheritedExportTests : ITest
     {
+        public int Run()
+        {
+            It_is_possible_to_mark_interface_to_export_all_its_implementations();
+            It_is_possible_to_mark_abstract_class_to_export_all_its_implementations();
+            It_is_possible_to_mark_class_as_not_discoverable();
+            Can_handle_multiple_inherited_and_export_attributes();
+            API_TEST_Can_discover_attribute_from_implemented_interface_OR_inherited_class();
+            return 5;
+        }
+
         [Test]
         public void It_is_possible_to_mark_interface_to_export_all_its_implementations()
         {

@@ -5,8 +5,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue123_TipsForMigrationFromAutofac_WithParameter
+    public class Issue123_TipsForMigrationFromAutofac_WithParameter : ITest
     {
+        public int Run()
+        {
+            Injecting_const_string_via_delegate();
+            Injecting_const_string_via_named_parameter();
+            Injecting_const_string_via_typed_parameter();
+            Injecting_const_string_via_resolved_parameter();
+            return 4;
+        }
+
         [Test]
         public void Injecting_const_string_via_delegate()
         {

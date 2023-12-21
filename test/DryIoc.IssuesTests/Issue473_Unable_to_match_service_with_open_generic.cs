@@ -8,8 +8,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue473_Unable_to_match_service_with_open_generic
+    public class Issue473_Unable_to_match_service_with_open_generic : ITest
     {
+        public int Run()
+        {
+            Unable_to_match_in_ResolveMany();
+            Able_to_match_in_ResolveMany();
+            return 2;
+        }
+
         [Test]
         public void Unable_to_match_in_ResolveMany()
         {

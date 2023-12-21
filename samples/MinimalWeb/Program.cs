@@ -3,7 +3,7 @@ using DryIoc.Microsoft.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var container = new MyContainer(Rules.MicrosoftDependencyInjectionRules);
+var container = new MyContainer(DryIocAdapter.MicrosoftDependencyInjectionRules);
 
 // register natively with DryIoc
 container.Register<Bar>();
@@ -49,11 +49,11 @@ public class SingletonAutomaticallyResolved
     }
 }
 
-public class MyContainer : Container
+public sealed class MyContainer : Container
 {
     public MyContainer(Rules rules) : base(rules) {}
 
-    public override IResolverContext WithNewOpenScope() 
+    public override IContainer WithNewOpenScope() 
     {
         var scope = base.WithNewOpenScope();
         scope.Resolve<ScopedAutomaticallyResolved>();
@@ -65,10 +65,9 @@ public class MyDryIocServiceProviderFactory : DryIocServiceProviderFactory
 {
     public MyDryIocServiceProviderFactory(IContainer container) : base(container) {}
 
-    public override IServiceProvider CreateServiceProvider(IContainer container)
+    public override IServiceProvider CreateServiceProvider(DryIocServiceProvider provider)
     {
-        var provider = base.CreateServiceProvider(container);
-        container.Resolve<SingletonAutomaticallyResolved>();
+        provider.Container.Resolve<SingletonAutomaticallyResolved>();
         return provider;
     }
 }

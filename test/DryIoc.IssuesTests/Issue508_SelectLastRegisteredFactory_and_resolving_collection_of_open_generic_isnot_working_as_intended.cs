@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue508_SelectLastRegisteredFactory_and_resolving_collection_of_open_generic_isnot_working_as_intended
+    public class Issue508_SelectLastRegisteredFactory_and_resolving_collection_of_open_generic_isnot_working_as_intended : ITest
     {
+        public int Run()
+        {
+            ResolvesDifferentInstancesForServiceWhenResolvingEnumerable();
+            return 1;
+        }
+
         [Test]
         public void ResolvesDifferentInstancesForServiceWhenResolvingEnumerable()
         {

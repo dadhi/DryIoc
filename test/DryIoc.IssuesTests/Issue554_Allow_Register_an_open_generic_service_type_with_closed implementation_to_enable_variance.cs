@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue554_Allow_Register_an_open_generic_service_type_with_closed_implementation_to_enable_variance
+    public class Issue554_Allow_Register_an_open_generic_service_type_with_closed_implementation_to_enable_variance : ITest
     {
+        public int Run()
+        {
+            Can_Register_with_open_generic_service_type_and_Resolve_variance_compatible_type();
+            Can_RegisterMany_with_open_generic_service_type_and_Resolve_variance_compatible_type();
+            return 2;
+        }
+
         [Test]
         public void Can_Register_with_open_generic_service_type_and_Resolve_variance_compatible_type()
         {

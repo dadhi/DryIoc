@@ -7,8 +7,27 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ImportAttributeTests
+    public class ImportAttributeTests : ITest
     {
+        public int Run()
+        {
+            Inject_service_as_parameter_of_required_service_type_specified_by_Import_ContractType();
+            Inject_service_as_Func_of_Service_with_Import_contract_type();
+            Inject_service_as_Lazy_of_Service_with_Import_contract_type();
+            Inject_service_as_Lazy_Meta_of_Service_with_Import_contract_type();
+            Inject_service_as_Func_Array_of_Service_with_Import_contract_type();
+            Inject_service_as_Func_Array_of_Service_with_Import_contract_key_no_type_specified();
+            Inject_property_with_default_Import_should_work();
+            Resolve_property_for_already_resolved_instance();
+            Resolving_unregistered_property_marked_by_Import_should_throw();
+            Resolving_unregistered_property_without_attribute_model_should_not_throw_so_the_property_stays_null();
+            Resolving_registered_property_with_not_assignable_type_should_Throw();
+            Resolve_custom_generic_wrapper_marked_with_Import();
+            Could_import_property_with_internal_setter();
+            When_resolving_props_and_fields_manually_required_type_should_work();
+            return 14;
+        }
+
         [Test]
         public void Inject_service_as_parameter_of_required_service_type_specified_by_Import_ContractType()
         {

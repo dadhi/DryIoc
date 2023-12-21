@@ -3,8 +3,16 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue561_Child_containers_and_singletons
+    public class Issue561_Child_containers_and_singletons : ITest
     {
+        public int Run()
+        {
+            should_resolve_unregistered_concrete_class();
+            child_can_override_parent_singleton_instances_in_isolation();
+            child_can_override_parent_transient_registrations_in_isolation();
+            return 3;
+        }
+        
         public interface IService { }
         public class Service : IService { }
         public class TestService : IService { }

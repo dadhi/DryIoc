@@ -1,4 +1,5 @@
 using System.Linq;
+using DryIoc.Microsoft.DependencyInjection;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -9,7 +10,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test()
         {
-            var container = new Container(Rules.MicrosoftDependencyInjectionRules);
+            var container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules);
 
             container.Register<IConfigureOptions<TestOptions>, TestOptionsSetup>();
 

@@ -1,12 +1,17 @@
-using System.Diagnostics;
 using System.Threading.Tasks;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue603_async_actions_in_MVC
+    public class Issue603_async_actions_in_MVC : ITest
     {
+        public int Run()
+        {
+            Test().GetAwaiter().GetResult();
+            return 1;
+        }
+
         [Test]
         public async Task Test()
         {

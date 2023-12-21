@@ -1,12 +1,19 @@
 using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue570_ArgumentNullThrownWhenMultipleConstructorsAndArgsDepsProvided
+    public class Issue570_ArgumentNullThrownWhenMultipleConstructorsAndArgsDepsProvided : ITest
     {
+        public int Run()
+        {
+            ResolveShouldNotThrowWhenMultipleConstructorsAndArgsDepsProvided();
+            ResolveShouldNotThrowWhenMultipleConstructorsAndArgsDepsProvided_WithConcreteTypesResolution();
+            Should_work_with_the_Dictionary_is_right();
+            return 3;
+        }
+
         [Test]
         public void ResolveShouldNotThrowWhenMultipleConstructorsAndArgsDepsProvided()
         {

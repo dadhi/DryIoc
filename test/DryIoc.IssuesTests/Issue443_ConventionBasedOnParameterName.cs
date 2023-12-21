@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue443_ConventionBasedOnParameterName
+    public class Issue443_ConventionBasedOnParameterName : ITest
     {
+        public int Run()
+        {
+            Can_globally_use_string_parameter_name_as_service_key();
+            return 1;
+        }
+
         [Test]
         public void Can_globally_use_string_parameter_name_as_service_key()
         {

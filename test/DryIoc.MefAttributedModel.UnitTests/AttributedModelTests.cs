@@ -9,8 +9,36 @@ namespace DryIoc.MefAttributedModel.UnitTests
     using NUnit.Framework;
 
     [TestFixture]
-    public class AttributedModelTests : AttributedModelTestsBase
+    public class AttributedModelTests : AttributedModelTestsBase, ITest
     {
+        public int Run()
+        {
+            Init(); I_can_resolve_service_with_dependencies(); Dispose();
+            Init(); I_can_resolve_transient_service(); Dispose();
+            Init(); I_can_resolve_singleton_service(); Dispose();
+            Init(); I_can_resolve_singleton_open_generic_service(); Dispose();
+            Init(); I_can_resolve_transient_open_generic_service(); Dispose();
+            Init(); I_can_resolve_open_generic_service_with_two_parameters(); Dispose();
+            Init(); I_can_resolve_service_factory(); Dispose();
+            Init(); I_can_resolve_array_of_func_with_one_parameter(); Dispose();
+            Init(); I_can_resolve_meta_factory_many(); Dispose();
+            Init(); Container_can_be_setup_to_select_one_constructor_based_on_attribute(); Dispose();
+            Init(); Internal_constructor_used(); Dispose();
+            Init(); Service_with_metadata_can_be_resolved_without_name(); Dispose();
+            Init(); Resolving_service_with_multiple_constructors_without_importing_attribute_should_fail(); Dispose();
+            Init(); Export_as_new_resolution_scope_dependency(); Dispose();
+            Init(); Export_condition_should_be_evaluated(); Dispose();
+            Init(); I_can_mark_exports_to_be_injected_as_resolution_roots(); Dispose();
+            Init(); Can_register_open_generic_returned_by_factory_method_nested_in_open_generic_class(); Dispose();
+            Init(); Can_specify_all_Register_options_for_export(); Dispose();
+            Init(); ExportedRegistrationInfo_has_non_null_metadata_provided_by_WithMetadataAttribute(); Dispose();
+            Init(); ExportedRegistrationInfo_has_non_null_metadata_provided_by_ExportMetadataAttribute(); Dispose();
+            Init(); Can_resolve_export_with_WithMetadata_only_metadata(); Dispose();
+            Init(); Can_resolve_export_with_ExportAttribute_only_metadata(); Dispose();
+            Init(); Can_resolve_export_with_multi_metadata(); Dispose();
+            return 23;
+        }
+
         [Test]
         public void I_can_resolve_service_with_dependencies()
         {

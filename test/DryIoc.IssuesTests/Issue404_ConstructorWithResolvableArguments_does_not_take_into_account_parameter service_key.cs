@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue404_ConstructorWithResolvableArguments_does_not_take_into_account_parameter_service_key
+    public class Issue404_ConstructorWithResolvableArguments_does_not_take_into_account_parameter_service_key : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

@@ -5,8 +5,19 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ImportManyTests
+    public class ImportManyTests : ITest
     {
+        public int Run()
+        {
+            ImportMany_works_with_importing_constructor_in_DryIoc1();
+            ImportMany_works_with_importing_constructor_in_DryIoc2();
+            ImportMany_works_with_property_injection_in_DryIoc3();
+            ImportMany_works_with_property_injection_in_DryIoc4();
+            ImportMany_with_required_service_type_should_work();
+            ImportMany_with_service_key_should_work();
+            return 6;
+        }
+
         private IContainer Container
         {
             get { return CreateContainer(); }

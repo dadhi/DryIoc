@@ -1,3 +1,4 @@
+using DryIoc.Microsoft.DependencyInjection;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -8,7 +9,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test1()
         {
-            var c = new Container(Rules.MicrosoftDependencyInjectionRules);
+            var c = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules);
 
             c.Register<IMemoryCache, MemCache>(Reuse.Singleton);
 

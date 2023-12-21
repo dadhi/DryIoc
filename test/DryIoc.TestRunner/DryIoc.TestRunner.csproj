@@ -13,6 +13,7 @@
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj" />
     <ProjectReference Include="..\..\docs\DryIoc.Docs\DryIoc.Docs.csproj" />
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.csproj" />
   </ItemGroup>
 
   <ItemGroup>

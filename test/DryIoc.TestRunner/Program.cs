@@ -9,14 +9,16 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            // new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton().Run();
-            // new GHIssue243_Delegate_Factory_Resolving_Incremental_Improvement_over_Func_Wrapper().Run();
+            // new MefAttributedModel.UnitTests.MoreAttributedModelTests().Run();
+            // new Issue486_CustomDynamicRegistrationProvider().Run();
 
             RunAllTests();
 
+            // new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules().Run();
+            // new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton().Run();
+            // new GHIssue243_Delegate_Factory_Resolving_Incremental_Improvement_over_Func_Wrapper().Run();
             // new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run(); // todo: @fixme
             // new GHIssue169_Decorators().Run();
-
             // new ActionTests().Run();
             // new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
             // new GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
@@ -83,32 +85,88 @@ namespace DryIoc.UnitTests
                 new UnregisterTests(),
                 new WipeCacheTests(),
                 new WrapperTests(),
+
+                new MefAttributedModel.UnitTests.AllowDefaultTests(),
+                new MefAttributedModel.UnitTests.AttributedModelTests(),
+                new MefAttributedModel.UnitTests.CodeGenerationTests(),
+                new MefAttributedModel.UnitTests.DryIocMefCompatibilityTests(),
+                new MefAttributedModel.UnitTests.ExportAsDecoratorTests(),
+                new MefAttributedModel.UnitTests.ExportAsWrapperTests(),
+                new MefAttributedModel.UnitTests.ExportFactoryTests(),
+                new MefAttributedModel.UnitTests.ExportImportWithKeyTests(),
+                new MefAttributedModel.UnitTests.ExportManyTests(),
+                new MefAttributedModel.UnitTests.ImportAttributeTests(),
+                new MefAttributedModel.UnitTests.ImportExternalTests(),
+                new MefAttributedModel.UnitTests.ImportManyTests(),
+                new MefAttributedModel.UnitTests.ImportWithMetadataTests(),
+                new MefAttributedModel.UnitTests.InheritedExportTests(),
+                new MefAttributedModel.UnitTests.ReuseAttributeTests(),
+                new MefAttributedModel.UnitTests.MoreAttributedModelTests(),
             };
             var issueTests = new ITest[]
             {
                 new DotnetWeekBlogExample(),
+                new ParameterResolutionFixture(),
+                new Messages_Test(),
+
                 new SO_Child_Container_for_transients(),
                 new SO_Injecting_the_collection_of_interfaces_implemented_by_decorator(),
                 new SO_Decorator_not_being_constrained_correctly(),
+
                 new Issue_Can_resolve_singleton_with_Func_of_scoped_dependency(),
                 new Issue_HandleVariance(),
                 new Issue_InjectingSerilogLogger(),
-                new ParameterResolutionFixture(),
                 new Issue_Register_null_string(),
                 new Issue_SupportForDynamicKeyword(),
                 new Issue_UsingAsyncMethodAsMadeOf(),
                 new Issue_Value_type_resolution_dependency(),
+                
                 new Issue107_NamedScopesDependingOnResolvedTypes(),
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
+                new Issue357_PartImportsSatisfied(),
+                new Issue404_ConstructorWithResolvableArguments_does_not_take_into_account_parameter_service_key(),
+                new Issue407_Cannot_resolve_MadeOf_params_explicitly(),
                 new Issue416_Adding_always_true_condition_to_decorator_changes_the_decorated_outcome(),
+                new Issue417_Performance_issue_with_Func(),
+                new Issue422_Unable_to_resolve_decorator_with_named_dependency(),
+                new Issue423_InnerScopeIsInjectedIntoSingleton(),
+                new Issue429_Resolve_instance_from_named_scope_with_Func(),
+                new Issue435_ReuseSingleton_prevents_the_correct_container_injection_within_explicit_resolve(),
+                new Issue443_ConventionBasedOnParameterName(),
                 new Issue446_Select_single_open_generic_impl_based_on_matching_closed_service_type(),
+                new Issue451_Should_forbid_static_imports(),
+                new Issue473_Unable_to_match_service_with_open_generic(),
+                new Issue477_ArgumentException_while_resolving(),
                 new Issue486_CustomDynamicRegistrationProvider(),
                 new Issue488_DryIoc_ContainerException_if_using_WithDependencies(),
+                new Issue496_Provide_builtin_method_to_post_initialize_instance_after_it_is_registered(),
                 new Issue497_ConstructorWithResolvableArguments_is_not_working_properly(),
+                new Issue500_Rule_WithConcreteTypeDynamicRegistrations_disables_allowDisposableTransient(),
+                new Issue508_SelectLastRegisteredFactory_and_resolving_collection_of_open_generic_isnot_working_as_intended(),
+                new Issue512_InResolutionScopeOf_is_not_working(),
+                new Issue519_Dependency_of_singleton_not_working_when_using_child_container(),
+                new Issue527_ErrorResolvemManyAfterUregister(),
+                new Issue530_Multi_tenancy_support(),
+                new Issue541_Dynamic_Registrations_dont_detect_circular_dependencies(),
+                new Issue543_Dynamic_Registrations_dont_respect_shared_creation_policy(),
+                new Issue545_Func_Of_Scoped(),
+                new Issue546_Recursive_dependency_isnt_detected_in_large_object_graphs(),
                 new Issue548_After_registering_a_factory_Func_is_returned_instead_of_the_result_of_Func(),
+                new Issue554_Allow_Register_an_open_generic_service_type_with_closed_implementation_to_enable_variance(),
+                new Issue561_Child_containers_and_singletons(),
+                new Issue566_Named_service_not_replaced(),
+                new Issue569_Replacing_Registration_clears_all_existing_registrations(),
+                new Issue570_ArgumentNullThrownWhenMultipleConstructorsAndArgsDepsProvided(),
                 new Issue572_Dynamic_Service_Keys(),
+                new Issue574_IResolverContext_Use_instance_ShouldNotHaveSideEffectsOnOtherScopes(),
+                new Issue577_InconsistentResolutionAndCacheAnomaly(),
+                new Issue578_Specific_Service_Type_required_by_controller_not_resolving(),
+                new Issue579_VerifyResolutions_strange_behaviour(),
+                new Issue580_Same_service_instance_resolved_twice_when_decorator_is_used(),
+                new Issue581_Constructor_injection_with_array_parameter(),
+                new Issue596_RegisterMany_with_Factory(),
+                new Issue603_async_actions_in_MVC(),
 
-                new Messages_Test(),
                 new GHIssue4_Rule_for_Func_and_Lazy_to_be_resolved_even_without_requested_service_registered(),
                 new GHIssue6_Open_generic_singleton_service_registration_that_satisfies_multiple_interfaces(),
                 new GHIssue7_1_Context_based_injection(),
@@ -144,6 +202,7 @@ namespace DryIoc.UnitTests
                 new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton(),
                 new GHIssue508_Throws_when_lazy_resolve_after_explicit_create_using_factory_func_from_within_scope(),
                 new GHIssue512_Optimize_injection_of_IResolverContext(),
+                new GHIssue514_Avoid_using_the_Func_arguments_for_recursive_service_first_found_outside_the_Func(),
                 new GHIssue516_Singleton_Decorator_to_Scoped_base_should_not_work_but_does(),
                 new GHIssue518_Select_default_then_resolvable_constructor(),
                 new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit(),
@@ -159,9 +218,10 @@ namespace DryIoc.UnitTests
                 new GHIssue576_Extension_methods_not_being_handled_correctly_in_MadeOf_service_returning_expression(),
                 new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton(),
                 new GHIssue588_Container_IsDisposed_property_not_reflecting_own_scope_disposed_state(),
+                new GHIssue608_Multiple_same_type_same_keyed(),
                 new GHIssue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments(),
             };
-            // var docsTests = new Func<int>[] 
+            // var docsTests = new Func<int>[] // todo: @docs
             // { 
             //     () => { new Nested_decorators_order().Example(); return 1; }
             // };

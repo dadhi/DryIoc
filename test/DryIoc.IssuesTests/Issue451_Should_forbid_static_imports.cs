@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue451_Should_forbid_static_imports
+    public class Issue451_Should_forbid_static_imports : ITest
     {
+        public int Run()
+        {
+            Should_ignore_static_import();
+            return 1;
+        }
+
         [Test]
         public void Should_ignore_static_import()
         {

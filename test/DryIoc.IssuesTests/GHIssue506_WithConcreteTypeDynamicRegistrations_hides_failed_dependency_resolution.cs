@@ -1,4 +1,5 @@
 using System;
+using DryIoc.Microsoft.DependencyInjection;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -8,7 +9,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // Test1();
+            Test1();
             Test2();
             return 2;
         }
@@ -33,7 +34,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test2()
         {
-            var c = new Container(Rules.MicrosoftDependencyInjectionRules.WithConcreteTypeDynamicRegistrations());
+            var c = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules.WithConcreteTypeDynamicRegistrations());
             var o = c.Resolve<OtherService>();
             Assert.IsNotNull(o.Dependency);
         }

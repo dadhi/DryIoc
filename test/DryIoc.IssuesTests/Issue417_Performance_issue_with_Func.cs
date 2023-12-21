@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue417_Performance_issue_with_Func
+    public class Issue417_Performance_issue_with_Func : ITest
     {
+        public int Run()
+        {
+            Can_inject_singleton_as_resolve_call_inside_func_with_args();
+            return 1;
+        }
+
         [Test]
         public void Can_inject_singleton_as_resolve_call_inside_func_with_args()
         {

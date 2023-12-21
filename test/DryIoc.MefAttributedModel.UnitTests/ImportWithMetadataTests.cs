@@ -5,8 +5,15 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ImportWithMetadataTests
+    public class ImportWithMetadataTests : ITest
     {
+        public int Run()
+        {
+            It_should_throw_if_no_service_with_specified_metadata_found();
+            ImportMany_with_metadata_should_work();
+            return 2;
+        }
+
         [Test]
         public void It_should_throw_if_no_service_with_specified_metadata_found()
         {

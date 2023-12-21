@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue569_Replacing_Registration_clears_all_existing_registrations
+    public class Issue569_Replacing_Registration_clears_all_existing_registrations : ITest
     {
+        public int Run()
+        {
+            Replacing_default_registration_with_presence_of_keyed_should_not_replace_the_keyed();
+            Original_case();
+            return 2;
+        }
+
         [Test]
         public void Replacing_default_registration_with_presence_of_keyed_should_not_replace_the_keyed()
         {

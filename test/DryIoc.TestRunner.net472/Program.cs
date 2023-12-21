@@ -65,6 +65,23 @@ namespace DryIoc.UnitTests.net472
                 new UnregisterTests(),
                 new WipeCacheTests(),
                 new WrapperTests(),
+
+                new MefAttributedModel.UnitTests.AllowDefaultTests(),
+                new MefAttributedModel.UnitTests.AttributedModelTests(),
+                new MefAttributedModel.UnitTests.CodeGenerationTests(),
+                new MefAttributedModel.UnitTests.DryIocMefCompatibilityTests(),
+                new MefAttributedModel.UnitTests.ExportAsDecoratorTests(),
+                new MefAttributedModel.UnitTests.ExportAsWrapperTests(),
+                new MefAttributedModel.UnitTests.ExportFactoryTests(),
+                new MefAttributedModel.UnitTests.ExportImportWithKeyTests(),
+                new MefAttributedModel.UnitTests.ExportManyTests(),
+                new MefAttributedModel.UnitTests.ImportAttributeTests(),
+                new MefAttributedModel.UnitTests.ImportExternalTests(),
+                new MefAttributedModel.UnitTests.ImportManyTests(),
+                new MefAttributedModel.UnitTests.ImportWithMetadataTests(),
+                new MefAttributedModel.UnitTests.InheritedExportTests(),
+                new MefAttributedModel.UnitTests.ReuseAttributeTests(),
+                new MefAttributedModel.UnitTests.MoreAttributedModelTests(),
             };
             var issueTests = new ITest[]
             {

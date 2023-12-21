@@ -26,7 +26,7 @@ namespace DryIoc.IssuesTests
 
             var method = Made.Of(FactoryMethod.OfFunc(funcType.GetMethod("Invoke"), (object f) => f));
 
-            var factory = ReflectionFactory.OfTypeAndMadeNoValidation(serviceType, method);
+            var factory = ReflectionFactory.OfConcreteTypeAndMadeNoValidation(serviceType, method);
 
             container.Register(factory, serviceType, null, null, isStaticallyChecked: true);
 

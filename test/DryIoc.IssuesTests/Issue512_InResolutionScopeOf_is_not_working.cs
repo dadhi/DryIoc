@@ -3,8 +3,15 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue512_InResolutionScopeOf_is_not_working
+    public class Issue512_InResolutionScopeOf_is_not_working : ITest
     {
+        public int Run()
+        {
+            Test_with_default_container_rules();
+            Test_with_MS_DI_container_rules();
+            return 2;
+        }
+
         [Test]
         public void Test_with_default_container_rules()
         {

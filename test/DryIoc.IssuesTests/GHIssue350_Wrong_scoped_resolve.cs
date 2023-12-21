@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using DryIoc.Microsoft.DependencyInjection;
 
 namespace DryIoc.IssuesTests
 {
@@ -8,8 +9,8 @@ namespace DryIoc.IssuesTests
         [Test]
         public void TheBug_2_is_not_a_bug_and_depends_on_the_registration_order()
         {
-            var container = new Container(rules => rules
-                .WithMicrosoftDependencyInjectionRules()
+            var container = new Container(rules =>
+                DryIocAdapter.WithMicrosoftDependencyInjectionRules(rules)
                 .WithFuncAndLazyWithoutRegistration());
 
             container.Register<A>();
@@ -38,7 +39,6 @@ namespace DryIoc.IssuesTests
         public void TheBug_2_without_MS_DI_rules()
         {
             var container = new Container(rules => rules
-                // .WithMicrosoftDependencyInjectionRules()
                 .WithFuncAndLazyWithoutRegistration());
 
             container.Register<A>();
@@ -67,8 +67,8 @@ namespace DryIoc.IssuesTests
         [Test]
         public void TheBug_2_change_resgitration_order()
         {
-            var container = new Container(rules => rules
-                .WithMicrosoftDependencyInjectionRules()
+            var container = new Container(rules =>
+                DryIocAdapter.WithMicrosoftDependencyInjectionRules(rules)
                 .WithFuncAndLazyWithoutRegistration());
 
             container.Register<A>();
@@ -98,8 +98,8 @@ namespace DryIoc.IssuesTests
         [Test]
         public void TheBug()
         {
-            var container = new Container(rules => rules
-                .WithMicrosoftDependencyInjectionRules()
+            var container = new Container(rules =>
+                DryIocAdapter.WithMicrosoftDependencyInjectionRules(rules)
                 .WithFuncAndLazyWithoutRegistration());
 
             container.Register<A>();
@@ -124,7 +124,6 @@ namespace DryIoc.IssuesTests
         public void TheBug_without_MS_DI_rules()
         {
             var container = new Container(rules => rules
-                // .WithMicrosoftDependencyInjectionRules()
                 .WithFuncAndLazyWithoutRegistration());
 
             container.Register<A>();
@@ -148,8 +147,8 @@ namespace DryIoc.IssuesTests
         [Test]
         public void TheBug_simplified()
         {
-            var container = new Container(rules => rules
-                .WithMicrosoftDependencyInjectionRules()
+            var container = new Container(rules =>
+                DryIocAdapter.WithMicrosoftDependencyInjectionRules(rules)
                 .WithFuncAndLazyWithoutRegistration());
 
             container.Register<S, S1>(Reuse.ScopedTo("FirstScope"));
@@ -172,7 +171,6 @@ namespace DryIoc.IssuesTests
         public void TheBug_simplified_without_MS_DI_rules()
         {
             var container = new Container(rules => rules
-                // .WithMicrosoftDependencyInjectionRules()
                 .WithFuncAndLazyWithoutRegistration());
 
             container.Register<S, S1>(Reuse.ScopedTo("FirstScope"));

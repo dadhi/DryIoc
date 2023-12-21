@@ -5,8 +5,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue530_Multi_tenancy_support
+    public class Issue530_Multi_tenancy_support : ITest
     {
+        public int Run()
+        {
+            Sample_based_registration_condition_and_resolution_scope();
+            No_cache_problem_between_Resolved_singleton_and_scoped();
+            No_cache_problem_between_Injected_singleton_and_scoped();
+            Func_of_scoped_thing_does_not_work_without_ambient_scope();
+            return 4;
+        }
+
         [Test]
         public void Func_of_scoped_thing_does_not_work_without_ambient_scope()
         {

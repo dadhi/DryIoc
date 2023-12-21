@@ -12,10 +12,10 @@ using NUnit.Framework;
 
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
-    public class DryIocAdapterSpecificationTests : DependencyInjectionSpecificationTests
+    public class ServicesTests : DependencyInjectionSpecificationTests
     {
-        protected override IServiceProvider CreateServiceProvider(IServiceCollection services) => 
-          new DryIocServiceProviderFactory().CreateBuilder(services).BuildServiceProvider();
+        protected override IServiceProvider CreateServiceProvider(IServiceCollection services) =>
+            new DryIocServiceProviderFactory().CreateBuilder(services);
 
         internal class TestServiceCollection : List<ServiceDescriptor>, IServiceCollection
         {
@@ -57,8 +57,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 
             if (usingScope)
             {
-              msProvider = msProvider.CreateScope().ServiceProvider;
-              dryiocProvider = dryiocProvider.CreateScope().ServiceProvider;
+                msProvider = msProvider.CreateScope().ServiceProvider;
+                dryiocProvider = dryiocProvider.CreateScope().ServiceProvider;
             }
 
             // act

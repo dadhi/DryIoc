@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue422_Unable_to_resolve_decorator_with_named_dependency
+    public class Issue422_Unable_to_resolve_decorator_with_named_dependency : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

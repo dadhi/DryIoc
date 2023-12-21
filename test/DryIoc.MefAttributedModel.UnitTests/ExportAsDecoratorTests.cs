@@ -7,8 +7,24 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ExportAsDecoratorTests
+    public class ExportAsDecoratorTests : ITest
     {
+        public int Run()
+        {
+            Decorator_can_be_applied_based_on_Name();
+            Decorator_can_be_applied_based_on_both_name_and_Metadata();
+            Decorator_can_be_applied_based_on_custom_condition();
+            Decorator_will_ignore_Import_attribute_on_decorated_service_constructor();
+            Decorator_supports_matching_by_service_key();
+            Decorator_may_be_applied_to_Func_decorated();
+            Only_single_resolution_should_present_for_decorated_service();
+            Can_export_decorator_of_T();
+            Can_register_decorator_of_T();
+            Can_register_decorator_of_T_without_breaking_other_exports();
+            Decorator_RegistrationOrder_can_be_used_to_control_order_of_composition();
+            return 12;
+        }
+
         [Test]
         public void Decorator_can_be_applied_based_on_Name()
         {

@@ -7,8 +7,24 @@ using DryIoc.MefAttributedModel.UnitTests.CUT;
 namespace DryIoc.MefAttributedModel.UnitTests
 {
     [TestFixture]
-    public class ExportFactoryTests
+    public class ExportFactoryTests : ITest
     {
+        public int Run()
+        {
+            Could_register_factory_automatically_when_exported();
+            Could_register_multi_factory_automatically_when_exported();
+            Could_register_multi_factory_with_separate_named_Exports();
+            Reuse_should_be_applied_for_factory_created_services();
+            Specified_transient_reuse_should_be_applied_for_factory_created_services();
+            Could_export_Func_with_parameters_as_Factory();
+            Can_export_static_factory_method_from_nonstatic_class();
+            Can_export_static_factory_property_from_nonstatic_class();
+            Can_export_property_as_factory_from_static_class();
+            Can_export_field_as_factory_from_static_class();
+            Can_export_and_use_factory_with_key();
+            return 11;
+        }
+
         [Test]
         public void Could_register_factory_automatically_when_exported()
         {

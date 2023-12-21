@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue578_Specific_Service_Type_required_by_controller_not_resolving
+    public class Issue578_Specific_Service_Type_required_by_controller_not_resolving : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

@@ -446,14 +446,11 @@ namespace DryIoc.ImTools
             return -1;
         }
 
-        /// <summary>Produces new array without item at specified <paramref name="index"/>. 
-        /// Will return <paramref name="source"/> array if index is out of bounds, or source is null/empty.</summary>
-        public static T[] RemoveAt<T>(this T[] source, int index)
+        /// <summary>Produces new array without item at specified <paramref name="index"/>.</summary>
+        public static T[] RemoveAtSurePresent<T>(this T[] source, int index)
         {
-            if (source == null || source.Length == 0 || index < 0 || index >= source.Length)
-                return source;
             if (index == 0 && source.Length == 1)
-                return new T[0];
+                return Empty<T>();
             var result = new T[source.Length - 1];
             if (index != 0)
                 Array.Copy(source, 0, result, 0, index);
@@ -462,6 +459,12 @@ namespace DryIoc.ImTools
             return result;
         }
 
+        /// <summary>Produces new array without item at specified <paramref name="index"/>. 
+        /// Will return <paramref name="source"/> array if index is out of bounds, or source is null/empty.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static T[] RemoveAt<T>(this T[] source, int index) =>
+            source == null || source.Length == 0 || index < 0 || index >= source.Length ? source : RemoveAtSurePresent(source, index);
+
         /// <summary>Looks for item in array using equality comparison, and returns new array with found item remove, or original array if not item found.</summary>
         public static T[] Remove<T>(this T[] source, T value) =>
             source.RemoveAt(source.IndexOf(value));
@@ -469,7 +472,7 @@ namespace DryIoc.ImTools
         /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
         public static T FindFirst<T>(this T[] source, Func<T, bool> predicate)
         {
-            if (source != null && source.Length != 0)
+            if (source != null)
                 for (var i = 0; i < source.Length; ++i)
                 {
                     var item = source[i];
@@ -480,10 +483,10 @@ namespace DryIoc.ImTools
             return default(T);
         }
 
-        /// <summary>Version of FindFirst with the fixed state used by predicate to prevent allocations by predicate lambda closure</summary>
+        /// <summary>Version of FindFirst with the passed state used by predicate to prevent allocations by predicate lambda closure</summary>
         public static T FindFirst<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
         {
-            if (source != null && source.Length != 0)
+            if (source != null)
                 for (var i = 0; i < source.Length; ++i)
                 {
                     var item = source[i];
@@ -498,6 +501,54 @@ namespace DryIoc.ImTools
         public static T FindFirst<T>(this IEnumerable<T> source, Func<T, bool> predicate) =>
             source is T[] sourceArr ? sourceArr.FindFirst(predicate) : source.FirstOrDefault(predicate);
 
+        /// <summary>Returns first item matching the <paramref name="condition"/>,
+        /// given the <paramref name="state"/> without putting the state into the closure and allocating the unnecessary memory.</summary>
+        public static T FirstOrDefault<S, T>(this IEnumerable<T> source, S state, Func<S, T, bool> condition)
+        {
+            var e = source.GetEnumerator();
+            while (e.MoveNext())
+            {
+                var current = e.Current;
+                if (condition(state, current))
+                    return current;
+            }
+            return default;
+        }
+
+        /// <summary>Returns first item matching the <paramref name="predicate"/>, or default item value.</summary>
+        public static T FindFirst<T, S>(this IEnumerable<T> source, S state, Func<S, T, bool> predicate) =>
+            source is T[] sourceArr
+                ? sourceArr.FindFirst(state, predicate)
+                : source.FirstOrDefault(state, predicate);
+
+        /// <summary>Returns last item matching the <paramref name="predicate"/>, or default item value.</summary>
+        public static T FindLast<T>(this T[] source, Func<T, bool> predicate)
+        {
+            if (source != null)
+                for (var i = source.Length - 1; i >= 0; --i)
+                {
+                    var item = source[i];
+                    if (predicate(item))
+                        return item;
+                }
+
+            return default(T);
+        }
+
+        /// <summary>Version of FindLast with the passed state used by predicate to prevent allocations by predicate lambda closure</summary>
+        public static T FindLast<T, S>(this T[] source, S state, Func<S, T, bool> predicate)
+        {
+            if (source != null)
+                for (var i = source.Length - 1; i >= 0; --i)
+                {
+                    var item = source[i];
+                    if (predicate(state, item))
+                        return item;
+                }
+
+            return default(T);
+        }
+
         /// <summary>Returns element if collection consist on single element, otherwise returns default value.
         /// It does not throw for collection with many elements</summary>
         public static T SingleOrDefaultIfMany<T>(this IEnumerable<T> source)
@@ -508,13 +559,11 @@ namespace DryIoc.ImTools
             if (source == null)
                 return default(T);
 
-            using (var e = source.GetEnumerator())
-            {
-                if (!e.MoveNext())
-                    return default(T);
-                var it = e.Current;
-                return !e.MoveNext() ? it : default(T);
-            }
+            var e = source.GetEnumerator();
+            if (!e.MoveNext())
+                return default(T);
+            var it = e.Current;
+            return !e.MoveNext() ? it : default(T);
         }
 
         /// <summary>Does <paramref name="action"/> for each item</summary>
@@ -661,18 +710,18 @@ namespace DryIoc.ImTools
             {
                 var c0 = condition(source[0]);
                 var c1 = condition(source[1]);
-                return c0 && c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
+                return c0 & c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
             }
 
             if (source.Length == 3)
             {
-                var condition0 = condition(source[0]);
-                var condition1 = condition(source[1]);
-                var condition2 = condition(source[2]);
-                return condition0 && condition1 && condition2 ? source
-                    : condition0 ? (condition1 ? new[] { source[0], source[1] } : condition2 ? new[] { source[0], source[2] } : new[] { source[0] })
-                    : condition1 ? (condition2 ? new[] { source[1], source[2] } : new[] { source[1] })
-                    : condition2 ? new[] { source[2] }
+                var c0 = condition(source[0]);
+                var c1 = condition(source[1]);
+                var c2 = condition(source[2]);
+                return c0 & c1 & c2 ? source
+                    : c0 ? (c1 ? new[] { source[0], source[1] } : c2 ? new[] { source[0], source[2] } : new[] { source[0] })
+                    : c1 ? (c2 ? new[] { source[1], source[2] } : new[] { source[1] })
+                    : c2 ? new[] { source[2] }
                     : Empty<T>();
             }
 
@@ -710,18 +759,18 @@ namespace DryIoc.ImTools
             {
                 var c0 = condition(state, source[0]);
                 var c1 = condition(state, source[1]);
-                return c0 && c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
+                return c0 & c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
             }
 
             if (source.Length == 3)
             {
-                var condition0 = condition(state, source[0]);
-                var condition1 = condition(state, source[1]);
-                var condition2 = condition(state, source[2]);
-                return condition0 && condition1 && condition2 ? source
-                    : condition0 ? (condition1 ? new[] { source[0], source[1] } : condition2 ? new[] { source[0], source[2] } : new[] { source[0] })
-                    : condition1 ? (condition2 ? new[] { source[1], source[2] } : new[] { source[1] })
-                    : condition2 ? new[] { source[2] }
+                var c0 = condition(state, source[0]);
+                var c1 = condition(state, source[1]);
+                var c2 = condition(state, source[2]);
+                return c0 & c1 & c2 ? source
+                    : c0 ? (c1 ? new[] { source[0], source[1] } : c2 ? new[] { source[0], source[2] } : new[] { source[0] })
+                    : c1 ? (c2 ? new[] { source[1], source[2] } : new[] { source[1] })
+                    : c2 ? new[] { source[2] }
                     : Empty<T>();
             }
 
@@ -759,7 +808,7 @@ namespace DryIoc.ImTools
             {
                 var c0 = condition(a, b, source[0]);
                 var c1 = condition(a, b, source[1]);
-                return c0 && c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
+                return c0 & c1 ? source : c0 ? new[] { source[0] } : c1 ? new[] { source[1] } : Empty<T>();
             }
 
             var matchStart = 0;
@@ -802,18 +851,18 @@ namespace DryIoc.ImTools
             {
                 var c0 = condition(source[0]);
                 var c1 = condition(source[1]);
-                return c0 && c1 ? new[] { map(source[0]), map(source[1]) } : c0 ? new[] { map(source[0]) } : c1 ? new[] { map(source[1]) } : Empty<R>();
+                return c0 & c1 ? new[] { map(source[0]), map(source[1]) } : c0 ? new[] { map(source[0]) } : c1 ? new[] { map(source[1]) } : Empty<R>();
             }
 
             if (source.Length == 3)
             {
-                var condition0 = condition(source[0]);
-                var condition1 = condition(source[1]);
-                var condition2 = condition(source[2]);
-                return condition0 && condition1 && condition2 ? new[] { map(source[0]), map(source[1]), map(source[2]) }
-                    : condition0 ? (condition1 ? new[] { map(source[0]), map(source[1]) } : condition2 ? new[] { map(source[0]), map(source[2]) } : new[] { map(source[0]) })
-                    : condition1 ? (condition2 ? new[] { map(source[1]), map(source[2]) } : new[] { map(source[1]) })
-                    : condition2 ? new[] { map(source[2]) }
+                var c0 = condition(source[0]);
+                var c1 = condition(source[1]);
+                var c2 = condition(source[2]);
+                return c0 & c1 & c2 ? new[] { map(source[0]), map(source[1]), map(source[2]) }
+                    : c0 ? (c1 ? new[] { map(source[0]), map(source[1]) } : c2 ? new[] { map(source[0]), map(source[2]) } : new[] { map(source[0]) })
+                    : c1 ? (c2 ? new[] { map(source[1]), map(source[2]) } : new[] { map(source[1]) })
+                    : c2 ? new[] { map(source[2]) }
                     : Empty<R>();
             }
 
@@ -855,23 +904,23 @@ namespace DryIoc.ImTools
 
             if (source.Length == 2)
             {
-                var condition0 = condition(state, source[0]);
-                var condition1 = condition(state, source[1]);
-                return condition0 && condition1 ? new[] { map(state, source[0]), map(state, source[1]) }
-                    : condition0 ? new[] { map(state, source[0]) }
-                    : condition1 ? new[] { map(state, source[1]) }
+                var c0 = condition(state, source[0]);
+                var c1 = condition(state, source[1]);
+                return c0 & c1 ? new[] { map(state, source[0]), map(state, source[1]) }
+                    : c0 ? new[] { map(state, source[0]) }
+                    : c1 ? new[] { map(state, source[1]) }
                     : Empty<R>();
             }
 
             if (source.Length == 3)
             {
-                var condition0 = condition(state, source[0]);
-                var condition1 = condition(state, source[1]);
-                var condition2 = condition(state, source[2]);
-                return condition0 && condition1 && condition2 ? new[] { map(state, source[0]), map(state, source[1]), map(state, source[2]) }
-                    : condition0 ? (condition1 ? new[] { map(state, source[0]), map(state, source[1]) } : condition2 ? new[] { map(state, source[0]), map(state, source[2]) } : new[] { map(state, source[0]) })
-                    : condition1 ? (condition2 ? new[] { map(state, source[1]), map(state, source[2]) } : new[] { map(state, source[1]) })
-                    : condition2 ? new[] { map(state, source[2]) }
+                var c0 = condition(state, source[0]);
+                var c1 = condition(state, source[1]);
+                var c2 = condition(state, source[2]);
+                return c0 & c1 & c2 ? new[] { map(state, source[0]), map(state, source[1]), map(state, source[2]) }
+                    : c0 ? (c1 ? new[] { map(state, source[0]), map(state, source[1]) } : c2 ? new[] { map(state, source[0]), map(state, source[2]) } : new[] { map(state, source[0]) })
+                    : c1 ? (c2 ? new[] { map(state, source[1]), map(state, source[2]) } : new[] { map(state, source[1]) })
+                    : c2 ? new[] { map(state, source[2]) }
                     : Empty<R>();
             }
 
@@ -913,11 +962,11 @@ namespace DryIoc.ImTools
 
             if (source.Length == 2)
             {
-                var condition0 = condition(a, b, source[0]);
-                var condition1 = condition(a, b, source[1]);
-                return condition0 && condition1 ? new[] { map(a, b, source[0]), map(a, b, source[1]) }
-                    : condition0 ? new[] { map(a, b, source[0]) }
-                    : condition1 ? new[] { map(a, b, source[1]) }
+                var c0 = condition(a, b, source[0]);
+                var c1 = condition(a, b, source[1]);
+                return c0 & c1 ? new[] { map(a, b, source[0]), map(a, b, source[1]) }
+                    : c0 ? new[] { map(a, b, source[0]) }
+                    : c1 ? new[] { map(a, b, source[1]) }
                     : Empty<R>();
             }
 
@@ -1032,15 +1081,14 @@ namespace DryIoc.ImTools
         public static IEnumerable<T> Match<S, T>(this IEnumerable<T> source, S s, Func<S, T, bool> condition) =>
             source is T[] arr ? arr.Match(s, condition) : source == null ? null : Where(source, s, condition);
 
-        // todo: @wip benchmark it
         /// <summary>Calls Where on the Enumerator avoiding the closure over `S`.</summary>
-        public static IEnumerable<T> Where<S, T>(this IEnumerable<T> source, S s, Func<S, T, bool> condition)
-        { 
+        public static IEnumerable<T> Where<S, T>(this IEnumerable<T> source, S state, Func<S, T, bool> condition)
+        {
             var e = source.GetEnumerator();
             while (e.MoveNext())
             {
                 var current = e.Current;
-                if (condition(s, current))
+                if (condition(state, current))
                     yield return current;
             }
         }
@@ -1059,7 +1107,7 @@ namespace DryIoc.ImTools
 
         /// <summary>Calls combined Where and Select on the Enumerator avoiding the closure over `S`</summary>
         public static IEnumerable<R> WhereSelect<S, T, R>(this IEnumerable<T> source, S s, Func<S, T, bool> condition, Func<S, T, R> map)
-        { 
+        {
             var e = source.GetEnumerator();
             while (e.MoveNext())
             {
@@ -1073,11 +1121,15 @@ namespace DryIoc.ImTools
         /// otherwise calls combined Where and Select on the Enumerator avoiding the closure over `A` and `B`. 
         /// Should be called mostly when you have an arrays</summary>
         public static IEnumerable<R> Match<A, B, T, R>(this IEnumerable<T> source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map) =>
-            source is T[] arr ? arr.Match(a, b, condition, map) : source == null ? null : WhereSelect(source, a, b, condition, map);
+            source is T[] arr
+                ? arr.Match(a, b, condition, map)
+                : source == null
+                    ? null
+                    : WhereSelect(source, a, b, condition, map);
 
         /// <summary>Calls combined Where and Select on the Enumerator avoiding the closure over `S`</summary>
         public static IEnumerable<R> WhereSelect<A, B, T, R>(this IEnumerable<T> source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map)
-        { 
+        {
             var e = source.GetEnumerator();
             while (e.MoveNext())
             {
@@ -1192,7 +1244,7 @@ namespace DryIoc.ImTools
             }
         }
 
-        private static void ThrowRetryCountExceeded(int retryCountExceeded) =>
+        internal static void ThrowRetryCountExceeded(int retryCountExceeded) =>
             throw new InvalidOperationException(
                 $"Ref retried to Update for {retryCountExceeded} times But there is always someone else intervened.");
 
@@ -1257,6 +1309,37 @@ namespace DryIoc.ImTools
             }
         }
 
+        /// <summary>Get the interrupted result</summary>
+        public delegate R GetInterrupted<T, A, R>(T oldValue, T newValue, A a, R result);
+
+        /// <summary>
+        /// If interrupted (is checked by the <paramref name="getInterrupted"/> delegate),
+        /// then avoid the swap completely and returns the interrupted result.
+        /// Otherwise, tries to swap with the new value and returns the origina result.
+        /// See the usages to understand the purpose.
+        /// </summary>
+        public static R Swap<T, A, R>(ref T value, A a, R result,
+            Func<T, A, R, T> update, GetInterrupted<T, A, R> getInterrupted)
+                where T : class
+                where R : class
+        {
+            var spinWait = new SpinWait();
+            var retryCount = 0;
+            while (true)
+            {
+                var oldValue = value;
+                var newValue = update(oldValue, a, result);
+                var existingResult = getInterrupted(oldValue, newValue, a, result);
+                if (existingResult != result)
+                    return existingResult;
+                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                    return result;
+                if (++retryCount > Ref.RETRY_COUNT_UNTIL_THROW)
+                    Ref.ThrowRetryCountExceeded(Ref.RETRY_COUNT_UNTIL_THROW);
+                spinWait.SpinOnce();
+            }
+        }
+
         /// <summary>Swap with the additional state a, b required for the delegate.
         /// Helps to avoid closure creation for the delegate</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -1270,6 +1353,30 @@ namespace DryIoc.ImTools
             {
                 var oldValue = value;
                 var newValue = getNewValue(oldValue, a, b);
+                if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
+                    return oldValue;
+                if (++retryCount > retryCountUntilThrow)
+                    ThrowRetryCountExceeded(retryCountUntilThrow);
+                spinWait.SpinOnce();
+            }
+        }
+
+        /// <summary>Swap with the additional state a, b passed by ref, and so may be modified by the delegate implementation.</summary>
+        public delegate T GetNewValue<T, A, B>(T oldValue, ref A a, ref B b);
+
+        /// <summary>Swap with the additional state a, b required for the delegate.
+        /// Helps to avoid closure creation, and unnecessary memory allocation for the delegate</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static T Swap<T, A, B>(ref T value, ref A a, ref B b, GetNewValue<T, A, B> getNewValue,
+            int retryCountUntilThrow = RETRY_COUNT_UNTIL_THROW)
+            where T : class
+        {
+            var spinWait = new SpinWait();
+            var retryCount = 0;
+            while (true)
+            {
+                var oldValue = value;
+                var newValue = getNewValue(oldValue, ref a, ref b);
                 if (Interlocked.CompareExchange(ref value, newValue, oldValue) == oldValue)
                     return oldValue;
                 if (++retryCount > retryCountUntilThrow)
@@ -1414,7 +1521,7 @@ namespace DryIoc.ImTools
     /// which is different from System value type <see cref="KeyValuePair{TKey,TValue}"/>.
     /// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
     /// <typeparam name="K">Type of Key.</typeparam><typeparam name="V">Type of Value.</typeparam>
-    public class KV<K, V> : IPrintable
+    public sealed class KV<K, V> : IPrintable
     {
         /// <summary>Key.</summary>
         public readonly K Key;
@@ -1431,23 +1538,69 @@ namespace DryIoc.ImTools
         }
 
         /// <inheritdoc />
-        public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer) =>
-            s.Append("(").To(b => Key == null ? b : printer(b, Key))
-                .Append(", ").To(b => Value == null ? b : printer(b, Value))
-                .Append(')');
+        public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer)
+        {
+            s.Append("(");
+            if (Key != null)
+                s = printer(s, Key);
+            s.Append(", ");
+            if (Value != null)
+                s = printer(s, Value);
+            return s.Append(')');
+        }
 
-        /// <summary>Creates nice string view.</summary><returns>String representation.</returns>
+        /// <summary>Creates a nice string view.</summary>
         public override string ToString() =>
-            Print(new StringBuilder(), (s, x) => s.Append(x)).ToString();
+            Print(new StringBuilder(), static (s, x) => s.Append(x)).ToString();
 
         /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
-        public override bool Equals(object obj)
+        public override bool Equals(object obj) => obj is KV<K, V> other &&
+            (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key)) &&
+            (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
+
+        /// <summary>Combines key and value hash code</summary>
+        public override int GetHashCode() => Hasher.Combine(Key, Value);
+    }
+
+    /// <summary>Immutable Key-Value pair. The value type with the mutable Value comparing to the `KV` type.
+    /// In addition provides <see cref="Equals"/> and <see cref="GetHashCode"/> implementations.</summary>
+    /// <typeparam name="K">Type of Key.</typeparam><typeparam name="V">Type of Value.</typeparam>
+    public struct KVar<K, V> : IPrintable
+    {
+        /// <summary>Key.</summary>
+        public readonly K Key;
+
+        /// <summary>Value.</summary>
+        public V Value;
+
+        /// <summary>Creates Key-Value object by providing key and value. Does Not check either one for null.</summary>
+        /// <param name="key">key.</param><param name="value">value.</param>
+        public KVar(K key, V value)
         {
-            var other = obj as KV<K, V>;
-            return other != null
-                   && (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key))
-                   && (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
+            Key = key;
+            Value = value;
         }
+
+        /// <inheritdoc />
+        public StringBuilder Print(StringBuilder s, Func<StringBuilder, object, StringBuilder> printer)
+        {
+            s.Append("(");
+            if (Key != null)
+                s = printer(s, Key);
+            s.Append(", ");
+            if (Value != null)
+                s = printer(s, Value);
+            return s.Append(')');
+        }
+
+        /// <summary>Creates a nice string view.</summary>
+        public override string ToString() =>
+            Print(new StringBuilder(), static (s, x) => s.Append(x)).ToString();
+
+        /// <summary>Returns true if both key and value are equal to corresponding key-value of other object.</summary>
+        public override bool Equals(object obj) => obj is KV<K, V> other &&
+            (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key)) &&
+            (ReferenceEquals(other.Value, Value) || Equals(other.Value, Value));
 
         /// <summary>Combines key and value hash code</summary>
         public override int GetHashCode() => Hasher.Combine(Key, Value);
@@ -1457,10 +1610,22 @@ namespace DryIoc.ImTools
     public static class KV
     {
         /// <summary>Creates the key value pair.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static KV<K, V> Of<K, V>(K key, V value) => new KV<K, V>(key, value);
 
         /// <summary>Creates the pair with the new value</summary>
         public static KV<K, V> WithValue<K, V>(this KV<K, V> kv, V value) => new KV<K, V>(kv.Key, value);
+    }
+
+    /// <summary>Helpers for <see cref="KVar{K,V}"/>.</summary>
+    public static class KVar
+    {
+        /// <summary>Creates the key value pair.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static KVar<K, V> Of<K, V>(K key, V value) => new KVar<K, V>(key, value);
+
+        /// <summary>Creates the pair with the new value</summary>
+        public static KVar<K, V> WithValue<K, V>(this KVar<K, V> kv, V value) => new KVar<K, V>(kv.Key, value);
     }
 
     /// Simple helper for creation of the pair of two parts.
@@ -1952,6 +2117,9 @@ namespace DryIoc.ImTools
     /// Update handler including the key
     public delegate V Update<K, V>(K key, V oldValue, V newValue);
 
+    /// Update handler including the key
+    public delegate V Update<K, V, R>(K key, V oldValue, V newValue, ref R result);
+
     /// <summary>Entry containing the Value in addition to the Hash</summary>
     public abstract class ImHashMapEntry<K, V> : ImHashMap<K, V>.Entry
     {
@@ -2000,6 +2168,8 @@ namespace DryIoc.ImTools
         internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<int, V> newEntry) => newEntry;
         internal override Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<int, V> newEntry, Update<int, V> update) =>
             ImHashMap.Entry(Hash, update(Hash, Value, newEntry.Value));
+        internal override Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<int, V> newEntry, ref R result, Update<int, V, R> update) =>
+            ImHashMap.Entry(Hash, update(Hash, Value, newEntry.Value, ref result));
         internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<int, V> newEntry, Update<int, V> update) =>
             ImHashMap.Entry(Hash, update(Hash, Value, newEntry.Value));
         internal override ImHashMap<int, V> GetMapOrReplaceWithEntry(ImHashMap<int, V> oldMap, ImHashMapEntry<int, V> newEntry) =>
@@ -2064,6 +2234,13 @@ namespace DryIoc.ImTools
             var e = (KVEntry<K, V>)newEntry;
             var key = _key;
             return key.Equals(e._key) ? ImHashMap.Entry(Hash, key, update(key, Value, e.Value)) : new HashConflictingEntry(Hash, this, e);
+        }
+
+        internal override Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<K, V> newEntry, ref R result, Update<K, V, R> update)
+        {
+            var e = (KVEntry<K, V>)newEntry;
+            var key = _key;
+            return key.Equals(e._key) ? ImHashMap.Entry(Hash, key, update(key, Value, e.Value, ref result)) : new HashConflictingEntry(Hash, this, e);
         }
 
         internal override Entry AddOrUpdateWithTheSameHashByReferenceEquals(ImHashMapEntry<K, V> newEntry, Update<K, V> update)
@@ -2158,7 +2335,7 @@ namespace DryIoc.ImTools
             // for the debug purposes we just output the first N keys in array
             const int n = 50;
             var count = this.Count();
-            var hashes = typeof(K) == typeof(int) 
+            var hashes = typeof(K) == typeof(int)
                 ? ((ImHashMap<int, V>)(object)this).Enumerate().Take(n).Select(x => x.Hash).ToList()
                 : this.Enumerate().Take(n).Select(x => x.Hash).ToList();
             return $"{{hashes: new int[{(count > n ? $"{n}/{count}" : "" + count)}] {{{(string.Join(", ", hashes))}}}}}";
@@ -2249,6 +2426,9 @@ namespace DryIoc.ImTools
 
             /// <summary>Always returns updated entry with the updated value or the updated (hash-conflicting) entry with added `newEntry`</summary>
             internal abstract Entry AddOrUpdateWithTheSameHash(ImHashMapEntry<K, V> newEntry, Update<K, V> update);
+
+            /// <summary>Always returns updated entry with the updated value or the updated (hash-conflicting) entry with added `newEntry`</summary>
+            internal abstract Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<K, V> newEntry, ref R result, Update<K, V, R> update);
 
             /// <summary>Always returns updated entry with the updated value or the updated (hash-conflicting) entry with added `newEntry`.
             /// Comparing the key by `ReferenceEquals`</summary>
@@ -2366,6 +2546,20 @@ namespace DryIoc.ImTools
                     return new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e));
                 if (update != null)
                     e = new KVEntry<K, V>(Hash, key, update(key, cs[i].Value, e.Value));
+                return new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i));
+            }
+
+            internal override Entry AddOrUpdateWithTheSameHash<R>(ImHashMapEntry<K, V> newEntry, ref R result, Update<K, V, R> update)
+            {
+                var e = (KVEntry<K, V>)newEntry;
+                var key = e._key;
+                var cs = Conflicts;
+                var i = cs.Length - 1;
+                while (i != -1 && !cs[i]._key.Equals(key)) --i;
+                if (i == -1)
+                    return new HashConflictingEntry(Hash, cs.AppendToNonEmpty(e));
+                if (update != null)
+                    e = new KVEntry<K, V>(Hash, key, update(key, cs[i].Value, e.Value, ref result));
                 return new HashConflictingEntry(Hash, cs.UpdateNonEmpty(e, i));
             }
 
@@ -5196,7 +5390,7 @@ namespace DryIoc.ImTools
                         i = e3.ForEach(state, i, handler);
                         i = e4.ForEach(state, i, handler);
                         i = pp.ForEach(state, i, handler);
-                        i =  p.ForEach(state, i, handler);
+                        i = p.ForEach(state, i, handler);
                         i = pl.ForEach(state, i, handler);
 
                         if (mid != null)
@@ -5230,7 +5424,7 @@ namespace DryIoc.ImTools
                     i = e0.ForEach(state, i, handler);
                     i = e1.ForEach(state, i, handler);
                     i = pp.ForEach(state, i, handler);
-                    i =  p.ForEach(state, i, handler);
+                    i = p.ForEach(state, i, handler);
                 }
                 else if (map is ImHashMap<K, V>.Leaf5 l5)
                 {
@@ -5268,7 +5462,7 @@ namespace DryIoc.ImTools
                     i = e3.ForEach(state, i, handler);
                     i = e4.ForEach(state, i, handler);
                     i = pp.ForEach(state, i, handler);
-                    i =  p.ForEach(state, i, handler);
+                    i = p.ForEach(state, i, handler);
                 }
                 else if (map is ImHashMap<K, V>.Entry l1)
                     i = l1.ForEach(state, i, handler);
@@ -5517,13 +5711,13 @@ namespace DryIoc.ImTools
         /// <summary>Converts the map to an array with the minimum allocations</summary>
         public static S[] ToArray<V, S>(this ImHashMap<int, V> map, Func<VEntry<V>, S> selector) =>
             map == ImHashMap<int, V>.Empty ? ArrayTools.Empty<S>() :
-                map.ForEach(St.Rent(new S[map.Count()], selector), (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
-
+                map.ForEach(St.Rent(new S[map.Count()], selector), static (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
+        // todo: @perf accept the check for the selector result
         /// <summary>Converts the map to an array with the minimum allocations</summary>
         public static S[] ToArray<K, V, S>(this ImHashMap<K, V> map, Func<ImHashMapEntry<K, V>, S> selector) =>
             map == ImHashMap<K, V>.Empty
                 ? ArrayTools.Empty<S>()
-                : map.ForEach(St.Rent(new S[map.Count()], selector), (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
+                : map.ForEach(St.Rent(new S[map.Count()], selector), static (e, i, s) => s.a[i] = s.b(e)).ResetButGetA();
 
         /// <summary>Converts the map to an array with the minimum allocations</summary>
         public static VEntry<V>[] ToArray<V>(this ImHashMap<int, V> map) =>
@@ -5996,6 +6190,17 @@ namespace DryIoc.ImTools
 
         /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
         [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrUpdate<K, V, R>(this ImHashMap<K, V> map, int hash, K key, V value, ref R result, Update<K, V, R> update)
+        {
+            var newEntry = Entry(hash, key, value);
+            var mapOrOldEntry = map.AddOrGetEntry(hash, newEntry);
+            return mapOrOldEntry is ImHashMap<K, V>.Entry oldEntry && oldEntry != newEntry
+                ? map.ReplaceEntry(oldEntry, oldEntry.AddOrUpdateWithTheSameHash(newEntry, ref result, update))
+                : mapOrOldEntry;
+        }
+
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> AddOrUpdateByReferenceEquals<K, V>(this ImHashMap<K, V> map, int hash, K key, V value, Update<K, V> update)
         {
             var newEntry = Entry(hash, key, value);
@@ -6009,6 +6214,11 @@ namespace DryIoc.ImTools
         [MethodImpl((MethodImplOptions)256)]
         public static ImHashMap<K, V> AddOrUpdate<K, V>(this ImHashMap<K, V> map, K key, V value, Update<K, V> update) =>
             map.AddOrUpdate(key.GetHashCode(), key, value, update);
+
+        /// <summary>Adds or updates (no in-place mutation) the map with value by the passed key, always returning the NEW map!</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ImHashMap<K, V> AddOrUpdate<K, V, R>(this ImHashMap<K, V> map, K key, V value, ref R result, Update<K, V, R> update) =>
+            map.AddOrUpdate(key.GetHashCode(), key, value, ref result, update);
 
         /// <summary>Produces the new map with the new entry or keeps the existing map if the entry with the hash is already present</summary>
         [MethodImpl((MethodImplOptions)256)]

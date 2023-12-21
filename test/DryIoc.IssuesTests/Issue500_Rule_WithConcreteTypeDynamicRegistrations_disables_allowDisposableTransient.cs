@@ -4,8 +4,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue500_Rule_WithConcreteTypeDynamicRegistrations_disables_allowDisposableTransient
+    public class Issue500_Rule_WithConcreteTypeDynamicRegistrations_disables_allowDisposableTransient : ITest
     {
+        public int Run()
+        {
+            ContainerWithNoRules_ServiceWithResolve();
+            ContainerWithConcreteTypeDynamicRegistrations_ServiceWithResolve();
+            ContainerWithNoRules_ServiceWithFuncInjection();
+            ContainerWithConcreteTypeDynamicRegistrations_ServiceWithFuncInjection();
+            return 4;
+        }
+
         class DbContext : IDisposable
         {
             public void Dispose() { }
