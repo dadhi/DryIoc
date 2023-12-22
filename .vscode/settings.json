@@ -1,16 +1,34 @@
 {
     "cSpell.words": [
-        "behaviour",
+        "Castclass",
         "cref",
         "decoratee",
+        "Denormalizer",
         "Finalizers",
+        "Flushables",
+        "Funcs",
+        "Hasher",
         "HSTS",
         "Initializable",
+        "Jing",
+        "Jong",
+        "langword",
+        "Mediat",
+        "Memberwise",
+        "middlewares",
+        "NETFRAMEWORK",
+        "NETSTANDARD",
+        "Newobj",
         "overriden",
+        "rebalance",
+        "Serilog",
         "Statefully",
+        "ttinclude",
+        "typeparam",
         "typeparamref"
     ],
     "files.watcherExclude": {
         "**/target": true
-    }
+    },
+    "dotnet.defaultSolution": "DryIoc.sln"
 }

@@ -8,7 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="6.0.0" />
+    <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" />
+    <!-- <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="6.0.0" /> -->
   </ItemGroup>
 
 </Project>

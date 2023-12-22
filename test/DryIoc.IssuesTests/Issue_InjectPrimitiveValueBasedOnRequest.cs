@@ -4,29 +4,30 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class ParameterResolutionFixture
+    public class ParameterResolutionFixture : ITest
     {
-        private IContainer _container;
-
-        [SetUp]
-        public void SetUp()
+        public int Run()
         {
-            _container = new Container();
+            Resolves_For_StringType();
+            Resolves_For_CollectionType();
+            Injects_parent_type_using_factory();
+            return 3;
         }
 
         [Test]
         public void Resolves_For_StringType()
         {
             // setup
-            _container.Register<Target>();
-            _container.Register<ILog, Log>(
+            var container = new Container();
+            container.Register<Target>();
+            container.Register<ILog, Log>(
                 made: Parameters.Of.Details((request, parameter) => 
                     parameter.Name == "input" && parameter.ParameterType == typeof(string)
                     ? ServiceDetails.Of(request.Parent.ImplementationType.FullName)
                     : null));
 
             // exercise
-            var resolved = _container.Resolve<Target>();
+            var resolved = container.Resolve<Target>();
 
             // verify
             Assert.AreEqual("DryIoc.IssuesTests.Target", resolved.LogInput);
@@ -36,15 +37,16 @@ namespace DryIoc.IssuesTests
         public void Resolves_For_CollectionType()
         {
             // setup
-            _container.Register<Target>();
-            _container.Register<ILog, Log>(
+            var container = new Container();
+            container.Register<Target>();
+            container.Register<ILog, Log>(
                 serviceKey: "normal",
                 made: Parameters.Of.Type(request =>
                     request.Parent.First(p => p.ServiceType != typeof(ILog)).ImplementationType.FullName));
             
-            _container.Register<ILog, LogWrapper>();
+            container.Register<ILog, LogWrapper>();
 
-            var target = _container.Resolve<Target>();
+            var target = container.Resolve<Target>();
 
             Assert.AreEqual("1", target.LogInput);
         }
@@ -53,14 +55,15 @@ namespace DryIoc.IssuesTests
         public void Injects_parent_type_using_factory()
         {
             // setup
-            _container.Register<Target>();
-            _container.Register<ILog, Log>(
+            var container = new Container();
+            container.Register<Target>();
+            container.Register<ILog, Log>(
                 made: Made.Of(request => typeof(LoggerFactory)
                     .SingleMethod(nameof(LoggerFactory.GetLog))
                     .MakeGenericMethod(request.Parent.First(p => p.ServiceType != typeof(ILog)).ImplementationType)));
 
             // exercise
-            var resolved = _container.Resolve<Target>();
+            var resolved = container.Resolve<Target>();
 
             // verify
             Assert.AreEqual("DryIoc.IssuesTests.Target", resolved.LogInput);

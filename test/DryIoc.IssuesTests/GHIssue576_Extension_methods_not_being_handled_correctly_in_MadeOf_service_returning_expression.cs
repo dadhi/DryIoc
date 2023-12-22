@@ -148,7 +148,8 @@ namespace DryIoc.IssuesTests
             container.RegisterInstance<ILoggerFactory>(loggerFactory);
 
             container.Register(
-                Made.Of(_ => ServiceInfo.Of<ILoggerFactory>(),
+                Made.Of(
+                    _ => ServiceInfo.Of<ILoggerFactory>(),
                     f => f.CreateLogger(null)),
                 setup: Setup.With(condition: r => r.Parent.ImplementationType == null, asResolutionRoot: true));
 

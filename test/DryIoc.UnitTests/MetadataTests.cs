@@ -7,8 +7,42 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class MetadataTests
+    public class MetadataTests : ITest
     {
+        public int Run()
+        {
+            I_can_resolve_transient_service_with_metadata();
+            Can_resolve_metadata_as_Tuple();
+            Should_throw_in_case_of_service_with_unresolved_dependency();
+            I_can_resolve_func_of_transient_service_with_metadata();
+            I_can_resolve_array_of_func_of_transient_service_with_metadata();
+            I_can_resolve_array_of_func_of_transient_services_with_metadata();
+            I_can_resolve_singleton_service_with_metadata();
+            I_can_resolve_lazy_service_with_metadata();
+            I_can_resolve_array_of_lazy_with_metadata();
+            When_singleton_resolve_through_meta_lazy_It_should_not_be_instantiated();
+            I_can_resolve_open_generic_with_meta_array_dependency();
+            I_can_resolve_service_with_dependency_on_open_generic_with_meta_array_dependency();
+            Resolve_should_throw_if_metadata_is_not_registered();
+            Resolve_should_throw_if_requested_metadata_is_of_different_type();
+            When_one_service_is_registered_with_metadata_and_another_without_Resolved_array_should_contain_only_one();
+            Should_resolve_open_generic_with_metadata();
+            Should_NOT_resolve_meta_with_name_if_no_such_name_registered();
+            Should_resolve_any_named_service_with_corresponding_metadata_If_name_is_not_specified_in_resolve();
+            Should_NOT_resolve_any_Scoped_meta_of_service_from_the_root_container();
+            When_one_service_is_registered_with_name_and_other_is_default_only_one_named_should_be_resolved();
+            Can_inject_service_matching_the_key_value_metadata();
+            Can_inject_service_matching_the_key_value_metadata_via_parameter_name();
+            Can_inject_service_matching_the_key_value_metadata_via_ArgOf_spec();
+            Can_inject_service_matching_the_key_value_metadata_via_property();
+            Can_inject_func_of_service_matching_with_the_key_value_metadata();
+            Can_inject_lazy_of_service_matching_with_the_key_value_metadata();
+            Can_inject_service_matching_the_value_only_of_metadata();
+            Can_inject_collection_matching_the_metadata_key_value(true);
+            Can_inject_collection_matching_the_metadata_key_value(false);
+            return 29;
+        }
+
         [Test]
         public void I_can_resolve_transient_service_with_metadata()
         {
@@ -377,10 +411,10 @@ namespace DryIoc.UnitTests
         [Test]
         [TestCase(false)]
         [TestCase(true)]
-        public void Can_inject_collection_matching_the_metadata_key_value(bool lazyEnumarable)
+        public void Can_inject_collection_matching_the_metadata_key_value(bool lazyEnumerable)
         {
             IContainer container = new Container();
-            if (lazyEnumarable)
+            if (lazyEnumerable)
                 container = container.With(rules => rules.WithResolveIEnumerableAsLazyEnumerable());
 
             container.Register<IService, Service>(

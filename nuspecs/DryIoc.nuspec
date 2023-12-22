@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata minClientVersion="3.3.0">
         <id>DryIoc</id>
-        <version>5.4.3</version>
+        <version>6.0.0-preview-03</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2023 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -12,83 +12,14 @@
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>DryIoc is fast, small, full-featured IoC Container for .NET</description>
         <tags>IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
+        <readme>readme.md</readme>
         <releaseNotes>
 <![CDATA[
-## v5.4.3 Bug-fix release
+## v6.0.0 Major feature release
 
-- fixed: Release 5.4.2 is Broken for Framework 4.8
-
-## v5.4.2 Bug-fix release
-
-- fixed: #588 Container.IsDisposed property not reflecting own scope disposed state.
-- fixed: #598 How to diagnose Error.WaitForScopedServiceIsCreatedTimeoutExpired?
-
-## v5.4.1 Bug-fix release
-
-- fixed: #576 Extension methods not being handled correctly in Made.Of service returning expression
-- fixed: #577 False positive validation error when using service setup with certain conditions
-- fixed: #578 asResolutionRoot does not affect validation
-
-
-## v5.4.0 Small feature and bug-fix release
-
-- added: #572 Add DryIoc targets for NET 6.0, NET 7.0
-- added: #571 Add the rule for the injection of C#11 required properties via the rule PropertiesAndFields.RequiredProperties
-- added: #544 Add .NET 7 target and up MS dependency version for DryIoc.MS.DI
-- added: #565 Add ScopeName.Of to simplify the custom scope name matching logic
-- fixed: #116 DryIoc Resolve with decorators goes wrong for parallel execution
-- fixed: #547 Blazor File Upload issue with Net 7 and MS DI Package
-- fixed: #567 Using DryIoc causes Blazor to crash
-
-
-## v5.3.4 Bug-fix release
-
-- fixed: #559 Possible inconsistent behaviour of resolving collection of services opening resolution scope
-- fixed: #560 Fix GetWrappedType implementation(s) to not return null
-
-
-## v5.3.3 Bug-fix release
-
-- fixed: #555 Is there anyway to apply ConcreteTypeDynamicRegistrations to Rules.MicrosoftDependencyInjectionRules
-- fixed: #557 Rules.WithFactorySelector(Rules.SelectLastRegisteredFactory()) allows to Resolve the keyed service as non-keyed
-
-
-## v5.3.2 Bug-fix release
-
-- fixed: #554 System.NullReferenceException: Object reference not set to an instance of an object.
-
-
-## v5.3.1 Bug-fix release
-
--fixed: #546 Generic type constraint resolution doesn't see arrays as IEnumerable<>
-
-
-## v5.3.0 Small feature and bug-fix release
-
--fixed: #536 DryIoc Exception in a Constructor of a Dependency does tunnel through Resolve call
-
-
-## v5.2.2 Bug-fix release / 2022-08-23
-
--fixed: #519 Exception thrown when using WebOptimizer in ASP.NET Core MVC
-
-
-## v5.2.1 Bug-fix release
-
--fixed: #516 Singleton Decorator to Scoped base shouldn't work, but does
-
-
-## v5.2.0 Small feature and bug-fix release
-
-### Features
-
-- Adding `WithConcreteTypeDynamicRegistrations` overload with `IfUnresolved ifConcreteTypeIsUnresolved` parameter 
-to control exception information, and rule fallback behavior (#506)
-- Small speed-ups 
-
-### Fixes
-
-- #507 Transient resolve with opening scope using factory func in singleton
+- Compile-time Dependency Injection
+- Decrease memory footprint
+- Remove Obsolete API
 
 ]]>
         </releaseNotes>
@@ -99,39 +30,46 @@ to control exception information, and rule fallback behavior (#506)
         </contentFiles>
         <dependencies>
             <group targetFramework="net45" />
+            <group targetFramework="netstandard2.1" />
             <group targetFramework="netstandard2.0">
-                <dependency id="System.Reflection.Emit.Lightweight" version="4.3.0" />
+                <dependency id="System.Reflection.Emit.Lightweight" version="4.7.0" />
             </group>
         </dependencies>
     </metadata>
     <files>
         <file src="..\LICENSE.txt" />
         <file src="..\DryIoc.snk" />
-        <!-- <file src="..\nuspecs\DryIoc\readme.md" /> -->
+        <file src="..\nuspecs\DryIoc\readme.md" />
         <file src="..\logo\logo128.png" target="logo.png" />
-
+        
         <!--"build" is the special folder where you can put your .props or .targets files 
-        named after the NuGet package to be INCLUDED by NuGet into the target project-->
-        <!-- <file src="..\nuspecs\DryIoc\build\DryIoc.props"              target="build" /> -->
-        <file src="..\src\DryIoc\Container.Generated.tt"              target="CompileTimeDI" />
-        <file src="..\src\DryIoc\CompileTimeRegistrations.ttinclude"  target="CompileTimeDI" />
-        <file src="..\src\DryIoc\CompileTimeRegistrations.Example.cs" target="CompileTimeDI" />
+            named after the NuGet package to be INCLUDED by NuGet into the target project-->
+        <file src="..\nuspecs\DryIoc\build\DryIoc.props"                            target="build\DryIoc.props" />
+
+        <!--CompileTimeDI-->
+        <file src="..\src\DryIoc\CompileTimeDI\Container.Generated.tt"              target="CompileTimeDI" />
+        <file src="..\src\DryIoc\CompileTimeDI\CompileTimeRegistrations.ttinclude"  target="CompileTimeDI" />
+        <file src="..\src\DryIoc\CompileTimeDI\CompileTimeRegistrations.Example.cs" target="CompileTimeDI" />
+        <file src="..\src\DryIoc\.config\dotnet-tools.json"                         target="CompileTimeDI" />
 
         <!--net45-->
-        <file src="..\src\DryIoc\Container.cs"                        target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="content\net45\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc\Container.cs"                                      target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc\ImTools.cs"                                        target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs"                         target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs"                                     target="content\net45\DryIoc" />
+        <file src="..\src\DryIoc\Messages.cs"                                       target="content\net45\DryIoc" />
 
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\net45\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc\Container.cs"                                      target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc\ImTools.cs"                                        target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs"                         target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs"                                     target="contentFiles\cs\net45\DryIoc" />
+        <file src="..\src\DryIoc\Messages.cs"                                       target="contentFiles\cs\net45\DryIoc" />
 
         <!-- .netstandard 2.0 -->
-        <file src="..\src\DryIoc\Container.cs"                        target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\ImTools.cs"                          target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\FastExpressionCompiler.cs"           target="contentFiles\cs\netstandard2.0\DryIoc" />
-        <file src="..\src\DryIoc\Expression.cs"                       target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc\Container.cs"                                      target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc\ImTools.cs"                                        target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc\FastExpressionCompiler.cs"                         target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc\Expression.cs"                                     target="contentFiles\cs\netstandard2.0\DryIoc" />
+        <file src="..\src\DryIoc\Messages.cs"                                       target="contentFiles\cs\netstandard2.0\DryIoc" />
     </files>
 </package>

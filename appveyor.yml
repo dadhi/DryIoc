@@ -3,7 +3,7 @@ image:
   - Ubuntu
   - macOS
 
-version: 5.4.3-b{build}
+version: 6.0.0-preview-05-{build}
 
 test: off
 
@@ -11,13 +11,11 @@ skip_commits:
   message: /noci .*/
 
 build_script:
-  - dotnet test -f netcoreapp3.1 -c:Release test/DryIoc.CommonServiceLocator.UnitTests/DryIoc.CommonServiceLocator.UnitTests.csproj
-  - dotnet test -f netcoreapp3.1 -c:Release test/DryIoc.Microsoft.DependencyInjection.Specification.Tests/DryIoc.Microsoft.DependencyInjection.Specification.Tests.csproj
-
-  - dotnet test -f net7.0 -c:Release docs/DryIoc.Docs/DryIoc.Docs.csproj
-  - dotnet test -f net7.0 -c:Release test/DryIoc.UnitTests/DryIoc.UnitTests.csproj
-  - dotnet test -f net7.0 -c:Release test/DryIoc.IssuesTests/DryIoc.IssuesTests.csproj
-  - dotnet test -f net7.0 -c:Release test/DryIoc.Microsoft.DependencyInjection.Specification.Tests/DryIoc.Microsoft.DependencyInjection.Specification.Tests.csproj
+  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.UnitTests
+  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.IssuesTests
+  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.CommonServiceLocator.UnitTests
+  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.Microsoft.DependencyInjection.Specification.Tests
+  - dotnet test -p:DevMode=false -f:net7.0 -c:Release docs/DryIoc.Docs
 
 for:
   - matrix:

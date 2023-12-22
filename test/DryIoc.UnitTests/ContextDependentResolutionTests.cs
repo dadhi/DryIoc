@@ -4,8 +4,16 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ContextDependentResolutionTests
+    public class ContextDependentResolutionTests : ITest
     {
+        public int Run()
+        {
+            Can_use_FactoryMethod_to_register_ILogger_with_generic_implementation_dependent_on_parent();
+            Can_select_what_factory_to_use_as_dependency_and_what_as_resolution_root();
+            Can_use_different_implementations_based_on_context_using_condition();
+            return 3;
+        }
+
         public static class LogFactory
         {
             public static ILogger GetLog<T>()

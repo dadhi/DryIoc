@@ -1,15 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net472;net7.0</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' == 'true'">net8.0;net7.0;net472</TargetFrameworks>
+        <TargetFrameworks Condition="'$(DevMode)' != 'true'">net7.0;net472</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Autofac" Version="7.0.1" />
+        <PackageReference Include="Autofac" Version="7.1.0" />
         <PackageReference Include="Castle.Core" Version="5.1.1" />
-        <PackageReference Include="MediatR" Version="5.1.0" />
-        <PackageReference Include="NSubstitute" Version="5.0.0" />
-        <PackageReference Include="Moq" Version="4.18.4" />
+        <PackageReference Include="MediatR" Version="9.0.0" />
+        <PackageReference Include="NSubstitute" Version="5.1.0" />
+        <PackageReference Include="Moq" Version="4.20.70" />
         <PackageReference Include="log4net" Version="2.0.15" />
     </ItemGroup>
 

@@ -43,7 +43,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
-    /// <summary>The base class and the Factpry methods provider for the Expression.</summary>
+    /// <summary>The base class and the Factory methods provider for the Expression.</summary>
     public abstract class Expression
     {
         /// <summary>Expression node type.</summary>
@@ -99,7 +99,10 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         internal abstract SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> convertedExpressions);
 
         /// <summary>Converts to Expression and outputs its as string</summary>
-        public override string ToString() => ToExpression().ToString();
+        public override string ToString() => this.ToCSharpString(
+            new StringBuilder(256), stripNamespace: true, 
+            notRecognizedToCode: (x, stripNs, printType) => "default(" + x.GetType().ToCode(stripNs, printType) + ")/*" + x.ToString() + "*/")
+            .ToString();
 
         /// <summary>Reduces the Expression to simple ones</summary>
         public virtual Expression Reduce() => this;
@@ -118,29 +121,17 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             return result;
         }
 
-        public static ParameterExpression Parameter(Type type, string name = null)
-        {
-            if (type.IsByRef)
-                return new ByRefParameterExpression(type.GetElementType(), name);
-            if (type == typeof(object))   // often used in the reflection scenarios
-                return new ParameterExpression(name);
-            if (type == typeof(object[])) // often used in the reflection scenarios
-                return new TypedParameterExpression<object[]>(name);
-            return new TypedParameterExpression(type, name);
-        }
+        [MethodImpl((MethodImplOptions)256)]
+        public static ParameterExpression Parameter(Type type, string name = null) =>
+            type.IsByRef ? new ByRefParameterExpression(type.GetElementType(), name) :
+            type.IsEnum ? new TypedParameterExpression(type, name) :
+                TryToMakeKnownTypeParameter(type, name);
 
         [MethodImpl((MethodImplOptions)256)]
-        public static ParameterExpression ParameterOf<T>(string name = null) =>
-            new TypedParameterExpression<T>(name);
+        public static ParameterExpression ParameterOf<T>(string name = null) => new TypedParameterExpression<T>(name);
 
-        /// <summary>Variable is not by-ref yet</summary>
-        public static ParameterExpression Variable(Type type, string name = null) =>
-            type.IsEnum
-                ? new TypedParameterExpression(type, name)
-                : TryToMakeKnownTypeParameter(type, name);
+        public static ParameterExpression Variable(Type type, string name = null) => Parameter(type, name);
 
-        // todo: @perf benchmark thw switch on the LightExprVsExpr_Create_ComplexExpr
-        // todo: @perf but nevertheless optimize for the `object` and the `object[]` because their often used
         // Enum is excluded because otherwise TypeCode will return the thing for the underlying 
         private static ParameterExpression TryToMakeKnownTypeParameter(Type type, string name = null) =>
             Type.GetTypeCode(type) switch
@@ -160,8 +151,9 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                 TypeCode.UInt16 => new TypedParameterExpression<ushort>(name),
                 TypeCode.UInt32 => new TypedParameterExpression<uint>(name),
                 TypeCode.UInt64 => new TypedParameterExpression<ulong>(name),
-                _ => type == typeof(object)
-                    ? new ParameterExpression(name)
+                // we cannot match on TypeCode.Object because it corresponds to any reference type
+                _ => type == typeof(object) ? new TypedParameterExpression<object>(name)
+                    : type == typeof(object[]) ? new TypedParameterExpression<object[]>(name)
                     : new TypedParameterExpression(type, name)
             };
 
@@ -175,40 +167,24 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         /// <summary>Avoids the boxing for all (two) bool values</summary>
         public static ConstantExpression Constant(bool value) => value ? TrueConstant : FalseConstant;
 
-        public static ConstantExpression Constant(object value)
-        {
-            if (value == null)
-                return NullConstant;
+        public static ConstantExpression Constant(object value) =>
+            value == null ? NullConstant :
+            value is bool b ? (b ? TrueConstant : FalseConstant) :
+            value is int n ? (
+                n == 0 ? ZeroConstant :
+                n == 1 ? OneConstant :
+                n == -1 ? MinusOneConstant :
+                new IntConstantExpression(n)) :
+            new ValueConstantExpression(value);
 
-            if (value is bool b)
-                return b ? TrueConstant : FalseConstant;
-
-            if (value is int n)
-                return
-                    n == 0 ? ZeroConstant :
-                    n == 1 ? OneConstant :
-                    n == -1 ? MinusOneConstant :
-                    new IntConstantExpression(n);
-
-            return new ValueConstantExpression(value);
-        }
-
-        public static ConstantExpression Constant(object value, Type type)
-        {
-            if (value == null)
-                return ConstantNull(type);
-
-            if (type == typeof(bool))
-                return (bool)value ? TrueConstant : FalseConstant;
-
-            if (type == value.GetType())
-                return new ValueConstantExpression(value);
-
-            return new TypedValueConstantExpression(value, type);
-        }
+        public static ConstantExpression Constant(object value, Type type) =>
+            value == null ? ConstantNull(type) :
+            type == typeof(bool) ? ((bool)value ? TrueConstant : FalseConstant) :
+            type == value.GetType() ? new ValueConstantExpression(value) :
+            new TypedValueConstantExpression(value, type);
 
         [MethodImpl((MethodImplOptions)256)]
-        public static ConstantExpression ConstantNull(Type type = null) => 
+        public static ConstantExpression ConstantNull(Type type = null) =>
             type == null || type == typeof(object) ? NullConstant : new TypedNullConstantExpression(type);
 
         [MethodImpl((MethodImplOptions)256)]
@@ -218,7 +194,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static ConstantExpression ConstantInt(int value) => new IntConstantExpression(value);
 
         [MethodImpl((MethodImplOptions)256)]
-        public static ConstantExpression ConstantOf<T>(T value) => 
+        public static ConstantExpression ConstantOf<T>(T value) =>
             ReferenceEquals(value, null) ? ConstantNull<T>() : new ValueConstantExpression<T>(value);
 
         [MethodImpl((MethodImplOptions)256)]
@@ -250,122 +226,115 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, IReadOnlyList<Expression> arguments) =>
             arguments == null || arguments.Count == 0
             ? new NoArgsNewClassIntrinsicExpression(ctor)
-            : new NoByRefManyArgumentsNewExpression(ctor, arguments);
+            : new NoByRefManyArgsNewIntrinsicExpression(ctor, arguments);
 
-        public static NewExpression New(ConstructorInfo ctor) => 
-            new NoArgsNewClassIntrinsicExpression(ctor);
+        public static NewExpression New(ConstructorInfo ctor) => new NoArgsNewClassIntrinsicExpression(ctor);
 
-        public static NewExpression New(ConstructorInfo ctor, Expression arg) =>
-            new OneArgumentNewExpression(ctor, arg);
+        public static NewExpression New(ConstructorInfo ctor, Expression arg) => new OneArgumentNewExpression(ctor, arg);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, Expression arg) =>
-            new NoByRefOneArgumentNewExpression(ctor, arg);
+        public static NewExpression NewObjArgs(ConstructorInfo ctor, object arg) => new OneArgumentNewExpression(ctor, arg);
+
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, object arg) => new NoByRefOneArgNewIntrinsicExpression(ctor, arg);
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1) =>
             new TwoArgumentsNewExpression(ctor, arg0, arg1);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, Expression arg0, Expression arg1) =>
-            new NoByRefTwoArgumentsNewExpression(ctor, arg0, arg1);
+        public static NewExpression NewObjArgs(ConstructorInfo ctor, object arg0, object arg1) =>
+            new TwoArgumentsNewExpression(ctor, arg0, arg1);
+
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, object arg0, object arg1) =>
+            new NoByRefTwoArgumentsNewIntrinsicExpression(ctor, arg0, arg1);
 
         public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2) =>
             new ThreeArgumentsNewExpression(ctor, arg0, arg1, arg2);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2) =>
-            new NoByRefThreeArgumentsNewExpression(ctor, arg0, arg1, arg2);
+        public static NewExpression New(ConstructorInfo ctor, object arg0, object arg1, object arg2) =>
+            new ThreeArgumentsNewExpression(ctor, arg0, arg1, arg2);
 
-        public static NewExpression New(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, object arg0, object arg1, object arg2) =>
+            new NoByRefThreeArgumentsNewIntrinsicExpression(ctor, arg0, arg1, arg2);
+
+        public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
             new FourArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3) =>
-            new NoByRefFourArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3);
+        public static NewExpression NewObjArgs(ConstructorInfo ctor, object arg0, object arg1, object arg2, object arg3) =>
+            new FourArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3);
 
-        public static NewExpression New(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, object arg0, object arg1, object arg2, object arg3) =>
+            new NoByRefFourArgumentsNewIntrinsicExpression(ctor, arg0, arg1, arg2, arg3);
+
+        public static NewExpression New(ConstructorInfo ctor, Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
             new FiveArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4) =>
-            new NoByRefFiveArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4);
+        public static NewExpression NewObjArgs(ConstructorInfo ctor, object arg0, object arg1, object arg2, object arg3, object arg4) =>
+            new FiveArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4);
+
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor, object arg0, object arg1, object arg2, object arg3, object arg4) =>
+            new NoByRefFiveArgumentsNewIntrinsicExpression(ctor, arg0, arg1, arg2, arg3, arg4);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5) =>
             new SixArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5);
 
+        public static NewExpression NewObjArgs(ConstructorInfo ctor,
+            object arg0, object arg1, object arg2, object arg3, object arg4, object arg5) =>
+            new SixArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5);
+
         public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5) =>
-            new NoByRefSixArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5);
+            object arg0, object arg1, object arg2, object arg3, object arg4, object arg5) =>
+            new NoByRefSixArgumentsNewIntrinsicExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5);
 
         public static NewExpression New(ConstructorInfo ctor,
             Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5, Expression arg6) =>
             new SevenArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
 
-        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
-            Expression arg0, Expression arg1, Expression arg2, Expression arg3, Expression arg4, Expression arg5, Expression arg6) =>
-            new NoByRefSevenArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+        public static NewExpression NewObjArgs(ConstructorInfo ctor,
+            object arg0, object arg1, object arg2, object arg3, object arg4, object arg5, object arg6) =>
+            new SevenArgumentsNewExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
 
-        public static MethodCallExpression Call(MethodInfo method, params Expression[] arguments) =>
-            arguments == null || arguments.Length == 0
+        public static NewExpression NewNoByRefArgs(ConstructorInfo ctor,
+            object arg0, object arg1, object arg2, object arg3, object arg4, object arg5, object arg6) =>
+            new NoByRefSevenArgumentsNewIntrinsicExpression(ctor, arg0, arg1, arg2, arg3, arg4, arg5, arg6);
+
+        public static MethodCallExpression Call(MethodInfo method, IReadOnlyList<Expression> arguments) =>
+            arguments == null || arguments.Count == 0
                 ? new NotNullMethodCallExpression(method)
                 : new ManyArgumentsMethodCallExpression(method, arguments);
 
-        public static MethodCallExpression Call(MethodInfo method, IEnumerable<Expression> arguments)
-        {
-            var args = arguments.AsReadOnlyList();
-            if (args == null || args.Count == 0)
-                return new NotNullMethodCallExpression(method);
-            return new ManyArgumentsMethodCallExpression(method, args);
-        }
+        public static MethodCallExpression Call(MethodInfo method, params Expression[] arguments) =>
+            Call(method, (IReadOnlyList<Expression>)arguments);
 
-        public static MethodCallExpression Call(Expression instance, MethodInfo method, params Expression[] arguments)
-        {
-            if (arguments == null || arguments.Length == 0)
-                return new InstanceMethodCallExpression(instance, method);
-            return new InstanceManyArgumentsMethodCallExpression(instance, method, arguments);
-        }
+        public static MethodCallExpression Call(MethodInfo method, IEnumerable<Expression> arguments) =>
+            Call(method, arguments.AsReadOnlyList());
 
-        public static MethodCallExpression Call(Expression instance, MethodInfo method, IEnumerable<Expression> arguments)
-        {
-            var args = arguments.AsReadOnlyList();
-            if (args == null || args.Count == 0)
-                return new InstanceMethodCallExpression(instance, method);
-            return new InstanceManyArgumentsMethodCallExpression(instance, method, args);
-        }
+        public static MethodCallExpression Call(Expression instance, MethodInfo method, IReadOnlyList<Expression> arguments) =>
+            arguments == null || arguments.Count == 0
+                ? new InstanceMethodCallExpression(instance, method)
+                : new InstanceManyArgumentsMethodCallExpression(instance, method, arguments);
 
-        public static MethodCallExpression Call(Type type, string methodName, Type[] typeArguments, params Expression[] arguments)
-        {
-            var method = type.FindMethodOrThrow(methodName, typeArguments, arguments, TypeTools.StaticMethods);
-            if (arguments == null || arguments.Length == 0)
-                return new NotNullMethodCallExpression(method);
-            return new ManyArgumentsMethodCallExpression(method, arguments);
-        }
+        public static MethodCallExpression Call(Expression instance, MethodInfo method, params Expression[] arguments) =>
+            Call(instance, method, (IReadOnlyList<Expression>)arguments);
 
-        public static MethodCallExpression Call(Type type, string methodName, Type[] typeArguments, IEnumerable<Expression> arguments)
-        {
-            var argExprs = arguments.AsReadOnlyList();
-            var method = type.FindMethodOrThrow(methodName, typeArguments, argExprs, TypeTools.StaticMethods);
-            if (argExprs == null || argExprs.Count == 0)
-                return new NotNullMethodCallExpression(method);
-            return new ManyArgumentsMethodCallExpression(method, argExprs);
-        }
+        public static MethodCallExpression Call(Expression instance, MethodInfo method, IEnumerable<Expression> arguments) =>
+            Call(instance, method, arguments.AsReadOnlyList());
 
-        public static MethodCallExpression Call(Expression instance, string methodName, Type[] typeArguments, params Expression[] arguments)
-        {
-            var method = instance.Type.FindMethodOrThrow(methodName, typeArguments, arguments, TypeTools.InstanceMethods);
-            if (arguments == null || arguments.Length == 0)
-                return new InstanceMethodCallExpression(instance, method);
-            return new InstanceManyArgumentsMethodCallExpression(instance, method, arguments);
-        }
+        public static MethodCallExpression Call(Type type, string methodName, Type[] typeArguments, IReadOnlyList<Expression> arguments) =>
+            Call(type.FindMethodOrThrow(methodName, typeArguments, arguments, TypeTools.StaticMethods), arguments);
 
-        public static MethodCallExpression Call(Expression instance, string methodName, Type[] typeArguments, IEnumerable<Expression> arguments)
-        {
-            var args = arguments.AsReadOnlyList();
-            var method = instance.Type.FindMethodOrThrow(methodName, typeArguments, args, TypeTools.InstanceMethods);
-            if (args == null || args.Count == 0)
-                return new InstanceMethodCallExpression(instance, method);
-            return new InstanceManyArgumentsMethodCallExpression(instance, method, args);
-        }
+        public static MethodCallExpression Call(Type type, string methodName, Type[] typeArguments, params Expression[] arguments) =>
+            Call(type, methodName, typeArguments, (IReadOnlyList<Expression>)arguments);
+
+        public static MethodCallExpression Call(Type type, string methodName, Type[] typeArguments, IEnumerable<Expression> arguments) =>
+            Call(type, methodName, typeArguments, arguments.AsReadOnlyList());
+
+        public static MethodCallExpression Call(Expression instance, string methodName, Type[] typeArguments, IReadOnlyList<Expression> arguments) =>
+            Call(instance, instance.Type.FindMethodOrThrow(methodName, typeArguments, arguments, TypeTools.InstanceMethods), arguments);
+
+        public static MethodCallExpression Call(Expression instance, string methodName, Type[] typeArguments, params Expression[] arguments) =>
+            Call(instance, methodName, typeArguments, (IReadOnlyList<Expression>)arguments);
+
+        public static MethodCallExpression Call(Expression instance, string methodName, Type[] typeArguments, IEnumerable<Expression> arguments) =>
+            Call(instance, methodName, typeArguments, arguments.AsReadOnlyList());
 
         public static MethodCallExpression Call(MethodInfo method) =>
             new NotNullMethodCallExpression(method);
@@ -496,11 +465,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static IndexExpression ArrayAccess(Expression array, Expression index) =>
             new OneArgumentIndexExpression(array, index);
 
-        public static IndexExpression ArrayAccess(Expression array, params Expression[] indexes) =>
+        public static IndexExpression ArrayAccess(Expression array, IReadOnlyList<Expression> indexes) =>
             new ManyArgumentsIndexExpression(array, indexes);
 
+        public static IndexExpression ArrayAccess(Expression array, params Expression[] indexes) =>
+            ArrayAccess(array, (IReadOnlyList<Expression>)indexes);
+
         public static IndexExpression ArrayAccess(Expression array, IEnumerable<Expression> indexes) =>
-            new ManyArgumentsIndexExpression(array, indexes.AsReadOnlyList());
+            ArrayAccess(array, indexes.AsReadOnlyList());
 
         public static MemberExpression Field(FieldInfo field) =>
             new FieldExpression(field);
@@ -542,11 +514,15 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static UnaryExpression Convert<T>(Expression expression) =>
             new TypedConvertUnaryExpression<T>(expression);
 
-        public static UnaryExpression ConvertViaCastClassIntrinsic(Expression expression, Type type) =>
-            new ConvertViaCastClassIntrinsicExpression(expression, type);
+        public static UnaryExpression TryConvertIntrinsic(Expression expression, Type type) =>
+            !type.IsValueType && (!expression.Type.IsValueType || type == typeof(object))
+                ? new ConvertIntrinsicExpression(expression, type)
+                : Convert(expression, type);
 
-        public static UnaryExpression ConvertViaCastClassIntrinsic<T>(Expression expression) where T : class =>
-            new ConvertViaCastClassIntrinsicExpression<T>(expression);
+        public static UnaryExpression TryConvertIntrinsic<T>(Expression expression) where T : class =>
+            !typeof(T).IsValueType && (!expression.Type.IsValueType || typeof(T) == typeof(object))
+                ? new ConvertIntrinsicExpression<T>(expression)
+                : Convert<T>(expression);
 
         /// <summary>Creates a UnaryExpression that represents a conversion operation for which the implementing method is specified.</summary>
         public static UnaryExpression Convert(Expression expression, Type type, MethodInfo method) =>
@@ -577,12 +553,10 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             new TypedUnaryExpression<bool>(ExpressionType.IsTrue, expression);
 
         /// <summary>Creates a UnaryExpression, given an operand, by calling the appropriate factory method.</summary>
-        public static UnaryExpression MakeUnary(ExpressionType unaryType, Expression operand, Type type)
-        {
-            if (type == null || type == operand.Type)
-                return new NodeTypedUnaryExpression(unaryType, operand);
-            return new TypedUnaryExpression(unaryType, operand, type);
-        }
+        public static UnaryExpression MakeUnary(ExpressionType unaryType, Expression operand, Type type) =>
+            type == null || type == operand.Type
+                ? new NodeTypedUnaryExpression(unaryType, operand)
+                : new TypedUnaryExpression(unaryType, operand, type);
 
         /// <summary>Creates a UnaryExpression that represents an arithmetic negation operation.</summary>
         public static UnaryExpression Negate(Expression expression) =>
@@ -653,29 +627,31 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         {
             if (delegateType == null || delegateType == typeof(Delegate))
                 return Lambda(body);
-
             var returnType = GetDelegateReturnType(delegateType);
-            if (returnType == body.Type)
-                return new TypedLambdaExpression(delegateType, body);
-            return new TypedReturnLambdaExpression(delegateType, body, returnType);
+            return returnType == body.Type
+                ? new TypedLambdaExpression(delegateType, body)
+                : new TypedReturnLambdaExpression(delegateType, body, returnType);
         }
 
         public static LambdaExpression Lambda(Type delegateType, Expression body, Type returnType)
         {
             if (delegateType == null || delegateType == typeof(Delegate))
                 delegateType = Tools.GetFuncOrActionType(returnType);
-            if (returnType == body.Type)
-                return new TypedLambdaExpression(delegateType, body);
-            return new TypedReturnLambdaExpression(delegateType, body, returnType);
+            return returnType == body.Type
+                ? new TypedLambdaExpression(delegateType, body)
+                : new TypedReturnLambdaExpression(delegateType, body, returnType);
         }
 
         public static LambdaExpression Lambda(Expression body, IReadOnlyList<ParameterExpression> parameters) =>
-            parameters?.Count > 0
-            ? new ManyParametersLambdaExpression(Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), body.Type), body, parameters)
-            : new TypedLambdaExpression(Tools.GetFuncOrActionType(body.Type), body);
+            parameters != null && parameters.Count > 0
+                ? new ManyParametersLambdaExpression(Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), body.Type), body, parameters)
+                : new TypedLambdaExpression(Tools.GetFuncOrActionType(body.Type), body);
 
         public static LambdaExpression Lambda(Expression body, params ParameterExpression[] parameters) =>
             Lambda(body, (IReadOnlyList<ParameterExpression>)parameters);
+
+        public static LambdaExpression Lambda(Expression body, IEnumerable<ParameterExpression> parameters) =>
+            Lambda(body, parameters.AsReadOnlyList<ParameterExpression>());
 
         public static LambdaExpression Lambda(Expression body, ParameterExpression parameter) =>
             new OneParameterLambdaExpression(Tools.GetFuncOrActionType(parameter.Type, body.Type), body, parameter);
@@ -702,23 +678,20 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static LambdaExpression Lambda(Expression body, IReadOnlyList<ParameterExpression> parameters, Type returnType)
         {
             if (returnType == body.Type)
-                Lambda(body, parameters);
+                return Lambda(body, parameters);
             var delegateType = Tools.GetFuncOrActionType(Tools.GetParamTypes(parameters), returnType);
-            if (parameters?.Count > 0)
-                return new TypedReturnManyParametersLambdaExpression(delegateType, body, parameters, returnType);
-            return new TypedReturnLambdaExpression(delegateType, body, returnType);
+            return parameters?.Count > 0
+                ? new TypedReturnManyParametersLambdaExpression(delegateType, body, parameters, returnType)
+                : new TypedReturnLambdaExpression(delegateType, body, returnType);
         }
 
         public static LambdaExpression Lambda(Expression body, IEnumerable<ParameterExpression> parameters, Type returnType) =>
             Lambda(body, parameters.AsReadOnlyList(), returnType);
 
-        public static LambdaExpression Lambda(Type delegateType, Expression body, IReadOnlyList<ParameterExpression> parameters)
-        {
-            if (delegateType == null || delegateType == typeof(Delegate))
-                return Lambda(body, parameters);
-            var returnType = GetDelegateReturnType(delegateType);
-            return Lambda(delegateType, body, parameters, returnType);
-        }
+        public static LambdaExpression Lambda(Type delegateType, Expression body, IReadOnlyList<ParameterExpression> parameters) =>
+            delegateType == null || delegateType == typeof(Delegate)
+                ? Lambda(body, parameters)
+                : Lambda(delegateType, body, parameters, GetDelegateReturnType(delegateType));
 
         public static LambdaExpression Lambda(Type delegateType, Expression body, params ParameterExpression[] parameters) =>
             Lambda(delegateType, body, (IReadOnlyList<ParameterExpression>)parameters);
@@ -728,68 +701,50 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             if (delegateType == null || delegateType == typeof(Delegate))
                 return Lambda(body, parameters, returnType);
             if (parameters?.Count > 0)
-            {
-                if (returnType == body.Type)
-                    return new ManyParametersLambdaExpression(delegateType, body, parameters);
-                return new TypedReturnManyParametersLambdaExpression(delegateType, body, parameters, returnType);
-            }
-            if (returnType == body.Type)
-                return new TypedLambdaExpression(delegateType, body);
-            return new TypedReturnLambdaExpression(delegateType, body, returnType);
+                return returnType == body.Type
+                    ? new ManyParametersLambdaExpression(delegateType, body, parameters)
+                    : new TypedReturnManyParametersLambdaExpression(delegateType, body, parameters, returnType);
+            return returnType == body.Type
+                ? new TypedLambdaExpression(delegateType, body)
+                : new TypedReturnLambdaExpression(delegateType, body, returnType);
         }
 
         public static LambdaExpression Lambda(Type delegateType, Expression body, IEnumerable<ParameterExpression> parameters, Type returnType) =>
             Lambda(delegateType, body, parameters.AsReadOnlyList(), returnType);
 
-        public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new OneParameterLambdaExpression(delegateType, body, p0);
-            return new TypedReturnOneParameterLambdaExpression(delegateType, body, p0, returnType);
-        }
+        public static LambdaExpression Lambda(Type delegateType, Expression body, ParameterExpression p0, Type returnType) =>
+            returnType == body.Type
+                ? new OneParameterLambdaExpression(delegateType, body, p0)
+                : new TypedReturnOneParameterLambdaExpression(delegateType, body, p0, returnType);
+
+        public static LambdaExpression Lambda(Type delegateType, Expression body, ParameterExpression p0, ParameterExpression p1, Type returnType) =>
+            returnType == body.Type
+                ? new TwoParametersLambdaExpression(delegateType, body, p0, p1)
+                : new TypedReturnTwoParametersLambdaExpression(delegateType, body, p0, p1, returnType);
 
         public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, ParameterExpression p1, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new TwoParametersLambdaExpression(delegateType, body, p0, p1);
-            return new TypedReturnTwoParametersLambdaExpression(delegateType, body, p0, p1, returnType);
-        }
+            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, Type returnType) =>
+            returnType == body.Type
+                ? new ThreeParametersLambdaExpression(delegateType, body, p0, p1, p2)
+                : new TypedReturnThreeParametersLambdaExpression(delegateType, body, p0, p1, p2, returnType);
 
         public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new ThreeParametersLambdaExpression(delegateType, body, p0, p1, p2);
-            return new TypedReturnThreeParametersLambdaExpression(delegateType, body, p0, p1, p2, returnType);
-        }
+            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3, Type returnType) =>
+            returnType == body.Type
+                ? new FourParametersLambdaExpression(delegateType, body, p0, p1, p2, p3)
+                : new TypedReturnFourParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, returnType);
 
         public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new FourParametersLambdaExpression(delegateType, body, p0, p1, p2, p3);
-            return new TypedReturnFourParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, returnType);
-        }
+            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3, ParameterExpression p4, Type returnType) =>
+            returnType == body.Type
+                ? new FiveParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4)
+                : new TypedReturnFiveParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, returnType);
 
         public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3,
-            ParameterExpression p4, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new FiveParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4);
-            return new TypedReturnFiveParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, returnType);
-        }
-
-        public static LambdaExpression Lambda(Type delegateType, Expression body,
-            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3,
-            ParameterExpression p4, ParameterExpression p5, Type returnType)
-        {
-            if (returnType == body.Type)
-                return new SixParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, p5);
-            return new TypedReturnSixParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, p5, returnType);
-        }
+            ParameterExpression p0, ParameterExpression p1, ParameterExpression p2, ParameterExpression p3, ParameterExpression p4, ParameterExpression p5, Type returnType) =>
+            returnType == body.Type
+                ? new SixParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, p5)
+                : new TypedReturnSixParametersLambdaExpression(delegateType, body, p0, p1, p2, p3, p4, p5, returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body) where TDelegate : System.Delegate =>
             Lambda<TDelegate>(body, GetDelegateReturnType(typeof(TDelegate)));
@@ -800,12 +755,10 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                 : new TypedReturnExpression<TDelegate>(body, returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body, ParameterExpression p0, Type returnType)
-            where TDelegate : System.Delegate
-        {
-            if (returnType == body.Type)
-                return new OneParameterExpression<TDelegate>(body, p0);
-            return new TypedReturnOneParameterExpression<TDelegate>(body, p0, returnType);
-        }
+            where TDelegate : System.Delegate =>
+            returnType == body.Type
+                ? new OneParameterExpression<TDelegate>(body, p0)
+                : new TypedReturnOneParameterExpression<TDelegate>(body, p0, returnType);
 
         public static Expression<TDelegate> Lambda<TDelegate>(Expression body, ParameterExpression p0) where TDelegate : System.Delegate =>
             Lambda<TDelegate>(body, p0, GetDelegateReturnType(typeof(TDelegate)));
@@ -963,36 +916,50 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             MemberBinding b2, MemberBinding b3, MemberBinding b4, MemberBinding b5) =>
             new SixBindingsMemberInitExpression(newExpr, b0, b1, b2, b3, b4, b5);
 
+        public static MemberInitExpression MemberInit(NewExpression newExpr, IReadOnlyList<MemberBinding> bindings) =>
+            bindings == null || bindings.Count == 0
+                ? new MemberInitExpression(newExpr)
+                : new ManyBindingsMemberInitExpression(newExpr, bindings);
+
         public static MemberInitExpression MemberInit(NewExpression newExpr, params MemberBinding[] bindings) =>
-            bindings == null || bindings.Length == 0
-            ? new MemberInitExpression(newExpr)
-            : new ManyBindingsMemberInitExpression(newExpr, bindings);
+            MemberInit(newExpr, (IReadOnlyList<MemberBinding>)bindings);
 
         public static MemberInitExpression MemberInit(NewExpression newExpr, IEnumerable<MemberBinding> bindings) =>
             MemberInit(newExpr, bindings.AsReadOnlyList());
 
-        // note: LIGHT_EXPRESSION only
+        // @LightExpression only - System expression does not support the member initialization list on the non new expression but why not :)
         /// <summary>Does not present in System Expression. Enables member assignment on existing instance expression.</summary>
-        public static MemberInitExpression MemberInit(Expression expression, params MemberBinding[] bindings) =>
-            bindings == null || bindings.Length == 0
-            ? new MemberInitExpression(expression)
-            : new ManyBindingsMemberInitExpression(expression, bindings);
+        public static MemberInitExpression MemberInit(Expression expression, IReadOnlyList<MemberBinding> bindings) =>
+            bindings == null || bindings.Count == 0
+                ? new MemberInitExpression(expression)
+                : new ManyBindingsMemberInitExpression(expression, bindings);
 
-        // note: LIGHT_EXPRESSION only
+        // @LightExpression only
+        public static MemberInitExpression MemberInit(Expression expression, params MemberBinding[] assignments) =>
+            MemberInit(expression, (IReadOnlyList<MemberBinding>)assignments);
+
+        // @LightExpression only
         public static MemberInitExpression MemberInit(Expression expression, IEnumerable<MemberBinding> assignments) =>
             MemberInit(expression, assignments.AsReadOnlyList());
 
-        public static ListInitExpression ListInit(NewExpression newExpression, IEnumerable<ElementInit> initializers) =>
-            new ListInitExpression(newExpression, initializers.AsReadOnlyList());
         // todo: @perf optimize for the small amount of initializers the same as NewArrayInit
-        public static ListInitExpression ListInit(NewExpression newExpression, params ElementInit[] initializers) =>
+        public static ListInitExpression ListInit(NewExpression newExpression, IReadOnlyList<ElementInit> initializers) =>
             new ListInitExpression(newExpression, initializers);
 
-        public static NewArrayExpression NewArrayInit(Type type, params Expression[] initializers) =>
+        public static ListInitExpression ListInit(NewExpression newExpression, params ElementInit[] initializers) =>
+            ListInit(newExpression, (IReadOnlyList<ElementInit>)initializers);
+
+        public static ListInitExpression ListInit(NewExpression newExpression, IEnumerable<ElementInit> initializers) =>
+            ListInit(newExpression, initializers.AsReadOnlyList());
+
+        public static NewArrayExpression NewArrayInit(Type type, IReadOnlyList<Expression> initializers) =>
             new ManyElementsNewArrayInitExpression(type.MakeArrayType(), initializers);
 
+        public static NewArrayExpression NewArrayInit(Type type, params Expression[] initializers) =>
+            NewArrayInit(type, (IReadOnlyList<Expression>)initializers);
+
         public static NewArrayExpression NewArrayInit(Type type, IEnumerable<Expression> initializers) =>
-            new ManyElementsNewArrayInitExpression(type.MakeArrayType(), initializers.AsReadOnlyList());
+            NewArrayInit(type, initializers.AsReadOnlyList());
 
         public static NewArrayExpression NewArrayInit(Type type, Expression element) =>
             new OneElementNewArrayInitExpression(type.MakeArrayType(), element);
@@ -1015,14 +982,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             Expression el3, Expression el4, Expression el5) =>
             new SixElementNewArrayInitExpression(type.MakeArrayType(), el0, el1, el2, el3, el4, el5);
 
-        public static NewArrayExpression MakeArrayBounds(Type type, IReadOnlyList<Expression> bounds) =>
-            new ManyBoundsNewArrayBoundsExpression(bounds.Count == 1 ? type.MakeArrayType() : type.MakeArrayType(bounds.Count), bounds);
-
         public static NewArrayExpression NewArrayBounds(Type type, Expression bound) =>
             new OneBoundNewArrayBoundsExpression(type.MakeArrayType(), bound);
 
+        public static NewArrayExpression MakeArrayBounds(Type type, IReadOnlyList<Expression> bounds) =>
+            new ManyBoundsNewArrayBoundsExpression(bounds.Count == 1 ? type.MakeArrayType() : type.MakeArrayType(bounds.Count), bounds);
+
         public static NewArrayExpression NewArrayBounds(Type type, params Expression[] bounds) =>
-            MakeArrayBounds(type, bounds);
+            MakeArrayBounds(type, (IReadOnlyList<Expression>)bounds);
 
         public static NewArrayExpression NewArrayBounds(Type type, IEnumerable<Expression> bounds) =>
             MakeArrayBounds(type, bounds.AsReadOnlyList());
@@ -1088,11 +1055,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static ElementInit ElementInit(MethodInfo addMethod, Expression arg) =>
             new OneArgumentElementInit(addMethod, arg);
 
-        public static ElementInit ElementInit(MethodInfo addMethod, params Expression[] arguments) =>
+        public static ElementInit ElementInit(MethodInfo addMethod, IReadOnlyList<Expression> arguments) =>
             new ManyArgumentsElementInit(addMethod, arguments);
 
+        public static ElementInit ElementInit(MethodInfo addMethod, params Expression[] arguments) =>
+            ElementInit(addMethod, (IReadOnlyList<Expression>)arguments);
+
         public static ElementInit ElementInit(MethodInfo addMethod, IEnumerable<Expression> arguments) =>
-            new ManyArgumentsElementInit(addMethod, arguments.AsReadOnlyList());
+            ElementInit(addMethod, arguments.AsReadOnlyList());
 
         public static InvocationExpression Invoke(LambdaExpression expression) =>
             new NotNullExpressionInvocationExpression(expression);
@@ -1175,18 +1145,27 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                 ? new SixArgumentsInvocationExpression(expression, a0, a1, a2, a3, a4, a5)
                 : new TypedSixArgumentsInvocationExpression(expression, returnType, a0, a1, a2, a3, a4, a5);
 
-        public static InvocationExpression Invoke(Expression expression, IEnumerable<Expression> args) =>
+        public static InvocationExpression Invoke(Expression expression, IReadOnlyList<Expression> args) =>
             expression is LambdaExpression
-                ? new ManyArgumentsInvocationExpression(expression, args.AsReadOnlyList())
-                : new TypedManyArgumentsInvocationExpression(expression, args.AsReadOnlyList(), expression.Type.FindDelegateInvokeMethod().ReturnType);
+                ? new ManyArgumentsInvocationExpression(expression, args)
+                : new TypedManyArgumentsInvocationExpression(expression, args, expression.Type.FindDelegateInvokeMethod().ReturnType);
+
+        public static InvocationExpression Invoke(Expression expression, params Expression[] args) =>
+            Invoke(expression, (IReadOnlyList<Expression>)args);
+
+        public static InvocationExpression Invoke(Expression expression, IEnumerable<Expression> args) =>
+            Invoke(expression, args.AsReadOnlyList());
+
+        public static InvocationExpression Invoke(Type returnType, Expression expression, IReadOnlyList<Expression> args) =>
+            expression is LambdaExpression lambdaExpr && lambdaExpr.ReturnType == returnType
+                ? new ManyArgumentsInvocationExpression(expression, args)
+                : new TypedManyArgumentsInvocationExpression(expression, args, returnType);
+
+        public static InvocationExpression Invoke(Type returnType, Expression expression, params Expression[] args) =>
+            Invoke(returnType, expression, (IReadOnlyList<Expression>)args);
 
         public static InvocationExpression Invoke(Type returnType, Expression expression, IEnumerable<Expression> args) =>
-            expression is LambdaExpression lambdaExpr && lambdaExpr.ReturnType == returnType
-                ? new ManyArgumentsInvocationExpression(expression, args.AsReadOnlyList())
-                : new TypedManyArgumentsInvocationExpression(expression, args.AsReadOnlyList(), returnType);
-
-        public static InvocationExpression Invoke(Expression lambda, params Expression[] args) =>
-            Invoke(lambda, (IEnumerable<Expression>)args);
+            Invoke(returnType, expression, args.AsReadOnlyList());
 
         public static ConditionalExpression Condition(Expression test, Expression ifTrue, Expression ifFalse) =>
             new WithFalseBranchConditionalExpression(test, ifTrue, ifFalse);
@@ -1377,53 +1356,66 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public static BinaryExpression LessThanOrEqual(Expression left, Expression right, bool liftToNull, MethodInfo method) =>
             GetLogicalBinary(ExpressionType.LessThanOrEqual, left, right, liftToNull, method);
 
-        public static BlockExpression Block(IEnumerable<Expression> expressions) =>
-            new BlockExpression(expressions.AsReadOnlyList());
-
-        public static BlockExpression Block(params Expression[] expressions) =>
-            new BlockExpression(expressions);
-
+        // todo: @perf @mem optimize
         public static BlockExpression Block(Expression expr0) =>
             new BlockExpression(new[] { expr0 });
 
+        // todo: @perf @mem optimize
         public static BlockExpression Block(Expression expr0, Expression expr1) =>
             new BlockExpression(new[] { expr0, expr1 });
 
+        // todo: @perf @mem optimize
         public static BlockExpression Block(Expression expr0, Expression expr1, Expression expr2) =>
             new BlockExpression(new[] { expr0, expr1, expr2 });
 
-        public static BlockExpression Block(IEnumerable<ParameterExpression> variables, params Expression[] expressions) =>
-            new ManyVariablesBlockExpression(variables.AsReadOnlyList(), expressions);
+        public static BlockExpression Block(IReadOnlyList<Expression> expressions) => new BlockExpression(expressions);
+        public static BlockExpression Block(params Expression[] expressions) => Block((IReadOnlyList<Expression>)expressions);
+        public static BlockExpression Block(IEnumerable<Expression> expressions) => Block(expressions.AsReadOnlyList());
 
+        // todo: @perf @mem optimize
         public static BlockExpression Block(IEnumerable<ParameterExpression> variables, Expression expr0) =>
             new ManyVariablesBlockExpression(variables.AsReadOnlyList(), new[] { expr0 });
 
+        // todo: @perf @mem optimize
         public static BlockExpression Block(IEnumerable<ParameterExpression> variables, Expression expr0, Expression expr1) =>
             new ManyVariablesBlockExpression(variables.AsReadOnlyList(), new[] { expr0, expr1 });
 
+        // todo: @perf @mem optimize
         public static BlockExpression Block(IEnumerable<ParameterExpression> variables,
             Expression expr0, Expression expr1, Expression expr2) =>
             new ManyVariablesBlockExpression(variables.AsReadOnlyList(), new[] { expr0, expr1, expr2 });
 
+        public static BlockExpression Block(IEnumerable<ParameterExpression> variables, IReadOnlyList<Expression> expressions) =>
+            new ManyVariablesBlockExpression(variables.AsReadOnlyList(), expressions);
+
+        public static BlockExpression Block(IEnumerable<ParameterExpression> variables, params Expression[] expressions) =>
+            Block(variables, (IReadOnlyList<Expression>)expressions);
+
         public static BlockExpression Block(IEnumerable<ParameterExpression> variables, IEnumerable<Expression> expressions) =>
-            new ManyVariablesBlockExpression(variables.AsReadOnlyList(), expressions.AsReadOnlyList());
+            Block(variables, expressions.AsReadOnlyList());
 
-        public static BlockExpression Block(Type type, IEnumerable<ParameterExpression> variables, params Expression[] expressions) =>
-            new TypedManyVariablesBlockExpression(type, variables.AsReadOnlyList(), expressions);
-
+        // todo: @perf @mem optimize
         public static BlockExpression Block(Type type, IEnumerable<ParameterExpression> variables, Expression expr0) =>
             new TypedManyVariablesBlockExpression(type, variables.AsReadOnlyList(), new[] { expr0 });
 
+        // todo: @perf @mem optimize
         public static BlockExpression Block(Type type, IEnumerable<ParameterExpression> variables,
             Expression expr0, Expression expr1) =>
             new TypedManyVariablesBlockExpression(type, variables.AsReadOnlyList(), new[] { expr0, expr1 });
 
+        // todo: @perf @mem optimize
         public static BlockExpression Block(Type type, IEnumerable<ParameterExpression> variables,
             Expression expr0, Expression expr1, Expression expr2) =>
             new TypedManyVariablesBlockExpression(type, variables.AsReadOnlyList(), new[] { expr0, expr1, expr2 });
 
+        public static BlockExpression Block(Type type, IEnumerable<ParameterExpression> variables, IReadOnlyList<Expression> expressions) =>
+            new TypedManyVariablesBlockExpression(type, variables.AsReadOnlyList(), expressions);
+
+        public static BlockExpression Block(Type type, IEnumerable<ParameterExpression> variables, params Expression[] expressions) =>
+            Block(type, variables, (IReadOnlyList<Expression>)expressions);
+
         public static BlockExpression Block(Type type, IEnumerable<ParameterExpression> variables, IEnumerable<Expression> expressions) =>
-            new TypedManyVariablesBlockExpression(type, variables.AsReadOnlyList(), expressions.AsReadOnlyList());
+            Block(type, variables, expressions.AsReadOnlyList());
 
         public static BlockExpression MakeBlock(Type type, IEnumerable<ParameterExpression> variables, IEnumerable<Expression> expressions)
         {
@@ -1525,7 +1517,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                 case ExpressionType.Modulo:
                     return GetArithmeticBinary(binaryType, left, right);
 
-                // todo: @wip incomplete - use similar to GetArithmeticBinary
+                // todo: @incomplete - use similar to GetArithmeticBinary
                 case ExpressionType.Power: return Power(left, right);
                 case ExpressionType.And: return And(left, right);
                 case ExpressionType.AndAlso: return AndAlso(left, right);
@@ -1583,7 +1575,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                 case ExpressionType.AndAlso:
                 case ExpressionType.Or:
                 case ExpressionType.OrElse:
-                    return GetLeftTypedBinary(binaryType, left, right, method); // todo: @wip incomplete, see GetArithmeticBinary
+                    return GetLeftTypedBinary(binaryType, left, right, method); // todo: @incomplete, see GetArithmeticBinary
 
                 case ExpressionType.LessThan: return LessThan(left, right, liftToNull, method);
                 case ExpressionType.LessThanOrEqual: return LessThanOrEqual(left, right, liftToNull, method);
@@ -1770,7 +1762,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             new ContinueGotoExpression(target);
 
         public static GotoExpression Continue(LabelTarget target, Type type) =>
-            type == null ? new ContinueGotoExpression(target) : (GotoExpression)new ContinueTypedGotoExpression(target, type);
+            type == null ? new ContinueGotoExpression(target) : new ContinueTypedGotoExpression(target, type);
 
         public static GotoExpression Return(LabelTarget target) =>
             new ReturnGotoExpression(target);
@@ -2021,7 +2013,8 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
                         if (score == bestScore)
                         {
                             if (m.IsPublic == bestMatch.IsPublic) // prefer public over non-public
-                                throw new InvalidOperationException($"More than one generic method '{m.Name}' with {typeArgCount} type parameter(s) in the type '{type.ToCode()}' is compatible with the supplied arguments.");
+                                throw new InvalidOperationException(
+                                    $"More than one generic method '{m.Name}' with {typeArgCount} type parameter(s) in the type '{type.ToCode()}' is compatible with the supplied arguments.");
                             if (!m.IsPublic)
                                 continue; // means that `bestMatch` is public so keep it an continue
                         }
@@ -2304,11 +2297,11 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             Method = method;
     }
 
-    public class ConvertViaCastClassIntrinsicExpression<T> : UnaryExpression where T : class
+    public class ConvertIntrinsicExpression<T> : UnaryExpression where T : class
     {
         public sealed override ExpressionType NodeType => ExpressionType.Convert;
         public override Type Type => typeof(T);
-        public ConvertViaCastClassIntrinsicExpression(Expression operand) : base(operand) { }
+        internal ConvertIntrinsicExpression(Expression operand) : base(operand) { }
 
         public override bool IsIntrinsic => true;
 
@@ -2321,23 +2314,26 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         {
             if (!EmittingVisitor.TryEmit(Operand, paramExprs, il, ref closure, config, parent, byRefIndex))
                 return false;
+            if (Type == typeof(object))
+            {
+                var operandType = Operand.Type;
+                if (operandType.IsValueType)
+                    il.Emit(OpCodes.Box, operandType);
+            }
 #if NETFRAMEWORK
-            // The cast is required only for Full CLR starting from NET45, e.g.
-            // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
-            il.Emit(OpCodes.Castclass, Type);
+            else
+                // The cast is required only for Full CLR starting from NET45, e.g.
+                // .NET Core does not seem to care about verifiability and it's faster without the explicit cast
+                il.Emit(OpCodes.Castclass, Type);
 #endif
             return true;
         }
     }
 
-    public sealed class ConvertViaCastClassIntrinsicExpression : ConvertViaCastClassIntrinsicExpression<object>
+    public sealed class ConvertIntrinsicExpression : ConvertIntrinsicExpression<object>
     {
         public override Type Type { get; }
-        public ConvertViaCastClassIntrinsicExpression(Expression operand, Type type) : base(operand)
-        {
-            Debug.Assert(!type.IsValueType, $"the type `{type}` is expected to be a non-value type");
-            Type = type;
-        }
+        internal ConvertIntrinsicExpression(Expression operand, Type type) : base(operand) => Type = type;
     }
 
     public abstract class BinaryExpression : Expression
@@ -2816,9 +2812,6 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public virtual int ArgumentCount => 0;
         public virtual Expression GetArgument(int i) => throw new NotImplementedException();
 
-        /// <summary>Ensures that there is no by-ref (in, our, ref) parameters in the constructor.
-        /// Which allows some optimizations when compiling the expression to the delegate</summary>
-        public virtual bool NoByRefArgs => false;
         internal NewExpression(ConstructorInfo constructor) => Constructor = constructor;
 #if SUPPORTS_VISITOR
         protected internal override Expression Accept(ExpressionVisitor visitor) => visitor.VisitNew(this);
@@ -2838,7 +2831,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public sealed class NoArgsNewClassIntrinsicExpression : NewExpression
     {
-        internal NoArgsNewClassIntrinsicExpression(ConstructorInfo constructor) : base(constructor) {}
+        internal NoArgsNewClassIntrinsicExpression(ConstructorInfo constructor) : base(constructor) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
             bool isNestedLambda, ref ClosureInfo rootClosure) => true;
@@ -2852,21 +2845,20 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class OneArgumentNewExpression : NewExpression
     {
-        public readonly Expression Argument;
+        public readonly object Arg;
+        public Expression Argument => Arg.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument };
         public override int ArgumentCount => 1;
         public override Expression GetArgument(int i) => Argument;
-        internal OneArgumentNewExpression(ConstructorInfo constructor, Expression argument) : base(constructor) =>
-            Argument = argument;
+        internal OneArgumentNewExpression(ConstructorInfo constructor, object arg) : base(constructor) => Arg = arg;
     }
 
-    public sealed class NoByRefOneArgumentNewExpression : OneArgumentNewExpression
+    public sealed class NoByRefOneArgNewIntrinsicExpression : OneArgumentNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefOneArgumentNewExpression(ConstructorInfo constructor, Expression argument) : base(constructor, argument) { }
+        internal NoByRefOneArgNewIntrinsicExpression(ConstructorInfo constructor, object arg) : base(constructor, arg) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            bool isNestedLambda, ref ClosureInfo rootClosure) =>
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
@@ -2879,30 +2871,33 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class TwoArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1;
+        public readonly object A0, A1;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1 };
         public override int ArgumentCount => 2;
-        public override Expression GetArgument(int i) => i == 0 ? Argument0 : Argument1;
-        internal TwoArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1) : base(constructor)
+        public override Expression GetArgument(int i) => i == 0 ? A0.AsExpr() : A1.AsExpr();
+        internal TwoArgumentsNewExpression(ConstructorInfo constructor, object a0, object a1) : base(constructor)
         {
-            Argument0 = a0; Argument1 = a1;
+            A0 = a0; A1 = a1;
         }
     }
 
-    public sealed class NoByRefTwoArgumentsNewExpression : TwoArgumentsNewExpression
+    public sealed class NoByRefTwoArgumentsNewIntrinsicExpression : TwoArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefTwoArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1) : base(constructor, a0, a1) { }
+        internal NoByRefTwoArgumentsNewIntrinsicExpression(ConstructorInfo constructor, object a0, object a1) : base(constructor, a0, a1) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            bool isNestedLambda, ref ClosureInfo rootClosure) =>
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -2910,35 +2905,38 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class ThreeArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1, Argument2;
+        public readonly object A0, A1, A2;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2 };
         public override int ArgumentCount => 3;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : Argument2;
-        internal ThreeArgumentsNewExpression(ConstructorInfo constructor,
-            Expression a0, Expression a1, Expression a2) : base(constructor)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : A2.AsExpr();
+        internal ThreeArgumentsNewExpression(ConstructorInfo constructor, object a0, object a1, object a2) : base(constructor)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2;
+            A0 = a0; A1 = a1; A2 = a2;
         }
     }
 
-    public sealed class NoByRefThreeArgumentsNewExpression : ThreeArgumentsNewExpression
+    public sealed class NoByRefThreeArgumentsNewIntrinsicExpression : ThreeArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefThreeArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2)
+        internal NoByRefThreeArgumentsNewIntrinsicExpression(ConstructorInfo constructor, object a0, object a1, object a2)
             : base(constructor, a0, a1, a2) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            bool isNestedLambda, ref ClosureInfo rootClosure) =>
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config);
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -2946,26 +2944,28 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class FourArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1, Argument2, Argument3;
+        public readonly object A0, A1, A2, A3;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3 };
         public override int ArgumentCount => 4;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : Argument3;
-        internal FourArgumentsNewExpression(ConstructorInfo constructor,
-            Expression a0, Expression a1, Expression a2, Expression a3) : base(constructor)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : A3.AsExpr();
+        internal FourArgumentsNewExpression(ConstructorInfo constructor, object a0, object a1, object a2, object a3) : base(constructor)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3;
         }
     }
 
-    public sealed class NoByRefFourArgumentsNewExpression : FourArgumentsNewExpression
+    public sealed class NoByRefFourArgumentsNewIntrinsicExpression : FourArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefFourArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3)
+        internal NoByRefFourArgumentsNewIntrinsicExpression(ConstructorInfo constructor, object a0, object a1, object a2, object a3)
             : base(constructor, a0, a1, a2, a3) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            bool isNestedLambda, ref ClosureInfo rootClosure) =>
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
@@ -2973,10 +2973,12 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -2984,26 +2986,30 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class FiveArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4;
+        public readonly object A0, A1, A2, A3, A4;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4 };
         public override int ArgumentCount => 5;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : Argument4;
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : A4.AsExpr();
         internal FiveArgumentsNewExpression(ConstructorInfo constructor,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4) : base(constructor)
+            object a0, object a1, object a2, object a3, object a4) : base(constructor)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4;
         }
     }
 
-    public sealed class NoByRefFiveArgumentsNewExpression : FiveArgumentsNewExpression
+    public sealed class NoByRefFiveArgumentsNewIntrinsicExpression : FiveArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefFiveArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4)
+        internal NoByRefFiveArgumentsNewIntrinsicExpression(ConstructorInfo constructor, object a0, object a1, object a2, object a3, object a4)
             : base(constructor, a0, a1, a2, a3, a4) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            bool isNestedLambda, ref ClosureInfo rootClosure) =>
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
@@ -3012,11 +3018,13 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3024,27 +3032,32 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class SixArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5;
+        public readonly object A0, A1, A2, A3, A4, A5;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
+        public Expression Argument5 => A5.AsExpr();
         public override IReadOnlyList<Expression> Arguments =>
             new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5 };
         public override int ArgumentCount => 6;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : i == 4 ? Argument4 : Argument5;
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : i == 4 ? A4.AsExpr() : A5.AsExpr();
         internal SixArgumentsNewExpression(ConstructorInfo constructor,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5) : base(constructor)
+            object a0, object a1, object a2, object a3, object a4, object a5) : base(constructor)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4; Argument5 = a5;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4; A5 = a5;
         }
     }
 
-    public sealed class NoByRefSixArgumentsNewExpression : SixArgumentsNewExpression
+    public sealed class NoByRefSixArgumentsNewIntrinsicExpression : SixArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefSixArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5)
+        internal NoByRefSixArgumentsNewIntrinsicExpression(ConstructorInfo constructor, object a0, object a1, object a2, object a3, object a4, object a5)
             : base(constructor, a0, a1, a2, a3, a4, a5) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            bool isNestedLambda, ref ClosureInfo rootClosure) =>
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
@@ -3054,12 +3067,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3067,27 +3082,33 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class SevenArgumentsNewExpression : NewExpression
     {
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5, Argument6;
+        public readonly object A0, A1, A2, A3, A4, A5, A6;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
+        public Expression Argument5 => A5.AsExpr();
+        public Expression Argument6 => A6.AsExpr();
         public override IReadOnlyList<Expression> Arguments =>
             new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5, Argument6 };
         public override int ArgumentCount => 7;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : i == 4 ? Argument4 : i == 5 ? Argument5 : Argument6;
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : i == 4 ? A4.AsExpr() : i == 5 ? A5.AsExpr() : A6.AsExpr();
         internal SevenArgumentsNewExpression(ConstructorInfo constructor,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6) : base(constructor)
+            object a0, object a1, object a2, object a3, object a4, object a5, object a6) : base(constructor)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4; Argument5 = a5; Argument6 = a6;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4; A5 = a5; A6 = a6;
         }
     }
 
-    public sealed class NoByRefSevenArgumentsNewExpression : SevenArgumentsNewExpression
+    public sealed class NoByRefSevenArgumentsNewIntrinsicExpression : SevenArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefSevenArgumentsNewExpression(ConstructorInfo constructor, Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6)
+        internal NoByRefSevenArgumentsNewIntrinsicExpression(ConstructorInfo constructor, object a0, object a1, object a2, object a3, object a4, object a5, object a6)
             : base(constructor, a0, a1, a2, a3, a4, a5, a6) { }
         public override bool IsIntrinsic => true;
         public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
-            bool isNestedLambda, ref ClosureInfo rootClosure) => 
+            bool isNestedLambda, ref ClosureInfo rootClosure) =>
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument0, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument1, paramExprs, isNestedLambda, ref rootClosure, config) &&
             ExpressionCompiler.TryCollectBoundConstants(ref closure, Argument2, paramExprs, isNestedLambda, ref rootClosure, config) &&
@@ -3098,13 +3119,15 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
             ILGenerator il, ParentFlags parent, int byRefIndex = -1)
         {
-            var ok = EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1)
-                &&   EmittingVisitor.TryEmit(Argument6, paramExprs, il, ref closure, setup, parent | ParentFlags.CtorCall, -1);
+            var f = parent | ParentFlags.CtorCall;
+            var ok =
+                EmittingVisitor.TryEmit(Argument0, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument1, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument2, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument3, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument4, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument5, paramExprs, il, ref closure, setup, f, -1) &&
+                EmittingVisitor.TryEmit(Argument6, paramExprs, il, ref closure, setup, f, -1);
             il.Emit(OpCodes.Newobj, Constructor);
             return ok;
         }
@@ -3112,18 +3135,37 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 
     public class ManyArgumentsNewExpression : NewExpression
     {
-        private readonly IReadOnlyList<Expression> _arguments;
-        public override IReadOnlyList<Expression> Arguments => _arguments;
-        public override int ArgumentCount => _arguments.Count;
-        public override Expression GetArgument(int i) => _arguments[i];
-        internal ManyArgumentsNewExpression(ConstructorInfo constructor, IReadOnlyList<Expression> arguments) : base(constructor) =>
-            _arguments = arguments;
+        protected readonly IReadOnlyList<Expression> Args;
+        public override IReadOnlyList<Expression> Arguments => Args;
+        public override int ArgumentCount => Args.Count;
+        public override Expression GetArgument(int i) => Args[i];
+        internal ManyArgumentsNewExpression(ConstructorInfo constructor, IReadOnlyList<Expression> args) : base(constructor) => Args = args;
     }
 
-    public sealed class NoByRefManyArgumentsNewExpression : ManyArgumentsNewExpression
+    public sealed class NoByRefManyArgsNewIntrinsicExpression : ManyArgumentsNewExpression
     {
-        public override bool NoByRefArgs => true;
-        internal NoByRefManyArgumentsNewExpression(ConstructorInfo constructor, IReadOnlyList<Expression> arguments) : base(constructor, arguments) { }
+        internal NoByRefManyArgsNewIntrinsicExpression(ConstructorInfo constructor, IReadOnlyList<Expression> arguments) : base(constructor, arguments) { }
+        public override bool IsIntrinsic => true;
+        public override bool TryCollectBoundConstants(CompilerFlags config, ref ClosureInfo closure, IParameterProvider paramExprs,
+            bool isNestedLambda, ref ClosureInfo rootClosure)
+        {
+            var args = Args;
+            for (var i = 0; i < args.Count; i++)
+                if (!ExpressionCompiler.TryCollectBoundConstants(ref closure, args[i], paramExprs, isNestedLambda, ref rootClosure, config))
+                    return false;
+            return true;
+        }
+        public override bool TryEmit(CompilerFlags setup, ref ClosureInfo closure, IParameterProvider paramExprs,
+            ILGenerator il, ParentFlags parent, int byRefIndex = -1)
+        {
+            var f = parent | ParentFlags.CtorCall;
+            var args = Args;
+            for (var i = 0; i < args.Count; i++)
+                if (!EmittingVisitor.TryEmit(args[i], paramExprs, il, ref closure, setup, f, -1))
+                    return false;
+            il.Emit(OpCodes.Newobj, Constructor);
+            return true;
+        }
     }
 
     public abstract class NewArrayExpression : Expression, IArgumentProvider
@@ -3261,7 +3303,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class MethodCallExpression : Expression, IArgumentProvider
     {
         public sealed override ExpressionType NodeType => ExpressionType.Call;
-        public sealed override Type Type => Method.ReturnType;
+        public override Type Type => Method.ReturnType;
         public virtual MethodInfo Method => null;
         public virtual Expression Object => null;
         public virtual IReadOnlyList<Expression> Arguments => Tools.Empty<Expression>();
@@ -3270,8 +3312,11 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 #if SUPPORTS_VISITOR
         protected internal override Expression Accept(ExpressionVisitor visitor) => visitor.VisitMethodCall(this);
 #endif
-        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
-            SysExpr.Call(Object?.ToExpression(ref exprsConverted), Method, ToExpressions(Arguments, ref exprsConverted));
+        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted)
+        {
+            var expr = SysExpr.Call(Object?.ToExpression(ref exprsConverted), Method, ToExpressions(Arguments, ref exprsConverted));
+            return Type == Method.ReturnType ? expr : SysExpr.Convert(expr, Type); // insert the safe-guard convert
+        }
     }
 
     public class NotNullMethodCallExpression : MethodCallExpression
@@ -3308,10 +3353,11 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class OneArgumentMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument };
-        public readonly Expression Argument;
+        public readonly object Arg;
+        public Expression Argument => Arg.AsExpr();
         public override int ArgumentCount => 1;
-        public override Expression GetArgument(int i) => Argument;
-        internal OneArgumentMethodCallExpression(MethodInfo method, Expression argument) : base(method) => Argument = argument;
+        public override Expression GetArgument(int i) => Argument.AsExpr();
+        internal OneArgumentMethodCallExpression(MethodInfo method, object arg) : base(method) => Arg = arg;
     }
 
     public sealed class InstanceOneArgumentMethodCallExpression : OneArgumentMethodCallExpression
@@ -3325,12 +3371,14 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class TwoArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1 };
-        public readonly Expression Argument0, Argument1;
+        public readonly object A0, A1;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
         public override int ArgumentCount => 2;
-        public override Expression GetArgument(int i) => i == 0 ? Argument0 : Argument1;
-        internal TwoArgumentsMethodCallExpression(MethodInfo method, Expression a0, Expression a1) : base(method)
+        public override Expression GetArgument(int i) => i == 0 ? A0.AsExpr() : A1.AsExpr();
+        internal TwoArgumentsMethodCallExpression(MethodInfo method, object a0, object a1) : base(method)
         {
-            Argument0 = a0; Argument1 = a1;
+            A0 = a0; A1 = a1;
         }
     }
 
@@ -3345,13 +3393,15 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class ThreeArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2 };
-        public readonly Expression Argument0, Argument1, Argument2;
+        public readonly object A0, A1, A2;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
         public override int ArgumentCount => 3;
-        public override Expression GetArgument(int i) => i == 0 ? Argument0 : i == 1 ? Argument1 : Argument2;
-        internal ThreeArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2) : base(method)
+        public override Expression GetArgument(int i) => i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : A2.AsExpr();
+        internal ThreeArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2;
+            A0 = a0; A1 = a1; A2 = a2;
         }
     }
 
@@ -3365,14 +3415,17 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class FourArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3;
+        public readonly object A0, A1, A2, A3;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
         public override int ArgumentCount => 4;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : Argument3;
-        internal FourArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : A3.AsExpr();
+        internal FourArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3;
         }
     }
 
@@ -3387,14 +3440,18 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class FiveArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4;
+        public readonly object A0, A1, A2, A3, A4;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
         public override int ArgumentCount => 5;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : Argument4;
-        internal FiveArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : A4.AsExpr();
+        internal FiveArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3, object a4) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4;
         }
     }
 
@@ -3409,20 +3466,25 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class SixArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5;
+        public readonly object A0, A1, A2, A3, A4, A5;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
+        public Expression Argument5 => A5.AsExpr();
         public override int ArgumentCount => 6;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : i == 4 ? Argument4 : Argument5;
-        internal SixArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : i == 4 ? A4.AsExpr() : A5.AsExpr();
+        internal SixArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3, object a4, object a5) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4; Argument5 = a5;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4; A5 = a5;
         }
     }
 
     public sealed class InstanceSixArgumentsMethodCallExpression : SixArgumentsMethodCallExpression
     {
-        public override Expression Object { get; }
+        public override Expression Object { get; } // todo: @perf @mem make it an object?
         internal InstanceSixArgumentsMethodCallExpression(Expression instance, MethodInfo method,
             Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5)
             : base(method, a0, a1, a2, a3, a4, a5) => Object = instance;
@@ -3431,14 +3493,20 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
     public class SevenArgumentsMethodCallExpression : NotNullMethodCallExpression
     {
         public override IReadOnlyList<Expression> Arguments => new[] { Argument0, Argument1, Argument2, Argument3, Argument4, Argument5, Argument6 };
-        public readonly Expression Argument0, Argument1, Argument2, Argument3, Argument4, Argument5, Argument6;
+        public readonly object A0, A1, A2, A3, A4, A5, A6;
+        public Expression Argument0 => A0.AsExpr();
+        public Expression Argument1 => A1.AsExpr();
+        public Expression Argument2 => A2.AsExpr();
+        public Expression Argument3 => A3.AsExpr();
+        public Expression Argument4 => A4.AsExpr();
+        public Expression Argument5 => A5.AsExpr();
+        public Expression Argument6 => A6.AsExpr();
         public override int ArgumentCount => 7;
         public override Expression GetArgument(int i) =>
-            i == 0 ? Argument0 : i == 1 ? Argument1 : i == 2 ? Argument2 : i == 3 ? Argument3 : i == 4 ? Argument4 : i == 5 ? Argument5 : Argument6;
-        internal SevenArgumentsMethodCallExpression(MethodInfo method,
-            Expression a0, Expression a1, Expression a2, Expression a3, Expression a4, Expression a5, Expression a6) : base(method)
+            i == 0 ? A0.AsExpr() : i == 1 ? A1.AsExpr() : i == 2 ? A2.AsExpr() : i == 3 ? A3.AsExpr() : i == 4 ? A4.AsExpr() : i == 5 ? A5.AsExpr() : A6.AsExpr();
+        internal SevenArgumentsMethodCallExpression(MethodInfo method, object a0, object a1, object a2, object a3, object a4, object a5, object a6) : base(method)
         {
-            Argument0 = a0; Argument1 = a1; Argument2 = a2; Argument3 = a3; Argument4 = a4; Argument5 = a5; Argument6 = a6;
+            A0 = a0; A1 = a1; A2 = a2; A3 = a3; A4 = a4; A5 = a5; A6 = a6;
         }
     }
 
@@ -3560,8 +3628,12 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
 #if SUPPORTS_VISITOR
         protected internal override Expression Accept(ExpressionVisitor visitor) => visitor.VisitInvocation(this);
 #endif
-        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted) =>
-            SysExpr.Invoke(Expression.ToExpression(ref exprsConverted), ToExpressions(Arguments, ref exprsConverted));
+        internal override SysExpr CreateSysExpression(ref LiveCountArray<LightAndSysExpr> exprsConverted)
+        {
+            var expr = SysExpr.Invoke(Expression.ToExpression(ref exprsConverted), ToExpressions(Arguments, ref exprsConverted));
+            return Expression is LambdaExpression ? expr
+                : SysExpr.Convert(expr, Type); // insert the safe-guard convert
+        }
     }
 
     public class NotNullExpressionInvocationExpression : InvocationExpression
@@ -3570,6 +3642,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
         internal NotNullExpressionInvocationExpression(Expression expression) => Expression = expression;
     }
 
+    /// Implies that the Type may be different from the `expression` return type
     public sealed class TypedInvocationExpression : NotNullExpressionInvocationExpression
     {
         public override Type Type { get; }
@@ -3813,7 +3886,7 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             : base(@object, arguments) => Indexer = indexer;
     }
 
-    /// <summary>Base Block expression with no variables and with Type of its last (Result) exporession</summary>
+    /// <summary>Base Block expression with no variables and with Type of its last (Result) expression</summary>
     public class BlockExpression : Expression, IArgumentProvider
     {
         public override ExpressionType NodeType => ExpressionType.Block;

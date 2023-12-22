@@ -6,8 +6,21 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class WrapperTests
+    public class WrapperTests : ITest
     {
+        public int Run()
+        {
+            IsRegistered_wont_work_for_generic_wrappers();
+            When_registered_both_named_and_default_service_Then_resolving_Lazy_with_the_name_should_return_named_service();
+            Given_the_same_type_service_and_wrapper_registered_When_resolved_Then_service_will_preferred_over_wrapper();
+            Given_the_same_type_service_and_wrapper_registered_Wrapper_will_be_used_to_for_names_other_than_one_with_registered_service();
+            Wrapper_is_only_working_if_used_in_enumerable_or_other_wrapper_It_means_that_resolving_array_of_multiple_wrapper_should_throw();
+            Wrapper_may_not_be_generic_as_WeakReference();
+            Resolving_array_of_required_service_type_wrapper_should_work();
+            Injected_container_wrapper_should_NOT_be_tracked_as_transient_disposable();
+            return 8;
+        }
+
         [Test]
         public void IsRegistered_wont_work_for_generic_wrappers()
         {
@@ -62,8 +75,8 @@ namespace DryIoc.UnitTests
         public void Wrapper_is_only_working_if_used_in_enumerable_or_other_wrapper_It_means_that_resolving_array_of_multiple_wrapper_should_throw()
         {
             var container = new Container();
-            
-            var ex = Assert.Throws<ContainerException>(() => 
+
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Register(typeof(WrapperWithTwoArgs<,>), setup: Setup.Wrapper));
 
             Assert.AreEqual(Error.GenericWrapperWithMultipleTypeArgsShouldSpecifyArgIndex, ex.Error);
@@ -74,7 +87,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
 
-            container.Register(typeof(WeakReference), 
+            container.Register(typeof(WeakReference),
                 made: Made.Of(t => t.GetConstructorOrNull(args: typeof(object))),
                 setup: Setup.Wrapper);
 
@@ -95,6 +108,7 @@ namespace DryIoc.UnitTests
             var factoryWeakRefs = container.Resolve<WeakReference[]>(typeof(Func<Service>));
             Assert.AreEqual(1, factoryWeakRefs.Length);
         }
+
         public class WrapperWithTwoArgs<T0, T1>
         {
             public T0 Arg0 { get; set; }

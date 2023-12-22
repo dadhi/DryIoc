@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue_Register_null_string
+    public class Issue_Register_null_string : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

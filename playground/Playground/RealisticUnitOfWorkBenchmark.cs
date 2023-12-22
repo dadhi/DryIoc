@@ -937,7 +937,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
                         BmarkGrace | 5,538.53 us | 28.7673 us | 26.9090 us | 240.47 |    1.31 |     46.8750 |     23.4375 |           - |           216.09 KB |
                     BmarkGraceMsDi | 7,310.95 us | 28.3436 us | 23.6682 us | 317.48 |    1.50 |     62.5000 |     31.2500 |           - |           314.17 KB |
 
-            ## After enabling interpretation of FactoryDelegate registered by RegisterDelegate - found the culprit
+            ## After enabling interpretation of Func<IResolverContext, object> registered by RegisterDelegate - found the culprit
 
                             Method |        Mean |      Error |     StdDev |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|-----------:|-----------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
@@ -961,7 +961,7 @@ Intel Core i7-8750H CPU 2.20GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical 
                         BmarkGrace | 5,492.44 us | 27.8638 us | 26.0638 us | 238.34 |    1.82 |     46.8750 |     23.4375 |           - |           216.16 KB |
                     BmarkGraceMsDi | 7,250.63 us | 56.5489 us | 52.8958 us | 314.39 |    2.46 |     62.5000 |     31.2500 |           - |            314.2 KB |
 
-            ## Optimized interpreting of the ScopeOrSingleton and registered FactoryDelegate - now DI.MS.DI is faster than DI :)
+            ## Optimized interpreting of the ScopeOrSingleton and registered Func<IResolverContext, object> - now DI.MS.DI is faster than DI :)
 
                             Method |        Mean |       Error |     StdDev |      Median |  Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |------------:|------------:|-----------:|------------:|-------:|--------:|------------:|------------:|------------:|--------------------:|
@@ -1224,20 +1224,143 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |        Grace | 15,990.58 us | 123.798 us | 109.744 us | 194.52 |    2.21 |  93.7500 | 31.2500 |      - | 736.12 KB |
 |   Grace_MsDI | 18,884.30 us | 321.388 us | 268.373 us | 229.50 |    4.25 | 125.0000 | 62.5000 |      - |  904.7 KB |
 
+
 ## v5.0.1
 
 |      Method |      Mean |    Error |   StdDev |    Median | Ratio | RatioSD |   Gen 0 | Gen 1 | Gen 2 | Allocated |
 |------------ |----------:|---------:|---------:|----------:|------:|--------:|--------:|------:|------:|----------:|
 |      DryIoc |  93.89 us | 2.847 us | 8.167 us |  91.64 us |  1.00 |    0.00 | 12.8174 |     - |     - |  39.37 KB |
 | DryIoc_MsDI | 110.50 us | 2.545 us | 7.262 us | 109.15 us |  1.19 |    0.13 | 16.2354 |     - |     - |  49.82 KB |
+
+
+## v6 - ImTools v4
+
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 86.96 us | 1.477 us | 1.758 us |  1.00 |    0.00 |  6.2256 | 0.3662 |     - |  38.57 KB |
+| DryIoc_MsDI | 99.10 us | 1.255 us | 1.112 us |  1.13 |    0.02 |  7.9346 | 0.6104 |     - |  48.91 KB |
+|        MsDI | 93.91 us | 1.228 us | 1.026 us |  1.07 |    0.02 | 11.8408 | 4.2725 |     - |   72.6 KB |
+
+## v6 - Optimizing the Factory Expression Cache and more!
+
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 84.44 us | 1.621 us | 1.516 us |  1.00 |    0.00 |  6.2256 | 0.3662 |     - |  38.54 KB |
+| DryIoc_MsDI | 98.39 us | 1.011 us | 0.946 us |  1.17 |    0.02 |  7.9346 | 0.6104 |     - |  48.89 KB |
+|        MsDI | 92.17 us | 0.421 us | 0.352 us |  1.09 |    0.02 | 11.8408 | 4.2725 |     - |   72.6 KB |
+
+## v6 - SmallArrayPool (stashed)
+
+|      Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc |  87.82 us | 1.493 us | 1.397 us |  1.00 |    0.00 |  5.9814 | 0.3662 |     - |  37.38 KB |
+| DryIoc_MsDI | 100.88 us | 1.175 us | 1.099 us |  1.15 |    0.02 |  7.6904 | 0.4883 |     - |  47.71 KB |
+|        MsDI |  91.39 us | 0.972 us | 0.811 us |  1.04 |    0.02 | 11.8408 | 4.2725 |     - |  72.58 KB |
+
+## v6 - RequestStack optimized and ResolutionRoot request pool
+
+|      Method |      Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc |  93.61 us | 1.870 us | 4.025 us |  1.00 |    0.00 | 10.8643 |      - |     - |  33.56 KB |
+| DryIoc_MsDI | 108.99 us | 2.145 us | 4.972 us |  1.17 |    0.08 | 13.4277 |      - |     - |  41.25 KB |
+|        MsDI | 106.98 us | 2.114 us | 3.353 us |  1.15 |    0.07 | 22.9492 | 0.4883 |     - |  70.04 KB |
+
+
+## v6 - FactoryDelegate is replaced with Func avoiding the need for conversion
+
+|      Method |      Mean |    Error |   StdDev |    Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|---------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc |  98.57 us | 3.044 us | 8.974 us |  95.87 us |  1.00 |    0.00 | 10.8643 |      - |     - |  33.56 KB |
+| DryIoc_MsDI |  99.77 us | 0.970 us | 0.757 us |  99.65 us |  1.08 |    0.04 | 13.1836 |      - |     - |  40.75 KB |
+|        MsDI | 101.72 us | 1.980 us | 3.519 us | 100.69 us |  1.08 |    0.07 | 22.9492 | 0.6104 |     - |  70.04 KB |
+
+## v6 - No conversion to FactoryDelegate for cached constants results
+
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 85.50 us | 1.312 us | 1.227 us |  1.00 |    0.00 |  5.3711 | 0.4883 |     - |  33.25 KB |
+| DryIoc_MsDI | 97.42 us | 0.646 us | 0.572 us |  1.14 |    0.01 |  6.4697 | 0.6104 |     - |   40.2 KB |
+|        MsDI | 93.91 us | 1.406 us | 1.315 us |  1.10 |    0.02 | 11.8408 | 4.2725 |     - |  72.53 KB |
+
+## v6 Storing the ServiceDetails as ServiceInfo in Request
+
+|      Method |     Mean |   Error |   StdDev |   Median | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|--------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 162.8 us | 7.15 us | 21.08 us | 155.5 us |  1.00 |    0.00 | 10.7422 |      - |     - |  33.25 KB |
+| DryIoc_MsDI | 180.5 us | 7.23 us | 20.98 us | 174.1 us |  1.13 |    0.20 | 12.6953 |      - |     - |  39.34 KB |
+|        MsDI | 232.2 us | 4.64 us | 10.18 us | 232.5 us |  1.41 |    0.20 | 22.9492 | 0.9766 |     - |  70.04 KB |
+
+## v6 Directly recognizing and using InvokeFactoryDelegateExpression
+
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 85.37 us | 1.618 us | 1.731 us |  1.00 |    0.00 |  5.3711 | 0.4883 |     - |   33.2 KB |
+| DryIoc_MsDI | 96.08 us | 1.806 us | 1.855 us |  1.13 |    0.04 |  6.3477 | 0.6104 |     - |  39.15 KB |
+|        MsDI | 93.17 us | 0.802 us | 0.750 us |  1.09 |    0.02 | 11.8408 | 4.2725 |     - |  72.61 KB |
+
+## v6 Removing convert for scoped expression
+
+|      Method |      Mean |    Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|---------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc |  83.59 us | 1.614 us |  2.315 us |  1.00 |    0.00 |  5.2490 | 0.4883 |     - |  32.23 KB |
+| DryIoc_MsDI | 165.19 us | 5.806 us | 16.657 us |  1.94 |    0.16 |       - |      - |     - |  38.52 KB |
+|        MsDI |  96.35 us | 1.108 us |  0.982 us |  1.16 |    0.05 | 11.8408 | 4.2725 |     - |  72.62 KB |
+
+## v6 Removing the FactoryDelegateExpression wrapper
+
+|      Method |     Mean |    Error |   StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |---------:|---------:|---------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc | 79.95 us | 1.016 us | 0.950 us |  1.00 |    0.00 |  5.1270 | 0.4883 |     - |  31.55 KB |
+| DryIoc_MsDI | 89.66 us | 0.951 us | 0.843 us |  1.12 |    0.02 |  5.9814 | 0.4883 |     - |  37.31 KB |
+|        MsDI | 91.18 us | 0.974 us | 0.911 us |  1.14 |    0.02 | 11.8408 | 4.2725 |     - |  72.61 KB |
+
+|      Method |      Mean |     Error |    StdDev | Ratio | RatioSD |   Gen 0 |  Gen 1 | Gen 2 | Allocated |
+|------------ |----------:|----------:|----------:|------:|--------:|--------:|-------:|------:|----------:|
+|      DryIoc |  84.49 us |  1.688 us |  1.579 us |  1.00 |    0.00 |  5.1270 | 0.4883 |     - |  31.55 KB |
+| DryIoc_MsDI | 263.42 us | 24.769 us | 72.644 us |  3.04 |    0.82 |       - |      - |     - |  37.84 KB |
+|        MsDI |  92.93 us |  1.298 us |  1.084 us |  1.10 |    0.03 | 11.8408 | 4.2725 |     - |  72.59 KB |
+
+## v6 after update to MS.Ext.DI to v7.0.0
+
+|      Method |      Mean |    Error |    StdDev |    Median | Ratio | RatioSD |    Gen0 |   Gen1 | Allocated | Alloc Ratio |
+|------------ |----------:|---------:|----------:|----------:|------:|--------:|--------:|-------:|----------:|------------:|
+|      DryIoc |  95.50 us | 1.783 us |  3.477 us |  94.44 us |  1.00 |    0.00 | 10.2539 |      - |  31.64 KB |        1.00 |
+| DryIoc_MsDI | 122.30 us | 5.922 us | 17.462 us | 115.89 us |  1.17 |    0.11 | 12.0850 |      - |  37.23 KB |        1.18 |
+|        MsDI | 119.71 us | 2.642 us |  7.580 us | 116.47 us |  1.25 |    0.09 | 23.4375 | 0.3662 |  71.44 KB |        2.26 |
+
+## v6 after update to .NET 7
+
+BenchmarkDotNet=v0.13.3, OS=Windows 10 (10.0.19042.928/20H2/October2020Update)
+Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical cores
+.NET SDK=7.0.100
+  [Host]     : .NET 7.0.0 (7.0.22.51805), X64 RyuJIT AVX2
+  DefaultJob : .NET 7.0.0 (7.0.22.51805), X64 RyuJIT AVX2
+
+|      Method |     Mean |   Error |   StdDev |   Median | Ratio | RatioSD |    Gen0 |   Gen1 | Allocated | Alloc Ratio |
+|------------ |---------:|--------:|---------:|---------:|------:|--------:|--------:|-------:|----------:|------------:|
+|      DryIoc | 138.5 us | 9.07 us | 26.75 us | 129.7 us |  1.00 |    0.00 | 10.2539 |      - |  31.74 KB |        1.00 |
+| DryIoc_MsDI | 150.0 us | 6.67 us | 18.93 us | 147.7 us |  1.12 |    0.24 | 11.9629 |      - |  37.22 KB |        1.17 |
+|        MsDI | 205.2 us | 4.08 us | 11.70 us | 202.9 us |  1.53 |    0.27 | 23.1934 | 0.4883 |  71.36 KB |        2.25 |
+
+## v6 without expression caching
+
+|      Method |     Mean |   Error |   StdDev | Ratio | RatioSD |    Gen0 |   Gen1 | Allocated | Alloc Ratio |
+|------------ |---------:|--------:|---------:|------:|--------:|--------:|-------:|----------:|------------:|
+|      DryIoc | 164.4 us | 6.39 us | 17.91 us |  1.00 |    0.00 | 12.2070 |      - |  37.63 KB |        1.00 |
+| DryIoc_MsDI | 159.9 us | 4.89 us | 13.38 us |  0.98 |    0.13 | 13.9160 |      - |  43.05 KB |        1.14 |
+|        MsDI | 213.8 us | 4.37 us | 12.68 us |  1.31 |    0.16 | 23.1934 | 0.4883 |  71.34 KB |        1.90 |
+
 */
+
+            // [Benchmark]
             [Benchmark(Baseline = true)]
             public object DryIoc() => Measure(PrepareDryIoc());
 
+            // [Benchmark(Baseline = true)]
             [Benchmark]
             public object DryIoc_MsDI() => Measure(PrepareDryIocMsDi());
 
-            // [Benchmark]
+            [Benchmark]
             public object MsDI() => Measure(PrepareMsDi());
 
             // note: no need for this because it is the same as DryIoc benchmark
@@ -1340,7 +1463,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
                       BmarkAutofac | 12.845 us | 0.1024 us | 0.0957 us |  9.05 |    0.07 |      3.6163 |           - |           - |             16.7 KB |
                   BmarkAutofacMsDi | 18.235 us | 0.2559 us | 0.2393 us | 12.85 |    0.18 |      5.0964 |           - |           - |            23.55 KB |
 
-            ## Optimized interpreting of the ScopeOrSingleton and registered FactoryDelegate - now DI.MS.DI is faster than DI :)
+            ## Optimized interpreting of the ScopeOrSingleton and registered Func<IResolverContext, object> - now DI.MS.DI is faster than DI :)
 
                             Method |      Mean |     Error |    StdDev | Ratio | RatioSD | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 ---------------------------------- |----------:|----------:|----------:|------:|--------:|------------:|------------:|------------:|--------------------:|
@@ -1602,6 +1725,21 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 |   Lamar_MsDI |  6.673 us | 0.0876 us | 0.0732 us |  4.35 |    0.06 |  0.9995 | 0.4959 |     - |   6.16 KB |
 |      Autofac | 47.040 us | 0.7367 us | 0.6531 us | 30.65 |    0.48 |  7.7515 | 0.6104 |     - |  47.73 KB |
 | Autofac_MsDI | 59.566 us | 0.8734 us | 0.7742 us | 38.76 |    0.61 | 11.3525 | 0.9155 |     - |  69.59 KB |
+
+## DryIoc v6
+
+BenchmarkDotNet=v0.13.3, OS=Windows 10 (10.0.19042.928/20H2/October2020Update)
+Intel Core i5-8350U CPU 1.70GHz (Kaby Lake R), 1 CPU, 8 logical and 4 physical cores
+.NET SDK=7.0.100
+  [Host]     : .NET 7.0.0 (7.0.22.51805), X64 RyuJIT AVX2
+  DefaultJob : .NET 7.0.0 (7.0.22.51805), X64 RyuJIT AVX2
+
+
+|      Method |     Mean |     Error |    StdDev |   Median | Ratio | RatioSD |   Gen0 | Allocated | Alloc Ratio |
+|------------ |---------:|----------:|----------:|---------:|------:|--------:|-------:|----------:|------------:|
+|      DryIoc | 1.804 us | 0.0361 us | 0.0768 us | 1.787 us |  1.00 |    0.00 | 0.9499 |   2.91 KB |        1.00 |
+| DryIoc_MsDI | 2.698 us | 0.1138 us | 0.3266 us | 2.789 us |  1.50 |    0.16 | 0.9575 |   2.94 KB |        1.01 |
+|        MsDI | 3.911 us | 0.0782 us | 0.1991 us | 3.853 us |  2.18 |    0.18 | 1.5259 |   4.68 KB |        1.61 |
 */
 #pragma warning disable CS0169
             private IServiceProvider _msDi;
@@ -1648,19 +1786,19 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
             //[Benchmark]
             public object DryIoc_InterpretationOnly() => Measure(_dryIocInterpretationOnly);
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace() => Measure(_grace);
 
-            [Benchmark]
+            // [Benchmark]
             public object Grace_MsDI() => Measure(_graceMsDi);
 
-            [Benchmark]
+            // [Benchmark]
             public object Lamar_MsDI() => Measure(_lamarMsDi);
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac() => Measure(_autofac);
 
-            [Benchmark]
+            // [Benchmark]
             public object Autofac_MsDI() => Measure(_autofacMsDi);
         }
     }

@@ -1,4 +1,5 @@
 using System;
+using DryIoc.Microsoft.DependencyInjection;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -8,25 +9,34 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Test();
-            return 1;
+            Test1();
+            Test2();
+            return 2;
         }
 
         [Test]
-        public void Test()
+        public void Test1()
         {
             var containerWithNiceException = new Container();
             containerWithNiceException.Register<Service>();
 
-            const string expected = @"as parameter ""dependency""";
-
             var ex = Assert.Throws<ContainerException>(() => containerWithNiceException.Resolve<Service>());
+
+            const string expected = @"as parameter ""dependency""";
             StringAssert.Contains(expected, ex.Message);
 
             var containerWithAutoConcreteTypes = new Container(rules => rules.WithConcreteTypeDynamicRegistrations(IfUnresolved.Throw, reuse: Reuse.Transient));
 
             var ex2 = Assert.Throws<ContainerException>(() => containerWithAutoConcreteTypes.Resolve<Service>());
             StringAssert.Contains(expected, ex2.Message);
+        }
+
+        [Test]
+        public void Test2()
+        {
+            var c = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules.WithConcreteTypeDynamicRegistrations());
+            var o = c.Resolve<OtherService>();
+            Assert.IsNotNull(o.Dependency);
         }
 
         internal class Service
@@ -38,6 +48,16 @@ namespace DryIoc.IssuesTests
 
         internal interface IDependency
         {
+        }
+
+        internal class Dependency : IDependency
+        {
+        }
+
+        internal class OtherService
+        {
+            public readonly Dependency Dependency;
+            public OtherService(Dependency dependency) => Dependency = dependency;
         }
     }
 }

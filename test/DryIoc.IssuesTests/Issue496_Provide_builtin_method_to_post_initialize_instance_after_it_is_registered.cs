@@ -3,8 +3,15 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue496_Provide_builtin_method_to_post_initialize_instance_after_it_is_registered
+    public class Issue496_Provide_builtin_method_to_post_initialize_instance_after_it_is_registered : ITest
     {
+        public int Run()
+        {
+            Try_decorator_factory();
+            Try_initializer();
+            return 2;
+        }
+
         [Test]
         public void Try_decorator_factory()
         {

@@ -1,0 +1,1 @@
+dotnet build docs\DryIoc.Docs\DryIoc.Docs.csproj -f net6.0 -target:MdGenerate

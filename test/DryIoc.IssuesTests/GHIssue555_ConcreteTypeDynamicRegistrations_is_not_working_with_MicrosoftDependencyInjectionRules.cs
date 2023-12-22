@@ -16,14 +16,14 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test1()
         {
-            var rules = Rules
+            var rules = DryIocAdapter
                 .MicrosoftDependencyInjectionRules
                 .WithConcreteTypeDynamicRegistrations(reuse: Reuse.Transient);
 
             var container = new Container(rules);
 
-            var msDi = new DryIocServiceProviderFactory(container, RegistrySharing.Share);
-            var msDiContainer = msDi.CreateBuilder(new ServiceCollection());
+            var factory = new DryIocServiceProviderFactory(container, RegistrySharing.Share);
+            var msDiContainer = factory.CreateBuilder(new ServiceCollection()).Container;
             Assert.AreSame(container, msDiContainer);
         }
 

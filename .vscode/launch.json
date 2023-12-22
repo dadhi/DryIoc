@@ -5,25 +5,24 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Benchmarks",
+            "name": "MediatR comptime",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build_benchmark",
-            "program": "${workspaceFolder}/playground/Playground/bin/Debug/net7.0/Playground.dll",
+            "preLaunchTask": "build_mediatr_comptime",
+            "program": "${workspaceFolder}/playground/DryIoc.Messages.MediatRLikeExample.CompileTimeDI/bin/Debug/net6.0/DryIoc.Messages.MediatRLikeExample.CompileTimeDI.exe",
             "args": [],
-            "cwd": "${workspaceFolder}/playground/Playground",
+            "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
             "console": "internalConsole"
         },
         {
-            "name": "TestRunner",
+            "name": "Playground+Benchmarks",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build_testrunner",
-            // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/test/DryIoc.TestRunner/bin/Debug/net7.0/DryIoc.TestRunner.dll",
+            "preLaunchTask": "build_benchmark",
+            "program": "${workspaceFolder}/playground/Playground/bin/Debug/net8.0/Playground.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/test/DryIoc.TestRunner",
+            "cwd": "${workspaceFolder}/playground/Playground",
             // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
             "console": "internalConsole",
             "stopAtEntry": false,
@@ -31,14 +30,14 @@
             "requireExactSource": false // allows to for moderate code editing while debugging
         },
         {
-            "name": "GHIssue520",
+            "name": "TestRunner",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build_testrunner",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/samples/GHIssue520/bin/Debug/net7.0/test.dll",
+            "program": "${workspaceFolder}/test/DryIoc.TestRunner/bin/Debug/net8.0/DryIoc.TestRunner.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/samples/GHIssue520",
+            "cwd": "${workspaceFolder}/test/DryIoc.TestRunner",
             // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
             "console": "internalConsole",
             "stopAtEntry": false,

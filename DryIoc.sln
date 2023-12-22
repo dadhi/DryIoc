@@ -18,7 +18,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
 		appveyor.yml = appveyor.yml
-		build.bat = build.bat
 		CONTRIBUTING.md = CONTRIBUTING.md
 		Directory.Build.props = Directory.Build.props
 		Extensions.md = Extensions.md
@@ -116,19 +115,23 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DryIoc", "DryIoc", "{1858EE
 		nuspecs\DryIoc\readme.md = nuspecs\DryIoc\readme.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.TestRunner", "test\DryIoc.TestRunner\DryIoc.TestRunner.csproj", "{755CC987-E7B6-46CD-B612-D33B28EBD1A8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.TestRunner", "test\DryIoc.TestRunner\DryIoc.TestRunner.csproj", "{755CC987-E7B6-46CD-B612-D33B28EBD1A8}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.AzureFunctions", "src\DryIoc.AzureFunctions\DryIoc.AzureFunctions.csproj", "{400BE898-DF9C-4DE8-9483-1F43F990784B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.AzureFunctions", "src\DryIoc.AzureFunctions\DryIoc.AzureFunctions.csproj", "{400BE898-DF9C-4DE8-9483-1F43F990784B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.Microsoft.DependencyInjection.Specification.Tests", "test\DryIoc.Microsoft.DependencyInjection.Specification.Tests\DryIoc.Microsoft.DependencyInjection.Specification.Tests.csproj", "{480C65D7-184D-44E7-9B5D-05E30D857977}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.Microsoft.DependencyInjection.Specification.Tests", "test\DryIoc.Microsoft.DependencyInjection.Specification.Tests\DryIoc.Microsoft.DependencyInjection.Specification.Tests.csproj", "{480C65D7-184D-44E7-9B5D-05E30D857977}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Playground", "playground\Playground\Playground.csproj", "{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground", "playground\Playground\Playground.csproj", "{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.TestRunner.net472", "test\DryIoc.TestRunner.net472\DryIoc.TestRunner.net472.csproj", "{4B7B7E57-3975-448A-B79A-9315DDC3DB38}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{38A94225-72AE-4869-88A2-61FCB48ED681}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "test", "samples\GHIssue519\test.csproj", "{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "test", "samples\GHIssue519\test.csproj", "{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests", "test\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests.csproj", "{91671AB0-0788-4912-94B9-386F3EA820B2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MinimalWeb", "samples\MinimalWeb\MinimalWeb.csproj", "{D9B3581F-F4E5-4225-82FE-5AAC1779B63B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests", "test\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests\DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests.csproj", "{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -264,14 +267,22 @@ Global
 		{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4B7B7E57-3975-448A-B79A-9315DDC3DB38}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B7B7E57-3975-448A-B79A-9315DDC3DB38}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B7B7E57-3975-448A-B79A-9315DDC3DB38}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B7B7E57-3975-448A-B79A-9315DDC3DB38}.Release|Any CPU.Build.0 = Release|Any CPU
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73}.Release|Any CPU.Build.0 = Release|Any CPU
-		{91671AB0-0788-4912-94B9-386F3EA820B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{91671AB0-0788-4912-94B9-386F3EA820B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{91671AB0-0788-4912-94B9-386F3EA820B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{91671AB0-0788-4912-94B9-386F3EA820B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9B3581F-F4E5-4225-82FE-5AAC1779B63B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9B3581F-F4E5-4225-82FE-5AAC1779B63B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9B3581F-F4E5-4225-82FE-5AAC1779B63B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9B3581F-F4E5-4225-82FE-5AAC1779B63B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -309,8 +320,10 @@ Global
 		{400BE898-DF9C-4DE8-9483-1F43F990784B} = {258FA031-1B82-403A-B235-9A25B17A024A}
 		{480C65D7-184D-44E7-9B5D-05E30D857977} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 		{AE6FA868-31E9-4726-9A8E-8BAB2ADD1F9D} = {85CE6F42-1A5A-4475-9E8C-D3090BCC6EED}
+		{4B7B7E57-3975-448A-B79A-9315DDC3DB38} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 		{0CAC5A1E-FEB3-4C12-929C-AB9EF9171F73} = {38A94225-72AE-4869-88A2-61FCB48ED681}
-		{91671AB0-0788-4912-94B9-386F3EA820B2} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
+		{D9B3581F-F4E5-4225-82FE-5AAC1779B63B} = {38A94225-72AE-4869-88A2-61FCB48ED681}
+		{94DA08B7-DF4A-4C85-833A-7DEBB6323E56} = {69DDE71E-F688-44E9-9A60-AB0DE2D270FF}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {722EDB85-282C-48BF-9384-BC9C5C230923}

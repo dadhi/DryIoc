@@ -8,8 +8,23 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            Container_is_providing_method_for_that_Test_default_constructor();
+            If_single_constructor_available_Then_constructor_selection_is_not_applied();
+            If_multiple_constructor_available_and_nothing_selected_Then_it_should_throw_specific_error();
+            What_if_no_public_constructors();
+            For_func_with_arguments_Constructor_containing_all_func_args_should_be_selected();
+            For_func_with_arguments_Constructor_with_more_resolvable_arguments_should_be_preferred_over_less_or_no_args();
+            For_func_with_arguments_When_it_should_the_first_matching_constructor();
+            Could_specify_constructor_selection_as_default_strategy_for_all_Container_registrations();
+            When_using_all_arg_ctor_selector_implicitly_injected_services_should_be_honored();
+            When_using_all_arg_ctor_selector_implicit_custom_value_dependency_should_be_honored();
+            Can_specify_to_use_default_ctor();
+            Can_specify_to_use_default_ctor_and_throw_correct_error_if_no_default_ctor();
             Can_specify_to_use_default_ctor_and_throw_correct_error_if_no_impl_type();
-            return 1;
+            For_consistency_I_can_specify_FactoryMethod_to_be_a_constructor();
+            Constructor_FactoryMethod_will_throw_for_not_defined_impl_type();
+            AutoConstructorSelection_will_throw_for_not_defined_impl_type();
+            return 15;
         }
 
         [Test]

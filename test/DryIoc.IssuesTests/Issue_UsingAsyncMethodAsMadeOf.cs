@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue_UsingAsyncMethodAsMadeOf
+    public class Issue_UsingAsyncMethodAsMadeOf : ITest
     {
+        public int Run()
+        {
+            Async_Made_Of().GetAwaiter().GetResult();
+            return 1;
+        }
+
         [Test]
         public async Task Async_Made_Of()
         {

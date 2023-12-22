@@ -6,8 +6,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue446_Select_single_open_generic_impl_based_on_matching_closed_service_type
+    public class Issue446_Select_single_open_generic_impl_based_on_matching_closed_service_type : ITest
     {
+        public int Run()
+        {
+            Main_test();
+            return 1;
+        }
+
         [Test]
         public void Main_test()
         {

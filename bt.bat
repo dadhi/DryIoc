@@ -2,15 +2,20 @@
 setlocal EnableDelayedExpansion
 
 echo:
-echo:## Starting: TestRunner... ##
+echo:# Build the TestRunner (.NET 8 only)
 echo:
 
-dotnet run -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet build  -f net8.0 -c:Release test/DryIoc.TestRunner
 
+echo:
+echo:# Run the TestRunner
+echo:
+
+dotnet run --no-build -f net8.0 -c Release --project test/DryIoc.TestRunner
 if %ERRORLEVEL% neq 0 goto :error
-echo:## Finished: TestRunner ##
 
-echo:## Finished: ALL Successful ##
+echo:
+echo:## ALL Successful ##
 exit /b 0
 
 :error

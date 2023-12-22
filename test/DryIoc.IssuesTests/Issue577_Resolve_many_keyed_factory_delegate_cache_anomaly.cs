@@ -6,8 +6,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue577_InconsistentResolutionAndCacheAnomaly
+    public class Issue577_InconsistentResolutionAndCacheAnomaly : ITest
     {
+        public int Run()
+        {
+            ResolvingEagerWithSimplifiedRegistrationYieldsInstancesOfTheExpectedTypes();
+            ResolvingEagerWithSmallerDependencyTreeYieldsInstancesOfTheExpectedTypes();
+            ResolvingEagerYieldsInstancesOfTheExpectedTypes();
+            ResolvingLazyYieldsInstancesOfTheExpectedTypes();
+            return 4;
+        }
+
         private static readonly Type[] ExpectedStrategies = new[]
         {
             typeof(UnknownStrategy),

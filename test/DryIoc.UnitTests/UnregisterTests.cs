@@ -6,8 +6,44 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class UnregisterTests
+    public class UnregisterTests : ITest
     {
+        public int Run()
+        {
+            Unregister_default_registration_should_Succeed();
+            Unregister_unregistered_default_registration_should_not_throw();
+            Unregister_then_register_new_impl_Should_resolve_new_impl();
+            Unregister_default_with_default_key_should_work();
+            Unregister_unregistered_default_with_default_key_should_work();
+            Unregister_named_registration_from_default_should_Fail();
+            Unregister_then_register_named_impl_Should_return_new_impl();
+            Unregister_then_register_one_of_named_impl_Should_return_new_impl();
+            Unregister_default_with_not_applied_remove_condition_should_Fail();
+            Unregister_without_specific_default_key_will_remove_all_registered_defaults();
+            Unregister_default_registrations_with_condition_successful_for_one_of_two_will_keep_the_second_registration();
+            Unregister_unregistered_default_registrations_with_condition_should_not_throw();
+            Unregister_last_default_registrations_with_condition_successful_for_one_of_two_will_keep_the_second_registration();
+            Unregister_unregistered_last_default_registrations_with_condition_should_not_throw();
+            Unregister_specific_default_from_multiple_defaults_and_named_should_Succeed();
+            Unregister_unregistered_specific_default_from_multiple_defaults_and_named_should_not_throw();
+            Unregister_named_registration_should_Succeed();
+            Unregister_unregistered_named_registration_should_Succeed();
+            Unregister_without_key_from_named_registration_should_remove_all_registrations();
+            Unregister_named_from_default_and_named_default_should_keep_default();
+            Unregister_decorator_should_keep_decorated_service();
+            Unregister_of_unregistered_decorator_should_not_throw();
+            Unregister_decorator_with_condition_should_keep_decorator_for_which_condition_is_failed();
+            Unregister_generic_wrapper_is_possible();
+            Unregister_of_unregistered_generic_wrapper_should_not_throw();
+            Unregister_generic_wrapper_with_condition_is_possible();
+            Unregister_already_resolved_open_generic_service();
+            Unregister_singleton_resolution_root();
+            Unregister_singleton_injected_dependency();
+            Can_UnregisterMany();
+            Test_issue_412_resolving_open_generics_collection_after_Unregister();
+            return 31;
+        }
+
         [Test]
         public void Unregister_default_registration_should_Succeed()
         {
@@ -318,7 +354,7 @@ namespace DryIoc.UnitTests
         {
             var container = new Container();
             Assert.IsTrue(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
-            
+
             container.Unregister(typeof(Lazy<>), factoryType: FactoryType.Wrapper);
             Assert.IsFalse(container.IsRegistered(typeof(Lazy<>), factoryType: FactoryType.Wrapper));
         }
@@ -348,9 +384,9 @@ namespace DryIoc.UnitTests
 
         internal class NullHandlerDecorator : IHandler { }
 
-        internal interface IC {}
-        internal class C : IC {}
-        internal class C1 : IC {}
+        internal interface IC { }
+        internal class C : IC { }
+        internal class C1 : IC { }
 
         public class B : IDisposable
         {
@@ -361,7 +397,7 @@ namespace DryIoc.UnitTests
                 IsDisposed = true;
             }
         }
-        
+
         public class A : IDisposable
         {
             public B B { get; private set; }
@@ -388,7 +424,7 @@ namespace DryIoc.UnitTests
 
             container.Unregister(typeof(IA<>));
 
-            var ex = Assert.Throws<ContainerException>(() => 
+            var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<IA<int>>());
 
             Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), ex.ErrorName);
@@ -408,19 +444,19 @@ namespace DryIoc.UnitTests
 
             container.Unregister<A>();
 
-            Assert.Throws<ContainerException>(() => 
+            Assert.Throws<ContainerException>(() =>
             container.Resolve<A>()); // Will throw "Unable to resolve.." exception
 
             // Unregistered singleton will be kept for container lifetime and won't be disposed either, 
             // so you should take care of Dispose by yourself
             // or you may register singleton as Setup.With(weaklyReferenced: true)
-            Assert.IsFalse(a.IsDisposed); 
+            Assert.IsFalse(a.IsDisposed);
 
             // After that re-registering and resolving A should return different instance
             container.Register<A>(Reuse.Singleton);
 
             var a1 = container.Resolve<A>();
-            Assert.AreNotSame(a, a1);        
+            Assert.AreNotSame(a, a1);
         }
 
         [Test]
@@ -480,12 +516,12 @@ namespace DryIoc.UnitTests
 
             container.Register<NonRelevantService>();
             container.Unregister<NonRelevantService>();
-            
+
             var genericHandlers = container.ResolveMany<IHandler<X>>();
             Assert.AreEqual(0, genericHandlers.Count());
         }
 
-        public interface IHandler<T> { } 
+        public interface IHandler<T> { }
         public class X { }
         public class NonRelevantService { }
     }

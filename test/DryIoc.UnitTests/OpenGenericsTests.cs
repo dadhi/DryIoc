@@ -10,9 +10,43 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            Resolving_non_registered_generic_should_throw();
+            Resolving_generic_should_return_registered_open_generic_implementation();
+            Resolving_transient_open_generic_implementation_should_work();
+            Resolving_generic_with_generic_arg_as_dependency_should_work();
+            Given_open_generic_registered_as_singleton_Resolving_two_closed_generics_should_return_the_same_instance();
+            Given_open_generic_registered_as_singleton_Resolving_two_closed_generics_of_different_type_should_not_throw();
+            Resolving_generic_with_concrete_implementation_should_work();
+            Resolving_open_generic_service_type_should_throw();
+            Resolving_open_generic_with_recursive_dependency_of_the_same_type_should_throw();
+            Possible_to_select_constructor_for_open_generic_imlementation();
+            Possible_to_resolve_open_generic_with_constraints();
+            Resolve_many_should_filter_out_implementations_with_notfit_constraints();
+            Should_handle_reordered_type_arguments_for_closed_generics();
+            Should_resolve_with_reordered_type_arguments();
+            Should_resolve_with_nested_type_arguments();
+            Should_resolve_with_multiple_level_nested_and_reordered_type_arguments();
+            Should_Throw_when_service_has_multiple_type_args_for_single_implementation_type_parameter();
+            Should_Throw_when_service_has_multiple_type_args_for_single_implementation_type_parameter2();
+            Should_Throw_when_registering_implementation_with_service_without_some_type_args_specified();
+            Should_Throw_container_exception_for_service_type_with_mismatched_type_arguments();
+            Registering_open_generic_implementation_with_non_generic_service_should_Throw();
+            Registering_open_generic_implementation_with_matched_closed_generic_service_should_be_OK();
+            Registering_open_generic_implementation_with_not_implemented_closed_generic_service_should_Throw();
+            Registering_all_of_implemented_services_should_register_only_those_containing_all_impl_generic_args();
+            Given_open_generic_singleton_registered_with_register_many_then_resolving_as_close_generic_should_fail();
+            Registering_generic_but_not_closed_implementation_should_Throw();
             Registering_technically_non_generic_type_definition_service_type_but_compatible_with_implementation_should_work();
-            return 1;
+            Resolving_array_of_generic_implementations_should_select_only_matched_types();
+            Can_match_generic_parameter_from_constraint();
+            Should_throw_if_generic_service_is_not_implemented_in_impl_type();
+            Should_handle_recurred_constraint_pattern();
+            Registration_throws_if_service_does_not_provide_all_generic_parameters();
+            Can_register_open_generic_returned_by_factory_method();
+            Selecting_constructor_in_open_generic_class_should_work();
+            return 33;
         }
+
         [Test]
         public void Resolving_non_registered_generic_should_throw()
         {
@@ -25,7 +59,7 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Resolving_generic_should_return_registered_open_generic_impelementation()
+        public void Resolving_generic_should_return_registered_open_generic_implementation()
         {
             var container = new Container();
             container.Register(typeof(IService<>), typeof(Service<>));
@@ -384,7 +418,7 @@ namespace DryIoc.UnitTests
         internal class X<T> : Y<T> where T : IRecurrable<T> { }
 
         [Test]
-        public void Resgitration_throws_if_service_does_not_provide_all_generic_parameters()
+        public void Registration_throws_if_service_does_not_provide_all_generic_parameters()
         {
             var container = new Container();
             

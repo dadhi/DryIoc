@@ -48,15 +48,15 @@ namespace DryIoc.AzureFunctions
         public static IFunctionsHostBuilder UseDryIoc(this IFunctionsHostBuilder hostBuilder, IContainer container = null)
         {
             if (container == null)
-                container = new Container(Rules.MicrosoftDependencyInjectionRules);
-            else if (container.Rules != Rules.MicrosoftDependencyInjectionRules)
-                container = container.With(rules => rules.WithMicrosoftDependencyInjectionRules());
+                container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules);
+            else if (!DryIocAdapter.HasMicrosoftDependencyInjectionRules(container.Rules))
+                container = container.With(DryIocAdapter.WithMicrosoftDependencyInjectionRules);
 
-            hostBuilder.Services.AddSingleton<IContainer>(s =>
+            hostBuilder.Services.AddSingleton(s =>
             {
                 container.Populate(hostBuilder.Services);
 
-                container.RegisterDelegate<ILogger>(
+                container.RegisterDelegate(
                     r => r.Resolve<ILoggerFactory>().CreateLogger(LogCategories.CreateFunctionUserCategory(r.Resolve<FunctionName>().Name)), 
                     Reuse.Scoped);
 

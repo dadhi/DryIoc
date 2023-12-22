@@ -6,8 +6,16 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue80_ScopedOrSingleton_extra_constructor_calls
+    public class GHIssue80_ScopedOrSingleton_extra_constructor_calls : ITest
     {
+        public int Run()
+        {
+            SetUp(); Issue80_ScopedOrSingleton_SingletonCheck();
+            SetUp(); Issue80_ScopedOrSingleton();
+            SetUp(); Issue80_Scoped();
+            return 3;
+        }
+
         [SetUp]
         public void SetUp()
         {

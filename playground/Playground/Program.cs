@@ -10,6 +10,11 @@ namespace Playground
     {
         public static void Main()
         {
+            var di = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
+            RealisticUnitOfWorkBenchmark.Measure(di);
+
+            // BenchmarkRunner.Run<ZeroArgs_CtorInvoke_Vs_ActivatorCreate>();
+
             // var x = new InvokeVsInvokeUnsafeBenchmark().InvokeUnsafe();
             // BenchmarkRunner.Run<InvokeVsInvokeUnsafeBenchmark>();
 
@@ -19,7 +24,7 @@ namespace Playground
             //bm.SortViaInsertion();
             //BenchmarkRunner.Run<ManualInsertionSortVsOrderBy>();
 
-            BenchmarkRunner.Run<MatchExperiments>();
+            //BenchmarkRunner.Run<MatchCaseOrder>();
 
             //BenchmarkRunner.Run<ImMapBenchmarks.Populate>();
             //BenchmarkRunner.Run<ImMapBenchmarks.Lookup>();
@@ -30,34 +35,44 @@ namespace Playground
             //BenchmarkRunner.Run<StructEnumerableTest>();
             //BenchmarkRunner.Run<PropertyAccess>();
 
-            //BenchmarkRunner.Run<FindMethodInClass>();
+            // BenchmarkRunner.Run<FindMethodInClass>();
+            // BenchmarkRunner.Run<GetConstructor>();
+            // var cs = new GetConstructor().GetAll();
+            // Console.WriteLine(cs.Length);
             //BenchmarkRunner.Run<FactoryMethodInvoke_vs_ActivateCreateInstanceBenchmark>();
 
-            //var x = RealisticUnitOfWorkWithBigObjectGraphBenchmark.Measure(
+            // var x = RealisticUnitOfWorkWithBigObjectGraphBenchmark.Measure(
             //    RealisticUnitOfWorkWithBigObjectGraphBenchmark.PrepareDryIoc());
             //Debug.Assert(x != null);
+
+            // var di = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
+            // var x = RealisticUnitOfWorkBenchmark.Measure(di);
+            // var y = RealisticUnitOfWorkBenchmark.Measure(di);
+            // Console.ReadKey();
 
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.FirstTimeOpenScopeAndResolve>();
             //BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.SecondTimeOpenScopeAndResolve>();
+            // todo: @wip
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve>();
+
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.CompileResolutionExpression>();
             // BenchmarkRunner.Run<RealisticUnitOfWorkBenchmark.OpenScopeAndResolve>();
 
             // var d = RealisticUnitOfWorkBenchmark.PrepareDryIoc();
             // var e = RealisticUnitOfWorkBenchmark.ResolveExpression(d);
-            // Console.WriteLine("Press any key");
-            // Console.ReadKey();
-            // var f = (FactoryDelegate)e.CompileFast();
+            // var f = (Func<IResolverContext, object>)e.CompileFast();
             // var r = f(d.OpenScope());
             // var s = e.ToCSharpString();
+            // // var s = e.ToExpressionString();
+            // Console.WriteLine(s);
+            // Console.WriteLine("Press any key");
+            // Console.ReadKey();
 
             // var dms = RealisticUnitOfWorkBenchmark.PrepareDryIocMsDi();
             // var ems = RealisticUnitOfWorkBenchmark.ResolveExpression((IContainer)dms);
             // var sms = ems.ToCSharpString();
 
-            // var bm = new RealisticUnitOfWorkBenchmark.OpenScopeAndResolve();
-            // bm.WarmUp();
             // Console.WriteLine("WarmUp finished!");
             // Console.ReadKey();
             // bm.DryIoc_MsDI();
@@ -87,7 +102,7 @@ namespace Playground
             //BenchmarkRunner.Run<ResolveSingleInstanceWith10NestedSingleInstanceParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
             //BenchmarkRunner.Run<ResolveInstancePerDependencyWith2ParametersOncePerContainer.BenchmarkRegistrationAndResolution>();
 
-            //BenchmarkRunner.Run<IfVsNullСoalescingOperator>();
+            //BenchmarkRunner.Run<IfVsNullCoalescingOperator>();
             //BenchmarkRunner.Run<IfVsTernaryOperator>();
             //BenchmarkRunner.Run<ArrayAccessVsGetOrAddItem>();
             //new BenchmarkRunner().RunCompetition(new ExpressionCompileVsEmit());

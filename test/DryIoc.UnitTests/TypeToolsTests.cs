@@ -4,8 +4,21 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class TypeToolsTests
+    public class TypeToolsTests : ITest
     {
+        public int Run()
+        {
+            GetImplementedTypes_should_work_for_open_generic_types();
+            GetImplementedTypes_should_work_for_class_nested_in_open_generic_type_with_include_SourceType_option();
+            GetImplementedTypes_should_work_for_class_nested_in_open_generic_type_with_include_ObjectType_option();
+            GetImplementedTypes_should_work_for_class_nested_in_open_generic_type_with_both_SourceType_ObjectType_options();
+            Should_return_A_implementors();
+            Should_return_B_implementors();
+            IsCompilerGenerated_returns_false_for_string_type();
+            IsCompilerGenerated_returns_true_for_anonymous_type();
+            return 8;
+        }
+
         [Test]
         public void GetImplementedTypes_should_work_for_open_generic_types()
         {

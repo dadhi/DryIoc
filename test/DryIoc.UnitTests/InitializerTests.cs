@@ -6,8 +6,26 @@ using DryIoc.ImTools;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class InitializerTests
+    public class InitializerTests : ITest
     {
+        public int Run()
+        {
+            Can_register_initializer_as_decorator_delegate();
+            Can_register_initializer_as_decorator_delegate_of_generic_impl();
+            Can_register_initializer_as_decorator_delegate_with_dedicated_method();
+            Can_register_and_inject_initializer_as_decorator_delegate_with_dedicated_method();
+            Can_chain_initializers_as_decorator_delegate_with_dedicated_method();
+            Can_register_and_call_one_initializer_multiple_times_with_different_parameters();
+            Can_register_initializer_for_object_For_example_to_log_all_resolutions();
+            Can_register_initializer_for_both_service_and_dependency();
+            Can_register_initializer_for_object_For_example_to_log_all_resolutions_for_keyed_service();
+            Can_track_disposable_transient_in_scope_via_initializer();
+            Can_track_injected_disposable_transient_in_scope_via_initializer();
+            Issue_466_with_initializer();
+            Issue_466_with_decorator();
+            return 13;
+        }
+
         [Test]
         public void Can_register_initializer_as_decorator_delegate()
         {

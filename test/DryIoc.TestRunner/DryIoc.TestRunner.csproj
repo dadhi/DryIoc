@@ -1,14 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <TargetFrameworks Condition="'$(DevMode)' == 'true'">net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(DevMode)' != 'true'">net7.0</TargetFrameworks>
+
     <OutputType>Exe</OutputType>
-    <TargetFramework>net7.0</TargetFramework>
     <IsTestProject>false</IsTestProject>
+    <SkipDocGen>true</SkipDocGen>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj" />
+    <ProjectReference Include="..\..\docs\DryIoc.Docs\DryIoc.Docs.csproj" />
+    <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="ObjectLayoutInspector" Version="0.1.4" />
   </ItemGroup>
 

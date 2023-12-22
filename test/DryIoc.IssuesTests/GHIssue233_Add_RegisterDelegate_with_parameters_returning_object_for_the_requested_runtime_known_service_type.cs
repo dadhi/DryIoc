@@ -1,9 +1,9 @@
-using System;
 using DryIoc.FastExpressionCompiler.LightExpression;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
+    [TestFixture]
     public class GHIssue233_Add_RegisterDelegate_with_parameters_returning_object_for_the_requested_runtime_known_service_type
     {
         [Test]
@@ -32,7 +32,7 @@ namespace DryIoc.IssuesTests
 
             container.Register<A>();
 
-            container.RegisterDelegate(typeof(B), (A a) => new Wrong());
+            container.RegisterDelegate(typeof(B), (A a) => new NotB());
             Assert.IsTrue(container.IsRegistered<B>());
 
             var ex = Assert.Throws<ContainerException>(() => container.Resolve<B>());
@@ -62,7 +62,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void For_expression_generation_Should_be_able_to_register_delegate_with_runtime_service_type_with_two_arguments_returning_object()
         {
-            var container = new Container(Rules.Default.ForExpressionGeneration());
+            var container = new Container(Rules.Default.WithExpressionGenerationSettingsOnly());
 
             container.Register<A>();
             container.Register<B>();
@@ -95,6 +95,6 @@ namespace DryIoc.IssuesTests
             public C(A a, B b) => (A, B) = (a, b);
         }
 
-        class Wrong { }
+        class NotB { }
     }
 }

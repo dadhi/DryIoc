@@ -8,8 +8,8 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            Test_Simple();
             Test_Original_issue();
+            Test_Simple();
             return 2;
         }
 
@@ -33,8 +33,8 @@ namespace DryIoc.IssuesTests
 
         class Bar2
         {
-            public readonly FactoryDelegate<Foo2> GetFoo;
-            public Bar2(FactoryDelegate<Foo2> getFoo) => GetFoo = getFoo;
+            public readonly Func<IResolverContext, Foo2> GetFoo;
+            public Bar2(Func<IResolverContext, Foo2> getFoo) => GetFoo = getFoo;
         }
 
         class Foo2

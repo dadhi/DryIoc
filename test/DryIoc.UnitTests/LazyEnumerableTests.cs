@@ -8,8 +8,31 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class LazyEnumerableTests
+    public class LazyEnumerableTests : ITest
     {
+        public int Run()
+        {
+            Resolving_many_with_default_and_one_named_service_will_return_both_services();
+            I_can_resolve_many_singletons();
+            I_can_resolve_many_mixed_of_singletons_and_transients();
+            Resolving_many_of_single_service_registered_with_delegate_should_return_this_service();
+            I_can_resolve_many_open_generics();
+            I_can_resolve_many_lazy_singletons();
+            I_can_inject_many_as_dependency();
+            Resolving_many_for_not_registered_services_should_NOT_throw_BUT_return_an_empty_items();
+            When_many_is_reresolved_after_registering_another_service_Then_many_should_contain_that_service();
+            When_many_dependency_is_reresolved_after_registering_another_service_Then_many_should_contain_that_service();
+            I_should_be_able_to_resolve_Lazy_of_Func_of_Many();
+            Resolving_from_many_services_with_matched_meta_should_throw();
+            If_some_item_is_not_resolved_then_it_would_not_throw();
+            CanNOT_resolve_Func_with_args_of_LazyEnumerable();
+            Can_inject_Enumerable_as_LazyEnumerable_with_required_service_type();
+            // When_container_is_disposed_lazy_enumerable_will_stop_working(); // Explicit
+            I_can_resolve_IEnumerable_as_LazyEnumerable_with_container_rule();
+            I_can_resolve_IEnumerable_as_LazyEnumerable_with_container_rule_and_required_service_type();
+            return 17;
+        }
+
         [Test]
         public void Resolving_many_with_default_and_one_named_service_will_return_both_services()
         {

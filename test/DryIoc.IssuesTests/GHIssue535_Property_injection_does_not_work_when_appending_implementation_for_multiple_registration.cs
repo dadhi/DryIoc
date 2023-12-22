@@ -8,12 +8,12 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // Test1();
+            Test1();
             Test2();
-            return 1;
+            return 2;
         }
 
-        // [Test]
+        [Test]
         public void Test1()
         {
             // ARRANGE
@@ -50,12 +50,12 @@ namespace DryIoc.IssuesTests
                     case Foo2 foo2FromEnumerable:
                         Assert.AreEqual(testFoo2, foo.Test);
                         Assert.AreEqual(foo2, foo2FromEnumerable);
-                        break;
+                    break;
                 }
             }
         }
 
-        // [Test]
+        [Test]
         public void Test2()
         {
             // ARRANGE
@@ -64,7 +64,6 @@ namespace DryIoc.IssuesTests
 
             var container = new Container();
 
-            // container.RegisterMany(new[] { typeof(Foo1), typeof(IFoo) }, typeof(Foo1), reuse: Reuse.Singleton);
             var propertiesAndFieldsSelector = PropertiesAndFields.Of.Name(nameof(IFoo.Test), _ => testFoo1);
             container.RegisterMany(new[] { typeof(Foo1), typeof(IFoo) }, typeof(Foo1), reuse: Reuse.Singleton,
                 made: propertiesAndFieldsSelector, ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
@@ -72,7 +71,7 @@ namespace DryIoc.IssuesTests
             container.RegisterMany(new[] { typeof(Foo2), typeof(IFoo) }, typeof(Foo2), reuse: Reuse.Singleton);
 
             propertiesAndFieldsSelector = PropertiesAndFields.Of.Name(nameof(IFoo.Test), _ => testFoo2);
-            container.RegisterMany(new[] { typeof(Foo2), typeof(IFoo) }, typeof(Foo2), reuse: Reuse.Singleton, 
+            container.RegisterMany(new[] { typeof(Foo2), typeof(IFoo) }, typeof(Foo2), reuse: Reuse.Singleton,
                 made: propertiesAndFieldsSelector, ifAlreadyRegistered: IfAlreadyRegistered.AppendNewImplementation);
 
             // ACT
@@ -82,7 +81,7 @@ namespace DryIoc.IssuesTests
 
             // ASSERT
             Assert.AreEqual(testFoo1, foo1.Test);
-            Assert.AreEqual(testFoo2, foo2.Test);
+            Assert.AreEqual(null,     foo2.Test);
 
             foreach (var foo in foos)
             {
@@ -93,7 +92,7 @@ namespace DryIoc.IssuesTests
                         Assert.AreEqual(foo1, foo1FromEnumerable);
                         break;
                     case Foo2 foo2FromEnumerable:
-                        Assert.AreEqual(testFoo2, foo.Test);
+                        Assert.AreEqual(null, foo.Test);
                         Assert.AreEqual(foo2, foo2FromEnumerable);
                         break;
                 }

@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue4_Rule_for_Func_and_Lazy_to_be_resolved_even_without_requested_service_registered
+    public class GHIssue4_Rule_for_Func_and_Lazy_to_be_resolved_even_without_requested_service_registered : ITest
     {
+        public int Run()
+        {
+            Func_dependency_of_not_registered_service_should_work();
+            Lazy_resolve_of_not_registered_service_should_work();
+            return 2;
+        }
+
         [Test]
         public void Func_dependency_of_not_registered_service_should_work()
         {

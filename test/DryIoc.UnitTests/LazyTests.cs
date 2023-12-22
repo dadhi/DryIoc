@@ -7,8 +7,25 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class LazyTests
+    public class LazyTests : ITest
     {
+        public int Run()
+        {
+            Resolved_Lazy_should_be_LazyOfService_type();
+            Given_registered_transient_resolved_Lazy_should_have_the_different_Value();
+            Given_registered_singleton_resolved_Lazy_should_have_the_same_Value();
+            Given_registered_singleton_resolved_Lazy_should_still_be_different();
+            Given_registered_singleton_resolving_as_Lazy_should_NOT_create_service_instance_until_Value_is_accessed();
+            It_is_possible_to_resolve_Lazy_of_Lazy();
+            It_is_possible_to_resolve_Lazy_of_Func();
+            Given_registered_service_Injecting_it_as_Lazy_dependency_should_work();
+            Lazy_is_dynamic_and_allow_recursive_dependency();
+            Resolving_Func_With_Args_of_Lazy_should_throw_for_missing_dependency();
+            Lazy_dependency_is_injected_as_nested_Resolve_method();
+            Can_resolve_dynamic_dependency_as_Lazy();
+            return 12;
+        }
+
         [Test]
         public void Resolved_Lazy_should_be_LazyOfService_type()
         {
@@ -22,19 +39,19 @@ namespace DryIoc.UnitTests
         }
 
         [Test]
-        public void Given_registered_transient_resolved_Lazy_should_create_new_instances()
+        public void Given_registered_transient_resolved_Lazy_should_have_the_different_Value()
         {
             var container = new Container();
-            container.Register(typeof(ISingleton), typeof(Singleton), Reuse.Singleton);
+            container.Register(typeof(ISingleton), typeof(Singleton), Reuse.Transient);
 
             var one = container.Resolve<Lazy<ISingleton>>();
-            var another = container.Resolve<Lazy<ISingleton>>();
+            var two = container.Resolve<Lazy<ISingleton>>();
 
-            Assert.That(one, Is.Not.SameAs(another));
+            Assert.That(one.Value, Is.Not.SameAs(two.Value));
         }
 
         [Test]
-        public void Given_registered_singleton_resolved_Lazy_should_create_same_instances()
+        public void Given_registered_singleton_resolved_Lazy_should_have_the_same_Value()
         {
             var container = new Container();
             container.Register(typeof(ISingleton), typeof(Singleton), Reuse.Singleton);
@@ -43,6 +60,18 @@ namespace DryIoc.UnitTests
             var two = container.Resolve<Lazy<ISingleton>>();
 
             Assert.That(one.Value, Is.SameAs(two.Value));
+        }
+
+        [Test]
+        public void Given_registered_singleton_resolved_Lazy_should_still_be_different()
+        {
+            var container = new Container();
+            container.Register(typeof(ISingleton), typeof(Singleton), Reuse.Singleton);
+
+            var one = container.Resolve<Lazy<ISingleton>>();
+            var two = container.Resolve<Lazy<ISingleton>>();
+
+            Assert.That(one, Is.Not.SameAs(two));
         }
 
         [Test]

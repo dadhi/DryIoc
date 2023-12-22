@@ -4,8 +4,20 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class RegisterWithNonStringServiceKeyTests
+    public class RegisterWithNonStringServiceKeyTests : ITest
     {
+        public int Run()
+        {
+            Register_and_resolve_service_with_enumeration_key_should_work();
+            Register_with_one_and_resolve_with_another_key_should_Throw();
+            When_registered_with_int_key_Then_could_be_resolved_with_that_key();
+            When_registered_as_default_and_with_int_key_Then_resolving_with_int_key_should_succeed();
+            When_registered_with_negative_int_key_Then_could_be_resolved_with_that_key();
+            Register_with_default_then_with_Zero_but_with_KeepRegistered_option_should_succeed();
+            Register_with_the_same_int_key_should_Throw();
+            return 7;
+        }
+
         [Test]
         public void Register_and_resolve_service_with_enumeration_key_should_work()
         {

@@ -320,12 +320,12 @@ namespace DryIoc.UnitTests.CUT
         }
     }
 
-    public class ServiceWithTwoDepenedenciesOfTheSameType
+    public class ServiceWithTwoDependenciesOfTheSameType
     {
         public Service One { get; set; }
         public Service Another { get; set; }
 
-        public ServiceWithTwoDepenedenciesOfTheSameType(Service one, Service another)
+        public ServiceWithTwoDependenciesOfTheSameType(Service one, Service another)
         {
             One = one;
             Another = another;

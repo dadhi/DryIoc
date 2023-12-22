@@ -8,13 +8,16 @@ if %ERRORLEVEL% neq 0 goto :error
 echo:
 echo:## Finished: RESTORE and BUILD
 echo:
-echo:## Starting: TestRunner... ##
+echo:## Starting: TestRunner...
 echo:
 
-dotnet run --no-build -c Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
-
+dotnet run --no-build -f net8.0 -c Release --project test/DryIoc.TestRunner
 if %ERRORLEVEL% neq 0 goto :error
-echo:## Finished: TestRunner ##
+dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472
+if %ERRORLEVEL% neq 0 goto :error
+
+echo:
+echo:## Finished: TestRunner
 echo:
 echo:## Starting: TESTS...
 echo: 
@@ -29,7 +32,7 @@ echo:
 echo:## Starting: DOCUMENTATION GENERATION ##
 echo:
 
-dotnet msbuild -target:MdGenerate docs\DryIoc.Docs\DryIoc.Docs.csproj
+dotnet build docs\DryIoc.Docs\DryIoc.Docs.csproj -f net6.0 -target:MdGenerate
 
 echo:
 echo:## Finished: DOCUMENTATION GENERATION ##

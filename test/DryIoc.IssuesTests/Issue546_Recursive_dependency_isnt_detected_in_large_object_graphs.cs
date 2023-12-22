@@ -7,8 +7,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue546_Recursive_dependency_isnt_detected_in_large_object_graphs
+    public class Issue546_Recursive_dependency_isnt_detected_in_large_object_graphs : ITest
     {
+        public int Run()
+        {
+            Circular_dependencies_in_large_object_graphs_should_be_detected();
+            Circular_dependencies_in_large_object_graphs_should_be_detected_even_for_dynamic_registrations();
+            return 2;
+        }
+        
         [Test]
         public void Circular_dependencies_in_large_object_graphs_should_be_detected()
         {

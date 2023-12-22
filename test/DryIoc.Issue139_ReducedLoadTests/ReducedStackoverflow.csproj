@@ -16,7 +16,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.2.7" />
+        <PackageReference Include="Microsoft.AspNet.WebApi.Core" Version="5.2.9" />
     </ItemGroup>
 
     <ItemGroup>

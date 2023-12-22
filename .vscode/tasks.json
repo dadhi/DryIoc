@@ -4,12 +4,27 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "build_mediatr_comptime",
+            "type": "process",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/playground/DryIoc.Messages.MediatRLikeExample.CompileTimeDI/DryIoc.Messages.MediatRLikeExample.CompileTimeDI.csproj"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
             "label": "build_benchmark",
             "type": "process",
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}/playground/Playground/Playground.csproj"
+                "${workspaceFolder}/playground/Playground/Playground.csproj",
+                "-p:SkipCompTimeGen=true"
             ],
             "problemMatcher": "$msCompile",
             "group": {
@@ -23,7 +38,8 @@
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}/test/DryIoc.TestRunner/DryIoc.TestRunner.csproj"
+                "${workspaceFolder}/test/DryIoc.TestRunner/DryIoc.TestRunner.csproj",
+                "-p:SkipCompTimeGen=true"
             ],
             "problemMatcher": "$msCompile",
             "group": {

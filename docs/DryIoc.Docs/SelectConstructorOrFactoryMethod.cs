@@ -171,7 +171,8 @@ This way API provider may additionally configure or initialize service before re
 DryIoc directly supports static or instance factory methods. Container will inject dependencies into method parameters the
 same way as for constructors.
 
-__Note:__ Please prefer to use factory method over `RegisterDelegate` to minimize state capturing problems leading to memory leaks and to keep code as container-agnostic as possible.
+__Note:__ You may also consider using `RegisterDelegate<TDependencies..., TService>` method to register factory method. This version of method does not have problems of `RegisterDelegate<IResolverContext, TService>` of being service-locator. Read more [here](RegisterResolve.md#the-cure---registerdelegate-with-the-dependency-parameters).
+
 
 ### Using static factory method
 

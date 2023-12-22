@@ -7,8 +7,33 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class ReuseInCurrentScopeTests
+    public class ReuseInCurrentScopeTests : ITest
     {
+        public int Run()
+        {
+            Can_reuse_instances_in_new_open_scope();
+            Can_reuse_instances_in_three_level_nested_scope();
+            Can_reuse_injected_dependencies_in_new_open_scope();
+            Can_open_many_parallel_scopes();
+            Cannot_create_service_after_scope_is_disposed();
+            Scope_can_be_safely_disposed_multiple_times_It_does_NOT_throw();
+            Calling_Func_of_scoped_service_outside_of_scope_should_Throw();
+            Nested_scope_disposition_should_not_affect_singleton_resolution_for_parent_container();
+            Can_override_registrations_in_open_scope();
+            Can_ResolveMany_and_filter_out_scoped_services();
+            Can_ResolveMany_without_filtering_out_scoped_services_with_ScopedOrSingleton_reuse();
+            Can_switch_off_filtering_out_not_scoped_services();
+            Services_should_be_different_in_different_scopes();
+            Factory_should_return_different_service_when_called_in_different_scopes();
+            Open_context_independent_scope();
+            Open_context_independent_named_scope();
+            Open_multiple_context_independent_scopes();
+            Can_resolve_service_as_scoped_or_singleton_depending_on_scope_availability();
+            Can_inject_service_as_scoped_or_singleton_depending_on_scope_availability();
+            ValueType_scoped_dependency_should_be_correctly_interpreted_and_compiled();
+            return 20;
+        }
+
         [Test]
         public void Can_reuse_instances_in_new_open_scope()
         {
@@ -388,6 +413,35 @@ namespace DryIoc.UnitTests
 
             container.Dispose();
             Assert.IsTrue(singleton.Blah.IsDisposed);
+        }
+
+        [Test]
+        public void ValueType_scoped_dependency_should_be_correctly_interpreted_and_compiled()
+        {
+            var c = new Container();
+
+            c.Register<Uno>(Reuse.Scoped);
+            c.Register<DosValue>(Reuse.Scoped);
+
+            using var s = c.OpenScope();
+
+            var u0 = s.Resolve<Uno>();
+            var u1 = s.Resolve<Uno>();
+            var u2 = s.Resolve<Uno>();
+
+            Assert.IsNotNull(u0);
+            Assert.AreSame(u0, u1);
+            Assert.AreSame(u1, u2);
+        }
+
+        class Uno
+        {
+            public readonly DosValue Dos;
+            public Uno(DosValue dos) => Dos = dos;
+        }
+
+        struct DosValue {
+            public DosValue() {}
         }
 
         public class SingletonBlahUser

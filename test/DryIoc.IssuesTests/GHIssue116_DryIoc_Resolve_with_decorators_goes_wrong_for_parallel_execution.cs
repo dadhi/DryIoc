@@ -6,8 +6,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution
+    public class GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution : ITest
     {
+        public int Run()
+        {
+            DryIoc_Resolve_parallel_execution().GetAwaiter().GetResult();
+            DryIoc_Resolve_sequential_execution();
+            return 2;
+        }
+
         [Test]
         public async Task DryIoc_Resolve_parallel_execution()
         {

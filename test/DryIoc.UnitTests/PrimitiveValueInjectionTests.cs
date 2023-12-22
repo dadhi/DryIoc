@@ -4,8 +4,23 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class PrimitiveValueInjectionTests
+    public class PrimitiveValueInjectionTests : ITest
     {
+        public int Run()
+        {
+            Can_inject_value_into_parameter();
+            Can_inject_value_into_parameter_using_condition();
+            Throws_on_injecting_value_of_different_type();
+            Can_inject_primitive_value_and_resolve_the_rest_of_parameters();
+            Can_inject_primitive_value_and_handle_ReturnDefault_for_the_rest_of_parameters();
+            Able_to_inject_non_primitive_value();
+            Can_inject_primitive_value_into_property();
+            Can_inject_non_primitive_value_into_property();
+            Can_specify_how_to_resolve_property_per_registration_without_strings();
+            Should_throw_if_property_is_not_found();
+            return 10;
+        }
+
         [Test]
         public void Can_inject_value_into_parameter()
         {
@@ -38,7 +53,7 @@ namespace DryIoc.UnitTests
             var ex = Assert.Throws<ContainerException>(
                 () => container.Resolve<InjectionRulesTests.ClientWithStringParam>());
 
-            StringAssert.Contains("Injected value 500 is not assignable to String", ex.Message);
+            StringAssert.Contains("Injected value 500 is not assignable to string when resolving: string {CustomValue=500} as parameter \"x\"", ex.Message);
         }
 
         [Test]

@@ -72,7 +72,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             public async Task PublishAsync(string channel, string message) 
             { 
                 await Task.Delay(TimeSpan.FromMilliseconds(17));
-                Console.WriteLine(channel + "->" + message);
+                Assert.AreEqual("hello", channel);
+                Assert.AreEqual("sailor", message);
             }
         }
     }

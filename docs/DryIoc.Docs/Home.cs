@@ -142,19 +142,8 @@ for [MEF Attributed Model](http://msdn.microsoft.com/en-us/library/ee155691(v=vs
 
 ## Samples
 
-Located in this repo:
+Located in this repo in the [samples]((https://github.com/dadhi/DryIoc/tree/master/samples) folder.
 
-- [DryIoc.AspNetCore31.WebApi.Sample](https://github.com/dadhi/DryIoc/tree/master/samples/DryIoc.AspNetCore31.WebApi.Sample)
-- [DryIoc.WebApi.Owin.Sample](https://github.com/dadhi/DryIoc/tree/master/samples/DryIoc.WebApi.Owin.Sample)
-
-External links:
-
-- [DryIoc.WebApi sample](https://github.com/graftedbranch/dryiocwebapi.sample)
-- [DryIoc with Owin, JWT, Angular.js](https://github.com/lcssk8board/owin-jwt-angularjs)
-- [DryIoc for NancyFx](https://github.com/lcssk8board/DryIoc-Nancy) with 
-[Nancy.SelfHosted.HelloWorld](https://github.com/lcssk8board/DryIoc-Nancy/tree/master/source/Nancy.Bootstrappers.DryIoc/Nancy.SelfHosted.HelloWorld)
-- [DryIoc with MediatR](
-https://github.com/jbogard/MediatR/blob/master/samples/MediatR.Examples.DryIoc/Program.cs)
 
 ## Latest Version
 

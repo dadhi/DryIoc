@@ -8,8 +8,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue416_Adding_always_true_condition_to_decorator_changes_the_decorated_outcome
+    public class Issue416_Adding_always_true_condition_to_decorator_changes_the_decorated_outcome : ITest
     {
+        public int Run()
+        {
+            Resolve_can_resolve_decorator_as_resolution_call_together_with_resolution_scope_reuse();
+            ResolveMany_can_resolve_decorator_with_dependency();
+            Minimal_test();
+            Test();
+            return 4;
+        }
+
         [Test]
         public void Resolve_can_resolve_decorator_as_resolution_call_together_with_resolution_scope_reuse()
         {

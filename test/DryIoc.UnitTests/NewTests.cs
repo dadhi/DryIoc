@@ -4,8 +4,23 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class NewTests
+    public class NewTests : ITest
     {
+        public int Run()
+        {
+            Should_be_able_to_create_type_without_registering_in_container();
+            Should_be_able_to_create_type_with_factory_method();
+            Should_be_able_to_decorate_created_type();
+            Should_be_able_to_create_Func_wrapper_of_type();
+            Should_be_able_to_create_Func_with_argument_of_type();
+            Should_be_able_to_create_Lazy_with_argument_of_type();
+            Can_new_instance_of_runtime_known_type();
+            New_is_unable_to_create_open_generic_and_should_Throw_instead();
+            New_can_inject_singleton_dependency();
+            New_is_working_for_the_resolver();
+            return 10;
+        }
+
         [Test]
         public void Should_be_able_to_create_type_without_registering_in_container()
         {

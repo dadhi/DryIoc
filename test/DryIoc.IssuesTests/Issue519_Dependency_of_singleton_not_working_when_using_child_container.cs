@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue519_Dependency_of_singleton_not_working_when_using_child_container
+    public class Issue519_Dependency_of_singleton_not_working_when_using_child_container : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

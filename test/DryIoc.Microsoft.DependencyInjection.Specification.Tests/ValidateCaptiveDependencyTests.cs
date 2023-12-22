@@ -15,9 +15,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             services.AddScoped<Buz>();      // Actually a `ScopedOrSingleton` due MS.DI convention
 
             // These two line are "presumably" done by the framework
-            // var providerFactory = new DryIocServiceProviderFactory();
-            // var provider = providerFactory.CreateServiceProvider(providerFactory.CreateBuilder(services));
-            var provider =  new Container().WithDependencyInjectionAdapter(services);
+            var providerFactory = new DryIocServiceProviderFactory();
+            var provider = providerFactory.CreateServiceProvider(providerFactory.CreateBuilder(services));
 
             // Getting back the underlying DryIoc container to use its functions (it is always implicitly available).
             var container = provider.GetRequiredService<IContainer>();
@@ -37,9 +36,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             services.AddSingleton<Bar>();
 
             // These two line are "presumably" done by the framework
-            // var providerFactory = new DryIocServiceProviderFactory();
-            // var provider = providerFactory.CreateServiceProvider(providerFactory.CreateBuilder(services));
-            var provider =  new Container().WithDependencyInjectionAdapter(services);
+            var providerFactory = new DryIocServiceProviderFactory();
+            var provider = providerFactory.CreateServiceProvider(providerFactory.CreateBuilder(services));
 
             // Getting back the underlying DryIoc container to use its functions (it is always implicitly available).
             var container = provider.GetRequiredService<IContainer>();
@@ -56,10 +54,10 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             /* Exception message:
             
             code: Error.DependencyHasShorterReuseLifespan; 
-            message: Dependency Buz as parameter "buz" (IsSingletonOrDependencyOfSingleton) with reuse Scoped {Lifespan=100} has a shorter lifespan than its parent's Singleton Bar as parameter "bar" FactoryId=145 (IsSingletonOrDependencyOfSingleton)
-              in resolution root Scoped Foo FactoryId=144
+            message: Dependency Buz as parameter "buz" (IsSingletonOrDependencyOfSingleton) with reuse Scoped {Lifespan=100} has a shorter lifespan than its parent's Singleton Bar as parameter "bar" FactoryID=145 (IsSingletonOrDependencyOfSingleton)
+              in resolution root Scoped Foo FactoryID=144
               from container without scope
-             with Rules with {UsedForValidation} and without {ImplicitCheckForReuseMatchingScope, EagerCachingSingletonForFasterAccess} with TotalDependencyCountInLambdaToSplitBigObjectGraph=2147483647
+             with Rules with {UsedForValidation} and without {ImplicitCheckForReuseMatchingScope, EagerCachingSingletonForFasterAccess} with DependencyCountInLambdaToSplitBigObjectGraph=2147483647
             If you know what you're doing you may disable this error with the rule `new Container(rules => rules.WithoutThrowIfDependencyHasShorterReuseLifespan())`.
             */
         }

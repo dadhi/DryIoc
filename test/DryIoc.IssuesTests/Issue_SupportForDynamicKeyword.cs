@@ -5,8 +5,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue_SupportForDynamicKeyword
+    public class Issue_SupportForDynamicKeyword : ITest
     {
+        public int Run()
+        {
+            Can_resolve_collection_of_dynamics();
+            Can_inject_collection_of_dynamics();
+            return 2;
+        }
+
         [Test]
         public void Can_resolve_collection_of_dynamics()
         {

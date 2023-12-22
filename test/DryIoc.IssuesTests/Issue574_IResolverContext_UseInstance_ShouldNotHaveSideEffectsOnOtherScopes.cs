@@ -3,8 +3,19 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue574_IResolverContext_Use_instance_ShouldNotHaveSideEffectsOnOtherScopes
+    public class Issue574_IResolverContext_Use_instance_ShouldNotHaveSideEffectsOnOtherScopes : ITest
     {
+        public int Run()
+        {
+            Can_add_to_single_keyed_singleton_the_instance();
+            Can_add_to_multiple_keyed_singletons_the_instance();
+            No_cache_issues_between_normal_registration_and_register_instance();
+            No_cache_issues_between_more_than_2_normal_registration_and_register_instance();
+            ScopedFactory_ShouldResolveItselfWithinSelfScope_EvenIfThereAreParallelScopes();
+            ScopedFactory_ShouldResolveItselfWithinSelfScope_EvenIfThereAreParallelScopesAndNullArgsProvided();
+            return 6;
+        }
+
         [Test]
         public void Can_add_to_single_keyed_singleton_the_instance()
         {

@@ -12,8 +12,63 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            Should_resolve_decorator();
+            Should_resolve_decorator_of_decorator();
+            Should_resolve_decorator_for_named_service();
+            Should_NOT_cache_decorator_so_it_could_decorated_another_service();
+            Should_resolve_generic_decorator();
+            Should_resolve_closed_service_with_open_generic_decorator();
+            Should_resolve_generic_decorator_of_decorator();
+            Should_resolve_generic_decorator_of_closed_decorator_of_generic_service();
+            Resolve_could_NOT_select_closed_over_generic_decorator_cause_their_are_not_related();
+            Should_resolve_decorator_array();
+            Should_resolve_wrappers_of_decorator_array();
+            Should_support_decorator_implementation_without_decorated_service_argument_in_constructor();
+            Replacing_decorator_reuse_may_different_from_decorated_service();
+            Replacing_decorator_may_be_non_transient();
+            Normal_decorator_may_be_non_transient();
+            Should_support_decorator_of_decorator_without_decorated_service_argument_in_constructor();
+            Should_support_decorating_of_Lazy_service();
+            Should_support_decorating_of_Lazy_named_service();
+            Should_apply_decorator_When_resolving_Func_of_decorated_service();
+            Should_propagate_metadata_to_Meta_wrapper();
+            Possible_to_register_decorator_as_delegate_of_decorated_service();
+            Possible_to_register_decorator_as_delegate_of_decorated_service_with_additional_dependencies_resolved_from_Container();
+            Should_support_decorator_of_service_registered_with_delegate();
+            Should_support_decorator_of_decorator_registered_with_delegates();
+            When_mixing_Type_and_Delegate_decorators_the_registration_order_is_preserved();
+            I_can_ensure_Decorator_order_with_Order_option();
+            Delegate_decorator_may_use_decoratee_reuse();
             Delegate_decorator_with_the_runtime_service_types_RegisterDelegate();
-            return 1;
+            Delegate_decorator_with_2_runtime_service_types_RegisterDelegate();
+            Delegate_decorator_with_the_runtime_service_types_RegisterDelegate_should_throw_on_the_wrong_type();
+            Should_support_resolving_Func_with_parameters_of_decorated_service();
+            Should_support_resolving_Func_with_parameters_without_decorated_service_argument_in_constructor();
+            Should_allow_Register_and_Resolve_of_two_decorators_of_the_same_type();
+            Should_support_multiple_decorator_in_object_graph();
+            Should_support_decorator_of_Func_with_parameters();
+            May_decorate_func_of_service();
+            May_next_func_decorator_inside_other_decorator();
+            Removing_decorator_before_chaining_it_with_lazy_decorator();
+            Can_decorate_service_type_when_required_type_is_different();
+            Can_register_custom_Disposer_as_decorator();
+            Can_register_custom_Disposer_via_specific_register_method();
+            Can_register_custom_Disposer_via_specific_register_method_with_condition();
+            Can_register_2_custom_Disposers();
+            Can_register_2_custom_Disposers_for_keyed_service();
+            Decorator_created_by_factory_should_be_compasable_with_other_decorator();
+            Can_register_decorator_of_any_T_As_object();
+            If_decorator_of_any_T_has_not_compatible_decoratee_type_It_should_throw();
+            If_decorator_of_any_T_returns_unexpected_decorator_type_It_should_throw();
+            Can_register_decorator_of_any_T_As_object_and_specified_order_of_application();
+            I_can_register_decorator_with_key_to_identify_decoratee();
+            Can_register_decorator_of_T();
+            Can_decorate_enumerable_and_alter_the_service_key_filtering();
+            Can_decorate_ienumerable_and_alter_the_service_key_filtering_and_works_with_nested_wrappers();
+            Can_decorate_array_and_alter_the_service_key_filtering();
+            Can_use_different_reuses_for_decorators_based_on_different_decoratee_reuse_in_collection();
+            Using_decorator_to_implement_IsResolved();
+            return 56;
         }
 
         [Test]
@@ -1020,6 +1075,36 @@ namespace DryIoc.UnitTests
 
             Assert.AreSame(aax1[0], aax2[0]);
             Assert.AreNotSame(aax1[1], aax2[1]);
+        }
+
+        [Test]
+        public void Using_decorator_to_implement_IsResolved()
+        {
+            var c = new Container();
+
+            c.Register<Abc>();
+
+            var d = new AbcDecorator();
+            c.RegisterDelegate<Abc, Abc>(a => d.Decorate(a), setup: Setup.Decorator);
+
+            Assert.IsFalse(d.IsResolved);
+
+            var abc = c.Resolve<Abc>();
+            Assert.IsNotNull(abc);
+
+            Assert.IsTrue(d.IsResolved);
+        }
+
+        class Abc {}
+
+        class AbcDecorator 
+        {
+            public bool IsResolved { get; private set; }
+            public Abc Decorate(Abc a)
+            {
+                IsResolved = true;
+                return a;
+            }
         }
 
         public interface IAx { }

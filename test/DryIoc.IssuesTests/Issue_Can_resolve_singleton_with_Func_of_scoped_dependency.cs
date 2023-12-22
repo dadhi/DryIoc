@@ -4,8 +4,16 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue_Can_resolve_singleton_with_Func_of_scoped_dependency
+    public class Issue_Can_resolve_singleton_with_Func_of_scoped_dependency : ITest
     {
+        public int Run()
+        {
+            Can_resolve_singleton_with_Func_of_scoped_dependency();
+            Can_select_scoped_over_singleton_or_transient();
+            Can_select_singleton_over_scoped();
+            return 3;
+        }
+
         [Test]
         public void Can_resolve_singleton_with_Func_of_scoped_dependency()
         {

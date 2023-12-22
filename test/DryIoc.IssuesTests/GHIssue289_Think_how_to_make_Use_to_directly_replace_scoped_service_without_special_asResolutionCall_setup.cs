@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue289_Think_how_to_make_Use_to_directly_replace_scoped_service_without_special_asResolutionCall_setup
+    public class GHIssue289_Think_how_to_make_Use_to_directly_replace_scoped_service_without_special_asResolutionCall_setup : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {
@@ -13,7 +19,7 @@ namespace DryIoc.IssuesTests
             c.Register<Parent>(Reuse.Scoped);
 
             c.Register(Made.Of(() => ChildFactory()), Reuse.Scoped);
-            var childFactory = ((IContainer)c).ResolveFactory(Request.Create(c, ServiceInfo.Of<Child>()));
+            var childFactory = c.ResolveFactory(Request.CreateResolutionRoot(c, typeof(Child)));
 
             // instance is resolved in outer scope
             using (var _ = c.OpenScope())

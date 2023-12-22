@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue435_ReuseSingleton_prevents_the_correct_container_injection_within_explicit_resolve
+    public class Issue435_ReuseSingleton_prevents_the_correct_container_injection_within_explicit_resolve : ITest
     {
+        public int Run()
+        {
+            ScopesResolution();
+            return 1;
+        }
+
         [Test]
         public void ScopesResolution()
         {

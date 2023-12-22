@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.UnitTests
 {
     [TestFixture]
-    public class DynamicFactoryTests
+    public class DynamicFactoryTests : ITest
     {
+        public int Run()
+        {
+            I_can_resolve_service_with_not_registered_lazy_parameter_using_dynamic_factory();
+            Can_resolve_Func_of_Lazy();
+            return 2;
+        }
+
         [Test]
         public void I_can_resolve_service_with_not_registered_lazy_parameter_using_dynamic_factory()
         {

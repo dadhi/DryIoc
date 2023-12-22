@@ -1,10 +1,9 @@
 using DryIoc;
 using DryIoc.Microsoft.DependencyInjection;
-using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var container = new Container(Rules.MicrosoftDependencyInjectionRules.WithConcreteTypeDynamicRegistrations(reuse: Reuse.Transient));
+var container = new MyContainer(DryIocAdapter.MicrosoftDependencyInjectionRules);
 
 // register natively with DryIoc
 container.Register<Bar>();
@@ -12,25 +11,63 @@ container.Register<Bar>();
 builder.Host.UseServiceProviderFactory(new DryIocServiceProviderFactory(container));
 
 // register via Services collection
-builder.Services.AddTransient<IFoo, Foo>();
+builder.Services.AddTransient<Foo>();
+
+// some fun with container extensibility for #539
+builder.Services.AddScoped<ScopedAutomaticallyResolved>();
+builder.Services.AddSingleton<SingletonAutomaticallyResolved>();
 
 var app = builder.Build();
 
-app.MapGet("/", (IFoo foo) => $"Hello world with `{foo}`");
-app.MapGet("/bar", (IFoo foo, Bar bar) => $"Hello world with `{foo}` and `{bar}`");
-
-// enabled by adding the `WithConcreteTypeDynamicRegistrations` container rules
-app.MapGet("/pooh", ([FromServices]Pooh p) => $"Hello world with concrete type `{p}`");
+app.MapGet("/", (Foo foo) => $"Hello world with `{foo}`");
+app.MapGet("/bar", (Foo foo, Bar bar) => $"Hello world with `{foo}` and `{bar}`");
 
 app.Run();
 
-public interface IFoo {}
-
-public class Foo : IFoo
+public class Foo
 {
     public Foo(Bar bar = null) {}
 }
 
 public class Bar {}
 
-public class Pooh {}
+public class ScopedAutomaticallyResolved 
+{
+    public readonly SingletonAutomaticallyResolved Singleton;
+    public ScopedAutomaticallyResolved(SingletonAutomaticallyResolved singleton)
+    {
+        Singleton = singleton;
+        Console.WriteLine("ScopedAutomaticallyResolved created");
+    }
+}
+
+public class SingletonAutomaticallyResolved 
+{
+    public SingletonAutomaticallyResolved()
+    {
+        Console.WriteLine("SingletonAutomaticallyResolved created");
+    }
+}
+
+public sealed class MyContainer : Container
+{
+    public MyContainer(Rules rules) : base(rules) {}
+
+    public override IContainer WithNewOpenScope() 
+    {
+        var scope = base.WithNewOpenScope();
+        scope.Resolve<ScopedAutomaticallyResolved>();
+        return scope;
+    }
+}
+
+public class MyDryIocServiceProviderFactory : DryIocServiceProviderFactory
+{
+    public MyDryIocServiceProviderFactory(IContainer container) : base(container) {}
+
+    public override IServiceProvider CreateServiceProvider(DryIocServiceProvider provider)
+    {
+        provider.Container.Resolve<SingletonAutomaticallyResolved>();
+        return provider;
+    }
+}

@@ -4,13 +4,12 @@
     <TargetFramework>net7.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <LangVersion>11</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>  
     <PackageReference Include="Serilog.AspNetCore" Version="6.1.0" />
 
-    <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="6.2.0-preview-01" />
+    <PackageReference Include="DryIoc.Microsoft.DependencyInjection" Version="6.1.1" />
     <!-- <ProjectReference Include="..\..\src\DryIoc.Microsoft.DependencyInjection\DryIoc.Microsoft.DependencyInjection.csproj" /> -->
   </ItemGroup>
 

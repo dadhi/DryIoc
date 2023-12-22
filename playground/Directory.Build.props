@@ -4,7 +4,5 @@
     <PropertyGroup>
         <IsPackable>false</IsPackable>
         <TieredCompilation>false</TieredCompilation><!--skip tiering jitting for the fare benchmarks -->
-        <DebugType>pdbonly</DebugType>
-        <DebugSymbols>true</DebugSymbols>
     </PropertyGroup>
 </Project>

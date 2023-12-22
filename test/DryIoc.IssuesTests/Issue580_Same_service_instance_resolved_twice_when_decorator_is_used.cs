@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue580_Same_service_instance_resolved_twice_when_decorator_is_used
+    public class Issue580_Same_service_instance_resolved_twice_when_decorator_is_used : ITest
     {
+        public int Run()
+        {
+            Main();
+            return 1;
+        }
+
         [Test]
         public void Main()
         {
