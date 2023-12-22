@@ -167,7 +167,7 @@ namespace DryIoc.MefAttributedModel
                     return null;
             }
             else // todo: @wip factor this section both here and in the Container into the standalone method
-            {   
+            {
                 // todo: @perf use the GetServiceRegisteredAndDynamicFactories
                 var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true);
                 if (factories.Length == 0)
