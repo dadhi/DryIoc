@@ -11419,7 +11419,7 @@ namespace DryIoc
         public delegate PropertyOrFieldServiceInfo GetServiceInfo(MemberInfo member, Request request);
 
         /// <summary>Generates selector property and field selector with settings specified by parameters.
-        /// If all parameters are omitted the return all public not primitive members.</summary>
+        /// If all parameters are omitted the method returns all public not primitive fields and properties.</summary>
         public static PropertiesAndFieldsSelector All(
             bool withNonPublic = true,
             bool withPrimitive = true,
