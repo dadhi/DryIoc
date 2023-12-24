@@ -13,6 +13,7 @@ skip_commits:
 build_script:
   - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.UnitTests
   - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.IssuesTests
+  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.MefAttributedModel.UnitTests
   - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.CommonServiceLocator.UnitTests
   - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.Microsoft.DependencyInjection.Specification.Tests
   - dotnet test -p:DevMode=false -f:net7.0 -c:Release docs/DryIoc.Docs
