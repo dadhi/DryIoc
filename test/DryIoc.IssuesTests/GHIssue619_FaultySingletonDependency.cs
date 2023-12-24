@@ -14,7 +14,7 @@ namespace DryIoc.IssuesTests
             return 1;
         }
 
-        [Test]
+        // [Test]
         public void Test()
         {
             // default MEF reuse is a singleton

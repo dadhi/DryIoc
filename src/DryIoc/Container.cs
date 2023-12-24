@@ -32,6 +32,9 @@ THE SOFTWARE.
 #if !NET45 && !NET451 && !NET452 && !NET46 && !NET461 && !NET462 && !NET47 // todo: @wip try NET47_OR_LESS
 #define SUPPORTS_EXPRESSION_COMPILE_WITH_PREFER_INTERPRETATION_PARAM
 #endif
+#if NET7_0_OR_GREATER
+#define SUPPORTS_REQUIRED_PROPERTIES
+#endif
 
 namespace DryIoc
 {
@@ -9939,9 +9942,18 @@ namespace DryIoc
         /// <param name="holder">Holder of property or field.</param> <param name="value">Value to set.</param>
         public abstract void SetValue(object holder, object value);
 
-        /// <summary>Create member info out of provide property or field.</summary>
+        /// <summary>Create property or field service info out of provided member.</summary>
         public static PropertyOrFieldServiceInfo Of(MemberInfo member) =>
             member.ThrowIfNull() is PropertyInfo ? new Property((PropertyInfo)member) : (PropertyOrFieldServiceInfo)new Field((FieldInfo)member);
+
+        /// <summary>Create property service info out of provided property.</summary>
+        public static PropertyOrFieldServiceInfo Of(PropertyInfo property) => new Property(property);
+
+        /// <summary>Create property service info out of provided property with the details of `IfUnresolved.Throw`.</summary>
+        public static PropertyOrFieldServiceInfo OfRequiredProperty(PropertyInfo property) => new Property.RequiredProperty(property);
+
+        /// <summary>Create field service info out of provided property.</summary>
+        public static PropertyOrFieldServiceInfo Of(FieldInfo field) => new Field(field);
 
         private class Property : PropertyOrFieldServiceInfo
         {
@@ -9964,6 +9976,12 @@ namespace DryIoc
                 public override ServiceDetails Details { get; }
                 public WithDetails(PropertyInfo property, ServiceDetails details) : base(property) => Details = details;
                 public WithDetails(PropertyInfo property, Type serviceType, ServiceDetails details) : base(property, serviceType) => Details = details;
+            }
+
+            internal sealed class RequiredProperty : Property
+            {
+                public override ServiceDetails Details => ServiceDetails.Default; // with IfUnresolved.Throw
+                public RequiredProperty(PropertyInfo property) : base(property) {}
             }
         }
 
@@ -10153,6 +10171,9 @@ namespace DryIoc
 
         /// <summary>Resolved factory ID, used to identify applied decorator.</summary>
         public int FactoryID { get; private set; }
+
+        /// <summary>Constructor selected by the reflection factory</summary>
+        public ConstructorInfo SelectedConstructor { get; internal set; }
 
         // based on the parent(s) and current request FactoryID
         private int _hashCode; // todo: @perf do we need to calculate and store the hash code if it is not used 
@@ -10951,6 +10972,7 @@ namespace DryIoc
             InputArgExprs = inputArgExprs;
             // resets the factory info:
             _factoryOrImplType = null;
+            SelectedConstructor = null;
             Reuse = null;
             FactoryID = 0;
             DecoratedFactoryID = 0;
@@ -10962,6 +10984,7 @@ namespace DryIoc
         private void SetResolvedFactory(object factoryOrImplType, int factoryID, FactoryType factoryType, IReuse reuse, int decoratedFactoryID)
         {
             _factoryOrImplType = factoryOrImplType;
+            SelectedConstructor = null;
             FactoryID = factoryID;
             FactoryType = factoryType;
             Reuse = reuse;
@@ -11927,6 +11950,35 @@ namespace DryIoc
             IfUnresolved ifUnresolved = IfUnresolved.ReturnDefaultIfNotRegistered) =>
             All(withNonPublic: withNonPublic, withPrimitive: false, withFields: false, withBase: withBase, ifUnresolved: ifUnresolved);
 
+#if SUPPORTS_REQUIRED_PROPERTIES
+        /// <summary>The rule to discover and inject the `required properties` introduced in C# 11 and .NET 7.
+        /// The properties are only injected if the constructor selected for the injection is NOT marked with `SetsRequiredMembers`,
+        /// because it says the constuctor is reponsible for the setting of required properties.</summary>
+        public static PropertiesAndFieldsSelector RequiredProperties() => _requiredProperties;
+
+        // We are keeping it as the field internally 
+        // and still using the public accessor method to be consistent with the rest of the PropertiesAndFields API.
+        private static readonly PropertiesAndFieldsSelector _requiredProperties = req =>
+        {
+            var implType = req.ImplementationType;
+            if (implType == null)
+                return null;
+
+            var ctor = req.SelectedConstructor;
+            if (ctor != null && ctor.GetCustomAttribute<SetsRequiredMembersAttribute>() != null)
+                return null;
+
+            var props = implType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (props.Length == 0)
+                return null;
+
+            var requiredProps = props.Match(
+                static p => p.GetCustomAttribute<RequiredMemberAttribute>() != null,
+                static p => PropertyOrFieldServiceInfo.OfRequiredProperty(p));
+            return requiredProps;
+        };
+#endif
+
         /// <summary>Should return service info for input member (property or field).</summary>
         public delegate PropertyOrFieldServiceInfo GetServiceInfo(MemberInfo member, Request request);
 
@@ -12589,6 +12641,9 @@ namespace DryIoc
                 var ctorOrMember = factoryMethod.ConstructorOrMethodOrMember;
                 if (factoryMethod.ResolvedParameterExpressions != null)
                 {
+                    ctor = (ConstructorInfo)ctorOrMember;
+                    request.SelectedConstructor = ctor;
+
                     if (rules.UsedForValidation)
                     {
                         TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
@@ -12596,7 +12651,7 @@ namespace DryIoc
                     }
 
                     var assignements = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
-                    var newExpr = New((ConstructorInfo)ctorOrMember, factoryMethod.ResolvedParameterExpressions);
+                    var newExpr = New(ctor, factoryMethod.ResolvedParameterExpressions);
                     return failedToGetMember ? null : assignements == null ? newExpr : MemberInit(newExpr, assignements);
                 }
 
@@ -12605,9 +12660,11 @@ namespace DryIoc
                     return ConvertExpressionIfNeeded(
                         ctorOrMember is PropertyInfo p ? Property(factoryExpr, p) : Field(factoryExpr, (FieldInfo)ctorOrMember), request, ctorOrMember);
 
-                ctor = ctorOrMember as ConstructorInfo;
-                method = ctorOrMember as MethodInfo;
+                ctor = ctorOrMethod as ConstructorInfo;
+                method = ctorOrMethod as MethodInfo;
             }
+
+            request.SelectedConstructor = ctor;
 
             var parameters = ctorOrMethod.GetParameters();
             if (parameters.Length == 0)
@@ -14367,6 +14424,21 @@ namespace DryIoc
     {
         /// <summary>Does the job.</summary>
         bool Match(object scopeName);
+    }
+
+    /// <summary>Custom name matcher via the provided function. 
+    /// It may be used as a negative check, e.g. to avoid cirtain scopes and proceed to search for the specific parent scope.</summary>
+    public sealed class ScopeName : IScopeName
+    {
+        /// <summary>Constucts the scope name matches based on the user-provided predicate</summary>
+        public static ScopeName Of(Func<object, bool> matchPredicate) => new ScopeName(matchPredicate);
+
+        /// <summary>The match precicate</summary>
+        public readonly Func<object, bool> MatchPredicate;
+        private ScopeName(Func<object, bool> matchPredicate) => MatchPredicate = matchPredicate;
+
+        /// <inheritdoc />
+        public bool Match(object scopeName) => MatchPredicate(scopeName);
     }
 
     /// <summary>Represents multiple names</summary>

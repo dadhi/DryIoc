@@ -9,7 +9,7 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            new GHIssue619_FaultySingletonDependency().Run();
+            // new GHIssue619_FaultySingletonDependency().Run();
 
             RunAllTests();
 

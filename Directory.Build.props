@@ -22,6 +22,5 @@
 
     <ItemGroup>
         <None Remove="**\*.orig" />
-        <None Remove="**\*.ncrunchproject" />
     </ItemGroup>
 </Project>

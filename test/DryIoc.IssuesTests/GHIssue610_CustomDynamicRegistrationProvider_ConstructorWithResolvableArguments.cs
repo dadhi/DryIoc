@@ -59,7 +59,7 @@ namespace DryIoc.IssuesTests
             // index only registrations related to this issue
             var lazyRegistrations = AttributedModel.Scan(new[] { typeof(Command1).Assembly })
                 .MakeLazyAndEnsureUniqueServiceKeys()
-                .Where(r => r.ImplementationTypeFullName.IndexOf("Issue610") >= 0)
+                .Where(r => r.ImplementationTypeFullName.IndexOf("GHIssue610") >= 0)
                 .ToArray();
 
             // Command1 and Command2
