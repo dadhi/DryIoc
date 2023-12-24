@@ -4,7 +4,7 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class ParameterResolutionFixture : ITest
+    public class Issue_InjectPrimitiveValueBasedOnRequest : ITest
     {
         public int Run()
         {

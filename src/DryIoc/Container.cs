@@ -4392,7 +4392,7 @@ namespace DryIoc
         /// specifying any key. So the `childDefaultServiceKey` is like an invisible stamp on the child registration.
         /// </summary>
         public static IContainer CreateChild(this IContainer container,
-            RegistrySharing registrySharing, object childDefaultServiceKey,
+            RegistrySharing registrySharing, object childDefaultServiceKey = null,
             IfAlreadyRegistered? ifAlreadyRegistered = null, Rules newRules = null, bool withDisposables = false)
         {
             var rules = newRules != null && newRules != container.Rules ? newRules : container.Rules;

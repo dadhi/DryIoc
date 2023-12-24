@@ -2,25 +2,25 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    /// <summary>
-    /// Issue #26: Singleton creation from new scope fails
-    /// </summary>
     [TestFixture]
-    public class DryIOCSingletonFailureTest
+    public class Issue26_DryIOCSingletonFailureTest : ITest
     {
-        private readonly Container _container;
-
-        public DryIOCSingletonFailureTest()
+        public int Run()
         {
-            _container = new Container();
-            _container.RegisterInstance(new Producer());
-            _container.Register<Consumer>(Reuse.Singleton);
+            Passes();
+            Fails();
+            return 2;
         }
+
+        private readonly Container _container;
 
         [Test]
         public void Passes()
         {
-            _container.Resolve<Consumer>();
+            var container = new Container();
+            container.RegisterInstance(new Producer());
+            container.Register<Consumer>(Reuse.Singleton);
+            container.Resolve<Consumer>();
             //Console.WriteLine(1);
             Resolve();
             //Console.WriteLine(2);
@@ -38,6 +38,9 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Fails()
         {
+            var container = new Container();
+            container.RegisterInstance(new Producer());
+            container.Register<Consumer>(Reuse.Singleton);
             //Console.WriteLine(1);
             Resolve();
             //Console.WriteLine(2);

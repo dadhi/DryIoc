@@ -105,21 +105,24 @@ namespace DryIoc.UnitTests
             var issueTests = new ITest[]
             {
                 new DotnetWeekBlogExample(),
-                new ParameterResolutionFixture(),
                 new Messages_Test(),
 
                 new SO_Child_Container_for_transients(),
                 new SO_Injecting_the_collection_of_interfaces_implemented_by_decorator(),
                 new SO_Decorator_not_being_constrained_correctly(),
 
+                new InjectListOfDepsWithStringDeps(),
+                new Issue_2_Can_inject_singleton_service_from_parent_container_After_it_was_resolved_from_parent(),
                 new Issue_Can_resolve_singleton_with_Func_of_scoped_dependency(),
                 new Issue_HandleVariance(),
                 new Issue_InjectingSerilogLogger(),
+                new Issue_InjectPrimitiveValueBasedOnRequest(),
                 new Issue_Register_null_string(),
                 new Issue_SupportForDynamicKeyword(),
                 new Issue_UsingAsyncMethodAsMadeOf(),
                 new Issue_Value_type_resolution_dependency(),
                 
+                new Issue26_DryIOCSingletonFailureTest(),
                 new Issue107_NamedScopesDependingOnResolvedTypes(),
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue357_PartImportsSatisfied(),
