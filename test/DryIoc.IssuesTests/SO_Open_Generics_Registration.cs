@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class SO_Open_Generics_Registration
+    public class SO_Open_Generics_Registration : ITest
     {
+        public int Run()
+        {
+            Main();
+            return 1;
+        }
+
         [Test]
         public void Main()
         {

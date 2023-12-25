@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue533_Exporting_WPF_UserControl_causes_NullReferenceException
+    public class Issue533_Exporting_WPF_UserControl_causes_NullReferenceException : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

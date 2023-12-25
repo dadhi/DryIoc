@@ -4,8 +4,16 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue544_WithTrackingDisposableTransients_may_downgrade_Singletons_to_Transients
+    public class Issue544_WithTrackingDisposableTransients_may_downgrade_Singletons_to_Transients : ITest
     {
+        public int Run()
+        {
+            Decorator_CanHave_SingletonReuse();
+            Decorator_CanHave_SingletonReuse_AlsoForDisposables();
+            Composite_PreservesSingletonReuse();
+            return 3;
+        }
+
         public interface IA { }
         public class A : IA { }
         class B : IA { public B(IA aa) { } }

@@ -5,8 +5,19 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    class Issue522_IncorrectApplicationOfSingletonReuse
+    public class Issue522_IncorrectApplicationOfSingletonReuse : ITest
     {
+        public int Run()
+        {
+            DryIocWithDefaultSettingsCreatesDifferentInstancesOfNamedDriverUsingStaticFactory();
+            DryIocWithDefaultSettingsCreatesDifferentInstancesOfNamedDriverUsingNonStaticFactory();
+            DryIocWithTransientDefaultReuseCreatesDifferentInstancesOfNamedDriverUsingStaticFactory();
+            DryIocWithTransientDefaultReuseCreatesDifferentInstancesOfNamedDriverUsingNonStaticFactory();
+            DryIocWithScopedDefaultReuseCreatesDifferentInstancesOfNamedDriverUsingStaticFactory();
+            DryIocWithScopedDefaultReuseCreatesDifferentInstancesOfNamedDriverUsingNonStaticFactory();
+            return 6;
+        }
+
         [Test]
         public void DryIocWithDefaultSettingsCreatesDifferentInstancesOfNamedDriverUsingStaticFactory()
         {

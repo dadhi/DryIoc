@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class SO_DryIoC_pass_param_to_constructor_of_open_generic_service_based_on_generic_type_parameter
+    public class SO_DryIoC_pass_param_to_constructor_of_open_generic_service_based_on_generic_type_parameter : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {
