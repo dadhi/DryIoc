@@ -39,7 +39,8 @@ var result = container.GenerateResolutionExpressions(x => x.SelectMany(r =>
 
 string TrimUsings(string source)
 {
-    source = source.Replace("DryIoc.", "");
+    source = source.Replace("DryIoc.", ""); 
+    // todo: @wip remove unnecessary usings that's are System.Collections.Generic for KeyValuePair, etc.
     foreach (var x in NamespaceUsings)
         source = source.Replace(x + ".", "");
     return source;
