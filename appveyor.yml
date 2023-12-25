@@ -1,7 +1,7 @@
 image:
   - Visual Studio 2022
   - Ubuntu
-  - macOS
+  # - macOS #until I understant what is the error on AppVeyor CI
 
 version: 6.0.0-preview-05-{build}
 
