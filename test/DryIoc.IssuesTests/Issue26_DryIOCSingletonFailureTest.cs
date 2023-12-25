@@ -12,8 +12,6 @@ namespace DryIoc.IssuesTests
             return 2;
         }
 
-        private readonly Container _container;
-
         [Test]
         public void Passes()
         {
@@ -21,18 +19,20 @@ namespace DryIoc.IssuesTests
             container.RegisterInstance(new Producer());
             container.Register<Consumer>(Reuse.Singleton);
             container.Resolve<Consumer>();
-            //Console.WriteLine(1);
             Resolve();
-            //Console.WriteLine(2);
             Resolve();
-            //Console.WriteLine(3);
             Resolve();
-            //Console.WriteLine(4);
             Resolve();
-            //Console.WriteLine(5);
             Resolve();
-            //Console.WriteLine(6);
             Resolve();
+
+            void Resolve()
+            {
+                using (var scope = container.OpenScope())
+                {
+                    scope.Resolve<Consumer>();
+                }
+            }
         }
 
         [Test]
@@ -41,25 +41,19 @@ namespace DryIoc.IssuesTests
             var container = new Container();
             container.RegisterInstance(new Producer());
             container.Register<Consumer>(Reuse.Singleton);
-            //Console.WriteLine(1);
             Resolve();
-            //Console.WriteLine(2);
             Resolve();
-            //Console.WriteLine(3);
             Resolve();
-            //Console.WriteLine(4);
             Resolve();
-            //Console.WriteLine(5);
             Resolve();
-            //Console.WriteLine(6);
             Resolve();
-        }
 
-        private void Resolve()
-        {
-            using (var scope = _container.OpenScope())
+            void Resolve()
             {
-                scope.Resolve<Consumer>();
+                using (var scope = container.OpenScope())
+                {
+                    scope.Resolve<Consumer>();
+                }
             }
         }
 
