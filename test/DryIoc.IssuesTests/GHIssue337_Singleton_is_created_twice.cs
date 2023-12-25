@@ -22,7 +22,7 @@ namespace DryIoc.IssuesTests
             container.Register<IA, A>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
             var ts = new Task[8];
-            for (int i = 0; i < ts.Length; i++)
+            for (var i = 0; i < ts.Length; i++)
             {
                 ts[i] = Task.Run(() => container.Resolve<IA>());
             }
