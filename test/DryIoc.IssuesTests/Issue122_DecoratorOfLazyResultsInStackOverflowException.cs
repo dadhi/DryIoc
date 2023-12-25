@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue122_DecoratorOfLazyResultsInStackOverflowException
+    public class Issue122_DecoratorOfLazyResultsInStackOverflowException : ITest
     {
+        public int Run()
+        {
+            Decorator_may_be_applied_to_decorated_Lazy();
+            return 1;
+        }
+
         [Test]
         public void Decorator_may_be_applied_to_decorated_Lazy()
         {

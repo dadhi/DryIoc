@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue116_InvokeFactoryConstructorTwoTimes
+    public class Issue116_InvokeFactoryConstructorTwoTimes : ITest
     {
+        public int Run()
+        {
+            While_resolve_singleton_should_invoke_constructor_1_time();
+            return 1;
+        }
+
         class SomeSingleton
         {
         }

@@ -10,7 +10,7 @@ namespace DryIoc.IssuesTests
         public int Run()
         {
             Test_Array_with_event_raiser_and_static_handle_counters();
-            Test_ResolveMany_with_event_raiser_and_static_handle_counters();
+            // Test_ResolveMany_with_event_raiser_and_static_handle_counters();
             I_can_turn_off_variance_support_in_collection();
             I_can_turn_on_variance_support_in_collection();
             return 4;

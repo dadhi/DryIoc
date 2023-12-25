@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue128_ResolveFailsWithSingletonsInOuterScope
+    public class Issue128_ResolveFailsWithSingletonsInOuterScope : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

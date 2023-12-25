@@ -136,6 +136,11 @@ namespace DryIoc.UnitTests
                 new Issue107_NamedScopesDependingOnResolvedTypes(),
                 new Issue110_HidingMultipleContravariantImplementationsBehindComposite(),
                 new Issue110_SupportContravarianceInResolveMany(),
+                new Issue116_InvokeFactoryConstructorTwoTimes(),
+                new Issue122_DecoratorOfLazyResultsInStackOverflowException(),
+                new Issue123_TipsForMigrationFromAutofac_WithParameter(),
+                new Issue123_TipsForMigrationFromAutofac(),
+                new Issue128_ResolveFailsWithSingletonsInOuterScope(),
 
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue357_PartImportsSatisfied(),
