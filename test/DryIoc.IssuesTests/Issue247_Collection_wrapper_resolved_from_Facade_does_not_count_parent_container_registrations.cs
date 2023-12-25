@@ -6,8 +6,19 @@ using DryIoc.ImTools;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue247_Collection_wrapper_resolved_from_Facade_does_not_count_parent_container_registrations
+    public class Issue247_Collection_wrapper_resolved_from_Facade_does_not_count_parent_container_registrations : ITest
     {
+        public int Run()
+        {
+            When_both_current_and_fallback_services_are_available();
+            When_only_fallback_services_are_available();
+            For_KeyValuePair_When_both_current_and_fallback_services_are_available();
+            For_lazy_collection_When_both_current_and_fallback_services_are_available();
+            For_lazy_collection_When_only_fallback_services_are_available();
+            For_lazy_collection_of_KeyValuePair_When_both_current_and_fallback_services_are_available();
+            return 6;
+        }
+
         [Test]
         public void When_both_current_and_fallback_services_are_available()
         {

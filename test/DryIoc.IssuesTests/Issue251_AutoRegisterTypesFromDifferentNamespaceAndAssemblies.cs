@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue251_AutoRegisterTypesFromDifferentNamespaceAndAssemblies
+    public class Issue251_AutoRegisterTypesFromDifferentNamespaceAndAssemblies : ITest
     {
+        public int Run()
+        {
+            Test1();
+            return 1;
+        }
+
         [Test]
         public void Test1()
         {

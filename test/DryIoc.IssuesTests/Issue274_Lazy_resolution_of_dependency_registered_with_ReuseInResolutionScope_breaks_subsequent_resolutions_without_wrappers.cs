@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue274_Lazy_resolution_of_dependency_registered_with_ReuseInResolutionScope_breaks_subsequent_resolutions_without_wrappers
+    public class Issue274_Lazy_resolution_of_dependency_registered_with_ReuseInResolutionScope_breaks_subsequent_resolutions_without_wrappers : ITest
     {
+        public int Run()
+        {
+            FirstLazyResolutionShouldNotBreakSubsequentResolutions();
+            return 1;
+        }
+
         private interface IDependency { }
 
         private class Dependency : IDependency { }

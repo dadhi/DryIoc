@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue230_CustomInitializerAttachedToLazilyResolvedDependencyIsCalledOncePerResolution
+    public class Issue230_CustomInitializerAttachedToLazilyResolvedDependencyIsCalledOncePerResolution : ITest
     {
+        public int Run()
+        {
+            Custom_initializer_attached_to_lazily_resolved_dependency_is_called_once_per_resolution_not_once_per_construction();
+            return 1;
+        }
+
         [Test]
         public void Custom_initializer_attached_to_lazily_resolved_dependency_is_called_once_per_resolution_not_once_per_construction()
         {

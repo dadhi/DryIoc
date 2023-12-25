@@ -4,8 +4,19 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue213_LazySingletonsShouldBeResolvedAfterContainerIsDisposed
+    public class Issue213_LazySingletonsShouldBeResolvedAfterContainerIsDisposed : ITest
     {
+        public int Run()
+        {
+            Lazy_singletons_should_resolve_after_container_disposed();
+            Lazy_singletons_should_resolve_after_container_disposed_without_throwing_for_captive_dependency();
+            Func_singletons_should_resolve_after_container_disposed();
+            Lazy_singleton_resolved_in_scope_can_got_a_value_outside_a_scope();
+            Lazy_non_eager_singleton_resolved_in_scope_can_got_a_value_outside_a_scope();
+            Lazy_non_eager_singleton_injected_in_scope_can_got_a_value_outside_a_scope();
+            return 6;
+        }
+
         [Test]
         public void Lazy_singletons_should_resolve_after_container_disposed()
         {

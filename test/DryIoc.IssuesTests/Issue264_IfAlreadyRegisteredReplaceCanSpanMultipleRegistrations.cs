@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue264_IfAlreadyRegisteredReplaceCanSpanMultipleRegistrations
+    public class Issue264_IfAlreadyRegisteredReplaceCanSpanMultipleRegistrations : ITest
     {
+        public int Run()
+        {
+            Replace_in_RegisterMany_should_remove_all_service_type_registrations();
+            Can_unregister_result_of_register_many();
+            return 2;
+        }
+
         [Test]
         public void Replace_in_RegisterMany_should_remove_all_service_type_registrations()
         {

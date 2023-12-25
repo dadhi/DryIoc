@@ -6,8 +6,16 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue262_Using_attributes_to_inject_primitive_variables
+    public class Issue262_Using_attributes_to_inject_primitive_variables : ITest
     {
+        public int Run()
+        {
+            Test_parameter();
+            Test_field_2();
+            Test_root();
+            return 3;
+        }
+
         [Test]
         public void Test_parameter()
         {

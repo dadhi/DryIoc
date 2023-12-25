@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue267_False_alarm_about_recursive_dependency_when_using_decorator
+    public class Issue267_False_alarm_about_recursive_dependency_when_using_decorator : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

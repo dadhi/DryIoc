@@ -4,13 +4,18 @@ using System.Linq;
 using NUnit.Framework;
 
 using DryIoc.FastExpressionCompiler.LightExpression;
-using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue224_EnumerableWrappedInFuncLosesTheInformationAboutFuncWrapperCausingIncorrectScopeLifetimeValidation
+    public class Issue224_EnumerableWrappedInFuncLosesTheInformationAboutFuncWrapperCausingIncorrectScopeLifetimeValidation : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {
