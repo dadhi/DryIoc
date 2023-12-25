@@ -10,8 +10,14 @@ using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue377_Support_custom_IReuse_with_MEF_attributes
+    public class Issue377_Support_custom_IReuse_with_MEF_attributes : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

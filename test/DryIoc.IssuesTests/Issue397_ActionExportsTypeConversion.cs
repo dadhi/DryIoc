@@ -10,8 +10,19 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue397_ActionExportsTypeConversion
+    public class Issue397_ActionExportsTypeConversion : ITest
     {
+        public int Run()
+        {
+            Exported_actions_can_be_resolved_as_array();
+            Exported_actions_can_be_resolved_as_IEnumerable();
+            Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy();
+            Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_with_metadata();
+            Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_within_scope();
+            Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_with_metadata_within_scope();
+            return 6;
+        }
+
         public Issue397_ActionExportsTypeConversion()
         {
             // use English exception messages

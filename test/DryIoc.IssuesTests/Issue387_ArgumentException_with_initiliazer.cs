@@ -3,8 +3,16 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue387_ArgumentException_with_initiliazer
+    public class Issue387_ArgumentException_with_initiliazer : ITest
     {
+        public int Run()
+        {
+            Initializers_for_multiple_interfaces_single_impl_should_select_the_correct_one_for_the_resolved_iface();
+            Initializers_for_multiple_interfaces_single_impl_should_select_the_correct_one_for_the_other_resolved_iface();
+            Initializers_for_multiple_interfaces_single_impl_should_select_all_for_the_resolved_impl();
+            return 3;
+        }
+
         [Test]
         public void Initializers_for_multiple_interfaces_single_impl_should_select_the_correct_one_for_the_resolved_iface()
         {

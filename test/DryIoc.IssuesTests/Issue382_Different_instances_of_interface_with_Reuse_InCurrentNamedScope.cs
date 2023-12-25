@@ -3,8 +3,15 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue382_Different_instances_of_interface_with_Reuse_InCurrentNamedScope
+    public class Issue382_Different_instances_of_interface_with_Reuse_InCurrentNamedScope : ITest
     {
+        public int Run()
+        {
+            Should_work_as_is();
+            Should_work_with_asResolutionCall();
+            return 2;
+        }
+
         [Test]
         public void Should_work_as_is()
         {

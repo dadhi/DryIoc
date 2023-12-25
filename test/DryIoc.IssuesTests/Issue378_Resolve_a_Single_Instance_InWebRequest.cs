@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue378_Resolve_a_Single_Instance_InWebRequest
+    public class Issue378_Resolve_a_Single_Instance_InWebRequest : ITest
     {
+        public int Run()
+        {
+            Win_app_test();
+            Web_app_test();
+            return 2;
+        }
+
         public static IContainer ConfigureWinAppContainerAndRegisterServices()
         {
             var container = new Container(rules => rules

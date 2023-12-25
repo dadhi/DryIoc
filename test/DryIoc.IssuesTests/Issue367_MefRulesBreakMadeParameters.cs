@@ -3,12 +3,18 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    /// <summary>
-    /// Issue #357: WithMef() break made parameters.
-    /// </summary>
     [TestFixture]
-    public class Issue357_MefRulesBreakMadeParameters
+    public class Issue367_MefRulesBreakMadeParameters : ITest
     {
+        public int Run()
+        {
+            DryIoc_supports_made_parameters();
+            DryIoc_supports_made_factory_method_with_parameters();
+            DryIoc_WithMef_supports_made_parameters();
+            DryIoc_WithMef_supports_made_factory_method_with_parameters();
+            return 4;
+        }
+
         [Test]
         public void DryIoc_supports_made_parameters()
         {
@@ -73,7 +79,7 @@ namespace DryIoc.IssuesTests
         }
 
         private static Made factoryMethod = Made.Of(
-            typeof(Issue357_MefRulesBreakMadeParameters).Method("FactoryMethod", typeof(string)),
+            typeof(Issue367_MefRulesBreakMadeParameters).Method("FactoryMethod", typeof(string)),
             parameters: Parameters.Of.Type<string>(r => "b"));
     }
 }

@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue366_Facade_Returns_Null_for_ResolveMany_Fallback
+    public class Issue366_Facade_Returns_Null_for_ResolveMany_Fallback : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

@@ -5,8 +5,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue394_Reimporting_services
+    public class Issue394_Reimporting_services : ITest
     {
+        public int Run()
+        {
+            InjectPropertiesAndFields_imports_new_services_into_resolved_singleton();
+            InjectPropertiesAndFields_of_new_imports_for_external_instance_via_ClearCache();
+            Resolve_new_imports_for_transient_via_ClearCache();
+            Resolve_new_imports_for_singleton_via_WithoutSingletonsAndCache();
+            return 4;
+        }
+
         [Test]
         public void InjectPropertiesAndFields_imports_new_services_into_resolved_singleton()
         {

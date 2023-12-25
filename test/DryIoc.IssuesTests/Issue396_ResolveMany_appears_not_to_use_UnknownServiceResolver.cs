@@ -4,8 +4,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue396_ResolveMany_appears_not_to_use_UnknownServiceResolver
+    public class Issue396_ResolveMany_appears_not_to_use_UnknownServiceResolver : ITest
     {
+        public int Run()
+        {
+            Can_ResolveMany_of_not_registered_service_interface();
+            Can_ResolveMany_of_not_registered_service_generic_interface_without_scanning_order();
+            Selects_only_valid_non_generic_impl_for_non_generic_service();
+            I_should_be_able_to_specify_reuse();
+            return 4;
+        }
+
         [Test]
         public void Can_ResolveMany_of_not_registered_service_interface()
         {

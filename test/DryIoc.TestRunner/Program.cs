@@ -190,6 +190,16 @@ namespace DryIoc.UnitTests
                 new Issue355_UnexpectedSingletonDisposal(),
 
                 new Issue357_PartImportsSatisfied(),
+                new Issue366_Facade_Returns_Null_for_ResolveMany_Fallback(),
+                new Issue367_MefRulesBreakMadeParameters(),
+                new Issue377_Support_custom_IReuse_with_MEF_attributes(),
+                new Issue378_Resolve_a_Single_Instance_InWebRequest(),
+                new Issue382_Different_instances_of_interface_with_Reuse_InCurrentNamedScope(),
+                new Issue387_ArgumentException_with_initiliazer(),
+                new Issue394_Reimporting_services(),
+                new Issue396_ResolveMany_appears_not_to_use_UnknownServiceResolver(),
+                new Issue397_ActionExportsTypeConversion(),
+
                 new Issue404_ConstructorWithResolvableArguments_does_not_take_into_account_parameter_service_key(),
                 new Issue407_Cannot_resolve_MadeOf_params_explicitly(),
                 new Issue416_Adding_always_true_condition_to_decorator_changes_the_decorated_outcome(),
