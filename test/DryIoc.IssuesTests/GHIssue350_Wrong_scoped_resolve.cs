@@ -4,8 +4,20 @@ using DryIoc.Microsoft.DependencyInjection;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue350_Wrong_scoped_resolve
+    public class GHIssue350_Wrong_scoped_resolve : ITest
     {
+        public int Run()
+        {
+            TheBug();
+            TheBug_without_MS_DI_rules();
+            TheBug_simplified();
+            TheBug_simplified_without_MS_DI_rules();
+            TheBug_2_without_MS_DI_rules();
+            TheBug_2_change_resgitration_order();
+            TheBug_2_is_not_a_bug_and_depends_on_the_registration_order();
+            return 7;
+        }
+
         [Test]
         public void TheBug_2_is_not_a_bug_and_depends_on_the_registration_order()
         {

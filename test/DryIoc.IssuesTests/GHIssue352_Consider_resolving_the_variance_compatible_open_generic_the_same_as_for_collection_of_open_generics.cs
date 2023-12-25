@@ -2,14 +2,22 @@ using NUnit.Framework;
 using DryIoc.Messages;
 using System.Threading.Tasks;
 using System.Threading;
-using System.Linq;
 using DryIoc.Microsoft.DependencyInjection;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue352_Consider_resolving_the_variance_compatible_open_generic_the_same_as_for_collection_of_open_generics 
+    public class GHIssue352_Consider_resolving_the_variance_compatible_open_generic_the_same_as_for_collection_of_open_generics : ITest
     {
+        public int Run()
+        {
+            Contravariant_handler_can_be_Resolved_with_a_single_Resolve();
+            Contravariant_handler_can_be_Resolved_with_a_single_Resolve_even_with_MS_DI_rules();
+            Contravariant_handler_should_be_Resolved_in_collection();
+            Contravariant_handler_should_be_Resolved_in_collection_and_the_variant_resolve_should_not_affect_it();
+            return 4;
+        }
+
         [Test]
         public void Contravariant_handler_can_be_Resolved_with_a_single_Resolve()
         {

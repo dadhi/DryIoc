@@ -1,11 +1,16 @@
 using NUnit.Framework;
-using System.Linq;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue369_Child_container_and_openResolutionScope_in_one_test
+    public class GHIssue369_Child_container_and_openResolutionScope_in_one_test : ITest
     {
+        public int Run()
+        {
+            Should_resolve_context_from_the_new_scope();
+            return 1;
+        }
+
         public interface IServiceLocator
         {
             IResolverContext Resolver { get; }

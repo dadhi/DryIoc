@@ -6,8 +6,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue337_Singleton_is_created_twice
+    public class GHIssue337_Singleton_is_created_twice : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

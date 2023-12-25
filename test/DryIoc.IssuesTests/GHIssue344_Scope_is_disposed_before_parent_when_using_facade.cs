@@ -4,8 +4,14 @@ using System;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue344_Scope_is_disposed_before_parent_when_using_facade
+    public class GHIssue344_Scope_is_disposed_before_parent_when_using_facade : ITest
     {
+        public int Run()
+        {
+            The_test();
+            return 1;
+        }
+
         [Test]
         public void The_test()
         {

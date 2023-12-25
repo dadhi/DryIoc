@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue387_Nested_container_returns_a_new_instance_for_singletons
+    public class GHIssue387_Nested_container_returns_a_new_instance_for_singletons : ITest
     {
+        public int Run()
+        {
+            Test1();
+            return 1;
+        }
+
         [Test]
         public void Test1()
         {

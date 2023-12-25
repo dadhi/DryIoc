@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue332_Delegate_returning_null_throws_exception_RegisteredDelegateResultIsNotOfServiceType
+    public class GHIssue332_Delegate_returning_null_throws_exception_RegisteredDelegateResultIsNotOfServiceType : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test() 
         {

@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue315_Combining_RegisterDelegate_with_TrackingDisposableTransients_rule_throws_TargetParameterCountException
+    public class GHIssue315_Combining_RegisterDelegate_with_TrackingDisposableTransients_rule_throws_TargetParameterCountException : ITest
     {
+        public int Run()
+        {
+            Test_RegisterDelegate();
+            return 1;
+        }
+
         [Test]
         public void Test_RegisterDelegate()
         {

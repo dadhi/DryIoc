@@ -4,8 +4,14 @@ using System;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue340_WaitForItemIsSet_does_never_end
+    public class GHIssue340_WaitForItemIsSet_does_never_end : ITest
     {
+        public int Run()
+        {
+            WaitForItemIsSet_does_never_end();
+            return 1;
+        }
+
         [Test]
         public void WaitForItemIsSet_does_never_end()
         {

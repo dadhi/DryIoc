@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue301_Breakage_in_scoped_enumeration_in_v4
+    public class GHIssue301_Breakage_in_scoped_enumeration_in_v4 : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

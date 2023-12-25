@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue314_Expose_the_usual_IfAlreadyRegistered_option_parameter_for_RegisterMapping
+    public class GHIssue314_Expose_the_usual_IfAlreadyRegistered_option_parameter_for_RegisterMapping : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

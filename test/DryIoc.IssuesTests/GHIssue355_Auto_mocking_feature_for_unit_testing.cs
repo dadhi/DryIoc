@@ -5,8 +5,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue355_Auto_mocking_feature_for_unit_testing
+    public class GHIssue355_Auto_mocking_feature_for_unit_testing : ITest
     {
+        public int Run()
+        {
+            TestCase();
+            TestCase_Should_not_the_call_the_callback_for_the_registered_dependency();
+            TestCase_with_dynamic_registration();
+            TestCase_with_dynamic_registration_full_example();
+            return 4;
+        }
+
         [Test]
         public void TestCase()
         {

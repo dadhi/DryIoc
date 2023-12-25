@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue348_Create_a_child_container_without_WithNoMoreRegistrationAllowed_flag
+    public class GHIssue348_Create_a_child_container_without_WithNoMoreRegistrationAllowed_flag : ITest
     {
+        public int Run()
+        {
+            Should_allow_registration_in_child_container();
+            return 1;
+        }
+
         [Test]
         public void Should_allow_registration_in_child_container()
         {

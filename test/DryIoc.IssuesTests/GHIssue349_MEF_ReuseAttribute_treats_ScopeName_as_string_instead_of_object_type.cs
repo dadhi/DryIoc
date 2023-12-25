@@ -5,8 +5,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue349_MEF_ReuseAttribute_treats_ScopeName_as_string_instead_of_object_type
+    public class GHIssue349_MEF_ReuseAttribute_treats_ScopeName_as_string_instead_of_object_type : ITest
     {
+        public int Run()
+        {
+            Can_provide_the_object_Scope_service_name_into_the_attribute();
+            Can_provide_the_multiple_scope_names_in_the_attribute();
+            return 2;
+        }
+
         [Test]
         public void Can_provide_the_object_Scope_service_name_into_the_attribute()
         {

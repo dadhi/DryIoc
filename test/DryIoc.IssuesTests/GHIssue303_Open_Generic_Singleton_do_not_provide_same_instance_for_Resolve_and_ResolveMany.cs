@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue303_Open_Generic_Singleton_do_not_provide_same_instance_for_Resolve_and_ResolveMany
+    public class GHIssue303_Open_Generic_Singleton_do_not_provide_same_instance_for_Resolve_and_ResolveMany : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

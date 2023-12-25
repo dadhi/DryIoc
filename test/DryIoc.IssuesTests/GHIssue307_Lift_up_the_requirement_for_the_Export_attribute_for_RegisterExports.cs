@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue307_Lift_up_the_requirement_for_the_Export_attribute_for_RegisterExports
+    public class GHIssue307_Lift_up_the_requirement_for_the_Export_attribute_for_RegisterExports : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test() 
         {

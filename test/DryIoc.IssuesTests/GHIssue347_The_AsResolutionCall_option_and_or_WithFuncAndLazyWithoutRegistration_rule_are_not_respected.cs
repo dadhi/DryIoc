@@ -4,8 +4,16 @@ using System;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue347_The_AsResolutionCall_option_and_or_WithFuncAndLazyWithoutRegistration_rule_are_not_respected
+    public class GHIssue347_The_AsResolutionCall_option_and_or_WithFuncAndLazyWithoutRegistration_rule_are_not_respected : ITest
     {
+        public int Run()
+        {
+            RecursiveDependencyIssue_with_asResolutionCall();
+            RecursiveDependencyIssue_WithFuncAndLazyWithoutRegistration();
+            RecursiveDependencyIssue_with_Lazy_instead_of_Func();
+            return 3;
+        }
+
         [Test]
         public void RecursiveDependencyIssue_with_asResolutionCall()
         {

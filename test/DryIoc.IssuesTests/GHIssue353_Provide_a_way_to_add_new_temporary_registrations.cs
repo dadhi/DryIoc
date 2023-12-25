@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue353_Provide_a_way_to_add_new_temporary_registrations
+    public class GHIssue353_Provide_a_way_to_add_new_temporary_registrations : ITest
     {
+        public int Run()
+        {
+            Isolated_CreateFacade_without_disposing_the_parent();
+            return 1;
+        }
+
         [Test]
         public void Isolated_CreateFacade_without_disposing_the_parent()
         {

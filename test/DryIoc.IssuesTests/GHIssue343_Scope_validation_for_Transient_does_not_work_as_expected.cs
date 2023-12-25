@@ -3,8 +3,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue343_Scope_validation_for_Transient_does_not_work_as_expected
+    public class GHIssue343_Scope_validation_for_Transient_does_not_work_as_expected : ITest
     {
+        public int Run()
+        {
+            I_should_be_able_to_specify_Transient_as_captive_dependency();
+            By_default_the_Transient_is_not_a_captive_dependency();
+            The_Scoped_is_still_a_captive_dependency_in_Singleton();
+            The_switching_off_shorter_reuse_lifespan_error_doesnot_switch_off_the_Transient_error_you_need_to_specify_this();
+            return 4;
+        }
+
         [Test]
         public void I_should_be_able_to_specify_Transient_as_captive_dependency()
         {

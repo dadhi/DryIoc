@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue338_Child_container_disposes_parent_container_singletons
+    public class GHIssue338_Child_container_disposes_parent_container_singletons : ITest
     {
+        public int Run()
+        {
+            Should_allow_registration_in_child_container();
+            return 1;
+        }
+
         [Test]
         public void Should_allow_registration_in_child_container()
         {

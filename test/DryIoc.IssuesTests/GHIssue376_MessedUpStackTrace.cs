@@ -7,8 +7,14 @@ using DryIoc.MefAttributedModel;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue376_MessedUpStackTrace
+    public class GHIssue376_MessedUpStackTrace : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

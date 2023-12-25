@@ -4,8 +4,16 @@ using System.Linq;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue367_Resolve_with_FactoryMethod_of_instance_throws_ContainerException
+    public class GHIssue367_Resolve_with_FactoryMethod_of_instance_throws_ContainerException : ITest
     {
+        public int Run()
+        {
+            Test_StaticFactory();
+            Test_Factory_as_Service();
+            Test_Factory_as_Instance();
+            return 3;
+        }
+
         public interface IAbstraction<T>
         {
             string Description { get; }
