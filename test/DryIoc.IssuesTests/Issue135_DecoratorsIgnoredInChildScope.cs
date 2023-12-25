@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue135_DecoratorsIgnoredInChildScope
+    public class Issue135_DecoratorsIgnoredInChildScope : ITest
     {
+        public int Run()
+        {
+            Decorators_Work_As_Per_Parent_Container();
+            return 1;
+        }
+
         [Test]
         public void Decorators_Work_As_Per_Parent_Container()
         {

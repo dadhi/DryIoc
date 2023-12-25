@@ -8,8 +8,25 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue145_SimplifyDefiningOfOpenGenericFactoryMethod
+    public class Issue145_SimplifyDefiningOfOpenGenericFactoryMethod : ITest
     {
+        public int Run()
+        {
+            Should_map_nested_generic_parameters();
+            Should_map_repeated_generic_parameters();
+            Should_map_repeated_generic_parameters_and_other_parameters();
+            Should_map_static_open_generic_class_with_generic_factory_method();
+            Should_map_open_generic_class_with_generic_factory_method();
+            Should_throw_when_mapping_service_with_incompatible_type_arguments();
+            Should_throw_when_mapping_factory_mathod_declaring_type_with_incompatible_type_arguments();
+            Should_Not_throw_with_IfUnresolvedReturnDefault_when_mapping_factory_mathod_declaring_type_with_incompatible_type_arguments();
+            Should_throw_when_mapping_factory_method_with_incompatible_type_arguments();
+            Should_map_factory_field_with_compatible_type_arguments();
+            Should_map_factory_property_with_compatible_type_arguments();
+            Register_manually();
+            return 12;
+        }
+
         [Test]
         public void Register_manually()
         {

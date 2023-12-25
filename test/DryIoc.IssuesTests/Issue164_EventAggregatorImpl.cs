@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue164_EventAggregatorImpl
+    public class Issue164_EventAggregatorImpl : ITest
     {
+        public int Run()
+        {
+            Able_to_handle_multiple_events_being_singleton();
+            return 1;
+        }
+
         [Test]
         public void Able_to_handle_multiple_events_being_singleton()
         {

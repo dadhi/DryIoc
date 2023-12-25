@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue148_NestedOptionalDependenciesPreventTheOuterDependencyFromInstantiating
+    public class Issue148_NestedOptionalDependenciesPreventTheOuterDependencyFromInstantiating : ITest
     {
+        public int Run()
+        {
+            Should_use_optional_parameter_if_registered_in_nested_dependency();
+            return 1;
+        }
+
         [Test]
         public void Should_use_optional_parameter_if_registered_in_nested_dependency()
         {

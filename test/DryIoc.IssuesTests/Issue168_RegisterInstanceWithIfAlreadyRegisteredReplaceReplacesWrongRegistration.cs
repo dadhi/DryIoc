@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue168_RegisterInstanceWithIfAlreadyRegisteredReplaceReplacesWrongRegistration
+    public class Issue168_RegisterInstanceWithIfAlreadyRegisteredReplaceReplacesWrongRegistration : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

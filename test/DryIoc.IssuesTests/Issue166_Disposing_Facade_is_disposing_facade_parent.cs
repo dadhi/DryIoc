@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue166_Disposing_Facade_is_disposing_facade_parent
+    public class Issue166_Disposing_Facade_is_disposing_facade_parent : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

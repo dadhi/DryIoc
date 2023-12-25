@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue200_MultipleInstancesForSingletonCreatedWhenContainerIsSharedAmongMultipleThreads
+    public class Issue200_MultipleInstancesForSingletonCreatedWhenContainerIsSharedAmongMultipleThreads : ITest
     {
+        public int Run()
+        {
+            Inject_singleton_async_should_return_the_same_dependency();
+            return 1;
+        }
+
         [Test]
         public void Inject_singleton_async_should_return_the_same_dependency()
         {

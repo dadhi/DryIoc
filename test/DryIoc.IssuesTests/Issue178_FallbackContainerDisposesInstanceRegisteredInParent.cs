@@ -4,8 +4,16 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue178_FallbackContainerDisposesInstanceRegisteredInParent
+    public class Issue178_FallbackContainerDisposesInstanceRegisteredInParent : ITest
     {
+        public int Run()
+        {
+            Test_WithPreventDisposal();
+            Test_WithPreventDisposalAndReplace();
+            Test_WithPreventDisposalAndWeaklyReferenced();
+            return 3;
+        }
+
         [Test]
         public void Test_WithPreventDisposal()
         {

@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue144_NonPublic_property_as_FactoryMethod_causes_unexplained_NRE
+    public class Issue144_NonPublic_property_as_FactoryMethod_causes_unexplained_NRE : ITest
     {
+        public int Run()
+        {
+            There_should_not_be_NRE();
+            return 1;
+        }
+
         [Test]
         public void There_should_not_be_NRE()
         {

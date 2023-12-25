@@ -5,8 +5,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue153_ContextDependentResolutionOnlyWorksForTheVeryFirstContext
+    public class Issue153_ContextDependentResolutionOnlyWorksForTheVeryFirstContext : ITest
     {
+        public int Run()
+        {
+            Context_based_setup_should_work_for_different_context();
+            Lazy_expression_should_not_be_excessively_compiled();
+            return 2;
+        }
+
         [Test]
         public void Context_based_setup_should_work_for_different_context()
         {

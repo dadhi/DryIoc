@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue160_NestingOfDecoratorsOfWrappedServiceUsesOnlyFirstDecorator
+    public class Issue160_NestingOfDecoratorsOfWrappedServiceUsesOnlyFirstDecorator : ITest
     {
+        public int Run()
+        {
+            Decorate_Func_and_Lazy_in_chain();
+            return 1;
+        }
+
         [Test]
         public void Decorate_Func_and_Lazy_in_chain()
         {

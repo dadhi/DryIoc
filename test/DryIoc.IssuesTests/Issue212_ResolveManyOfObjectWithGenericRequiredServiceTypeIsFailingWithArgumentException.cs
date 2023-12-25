@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue212_ResolveManyOfObjectWithGenericRequiredServiceTypeIsFailingWithArgumentException
+    public class Issue212_ResolveManyOfObjectWithGenericRequiredServiceTypeIsFailingWithArgumentException : ITest
     {
+        public int Run()
+        {
+            Generic_with_non_matching_constraints_should_be_skipped_in_result_collection();
+            Generic_with_non_matching_constraints_should_be_skipped_in_result_array();
+            return 2;
+        }
+
         [Test]
         public void Generic_with_non_matching_constraints_should_be_skipped_in_result_collection()
         {

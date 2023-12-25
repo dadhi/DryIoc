@@ -4,8 +4,14 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    class Issue201_MultiThreadingIssueWhenRegisterInstanceUsedWithinOpenScope
+    public class Issue201_MultiThreadingIssueWhenRegisterInstanceUsedWithinOpenScope : ITest
     {
+        public int Run()
+        {
+            Use_instance_InThread_Replace_should_return_the_same_in_thread();
+            return 1;
+        }
+
         [Test]
         public void Use_instance_InThread_Replace_should_return_the_same_in_thread()
         {

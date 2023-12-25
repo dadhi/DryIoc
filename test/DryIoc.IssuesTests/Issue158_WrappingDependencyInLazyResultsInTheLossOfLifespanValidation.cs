@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue158_WrappingDependencyInLazyResultsInTheLossOfLifespanValidation
+    public class Issue158_WrappingDependencyInLazyResultsInTheLossOfLifespanValidation : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue159_Context_based_injection_doesnt_work_with_InjectPropertiesAndFields
+    public class Issue159_Context_based_injection_doesnt_work_with_InjectPropertiesAndFields : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

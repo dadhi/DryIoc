@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue181_RegisterInstanceUnregister
+    public class Issue181_RegisterInstanceUnregister : ITest
     {
+        public int Run()
+        {
+            Test_without_Unregister();
+            return 1;
+        }
+
         [Test]
         public void Test_without_Unregister()
         {

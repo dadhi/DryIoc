@@ -8,8 +8,14 @@ using static DryIoc.FastExpressionCompiler.LightExpression.Expression;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue169_FalseAlarmCheckingScopeLifetimeConsistencyForFuncWrapper
+    public class Issue169_FalseAlarmCheckingScopeLifetimeConsistencyForFuncWrapper : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

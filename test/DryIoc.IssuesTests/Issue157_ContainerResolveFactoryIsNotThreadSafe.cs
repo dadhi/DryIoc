@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue157_ContainerResolveFactoryIsNotThreadSafe
+    public class Issue157_ContainerResolveFactoryIsNotThreadSafe : ITest
     {
+        public int Run()
+        {
+            Should_not_throw_ResolveFromMultiple();
+            return 1;
+        }
+
         [Test]
         public void Should_not_throw_ResolveFromMultiple()
         {
