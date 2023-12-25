@@ -2,8 +2,14 @@
 
 namespace DryIoc.IssuesTests
 {
-    class Issue86_SkipIndexerOnAllPropertiesInjection
+    public class Issue86_SkipIndexerOnAllPropertiesInjection : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

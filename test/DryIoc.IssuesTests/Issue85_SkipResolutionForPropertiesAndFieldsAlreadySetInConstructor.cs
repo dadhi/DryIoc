@@ -8,8 +8,14 @@ namespace DryIoc.IssuesTests
     /// On hold. Here is the workaround with FactoryMethod.
     /// </summary>
     [TestFixture]
-    public class Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor
+    public class Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor : ITest
     {
+        public int Run()
+        {
+            May_set_properties_with_decorator();
+            return 1;
+        }
+
         [Test]
         public void May_set_properties_with_decorator()
         {
@@ -47,8 +53,15 @@ namespace DryIoc.IssuesTests
         /// Posted as answer to: http://stackoverflow.com/questions/321650/how-do-i-set-a-field-value-in-an-c-sharp-expression-tree
         /// </summary>
         [TestFixture]
-        public class CanSetPropAndFieldWithExpressionTreeInNet35
+        public class CanSetPropAndFieldWithExpressionTreeInNet35 : ITest
         {
+            public int Run()
+            {
+                Can_set_field_with_expression_tree_in_Net35();
+                Can_set_property_with_expression_tree_in_Net35();
+                return 2;
+            }
+
             private class Holder
             {
                 public int Field;

@@ -2,8 +2,15 @@
 
 namespace DryIoc.IssuesTests
 {
-    public class Issue81_SupportForOptionalParametersInConstructor
+    public class Issue81_SupportForOptionalParametersInConstructor : ITest
     {
+        public int Run()
+        {
+            Should_automatically_specify_IfUnresolvedReturnDefault_for_optional_parameters();
+            Should_keep_specified_default_parameter_value();
+            return 2;
+        }
+
         [Test]
         public void Should_automatically_specify_IfUnresolvedReturnDefault_for_optional_parameters()
         {

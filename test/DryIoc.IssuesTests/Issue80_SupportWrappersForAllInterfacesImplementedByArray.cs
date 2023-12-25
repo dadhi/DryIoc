@@ -3,8 +3,14 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    class Issue80_SupportWrappersForAllInterfacesImplementedByArray
+    public class Issue80_SupportWrappersForAllInterfacesImplementedByArray : ITest
     {
+        public int Run()
+        {
+            I_can_resolve_array_implemented_collection_type_with_required_service_type();
+            return 1;
+        }
+
         [Test]
         public void I_can_resolve_array_implemented_collection_type_with_required_service_type()
         {

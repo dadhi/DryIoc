@@ -5,8 +5,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue110_HidingMultipleContravariantImplementationsBehindComposite
+    public class Issue110_HidingMultipleContravariantImplementationsBehindComposite : ITest
     {
+        public int Run()
+        {
+            Test_Array_with_event_raiser_and_static_handle_counters();
+            Test_ResolveMany_with_event_raiser_and_static_handle_counters();
+            I_can_turn_off_variance_support_in_collection();
+            I_can_turn_on_variance_support_in_collection();
+            return 4;
+        }
+
         [Test]
         public void Test_Array_with_event_raiser_and_static_handle_counters()
         {

@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue110_SupportContravarianceInResolveMany
+    public class Issue110_SupportContravarianceInResolveMany : ITest
     {
+        public int Run()
+        {
+            Resolve_many_should_return_matching_contvariant_generic_service();
+            return 1;
+        }
+
         [Test]
         public void Resolve_many_should_return_matching_contvariant_generic_service()
         {

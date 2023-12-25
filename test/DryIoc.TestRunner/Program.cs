@@ -128,8 +128,15 @@ namespace DryIoc.UnitTests
                 new Issue58_HandleReusedObjectsIDisposableAndGCing(),
                 new Issue64_ScopeAndChildContainerAccessAfterDisposal(),
                 new Issue69_RecognizeGenericParameterConstraints(),
-
+                new Issue80_SupportWrappersForAllInterfacesImplementedByArray(),
+                new Issue81_SupportForOptionalParametersInConstructor(),
+                new Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor(),
+                new Issue85_SkipResolutionForPropertiesAndFieldsAlreadySetInConstructor.CanSetPropAndFieldWithExpressionTreeInNet35(),
+                new Issue86_SkipIndexerOnAllPropertiesInjection(),
                 new Issue107_NamedScopesDependingOnResolvedTypes(),
+                new Issue110_HidingMultipleContravariantImplementationsBehindComposite(),
+                new Issue110_SupportContravarianceInResolveMany(),
+
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue357_PartImportsSatisfied(),
                 new Issue404_ConstructorWithResolvableArguments_does_not_take_into_account_parameter_service_key(),
