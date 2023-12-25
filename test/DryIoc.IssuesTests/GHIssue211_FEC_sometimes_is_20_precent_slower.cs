@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue211_FEC_sometimes_is_20_precent_slower
+    public class GHIssue211_FEC_sometimes_is_20_precent_slower : ITest
     {
+        public int Run()
+        {
+            Should_get_a_singleton_constant_expression_from_the_cache();
+            return 1;
+        }
+
         [Test]
         public void Should_get_a_singleton_constant_expression_from_the_cache()
         {

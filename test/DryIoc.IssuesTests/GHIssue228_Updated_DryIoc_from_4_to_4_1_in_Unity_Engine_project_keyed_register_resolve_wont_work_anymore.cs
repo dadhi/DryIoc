@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Test
+    public class GHIssue228_Updated_DryIoc_from_4_to_4_1_in_Unity_Engine_project_keyed_register_resolve_wont_work_anymore : ITest
     {
+        public int Run()
+        {
+            Should_be_able_to_get_two_keyed_registrations();
+            return 1;
+        }
+
         [Test]
         public void Should_be_able_to_get_two_keyed_registrations()
         {

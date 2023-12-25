@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue294_in_parameter_modifier_breaks_service_resolution
+    public class GHIssue294_in_parameter_modifier_breaks_service_resolution : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

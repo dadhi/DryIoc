@@ -7,9 +7,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue223_IAsyncDisposable
+    public class GHIssue223_IAsyncDisposable : ITest
     {
-        // [Test]
+        public int Run()
+        {
+            // ShouldDisposeAsyncDisposable().GetAwaiter().GetResult();
+            return 1;
+        }
+
+        // [Test] // @wip
         public async Task ShouldDisposeAsyncDisposable()
         {
             var container = new Container();

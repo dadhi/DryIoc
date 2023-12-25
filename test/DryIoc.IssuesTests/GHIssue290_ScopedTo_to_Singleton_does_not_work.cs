@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue290_ScopedTo_to_Singleton_does_not_work
+    public class GHIssue290_ScopedTo_to_Singleton_does_not_work : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

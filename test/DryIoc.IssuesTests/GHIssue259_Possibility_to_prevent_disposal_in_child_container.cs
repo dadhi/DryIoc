@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue259_Possibility_to_prevent_disposal_in_child_container
+    public class GHIssue259_Possibility_to_prevent_disposal_in_child_container : ITest
     {
+        public int Run()
+        {
+            Test1();
+            return 1;
+        }
+
         [Test]
         public void Test1()
         {

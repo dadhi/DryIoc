@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue288_Recursive_resolution_ignores_current_scope_Use_instance
+    public class GHIssue288_Recursive_resolution_ignores_current_scope_Use_instance : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

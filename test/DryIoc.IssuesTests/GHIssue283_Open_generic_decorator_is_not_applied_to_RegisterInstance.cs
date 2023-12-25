@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue283_Open_generic_decorator_is_not_applied_to_RegisterInstance
+    public class GHIssue283_Open_generic_decorator_is_not_applied_to_RegisterInstance : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

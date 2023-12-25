@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue297_Can_RegisterMany_ignore_already_registered_services_based_on_reuse
+    public class GHIssue297_Can_RegisterMany_ignore_already_registered_services_based_on_reuse : ITest
     {
+        public int Run()
+        {
+            RegisterMany_may_skip_IsRegistered_as_Scoped();
+            RegisterMany_can_suppress_the_exception_if_no_service_is_registered();
+            return 2;
+        }
+
         [Test]
         public void RegisterMany_may_skip_IsRegistered_as_Scoped()
         {

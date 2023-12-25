@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue295_useParentReuse_does_not_respects_parent_reuse
+    public class GHIssue295_useParentReuse_does_not_respects_parent_reuse : ITest
     {
+        public int Run()
+        {
+            RespectsParentReuse();
+            return 1;
+        }
+
         [Test]
         public void RespectsParentReuse()
         {

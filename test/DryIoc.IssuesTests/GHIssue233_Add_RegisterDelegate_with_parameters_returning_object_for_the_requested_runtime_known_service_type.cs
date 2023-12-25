@@ -4,8 +4,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue233_Add_RegisterDelegate_with_parameters_returning_object_for_the_requested_runtime_known_service_type
+    public class GHIssue233_Add_RegisterDelegate_with_parameters_returning_object_for_the_requested_runtime_known_service_type : ITest
     {
+        public int Run()
+        {
+            Should_be_able_to_register_delegate_with_runtime_service_type_with_one_argument_returning_object();
+            Should_throw_if_delegate_with_one_argument_returning_Wrong_object();
+            Should_be_able_to_register_delegate_with_runtime_service_type_with_two_arguments_returning_object();
+            For_expression_generation_Should_be_able_to_register_delegate_with_runtime_service_type_with_two_arguments_returning_object();
+            return 4;
+        }
+
         [Test]
         public void Should_be_able_to_register_delegate_with_runtime_service_type_with_one_argument_returning_object()
         {

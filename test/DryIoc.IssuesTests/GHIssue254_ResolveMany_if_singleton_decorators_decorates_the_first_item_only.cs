@@ -4,8 +4,18 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue254_ResolveMany_if_singleton_decorators_decorates_the_first_item_only
+    public class GHIssue254_ResolveMany_if_singleton_decorators_decorates_the_first_item_only : ITest
     {
+        public int Run()
+        {
+            Test_RegisterDelegate_with_Decorator();
+            Test_RegisterDelegate_with_singleton_Decorator();
+            Test_RegisterDelegateDecorator_with_useDecorateeReuse_set_to_true_by_convention();
+            Test_Resolve_a_single_RegisterDelegate_with_scoped_Decorator();
+            Test_RegisterDelegate_with_scoped_Decorator();
+            return 5;
+        }
+
         [Test]
         public void Test_RegisterDelegate_with_Decorator()
         {

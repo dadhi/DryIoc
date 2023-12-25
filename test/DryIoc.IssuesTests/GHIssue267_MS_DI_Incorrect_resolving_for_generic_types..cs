@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue267_MS_DI_Incorrect_resolving_for_generic_types
+    public class GHIssue267_MS_DI_Incorrect_resolving_for_generic_types : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

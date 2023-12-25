@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue237_UseInstance_with_interface_based_serviceType_does_not_replace_previous_instance
+    public class GHIssue237_UseInstance_with_interface_based_serviceType_does_not_replace_previous_instance : ITest
     {
+        public int Run()
+        {
+            Second_Use_should_replace_the_first_one_in_scope();
+            return 1;
+        }
+
         [Test]
         public void Second_Use_should_replace_the_first_one_in_scope()
         {

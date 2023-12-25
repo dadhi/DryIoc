@@ -3,8 +3,18 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue235_Add_RegisterDelegateMany_RegisterInstanceMany_UseMany_to_fill_the_API_gap
+    public class GHIssue235_Add_RegisterDelegateMany_RegisterInstanceMany_UseMany_to_fill_the_API_gap : ITest
     {
+        public int Run()
+        {
+            Should_register_all_instance_public_implemented_types_by_default();
+            Should_register_all_instance_implemented_types_by_with_us_nonPublicTypes_parameter();
+            Should_register_all_instance_explicitly_specified_types();
+            Should_register_all_instance_public_types_implemented_by_provided_type();
+            Should_use_the_same_instance_for_multiple_interfaces();
+            return 5;
+        }
+
         [Test]
         public void Should_register_all_instance_public_implemented_types_by_default()
         {

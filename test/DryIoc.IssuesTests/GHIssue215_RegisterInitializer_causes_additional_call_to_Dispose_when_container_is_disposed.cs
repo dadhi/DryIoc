@@ -6,8 +6,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue215_RegisterInitializer_causes_additional_call_to_Dispose_when_container_is_disposed
+    public class GHIssue215_RegisterInitializer_causes_additional_call_to_Dispose_when_container_is_disposed : ITest
     {
+        public int Run()
+        {
+            Should_call_dispose_once();
+            return 1;
+        }
+
         [Test]
         public void Should_call_dispose_once()
         {
