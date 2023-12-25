@@ -3,8 +3,15 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    public class Issue58_HandleReusedObjectsIDisposableAndGCing
+    public class Issue58_HandleReusedObjectsIDisposableAndGCing : ITest
     {
+        public int Run()
+        {
+            ExternallyOwnedInstanceShouldNotBeAliveAfterDisposalAndGc();
+            // ExternallyOwnedInstanceShouldNotBeAliveAfterDisposalAndGc2();
+            return 1;
+        }
+
         interface ITest : IDisposable
         {
         }

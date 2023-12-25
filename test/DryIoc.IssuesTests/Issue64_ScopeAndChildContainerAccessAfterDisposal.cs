@@ -4,8 +4,17 @@ using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
-    public class Issue64_ScopeAndChildContainerAccessAfterDisposal
+    public class Issue64_ScopeAndChildContainerAccessAfterDisposal : ITest
     {
+        public int Run()
+        {
+            ChildContainerAccessAfterDisposalShouldThrow().GetAwaiter().GetResult();
+            ShouldThrowAfterScopeDisposal().GetAwaiter().GetResult();
+            ShouldThrowAfterScopeDisposal_WhenPropertiesAreResolved().GetAwaiter().GetResult();
+            ChildContainerAccessAfterDisposalShouldThrow_ForNamedRegistration().GetAwaiter().GetResult();
+            return 4;
+        }
+
         [Test]
         public async Task ChildContainerAccessAfterDisposalShouldThrow()
         {

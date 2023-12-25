@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue45_UnregisterOpenGenericAfterItWasResolvedOnce
+    public class Issue45_UnregisterOpenGenericAfterItWasResolvedOnce : ITest
     {
+        public int Run()
+        {
+            Unregister_open_generic_after_it_was_resolved_once();
+            Unregister_wrapper_after_it_was_resolved_once();
+            return 2;
+        }
+
         [Test]
         public void Unregister_open_generic_after_it_was_resolved_once()
         {

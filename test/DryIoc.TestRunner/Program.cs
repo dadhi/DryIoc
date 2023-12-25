@@ -123,6 +123,12 @@ namespace DryIoc.UnitTests
                 new Issue_Value_type_resolution_dependency(),
                 
                 new Issue26_DryIOCSingletonFailureTest(),
+                new Issue45_UnregisterOpenGenericAfterItWasResolvedOnce(),
+                new Issue46_ReuseInCurrentScopeForNestedDependenciesNotWorking(),
+                new Issue58_HandleReusedObjectsIDisposableAndGCing(),
+                new Issue64_ScopeAndChildContainerAccessAfterDisposal(),
+                new Issue69_RecognizeGenericParameterConstraints(),
+
                 new Issue107_NamedScopesDependingOnResolvedTypes(),
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
                 new Issue357_PartImportsSatisfied(),

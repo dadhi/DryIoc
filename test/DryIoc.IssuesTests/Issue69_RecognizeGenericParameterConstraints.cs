@@ -2,8 +2,14 @@
 
 namespace DryIoc.IssuesTests
 {
-    class Issue69_RecognizeGenericParameterConstraints
+    public class Issue69_RecognizeGenericParameterConstraints : ITest
     {
+        public int Run()
+        {
+            Should_support_generic_parameters_constraints();
+            return 1;
+        }
+
         [Test]
         public void Should_support_generic_parameters_constraints()
         {

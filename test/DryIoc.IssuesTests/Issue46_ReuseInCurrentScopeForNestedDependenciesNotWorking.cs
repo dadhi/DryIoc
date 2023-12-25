@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue46_ReuseInCurrentScopeForNestedDependenciesNotWorking
+    public class Issue46_ReuseInCurrentScopeForNestedDependenciesNotWorking : ITest
     {
+        public int Run()
+        {
+            Main();
+            return 1;
+        }
+
         [Test]
         public void Main()
         {
