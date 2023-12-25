@@ -4,8 +4,16 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue179_MadeOf_Parameters_do_not_follow_Reuse_setting
+    public class GHIssue179_MadeOf_Parameters_do_not_follow_Reuse_setting : ITest
     { 
+        public int Run()
+        {
+            Test();
+            Test_with_parameter_selector();
+            Test_made_with_parameters();
+            return 3;
+        }
+
         [Test]
         public void Test()
         {

@@ -1,13 +1,32 @@
 using NUnit.Framework;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 
 namespace DryIoc.IssuesTests
 {
-    public class GHIssue184_ReflectionTools_returns_static_constructors
+    public class GHIssue184_ReflectionTools_returns_static_constructors : ITest
     {
+        public int Run()
+        {
+            GetConstructorOrNull_DoesNotReturnStaticConstructor(typeof(SingleConstructorWithStaticConstructor1));
+            GetConstructorOrNull_DoesNotReturnStaticConstructor(typeof(SingleConstructorWithStaticConstructor2));
+            GetConstructorOrNull_ReturnsDoubleConstructorWithArguments(typeof(DoubleConstructorWithStaticConstructor1));
+            GetConstructorOrNull_ReturnsDoubleConstructorWithArguments(typeof(DoubleConstructorWithStaticConstructor2));
+            GetConstructorOrNull_ReturnsDoubleConstructorWithoutArguments(typeof(DoubleConstructorWithStaticConstructor1));
+            GetConstructorOrNull_ReturnsDoubleConstructorWithoutArguments(typeof(DoubleConstructorWithStaticConstructor2));
+            GetConstructorOrNull_ReturnsSingleConstructorWithArguments(typeof(SingleConstructorWithStaticConstructor1));
+            GetConstructorOrNull_ReturnsSingleConstructorWithArguments(typeof(SingleConstructorWithStaticConstructor2));
+            GetSingleConstructorOrNull_ReturnsNullForDoubleConstructor(typeof(DoubleConstructorWithStaticConstructor1));
+            GetSingleConstructorOrNull_ReturnsNullForDoubleConstructor(typeof(DoubleConstructorWithStaticConstructor2));
+            GetSingleConstructorOrNull_ReturnsSingleConstructor(typeof(SingleConstructorWithStaticConstructor1));
+            GetSingleConstructorOrNull_ReturnsSingleConstructor(typeof(SingleConstructorWithStaticConstructor2));
+            SingleConstructor_DoesNotThrowForStaticConstructor(typeof(SingleConstructorWithStaticConstructor1));
+            SingleConstructor_DoesNotThrowForStaticConstructor(typeof(SingleConstructorWithStaticConstructor2));
+            SingleConstructor_ThrowsForDoubleConstructor(typeof(DoubleConstructorWithStaticConstructor1));
+            SingleConstructor_ThrowsForDoubleConstructor(typeof(DoubleConstructorWithStaticConstructor2));
+            return 8;
+        }
+
         [Test]
         [TestCaseSource(nameof(SingleConstructors))]
         public void GetConstructorOrNull_DoesNotReturnStaticConstructor(Type type)

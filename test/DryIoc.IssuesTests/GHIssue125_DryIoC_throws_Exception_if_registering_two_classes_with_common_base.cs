@@ -1,14 +1,17 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue125_DryIoC_throws_Exception_if_registering_two_classes_with_common_base
+    public class GHIssue125_DryIoC_throws_Exception_if_registering_two_classes_with_common_base : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

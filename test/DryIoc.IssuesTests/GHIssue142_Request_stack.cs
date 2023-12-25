@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue142_Request_stack
+    public class GHIssue142_Request_stack : ITest
     {
+        public int Run()
+        {
+            Should_reuse_the_request_instance_for_the_second_dependency();
+            return 1;
+        }
+
         [Test]
         public void Should_reuse_the_request_instance_for_the_second_dependency()
         {

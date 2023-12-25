@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue139_StackOverflow_exception
+    public class GHIssue139_StackOverflow_exception : ITest
     {
+        public int Run()
+        {
+            Singleton_decorator_should_be_correctly_applied_to_different_implementations();
+            return 1;
+        }
+
         [Test]
         public void Singleton_decorator_should_be_correctly_applied_to_different_implementations()
         {

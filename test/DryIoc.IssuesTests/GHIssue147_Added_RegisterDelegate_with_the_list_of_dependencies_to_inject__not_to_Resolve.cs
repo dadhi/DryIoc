@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue147_Added_RegisterDelegate_with_the_list_of_dependencies_to_inject__not_to_Resolve
+    public class GHIssue147_Added_RegisterDelegate_with_the_list_of_dependencies_to_inject__not_to_Resolve : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

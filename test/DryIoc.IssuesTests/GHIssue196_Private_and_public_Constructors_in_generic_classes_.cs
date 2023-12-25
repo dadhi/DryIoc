@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue196_Private_and_public_Constructors_in_generic_classes_
+    public class GHIssue196_Private_and_public_Constructors_in_generic_classes : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         class TestClass<T>
         {
             public TestClass()

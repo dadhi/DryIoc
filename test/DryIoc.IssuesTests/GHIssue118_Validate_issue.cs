@@ -3,8 +3,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue118_Validate_issue
+    public class GHIssue118_Validate_issue : ITest
     {
+        public int Run()
+        {
+            Test_without_Validate();
+            Test_with_Validate();
+            return 2;
+        }
+
         [Test]
         public void Test_without_Validate()
         {

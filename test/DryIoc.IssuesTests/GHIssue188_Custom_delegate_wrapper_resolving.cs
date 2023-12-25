@@ -5,8 +5,19 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    internal class GHIssue188_Custom_delegate_wrapper_resolving
+    public class GHIssue188_Custom_delegate_wrapper_resolving : ITest
     {
+        public int Run()
+        {
+            Resolve_custom_delegate_wrapper();
+            Resolve_only_one_dependency_instance();
+            Resolve_only_one_dependency_instance_without_UseInterpretation_should_work();
+            Resolve_only_one_dependency_instance_with_RegisterDelegate();
+            Resolve_only_one_dependency_instance_with_RegisterDelegate_of_func_with_args();
+            Resolve_only_one_dependency_instance_with_RegisterDelegate_of_func_with_args_compilation_only();
+            return 6;
+        }
+
         [Test]
         public void Resolve_custom_delegate_wrapper()
         {

@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue105_Resolve_uses_args_values_to_resolve_dependencies_too
+    public class GHIssue105_Resolve_uses_args_values_to_resolve_dependencies_too : ITest
     {
+        public int Run()
+        {
+            Resolve_shall_not_use_args_to_resolve_dependencies();
+            return 1;
+        }
+
         [Test]
         public void Resolve_shall_not_use_args_to_resolve_dependencies()
         {

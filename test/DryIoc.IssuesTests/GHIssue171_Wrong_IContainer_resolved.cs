@@ -1,13 +1,17 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue171_Wrong_IContainer_resolved
+    public class GHIssue171_Wrong_IContainer_resolved : ITest
     {
+        public int Run()
+        {
+            Should_resolve_correct_registered_container_with_RegisterDelegate();
+            Should_resolve_correct_registered_container_with_Use();
+            return 2;
+        }
+
         [Test]
         public void Should_resolve_correct_registered_container_with_RegisterDelegate()
         {

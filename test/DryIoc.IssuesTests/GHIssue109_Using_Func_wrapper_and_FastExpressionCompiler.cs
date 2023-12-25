@@ -5,8 +5,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue109_Using_Func_wrapper_and_FastExpressionCompiler
+    public class GHIssue109_Using_Func_wrapper_and_FastExpressionCompiler : ITest
     {
+        public int Run()
+        {
+            Should_be_able_to_resolve_Func();
+            Should_be_able_to_resolve_Func_of_scoped();
+            return 2;
+        }
+
         [Test]
         public void Should_be_able_to_resolve_Func()
         {

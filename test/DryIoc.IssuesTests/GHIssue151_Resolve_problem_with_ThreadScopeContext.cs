@@ -25,8 +25,14 @@ namespace DryIocTest
     }
 
     [TestFixture]
-    public class GHIssue151_Resolve_problem_with_ThreadScopeContext
+    public class GHIssue151_Resolve_problem_with_ThreadScopeContext : ITest
     {
+        public int Run()
+        {
+            Simplest_Test();
+            Simple_Test();
+            return 2;
+        }
 
         public class Count
         {

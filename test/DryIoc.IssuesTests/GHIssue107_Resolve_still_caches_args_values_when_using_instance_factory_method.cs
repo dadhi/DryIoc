@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue107_Resolve_still_caches_args_values_when_using_instance_factory_method
+    public class GHIssue107_Resolve_still_caches_args_values_when_using_instance_factory_method : ITest
     {
+        public int Run()
+        {
+            Resolve_shall_not_cache_args_values();
+            return 1;
+        }
+
         [Test]
         public void Resolve_shall_not_cache_args_values()
         {
