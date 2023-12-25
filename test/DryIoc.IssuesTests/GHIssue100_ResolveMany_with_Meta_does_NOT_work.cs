@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue100_ResolveMany_with_Meta_does_NOT_work
+    public class GHIssue100_ResolveMany_with_Meta_does_NOT_work : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

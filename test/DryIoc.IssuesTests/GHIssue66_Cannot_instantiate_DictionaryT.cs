@@ -5,8 +5,20 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue66_Cannot_instantiate_DictionaryT
+    public class GHIssue66_Cannot_instantiate_DictionaryT : ITest
     {
+        public int Run()
+        {
+            AutoConcreteTypeResolution_should_be_able_to_create_with_default_ctor();
+            WithConcreteTypeDynamicRegistrations_should_be_able_to_create_with_default_ctor();
+            Should_throw_on_nested_unresolved_dep();
+            Should_resolve_dep();
+            Should_throw_when_no_constructors_are_match();
+            Should_throw_when_single_constructor_cant_be_used();
+            Should_consider_arguments_passed_to_Resolve();
+            return 7;
+        }
+
         [Test]
         public void AutoConcreteTypeResolution_should_be_able_to_create_with_default_ctor()
         {

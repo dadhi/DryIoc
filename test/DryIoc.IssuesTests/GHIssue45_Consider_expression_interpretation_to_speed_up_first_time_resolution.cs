@@ -3,8 +3,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    class GHIssue45_Consider_expression_interpretation_to_speed_up_first_time_resolution
+    public class GHIssue45_Consider_expression_interpretation_to_speed_up_first_time_resolution : ITest
     {
+        public int Run()
+        {
+            Test();
+            Interpreting_scoped_registered_delegates();
+            return 2;
+        }
+
         [Test]
         public void Test()
         {

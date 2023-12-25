@@ -3,8 +3,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue41_RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType
+    public class GHIssue41_RegisteredFactoryMethodResultTypesIsNotAssignableToImplementationType : ITest
     {
+        public int Run()
+        {
+            Test_with_source_conversion_operator();
+            Test_with_target_conversion_operator();
+            return 2;
+        }
+
         [Test]
         public void Test_with_source_conversion_operator()
         {

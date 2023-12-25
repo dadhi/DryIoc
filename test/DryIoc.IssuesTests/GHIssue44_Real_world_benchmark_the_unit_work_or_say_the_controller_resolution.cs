@@ -4,8 +4,19 @@ using RealisticUnitOfWork;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue44_Real_world_benchmark_the_unit_work_or_say_the_controller_resolution
+    public class GHIssue44_Real_world_benchmark_the_unit_work_or_say_the_controller_resolution : ITest
     {
+        public int Run()
+        {
+            CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve();
+            CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve_RegisterDelegateWithInjectedDependencies();
+            CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve_RegisterDelegateWithInjectedDependencies_InterpretationOnly();
+            Prepare_and_3_times_resolve_with_Interpretation_Compilation_and_Cache();
+            OpenScopeAndResolve_third_and_more_times();
+            OpenScopeAndResolve_with_UseInterpretation();
+            return 6;
+        }
+
         [Test]
         public void CreateContainerAndRegisterServices_Then_FirstTimeOpenScopeAndResolve()
         {

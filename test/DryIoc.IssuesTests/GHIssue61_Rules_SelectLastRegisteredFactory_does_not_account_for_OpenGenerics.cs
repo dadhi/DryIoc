@@ -3,8 +3,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue61_Rules_SelectLastRegisteredFactory_does_not_account_for_OpenGenerics
+    public class GHIssue61_Rules_SelectLastRegisteredFactory_does_not_account_for_OpenGenerics : ITest
     {
+        public int Run()
+        {
+            Test_with_last_selected_factory();
+            Test_without_last_factory_selection_rule();
+            return 2;
+        }
+
         [Test]
         public void Test_with_last_selected_factory()
         {
