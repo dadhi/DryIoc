@@ -5,8 +5,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue333_Container_should_resolve_IEnumerable_instances_registered_without_serviceKey
+    public class Issue333_Container_should_resolve_IEnumerable_instances_registered_without_serviceKey : ITest
     {
+        public int Run()
+        {
+            Can_globally_filter_keyed_services_from_collection();
+            Can_globally_filter_keyed_services_and_the_keyed_dependencies_from_collection();
+            return 2;
+        }
+
         [Test]
         public void Can_globally_filter_keyed_services_from_collection()
         {

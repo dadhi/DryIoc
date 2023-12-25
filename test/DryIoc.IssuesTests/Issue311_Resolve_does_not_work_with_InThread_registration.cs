@@ -6,8 +6,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue311_Resolve_does_not_work_with_InThread_registration
+    public class Issue311_Resolve_does_not_work_with_InThread_registration : ITest
     {
+        public int Run()
+        {
+            Test().GetAwaiter().GetResult();
+            return 1;
+        }
+
         [Test]
         public async Task Test()
         {

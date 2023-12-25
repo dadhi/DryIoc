@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc
 {
     [TestFixture]
-    public class Issue277_Custom_value_for_dependency_evaluated_to_null_is_interpreted_as_no_custom_value
+    public class Issue277_Custom_value_for_dependency_evaluated_to_null_is_interpreted_as_no_custom_value : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

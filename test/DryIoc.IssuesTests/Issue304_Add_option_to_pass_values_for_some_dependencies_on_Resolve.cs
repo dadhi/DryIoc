@@ -3,8 +3,16 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue304_Add_option_to_pass_values_for_some_dependencies_on_Resolve
+    public class Issue304_Add_option_to_pass_values_for_some_dependencies_on_Resolve : ITest
     {
+        public int Run()
+        {
+            Test_parameters_as_container_WithDependencies();
+            Test_parameters_as_direct_resolve();
+            Test_properties();
+            return 3;
+        }
+
         [Test]
         public void Test_parameters_as_container_WithDependencies()
         {

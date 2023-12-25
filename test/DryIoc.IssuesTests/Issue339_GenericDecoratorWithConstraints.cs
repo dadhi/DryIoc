@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue339_GenericDecoratorWithConstraints
+    public class Issue339_GenericDecoratorWithConstraints : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

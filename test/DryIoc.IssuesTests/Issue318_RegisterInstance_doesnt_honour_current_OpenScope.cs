@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue318_RegisterInstance_doesnt_honour_current_OpenScope
+    public class Issue318_RegisterInstance_doesnt_honour_current_OpenScope : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

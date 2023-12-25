@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue328_Lazy_collection_resolve_behavior_in_and_out_of_scope
+    public class Issue328_Lazy_collection_resolve_behavior_in_and_out_of_scope : ITest
     {
+        public int Run()
+        {
+            Cache_should_not_affect_results_for_lazy_enumerable();
+            return 1;
+        }
+
         [Test]
         public void Cache_should_not_affect_results_for_lazy_enumerable()
         {

@@ -6,8 +6,16 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue344_TransientDisposableValidation
+    public class Issue344_TransientDisposableValidation : ITest
     {
+        public int Run()
+        {
+            Container_with_default_reuse_set_to_singleton_shouldnt_complain_about_transient_disposable_registration();
+            Container_with_Mef_support_with_tracking_disposable_transients_shouldnt_complain_about_transient_disposable_registration();
+            VerifyRules();
+            return 3;
+        }
+
         [Test]
         public void Container_with_default_reuse_set_to_singleton_shouldnt_complain_about_transient_disposable_registration()
         {

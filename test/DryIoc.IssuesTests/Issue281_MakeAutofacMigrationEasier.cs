@@ -5,8 +5,20 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue281_MakeAutofacMigrationEasier
+    public class Issue281_MakeAutofacMigrationEasier : ITest
     {
+        public int Run()
+        {
+            Test_CustomDelegate_Autofac();
+            Test_CustomDelegate_DryIoc();
+            Test_CustomDelegate_of_Singleton_in_DryIoc();
+            Test_TypedParameter_Autofac();
+            Test_TypedParameter_DryIoc_option_one();
+            Test_TypedParameter_DryIoc_option_two();
+            Test_DryIoc_returns_the_same_singleton_prior_resolved_with_Func();
+            return 7;
+        }
+
         [Test]
         public void Test_CustomDelegate_Autofac()
         {

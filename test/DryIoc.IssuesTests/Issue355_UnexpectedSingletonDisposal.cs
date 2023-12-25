@@ -6,8 +6,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue355_UnexpectedSingletonDisposal
+    public class Issue355_UnexpectedSingletonDisposal : ITest
     {
+        public int Run()
+        {
+            Externally_owned_singleton_shouldnt_be_tracked_and_disposed_of();
+            return 1;
+        }
+
         private IContainer Container { get; } = CreateContainer();
 
         private static IContainer CreateContainer()

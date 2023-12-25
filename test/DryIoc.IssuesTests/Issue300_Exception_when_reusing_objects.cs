@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue300_Exception_when_reusing_objects
+    public class Issue300_Exception_when_reusing_objects : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

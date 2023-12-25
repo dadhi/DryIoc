@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue278_Arg_Of_does_not_recognize_service_key_of_non_primitive_type
+    public class Issue278_Arg_Of_does_not_recognize_service_key_of_non_primitive_type : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         [Test]
         public void Test()
         {

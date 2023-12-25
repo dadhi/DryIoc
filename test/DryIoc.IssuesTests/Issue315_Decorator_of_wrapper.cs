@@ -6,8 +6,17 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue315_Decorator_of_wrapper
+    public class Issue315_Decorator_of_wrapper : ITest
     {
+        public int Run()
+        {
+            Test(true);
+            Test(false);
+            Collection_decorator_can_be_used_with_item_decorators(true);
+            Collection_decorator_can_be_used_with_item_decorators(false);
+            return 2;
+        }
+
         [Test]
         [TestCase(true)]
         [TestCase(false)]

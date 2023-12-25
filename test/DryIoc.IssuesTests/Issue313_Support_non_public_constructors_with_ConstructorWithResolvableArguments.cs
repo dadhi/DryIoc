@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue313_Support_non_public_constructors_with_ConstructorWithResolvableArguments
+    public class Issue313_Support_non_public_constructors_with_ConstructorWithResolvableArguments : ITest
     {
+        public int Run()
+        {
+            Test();
+            return 1;
+        }
+
         public class A { internal A() { } }
         public class B { internal B(A a) { } }
 

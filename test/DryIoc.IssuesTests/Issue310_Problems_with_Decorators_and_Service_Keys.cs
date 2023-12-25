@@ -6,8 +6,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests.Interception
 {
     [TestFixture]
-    public class Issue310_Problems_with_Decorators_and_Service_Keys
+    public class Issue310_Problems_with_Decorators_and_Service_Keys : ITest
     {
+        public int Run()
+        {
+            Decorator_dependency_should_not_require_key();
+            Test_class_interception_with_decorators();
+            return 2;
+        }
+
         [Test]
         public void Decorator_dependency_should_not_require_key()
         {

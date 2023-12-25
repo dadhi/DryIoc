@@ -3,8 +3,14 @@
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class Issue287_Add_IfUnresolved_ReturnDefaultIfNotRegistered_policy
+    public class Issue287_Add_IfUnresolved_ReturnDefaultIfNotRegistered_policy : ITest
     {
+        public int Run()
+        {
+            The_property_injection_uses_IfUnresolved_ReturnDefaultIfUnregistered_policy();
+            return 1;
+        }
+
         class A
         {
             public B B { get; set; }
