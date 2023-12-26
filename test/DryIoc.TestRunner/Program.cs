@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
+using System.Security.AccessControl;
 using DryIoc.IssuesTests;
+using DryIoc.Microsoft.DependencyInjection;
 // using DryIoc.Docs;
 
 namespace DryIoc.UnitTests
@@ -119,6 +121,9 @@ namespace DryIoc.UnitTests
                 new MefAttributedModel.UnitTests.InheritedExportTests(),
                 new MefAttributedModel.UnitTests.ReuseAttributeTests(),
                 new MefAttributedModel.UnitTests.MoreAttributedModelTests(),
+
+                new Syntax.Autofac.UnitTests.Issue123_TipsForMigrationFromAutofac(),
+                new Syntax.Autofac.UnitTests.Issue123_TipsForMigrationFromAutofac_WithParameter(),
             };
             var issueTests = new ITest[]
             {

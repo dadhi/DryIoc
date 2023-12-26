@@ -6,7 +6,11 @@ using Autofac.Core;
 using Autofac.Features.OwnedInstances;
 using NUnit.Framework;
 
+#if DRYIOC_SYNTAX_TESTS
+namespace DryIoc.Syntax.Autofac.UnitTests
+#else
 namespace DryIoc.IssuesTests
+#endif
 {
     [TestFixture]
     public class Issue123_TipsForMigrationFromAutofac : ITest
