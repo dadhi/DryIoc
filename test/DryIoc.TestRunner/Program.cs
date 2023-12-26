@@ -52,6 +52,9 @@ namespace DryIoc.UnitTests
                 new Docs.RulesAndDefaultConventions(),
                 new Docs.SelectConstructorOrFactoryMethod(),
                 new Docs.SpecifyDependencyAndPrimitiveValues(),
+                new Docs.ThreadSafety(),
+                new Docs.UsingInTestsWithMockingLibrary(),
+                new Docs.Wrappers(),
 
                 new ActionTests(),
                 new ArrayToolsTest(),

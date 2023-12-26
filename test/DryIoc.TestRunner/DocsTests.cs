@@ -270,3 +270,59 @@ public class SpecifyDependencyAndPrimitiveValues : ITest
         return 25;
     }
 }
+
+public class ThreadSafety : ITest
+{
+    public int Run()
+    {
+        new Resolving_singleton_in_parallel().Example();
+        return 1;
+    }
+}
+
+public class UsingInTestsWithMockingLibrary : ITest
+{
+    public int Run()
+    {
+        new NSubstitute_example().Example();
+        new NSubstitute_example_with_singleton_mocks().Example();
+        new NSubstitute_example_with_singleton_mocks().Example_of_mocking_the_open_generic_dependency();
+        new Moq_example_with_test_container().Example();
+        return 4;
+    }
+}
+
+public class Wrappers : ITest
+{
+    public int Run()
+    {
+        new Wrapper_example().Example();
+        new Lazy_and_Func_require_services_to_be_registered().Example();
+        new Func_works_without_registration().Example();
+        new Passed_argument_was_not_used().Example();
+        new Func_with_args_and_reuse().Example();
+        new Func_with_args_with_rule_ignoring_reuse().Example();
+        new Func_with_single_argument_to_resolve_service_by_key().Example();
+        new Providing_metadata().Example();
+        new Filtering_based_on_metadata().Example();
+        new Resolve_value_out_of_metadata_dictionary().Example();
+        new Collection_of_Lazy_things().Example();
+        new Filtering_not_resolved_services().Example();
+        new Collection_with_custom_order().Example();
+        new Both_open_and_closed_generic_included_in_collection().Example();
+        new Covariant_generics_collection().Example();
+        new Covariant_generics_collection_suppressed().Example();
+        new DryIoc_composite_pattern().Example();
+        new Prefer_composite_when_resolving_a_single_service().Example();
+        new LazyEnumerable_example().Example();
+        new Specify_LazyEnumerable_per_dependency().Example();
+        new Specify_to_use_LazyEnumerable_for_all_IEnumerable().Example();
+        new Dictionary_of_services_with_their_keys().Example();
+        new Resolve_expression().Example();
+        new Swap_container_in_factory_delegate().Example();
+        new User_defined_wrappers().Example();
+        new Non_generic_wrapper().Example();
+        new Non_generic_wrapper().Example_with_closed_generic_wrapper();
+        return 27;
+    }
+}
