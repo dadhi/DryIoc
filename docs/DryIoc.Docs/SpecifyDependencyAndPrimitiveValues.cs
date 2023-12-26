@@ -36,7 +36,7 @@ using DryIoc;
 //md}
 
 //md```cs 
-class Resolving_with_a_service_type 
+public class Resolving_with_a_service_type 
 {
     [Test] public void Example()
     {
@@ -76,7 +76,7 @@ Given you registered multiple services of the same Service Type, Service Key pro
 
 First let's see what happens when Service Key specification is omitted (using `Foo` from  above):
 ```cs md*/
-class Fail_to_resolve_from_the_multiple_registered_services 
+public class Fail_to_resolve_from_the_multiple_registered_services 
 {
     [Test] public void Example()
     {
@@ -105,7 +105,7 @@ Resolution of `Foo` will fail with the exception `"Expecting a single default re
 Now let's make it work with the `enum` Service Key:
 
 ```cs md*/
-class Using_the_enum_service_key
+public class Using_the_enum_service_key
 {    
     [Test] public void Example()
     {
@@ -143,7 +143,7 @@ __Note:__ Service Key may be of any type as long as type implements `object.Equa
 We have used `Arg` class for specifying Service Key (explained later in details). Alternatively you may use the `Parameters` or `PropertiesAndFields` classes:
 
 ```cs md*/
-class Using_the_enum_service_key_and_parameter_specification
+public class Using_the_enum_service_key_and_parameter_specification
 {    
     [Test] public void Example()
     {
@@ -200,7 +200,7 @@ These options may be specified when calling `Resolve` method:
 
 Or per dependency when registering service:
 ```cs md*/
-class Specifying_IfUnresolved_for_the_parameter
+public class Specifying_IfUnresolved_for_the_parameter
 {
     [Test] public void Example()
     {
@@ -228,7 +228,7 @@ class Specifying_IfUnresolved_for_the_parameter
 
 Specify `IfUnresolved.Throw` for the property or the field dependency to override returning null by default:
 ```cs md*/
-class Specifying_IfUnresolved_for_the_property
+public class Specifying_IfUnresolved_for_the_property
 {
     [Test] public void Example()
     {
@@ -261,7 +261,7 @@ class Specifying_IfUnresolved_for_the_property
 
 Primitive default value may be specified in case of `IfUnresolved.ReturnDefault`:
 ```cs md*/
-class Specifying_the_default_value_for_the_unresolved_parameter
+public class Specifying_the_default_value_for_the_unresolved_parameter
 {
     [Test] public void Example()
     {
@@ -291,7 +291,7 @@ DryIoc respects the [Optional Arguments](https://msdn.microsoft.com/en-us/librar
 the constructors and the factory methods. Basically it is the application of the `IfUnresolved.ReturnDefault` option for the parameter dependency with the use of the provided default parameter value. No need to specify anything in addition:
 
 ```cs md*/
-class Respecting_the_csharp_optional_arguments
+public class Respecting_the_csharp_optional_arguments
 {
     [Test] public void Example()
     {
@@ -323,7 +323,7 @@ class Respecting_the_csharp_optional_arguments
 
 An overview of all possible ways of injecting primitive value using `String` parameter as example:
 ```cs md*/
-class Injecting_the_value_of_a_primitive_type
+public class Injecting_the_value_of_a_primitive_type
 {
     public class Foo
     {
@@ -394,7 +394,7 @@ class Injecting_the_value_of_a_primitive_type
 
 DryIoc supports the injecting of custom (non-registered) values as a parameter, property, or field. But using the _constant_ value is not very interesting, so let's look at the case when the value depends on the  object graph context. It is the common pattern to pass the holder Type as a parameter when utilizing the "Logger" object. Check example below:
 ```cs md*/
-class Injecting_the_custom_value_depending_on_context
+public class Injecting_the_custom_value_depending_on_context
 {
     [Test] public void Example()
     {
@@ -439,7 +439,7 @@ __Note:__ DryIoc supports only primitive custom values: numbers, strings, enums 
 
 Sometimes dependency may depend on concrete injection position in the object graph. You may need the one type of `ILogger` for one service and the another one for another service. You may handle it by registering two loggers with the different Service Key. Another way is to address problem directly by setting up the resolution condition:
 ```cs md*/
-class Injecting_the_custom_value_with_condition_setup
+public class Injecting_the_custom_value_with_condition_setup
 {
     [Test] public void Example()
     {
@@ -485,7 +485,7 @@ It contains three __optional__ parts:
 
 Example of full `Made` specification:
 ```cs md*/
-class Full_spec_with_reflection
+public class Full_spec_with_reflection
 {
     [Test] public void Example()
     {
@@ -510,7 +510,7 @@ As you can see, the `factoryMethod` selector uses reflection to select the const
 But the Reflection-based spec is rarely needed because the `Made` has an option for the strongly-typed expression spec:
 
 ```cs md*/
-class The_spec_with_strongly_typed_Made
+public class The_spec_with_strongly_typed_Made
 {
     [Test] public void Example()
     {
@@ -540,7 +540,7 @@ the default convention will be applied for the omitted part.
 To define the `parameters` and `propertiesAndFields` parts DryIoc provides the corresponding `Parameters` and `PropertiesAndFields` static classes. They may be defined in a more simple way as following:
 
 ```cs md*/
-class The_spec_Parameters
+public class The_spec_Parameters
 {
     [Test] public void Example()
     {
@@ -569,7 +569,7 @@ __Note:__ The `Parameters` and `PropertiesAndFields` are implicitly convertible 
 
 To specify multiple parameters or properties/fields just chain the `Type`, `Name`, and the more low-level `Details` extension methods:
 ```cs md*/
-class The_spec_chain
+public class The_spec_chain
 {
     [Test] public void Example()
     {

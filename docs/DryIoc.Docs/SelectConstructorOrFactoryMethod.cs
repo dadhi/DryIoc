@@ -55,7 +55,7 @@ There are multiple ways to select constructor:
 - The preferable way is strongly typed specification with [Expression Tree](https://msdn.microsoft.com/en-us/library/bb397951.aspx) expression:
 
 ```cs md*/
-class Register_strongly_typed_service_with_expression
+public class Register_strongly_typed_service_with_expression
 {
     [Test]
     public void Example()
@@ -76,7 +76,7 @@ class Register_strongly_typed_service_with_expression
 - Another way is using Reflection:
 
 ```cs md*/
-class Register_with_reflection
+public class Register_with_reflection
 {
     [Test]
     public void Example()
@@ -102,7 +102,7 @@ public class Foo<T>
 
 public class Dep<T> : IDependency<T> {} 
 
-class Register_open_generics_with_reflection
+public class Register_open_generics_with_reflection
 {
     [Test]
     public void Example()
@@ -129,7 +129,7 @@ The rule may be used:
 - Per service registration (preferable to pin-point problematic service but stay deterministic for rest of registrations):
 
 ```cs md*/
-class Register_with_automatic_constructor_selection
+public class Register_with_automatic_constructor_selection
 {
     [Test]
     public void Example()
@@ -147,7 +147,7 @@ class Register_with_automatic_constructor_selection
 - For the entire Container:
 
 ```cs md*/
-class Register_with_automatic_constructor_selection_for_entire_container
+public class Register_with_automatic_constructor_selection_for_entire_container
 {
     [Test]
     public void Example()
@@ -178,7 +178,7 @@ __Note:__ You may also consider using `RegisterDelegate<TDependencies..., TServi
 ### Using static factory method
 
 ```cs md*/
-class Register_with_static_factory_method
+public class Register_with_static_factory_method
 {
     [Test]
     public void Example()
@@ -212,7 +212,7 @@ class Register_with_static_factory_method
 ### Using instance factory method
 
 ```cs md*/
-class Register_with_instance_factory_method
+public class Register_with_instance_factory_method
 {
     [Test]
     public void Example()
@@ -261,7 +261,7 @@ If DryIoc supports factory methods then why not support Properties and Fields?
 Here we are:
 
 ```cs md*/
-class Register_with_instace_property
+public class Register_with_instance_property
 {
     [Test]
     public void Example()
@@ -299,7 +299,7 @@ The generic parameter constraints are supported too.
 Example:
 
 ```cs md*/
-class Register_open_generics
+public class Register_open_generics
 {
     [Test]
     public void Example()
@@ -345,7 +345,7 @@ class Register_open_generics
 DryIoc provides the [DryIoc.MefAttributedModel](Extensions/MefAttributedModel) extension which enables the use of MEF `Export` and `Import` attributes for registrations and injections 
 which may help to register the open-generics. Look for the use of the `Export` attribute and for the `AsDecorator` (how simple is this).
 ```cs md*/
-class Register_open_generics_with_MefAttributedModel_extension
+public class Register_open_generics_with_MefAttributedModel_extension
 {
     [Test]
     public void Example()

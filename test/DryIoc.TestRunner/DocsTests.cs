@@ -185,3 +185,88 @@ public class ReuseAndScopes : ITest
         return 20;
     }
 }
+
+public class RulesAndDefaultConventions : ITest
+{
+    public int Run()
+    {
+        new Register_many_implementation().Example();
+        new Register_many_implementation_with_default_if_already_registered_behavior().Example();
+        new Register_with_ifAlreadyReplaced_option().Example();
+        new Select_last_registered_service().Example();
+        new AsResolutionCall_setup().Example();
+        new Filter_out_service_that_do_not_have_a_matching_scope().Example();
+        new Turning_matching_scope_filtering_Off().Example();
+        new Select_last_registered_factory_with_implicit_scope_selection().Example();
+        new Automatically_injected_container_interfaces().Example();
+        new Registering_container_interfaces_by_hand().Example();
+        new Registering_container_interfaces_by_hand().Example_injecting_all_container_interfaces_without_registering_them();
+        new Constructor_with_resolvable_arguments().Example();
+        new Using_specific_ctor_or_factory_method().Example();
+        new Specify_how_to_treat_unresolved_parameter_or_property().Example();
+        new Using_factory_selector_to_change_the_default_preferred_service().Example();
+        new ResolveMany_does_not_work_WithUnknownResolvers().Example_not_working();
+        new ResolveMany_does_not_work_WithUnknownResolvers().Example_working();
+        new Auto_register_unknown_service().Example();
+        new Auto_concrete_dynamic_type_registrations().Example();
+        new Throw_if_dependency_has_a_shorter_lifetime().Example();
+        new Disable_captive_dependency_exception().Example();
+        new Wrap_captive_dependency_in_Func().Example();
+        new Register_disposable_transient().Example();
+        new Silence_registering_disposable_transient_exception().Example();
+        new Default_IfAlreadyRegistered().Example();
+        new Default_IfAlreadyRegistered_AppendNotKeyed().Example();
+        return 26;
+    }
+}
+
+public class SelectConstructorOrFactoryMethod : ITest
+{
+    public int Run()
+    {
+        new Register_strongly_typed_service_with_expression().Example();
+        new Register_with_reflection().Example();
+        new Register_open_generics_with_reflection().Example();
+        new Register_with_automatic_constructor_selection().Example();
+        new Register_with_automatic_constructor_selection_for_entire_container().Example();
+        new Register_with_static_factory_method().Example();
+        new Register_with_instance_factory_method().Example();
+        new Register_with_instance_property().Example();
+        new Register_open_generics().Example();
+        new Register_open_generics_with_MefAttributedModel_extension().Example();
+        return 10;
+    }
+}
+
+public class SpecifyDependencyAndPrimitiveValues : ITest
+{
+    public int Run()
+    {
+        new Resolving_with_a_service_type().Example();
+        new Fail_to_resolve_from_the_multiple_registered_services().Example();
+        new Using_the_enum_service_key().Example();
+        new Using_the_enum_service_key_and_parameter_specification().Example();
+        new Specifying_IfUnresolved_for_the_parameter().Example();
+        new Specifying_IfUnresolved_for_the_property().Example();
+        new Specifying_the_default_value_for_the_unresolved_parameter().Example();
+        new Respecting_the_csharp_optional_arguments().Example();
+        new Injecting_the_value_of_a_primitive_type().Example_via_RegisterInstance();
+        new Injecting_the_value_of_a_primitive_type().Example_via_RegisterInstance_and_ServiceKey();
+        new Injecting_the_value_of_a_primitive_type().Example_via_strongly_typed_spec();
+        new Injecting_the_value_of_a_primitive_type().Example_via_strongly_typed_spec_and_direct_argument_spec();
+        new Injecting_the_value_of_a_primitive_type().Example_via_RegisterDelegate();
+        new Injecting_the_custom_value_depending_on_context().Example();
+        new Injecting_the_custom_value_with_condition_setup().Example();
+        new Full_spec_with_reflection().Example();
+        new The_spec_with_strongly_typed_Made().Example();
+        new The_spec_Parameters().Example();
+        new The_spec_chain().Example();
+        new Match_the_parameter_name_to_the_service_key().Problem();
+        new Match_the_parameter_name_to_the_service_key().Solution();
+        new Match_the_parameter_name_to_the_service_key().Solution_drop_MadeOf_part();
+        new Match_the_parameter_name_to_the_service_key().Solution_matching_all_registration_parameters();
+        new Match_the_parameter_name_to_the_service_key().Solution_with_strongly_typed_parameters();
+        new Match_the_parameter_name_to_the_service_key().Solution_with_the_rule_applied_on_container_level();
+        return 25;
+    }
+}

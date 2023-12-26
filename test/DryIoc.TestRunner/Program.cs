@@ -49,6 +49,9 @@ namespace DryIoc.UnitTests
                 new Docs.RegisterResolve(),
                 new Docs.RequiredServiceType(),
                 new Docs.ReuseAndScopes(),
+                new Docs.RulesAndDefaultConventions(),
+                new Docs.SelectConstructorOrFactoryMethod(),
+                new Docs.SpecifyDependencyAndPrimitiveValues(),
 
                 new ActionTests(),
                 new ArrayToolsTest(),
