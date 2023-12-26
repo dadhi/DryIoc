@@ -71,7 +71,7 @@ Additionally after the service is found, DryIoc will look for any matching [Deco
 - DryIoc allows to register multiple default (without key) services. 
 Actually, multiple services mean multiple implementations of the single service type:
 ```cs md*/
-
+namespace DryIoc.Docs;
 using System;
 using System.Collections.Generic;
 using System.Linq;

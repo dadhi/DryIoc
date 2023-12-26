@@ -85,6 +85,7 @@ __Note__: DryIoc does not support transient disposable registration by default (
 an individual registration or `Rules.WithoutThrowOnRegisteringDisposableTransient()` to allow per container.
 
 ```cs 
+namespace DryIoc.Docs;
 using System;
 using DryIoc;
 using NUnit.Framework;

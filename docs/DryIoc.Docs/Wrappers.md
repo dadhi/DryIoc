@@ -49,6 +49,7 @@ More info:
 
 Wrapper example:
 ```cs 
+namespace DryIoc.Docs;
 using System;
 using System.Collections.Generic;
 using System.Linq;

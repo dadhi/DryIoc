@@ -21,7 +21,7 @@ Let's define an extension method for intercepting interfaces and classes:
 <details><summary><strong>usings ...</strong></summary>
 
 ```cs
-
+namespace DryIoc.Docs;
 using DryIoc;
 using DryIoc.ImTools;
 using Castle.DynamicProxy;

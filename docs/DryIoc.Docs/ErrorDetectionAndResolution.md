@@ -45,7 +45,7 @@ A very common problem when you forgot to register required service or dependency
 
 For instance if no registration exist for the service type - nor keyed nor default, then the error will be:
 ```cs 
-
+namespace DryIoc.Docs;
 using System;
 using DryIoc;
 using NUnit.Framework;

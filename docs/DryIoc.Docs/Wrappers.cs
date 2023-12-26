@@ -50,6 +50,7 @@ More info:
 
 Wrapper example:
 ```cs md*/
+namespace DryIoc.Docs;
 using System;
 using System.Collections.Generic;
 using System.Linq;

@@ -17,6 +17,7 @@ Registering open-generic is no different from the non-generic service.
 The only limitation is imposed by C# itself - it is impossible to specify type statically, you need to use `typeof`.
 
 ```cs 
+namespace DryIoc.Docs;
 using System;
 using System.Linq;
 using DryIoc;

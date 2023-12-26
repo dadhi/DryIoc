@@ -15,6 +15,7 @@
 
 In most cases all you need is: 
 ```cs md*/
+namespace DryIoc.Docs;
 using System;
 using DryIoc;
 using NUnit.Framework;
@@ -32,7 +33,7 @@ class Creating_container
 
 Actually, the above example is equivalent to:
 ```cs md*/
-class Creating_container_with_explicit_defaults
+public class Creating_container_with_explicit_defaults
 {
     [Test] public void Example()
     {
@@ -53,7 +54,7 @@ Rules are immutable, you can create the new rules from the old ones via `With..`
 get the rules without some setting via the `Without..` methods.
 
 ```cs md*/
-class Adding_some_rules
+public class Adding_some_rules
 {
     [Test] public void Example()
     {
@@ -68,7 +69,7 @@ class Adding_some_rules
 
 There is an alternate way to specify the rules with existing container rules as a starting point (without explicit mention of `Rules.Default`):
 ```cs md*/
-class Adding_some_rules_with_action
+public class Adding_some_rules_with_action
 {
     [Test]
     public void Example()
@@ -98,7 +99,7 @@ Disposing container will:
 Usage of disposed Container will end-up with exception.
 
 ```cs md*/
-class Disposing_container
+public class Disposing_container
 {
     public class MyService : IDisposable
     {

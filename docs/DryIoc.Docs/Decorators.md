@@ -53,7 +53,7 @@ We start by defining the `IHandler` which we will decorate adding the logging ca
 <details><summary><strong>usings ...</strong></summary>
 
 ```cs
-
+namespace DryIoc.Docs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -109,7 +109,7 @@ public class LoggingHandlerDecorator : IHandler
     }
 }
 
-class Decorator_with_logger
+public class Decorator_with_logger
 {
     [Test]
     public void Example()
@@ -147,7 +147,7 @@ To apply decorator for service registered with `serviceKey` you need to specify 
 use a `Decorator.Of` method.
 
 ```cs 
-class Decorator_of_service_with_serviceKey
+public class Decorator_of_service_with_serviceKey
 {
     [Test]
     public void Example_with_condition()
@@ -187,7 +187,7 @@ class Decorator_of_service_with_serviceKey
 more simple API to specify a decorated service key or/and type. 
 
 ```cs 
-class Decorator_of_service_with_key_and_type
+public class Decorator_of_service_with_key_and_type
 {
     class BooHandler : IHandler
     {
@@ -243,7 +243,7 @@ class S { }
 class D1 : S { public D1(S s) { } }
 class D2 : S { public D2(S s) { } }
 
-class Nested_decorators
+public class Nested_decorators
 {
     [Test]
     public void Example()
@@ -306,7 +306,7 @@ class D1<T> : S<T> { }
 class D2<T> : S<T> { }
 class DStr : S<string> { }
 
-class Open_generic_decorators
+public class Open_generic_decorators
 {
     [Test]
     public void Example()
@@ -358,7 +358,7 @@ public class X : IStartable
     public void Start() => IsStarted = true;
 }
 
-class Decorator_of_generic_T_type
+public class Decorator_of_generic_T_type
 {
     [Test]
     public void Example()
@@ -386,7 +386,7 @@ __affecting the resolution performance__.
 To make decorator more targeted, we can provide the setup condition:
 
 ```cs 
-class Decorator_of_generic_T_type_with_condition
+public class Decorator_of_generic_T_type_with_condition
 {
     [Test]
     public void Example()
@@ -421,7 +421,7 @@ __Note__: If no reuse specified for decorator, it means the decorator is of defa
 (which is `Reuse.Transient` by default).
 
 ```cs 
-class Decorator_reuse
+public class Decorator_reuse
 {
     [Test]
     public void Example()
@@ -445,7 +445,7 @@ class Decorator_reuse
 This setup option allows decorator to match the decorated service reuse whatever it might be. 
 It is a good "default" option when you don't want to adjust decorated service reuse, but just want it to follow along. 
 ```cs 
-class Decoratee_reuse
+public class Decoratee_reuse
 {
     [Test]
     public void Example()
@@ -481,7 +481,7 @@ class LazyCallDecorator : ACall
     public override void Call() => A.Value.Call();
 }
 
-class Decorator_of_wrapped_service
+public class Decorator_of_wrapped_service
 {
     [Test]
     public void Example()
@@ -511,7 +511,7 @@ class DFunc : S
     public DFunc(Func<S> s) { S = s; }
 }
 
-class Nesting_decorators_of_wrapped_service
+public class Nesting_decorators_of_wrapped_service
 {
     [Test]
     public void Example()
@@ -545,7 +545,7 @@ public class A : I { }
 public class B : I { }
 public class C : I { }
 
-class Collection_wrapper_of_non_keyed_and_keyed_services
+public class Collection_wrapper_of_non_keyed_and_keyed_services
 {
     [Test]
     public void Example()
@@ -568,7 +568,7 @@ To exclude keyed service `C` we may define the decorator for `IEnumerable<I>`,
 which accepts all instances and filters out the keyed things:
 
 ```cs 
-class Decorator_of_wrapper
+public class Decorator_of_wrapper
 {
     public static IEnumerable<I> GetNoneKeyed(IEnumerable<KeyValuePair<object, I>> all) =>
         all.Where(kv => kv.Key is DefaultKey).Select(kv => kv.Value);
@@ -606,7 +606,7 @@ invokes some initialization logic on the decorated instance,
 and returns this (or another) instance.
 
 ```cs 
-class Decorator_as_initializer
+public class Decorator_as_initializer
 {
     public class Foo
     {
@@ -660,7 +660,7 @@ Let's imagine that we have a scoped service and number of the nested scopes,
 and we want the already created service from the parent scope instead of creating the new one in the child scope:
 
 ```cs 
-class Reusing_the_scoped_service_from_the_parent_scope
+public class Reusing_the_scoped_service_from_the_parent_scope
 {
     [Test]
     public void Example()
@@ -734,7 +734,7 @@ but requires a one-time initialization logic (say a database migration) based on
 Btw, this is the real case from the Gitter discussion with the user.
 
 ```cs 
-class Using_the_Decorator_directly_for_the_complex_initialization
+public class Using_the_Decorator_directly_for_the_complex_initialization
 {
     [Test]
     public void Example()

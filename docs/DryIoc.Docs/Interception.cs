@@ -22,7 +22,7 @@ Let's define an extension method for intercepting interfaces and classes:
 md*/
 //md{ usings ...
 //md```cs
-
+namespace DryIoc.Docs;
 using DryIoc;
 using DryIoc.ImTools;
 using Castle.DynamicProxy;

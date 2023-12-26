@@ -6,6 +6,7 @@
 
 Let's define a simple interface and implementation setup:
 ```cs 
+namespace DryIoc.Docs;
 using DryIoc;
 using NUnit.Framework;
 // ReSharper disable UnusedVariable

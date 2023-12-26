@@ -58,6 +58,7 @@ use the `With(...)` method to brew your own "child" container.
 Here the whole method:
 
 ```cs md*/
+namespace DryIoc.Docs;
 using DryIoc;
 using NUnit.Framework;
 

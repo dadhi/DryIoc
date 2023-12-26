@@ -39,6 +39,8 @@ namespace DryIoc.UnitTests
         {
             var unitTests = new ITest[]
             {
+                new Docs.DocsTests(),
+
                 new ActionTests(),
                 new ArrayToolsTest(),
                 new AsyncExecutionFlowScopeContextTests(),

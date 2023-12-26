@@ -79,6 +79,7 @@ __DryIoc.MefAttributedModel__ is the set of extension methods to support:
 <details><summary>using ...</summary>
 
 ```cs md*/
+namespace DryIoc.Docs;
 using System;
 using System.ComponentModel.Composition; // for the Export and Import attributes
 using DryIocAttributes;                  // for the ExportEx and ExportMany attributes

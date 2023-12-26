@@ -23,6 +23,7 @@ Better illustrated with examples.
 ### Required service type is implemented by resolved type 
 
 ```cs 
+namespace DryIoc.Docs;
 using DryIoc;
 using NUnit.Framework;
 using System;

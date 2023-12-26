@@ -64,7 +64,7 @@ e.g. in `var client = container.Resolve<IClient>();` `client` is a Resolution Ro
 
 DryIoc supports registration via `Register..` methods with the provided mapping of service and implementation types:
 ```cs md*/
-
+namespace DryIoc.Docs;
 using System;
 using System.Collections.Generic;
 using System.Linq;

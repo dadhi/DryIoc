@@ -29,6 +29,7 @@ Given the class with the two constructors:
 md*/
 //md{ usings ...
 //md```cs
+namespace DryIoc.Docs;
 using DryIoc;
 using DryIocAttributes;
 using DryIoc.MefAttributedModel;

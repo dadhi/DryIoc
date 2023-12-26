@@ -27,6 +27,7 @@ The minimal part of service and dependency resolution specification is Service T
 md*/
 //md{ usings ...
 //md```cs
+namespace DryIoc.Docs;
 using System;
 using NUnit.Framework;
 using DryIoc;

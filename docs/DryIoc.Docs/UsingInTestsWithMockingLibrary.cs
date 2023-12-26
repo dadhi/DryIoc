@@ -14,6 +14,7 @@ md*/
 
 //md{ usings ...
 //md ```cs
+namespace DryIoc.Docs;
 using System;
 using System.Collections.Concurrent;
 using NUnit.Framework;

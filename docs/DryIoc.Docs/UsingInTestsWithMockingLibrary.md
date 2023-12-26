@@ -13,6 +13,7 @@ For examples below we need to add:
 <details><summary><strong>usings ...</strong></summary>
 
  ```cs
+namespace DryIoc.Docs;
 using System;
 using System.Collections.Concurrent;
 using NUnit.Framework;

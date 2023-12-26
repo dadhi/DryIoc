@@ -28,6 +28,7 @@ Given the class with the two constructors:
 <details><summary><strong>usings ...</strong></summary>
 
 ```cs
+namespace DryIoc.Docs;
 using DryIoc;
 using DryIocAttributes;
 using DryIoc.MefAttributedModel;

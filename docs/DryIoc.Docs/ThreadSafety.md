@@ -23,7 +23,8 @@ The above guaranties are possible because of the Container data-structure.
 In a pseudo code and simplifying things a lot the DryIoc Container may be represented as following:
 <details><summary><strong>usings ...</strong></summary>
 
-```cs 
+```cs
+namespace DryIoc.Docs;
 using System;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
