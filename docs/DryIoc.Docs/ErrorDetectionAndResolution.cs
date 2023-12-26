@@ -52,7 +52,7 @@ using DryIoc;
 using NUnit.Framework;
 // ReSharper disable UnusedParameter.Local
 
-class Unable_to_resolve_unknown_service
+public class Unable_to_resolve_unknown_service
 {
     public class Y { }
     public class X { public X(Y y) { } }
@@ -89,7 +89,7 @@ If in previous example, `Y` class is registered with key,
 then DryIoc will list available registrations and provide an additional information about container state:
 ```cs md*/
 
-class Unable_to_resolve_from_registered_services
+public class Unable_to_resolve_from_registered_services
 {
     public class Y { }
     public class X { public X(Y y) { } }
@@ -120,7 +120,7 @@ class Unable_to_resolve_from_registered_services
 Let's see a bit different situation when you have registered a scoped service, but there was no scope opened.
 
 ```cs md*/
-class No_current_scope_available
+public class No_current_scope_available
 {
     public class Y { }
     public class X { public X(Y y) { } }
@@ -175,7 +175,7 @@ __Note:__ Recursive dependency usually points to a design problem. That's why so
 DryIoc will throw `ContainerException` with `Error.RecursiveDependencyDetected` when resolving either `A` or `B`:
 ```cs md*/
 
-class Recursive_dependency_detected
+public class Recursive_dependency_detected
 {
     class A { public A(B b) { } }
     class B { public B(A a) { } }
@@ -215,7 +215,7 @@ class Recursive_dependency_detected
 In some case recursive dependency is what you wont, usually inside `Lazy` or `Func` wrapper:
 ```cs md*/
 
-class Allow_a_recursive_dependencies
+public class Allow_a_recursive_dependencies
 {
     class Parent
     {
@@ -238,7 +238,7 @@ class Allow_a_recursive_dependencies
 
 By the way, DryIoc natively supports  `Lazy`  and `Func` [wrappers](Wrappers.md):
 ```cs md*/
-class Allow_recursive_dependency_in_DryIoc
+public class Allow_recursive_dependency_in_DryIoc
 {
     class Child
     {
@@ -278,7 +278,7 @@ The method finds all or selected registrations (except for the open-generics), t
 __Note:__ `Validate` does not actually create any service object, neither affects container state (internally it clones the container with modified rules to guide the validation)
 
 ```cs md*/
-class Registrations_diagnostics
+public class Registrations_diagnostics
 {
     public class RequiredDependency { }
     public class MyService { public MyService(RequiredDependency dependency) { } }
@@ -329,10 +329,10 @@ when a Scoped dependency is injected into Singleton. The problem here is that de
 requested from the longer lived consumer when the dependency is already dead - and now you are in uncharted territory.
 
 ```cs md*/
-class Validate_CaptiveDependency_example
+public class Validate_CaptiveDependency_example
 {
     [Test]
-    public void  Scoped_in_a_Singleton_should_be_reported_by_Validate()
+    public void Scoped_in_a_Singleton_should_be_reported_by_Validate()
     {
         var container = new Container();
         container.Register<Foo>(Reuse.Scoped);

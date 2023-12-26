@@ -167,7 +167,7 @@ namespace DryIoc.UnitTests.net472
 
             var totalPassed = 0;
             var sw = Stopwatch.StartNew();
-            totalPassed += RunTests(unitTests, "UnitTests");
+            totalPassed += RunTests(unitTests, "Docs, UnitTests");
             totalPassed += RunTests(issueTests, "IssueTests");
             totalPassed += RunTests(loadTests, "ReducedLoadTest");
             Console.WriteLine($"\nTotal {totalPassed} of tests are passing in {sw.ElapsedMilliseconds} ms.");

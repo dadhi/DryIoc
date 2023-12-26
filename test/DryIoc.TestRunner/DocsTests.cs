@@ -1,6 +1,6 @@
 namespace DryIoc.Docs;
 
-public class DocsTests : ITest
+public class CreatingAndDisposingContainer : ITest
 {
     public int Run()
     {
@@ -8,7 +8,14 @@ public class DocsTests : ITest
         new Adding_some_rules().Example();
         new Adding_some_rules_with_action().Example();
         new Disposing_container().Example();
+        return 4;
+    }
+}
 
+public class Decorators : ITest
+{
+    public int Run()
+    {
         new Decorator_with_logger().Example();
         new Decorator_of_service_with_serviceKey().Example_with_condition();
         new Decorator_of_service_with_serviceKey().Example_with_DecoratorOf();
@@ -28,7 +35,22 @@ public class DocsTests : ITest
         new Decorator_as_initializer().Example();
         new Reusing_the_scoped_service_from_the_parent_scope().Example();
         new Using_the_Decorator_directly_for_the_complex_initialization().Example();
+        return 19;
+    }
+}
 
-        return 23;
+public class ErrorDetectionAndResolution : ITest
+{
+    public int Run()
+    {
+        new Unable_to_resolve_unknown_service().Example();
+        new Unable_to_resolve_from_registered_services().Example();
+        new No_current_scope_available().Example();
+        new Recursive_dependency_detected().Example();
+        new Allow_a_recursive_dependencies().Example();
+        new Allow_recursive_dependency_in_DryIoc().Example();
+        new Registrations_diagnostics().Example();
+        new Validate_CaptiveDependency_example().Scoped_in_a_Singleton_should_be_reported_by_Validate();
+        return 8;
     }
 }

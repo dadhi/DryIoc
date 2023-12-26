@@ -39,7 +39,9 @@ namespace DryIoc.UnitTests
         {
             var unitTests = new ITest[]
             {
-                new Docs.DocsTests(),
+                new Docs.CreatingAndDisposingContainer(),
+                new Docs.Decorators(),
+                new Docs.ErrorDetectionAndResolution(),
 
                 new ActionTests(),
                 new ArrayToolsTest(),
@@ -391,7 +393,7 @@ namespace DryIoc.UnitTests
 
             var totalPassed = 0;
             var sw = Stopwatch.StartNew();
-            totalPassed += RunTests(unitTests, "UnitTests");
+            totalPassed += RunTests(unitTests, "Docs, UnitTests");
             totalPassed += RunTests(issueTests, "IssueTests");
             Console.WriteLine($"\nTotal {totalPassed} of tests are passing in {sw.ElapsedMilliseconds} ms.");
 
