@@ -42,6 +42,8 @@ namespace DryIoc.UnitTests
                 new Docs.CreatingAndDisposingContainer(),
                 new Docs.Decorators(),
                 new Docs.ErrorDetectionAndResolution(),
+                new Docs.ExamplesContextBasedResolution(),
+                new Docs.Interception(),
 
                 new ActionTests(),
                 new ArrayToolsTest(),

@@ -22,7 +22,7 @@ using NUnit.Framework;
 using System;
 using log4net;
 
-class Log4net_logger_example
+public class Log4net_logger_example
 {
     public class A
     {
@@ -60,7 +60,7 @@ In addition, the condition allows to use default logger where context is not ava
 
 ```cs md*/
 
-class Serilog_logger_example
+public class Serilog_logger_example
 {
     public class LogSubject
     {

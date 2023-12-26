@@ -54,3 +54,24 @@ public class ErrorDetectionAndResolution : ITest
         return 8;
     }
 }
+
+public class ExamplesContextBasedResolution : ITest
+{
+    public int Run()
+    {
+        new Log4net_logger_example().Example();
+        new Serilog_logger_example().Example();
+        return 2;
+    }
+}
+
+public class Interception : ITest
+{
+    public int Run()
+    {
+        new Register_and_use_interceptor().Example();
+        new Register_and_use_async_interceptor().Example().GetAwaiter().GetResult();
+        new Register_and_use_interceptor_with_LinFu().Example();
+        return 3;
+    }
+}
