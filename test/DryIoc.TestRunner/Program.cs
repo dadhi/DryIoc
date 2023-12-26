@@ -47,6 +47,8 @@ namespace DryIoc.UnitTests
                 new Docs.KindsOfChildContainer(),
                 new Docs.OpenGenerics(),
                 new Docs.RegisterResolve(),
+                new Docs.RequiredServiceType(),
+                new Docs.ReuseAndScopes(),
 
                 new ActionTests(),
                 new ArrayToolsTest(),

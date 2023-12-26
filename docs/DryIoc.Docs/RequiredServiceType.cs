@@ -31,7 +31,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-class Required_service_type_is_implemented_by_resolution_type
+public class Required_service_type_is_implemented_by_resolution_type
 {
     interface IFoo { }
     class Foo : IFoo { }
@@ -56,7 +56,7 @@ __Note:__ Required service type always refers to __service type__ and not to __i
 ### Required service type identifies a wrapped service type when resolving a [Wrapper](Wrappers)
 
 ```cs md*/
-class Service_type_for_a_wrapper
+public class Service_type_for_a_wrapper
 {
     class Foo { }
 
@@ -80,7 +80,7 @@ Works with nested wrappers as well, e.g. `IEnumerable<Func<object>>`
 ### Specify to use open-generic type in case you have both closed and open-generic registrations
 
 ```cs md*/
-class Select_to_use_and_open_generic_type 
+public class Select_to_use_and_open_generic_type 
 {
     interface IFoo<T> { }
     class FooInt : IFoo<int> { }
@@ -135,7 +135,7 @@ How to configure `GenericHandler` to use `IFoo` for the `object` dependency?
 
 First, let's use a `RegisterDelegate` as a generally available technique in many IoC Containers: 
 ```cs md*/
-class Using_register_delegate_to_adapt_service_type
+public class Using_register_delegate_to_adapt_service_type
 {
     interface IFoo { }
     class Foo : IFoo { }
@@ -165,7 +165,7 @@ and may lead to problems when used wrong:
 
 Let's use required service type:
 ```cs md*/
-class Required_service_type_to_adapt_the_object_dependency
+public class Required_service_type_to_adapt_the_object_dependency
 {
     interface IFoo { }
     class Foo : IFoo { }
@@ -201,7 +201,7 @@ That's allow us to specify a target service type inside a wrapper.
 
 Imaging, the `GenericHandler` expects a `Lazy<object>` instead of an `object` in its constructor:
 ```cs nd*/
-class Required_service_type_with_wrapper
+public class Required_service_type_with_wrapper
 {
     public class GenericHandler
     {
@@ -240,7 +240,7 @@ Here in `Arg.Of<Lazy<object>, IFoo>()` DryIoc will look for required service typ
 [IEnumerable and the rest of supported collection types]((Wrappers.md#ienumerable-or-array-of-a)) are also Wrappers, 
 so you may expect required service type to work with them too:
 ```cs md*/
-class Required_service_type_in_collection
+public class Required_service_type_in_collection
 {
     interface IDigit { }
     class One : IDigit { }

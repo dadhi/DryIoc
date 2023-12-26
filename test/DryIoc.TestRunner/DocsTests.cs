@@ -142,3 +142,46 @@ public class RegisterResolve : ITest
         return 31;
     }
 }
+
+public class RequiredServiceType : ITest
+{
+    public int Run()
+    {
+        new Required_service_type_is_implemented_by_resolution_type().Example();
+        new Service_type_for_a_wrapper().Example();
+        new Select_to_use_and_open_generic_type().Example();
+        new Using_register_delegate_to_adapt_service_type().Example();
+        new Required_service_type_to_adapt_the_object_dependency().Example();
+        new Required_service_type_with_wrapper().Example();
+        new Required_service_type_in_collection().Example();
+        return 7;
+    }
+}
+
+public class ReuseAndScopes : ITest
+{
+    public int Run()
+    {
+        new Disposable_transient_as_resolved_service().Example();
+        new Disposable_transient_as_injected_dependency().Example();
+        new Tracking_disposable_transient().Example();
+        new Prevent_disposable_tracking_with_Func().Example();
+        new Default_reuse_per_container().Example();
+        new Singleton_reuse().Example();
+        new Scoped_reuse_register_and_resolve().Example();
+        new Scoped_reuse_resolve_wrapped_in_Lazy_outside_of_scope().Example();
+        new Scoped_reuse_resolve_Lazy_with_scope_context().Example();
+        new Nested_scopes_without_scope_context().Example();
+        new Nested_scopes_with_scope_context().Example();
+        new Named_open_scopes_and_scoped_to_name().Example();
+        new Scoped_to_service_reuse().Example();
+        new Emulating_openResolutionScope_setup().Example();
+        new Scoped_to_service_reuse_with_dispose().Example();
+        new Own_the_resolution_scope_disposal().Example();
+        new Use_parent_reuse().Example();
+        new Reuse_lifespan_mismatch_detection().Example();
+        new Reuse_lifespan_mismatch_error_suppress().Example();
+        new Avoiding_reuse_lifespan_mismatch_for_Func_or_Lazy_dependency().Example();
+        return 20;
+    }
+}
