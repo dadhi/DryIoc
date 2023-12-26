@@ -2,7 +2,7 @@
 setlocal EnableDelayedExpansion
 
 echo:
-echo:# Run the TestRunner on .NET 8.0
+echo:# Build and Run TestRunner on .NET 8.0
 echo:
 
 dotnet run -f net8.0 -c Release --project test/DryIoc.TestRunner

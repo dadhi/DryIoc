@@ -1,6 +1,6 @@
 using System;
 using System.Diagnostics;
-using System.Security.AccessControl;
+using System.Threading.Tasks;
 using DryIoc.IssuesTests;
 using DryIoc.Microsoft.DependencyInjection;
 // using DryIoc.Docs;
@@ -412,8 +412,14 @@ namespace DryIoc.UnitTests
 
             var totalPassed = 0;
             var sw = Stopwatch.StartNew();
-            totalPassed += RunTests(unitTests, "Docs, UnitTests");
-            totalPassed += RunTests(issueTests, "IssueTests");
+
+            var unitTestsTask = Task.Run(() => RunTests(unitTests, "Docs, UnitTests"));
+            var issueTestsTask = Task.Run(() => RunTests(issueTests, "IssueTests"));
+            Task.WaitAll(unitTestsTask, issueTestsTask);
+            totalPassed = 
+                (unitTestsTask.IsCompletedSuccessfully ? unitTestsTask.Result : 0) + 
+                (issueTestsTask.IsCompletedSuccessfully ? issueTestsTask.Result : 0);
+
             Console.WriteLine($"\nTotal {totalPassed} of tests are passing in {sw.ElapsedMilliseconds} ms.");
 
             int Run(Func<int> run, string name = null)
@@ -444,7 +450,6 @@ namespace DryIoc.UnitTests
 
             int RunTests(ITest[] tests, string name)
             {
-                Console.WriteLine($"\n{name} - running on .NET Core..\n");
                 var somePassed = 0;
                 var someFailed = false;
                 var sw = Stopwatch.StartNew();
@@ -455,11 +460,10 @@ namespace DryIoc.UnitTests
                     else someFailed = true;
                 }
                 if (!someFailed)
-                    Console.WriteLine($"\n{somePassed} {name} are passing in {sw.ElapsedMilliseconds} ms.");
+                    Console.WriteLine($"\n{name}: All {somePassed} tests are passing in {sw.ElapsedMilliseconds} ms.");
                 else
                 {
-                    Console.WriteLine("\nFAILURE! Some tests are FAILED!");
-                    Console.WriteLine($"\nThe rest {somePassed} of {name} are passing in {sw.ElapsedMilliseconds} ms.");
+                    Console.WriteLine($"\n{name}: Some tests are FAILED! Remaining {somePassed} tests are passing in {sw.ElapsedMilliseconds} ms.");
                     Environment.ExitCode = 1; // error exit code
                 }
                 return somePassed;
