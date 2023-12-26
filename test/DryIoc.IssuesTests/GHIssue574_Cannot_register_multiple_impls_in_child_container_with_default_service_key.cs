@@ -20,7 +20,7 @@ namespace DryIoc.IssuesTests
             return 1;
         }
 
-        //[Ignore("fixme")]
+        //[Ignore("@fixme")]
         public void ResolveEnumerableFromChild()
         {
             var services = new ServiceCollection();
