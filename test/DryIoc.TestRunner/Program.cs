@@ -316,9 +316,7 @@ namespace DryIoc.UnitTests
                 new GHIssue315_Combining_RegisterDelegate_with_TrackingDisposableTransients_rule_throws_TargetParameterCountException(),
                 new GHIssue323_Add_registration_setup_option_to_avoidResolutionScopeTracking(),
                 new GHIssue332_Delegate_returning_null_throws_exception_RegisteredDelegateResultIsNotOfServiceType(),
-
-                // new GHIssue337_Singleton_is_created_twice(), // @wip fails
-
+                // new GHIssue337_Singleton_is_created_twice(), // todo: @wip fails
                 new GHIssue338_Child_container_disposes_parent_container_singletons(),
                 new GHIssue340_WaitForItemIsSet_does_never_end(),
                 new GHIssue343_Scope_validation_for_Transient_does_not_work_as_expected(),
@@ -342,11 +340,21 @@ namespace DryIoc.UnitTests
 
                 new GHIssue402_Inconsistent_transient_disposable_behavior_when_using_Made(),
                 new GHIssue406_Allow_the_registration_of_the_partially_closed_implementation_type(),
+                new GHIssue417_Performance_degradation_with_dynamic_registrations_in_v4_compared_to_v2(),
+                new GHIssue418_ResolveCovariantBaseType(),
+                new GHIssue434_ReturnDefaultIfNotRegistered_is_not_respected_between_scopes(),
+                new GHIssue446_Resolving_a_record_without_registration_causes_a_StackOverflowException(),
+                new GHIssue448_Dynamic_registration_does_not_work_for_resolve_with_service_key(),
+                new GHIssue449_Optional_dependency_shouldnt_treat_its_dependencies_as_optional(),
+                new GHIssue451_Resolve_compiler_generated_settings_regression(),
                 new GHIssue460_Getting_instance_from_parent_scope_even_if_replaced_by_Use(),
                 new GHIssue461_Transient_IDisposable_factory_method_with_custom_constructor_args(),
                 new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter(),
                 new GHIssue471_Regression_v5_using_Rules_SelectKeyedOverDefaultFactory(),
+                new GHIssue483_Used_instance_is_not_checked_in_the_upper_scopes_in_some_case(),
+                new GHIssue489_Resolve_with_IfUnresolved_ReturnDefaultIfNotRegistered_throws_if_dependency_is_not_registered(),
                 new GHIssue495_Automatically_generate_Resolution_calls_for_the_missing_registrations_to_avoid_manual_RegisterPlaceholder(),
+
                 new GHIssue504_Add_IDictionary_wrapper(),
                 new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution(),
                 new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton(),

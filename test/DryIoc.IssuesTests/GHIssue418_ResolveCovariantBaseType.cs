@@ -4,8 +4,18 @@ using System.Collections.Generic;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue418_ResolveCovariantBaseType
+    public class GHIssue418_ResolveCovariantBaseType : ITest
     {
+        public int Run()
+        {
+            RegisterCovariantImplementationTypeWithMapping();
+            RegisterCovariantInterfaceTypeWithMapping();
+            RegisterCovariantListTypeDirect();
+            RegisterClosedGenericImplementationAsOpenGeneric();
+            RegisterCovariantImplementationTypeWithDelegete();
+            return 5;
+        }
+
         /// <summary>
         ///     Currently, resolving the list as <see cref="IReadOnlyList{BaseClass}" /> fails in this test.
         ///     The list is registered as its implementation and mapped to the interface.

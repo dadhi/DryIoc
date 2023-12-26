@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue434_ReturnDefaultIfNotRegistered_is_not_respected_between_scopes
+    public class GHIssue434_ReturnDefaultIfNotRegistered_is_not_respected_between_scopes : ITest
     {
+        public int Run()
+        {
+            Test_Use();
+            return 1;
+        }
+
         [Test]
         public void Test_Use()
         {

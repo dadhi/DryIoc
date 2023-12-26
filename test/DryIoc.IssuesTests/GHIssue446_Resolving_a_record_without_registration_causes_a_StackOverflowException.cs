@@ -3,8 +3,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue446_Resolving_a_record_without_registration_causes_a_StackOverflowException
+    public class GHIssue446_Resolving_a_record_without_registration_causes_a_StackOverflowException : ITest
     {
+        public int Run()
+        {
+            Test1();
+            Test2();
+            return 1;
+        }
+
         [Test]
         public void Test1()
         {

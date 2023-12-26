@@ -7,8 +7,15 @@ using DryIoc.MefAttributedModel;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue417_Performance_degradation_with_dynamic_registrations_in_v4_compared_to_v2
+    public class GHIssue417_Performance_degradation_with_dynamic_registrations_in_v4_compared_to_v2 : ITest
     {
+        public int Run()
+        {
+            SlowTest();
+            SuperSlowTest();
+            return 2;
+        }
+
         [Test]
         public void SlowTest()
         {

@@ -6,8 +6,14 @@ using System.Collections.Generic;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue448_Dynamic_registration_does_not_work_for_resolve_with_service_key
+    public class GHIssue448_Dynamic_registration_does_not_work_for_resolve_with_service_key : ITest
     {
+        public int Run()
+        {
+            Test1();
+            return 1;
+        }
+
         [Test]
         public void Test1()
         {

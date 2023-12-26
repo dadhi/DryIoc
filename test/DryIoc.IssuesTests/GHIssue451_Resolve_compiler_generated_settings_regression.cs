@@ -6,8 +6,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue451_Resolve_compiler_generated_settings_regression
+    public class GHIssue451_Resolve_compiler_generated_settings_regression : ITest
     {
+        public int Run()
+        {
+            ExportSingletonPropertyWorks();
+            return 1;
+        }
+
         [Test]
         public void ExportSingletonPropertyWorks()
         {

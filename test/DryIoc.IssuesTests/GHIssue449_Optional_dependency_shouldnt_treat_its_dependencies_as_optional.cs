@@ -6,8 +6,19 @@ using System;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue449_Optional_dependency_shouldnt_treat_its_dependencies_as_optional
+    public class GHIssue449_Optional_dependency_shouldnt_treat_its_dependencies_as_optional : ITest
     {
+        public int Run()
+        {
+            Import_AllowDefault_DoesntImportUnregisteredDependency();
+            Import_AllowDefault_DoesntImportServiceWithoutDependencies_without_MEF();
+            Import_AllowDefault_DoesntImportServiceWithoutDependencies();
+            Import_AllowDefault_ImportsServiceWithDependencies();
+            Import_Lazy_with_AllowDefault_Should_not_check_into_dependencies();
+            Import_Lazy_with_AllowDefault_Should_not_check_into_Lazy_dependencies_as_well();
+            return 6;
+        }
+
         [Test]
         public void Import_AllowDefault_DoesntImportUnregisteredDependency()
         {
