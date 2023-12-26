@@ -326,3 +326,20 @@ public class Wrappers : ITest
         return 27;
     }
 }
+
+public class MefAttributedModel : ITest
+{
+    public int Run()
+    {
+        new Basic_example().Example();
+        new Export_and_Import_used_separately().Example();
+        new Export_example().Example();
+        new Using_InheritedExport().Example();
+        new DryIocAttributes_ExportMany().Example();
+        new ExportMany_with_Except_and_NonPublic_options().Example();
+        new Import_specification().Example();
+        new Exporting_disposable_transient().Example();
+        new Exporting_with_TrackDisposableTransient().Example();
+        return 9;
+    }
+}

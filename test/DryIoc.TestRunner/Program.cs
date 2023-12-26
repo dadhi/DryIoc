@@ -55,6 +55,7 @@ namespace DryIoc.UnitTests
                 new Docs.ThreadSafety(),
                 new Docs.UsingInTestsWithMockingLibrary(),
                 new Docs.Wrappers(),
+                new Docs.MefAttributedModel(),
 
                 new ActionTests(),
                 new ArrayToolsTest(),
