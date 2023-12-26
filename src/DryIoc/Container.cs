@@ -13849,19 +13849,18 @@ namespace DryIoc
 
         internal static object WaitForItemIsSet(ImHashMapEntry<int, object> itemRef)
         {
-            var tickCount = (uint)Environment.TickCount;
-            var tickStart = tickCount;
+            var msCount = (uint)Environment.TickCount;
+            var msStart = msCount;
             Debug.WriteLine("Waiting for Scoped service to be set/created is starting...");
 
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
             {
                 spinWait.SpinOnce();
-                if (tickCount - tickStart > WaitForScopedServiceIsCreatedTimeoutTicks)
+                if (msCount - msStart > WaitForScopedServiceIsCreatedTimeoutTicks)
                     Throw.WithDetails(itemRef.Key, Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForScopedServiceIsCreatedTimeoutTicks);
-                tickCount = (uint)Environment.TickCount;
+                msCount = (uint)Environment.TickCount;
             }
-
             Debug.WriteLine("Waiting for Scoped service to be set/created is complete.");
             return itemRef.Value;
         }

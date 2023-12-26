@@ -71,7 +71,7 @@ using System.Linq;
 using DryIoc;
 using NUnit.Framework;
 
-class Register_service_with_implementation_types
+public class Register_service_with_implementation_types
 {
     [Test]
     public void Example()
@@ -88,7 +88,7 @@ but may be important for other cases, like [Decorators](Decorators) or Collectio
 
 If you don't know the type at compile-time you can specify a run-time `Type` instead:
 ```cs md*/
-class Register_service_with_implementation_runtime_types
+public class Register_service_with_implementation_runtime_types
 {
     [Test]
     public void Example()
@@ -104,7 +104,7 @@ The container will check if the service type is assignable to the implementation
 
 You can register open-generic as well:
 ```cs md*/
-class Register_open_generic_service_with_implementation_runtime_types
+public class Register_open_generic_service_with_implementation_runtime_types
 {
     interface IService<T> { }
     class SomeService<T> : IService<T> { }
@@ -123,7 +123,7 @@ class Register_open_generic_service_with_implementation_runtime_types
 
 An implementation type may play the role of service type:
 ```cs md*/
-class Register_implementation_as_service_type
+public class Register_implementation_as_service_type
 {
     [Test]
     public void Example()
@@ -161,7 +161,7 @@ In addition factory holds the `Reuse`.
 You may use this API as following:
 
 ```cs md*/
-class One_level_deep_registration_API
+public class One_level_deep_registration_API
 {
     [Test]
     public void Example()
@@ -198,7 +198,7 @@ DryIoc supports Singleton with a concept of [Reuse and Scopes](ReuseAndScopes).
 Example of singleton service registration:
 
 ```cs md*/
-class Singleton_service_registration
+public class Singleton_service_registration
 {
     [Test]
     public void Example()
@@ -234,7 +234,7 @@ DryIoc supports two kinds of multiple implementations of the same service: defau
 For multiple default implementations write Register as usual:
 
 ```cs md*/
-class Multiple_default_registrations
+public class Multiple_default_registrations
 {
     internal interface ICommand { }
     internal class GetCommand : ICommand { }
@@ -294,7 +294,7 @@ or to [named scope](ReuseAndScopes.md#reuseincurrentnamedscope-and-reuseinthread
 
 To identify specific service implementation you may provide a Service Key in registration. Service Key is a value of arbitrary type which implements `Object.GetHashCode` and `Object.Equals`. Usually an enum type, string, or number.
 ```cs md*/
-class Multiple_keyed_registrations
+public class Multiple_keyed_registrations
 {
     internal interface ICommand { }
     internal class GetCommand : ICommand { }
@@ -330,7 +330,7 @@ There is also a way to get the commands with their respective keys.
 It may be especially useful in combination with `Lazy` or `Func` [wrappers](Wrappers), e.g. to built a menu or navigation in UI.
 
 ```cs md*/
-class Resolve_commands_with_keys
+public class Resolve_commands_with_keys
 {
     internal interface ICommand { }
     internal class GetCommand : ICommand { }
@@ -369,7 +369,7 @@ This works both for default and keyed registrations, because a default registrat
 __Note:__ When resolving a collection of services with service keys of different types, you need to specify `object` as `TKey` in a pair.
 
 ```cs md*/
-class Resolving_service_with_key_as_KeyValuePair
+public class Resolving_service_with_key_as_KeyValuePair
 {
     interface I { }
     class X : I { }
@@ -422,7 +422,7 @@ For instance, you may test for specific `Reuse`, or `Metadata`, or `Setup`.
 
 To find out whether `MyService` is registered as `Singleton`:
 ```cs md*/
-class IsRegistered_examples
+public class IsRegistered_examples
 {
     class MyService { }
 
@@ -451,7 +451,7 @@ class IsRegistered_examples
 In the above case we are looking for any default or keyed registration. 
 If you need to find a service with specific key then specify the key:
 ```cs md*/
-class IsRegistered_with_key_examples
+public class IsRegistered_with_key_examples
 {
     class MyService { }
 
@@ -481,7 +481,7 @@ By default `IsRegistered` will look only for __services__, not for [decorators](
 To look for them you need to specify the corresponding FactoryType:
 ```cs md*/
 
-class IsRegistered_for_wrapper_or_decorators
+public class IsRegistered_for_wrapper_or_decorators
 {
     class Owned<T> { }
 
@@ -501,7 +501,7 @@ __Important:__ `IsRegistered` does not check if a service is actually resolvable
 For instance, if some of its dependencies are not registered. To check for resolvability use Resolve with `IfUnresolved.ReturnDefault`:
 
 ```cs md*/
-class Check_if_resolvable
+public class Check_if_resolvable
 {
     class MyService { }
 
@@ -526,7 +526,7 @@ There are other ways to get existing registration, that may fit to your needs.
 The basic one is to get all Container registrations and find the one you need.
 
 ```cs md*/
-class Get_specific_registration
+public class Get_specific_registration
 {
     class MyService { }
 
@@ -632,7 +632,7 @@ __Note:__ If you really need to register something from the excluded list, you m
 
 For example you may want to have a singleton implementation accessed via two different services (facades):
 ```cs md*/
-class Register_mapping
+public class Register_mapping
 {
     public interface I { }
     public interface J { }
@@ -657,7 +657,7 @@ class Register_mapping
 The same result may be achieved via the `RegisterMany`:
 
 ```cs md*/
-class Register_mapping_with_RegisterMany
+public class Register_mapping_with_RegisterMany
 {
     public interface I { }
     public interface J { }
@@ -686,7 +686,7 @@ see this [StackOverflow question for example](https://stackoverflow.com/question
 You can register any custom delegate as your service factory via `RegisterDelegate`:
 
 ```cs md*/
-class Register_delegate
+public class Register_delegate
 {
     [Test]
     public void Example()
@@ -709,7 +709,7 @@ The `IResolverContext resolverContext` delegate parameter was not used in the ex
 Actually, it could be used to resolve any additional dependencies required for the service creation and initialization:
 
 ```cs md*/
-class Register_delegate_with_resolved_dependencies
+public class Register_delegate_with_resolved_dependencies
 {
     [Test]
     public void Example()
@@ -767,7 +767,7 @@ it **injects** the requested dependencies as the delegate arguments so there is 
 The example:
 ```cs md*/
 
-class Register_delegate_with_parameters
+public class Register_delegate_with_parameters
 {
     [Test]
     public void Example()
@@ -801,7 +801,7 @@ Given `type = typeof(Foo)` it is impossible to write `new type();`.
 To enable such use-case DryIoc allow to register delegate with runtime known type:
 
 ```cs md*/
-class Register_delegate_returning_object
+public class Register_delegate_returning_object
 {
     [Test]
     public void Example()
@@ -828,7 +828,7 @@ __Note:__ To register external instance at the Scope level please refer to the [
 If instance implements an `IDisposable` then it will be tracked for disposal in the container `SingletonScope`. You may also directly call `TrackDisposable(instance)` on the specific scope.
 
 ```cs md*/
-class Register_instance_example
+public class Register_instance_example
 {
     [Test]
     public void Example()
@@ -862,7 +862,7 @@ __Note:__ The instance added via `Use` does not support `serviceKey`, [Wrappers]
 
 ```cs md*/
 
-class Example_of_scoped_and_singleton_instance
+public class Example_of_scoped_and_singleton_instance
 {
     [Test]
     public void Example()
@@ -901,8 +901,9 @@ In previous examples we did not specify the service type, but you can specify it
 and moreover, you can provide run-time **service type** for the `object` instance:
 
 ```cs md*/
-class Typed_instance
+public class Typed_instance
 {
+    [Test]
     public void Example()
     {
         var container = new Container();
@@ -931,7 +932,7 @@ __Note:__ From the implementation perspective `RegisterInitializer` is just a su
 
 Let's say we want to log the creation of our service:
 ```cs md*/
-class Register_initializer
+public class Register_initializer
 {
     [Test]
     public void Example()
@@ -961,7 +962,7 @@ class Register_initializer
 OK, this works for the specific service `IService` but what if I want to log the creation of _any_ resolved or injected service.
 
 ```cs md*/
-class Register_initializer_for_any_object
+public class Register_initializer_for_any_object
 {
     [Test]
     public void Example()
@@ -1013,7 +1014,7 @@ But there is an overload of `RegisterInitializer` (since the DryIoc v4.5.0) with
 Having a separate reuse option makes possible to apply initializer once per scope (Scoped), once per container (Singleton), or every time (Transient).
 
 ```cs md*/
-class RegisterInitializer_with_reuse_different_from_initialized_object
+public class RegisterInitializer_with_reuse_different_from_initialized_object
 {
     [Test]
     public void Example()
@@ -1050,7 +1051,7 @@ Sometimes, you maybe not yet decided on the service implementation or maybe you 
 In this case you may use a `RegisterPlaceholder<IService>()`, then later do `Register<IService, Foo>(ifAlreadyRegistered:IfAlreadyRegistered.Replace)`.
 
 ```cs md*/
-class Register_placeholder
+public class Register_placeholder
 {
     [Test]
     public void Example()
@@ -1090,7 +1091,7 @@ but still wants to invoke "release logic" when goes out of the scope.
 __Note:__ Internally it is just a [Decorator](Decorators) which creates "companion" disposable object
 with specified _release_ action. When scope is disposed then the companion is disposed too invoking the action.
 ```cs md*/
-class Register_disposer
+public class Register_disposer
 {
     [Test]
     public void Example()
@@ -1121,7 +1122,7 @@ class Register_disposer
 The same as for `RegisterInitializer`, the disposer _target type_ maybe any type implemented by registered service type 
 (but not the implementation type).
 ```cs md*/
-class Register_disposer_for_many_services
+public class Register_disposer_for_many_services
 {
     [Test]
     public void Example()

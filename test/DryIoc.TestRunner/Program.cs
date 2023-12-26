@@ -44,6 +44,9 @@ namespace DryIoc.UnitTests
                 new Docs.ErrorDetectionAndResolution(),
                 new Docs.ExamplesContextBasedResolution(),
                 new Docs.Interception(),
+                new Docs.KindsOfChildContainer(),
+                new Docs.OpenGenerics(),
+                new Docs.RegisterResolve(),
 
                 new ActionTests(),
                 new ArrayToolsTest(),

@@ -25,7 +25,7 @@ using DryIoc;
 using NUnit.Framework;
 // ReSharper disable UnusedTypeParameter
 
-class Register_open_generic
+public class Register_open_generic
 {
     [Test]
     public void Example()
@@ -46,7 +46,7 @@ class Register_open_generic
 
 The rest of API is identical. Here the variants:
 ```cs md*/
-class Open_generic_registrations
+public class Open_generic_registrations
 {
     [Test]
     public void Example()
@@ -75,7 +75,7 @@ class Open_generic_registrations
 
 When resolving a single service a registered closed service has a priority over the corresponding open-generic service implementation:
 ```cs md*/
-class Closed_is_preferred_over_open_generic
+public class Closed_is_preferred_over_open_generic
 {
     [Test]
     public void Example()
@@ -109,7 +109,7 @@ DryIoc will evaluate type argument constraints when resolving open-generic. Let'
 Example:
 
 ```cs md*/
-class Matching_open_generic_type_constraints
+public class Matching_open_generic_type_constraints
 {
     [Test]
     public void Example()
@@ -137,7 +137,7 @@ class Matching_open_generic_type_constraints
 Example:
 
 ```cs md*/
-class Fill_in_type_arguments_from_constraints
+public class Fill_in_type_arguments_from_constraints
 {
     [Test]
     public void Example()
@@ -173,7 +173,7 @@ __Note:__ This example is not so uncommon in the modern world, say in [MediatR](
 
 When resolving the collection of generic types DryIoc will include variance-compatible types:
 ```cs md*/
-class Generic_variance_thingy
+public class Generic_variance_thingy
 {
     [Test]
     public void Example()
@@ -205,7 +205,7 @@ class Generic_variance_thingy
 
 This rule is enabled by default, but you can turn it off:
 ```cs md*/
-class Turn_off_generic_variance_in_collections
+public class Turn_off_generic_variance_in_collections
 {
     [Test]
     public void Example()
