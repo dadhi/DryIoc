@@ -24,6 +24,11 @@ namespace DryIoc.UnitTests
             // e.g. see GHIssue337_Singleton_is_created_twice, GHIssue391_Deadlock_during_Resolve, Issue157_ContainerResolveFactoryIsNotThreadSafe
             Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 70;
 
+            var perfMemoryTests = new ITest[]
+            {
+                new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
+            };
+
             var unitTests = new ITest[]
             {
                 new Docs.CreatingAndDisposingContainer(),
@@ -114,7 +119,8 @@ namespace DryIoc.UnitTests
                 new Microsoft.DependencyInjection.Specification.Tests.GetRequiredServiceTests(),
                 new Microsoft.DependencyInjection.Specification.Tests.ServicesTests(),
             };
-            var issueTests = new ITest[]
+
+            var issuesTests = new ITest[]
             {
                 new DotnetWeekBlogExample(),
                 new Messages_Test(),
@@ -161,9 +167,6 @@ namespace DryIoc.UnitTests
                 new Issue144_NonPublic_property_as_FactoryMethod_causes_unexplained_NRE(),
                 new Issue145_SimplifyDefiningOfOpenGenericFactoryMethod(),
                 new Issue148_NestedOptionalDependenciesPreventTheOuterDependencyFromInstantiating(),
-
-                // todo: @wip big test move it
-                // new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
 
                 new Issue153_ContextDependentResolutionOnlyWorksForTheVeryFirstContext(),
                 new Issue157_ContainerResolveFactoryIsNotThreadSafe(),
@@ -400,12 +403,16 @@ namespace DryIoc.UnitTests
             var totalPassed = 0;
             var sw = Stopwatch.StartNew();
 
-            var unitTestsTask = Task.Run(() => RunTests(unitTests, "Docs, UnitTests"));
-            var issueTestsTask = Task.Run(() => RunTests(issueTests, "IssueTests"));
-            Task.WaitAll(unitTestsTask, issueTestsTask);
-            totalPassed = 
-                (unitTestsTask.IsCompletedSuccessfully ? unitTestsTask.Result : 0) + 
-                (issueTestsTask.IsCompletedSuccessfully ? issueTestsTask.Result : 0);
+            var unitTestsTask = Task.Run(() => RunTests(unitTests, "UnitTests;Docs"));
+            var issuesTestsTask = Task.Run(() => RunTests(issuesTests, "IssuesTests"));
+            var perfMemoryTestsTask = Task.Run(() => RunTests(perfMemoryTests, "PerfMemoryTests"));
+            Task.WaitAll(unitTestsTask, issuesTestsTask, perfMemoryTestsTask);
+
+            var unitTestCount = unitTestsTask.IsCompletedSuccessfully ? unitTestsTask.Result : 0;
+            var issuesTestCount = issuesTestsTask.IsCompletedSuccessfully ? issuesTestsTask.Result : 0;
+            var perfMemoryTestCount = perfMemoryTestsTask.IsCompletedSuccessfully ? perfMemoryTestsTask.Result : 0;
+
+            totalPassed = unitTestCount + issuesTestCount + perfMemoryTestCount;
 
             Console.WriteLine($"\nTotal {totalPassed} of tests are passing in {sw.ElapsedMilliseconds} ms.");
 
