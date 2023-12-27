@@ -1,7 +1,7 @@
 image:
   - Visual Studio 2022
   - Ubuntu
-  # - macOS #until I understant what is the error on AppVeyor CI
+  - macOS #until I understant what is the error on AppVeyor CI
 
 version: 6.0.0-preview-05-{build}
 
@@ -11,13 +11,7 @@ skip_commits:
   message: /noci .*/
 
 build_script:
-  - dotnet test -p:DevMode=false -f:net7.0 -c:Release docs/DryIoc.Docs
-  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.UnitTests
-  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.IssuesTests
-  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.MefAttributedModel.UnitTests
-  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.CommonServiceLocator.UnitTests
-  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.Microsoft.DependencyInjection.Specification.Tests
-  - dotnet test -p:DevMode=false -f:net7.0 -c:Release test/DryIoc.Syntax.Autofac.UnitTests
+  - dotnet run -f net7.0 -c Release -p:DevMode=false --project test/DryIoc.TestsRunner
 
 for:
   - matrix:
