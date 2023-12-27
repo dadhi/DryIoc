@@ -156,7 +156,7 @@ public class Register_and_use_async_interceptor
     {
         public async Task<string> HeyAsync(string name)
         {
-            await Task.Delay(50);
+            await Task.Delay(30);
             return $"Hey {name} async!";
         }
     }

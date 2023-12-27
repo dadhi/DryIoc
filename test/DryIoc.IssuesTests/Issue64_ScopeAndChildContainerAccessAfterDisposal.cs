@@ -29,7 +29,7 @@ namespace DryIoc.IssuesTests
 
                     t = Task.Run(async () =>
                     {
-                        await Task.Delay(100);
+                        await Task.Delay(15);
                         b.Resolve<XProvider>();
                     });
 
@@ -52,7 +52,7 @@ namespace DryIoc.IssuesTests
 
                     t = Task.Run(async () =>
                     {
-                        await Task.Delay(100);
+                        await Task.Delay(15);
                         b.Resolve<XProvider>();
                     });
 
@@ -74,7 +74,7 @@ namespace DryIoc.IssuesTests
                 {
                     t = Task.Run(async () =>
                     {
-                        await Task.Delay(100);
+                        await Task.Delay(15);
                         var provider = new XProvider();
                         b.InjectPropertiesAndFields(provider);
                     });
@@ -99,7 +99,7 @@ namespace DryIoc.IssuesTests
 
                     t = Task.Run(async () =>
                     {
-                        await Task.Delay(100);
+                        await Task.Delay(15);
                         result = b.Resolve<XProvider>(1);
                     });
 

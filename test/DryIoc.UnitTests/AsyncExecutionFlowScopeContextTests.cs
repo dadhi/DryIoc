@@ -100,9 +100,9 @@ namespace DryIoc.UnitTests
             using (var b = c.OpenScope())
             {
                 var yGoodness = b.Resolve<Blah>();
-                await Task.Delay(50).ConfigureAwait(false);
+                await Task.Delay(30).ConfigureAwait(false);
                 Assert.AreSame(yGoodness, b.Resolve<Blah>());
-                await Task.Delay(50).ConfigureAwait(true);
+                await Task.Delay(30).ConfigureAwait(true);
                 Assert.AreSame(yGoodness, b.Resolve<Blah>());
             }
         }
@@ -118,7 +118,7 @@ namespace DryIoc.UnitTests
                 {
                     scope.Resolve<Blah>();
 
-                    await Task.Delay(100).ConfigureAwait(false);
+                    await Task.Delay(30).ConfigureAwait(false);
 
                     var ex = Assert.Throws<ContainerException>(() => 
                     scope.Resolve<Blah>());
@@ -141,7 +141,7 @@ namespace DryIoc.UnitTests
                 {
                     var scoped = scope.Resolve<Blah>();
 
-                    await Task.Delay(100).ConfigureAwait(false);
+                    await Task.Delay(30).ConfigureAwait(false);
 
                     var singleton = scope.Resolve<Blah>();
                     Assert.AreNotSame(scoped, singleton);

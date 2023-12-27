@@ -111,7 +111,7 @@ namespace DryIoc.IssuesTests
             }
             public async ValueTask DisposeAsync()
             {
-                await Task.Delay(100);
+                await Task.Delay(30);
                 onDisposed(this);
             }
         }

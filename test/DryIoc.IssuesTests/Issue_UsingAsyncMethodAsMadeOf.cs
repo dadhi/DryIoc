@@ -27,7 +27,7 @@ namespace DryIoc.IssuesTests
 
         public static async Task<A> GetA()
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(50));
+            await Task.Delay(TimeSpan.FromMilliseconds(30));
             return await Task.FromResult(new A());
         }
 

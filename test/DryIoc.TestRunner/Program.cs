@@ -9,7 +9,7 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            new GHIssue619_FaultySingletonDependency().Run();
+            // new GHIssue619_FaultySingletonDependency().Run();
             // new GHIssue337_Singleton_is_created_twice().Run();
 
             RunAllTests();
@@ -135,7 +135,8 @@ namespace DryIoc.UnitTests
                 new Issue_SupportForDynamicKeyword(),
                 new Issue_UsingAsyncMethodAsMadeOf(),
                 new Issue_Value_type_resolution_dependency(),
-                
+
+                // BitBucket issues from older times
                 new Issue26_DryIOCSingletonFailureTest(),
                 new Issue45_UnregisterOpenGenericAfterItWasResolvedOnce(),
                 new Issue46_ReuseInCurrentScopeForNestedDependenciesNotWorking(),
@@ -161,7 +162,9 @@ namespace DryIoc.UnitTests
                 new Issue145_SimplifyDefiningOfOpenGenericFactoryMethod(),
                 new Issue148_NestedOptionalDependenciesPreventTheOuterDependencyFromInstantiating(),
 
-                new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
+                // todo: @wip big test move it
+                // new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
+
                 new Issue153_ContextDependentResolutionOnlyWorksForTheVeryFirstContext(),
                 new Issue157_ContainerResolveFactoryIsNotThreadSafe(),
                 new Issue158_WrappingDependencyInLazyResultsInTheLossOfLifespanValidation(),
@@ -202,7 +205,6 @@ namespace DryIoc.UnitTests
                 new Issue339_GenericDecoratorWithConstraints(),
                 new Issue344_TransientDisposableValidation(),
                 new Issue355_UnexpectedSingletonDisposal(),
-
                 new Issue357_PartImportsSatisfied(),
                 new Issue366_Facade_Returns_Null_for_ResolveMany_Fallback(),
                 new Issue367_MefRulesBreakMadeParameters(),
@@ -213,7 +215,6 @@ namespace DryIoc.UnitTests
                 new Issue394_Reimporting_services(),
                 new Issue396_ResolveMany_appears_not_to_use_UnknownServiceResolver(),
                 new Issue397_ActionExportsTypeConversion(),
-
                 new Issue404_ConstructorWithResolvableArguments_does_not_take_into_account_parameter_service_key(),
                 new Issue407_Cannot_resolve_MadeOf_params_explicitly(),
                 new Issue416_Adding_always_true_condition_to_decorator_changes_the_decorated_outcome(),
@@ -260,6 +261,7 @@ namespace DryIoc.UnitTests
                 new Issue596_RegisterMany_with_Factory(),
                 new Issue603_async_actions_in_MVC(),
 
+                // Now on GitHub
                 new GHIssue4_Rule_for_Func_and_Lazy_to_be_resolved_even_without_requested_service_registered(),
                 new GHIssue6_Open_generic_singleton_service_registration_that_satisfies_multiple_interfaces(),
                 new GHIssue7_1_Context_based_injection(),
@@ -274,7 +276,6 @@ namespace DryIoc.UnitTests
                 new GHIssue63_Func_wrapper_resolving(),
                 new GHIssue66_Cannot_instantiate_DictionaryT(),
                 new GHIssue80_ScopedOrSingleton_extra_constructor_calls(),
-
                 new GHIssue100_ResolveMany_with_Meta_does_NOT_work(),
                 new GHIssue101_Compile_time_generated_object_graph(),
                 new GHIssue105_Resolve_uses_args_values_to_resolve_dependencies_too(),
@@ -300,7 +301,6 @@ namespace DryIoc.UnitTests
                 new GHIssue192_DryIOC_new_Transient_Disposable(),
                 new GHIssue196_Private_and_public_Constructors_in_generic_classes(),
                 new GHIssue198_Open_generics_resolve_fails_if_there_is_a_static_constructor(),
-
                 new GHIssue211_FEC_sometimes_is_20_precent_slower(),
                 new GHIssue215_RegisterInitializer_causes_additional_call_to_Dispose_when_container_is_disposed(),
                 new GHIssue223_IAsyncDisposable(),
