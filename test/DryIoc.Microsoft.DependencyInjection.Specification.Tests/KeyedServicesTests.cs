@@ -10,8 +10,60 @@ using Xunit;
 
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
-    public class KeyedServicesTests : KeyedDependencyInjectionSpecificationTests
+    public class KeyedServicesTests : KeyedDependencyInjectionSpecificationTests, ITest
     {
+        public int Run()
+        {
+            ResolveKeyedService_COPY();
+            ResolveKeyedServiceTransientFactory_COPY();
+            ResolveKeyedServiceSingletonInstanceWithKeyedParameter_COPY();
+            ResolveKeyedServiceSingletonFactoryWithAnyKey_COPY();
+            ResolveKeyedServiceSingletonFactoryWithAnyKey_OpenGenericService();
+            ResolveKeyedServiceSingletonInstanceWithAnyKey_COPY();
+            ResolveKeyedServicesSingletonInstanceWithAnyKey_COPY();
+            ResolveKeyedServicesSingletonInstanceWithAnyKey_ResolveMany();
+            ResolveKeyedServicesSingletonInstanceWithAnyKey_3_services_ResolveMany();
+            ResolveKeyedServicesSingletonInstanceWithAnyKey_3_services();
+            ResolveKeyedServicesSingletonInstanceWithAnyKey_AnyKey();
+            ResolveKeyedGenericServices_COPY();
+            var testCount = 12;
+
+            // KeyedDependencyInjectionSpecificationTests
+            ResolveKeyedService();
+            ResolveNullKeyedService();
+            ResolveNonKeyedService();
+            ResolveKeyedOpenGenericService();
+            ResolveKeyedServices();
+            ResolveKeyedGenericServices();
+            ResolveKeyedServiceSingletonInstance();
+            ResolveKeyedServiceSingletonInstanceWithKeyInjection();
+            ResolveKeyedServiceSingletonInstanceWithAnyKey();
+            ResolveKeyedServicesSingletonInstanceWithAnyKey();
+            ResolveKeyedServiceSingletonInstanceWithKeyedParameter();
+            CreateServiceWithKeyedParameter();
+            ResolveKeyedServiceSingletonFactory();
+            ResolveKeyedServiceSingletonFactoryWithAnyKey();
+            ResolveKeyedServiceSingletonFactoryWithAnyKeyIgnoreWrongType();
+            ResolveKeyedServiceSingletonType();
+            ResolveKeyedServiceTransientFactory();
+            ResolveKeyedServiceTransientType();
+            ResolveKeyedServiceTransientTypeWithAnyKey();
+            ResolveKeyedSingletonFromInjectedServiceProvider();
+            ResolveKeyedTransientFromInjectedServiceProvider();
+            ResolveKeyedSingletonFromScopeServiceProvider();
+            ResolveKeyedScopedFromScopeServiceProvider();
+            ResolveKeyedTransientFromScopeServiceProvider();
+            SimpleServiceKeyedResolution();
+            ExplicitServiceRegistrationWithIsKeyedService();
+            OpenGenericsWithIsKeyedService();
+            ClosedGenericsWithIsKeyedService();
+            IEnumerableWithIsKeyedServiceAlwaysReturnsTrue();
+            NonKeyedServiceWithIsKeyedService();
+            testCount += 30;
+
+            return testCount;
+        }
+
         private static DryIocServiceProvider BuildProvider(IServiceCollection collection) =>
             new DryIocServiceProviderFactory().CreateBuilder(collection);
 
