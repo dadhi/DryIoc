@@ -15351,11 +15351,6 @@ namespace DryIoc
             typeof(Error).GetTypeInfo().DeclaredFields
                 .Where(f => f.FieldType == typeof(int)).Where((_, i) => i == error + 1)
                 .FirstOrDefault()?.Name;
-
-        static Error()
-        {
-            Throw.GetMatchedException = ContainerException.Of;
-        }
     }
 
     /// <summary>Checked error condition, possible error sources.</summary>
@@ -15403,7 +15398,12 @@ namespace DryIoc
         public delegate Exception GetMatchedExceptionHandler(ErrorCheck errorCheck, int error, object arg0, object arg1, object arg2, object arg3, Exception inner);
 
         /// <summary>Returns matched exception for error check and error code.</summary>
-        public static GetMatchedExceptionHandler GetMatchedException = ContainerException.Of;
+        public static GetMatchedExceptionHandler GetMatchedException
+        {
+            get => _getMatchedException ?? ContainerException.Of;
+            set => _getMatchedException = value;
+        }
+        private static GetMatchedExceptionHandler _getMatchedException;
 
         /// <summary>Throws matched exception with provided error code if throw condition is true.</summary>
         public static void If(bool throwCondition, int error = -1, object arg0 = null, object arg1 = null, object arg2 = null, object arg3 = null)
