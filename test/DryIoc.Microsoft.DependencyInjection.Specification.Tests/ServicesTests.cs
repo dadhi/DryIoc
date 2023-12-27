@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.DependencyInjection.Specification;
@@ -12,8 +13,60 @@ using NUnit.Framework;
 
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
-    public class ServicesTests : DependencyInjectionSpecificationTests
+    public class ServicesTests : DependencyInjectionSpecificationTests, ITest
     {
+        public int Run()
+        {
+            foreach (object[] lt in LifetimeCombinations)
+                Resolve_single_service_with_multiple_registrations_should_resolve_the_same_way_as_microsoft_di(
+                    (bool)lt[0], (ServiceLifetime)lt[1], (ServiceLifetime)lt[2], (Type)lt[3]);
+            var testCount = LifetimeCombinations.Length;
+
+            OpenGenericsWithIsService_DoubleTest();
+            ServiceScopeFactoryIsSingleton_local();
+            ScopesAreFlatNotHierarchical_local();
+            testCount += 3;
+
+            // DependencyInjectionSpecificationTests
+            var createInstFuncs = CreateInstanceFuncs.SelectMany(xs => xs).Cast<CreateInstanceFunc>().ToArray();
+
+            foreach (var f in createInstFuncs) TypeActivatorEnablesYouToCreateAnyTypeWithServicesEvenWhenNotInIocContainer(f);
+            foreach (var f in createInstFuncs) TypeActivatorAcceptsAnyNumberOfAdditionalConstructorParametersToProvide(f);
+            foreach (var f in createInstFuncs) TypeActivatorWorksWithStaticCtor(f);
+            foreach (var f in createInstFuncs) TypeActivatorWorksWithCtorWithOptionalArgs(f);
+            foreach (var f in createInstFuncs) TypeActivatorWorksWithCtorWithOptionalArgs_WithStructDefaults(f);
+            foreach (var f in createInstFuncs) TypeActivatorCanDisambiguateConstructorsWithUniqueArguments(f);
+            foreach (var f in createInstFuncs) TypeActivatorRequiresAllArgumentsCanBeAccepted(f);
+            foreach (var f in createInstFuncs) TypeActivatorRethrowsOriginalExceptionFromConstructor(f);
+            foreach (var f in createInstFuncs) TypeActivatorUsesMarkedConstructor(f);
+            foreach (var f in createInstFuncs) TypeActivatorThrowsOnMultipleMarkedCtors(f);
+            foreach (var f in createInstFuncs) TypeActivatorThrowsWhenMarkedCtorDoesntAcceptArguments(f);
+            foreach (var f in createInstFuncs) UnRegisteredServiceAsConstructorParameterThrowsException(f);
+            testCount += 12;
+
+            GetServiceOrCreateInstanceRegisteredServiceTransient();
+            GetServiceOrCreateInstanceRegisteredServiceSingleton();
+            GetServiceOrCreateInstanceUnregisteredService();
+            CreateInstance_WithAbstractTypeAndPublicConstructor_ThrowsCorrectException();
+            CreateInstance_CapturesInnerException_OfTargetInvocationException();
+            ServicesRegisteredWithImplementationTypeCanBeResolved();
+            ServicesRegisteredWithImplementationType_ReturnDifferentInstancesPerResolution_ForTransientServices();
+            ServicesRegisteredWithImplementationType_ReturnSameInstancesPerResolution_ForSingletons();
+            ServiceInstanceCanBeResolved();
+            TransientServiceCanBeResolvedFromProvider();
+            TransientServiceCanBeResolvedFromScope();
+            NonSingletonService_WithInjectedProvider_ResolvesScopeProvider(ServiceLifetime.Scoped);
+            NonSingletonService_WithInjectedProvider_ResolvesScopeProvider(ServiceLifetime.Transient);
+            SingletonServiceCanBeResolvedFromScope();
+            SingleServiceCanBeIEnumerableResolved();
+            MultipleServiceCanBeIEnumerableResolved();
+            RegistrationOrderIsPreservedWhenServicesAreIEnumerableResolved();
+
+            testCount += 17;
+
+            return testCount;
+        }
+
         protected override IServiceProvider CreateServiceProvider(IServiceCollection services) =>
             new DryIocServiceProviderFactory().CreateBuilder(services);
 

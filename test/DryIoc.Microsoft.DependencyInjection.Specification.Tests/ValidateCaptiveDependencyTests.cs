@@ -4,8 +4,15 @@ using NUnit.Framework;
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     [TestFixture]
-    public class ValidateCaptiveDependencyTests
+    public class ValidateCaptiveDependencyTests : ITest
     {
+        public int Run()
+        {
+            ServiceCollection_AddScoped_dependency_in_a_Singleton_is_Not_validated_as_captive_dependency();
+            DryIoc_own_Register_ReuseScope_dependency_in_a_Singleton_IS_Validated_as_captive_dependency();
+            return 2;
+        }
+
         [Test]
         public void ServiceCollection_AddScoped_dependency_in_a_Singleton_is_Not_validated_as_captive_dependency()
         {

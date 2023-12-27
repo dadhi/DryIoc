@@ -109,6 +109,10 @@ namespace DryIoc.UnitTests
 
                 new Syntax.Autofac.UnitTests.Issue123_TipsForMigrationFromAutofac(),
                 new Syntax.Autofac.UnitTests.Issue123_TipsForMigrationFromAutofac_WithParameter(),
+
+                new Microsoft.DependencyInjection.Specification.Tests.ValidateCaptiveDependencyTests(),
+                new Microsoft.DependencyInjection.Specification.Tests.GetRequiredServiceTests(),
+                new Microsoft.DependencyInjection.Specification.Tests.ServicesTests(),
             };
             var issueTests = new ITest[]
             {

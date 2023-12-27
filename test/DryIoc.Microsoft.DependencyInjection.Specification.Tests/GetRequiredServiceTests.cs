@@ -1,13 +1,19 @@
 using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     [TestFixture]
-    public class GetRequiredServiceTests
+    public class GetRequiredServiceTests : ITest
     {
+        public int Run()
+        {
+            GetRequiredService_throws_InvalidOperationException_now();
+            GetService_should_throw_with_the_global_rule_set();
+            return 2;
+        }
+
         [Test]
         public void GetService_should_throw_with_the_global_rule_set()
         {
