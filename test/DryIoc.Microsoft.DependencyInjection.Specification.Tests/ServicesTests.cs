@@ -53,6 +53,16 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             }
             testCount += matchesDataCount;
 
+            ResolvesDifferentInstancesForServiceWhenResolvingEnumerable(
+                typeof(IFakeService), typeof(FakeService), typeof(IFakeService), ServiceLifetime.Scoped);
+            ResolvesDifferentInstancesForServiceWhenResolvingEnumerable(
+                typeof(IFakeService), typeof(FakeService), typeof(IFakeService), ServiceLifetime.Singleton);
+            ResolvesDifferentInstancesForServiceWhenResolvingEnumerable(
+                typeof(IFakeOpenGenericService<>), typeof(FakeOpenGenericService<>), typeof(IFakeOpenGenericService<IServiceProvider>), ServiceLifetime.Scoped);
+            ResolvesDifferentInstancesForServiceWhenResolvingEnumerable(
+                typeof(IFakeOpenGenericService<>), typeof(FakeOpenGenericService<>), typeof(IFakeOpenGenericService<IServiceProvider>), ServiceLifetime.Singleton);
+            testCount += 4;
+
             TypeActivatorCreateFactoryDoesNotAllowForAmbiguousConstructorMatches(typeof(string));
             TypeActivatorCreateFactoryDoesNotAllowForAmbiguousConstructorMatches(typeof(int));
             TypeActivatorCreateInstanceUsesLongestAvailableConstructor("", "IFakeService, string");
