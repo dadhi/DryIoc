@@ -13845,23 +13845,21 @@ namespace DryIoc
         }
 
         /// <summary>The amount of time to wait for the other party to create the scoped (or singleton) service.</summary>
-        public static uint WaitForScopedServiceIsCreatedTimeoutTicks = 3000;
+        public static int WaitForScopedServiceIsCreatedTimeoutMilliseconds = 3_000; // 3 seconds max
 
         internal static object WaitForItemIsSet(ImHashMapEntry<int, object> itemRef)
         {
-            var msCount = (uint)Environment.TickCount;
-            var msStart = msCount;
             Debug.WriteLine("Waiting for Scoped service to be set/created is starting...");
-
+            var timeoutTicks = WaitForScopedServiceIsCreatedTimeoutMilliseconds * TimeSpan.TicksPerMillisecond;
+            var startedAtTicks = Stopwatch.GetTimestamp();
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
             {
                 spinWait.SpinOnce();
-                if (msCount - msStart > WaitForScopedServiceIsCreatedTimeoutTicks)
-                    Throw.WithDetails(itemRef.Key, Error.WaitForScopedServiceIsCreatedTimeoutExpired, WaitForScopedServiceIsCreatedTimeoutTicks);
-                msCount = (uint)Environment.TickCount;
+                if (Stopwatch.GetTimestamp() - startedAtTicks > timeoutTicks)
+                    Throw.WithDetails(itemRef.Key, Error.WaitForScopedServiceIsCreatedTimeoutExpired);
             }
-            Debug.WriteLine("Waiting for Scoped service to be set/created is complete.");
+            Debug.WriteLine($"Waiting for Scoped service to be set/created is completed in {(int)((Stopwatch.GetTimestamp() - startedAtTicks)/TimeSpan.TicksPerMillisecond)} ms");
             return itemRef.Value;
         }
 
@@ -15321,13 +15319,13 @@ namespace DryIoc
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(
-                "DryIoc has waited for the creation of the scoped or singleton service by the \"other party\" for the {0} time ticks without the completion. " + NewLine +
+                $"Waited for the creation of the Scoped or Singleton service by the \"other party\" for {Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds} ms without the completion. " + NewLine +
                 "You may call `exception.TryGetDetails(container)` to get the details of the problematic service registration." + NewLine +
-                "The error means that either the \"other party\" is the parallel thread which has started but is unable to finish the creation of the service in the provided amount of time. " + NewLine +
-                "Or more likely the \"other party\"  is the same thread and there is an undetected recursive dependency or " + NewLine +
-                "the scoped service creation is failed with the exception and the exception was catched but you are trying to resolve the failed service again. " + NewLine +
+                "The error means that either the \"other party\" is the parallel thread which has started but is unable to finish the creation of the service in time. " + NewLine +
+                "Or more likely the \"other party\" is the same thread and there is an undetected recursive dependency or, " + NewLine +
+                "service creation is failed with the exception and the exception was catched, but you're trying to resolve the failed service again. " + NewLine +
                 "For all those reasons DryIoc has a timeout to prevent the infinite waiting. " + NewLine +
-                $"You may change the default timeout via `Scope.{nameof(Scope.WaitForScopedServiceIsCreatedTimeoutTicks)}=NewNumberOfTicks`"),
+                $"You may change the default timeout via setting the static `Scope.{nameof(Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds)}`"),
             ServiceTypeIsNull = Of("Registered service type is null");
 
 #pragma warning restore 1591 // "Missing XML-comment"
