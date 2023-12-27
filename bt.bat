@@ -6,7 +6,7 @@ set started_at=%time%
 set /a started_at_ms=%started_at:~0,2%*24*60*100+%started_at:~3,2%*60*100+%started_at:~6,2%*100+%started_at:~9,2%
 
 echo:
-echo:# Build and Run TestRunner on .NET 8.0
+echo:## Build and Run TestRunner on .NET 8.0
 echo:[started at %started_at%]
 echo:
 
@@ -20,7 +20,7 @@ set /a ellapsed_ms=%finished_at_ms%*10-%started_at_ms%*10
 
 echo:
 echo:[finished at %finished_at%]
-echo:## ALL Tests passed in %ellapsed_ms% ms. 
+echo:## Build and Tests completed in %ellapsed_ms% ms. 
 echo:
 exit /b 0
 

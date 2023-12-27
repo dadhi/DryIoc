@@ -44,6 +44,19 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             foreach (var f in createInstFuncs) UnRegisteredServiceAsConstructorParameterThrowsException(f);
             testCount += 12;
 
+            var matchesData = ServiceContainerPicksConstructorWithLongestMatchesData;
+            var matchesDataCount = 0;
+            foreach (var d in matchesData)
+            {
+                ServiceContainerPicksConstructorWithLongestMatches((IServiceCollection)d[0], (TypeWithSupersetConstructors)d[1]);
+                ++matchesDataCount;
+            }
+            testCount += matchesDataCount;
+
+            TypeActivatorCreateFactoryDoesNotAllowForAmbiguousConstructorMatches(typeof(string));
+            TypeActivatorCreateFactoryDoesNotAllowForAmbiguousConstructorMatches(typeof(int));
+            TypeActivatorCreateInstanceUsesLongestAvailableConstructor("", "IFakeService, string");
+            TypeActivatorCreateInstanceUsesLongestAvailableConstructor(5, "IFakeService, int");
             GetServiceOrCreateInstanceRegisteredServiceTransient();
             GetServiceOrCreateInstanceRegisteredServiceSingleton();
             GetServiceOrCreateInstanceUnregisteredService();
@@ -95,7 +108,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             IEnumerableWithIsServiceAlwaysReturnsTrue();
             BuiltInServicesWithIsServiceReturnsTrue();
 
-            testCount += 50;
+            testCount += 54;
 
             return testCount;
         }
