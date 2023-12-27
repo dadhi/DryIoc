@@ -337,6 +337,7 @@ namespace DryIoc.UnitTests
                 new GHIssue307_Lift_up_the_requirement_for_the_Export_attribute_for_RegisterExports(),
                 new GHIssue314_Expose_the_usual_IfAlreadyRegistered_option_parameter_for_RegisterMapping(),
                 new GHIssue315_Combining_RegisterDelegate_with_TrackingDisposableTransients_rule_throws_TargetParameterCountException(),
+                new Microsoft.DependencyInjection.Specification.Tests.GHIssue317_Error_for_register_IOptions_in_prism(),
                 new GHIssue323_Add_registration_setup_option_to_avoidResolutionScopeTracking(),
                 new GHIssue332_Delegate_returning_null_throws_exception_RegisteredDelegateResultIsNotOfServiceType(),
                 // new GHIssue337_Singleton_is_created_twice(), // todo: @wip fails
@@ -365,7 +366,10 @@ namespace DryIoc.UnitTests
                 new GHIssue406_Allow_the_registration_of_the_partially_closed_implementation_type(),
                 new GHIssue417_Performance_degradation_with_dynamic_registrations_in_v4_compared_to_v2(),
                 new GHIssue418_ResolveCovariantBaseType(),
+                new Microsoft.DependencyInjection.Specification.Tests.GHIssue429_Memory_leak_on_MS_DI_with_Disposable_Transient(),
+                new Microsoft.DependencyInjection.Specification.Tests.GHIssue432_Resolving_interfaces_with_contravariant_type_parameter_fails_with_RegisteringImplementationNotAssignableToServiceType_error(),
                 new GHIssue434_ReturnDefaultIfNotRegistered_is_not_respected_between_scopes(),
+                new Microsoft.DependencyInjection.Specification.Tests.GHIssue435_hangfire_use_dryioc_report_ContainerIsDisposed(),
                 new GHIssue446_Resolving_a_record_without_registration_causes_a_StackOverflowException(),
                 new GHIssue448_Dynamic_registration_does_not_work_for_resolve_with_service_key(),
                 new GHIssue449_Optional_dependency_shouldnt_treat_its_dependencies_as_optional(),

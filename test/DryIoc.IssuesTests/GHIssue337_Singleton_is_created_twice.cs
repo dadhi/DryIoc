@@ -17,7 +17,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test()
         {
-            var container = new Container(r => r.WithoutThrowOnRegisteringDisposableTransient());
+            var container = new Container(Rules.Default.WithoutThrowOnRegisteringDisposableTransient());
 
             container.Register<IA, A>(Reuse.Singleton, ifAlreadyRegistered: IfAlreadyRegistered.Replace);
 
@@ -39,7 +39,7 @@ namespace DryIoc.IssuesTests
             public A() 
             {
                 Thread.Sleep(100);
-                Console.WriteLine(++Counter);
+                ++Counter;
             }
         }
 

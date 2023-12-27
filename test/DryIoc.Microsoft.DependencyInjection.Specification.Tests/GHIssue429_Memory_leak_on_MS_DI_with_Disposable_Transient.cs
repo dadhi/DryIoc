@@ -1,13 +1,19 @@
 using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     [TestFixture]
-    public class GHIssue429_Memory_leak_on_MS_DI_with_Disposable_Transient
+    public class GHIssue429_Memory_leak_on_MS_DI_with_Disposable_Transient : ITest
     {
+        public int Run()
+        {
+            Test_with_MS_DI_rules();
+            Test_without_disposable_transient();
+            return 2;
+        }
+
         [Test]
         public void Test_with_MS_DI_rules()
         {

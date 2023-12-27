@@ -1,13 +1,18 @@
 using System;
-using System.Collections.Generic;
 using NUnit.Framework;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     [TestFixture]
-    public class GHIssue432_Resolving_interfaces_with_contravariant_type_parameter_fails_with_RegisteringImplementationNotAssignableToServiceType_error
+    public class GHIssue432_Resolving_interfaces_with_contravariant_type_parameter_fails_with_RegisteringImplementationNotAssignableToServiceType_error : ITest
     {
+        public int Run()
+        {
+            Test1();
+            return 1;
+        }
+
         [Test]
         public void Test1()
         {

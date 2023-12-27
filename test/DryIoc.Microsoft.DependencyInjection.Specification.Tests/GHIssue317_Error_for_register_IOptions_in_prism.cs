@@ -5,8 +5,14 @@ using NUnit.Framework;
 namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
 {
     [TestFixture]
-    public class GHIssue317_Error_for_register_IOptions_in_prism
+    public class GHIssue317_Error_for_register_IOptions_in_prism : ITest
     {
+        public int Run()
+        {
+            Test1();
+            return 1;
+        }
+
         [Test]
         public void Test1()
         {

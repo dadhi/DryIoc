@@ -538,7 +538,7 @@ In addition `ImportExternal` allows to specify:
 
 ### WithMetadata
 
-Have two goals:
+Metadata has two goals:
 
 - Allows to specify metadata object associated with exported implementation.
 - Specifies the required metadata object for imported part, similar to MEF2 `RequiredMetadataAttribute`.
