@@ -13849,17 +13849,25 @@ namespace DryIoc
 
         internal static object WaitForItemIsSet(ImHashMapEntry<int, object> itemRef)
         {
-            Debug.WriteLine("Waiting for Scoped service to be set/created is starting...");
             var timeoutTicks = WaitForScopedServiceIsCreatedTimeoutMilliseconds * TimeSpan.TicksPerMillisecond;
+
             var startedAtTicks = Stopwatch.GetTimestamp();
+            Debug.WriteLine($"Starting: Waiting for Scoped service to be set/created for max {timeoutTicks} ticks starting at {startedAtTicks}...");
+
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
             {
                 spinWait.SpinOnce();
-                if (Stopwatch.GetTimestamp() - startedAtTicks > timeoutTicks)
+                var newTicks = Stopwatch.GetTimestamp();
+                if (newTicks - startedAtTicks > timeoutTicks)
                     Throw.WithDetails(itemRef.Key, Error.WaitForScopedServiceIsCreatedTimeoutExpired);
+                else if (newTicks - startedAtTicks < 0)
+                { 
+                    startedAtTicks = newTicks;
+                    Debug.WriteLine($"Happened: Robustness for the case of possible overflow, so we are starting a new with new ticks {startedAtTicks}");
+                }
             }
-            Debug.WriteLine($"Waiting for Scoped service to be set/created is completed in {(int)((Stopwatch.GetTimestamp() - startedAtTicks)/TimeSpan.TicksPerMillisecond)} ms");
+            Debug.WriteLine($"Completed: Waiting for Scoped service to be set/created is completed in {(Stopwatch.GetTimestamp() - startedAtTicks)} ticks");
             return itemRef.Value;
         }
 
