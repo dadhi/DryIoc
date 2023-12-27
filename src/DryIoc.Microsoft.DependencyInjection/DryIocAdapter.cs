@@ -468,10 +468,10 @@ namespace DryIoc.Microsoft.DependencyInjection
             if (serviceType.IsGenericTypeDefinition)
                 return false;
 
-            if (serviceType == typeof(IServiceProviderIsService) |
-                serviceType == typeof(ISupportRequiredService) |
+            if (serviceType == typeof(IServiceProvider) |
                 serviceType == typeof(IServiceScopeFactory) |
-                serviceType == typeof(IServiceProvider) |
+                serviceType == typeof(ISupportRequiredService) |
+                serviceType == typeof(IServiceProviderIsService) |
                 serviceType == typeof(IKeyedServiceProvider) |
                 serviceType == typeof(IServiceProviderIsKeyedService))
                 return true;

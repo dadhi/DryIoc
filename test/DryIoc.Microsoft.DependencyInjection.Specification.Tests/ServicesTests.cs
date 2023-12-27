@@ -61,8 +61,41 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             SingleServiceCanBeIEnumerableResolved();
             MultipleServiceCanBeIEnumerableResolved();
             RegistrationOrderIsPreservedWhenServicesAreIEnumerableResolved();
+            OuterServiceCanHaveOtherServicesInjected();
+            FactoryServicesCanBeCreatedByGetService();
+            FactoryServicesAreCreatedAsPartOfCreatingObjectGraph();
+            LastServiceReplacesPreviousServices();
+            SingletonServiceCanBeResolved();
+            ServiceProviderRegistersServiceScopeFactory();
+            ServiceScopeFactoryIsSingleton();
+            ScopedServiceCanBeResolved();
+            NestedScopedServiceCanBeResolved();
+            ScopedServices_FromCachedScopeFactory_CanBeResolvedAndDisposed();
+            ScopesAreFlatNotHierarchical();
+            ServiceProviderIsDisposable();
+            DisposingScopeDisposesService();
+            SelfResolveThenDispose();
+            SafelyDisposeNestedProviderReferences();
+            SingletonServicesComeFromRootProvider();
+            NestedScopedServiceCanBeResolvedWithNoFallbackProvider();
+            OpenGenericServicesCanBeResolved();
+            ConstrainedOpenGenericServicesCanBeResolved();
+            ConstrainedOpenGenericServicesReturnsEmptyWithNoMatches();
+            InterfaceConstrainedOpenGenericServicesCanBeResolved();
+            AbstractClassConstrainedOpenGenericServicesCanBeResolved();
+            ClosedServicesPreferredOverOpenGenericServices();
+            ResolvingEnumerableContainingOpenGenericServiceUsesCorrectSlot();
+            AttemptingToResolveNonexistentServiceReturnsNull();
+            NonexistentServiceCanBeIEnumerableResolved();
+            DisposesInReverseOrderOfCreation();
+            ResolvesMixedOpenClosedGenericsAsEnumerable();
+            ExplicitServiceRegisterationWithIsService();
+            OpenGenericsWithIsService();
+            ClosedGenericsWithIsService();
+            IEnumerableWithIsServiceAlwaysReturnsTrue();
+            BuiltInServicesWithIsServiceReturnsTrue();
 
-            testCount += 17;
+            testCount += 50;
 
             return testCount;
         }

@@ -146,7 +146,7 @@ Intel Core i9-8950HK CPU 2.90GHz (Coffee Lake), 1 CPU, 12 logical and 6 physical
 
 ## Reliability
 
-* ~2300 tests.
+* Around 2000 of case tests.
 * Thread-safe and lock-free registrations and resolutions. 
 * Detects recursive dependencies (cycles) in object graph.
 * Throws exceptions as early as possible with a lot of details.
