@@ -38,7 +38,7 @@ namespace DryIoc.IssuesTests
             public static int Counter;
             public A() 
             {
-                Thread.Sleep(100);
+                Thread.Sleep(30);
                 ++Counter;
             }
         }

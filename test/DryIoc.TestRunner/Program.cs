@@ -2,8 +2,6 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using DryIoc.IssuesTests;
-using DryIoc.Microsoft.DependencyInjection;
-// using DryIoc.Docs;
 
 namespace DryIoc.UnitTests
 {
@@ -11,34 +9,21 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            // new GHIssue619_FaultySingletonDependency().Run();
+            new GHIssue619_FaultySingletonDependency().Run();
+            // new GHIssue337_Singleton_is_created_twice().Run();
 
             RunAllTests();
 
-            // new GHIssue555_ConcreteTypeDynamicRegistrations_is_not_working_with_MicrosoftDependencyInjectionRules().Run();
-            // new GHIssue507_Transient_resolve_with_opening_scope_using_factory_func_in_singleton().Run();
-            // new GHIssue243_Delegate_Factory_Resolving_Incremental_Improvement_over_Func_Wrapper().Run();
-            // new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run(); // todo: @fixme
-            // new GHIssue169_Decorators().Run();
-            // new ActionTests().Run();
-            // new GHIssue116_ReOpened_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
-            // new GHIssue116_DryIoc_Resolve_with_decorators_goes_wrong_for_parallel_execution().Run();
-            // new GHIssue550_Use_not_working_for_scoped_type_after_having_resolved_it_in_another_scope().Run();
-            // new GHIssue546_Generic_type_constraint_resolution_doesnt_see_arrays_as_IEnumerable().Run();
-            // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
-            // new GHIssue535_Property_injection_does_not_work_when_appending_implementation_for_multiple_registration().Run();
-            // new GHIssue532_WithUseInterpretation_still_use_DynamicMethod_and_ILEmit().Run();
-            // new GHIssue506_WithConcreteTypeDynamicRegistrations_hides_failed_dependency_resolution().Run();
-            // new GHIssue470_Regression_v5_when_resolving_Func_of_IEnumerable_of_IService_with_Parameter().Run();
-            // new GHIssue101_Compile_time_generated_object_graph().Run();
-            // new SO_Injecting_the_collection_of_interfaces_implemented_by_decorator().Run();
-            // new SO_Child_Container_for_transients().Run();
-            // new RegisterManyTests().Run();
             // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
         }
 
         public static void RunAllTests()
         {
+            // note: @important to remember to do the Tread.Sleep in tests less that this setting, 
+            // if you don't intentionally want the Error.WaitForScopedServiceIsCreatedTimeoutExpired exception, 
+            // e.g. see GHIssue337_Singleton_is_created_twice, GHIssue391_Deadlock_during_Resolve, Issue157_ContainerResolveFactoryIsNotThreadSafe
+            Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 70;
+
             var unitTests = new ITest[]
             {
                 new Docs.CreatingAndDisposingContainer(),
@@ -340,7 +325,7 @@ namespace DryIoc.UnitTests
                 new Microsoft.DependencyInjection.Specification.Tests.GHIssue317_Error_for_register_IOptions_in_prism(),
                 new GHIssue323_Add_registration_setup_option_to_avoidResolutionScopeTracking(),
                 new GHIssue332_Delegate_returning_null_throws_exception_RegisteredDelegateResultIsNotOfServiceType(),
-                // new GHIssue337_Singleton_is_created_twice(), // todo: @wip fails
+                new GHIssue337_Singleton_is_created_twice(),
                 new GHIssue338_Child_container_disposes_parent_container_singletons(),
                 new GHIssue340_WaitForItemIsSet_does_never_end(),
                 new GHIssue343_Scope_validation_for_Transient_does_not_work_as_expected(),
@@ -405,14 +390,8 @@ namespace DryIoc.UnitTests
                 new GHIssue588_Container_IsDisposed_property_not_reflecting_own_scope_disposed_state(),
                 new GHIssue608_Multiple_same_type_same_keyed(),
                 new GHIssue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments(),
-                new GHIssue619_FaultySingletonDependency(),
+                new GHIssue619_FaultySingletonDependency(), // todo: @fixme
             };
-            // var docsTests = new Func<int>[] // todo: @docs
-            // { 
-            //     () => { new Nested_decorators_order().Example(); return 1; }
-            // };
-
-            Scope.WaitForScopedServiceIsCreatedTimeoutTicks = 50; // @important
 
             var totalPassed = 0;
             var sw = Stopwatch.StartNew();
@@ -464,7 +443,7 @@ namespace DryIoc.UnitTests
                     else someFailed = true;
                 }
                 if (!someFailed)
-                    Console.WriteLine($"\n{name}: All {somePassed} tests are passing in {sw.ElapsedMilliseconds} ms.");
+                    Console.WriteLine($"\n{name}: {somePassed} tests are passing in {sw.ElapsedMilliseconds} ms.");
                 else
                 {
                     Console.WriteLine($"\n{name}: Some tests are FAILED! Remaining {somePassed} tests are passing in {sw.ElapsedMilliseconds} ms.");

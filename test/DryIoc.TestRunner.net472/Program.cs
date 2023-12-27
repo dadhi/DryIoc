@@ -18,6 +18,11 @@ namespace DryIoc.UnitTests.net472
 
         public static void RunAllTests()
         {
+            // note: @important to remember to do the Tread.Sleep in tests less that this setting, 
+            // if you don't intentionally want the Error.WaitForScopedServiceIsCreatedTimeoutExpired exception, 
+            // e.g. see GHIssue337_Singleton_is_created_twice, GHIssue391_Deadlock_during_Resolve, Issue157_ContainerResolveFactoryIsNotThreadSafe
+            Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 70;
+
             var unitTests = new ITest[]
             {
                 new ActionTests(),
@@ -158,12 +163,6 @@ namespace DryIoc.UnitTests.net472
             {
                 new ReducedLoadTest()
             };
-            // var docsTests = new Func<int>[] 
-            // { 
-            //     () => { new Nested_decorators_order().Example(); return 1; }
-            // };
-
-            Scope.WaitForScopedServiceIsCreatedTimeoutTicks = 50; // @important
 
             var totalPassed = 0;
             var sw = Stopwatch.StartNew();
