@@ -3,8 +3,14 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
-    public class SelectConstructorWithAllResolvableArguments
+    public class SelectConstructorWithAllResolvableArguments : ITest
     {
+        public int Run()
+        {
+            Container_is_providing_method_for_that();
+            return 1;
+        }
+
         [Test]
         public void Container_is_providing_method_for_that()
         {

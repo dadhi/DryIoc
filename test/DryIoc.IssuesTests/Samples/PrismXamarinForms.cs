@@ -4,8 +4,16 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
-    public class PrismXamarinForms
+    public class PrismXamarinForms : ITest
     {
+        public int Run()
+        {
+            Test();
+            Replace_singleton_dependency_with_asResolutionCall();
+            Replace_singleton_dependency_with_instance();
+            return 3;
+        }
+
         [Test]
         public void Test()
         {

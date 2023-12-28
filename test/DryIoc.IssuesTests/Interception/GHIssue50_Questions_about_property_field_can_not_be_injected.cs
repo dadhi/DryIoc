@@ -5,8 +5,15 @@ using DryIoc.Interception;
 namespace DryIoc.IssuesTests.Interception
 {
     [TestFixture]
-    public class GHIssue50_Questions_about_property_field_can_not_be_injected
+    public class GHIssue50_Questions_about_property_field_can_not_be_injected : ITest
     {
+        public int Run()
+        {
+            Intercepting_both_interface_and_class_should_work();
+            Can_specify_multiple_interceptors_at_once();
+            return 2;
+        }
+
         [Test]
         public void Intercepting_both_interface_and_class_should_work()
         {

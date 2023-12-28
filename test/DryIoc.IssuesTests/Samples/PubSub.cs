@@ -6,8 +6,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
-    public class PubSub
+    public class PubSub : ITest
     {
+        public int Run()
+        {
+            Can_subscribe_to_Hub_based_on_implemented_interface();
+            Can_subscribe_attributed_subscriber();
+            return 2;
+        }
+
         [Test]
         public void Can_subscribe_to_Hub_based_on_implemented_interface()
         {

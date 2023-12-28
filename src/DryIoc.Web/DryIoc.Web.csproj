@@ -4,7 +4,7 @@
 
         <Product>DryIoc.Web</Product>
 
-        <VersionPrefix>5.0.0</VersionPrefix>
+        <VersionPrefix>6.0.0</VersionPrefix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
@@ -16,22 +16,31 @@
         <PackageTags>Web ASP Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-v5.0.0:
+## v6.0.0:
+- added: Support for DryIoc v6
+
+## v5.0.0:
 - added: Support for DryIoc v5
-v4.0.0:
+
+## v4.0.0:
 - added: Support for DryIoc v4
 - added: IDryIocHttpModuleRequestHandler API and HttpContextScopeContextRequestHandler implementation
 - added: DryIocHttpModule.RequestHandler
-v3.0.0:
+
+## v3.0.0:
 - added: Support for DryIoc v3
-v2.2.0:
+
+## v2.2.0:
 - added: Ability to handle HttpContextScopeContext errors via User handler to find reason for #433
-v2.1.1:
+
+## v2.1.1:
 - More robust HttpContextScopeContext to prevent possible concurrency errors
-v2.1.0:
+
+## v2.1.0:
 - added: #336: DryIoc Web And Mvc on ASP.NET MVC 4
 - changed: Depending on Microsoft.Web.Infrastructure package instead of framework assembly
-v2.0.1:
+
+## v2.0.1:
 - fixed: HttpContext to return null scope if context is not available, as it supposed to be.
         ]]>
         </PackageReleaseNotes>

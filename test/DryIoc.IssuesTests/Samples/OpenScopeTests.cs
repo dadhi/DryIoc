@@ -3,8 +3,16 @@
 namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
-    public class OpenScopeTests
+    public class OpenScopeTests : ITest
     {
+        public int Run()
+        {
+            Session_example_of_scope_usage();
+            Session_example_of_scope_usage_when_factory_is_not_resolution_root();
+            Session_example_of_scope_usage_using_factory_method();
+            return 3;
+        }
+
         [Test]
         public void Session_example_of_scope_usage()
         {

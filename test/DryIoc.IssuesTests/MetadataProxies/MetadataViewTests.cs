@@ -3,16 +3,23 @@ using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests.MetadataProxies
 {
     [TestFixture]
-    public class MetadataViewTests
+    public class MetadataViewTests : ITest
     {
+        public int Run()
+        {
+            Untyped_metadata_works_out_of_the_box();
+            Typed_metadata_view_cannot_be_resolved_by_default();
+            Untyped_metadata_works_fine_with_new_Lazy_wrapper();
+            Typed_metadata_view_now_also_resolves();
+            return 4;
+        }
+
         [Test]
         public void Untyped_metadata_works_out_of_the_box()
         {

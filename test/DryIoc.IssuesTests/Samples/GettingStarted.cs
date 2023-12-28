@@ -3,8 +3,18 @@
 namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
-    public class GettingStarted
+    public class GettingStarted : ITest
     {
+        public int Run()
+        {
+            Register_some_client_and_service_types_Then_resolve_client_with_injected_service();
+            Specify_reuse_type_for_resolved_injected_objects();
+            If_you_forgot_to_register_service_type_Container_will_guide_you_with_exception_message();
+            Unable_to_resolve_in_case_of_wrong_key();
+            Unable_to_resolve_in_case_of_no_scope();
+            return 5;
+        }
+
         [Test]
         public void Register_some_client_and_service_types_Then_resolve_client_with_injected_service()
         {

@@ -5,8 +5,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
-    public class ResolveMocksForNonRegisteredServices
+    public class ResolveMocksForNonRegisteredServices : ITest
     {
+        public int Run()
+        {
+            Resolve_mock_for_non_registered_service();
+            Inject_mock_for_non_registered_service();
+            return 2;
+        }
+
         [Test]
         public void Resolve_mock_for_non_registered_service()
         {

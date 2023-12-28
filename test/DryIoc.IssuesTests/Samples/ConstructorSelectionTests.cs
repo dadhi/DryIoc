@@ -3,8 +3,16 @@
 namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
-    public class ConstructorSelectionTests
+    public class ConstructorSelectionTests : ITest
     {
+        public int Run()
+        {
+            When_registering_service_with_multiple_constructors_you_Should_specify_what_constructor_to_use();
+            Registering_service_with_many_public_constructors_without_constructor_selector_will_throw();
+            It_is_possible_to_register_and_resolve_service_with_internal_constructor();
+            return 3;
+        }
+
         [Test]
         public void When_registering_service_with_multiple_constructors_you_Should_specify_what_constructor_to_use()
         {

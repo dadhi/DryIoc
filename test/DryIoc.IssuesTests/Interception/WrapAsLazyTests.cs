@@ -8,8 +8,37 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests.Interception
 {
     [TestFixture]
-    public class WrapAsLazyTests
+    public class WrapAsLazyTests : ITest
     {
+        public int Run()
+        {
+            Service_can_be_registered_as_always_lazy();
+            Interface_can_be_resolved_as_always_lazy_via_ProxyGenerator();
+            Interface_can_be_resolved_as_always_lazy_via_DefaultProxyBuilder();
+            Interface_not_available_at_compile_time_can_be_resolved_as_always_lazy_via_ProxyGenerator();
+            Interface_not_available_at_compile_time_can_be_resolved_as_always_lazy_via_DefaultProxyBuilder();
+            Circular_dependency_is_normally_not_allowed();
+            Circular_dependency_is_allowed_when_services_are_registered_as_lazy();
+            Circular_dependency_handling_doesnt_actually_work_for_the_deeper_levels();
+            Resolve_array_works_for_simple_decorators();
+            Resolve_single_works_for_intercepting_decorators_similar_to_CastleDynamicProxy_based_one();
+            Resolve_array_works_for_intercepting_decorators_similar_to_CastleDynamicProxy_based_one();
+            Resolve_array_works_with_lazy_proxy_via_ProxyGenerator();
+            Resolve_array_works_with_lazy_proxy_via_DefaultProxyBuilder();
+            ResolveMany_works_with_lazy_proxy_via_ProxyGenerator();
+            ResolveMany_works_with_lazy_proxy_via_DefaultProxyBuilder();
+            Resolve_array_works_for_command_with_dependency_lazy_proxy_via_ProxyGenerator();
+            Resolve_array_works_with_metadata();
+            Resolve_array_works_with_metadata_and_trivial_decorator();
+            Resolve_array_with_metadata_works_with_LazyProxy();
+            ImportMany_with_metadata_works_without_lazy_proxies();
+            ImportMany_with_metadata_works_with_lazy_proxies_via_ProxyGenerator();
+            ImportMany_with_metadata_works_with_lazy_proxies_via_DefaultProxyBuilder();
+            Import_lazy_calls_OnImportsSatisfied();
+            Imported_service_with_a_trivial_decorator_calls_OnImportsSatisfied();
+            return 24;
+        }
+
         [Test]
         public void Service_can_be_registered_as_always_lazy()
         {

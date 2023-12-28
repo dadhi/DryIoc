@@ -6,8 +6,15 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
-    public class AutoWiring
+    public class AutoWiring : ITest
     {
+        public int Run()
+        {
+            Discover_and_register_new_plugins_from_assembly();
+            Convention_setup_example();
+            return 2;
+        }
+
         [Test]
         public void Discover_and_register_new_plugins_from_assembly()
         {

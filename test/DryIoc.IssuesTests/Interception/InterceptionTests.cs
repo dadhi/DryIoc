@@ -8,8 +8,15 @@ using DryIoc.Interception;
 namespace DryIoc.IssuesTests.Interception
 {
     [TestFixture]
-    public class InterceptionTests
+    public class InterceptionTests : ITest
     {
+        public int Run()
+        {
+            Test_interface_interception();
+            Intercepting_disposable_transient();
+            return 2;
+        }
+
         [Test]
         public void Test_interface_interception()
         {

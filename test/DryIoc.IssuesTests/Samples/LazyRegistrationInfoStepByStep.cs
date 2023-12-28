@@ -9,8 +9,21 @@ using NUnit.Framework;
 namespace DryIoc.IssuesTests.Samples
 {
     [TestFixture]
-    public class LazyRegistrationInfoStepByStep
+    public class LazyRegistrationInfoStepByStep : ITest
     {
+        public int Run()
+        {
+            Can_get_registration_info_with_implementation_type_replaced_by_its_full_name();
+            NonLazy_import_of_commands();
+            Lazy_import_of_commands();
+            Lazy_import_of_commands_using_LazyFactory();
+            Lazy_import_of_commands_using_custom_DynamicRegistrationProvider();
+            Lazy_import_of_commands_using_multiple_dynamic_registrations_of_the_same_service();
+            Lazy_import_should_detect_circular_dependencies();
+            Lazy_import_of_Actions();
+            return 8;
+        }
+
         [Test]
         public void Can_get_registration_info_with_implementation_type_replaced_by_its_full_name()
         {
