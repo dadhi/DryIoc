@@ -118,6 +118,8 @@ namespace DryIoc.UnitTests
                 new Microsoft.DependencyInjection.Specification.Tests.ValidateCaptiveDependencyTests(),
                 new Microsoft.DependencyInjection.Specification.Tests.GetRequiredServiceTests(),
                 new Microsoft.DependencyInjection.Specification.Tests.ServicesTests(),
+
+                new CommonServiceLocator.UnitTests.DryIocServiceLocatorTests(),
             };
 
             var issuesTests = new ITest[]
@@ -167,7 +169,6 @@ namespace DryIoc.UnitTests
                 new Issue144_NonPublic_property_as_FactoryMethod_causes_unexplained_NRE(),
                 new Issue145_SimplifyDefiningOfOpenGenericFactoryMethod(),
                 new Issue148_NestedOptionalDependenciesPreventTheOuterDependencyFromInstantiating(),
-
                 new Issue153_ContextDependentResolutionOnlyWorksForTheVeryFirstContext(),
                 new Issue157_ContainerResolveFactoryIsNotThreadSafe(),
                 new Issue158_WrappingDependencyInLazyResultsInTheLossOfLifespanValidation(),

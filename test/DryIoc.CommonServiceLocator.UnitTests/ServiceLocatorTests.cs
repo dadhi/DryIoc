@@ -4,8 +4,18 @@ using NUnit.Framework;
 
 namespace DryIoc.CommonServiceLocator.UnitTests
 {
-    public class DryIocServiceLocatorTests
+    public class DryIocServiceLocatorTests : ITest
     {
+        public int Run()
+        {
+            Can_get_instance_with_locator();
+            Can_get_keyed_instance_with_locator();
+            Can_get_all_instances_with_locator();
+            Get_instance_of_not_registered_service_should_Throw();
+            Get_all_instances_of_not_registered_service_should_return_empty_collection();
+            return 5;
+        }
+
         [Test]
         public void Can_get_instance_with_locator()
         {

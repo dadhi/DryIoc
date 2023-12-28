@@ -11,7 +11,7 @@ skip_commits:
   message: /noci .*/
 
 build_script:
-  - dotnet run -f net7.0 -c Release -p:DevMode=false --project test/DryIoc.TestsRunner
+  - dotnet run -v:minimal -p:DevMode=false -f:net7.0 -c:Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 
 for:
   - matrix:
