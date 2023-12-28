@@ -23,7 +23,7 @@ namespace DryIoc.UnitTests
             // note: @important to remember to do the Tread.Sleep in tests less that this setting, 
             // if you don't intentionally want the Error.WaitForScopedServiceIsCreatedTimeoutExpired exception, 
             // e.g. see GHIssue337_Singleton_is_created_twice, GHIssue391_Deadlock_during_Resolve, Issue157_ContainerResolveFactoryIsNotThreadSafe
-            Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 70;
+            Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 100;
 
             var perfMemoryTests = new ITest[]
             {
