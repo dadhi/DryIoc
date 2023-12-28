@@ -9,6 +9,7 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
+            // new ThrowTests().Run();
             // new GHIssue619_FaultySingletonDependency().Run();
             // new GHIssue337_Singleton_is_created_twice().Run();
 
@@ -88,9 +89,7 @@ namespace DryIoc.UnitTests
                 new RulesTests(),
                 new SelectConstructorWithAllResolvableArgumentTests(),
                 new StronglyTypeConstructorAndParametersSpecTests(),
-
-                // new ThrowTests(), // todo: @wip @fixme commented until #622 is fixed
-
+                new ThrowTests(),
                 new TypeCSharpNameFormattingTests(),
                 new TypeToolsTests(),
                 new UnregisterTests(),
