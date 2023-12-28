@@ -20,9 +20,8 @@ echo:
 echo:## Starting: TestRunner...
 echo:
 
-dotnet run --no-build -f net8.0 -c Release --project test/DryIoc.TestRunner
-if %ERRORLEVEL% neq 0 goto :error
-dotnet run --no-build -c Release --project test/DryIoc.TestRunner.net472
+dotnet run --no-build -f:net8.0 -c:Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet run --no-build -c:Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
 if %ERRORLEVEL% neq 0 goto :error
 
 echo:
@@ -53,7 +52,7 @@ set /a finished_at_ms=%finished_at:~0,2%*24*60*100+%finished_at:~3,2%*60*100+%fi
 set /a ellapsed_ms=%finished_at_ms%*10-%started_at_ms%*10
 
 echo:
-echo:[finished at %finished_at%]
+echo:[finished at %finished_at%, elapsed: %ellapsed_ms% ms]
 echo:## Finished: ALL Successful ##
 exit /b 0
 

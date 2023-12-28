@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.WebApi</id>
-        <version>5.0.0</version>
+        <version>6.0.0</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2013-2023 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,6 +13,9 @@
         <tags>Web ASP API Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
 <![CDATA[
+## v6.0.0:
+- Support for DryIoc v6
+
 ## v5.0.0:
 - Support for DryIoc v5
 
@@ -23,8 +26,8 @@
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc" version="5.3.0" />
-                <dependency id="Microsoft.AspNet.WebApi.Core" version="5.2.7" />
+                <dependency id="DryIoc" version="6.0.0" />
+                <dependency id="Microsoft.AspNet.WebApi.Core" version="5.3.0" />
             </group>
         </dependencies>
     </metadata>
