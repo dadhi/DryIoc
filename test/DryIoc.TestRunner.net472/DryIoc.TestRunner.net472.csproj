@@ -18,6 +18,8 @@
     <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.Syntax.Autofac.UnitTests\DryIoc.Syntax.Autofac.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.Issue139_ReducedLoadTests\ReducedStackoverflow.csproj" />
+
+    <ProjectReference Include="..\DryIoc.Web.UnitTests\DryIoc.Web.UnitTests.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -112,6 +112,9 @@ namespace DryIoc.UnitTests
 
                 new Syntax.Autofac.UnitTests.Issue123_TipsForMigrationFromAutofac(),
                 new Syntax.Autofac.UnitTests.Issue123_TipsForMigrationFromAutofac_WithParameter(),
+
+                // Old ASP Stuff:
+                new Web.UnitTests.DryIocWebTests(),
             };
 
             var issuesTests = new ITest[]

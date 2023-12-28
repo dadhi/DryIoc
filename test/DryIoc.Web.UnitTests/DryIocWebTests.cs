@@ -7,8 +7,18 @@ using NUnit.Framework;
 namespace DryIoc.Web.UnitTests
 {
     [TestFixture]
-    public class DryIocWebTests
+    public class DryIocWebTests : ITest
     {
+        public int Run()
+        {
+            Can_create_container_with_HttpContext_reuse_context();
+            Can_init_module_initializer_without_errors();
+            Can_http_module_without_errors();
+            Should_put_new_scope_into_context_on_begin_request();
+            Disposing_module_does_nothing_and_does_not_throw();
+            return 5;
+        }
+
         [Test]
         public void Can_create_container_with_HttpContext_reuse_context()
         {
