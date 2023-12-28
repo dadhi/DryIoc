@@ -16176,7 +16176,7 @@ namespace DryIoc
         }
 
         /// <summary>Portable version of PropertyInfo.GetGetMethod.</summary>
-        public static MethodInfo GetGmetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
+        public static MethodInfo GetGetMethodOrNull(this PropertyInfo p, bool includeNonPublic = false)
         {
             var name = "get_" + p.Name;
             var methods = p.DeclaringType.GetTypeInfo().DeclaredMethods.ToArrayOrSelf();
