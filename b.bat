@@ -6,13 +6,13 @@ set started_at=%time%
 set /a started_at_ms=%started_at:~0,2%*24*60*100+%started_at:~3,2%*60*100+%started_at:~6,2%*100+%started_at:~9,2%
 
 echo:
-echo:## Build and Run TestRunner (.NET 8.0 and .NET FRAMEWORK 4.7.2)
+echo:# Build and Run TestRunners for .NET 8.0 and .NET FRAMEWORK 4.7.2
 echo:[started at %started_at%]
 echo:
-echo:### .NET 8.0
+echo:## .NET 8.0
 dotnet run -v:minimal -f:net8.0 -c:Release -p:GeneratePackageOnBuild=false --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 echo:
-echo:### .NET FRAMEWORK 4.7.2
+echo:## .NET FRAMEWORK 4.7.2
 dotnet run -v:minimal -c:Release -p:GeneratePackageOnBuild=false --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
 
 if %ERRORLEVEL% neq 0 goto :error
@@ -23,12 +23,11 @@ set /a finished_at_ms=%finished_at:~0,2%*24*60*100+%finished_at:~3,2%*60*100+%fi
 set /a ellapsed_ms=%finished_at_ms%*10-%started_at_ms%*10
 
 echo:
-echo:[finished at %finished_at%]
-echo:## Build and Tests completed in %ellapsed_ms% ms. 
-echo:
+echo:[finished at %finished_at%, elapsed: %ellapsed_ms% ms]
+echo:# Finished: ALL Successful
 exit /b 0
 
 :error
 echo:
-echo:## Build is failed :-(
+echo:# Finished: Something failed :-(
 exit /b 1

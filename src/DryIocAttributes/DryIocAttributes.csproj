@@ -4,7 +4,6 @@
 
         <Product>DryIocAttributes</Product>
         <VersionPrefix>7.0.0</VersionPrefix>
-        <VersionSuffix>preview-03</VersionSuffix>
         <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
