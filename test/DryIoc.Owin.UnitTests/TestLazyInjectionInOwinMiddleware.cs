@@ -8,8 +8,15 @@ using Owin;
 namespace DryIoc.Owin.UnitTests
 {
     [TestFixture]
-    public class TestLazyInjectionInOwinMiddleware
+    public class TestLazyInjectionInOwinMiddleware : ITest
     {
+        public int Run()
+        {
+            Init();
+            TestLazyWithOwin().GetAwaiter().GetResult();
+            return 1;
+        }
+
         static Container container;
         public class Startup
         {

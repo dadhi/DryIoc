@@ -6,15 +6,22 @@ using Microsoft.Owin.Testing;
 using NUnit.Framework;
 using DryIoc.Owin;
 using DryIoc.Web;
-using ImTools;
+using DryIoc.ImTools;
 
 namespace DryIoc.Mvc.Owin.UnitTests
 {
     [TestFixture]
-    public class DryIocMvcOwinTests
+    public class DryIocMvcOwinTests : ITest
     {
+        public int Run()
+        {
+            Configure_container_with_MVC_and_use_OWIN_middleware().GetAwaiter().GetResult();
+            Registering_greeting_with_middleware_configuration().GetAwaiter().GetResult();
+            return 2;
+        }
+
         [Test]
-        public async void Configure_container_with_MVC_and_use_OWIN_middleware()
+        public async Task Configure_container_with_MVC_and_use_OWIN_middleware()
         {
             IContainer container = new Container();
             container.Register<TestGreetingMiddleware>();
@@ -35,7 +42,7 @@ namespace DryIoc.Mvc.Owin.UnitTests
         }
 
         [Test]
-        public async void Registering_greeting_with_middleware_configuration()
+        public async Task Registering_greeting_with_middleware_configuration()
         {
             IContainer container = new Container();
             container.Register<TestGreetingMiddleware>();

@@ -115,11 +115,17 @@ namespace DryIoc.UnitTests
 
                 // Old ASP Stuff:
                 new Web.UnitTests.DryIocWebTests(),
+                new Web.UnitTests.HttpContextScopeContextTests(),
                 new SignalR.UnitTests.DryIocSignalRTests(),
                 new Owin.UnitTests.DryIocOwinMiddlewareTests(),
+                new Owin.UnitTests.TestLazyInjectionInOwinMiddleware(),
                 new Mvc.UnitTests.DryIocDataAnnotationsValidatorTests(),
+                new Mvc.UnitTests.DryIocMvcTests(),
+                new Mvc.UnitTests.ReuseInRequestTests(),
+                new Mvc.Owin.UnitTests.DryIocMvcOwinTests(),
                 new WebApi.UnitTests.DryIocWebApiTests(),
                 new WebApi.UnitTests.RegisterHttpRequestMessageInRequestTests(),
+                new WebApi.Owin.UnitTests.DryIocWebApiOwinTests(),
             };
 
             var issuesTests = new ITest[]

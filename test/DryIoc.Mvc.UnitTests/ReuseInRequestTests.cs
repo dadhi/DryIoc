@@ -6,8 +6,14 @@ using NUnit.Framework;
 namespace DryIoc.Mvc.UnitTests
 {
     [TestFixture]
-    public class ReuseInRequestTests
+    public class ReuseInRequestTests : ITest
     {
+        public int Run()
+        {
+            Working_with_HttpContext_based_scope_context();
+            return 1;
+        }
+
         [Test]
         public void Working_with_HttpContext_based_scope_context()
         {

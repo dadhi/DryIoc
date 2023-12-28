@@ -9,8 +9,21 @@ using NUnit.Framework;
 namespace DryIoc.Mvc.UnitTests
 {
     [TestFixture]
-    public class DryIocMvcTests
+    public class DryIocMvcTests : ITest
     {
+        public int Run()
+        {
+            Can_enable_mvc_support_for_container_and_resolve_filter_provider();
+            Can_specify_to_throw_on_unresolved_controller();
+            Can_specify_scope_context_scope_error_handler();
+            Without_specifying_scope_context_error_handler_the_error_should_be_re_thrown();
+            Can_resolve_from_dependency_resolver();
+            Can_resolve_filter_provider();
+            When_custom_scope_context_is_specified_then_it_should_be_preserved();
+            Correct_filter_provider_substitution();
+            return 8;
+        }
+
         [Test]
         public void Can_enable_mvc_support_for_container_and_resolve_filter_provider()
         {

@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.Web.UnitTests
 {
     [TestFixture]
-    public class HttpContextScopeContextTests
+    public class HttpContextScopeContextTests : ITest
     {
+        public int Run()
+        {
+            Can_open_scope_without_container_for_stateless_context();
+            return 1;
+        }
+
         [Test]
         public void Can_open_scope_without_container_for_stateless_context()
         {

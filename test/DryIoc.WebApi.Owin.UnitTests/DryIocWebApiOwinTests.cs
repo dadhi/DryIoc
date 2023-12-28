@@ -7,8 +7,15 @@
     using Owin;
 
     [TestFixture]
-    public class DryIocWebApiOwinTests
+    public class DryIocWebApiOwinTests : ITest
     {
+        public int Run()
+        {
+            Ensure_that_we_added_delegating_handler();
+            Ensure_that_we_added_delegating_handler_once();
+            return 2;
+        }
+
         [Test]
         public void Ensure_that_we_added_delegating_handler()
         {
