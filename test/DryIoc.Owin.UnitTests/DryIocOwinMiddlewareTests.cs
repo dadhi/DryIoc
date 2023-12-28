@@ -7,8 +7,17 @@ using NUnit.Framework;
 namespace DryIoc.Owin.UnitTests
 {
     [TestFixture]
-    public class DryIocOwinMiddlewareTests
+    public class DryIocOwinMiddlewareTests : ITest
     {
+        public int Run()
+        {
+            Scoped_container_is_used_in_pipeline().GetAwaiter().GetResult();
+            Registered_test_middleware_is_used_in_pipeline().GetAwaiter().GetResult();
+            Should_ignore_unresolved_middleware_due_missing_dependency().GetAwaiter().GetResult();
+            Can_register_to_context_request().GetAwaiter().GetResult();
+            return 4;
+        }
+
         [Test]
         public async Task Scoped_container_is_used_in_pipeline()
         {

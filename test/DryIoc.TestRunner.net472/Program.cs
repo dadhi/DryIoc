@@ -115,6 +115,8 @@ namespace DryIoc.UnitTests
 
                 // Old ASP Stuff:
                 new Web.UnitTests.DryIocWebTests(),
+                new SignalR.UnitTests.DryIocSignalRTests(),
+                new Owin.UnitTests.DryIocOwinMiddlewareTests(),
             };
 
             var issuesTests = new ITest[]
