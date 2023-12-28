@@ -145,11 +145,13 @@ namespace DryIoc.UnitTests
                 new Issue_UsingAsyncMethodAsMadeOf(),
                 new Issue_Value_type_resolution_dependency(),
 
+                // note: Explicit, relies on GC
+                // new Issue58_HandleReusedObjectsIDisposableAndGCing(),
+
                 // BitBucket issues from older times
                 new Issue26_DryIOCSingletonFailureTest(),
                 new Issue45_UnregisterOpenGenericAfterItWasResolvedOnce(),
                 new Issue46_ReuseInCurrentScopeForNestedDependenciesNotWorking(),
-                new Issue58_HandleReusedObjectsIDisposableAndGCing(),
                 new Issue64_ScopeAndChildContainerAccessAfterDisposal(),
                 new Issue69_RecognizeGenericParameterConstraints(),
                 new Issue80_SupportWrappersForAllInterfacesImplementedByArray(),
@@ -410,9 +412,9 @@ namespace DryIoc.UnitTests
             var perfMemoryTestsTask = Task.Run(() => RunTests(perfMemoryTests, "PerfMemoryTests"));
             Task.WaitAll(unitTestsTask, issuesTestsTask, perfMemoryTestsTask);
 
-            var unitTestCount = unitTestsTask.IsCompletedSuccessfully ? unitTestsTask.Result : 0;
-            var issuesTestCount = issuesTestsTask.IsCompletedSuccessfully ? issuesTestsTask.Result : 0;
-            var perfMemoryTestCount = perfMemoryTestsTask.IsCompletedSuccessfully ? perfMemoryTestsTask.Result : 0;
+            var unitTestCount = unitTestsTask.IsCompleted ? unitTestsTask.Result : 0;
+            var issuesTestCount = issuesTestsTask.IsCompleted ? issuesTestsTask.Result : 0;
+            var perfMemoryTestCount = perfMemoryTestsTask.IsCompleted ? perfMemoryTestsTask.Result : 0;
 
             totalPassed = unitTestCount + issuesTestCount + perfMemoryTestCount;
 

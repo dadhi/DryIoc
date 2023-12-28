@@ -8,8 +8,15 @@ using Wire;
 namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 {
     [TestFixture]
-    public class CompileTimeRegistrationInfoSerializationTests
+    public class CompileTimeRegistrationInfoSerializationTests : ITest
     {
+        public int Run()
+        {
+            Given_scnanned_assembly_When_serialize_data_Then_deserialize_will_return_the_same_data();
+            Given_deserialized_data_When_registering_scanned_data_into_container_Then_metadata_should_correctly_registered_too();
+            return 2;
+        }
+
         private const string DATA_FILE = "SerializedExports.bin";
 
         private string _originalDirectory;

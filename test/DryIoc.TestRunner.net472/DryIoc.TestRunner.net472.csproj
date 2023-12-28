@@ -8,11 +8,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+     <Compile Include="..\DryIoc.TestRunner\DocsTests.cs" Link="DocsTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DryIoc.UnitTests\DryIoc.UnitTests.csproj" />
-    <ProjectReference Include="..\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj" />
-    <ProjectReference Include="..\DryIoc.Issue139_ReducedLoadTests\ReducedStackoverflow.csproj" />
     <ProjectReference Include="..\..\docs\DryIoc.Docs\DryIoc.Docs.csproj" />
+    <ProjectReference Include="..\DryIoc.IssuesTests\DryIoc.IssuesTests.csproj" />
     <ProjectReference Include="..\DryIoc.MefAttributedModel.UnitTests\DryIoc.MefAttributedModel.UnitTests.csproj" />
+    <ProjectReference Include="..\DryIoc.Syntax.Autofac.UnitTests\DryIoc.Syntax.Autofac.UnitTests.csproj" />
+    <ProjectReference Include="..\DryIoc.Issue139_ReducedLoadTests\ReducedStackoverflow.csproj" />
   </ItemGroup>
 
   <ItemGroup>

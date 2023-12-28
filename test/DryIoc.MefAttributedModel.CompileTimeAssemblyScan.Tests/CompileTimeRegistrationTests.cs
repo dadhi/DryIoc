@@ -6,8 +6,15 @@ using NUnit.Framework;
 namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
 {
     [TestFixture]
-    public class CompileTimeRegistrationTests
+    public class CompileTimeRegistrationTests : ITest
     {
+        public int Run()
+        {
+            Can_register_service_with_constants_alone();
+            Can_register_decorator_and_wrapper_with_constants_alone();
+            return 2;
+        }
+
         [Test]
         public void Can_register_service_with_constants_alone()
         {
