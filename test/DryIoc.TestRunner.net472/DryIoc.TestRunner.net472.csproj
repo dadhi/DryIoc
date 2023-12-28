@@ -20,6 +20,7 @@
     <ProjectReference Include="..\DryIoc.Issue139_ReducedLoadTests\ReducedStackoverflow.csproj" />
 
     <ProjectReference Include="..\DryIoc.Web.UnitTests\DryIoc.Web.UnitTests.csproj" />
+    <ProjectReference Include="..\DryIoc.SignalR.UnitTests\DryIoc.SignalR.UnitTests.csproj" />
   </ItemGroup>
 
   <ItemGroup>
