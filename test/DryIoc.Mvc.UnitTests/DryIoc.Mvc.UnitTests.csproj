@@ -8,7 +8,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="NSubstitute" Version="5.0.0" />
+        <PackageReference Include="NSubstitute" Version="5.1.0" />
     </ItemGroup>
 
     <ItemGroup>

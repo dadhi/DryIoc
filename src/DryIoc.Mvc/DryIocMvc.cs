@@ -106,13 +106,13 @@ namespace DryIoc.Mvc
         /// <param name="container">Container to register controllers to.</param>
         /// <param name="controllerAssemblies">(optional) Uses <see cref="BuildManager.GetReferencedAssemblies"/> by default.</param>
         /// <param name="controllerReuse">(optional) Defaults to <see cref="Reuse.InWebRequest"/></param>
-        public static void RegisterMvcControllers(this IContainer container, 
+        public static void RegisterMvcControllers(this IContainer container,
             IEnumerable<Assembly> controllerAssemblies = null, IReuse controllerReuse = null)
         {
             controllerAssemblies = controllerAssemblies ?? GetReferencedAssemblies();
             controllerReuse = controllerReuse ?? Reuse.InWebRequest;
 
-            container.RegisterMany(controllerAssemblies, IsController, controllerReuse, 
+            container.RegisterMany(controllerAssemblies, IsController, controllerReuse,
                 FactoryMethod.ConstructorWithResolvableArguments);
         }
 
@@ -140,13 +140,11 @@ namespace DryIoc.Mvc
         /// <returns>Returns source container for fluent access.</returns>
         public static IContainer WithDataAnnotationsValidator(this IContainer container)
         {
-            var serviceProvider = new DryIocServiceProvider(container.ThrowIfNull());
-
             DataAnnotationsModelValidatorProvider.RegisterDefaultAdapterFactory((metadata, context, attribute) =>
-                new DryIocDataAnnotationsModelValidator(serviceProvider, metadata, context, attribute));
+                new DryIocDataAnnotationsModelValidator(container, metadata, context, attribute));
 
             DataAnnotationsModelValidatorProvider.RegisterDefaultValidatableObjectAdapterFactory((metadata, context) =>
-                new DryIocValidatableObjectAdapter(serviceProvider, metadata, context));
+                new DryIocValidatableObjectAdapter(container, metadata, context));
 
             return container;
         }
@@ -168,7 +166,7 @@ namespace DryIoc.Mvc
         /// <summary> Resolves single registered services that support arbitrary object creation. </summary>
         /// <returns> The requested service or object. </returns>
         /// <param name="serviceType">The type of the requested service or object.</param>
-        public object GetService(Type serviceType) => 
+        public object GetService(Type serviceType) =>
             _resolver.Resolve(serviceType,
                 _throwIfUnresolved != null && _throwIfUnresolved(serviceType)
                     ? IfUnresolved.Throw : IfUnresolved.ReturnDefault);
@@ -176,7 +174,7 @@ namespace DryIoc.Mvc
         /// <summary> Resolves multiply registered services. </summary>
         /// <returns> The requested services. </returns>
         /// <param name="serviceType">The type of the requested services.</param>
-        public IEnumerable<object> GetServices(Type serviceType) => 
+        public IEnumerable<object> GetServices(Type serviceType) =>
             _resolver.ResolveMany<object>(serviceType);
 
         private readonly IResolver _resolver;
@@ -205,23 +203,6 @@ namespace DryIoc.Mvc
         }
 
         private readonly IContainer _container;
-    }
-
-    /// <summary>Service provider wrapping DryIoc <see cref="IResolver"/>.</summary>
-    public sealed class DryIocServiceProvider : IServiceProvider
-    {
-        /// <summary>Constructs the wrapper over resolver</summary> <param name="resolver"></param>
-        public DryIocServiceProvider(IResolver resolver)
-        {
-            _resolver = resolver;
-        }
-
-        /// <summary>Resolves the service for requested <paramref name="serviceType"/>.</summary>
-        /// <param name="serviceType">Requested service type.</param> <returns>Resolved service object</returns>
-        public object GetService(Type serviceType) => 
-            _resolver.Resolve(serviceType);
-
-        private readonly IResolver _resolver;
     }
 
     /// <summary>Provides a model validator and injects <see cref="IServiceProvider"/> 

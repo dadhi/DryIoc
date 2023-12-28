@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Web.Mvc;
@@ -5,22 +6,27 @@ using NUnit.Framework;
 
 namespace DryIoc.Mvc.UnitTests
 {
-    public class DryIocDataAnnotationsValidatorTests
+    public class DryIocDataAnnotationsValidatorTests : ITest
     {
-        private Container _container;
-        private DryIocServiceProvider _serviceProvider;
-
-        [SetUp]
-        public void Initialize()
+        public int Run()
         {
-            _container = new Container();
-            _serviceProvider = new DryIocServiceProvider(_container);
+            Can_register_validators();
+            User_model_login_is_valid();
+            User_model_login_not_is_valid();
+            User_model_validatable_object_is_valid();
+            User_model_validatable_object_not_is_valid();
+            Login_model_login_is_valid();
+            Login_model_login_not_is_valid();
+            Login_model_validatable_object_is_valid();
+            Login_model_validatable_object_not_is_valid();
+            return 9;
         }
 
         [Test]
         public void Can_register_validators()
         {
-            Assert.DoesNotThrow(() => _container.WithDataAnnotationsValidator());
+            var container = new Container();
+            Assert.DoesNotThrow(() => container.WithDataAnnotationsValidator());
         }
 
         private class UserModel : IValidatableObject
@@ -42,12 +48,14 @@ namespace DryIoc.Mvc.UnitTests
         [Test]
         public void User_model_login_is_valid()
         {
+            var container = new Container();
+
             var user = new UserModel
             {
                 Login = "arabasso"
             };
 
-            var results = ValidateUserModel(user);
+            var results = ValidateUserModel(container, user);
 
             Assert.That(results, Is.Empty);
         }
@@ -55,18 +63,20 @@ namespace DryIoc.Mvc.UnitTests
         [Test]
         public void User_model_login_not_is_valid()
         {
+            var container = new Container();
+
             var user = new UserModel();
 
-            var results = ValidateUserModel(user);
+            var results = ValidateUserModel(container, user);
 
             Assert.That(results, Is.Not.Empty);
         }
 
-        private IEnumerable<ModelValidationResult> ValidateUserModel(UserModel user)
+        private IEnumerable<ModelValidationResult> ValidateUserModel(IServiceProvider serviceProvider, UserModel user)
         {
             var metadata = ModelMetadataProviders.Current.GetMetadataForProperty(() => user.Login, typeof(UserModel), "Login");
 
-            var dataAnnotationValidator = new DryIocDataAnnotationsModelValidator(_serviceProvider, metadata,
+            var dataAnnotationValidator = new DryIocDataAnnotationsModelValidator(serviceProvider, metadata,
                 new ControllerContext(),
                 new RequiredAttribute());
 
@@ -81,16 +91,17 @@ namespace DryIoc.Mvc.UnitTests
                 Login = "arabasso"
             };
 
-            var results = ValidateUserObjectAdapter(user);
+            var container = new Container();
+            var results = ValidateUserObjectAdapter(container, user);
 
             Assert.That(results, Is.Empty);
         }
 
-        private IEnumerable<ModelValidationResult> ValidateUserObjectAdapter(UserModel user)
+        private IEnumerable<ModelValidationResult> ValidateUserObjectAdapter(IServiceProvider serviceProvider, UserModel user)
         {
             var metadata = ModelMetadataProviders.Current.GetMetadataForType(() => user, typeof(UserModel));
 
-            var validatableObjectAdapter = new DryIocValidatableObjectAdapter(_serviceProvider, metadata,
+            var validatableObjectAdapter = new DryIocValidatableObjectAdapter(serviceProvider, metadata,
                 new ControllerContext());
 
             return validatableObjectAdapter.Validate(user);
@@ -99,9 +110,10 @@ namespace DryIoc.Mvc.UnitTests
         [Test]
         public void User_model_validatable_object_not_is_valid()
         {
+            var serviceProvider = new Container();
             var user = new UserModel();
 
-            var results = ValidateUserObjectAdapter(user);
+            var results = ValidateUserObjectAdapter(serviceProvider, user);
 
             Assert.That(results, Is.Not.Empty);
         }
@@ -141,7 +153,7 @@ namespace DryIoc.Mvc.UnitTests
             {
                 unchecked
                 {
-                    return ((Username?.GetHashCode() ?? 0)*397) ^ (Password?.GetHashCode() ?? 0);
+                    return ((Username?.GetHashCode() ?? 0) * 397) ^ (Password?.GetHashCode() ?? 0);
                 }
             }
 
@@ -168,19 +180,20 @@ namespace DryIoc.Mvc.UnitTests
                 Username = "arabasso",
                 Password = "123"
             };
+            
+            var container = new Container();
+            container.RegisterDelegate(c => login);
 
-            _container.RegisterDelegate(c => login);
-
-            var results = ValidateLoginModel(login);
+            var results = ValidateLoginModel(container, login);
 
             Assert.That(results, Is.Empty);
         }
 
-        private IEnumerable<ModelValidationResult> ValidateLoginModel(LoginModel login)
+        private IEnumerable<ModelValidationResult> ValidateLoginModel(IServiceProvider serviceProvider, LoginModel login)
         {
             var metadata = ModelMetadataProviders.Current.GetMetadataForType(() => login, typeof(LoginModel));
 
-            var dataAnnorationValidator = new DryIocDataAnnotationsModelValidator(_serviceProvider, metadata,
+            var dataAnnorationValidator = new DryIocDataAnnotationsModelValidator(serviceProvider, metadata,
                 new ControllerContext(),
                 new VerifyLoginValidationAttribute());
 
@@ -196,9 +209,10 @@ namespace DryIoc.Mvc.UnitTests
                 Password = "123"
             };
 
-            _container.RegisterDelegate(c => new LoginModel());
+            var container = new Container();
+            container.RegisterDelegate(c => new LoginModel());
 
-            var results = ValidateLoginModel(login);
+            var results = ValidateLoginModel(container, login);
 
             Assert.That(results, Is.Not.Empty);
         }
@@ -212,9 +226,10 @@ namespace DryIoc.Mvc.UnitTests
                 Password = "123"
             };
 
-            _container.RegisterDelegate(c => login);
+            var container = new Container();
+            container.RegisterDelegate(c => login);
 
-            var results = ValidateLoginObjectAdapter(login);
+            var results = ValidateLoginObjectAdapter(container, login);
 
             Assert.That(results, Is.Empty);
         }
@@ -228,18 +243,19 @@ namespace DryIoc.Mvc.UnitTests
                 Password = "123"
             };
 
-            _container.RegisterDelegate(c => new LoginModel());
+            var container = new Container();
+            container.RegisterDelegate(c => new LoginModel());
 
-            var results = ValidateLoginObjectAdapter(login);
+            var results = ValidateLoginObjectAdapter(container, login);
 
             Assert.That(results, Is.Not.Empty);
         }
 
-        private IEnumerable<ModelValidationResult> ValidateLoginObjectAdapter(LoginModel login)
+        private IEnumerable<ModelValidationResult> ValidateLoginObjectAdapter(IServiceProvider serviceProvider, LoginModel login)
         {
             var metadata = ModelMetadataProviders.Current.GetMetadataForType(() => login, typeof(LoginModel));
 
-            var validatableObjectAdapter = new DryIocValidatableObjectAdapter(_serviceProvider, metadata,
+            var validatableObjectAdapter = new DryIocValidatableObjectAdapter(serviceProvider, metadata,
                 new ControllerContext());
 
             return validatableObjectAdapter.Validate(login);

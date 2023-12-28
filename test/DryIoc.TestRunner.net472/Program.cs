@@ -117,6 +117,7 @@ namespace DryIoc.UnitTests
                 new Web.UnitTests.DryIocWebTests(),
                 new SignalR.UnitTests.DryIocSignalRTests(),
                 new Owin.UnitTests.DryIocOwinMiddlewareTests(),
+                new Mvc.UnitTests.DryIocDataAnnotationsValidatorTests(),
             };
 
             var issuesTests = new ITest[]

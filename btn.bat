@@ -10,7 +10,7 @@ echo:## Build and Run TestRunner on .NET 4.7.2
 echo:[started at %started_at%]
 echo:
 
-dotnet run -v:minimal -c:Release --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
+dotnet run -v:minimal -c:Release -p:GeneratePackageOnBuild=false --project test/DryIoc.TestRunner.net472/DryIoc.TestRunner.net472.csproj
 
 if %ERRORLEVEL% neq 0 goto :error
 

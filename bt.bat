@@ -10,7 +10,7 @@ echo:## Build and Run TestRunner on .NET 8.0
 echo:[started at %started_at%]
 echo:
 
-dotnet run -v:minimal -f:net8.0 -c:Release --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
+dotnet run -v:minimal -f:net8.0 -c:Release -p:GeneratePackageOnBuild=false --project test/DryIoc.TestRunner/DryIoc.TestRunner.csproj
 if %ERRORLEVEL% neq 0 goto :error
 
 rem Calculate elapsed time

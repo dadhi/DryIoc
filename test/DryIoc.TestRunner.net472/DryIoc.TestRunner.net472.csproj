@@ -22,6 +22,7 @@
     <ProjectReference Include="..\DryIoc.SignalR.UnitTests\DryIoc.SignalR.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.Web.UnitTests\DryIoc.Web.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.Owin.UnitTests\DryIoc.Owin.UnitTests.csproj" />
+    <ProjectReference Include="..\DryIoc.Mvc.UnitTests\DryIoc.Mvc.UnitTests.csproj" />
   </ItemGroup>
 
   <ItemGroup>
