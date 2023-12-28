@@ -24,6 +24,7 @@ namespace DryIoc.UnitTests
             var perfMemoryTests = new ITest[]
             {
                 new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
+                new LoadTest.ReducedLoadTest(),
             };
 
             var unitTests = new ITest[]
