@@ -15,38 +15,46 @@
         <PackageTags>Web ASP MVC Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-v6.0.0:
+## v6.0.0
 - Support for DryIoc v6
-v5.0.0:
+
+## v5.0.0
 - Support for DryIoc v5
-v4.0.0:
+
+## v4.0.0
 - added: Support for DryIoc v4
 - added: Support for optional `controllerReuse` parameter in `WithMvc` method
 - added: AsyncExecutionFlowScopeContextRequestHandler implementation of IDryIocHttpModuleRequestHandler
-v3.0.0:
+
+## v3.0.0
 - Support for DryIoc v3
-v2.2.2:
+
+## v2.2.2
 - added: Ablity to handle HttpContextScopeContext errors via User handler to find reason for #433
-v2.2.1:
+
+## v2.2.1
 - More robust HttpContextScopeContext to prevent possible concurrency errors
-v2.2.0:
+
+## v2.2.0
 - fixed: #398: How to enable clear error messages when DryIoc is not able to resolve a service?
 - added: WithMvc option to propagate DryIoc errors to the client
-v2.1.0:
+
+## v2.1.0
 - added: #336: DryIoc Web And Mvc on ASP.NET MVC 4
 - added: WithDataAnnotationsValidator extension method
 - changed: Depending on Microsoft.Web.Infrastructure package instead of framework assembly
-v2.0.1
+
+## v2.0.1
 - fixed: #265: [DryIoc.Mvc] SetFilterAttributeFilterProvider removes wrong FilterProvider
 ]]>
         </PackageReleaseNotes>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNet.Mvc" Version="5.2.9" />
-        <PackageReference Include="Microsoft.AspNet.Razor" Version="3.2.9" />
-        <PackageReference Include="Microsoft.AspNet.WebPages" Version="3.2.9" />
-        <PackageReference Include="Microsoft.Web.Infrastructure" Version="1.0.0.0" />
+        <PackageReference Include="Microsoft.AspNet.Mvc" Version="5.3.0" />
+        <PackageReference Include="Microsoft.AspNet.Razor" Version="3.3.0" />
+        <PackageReference Include="Microsoft.AspNet.WebPages" Version="3.3.0" />
+        <PackageReference Include="Microsoft.Web.Infrastructure" Version="1.0.0" />
     </ItemGroup>
 
     <ItemGroup>

@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.SignalR</id>
-        <version>5.0.0</version>
+        <version>6.0.0</version>
         <authors>Maksim Volkau</authors>
         <copyright>Copyright © 2016-2023 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
@@ -13,21 +13,30 @@
         <tags>Web ASPNET SignalR Extension IoC Container Inversion-of-Control DI Dependency-Injection DRY DryIoc</tags>
         <releaseNotes>
             <![CDATA[
-v5.0.0:
+## v6.0.0:
+- Support for DryIoc v6
+
+## v5.0.0:
 - Support for DryIoc v5
 - Upping the SignalR 2.4.3
-v4.1.0:
+
+## v4.1.0:
 - added: DryIocHubDispatcher
 - fixed: #292 Web Api SignalR. Cannot resolve hub instance on connection timeout.
-v4.0.0:
+
+## v4.0.0:
 - added: Support for DryIoc v4
-v3.0.0:
+
+## v3.0.0:
 - added: Support for DryIoc v3
-v2.1:
+
+## v2.1:
 - changed: Reference to latest DryIoc 2.10
-v2.0.1:
+
+## v2.0.1:
 - changed: Reference to latest DryIoc 2.8.3
-v2.0.0:
+
+## v2.0.0:
 - changed: WithSignalR to not modify container and just register HubActivator, Hubs, and set GlobalHost.Resolver
 - changed: HubActivator to just resolving the Hub without opening the scope
 - add: Helper methods to RegisterHubs
@@ -35,7 +44,7 @@ v2.0.0:
         </releaseNotes>
         <dependencies>
             <group>
-                <dependency id="DryIoc" version="5.3.0" />
+                <dependency id="DryIoc" version="6.0.0" />
                 <dependency id="Microsoft.AspNet.SignalR.Core" version="2.4.3" />
                 <dependency id="Microsoft.Owin.Security" version="4.2.2" />
             </group>
