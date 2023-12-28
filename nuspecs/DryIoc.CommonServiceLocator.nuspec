@@ -2,9 +2,9 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>DryIoc.CommonServiceLocator</id>
-        <version>4.1.0</version><!-- overridden by "nuget pack -Version" flag -->
+        <version>6.0.0</version>
         <authors>Maksim Volkau</authors>
-        <copyright>Copyright © 2014-2021 Maksim Volkau</copyright>
+        <copyright>Copyright © 2014-2023 Maksim Volkau</copyright>
         <projectUrl>https://github.com/dadhi/DryIoc</projectUrl>
         <license type="expression">MIT</license>
         <icon>logo.png</icon>
@@ -13,22 +13,28 @@
         <tags>Service-Locator CommonServiceLocator IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</tags>
         <releaseNotes>
 <![CDATA[
-v4.1.0:
+## v6.0.0:
+- Support for DryIoc v6
+
+## v4.1.0:
 - Support for DryIoc v4.1
 - #226 Update DryIoc.CommonServiceLocator references
-v4.0.0:
+
+## v4.0.0:
 - Support for DryIoc v4.0
-v3.1.0:
+
+## v3.1.0:
 - Support for DryIoc v3.1
-v3.0.0:
+
+## v3.0.0:
 - Support for DryIoc v3
 - Support for CommonServiceLocator v2
 ]]>
         </releaseNotes>
         <dependencies>
           <group>
-            <dependency id="DryIoc" version="4.0.0" />
-            <dependency id="CommonServiceLocator" version="2.0.3" />
+            <dependency id="DryIoc" version="6.0.0" />
+            <dependency id="CommonServiceLocator" version="2.0.7" />
           </group>
         </dependencies>
     </metadata>

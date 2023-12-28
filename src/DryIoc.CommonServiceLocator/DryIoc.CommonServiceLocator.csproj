@@ -3,8 +3,8 @@
         <TargetFrameworks>netstandard2.0;net7.0</TargetFrameworks>
 
         <Product>DryIoc.CommonServiceLocator</Product>
-        <VersionPrefix>5.0.0</VersionPrefix>
-        <VersionSuffix>preview-01</VersionSuffix>
+        <VersionPrefix>6.0.0</VersionPrefix>
+        <VersionSuffix></VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(Product) $(TargetFramework)</AssemblyTitle>
@@ -14,11 +14,23 @@
         <Description>Implementation of CommonServiceLocator for DryIoc container, see rationale at https://github.com/unitycontainer/commonservicelocator </Description>
         <PackageTags>Service-Locator CommonServiceLocator IoC Container Inversion-of-Control DI Dependency-Injection DRY Service-Provider Factory</PackageTags>
         <PackageReleaseNotes>
-            <![CDATA[
-v5.0.0:
+<![CDATA[
+## v6.0.0:
+- Support for DryIoc v6
 
-- Removing support for .NET 4.0 
+## v4.1.0:
+- Support for DryIoc v4.1
+- #226 Update DryIoc.CommonServiceLocator references
 
+## v4.0.0:
+- Support for DryIoc v4.0
+
+## v3.1.0:
+- Support for DryIoc v3.1
+
+## v3.0.0:
+- Support for DryIoc v3
+- Support for CommonServiceLocator v2
 ]]>
         </PackageReleaseNotes>
     </PropertyGroup>
