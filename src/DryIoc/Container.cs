@@ -13849,25 +13849,27 @@ namespace DryIoc
 
         internal static object WaitForItemIsSet(ImHashMapEntry<int, object> itemRef)
         {
-            var timeoutTicks = WaitForScopedServiceIsCreatedTimeoutMilliseconds * TimeSpan.TicksPerMillisecond;
+            var timeout = WaitForScopedServiceIsCreatedTimeoutMilliseconds;
 
-            var startedAtTicks = Stopwatch.GetTimestamp();
-            Debug.WriteLine($"Starting: Waiting for Scoped service to be set/created for max {timeoutTicks} ticks starting at {startedAtTicks}...");
+            var startedAt = Environment.TickCount & Int32.MaxValue;
+            Debug.WriteLine($"Starting: Waiting for Scoped service to be set/created for max {timeout} ms starting at {startedAt}...");
 
+            var ellapsed = 0;
             var spinWait = new SpinWait();
             while (itemRef.Value == NoItem)
             {
                 spinWait.SpinOnce();
-                var newTicks = Stopwatch.GetTimestamp();
-                if (newTicks - startedAtTicks > timeoutTicks)
-                    Throw.WithDetails(itemRef.Key, Error.WaitForScopedServiceIsCreatedTimeoutExpired);
-                else if (newTicks - startedAtTicks < 0)
+                var currentAt = Environment.TickCount & Int32.MaxValue;
+                ellapsed = currentAt - startedAt;
+                if (ellapsed > timeout)
+                    Throw.WithDetails(itemRef.Key, Error.WaitForScopedServiceIsCreatedTimeoutExpired, ellapsed);
+                else if (ellapsed < 0)
                 { 
-                    startedAtTicks = newTicks;
-                    Debug.WriteLine($"Happened: Robustness for the case of possible overflow, so we are starting a new with new ticks {startedAtTicks}");
+                    startedAt = currentAt;
+                    Debug.WriteLine($"Happened: Robustness for the case of possible overflow, so we are starting a new with new {startedAt}.");
                 }
             }
-            Debug.WriteLine($"Completed: Waiting for Scoped service to be set/created is completed in {(Stopwatch.GetTimestamp() - startedAtTicks)} ticks");
+            Debug.WriteLine($"Completed: Waiting for Scoped service to be set/created is completed in {ellapsed}.");
             return itemRef.Value;
         }
 
@@ -15327,8 +15329,8 @@ namespace DryIoc
             UnableToInterpretTheNestedLambda = Of(
                 "Unable to interpret the nested lambda with Body:" + NewLine + "{0}"),
             WaitForScopedServiceIsCreatedTimeoutExpired = Of(
-                $"Waited for the creation of the Scoped or Singleton service by the \"other party\" for {Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds} ms without the completion. " + NewLine +
-                "You may call `exception.TryGetDetails(container)` to get the details of the problematic service registration." + NewLine +
+                $"Waited for the creation of the Scoped or Singleton service by \"other party\" for {{0}}(actual) > {Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds}(max) ms without the completion. " + NewLine +
+                "You may call `exception.TryGetDetails(container)` to get more the details of the problematic service registration." + NewLine +
                 "The error means that either the \"other party\" is the parallel thread which has started but is unable to finish the creation of the service in time. " + NewLine +
                 "Or more likely the \"other party\" is the same thread and there is an undetected recursive dependency or, " + NewLine +
                 "service creation is failed with the exception and the exception was catched, but you're trying to resolve the failed service again. " + NewLine +
