@@ -23,6 +23,7 @@
     <ProjectReference Include="..\DryIoc.Web.UnitTests\DryIoc.Web.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.Owin.UnitTests\DryIoc.Owin.UnitTests.csproj" />
     <ProjectReference Include="..\DryIoc.Mvc.UnitTests\DryIoc.Mvc.UnitTests.csproj" />
+    <ProjectReference Include="..\DryIoc.WebApi.UnitTests\DryIoc.WebApi.UnitTests.csproj" />
   </ItemGroup>
 
   <ItemGroup>

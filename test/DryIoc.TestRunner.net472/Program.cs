@@ -118,6 +118,8 @@ namespace DryIoc.UnitTests
                 new SignalR.UnitTests.DryIocSignalRTests(),
                 new Owin.UnitTests.DryIocOwinMiddlewareTests(),
                 new Mvc.UnitTests.DryIocDataAnnotationsValidatorTests(),
+                new WebApi.UnitTests.DryIocWebApiTests(),
+                new WebApi.UnitTests.RegisterHttpRequestMessageInRequestTests(),
             };
 
             var issuesTests = new ITest[]

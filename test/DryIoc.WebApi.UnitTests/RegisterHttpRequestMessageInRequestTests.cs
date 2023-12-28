@@ -4,8 +4,14 @@ using NUnit.Framework;
 namespace DryIoc.WebApi.UnitTests
 {
     [TestFixture]
-    public class RegisterHttpRequestMessageInRequestTests
+    public class RegisterHttpRequestMessageInRequestTests : ITest
     {
+        public int Run()
+        {
+            Register_request_message_in_current_scope();
+            return 1;
+        }
+
         public class TestRequestMessage {}
 
         public class A

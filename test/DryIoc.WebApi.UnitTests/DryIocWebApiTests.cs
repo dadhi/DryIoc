@@ -12,8 +12,27 @@ using NUnit.Framework;
 namespace DryIoc.WebApi.UnitTests
 {
     [TestFixture]
-    public class DryIocWebApiTests
+    public class DryIocWebApiTests : ITest
     {
+        public int Run()
+        {
+            Enable_WebApi_support_without_exceptions();
+            Can_resolve_from_dependency_resolver();
+            Can_begin_scope_and_resolved_scoped_service();
+            Can_begin_scope_and_resolve_controller_without_specifying_assemblies();
+            Can_begin_scope_and_resolve_controller_specifying_assemblies();
+            Can_verify_if_no_controllers_were_registered();
+            Can_specify_to_throw_on_unresolved_controller();
+            IsController_will_not_recognize_type_without_controller_suffix();
+            Controller_with_property_injection();
+            Can_begin_scope_and_resolve_any_service_as_fallback_rule();
+            Can_resolve_filter_provider();
+            Can_register_current_request_in_dependency_scope();
+            When_custom_scope_context_is_specified_then_it_should_be_preserved();
+            One_and_only_one_filter_provider_registered();
+            return 14;
+        }
+
         [Test]
         public void Enable_WebApi_support_without_exceptions()
         {
