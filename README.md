@@ -21,7 +21,7 @@ DryIoc is fast, small, full-featured IoC Container for .NET
 [MefAttributedModel]: https://github.com/dadhi/DryIoc/blob/master/docs/DryIoc.Docs/MefAttributedModel.md
 
 - Designed for low-ceremony use, performance, and extensibility.
-- Supports: .NET 4.5+, [.NET Standard 2.0+](https://github.com/dotnet/corefx/blob/master/Documentation/architecture/net-platform-standard.md)
+- Targets: net45;netstandard2.0;netstandard2.1;net6.0;net7.0;net8.0
 - NuGet packages:
  
     - __DryIoc.dll__ [![NuGet Badge](https://buildstats.info/nuget/DryIoc.dll)](https://www.nuget.org/packages/DryIoc.dll)
