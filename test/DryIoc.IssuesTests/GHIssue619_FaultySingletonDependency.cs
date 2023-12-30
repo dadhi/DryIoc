@@ -10,12 +10,11 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // Test(); // todo: @fixme @wip #619
+            // Resolve_second_time_the_Lazy_failed_the_first_time();
             return 1;
         }
 
-        // [Test]
-        public void Test()
+        public void Resolve_second_time_the_Lazy_failed_the_first_time()
         {
             // default MEF reuse is a singleton
             var container = new Container().WithMef();

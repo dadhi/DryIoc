@@ -13,9 +13,9 @@ namespace DryIoc.IssuesTests
             return 2;
         }
 
-        public interface IScopedComponent {}
+        public interface IScopedComponent { }
 
-        public class ScopedComponent : IScopedComponent {}
+        public class ScopedComponent : IScopedComponent { }
 
         public interface ISingletonComponent
         {
@@ -39,8 +39,9 @@ namespace DryIoc.IssuesTests
             var c = new Container(scopeContext: new AsyncExecutionFlowScopeContext());
 
             c.Register<ISingletonComponent, SingletonComponentWithScopedFunc>(Reuse.Singleton);
+
             var scopeName = "myScope";
-            c.Register<IScopedComponent, ScopedComponent>(Reuse.InCurrentNamedScope(scopeName));
+            c.Register<IScopedComponent, ScopedComponent>(Reuse.ScopedTo(scopeName));
 
             IScopedComponent scoped1a, scoped1b, scoped2;
 
