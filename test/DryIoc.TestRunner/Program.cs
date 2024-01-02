@@ -9,8 +9,7 @@ namespace DryIoc.UnitTests
     {
         public static void Main()
         {
-            // new GHIssue619_FaultySingletonDependency().Run();
-            // new Issue545_Func_Of_Scoped().Run();
+            new GHIssue619_FaultySingletonDependency().Run();
 
             RunAllTests();
 

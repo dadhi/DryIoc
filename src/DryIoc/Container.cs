@@ -932,7 +932,7 @@ namespace DryIoc
             var clearedWrapper = Registry.ClearCache(registry, hash, serviceType, serviceKey, FactoryType.Wrapper);
             var clearedDecorator = Registry.ClearCache(registry, hash, serviceType, serviceKey, FactoryType.Decorator);
 
-            return clearedServices || clearedWrapper || clearedDecorator;
+            return clearedServices | clearedWrapper | clearedDecorator;
         }
 
         /// <inheritdoc />
@@ -2167,7 +2167,7 @@ namespace DryIoc
             public virtual ImHashMap<Type, object> Wrappers => WrappersSupport.Wrappers; // value is Factory 
             public virtual ImHashMap<Type, object> Decorators => ImHashMap<Type, object>.Empty; // value is Factory[]  // todo: @perf make it Factory or Factory[]
 
-            internal const int CACHE_SLOT_COUNT = 16;
+            internal const int CACHE_SLOT_COUNT = 16; // todo: @perf using the fixed array buffer on stack
             internal const int CACHE_SLOT_COUNT_MASK = CACHE_SLOT_COUNT - 1;
 
             public virtual ImHashMap<Type, object>[] DefaultFactoryCache => null;
@@ -3455,6 +3455,9 @@ namespace DryIoc
                             var binding = (MemberAssignment)memberInit.GetArgument(i);
                             if (!TryInterpret(r, binding.Expression, paramExprs, paramValues, parentArgs, out var memberValue))
                                 return false;
+
+                            if (memberValue is ScopedItemException ie)
+                                ie.ReThrow();
 
                             var field = binding.Member as FieldInfo;
                             if (field != null)
@@ -10375,7 +10378,7 @@ namespace DryIoc
                 Throw.It(Error.PushingToRequestWithoutFactory, info, this);
 
             var details = GetServiceDetails();
-            if (details != null && details != ServiceDetails.Default)
+            if (details != null & details != ServiceDetails.Default)
                 info = info.InheritInfoFromDependencyOwner(ActualServiceType, details, Container, FactoryType);
 
             var flags = Flags & InheritedFlags | additionalFlags;
@@ -10578,7 +10581,7 @@ namespace DryIoc
             // resolving the factory for the second time, usually happens in decorators, FactoryID is 0 for factory resolved for collection item
             var factoryId = factory.FactoryID;
             var decoratedFactoryID = 0;
-            if (Factory != null && FactoryID != 0)
+            if (Factory != null & FactoryID != 0)
             {
                 if (FactoryID == factoryId)
                     return this; // stop resolving to the same factory twice
@@ -10605,7 +10608,7 @@ namespace DryIoc
             IReuse firstParentNonTransientReuseOrNull = null;
             if (!DirectParent.IsEmpty)
             {
-                var checkRecursiveDependency = !skipRecursiveDependencyCheck &&
+                var checkRecursiveDependency = !skipRecursiveDependencyCheck &
                     factory.FactoryType == FactoryType.Service;
 
                 var reuseLifespan = reuse?.Lifespan ?? 0;
@@ -11613,7 +11616,7 @@ namespace DryIoc
             // Next, lookup for the already created service in the singleton scope
             Expression serviceExpr;
             var singletonId = 0;
-            var canCreateSingletonNow = reuse is SingletonReuse && rules.EagerCachingSingletonForFasterAccess;
+            var canCreateSingletonNow = reuse is SingletonReuse & rules.EagerCachingSingletonForFasterAccess;
             if (canCreateSingletonNow)
             {
                 // Then optimize for already resolved singleton object, otherwise goes normal ApplyReuse route
@@ -11635,7 +11638,9 @@ namespace DryIoc
                     if (singleton == Scope.NoItem && (requestFlags & (RequestFlags.TracksTransientDisposable | RequestFlags.IsWrappedInFunc)) == 0)
                         singleton = Scope.WaitForItemIsSet(itemRef);
                     if (singleton != Scope.NoItem)
-                    {
+                    {   // todo: @perf how to avoid the wrapping in Constant, because it happens just to conform to the API, but we may change the API as well, right?
+                        if (singleton is ScopedItemException sex)
+                            sex.ReThrow(); // see the #618 for details
                         var e = singleton != null ? Constant(singleton) : ConstantNull(request.ActualServiceType); // fixes #258
                         return !setup.WeaklyReferencedOrPreventDisposal ? e : GetWrappedSingletonAccessExpression(e, setup);
                     }
@@ -12619,7 +12624,6 @@ namespace DryIoc
             MethodInfo method = null;
             Expression factoryExpr = null;
             Delegate factoryFunc = null;
-            var failedToGetMember = false;
             if (factoryMethod == null)
             {
                 ctorOrMethod = ctor = ctor ?? request.ImplementationType.SingleConstructor();
@@ -12657,14 +12661,13 @@ namespace DryIoc
                     request.SelectedConstructor = ctor;
 
                     if (rules.UsedForValidation)
-                    {
-                        TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
+                    {   // evaluate the assignments without using the result for the side-effect sake
+                        TryGetMemberInitList(null, request, container, rules, validateOnly: true);
                         return request.ActualServiceType.GetDefaultValueExpression();
                     }
 
-                    var assignements = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
                     var newExpr = New(ctor, factoryMethod.ResolvedParameterExpressions);
-                    return failedToGetMember ? null : assignements == null ? newExpr : MemberInit(newExpr, assignements);
+                    return TryGetMemberInitList(newExpr, request, container, rules);
                 }
 
                 ctorOrMethod = ctorOrMember as MethodBase;
@@ -12684,7 +12687,7 @@ namespace DryIoc
                 if (rules.UsedForValidation)
                 {
                     if (ctor != null)
-                        TryGetMemberAssignments(ref failedToGetMember, request, container, rules); // ignore the results for validation
+                        TryGetMemberInitList(null, request, container, rules, validateOnly: true);
                     return request.ActualServiceType.GetDefaultValueExpression();
                 }
                 if (method != null)
@@ -12692,8 +12695,7 @@ namespace DryIoc
                     var callExpr = factoryFunc != null ? new FuncInvoke0Expression(factoryFunc, method) : Call(factoryExpr, method);
                     return ConvertExpressionIfNeeded(callExpr, request, method);
                 }
-                var assignments = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
-                return failedToGetMember ? null : assignments == null ? New(ctor) : MemberInit(New(ctor), assignments);
+                return TryGetMemberInitList(New(ctor), request, container, rules);
             }
 
             var hasByRefParams = false;
@@ -12849,37 +12851,50 @@ namespace DryIoc
             if (ctor == null)
                 return ConvertExpressionIfNeeded(serviceExpr, request, ctorOrMethod);
 
-            var memberInits = TryGetMemberAssignments(ref failedToGetMember, request, container, rules);
-            return failedToGetMember ? null : memberInits == null ? serviceExpr : MemberInit((NewExpression)serviceExpr, memberInits);
+            return TryGetMemberInitList((NewExpression)serviceExpr, request, container, rules);
         }
 
-        private MemberAssignment[] TryGetMemberAssignments(ref bool failedToGet, Request request, IContainer container, Rules rules)
+        private Expression TryGetMemberInitList(NewExpression newExpr, Request request, IContainer container, Rules rules,
+            bool validateOnly = false)
         {
             if (rules.PropertiesAndFields == null && Made.PropertiesAndFields == null)
-                return null;
+                return newExpr;
 
             var propertiesAndFields = rules.TryGetPropertiesAndFieldsSelector(Made).Invoke(request);
             if (propertiesAndFields == null)
-                return null;
+                return newExpr;
 
-            MemberAssignment[] assignments = null;
+            object memberOrMembers = null; // null | MemberAssignment | MemberAssignment[] // the man made discriminated union
             foreach (var member in propertiesAndFields)
                 if (member != null)
                 {
                     var memberRequest = request.Push(member);
-                    var memberExpr =
-                        TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, member.Details)
-                        ?? container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
-                    if (memberExpr != null)
-                        assignments = assignments.Append(Bind(member.Member, memberExpr));
-                    else if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+                    var memberExpr = TryGetUsedInstanceOrCustomValueExpression(request, memberRequest, member.Details);
+                    if (memberExpr == null)
+                        memberExpr = container.ResolveFactory(memberRequest)?.GetExpressionOrDefault(memberRequest);
+
+                    if (memberExpr == null)
                     {
-                        failedToGet = true;
-                        return null;
-                    };
+                        if (request.IfUnresolved == IfUnresolved.ReturnDefault)
+                            return null; // todo: @wip add two properties to check that indicate that we have failed to get the member
+                        continue;
+                    }
+
+                    if (!validateOnly)
+                    {
+                        var memberAssignment = Bind(member.Member, memberExpr);
+                        memberOrMembers = memberOrMembers == null ? memberAssignment 
+                            : memberOrMembers is MemberAssignment ma0 ? new MemberAssignment[] { ma0, memberAssignment }
+                            : ((MemberAssignment[])memberOrMembers).AppendToNonEmpty(memberAssignment);
+                    }
                 }
 
-            return assignments;
+            if (validateOnly)
+                return null;
+            return memberOrMembers == null ? newExpr
+                : memberOrMembers is MemberAssignment ma 
+                    ? MemberInit(newExpr, ma)
+                    : MemberInitMany(newExpr, (MemberAssignment[])memberOrMembers);
         }
 
         private static Expression ConvertExpressionIfNeeded(Expression serviceExpr, Request request, MemberInfo ctorOrMember)
@@ -13895,11 +13910,11 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
-        public object TryGetOrAddWithoutClosure(int id, IResolverContext resolveContext,
+        public object TryGetOrAddWithoutClosure(int id, IResolverContext resolverContext,
             Expression expr, Func<IResolverContext, Expression, object> createValue, int disposalOrder = 0)
         {
             if (_disposed == 1)
-                Throw.ScopeIsDisposed(this, resolveContext); // todo: @spell resolve -> resolver
+                Throw.ScopeIsDisposed(this, resolverContext);
 
             var itemRef = ImHashMap.Entry(id, NoItem);
             ref var map = ref _maps[id & MAP_COUNT_SUFFIX_MASK];
@@ -13907,7 +13922,7 @@ namespace DryIoc
             var newMap = oldMap.AddOrKeepEntry(itemRef);
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
             {
-                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, (x, i) => x.AddOrKeepEntry(i));
+                newMap = Ref.SwapAndGetNewValue(ref map, itemRef, static (x, i) => x.AddOrKeepEntry(i));
                 var otherItemRef = newMap.GetSurePresent(id);
                 if (otherItemRef != itemRef)
                     return otherItemRef.Value != NoItem ? otherItemRef.Value : WaitForItemIsSet(otherItemRef);
@@ -13919,7 +13934,7 @@ namespace DryIoc
             }
 
             object result = null;
-            itemRef.Value = result = createValue(resolveContext, expr);
+            itemRef.Value = result = createValue(resolverContext, expr);
 
             if (result is IDisposable disp && !ReferenceEquals(disp, this))
                 AddDisposable(disp, disposalOrder);
@@ -13938,7 +13953,7 @@ namespace DryIoc
             var oldMap = map;
             var newMap = oldMap.AddOrUpdateEntry(itemRef);
             if (Interlocked.CompareExchange(ref map, newMap, oldMap) != oldMap)
-                Ref.Swap(ref map, itemRef, (x, i) => x.AddOrUpdateEntry(i));
+                Ref.Swap(ref map, itemRef, static (x, i) => x.AddOrUpdateEntry(i));
 
             if (item is IDisposable disp && !ReferenceEquals(disp, this))
                 AddUnorderedDisposable(disp);
@@ -13953,7 +13968,7 @@ namespace DryIoc
                 var e = _disposables.GetEntryOrDefault(disposalOrder) ?? AddDisposableEntry(disposalOrder);
                 var items = e.Value;
                 if (Interlocked.CompareExchange(ref e.Value, items.Push(disposable), items) != items)
-                    Ref.Swap(ref e.Value, disposable, (x, d) => x.Push(d));
+                    Ref.Swap(ref e.Value, disposable, static (x, d) => x.Push(d));
             }
         }
 
@@ -13963,12 +13978,12 @@ namespace DryIoc
             var e = _disposables.GetEntryOrDefault(0);
             var items = e.Value;
             if (Interlocked.CompareExchange(ref e.Value, items.Push(disposable), items) != items)
-                Ref.Swap(ref e.Value, disposable, (x, d) => x.Push(d));
+                Ref.Swap(ref e.Value, disposable, static (x, d) => x.Push(d));
         }
 
         private ImHashMapEntry<int, ImList<IDisposable>> AddDisposableEntry(int disposableOrder)
         {
-            Ref.Swap(ref _disposables, disposableOrder, (x, o) => x.AddOrKeep(o, ImList<IDisposable>.Empty));
+            Ref.Swap(ref _disposables, disposableOrder, static (x, o) => x.AddOrKeep(o, ImList<IDisposable>.Empty));
             return _disposables.GetSurePresent(disposableOrder);
         }
 
@@ -14005,7 +14020,7 @@ namespace DryIoc
                 Throw.It(Error.ScopeIsDisposed, ToString());
             var u = _used;
             if (Interlocked.CompareExchange(ref _used, u.AddOrUpdateByReferenceEquals(hash, type, instance), u) != u)
-                Ref.Swap(ref _used, hash, type, instance, (x, h, t, i) => x.AddOrUpdateByReferenceEquals(h, t, i));
+                Ref.Swap(ref _used, hash, type, instance, static (x, h, t, i) => x.AddOrUpdateByReferenceEquals(h, t, i));
         }
 
         /// <summary>Try retrieve the used instance from the scope.</summary>
@@ -14063,7 +14078,7 @@ namespace DryIoc
 
         private static void SafelyDisposeOrderedDisposables(ImHashMap<int, ImList<IDisposable>> disposables)
         {
-            disposables.ForEach((e, _) =>
+            disposables.ForEach(static (e, _) =>
             {
                 try
                 {
@@ -15551,7 +15566,7 @@ namespace DryIoc
             typeof(WeakReference).GetProperty(nameof(WeakReference.Target));
         internal static readonly ConstructorInfo WeakReferenceCtor =
             typeof(WeakReference).GetConstructor(new[] { typeof(object) });
-
+        // todo: @perf preserve the stack trace by the modern means, e.g. via ExceptionDispatchInfo.Capture
         private static Lazy<Action<Exception>> _preserveExceptionStackTraceAction = new Lazy<Action<Exception>>(() =>
             typeof(Exception).GetSingleMethodOrNull("InternalPreserveStackTrace", true)
             ?.To(x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));

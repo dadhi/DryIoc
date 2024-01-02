@@ -939,6 +939,15 @@ namespace DryIoc.FastExpressionCompiler.LightExpression
             MemberInit(expression, (IReadOnlyList<MemberBinding>)assignments);
 
         // @LightExpression only
+        /// <summary>Applies both the New and arbitrary other expression</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static MemberInitExpression MemberInitMany(Expression expression, params MemberBinding[] assignments)
+        {
+            Debug.Assert(assignments != null && assignments.Length > 0, "assignments != null && assignments.Length > 0");
+            return new ManyBindingsMemberInitExpression(expression, assignments);
+        }
+
+        // @LightExpression only
         public static MemberInitExpression MemberInit(Expression expression, IEnumerable<MemberBinding> assignments) =>
             MemberInit(expression, assignments.AsReadOnlyList());
 

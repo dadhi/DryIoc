@@ -6,14 +6,16 @@ using System.ComponentModel.Composition;
 namespace DryIoc.IssuesTests
 {
     [TestFixture]
-    public class GHIssue619_FaultySingletonDependency : ITest
+    public sealed class GHIssue619_FaultySingletonDependency : ITest
     {
         public int Run()
         {
-            // Resolve_second_time_the_Lazy_failed_the_first_time();
+            // Resolve_second_time_the_Lazy_failed_the_first_time_with_Lazy_singletons_rule();
+            Resolve_second_time_the_Lazy_failed_the_first_time();
             return 1;
         }
 
+        [Test]
         public void Resolve_second_time_the_Lazy_failed_the_first_time()
         {
             // default MEF reuse is a singleton
@@ -22,17 +24,38 @@ namespace DryIoc.IssuesTests
 
             // dependency initialization failed (test passes)
             var s1 = container.Resolve<ServiceWithLazyImport>();
-            Assert.That(s1.DoWork, Throws.TypeOf<InvalidOperationException>());
+            Assert.Throws<InvalidOperationException>(() =>
+                s1.DoWork());
 
             // should it fail or should it work? (test fails)
-            var s2 = container.Resolve<ServiceWithNormalImport>();
-            s2.DoWork();
-            //or Assert.That(s2.DoWork, Throws.TypeOf<InvalidOperationException>());?
+            Assert.Throws<InvalidOperationException>(() =>
+                container.Resolve<ServiceWithNormalImport>());
 
             // should it fail or should it work?
             var s3 = container.Resolve<ServiceWithLazyImport>();
-            s3.DoWork();
-            //or Assert.That(s3.DoWork, Throws.TypeOf<InvalidOperationException>());?
+            Assert.Throws<InvalidOperationException>(() =>
+                s3.DoWork());
+        }
+
+        public void Resolve_second_time_the_Lazy_failed_the_first_time_with_Lazy_singletons_rule()
+        {
+            // default MEF reuse is a singleton
+            var container = new Container(Rules.Default.WithoutEagerCachingSingletonForFasterAccess()).WithMef();
+            container.RegisterExports(typeof(Dependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
+
+            // dependency initialization failed (test passes)
+            var s1 = container.Resolve<ServiceWithLazyImport>();
+            Assert.Throws<InvalidOperationException>(() =>
+                s1.DoWork());
+
+            // should it fail or should it work? (test fails)
+            Assert.Throws<InvalidOperationException>(() =>
+                container.Resolve<ServiceWithNormalImport>());
+
+            // should it fail or should it work?
+            var s3 = container.Resolve<ServiceWithLazyImport>();
+            Assert.Throws<InvalidOperationException>(() =>
+                s3.DoWork());
         }
 
         [Export, PartCreationPolicy(CreationPolicy.NonShared)]
@@ -74,7 +97,7 @@ namespace DryIoc.IssuesTests
             }
 
             public void DoWork()
-            { 
+            {
             }
         }
     }
