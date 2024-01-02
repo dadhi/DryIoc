@@ -3453,14 +3453,18 @@ namespace DryIoc
                         for (var i = 0; i < count; i++)
                         {
                             var binding = (MemberAssignment)memberInit.GetArgument(i);
-                            if (!TryInterpret(r, binding.Expression, paramExprs, paramValues, parentArgs, out var memberValue))
+                            var bindingExpr = binding.Expression;
+                            object memberValue = null; 
+                            if (bindingExpr is ConstantExpression cm)
+                            {
+                                memberValue = cm.Value; 
+                                if (memberValue is ScopedItemException ie)
+                                    ie.ReThrow();
+                            }
+                            else if (!TryInterpret(r, bindingExpr, paramExprs, paramValues, parentArgs, out memberValue))
                                 return false;
 
-                            if (memberValue is ScopedItemException ie)
-                                ie.ReThrow();
-
-                            var field = binding.Member as FieldInfo;
-                            if (field != null)
+                            if (binding.Member is FieldInfo field)
                                 field.SetValue(instance, memberValue);
                             else
                                 ((PropertyInfo)binding.Member).SetValue(instance, memberValue, null);
@@ -3477,7 +3481,11 @@ namespace DryIoc
                         {
                             var arg = newArray.GetArgument(i);
                             if (arg is ConstantExpression ca)
+                            {
                                 items[i] = ca.Value;
+                                if (items[i] is ScopedItemException ie)
+                                    ie.ReThrow();
+                            }
                             else if (!TryInterpret(r, arg, paramExprs, paramValues, parentArgs, out items[i]))
                                 return false;
                         }
