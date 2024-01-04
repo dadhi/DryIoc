@@ -331,6 +331,32 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> types) =>
             registrator.RegisterExports(types.ThrowIfNull().SelectMany(GetExportedRegistrations));
 
+        /// <summary>Customize your exports while registering the Type (and may be its members).
+        /// Returns the number of registrations. It may be zero. 
+        /// You may skip the registration by returning null from <paramref name="checkAndCustomize"/></summary>
+        public static int RegisterExport(this IRegistrator registrator, Type type,
+            Func<ExportedRegistrationInfo, ExportedRegistrationInfo> checkAndCustomize = null,
+            bool shouldRegisterWithoutExport = false)
+        {
+            var registrationInfos = type.GetExportedRegistrations(shouldRegisterWithoutExport);
+            var registrationCount = 0;
+            if (checkAndCustomize == null)
+            {
+                foreach (var info in registrationInfos)
+                    registrationCount += RegisterInfo(registrator, info);
+            }
+            else
+            {
+                foreach (var info in registrationInfos)
+                {
+                    var customInfo = checkAndCustomize(info);
+                    if (customInfo == null) continue;
+                    registrationCount += RegisterInfo(registrator, customInfo);
+                }
+            }
+            return registrationCount;
+        }
+
         /// <summary>Registers implementation type(s) with provided registrator/container.
         /// Expects the implementation type with or without the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
         public static void RegisterExportsAndTypes(this IRegistrator registrator, IEnumerable<Type> types) =>
@@ -375,19 +401,23 @@ namespace DryIoc.MefAttributedModel
         }
 
         /// <summary>Registers factories into registrator/container based on single provided info, which could
-        /// contain multiple exported services with single implementation.</summary>
-        public static void RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info)
+        /// contain multiple exported services with single implementation.
+        /// Returns the number of actual registrations.</summary>
+        public static int RegisterInfo(this IRegistrator registrator, ExportedRegistrationInfo info)
         {
+            var exports = info.Exports;
+            if (exports == null || exports.Length == 0)
+                return 0; // nothing to register
+
             // factory is used for all exports of implementation
             var factory = info.CreateFactory();
-
-            var exports = info.Exports;
             for (var i = 0; i < exports.Length; i++)
             {
                 var export = exports[i];
                 registrator.Register(factory, export.ServiceType, export.ServiceKey, export.IfAlreadyRegistered,
                     isStaticallyChecked: true); // set to true, because we're reflecting from the compiler checked code
             }
+            return exports.Length;
         }
 
         /// <summary>Scans assemblies to find concrete type annotated with <see cref="ExportAttribute"/>, or <see cref="ExportManyAttribute"/>
@@ -397,7 +427,7 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Creates registration info DTOs for provided type and/or for exported members.
         /// If no exports found, the method returns empty enumerable.</summary>
-        public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(Type type) => GetExportedRegistrations(type, false);
+        public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(this Type type) => GetExportedRegistrations(type, false);
 
         // todo: Review the need for factory service key
         // - May be export factory AsWrapper to hide from collection resolution
@@ -406,7 +436,7 @@ namespace DryIoc.MefAttributedModel
 
         /// <summary>Creates registration info DTOs for provided type and/or for exported members.
         /// If no exports found, the method returns empty enumerable.</summary>
-        public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(Type type, bool shouldRegisterWithoutExport)
+        public static IEnumerable<ExportedRegistrationInfo> GetExportedRegistrations(this Type type, bool shouldRegisterWithoutExport)
         {
             if (!CanBeExported(type))
                 yield break;
@@ -455,11 +485,10 @@ namespace DryIoc.MefAttributedModel
                     factoryMethod.InstanceFactory = typeRegistrationInfo.Exports[0];
                 }
 
-                var method = member as MethodInfo;
-                if (method != null)
+                if (member is MethodInfo method)
                 {
                     factoryMethod.MethodParameterTypeFullNamesOrNames =
-                        method.GetParameters().Map(p => p.ParameterType.FullName ?? p.ParameterType.Name);
+                        method.GetParameters().Map(static p => p.ParameterType.FullName ?? p.ParameterType.Name);
 
                     // the only possibility (for now) for registering completely generic T service
                     // is registering it as an Object
@@ -1265,6 +1294,7 @@ namespace DryIoc.MefAttributedModel
     #region Registration Info DTOs
 #pragma warning disable 659
 
+    // todo: @improve introduce Clone, may be move the State into stuct and add API to utilize the `with` syntax for customization
     /// <summary>Serializable DTO of all registration information.</summary>
     public sealed class ExportedRegistrationInfo
     {

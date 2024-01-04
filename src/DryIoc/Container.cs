@@ -3195,7 +3195,7 @@ namespace DryIoc
             }
         }
 
-        private static void TrySetScopedItemException(IResolverContext r, Exception ex)
+        private static void TrySetScopedItemException(IResolverContext r, Exception ex) // todo: @magic what is this?
         {
             ScopedItemException itemEx = null;
             var s = r.CurrentScope as Scope; // todo: @perf do we need this cast even
@@ -15572,17 +15572,26 @@ namespace DryIoc
     {
         internal static readonly PropertyInfo WeakReferenceValueProperty =
             typeof(WeakReference).GetProperty(nameof(WeakReference.Target));
+
         internal static readonly ConstructorInfo WeakReferenceCtor =
             typeof(WeakReference).GetConstructor(new[] { typeof(object) });
+
         // todo: @perf preserve the stack trace by the modern means, e.g. via ExceptionDispatchInfo.Capture
+#if NET8_0_OR_GREATER
+        [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "InternalPreserveStackTrace")]
+        private static extern void InternalPreserveStackTrace(Exception exception);
+#else
         private static Lazy<Action<Exception>> _preserveExceptionStackTraceAction = new Lazy<Action<Exception>>(() =>
             typeof(Exception).GetSingleMethodOrNull("InternalPreserveStackTrace", true)
             ?.To(x => x.CreateDelegate(typeof(Action<Exception>)).To<Action<Exception>>()));
+        private static void InternalPreserveStackTrace(Exception exception) =>
+            _preserveExceptionStackTraceAction.Value?.Invoke(exception);
+#endif
 
         /// <summary>Preserves the stack trace before re-throwing.</summary>
         public static Exception TryRethrowWithPreservedStackTrace(this Exception ex)
         {
-            _preserveExceptionStackTraceAction.Value?.Invoke(ex);
+            InternalPreserveStackTrace(ex);
             return ex;
         }
 

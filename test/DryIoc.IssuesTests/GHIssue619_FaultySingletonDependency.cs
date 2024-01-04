@@ -1,4 +1,5 @@
 using DryIoc.MefAttributedModel;
+using DryIocAttributes;
 using NUnit.Framework;
 using System;
 using System.ComponentModel.Composition;
@@ -10,38 +11,111 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // Resolve_second_time_the_Lazy_failed_the_first_time_with_Lazy_singletons_rule();
-            Resolve_second_time_the_Lazy_failed_the_first_time();
-            return 1;
+            Resolve_second_time_Succeeds_for_Lazy_of_Singleton_failed_the_first_time_After_Replacing_the_registration();
+            Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time();
+            Resolve_second_time_Succeeds_for_Lazy_of_Singleton_failed_the_first_time_After_Adding_new_registration();
+            // Resolve_second_time_the_Lazy_failed_the_first_time_with_Non_Eager_singletons_rule();
+            return 2;
         }
 
         [Test]
-        public void Resolve_second_time_the_Lazy_failed_the_first_time()
+        public void Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time()
         {
-            // default MEF reuse is a singleton
             var container = new Container().WithMef();
-            container.RegisterExports(typeof(Dependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
+            container.RegisterExports(typeof(SingletonDependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
+
+            // controlling the fail in Dependency constructor
+            var config = new Config { DependencyCtorThrows = true };
+            container.Use(config);
 
             // dependency initialization failed (test passes)
             var s1 = container.Resolve<ServiceWithLazyImport>();
             Assert.Throws<InvalidOperationException>(() =>
                 s1.DoWork());
 
-            // should it fail or should it work? (test fails)
+            config.DependencyCtorThrows = false;
+
+            // Still failing because the singleton is saved in the singleton scope
             Assert.Throws<InvalidOperationException>(() =>
                 container.Resolve<ServiceWithNormalImport>());
 
-            // should it fail or should it work?
+            // Still failing because Lazy does not re-evaluate the Value
             var s3 = container.Resolve<ServiceWithLazyImport>();
             Assert.Throws<InvalidOperationException>(() =>
                 s3.DoWork());
         }
 
-        public void Resolve_second_time_the_Lazy_failed_the_first_time_with_Lazy_singletons_rule()
+        [Test]
+        public void Resolve_second_time_Succeeds_for_Lazy_of_Singleton_failed_the_first_time_After_Adding_new_registration()
+        {
+            var container = new Container(
+                Rules.Default.WithFactorySelector(Rules.SelectLastRegisteredFactory())
+            ).WithMef();
+
+            container.RegisterExports(typeof(SingletonDependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
+
+            var config = new Config { DependencyCtorThrows = true };
+            container.Use(config);
+
+            // dependency initialization failed (test passes)
+            var s1 = container.Resolve<ServiceWithLazyImport>();
+            Assert.Throws<InvalidOperationException>(() =>
+                s1.DoWork());
+
+            config.DependencyCtorThrows = false;
+
+            // Add the second registration of the SingletonDependency, and it will be resolved now due to the SelectLastRegisteredFactory rule
+            container.RegisterExports(typeof(SingletonDependency));
+
+            // Re-resolving the failed dependency that now succeeds, because now it looks to the
+            var s2 = container.Resolve<ServiceWithNormalImport>();
+            Assert.IsInstanceOf<SingletonDependency>(s2.Dependency);
+
+            // Success because we are resolving the newly added Lazy
+            var s3 = container.Resolve<ServiceWithLazyImport>();
+            Assert.IsInstanceOf<SingletonDependency>(s3.LazyDependency.Value);
+        }
+
+        [Test]
+        public void Resolve_second_time_Succeeds_for_Lazy_of_Singleton_failed_the_first_time_After_Replacing_the_registration()
+        {
+            var container = new Container().WithMef();
+
+            container.RegisterExports(typeof(SingletonDependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
+
+            var config = new Config { DependencyCtorThrows = true };
+            container.Use(config);
+
+            // dependency initialization failed (test passes)
+            var s1 = container.Resolve<ServiceWithLazyImport>();
+            Assert.Throws<InvalidOperationException>(() =>
+                s1.DoWork());
+
+            config.DependencyCtorThrows = false;
+
+            // Add the second registration of the SingletonDependency, and it will be resolved now due to the SelectLastRegisteredFactory rule
+            container.RegisterExport(typeof(SingletonDependency),
+                reg =>
+                {
+                    foreach (var export in reg.Exports)
+                        export.IfAlreadyRegistered = IfAlreadyRegistered.Replace;
+                    return reg;
+                });
+
+            // Re-resolving the failed dependency that now succeeds, because now it looks to the
+            var s2 = container.Resolve<ServiceWithNormalImport>();
+            Assert.IsInstanceOf<SingletonDependency>(s2.Dependency);
+
+            // Success because we are resolving the newly replace Lazy
+            var s3 = container.Resolve<ServiceWithLazyImport>();
+            Assert.IsInstanceOf<SingletonDependency>(s3.LazyDependency.Value);
+        }
+
+        public void Resolve_second_time_the_Lazy_failed_the_first_time_with_Non_Eager_singletons_rule()
         {
             // default MEF reuse is a singleton
             var container = new Container(Rules.Default.WithoutEagerCachingSingletonForFasterAccess()).WithMef();
-            container.RegisterExports(typeof(Dependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
+            container.RegisterExports(typeof(SingletonDependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
 
             // dependency initialization failed (test passes)
             var s1 = container.Resolve<ServiceWithLazyImport>();
@@ -49,12 +123,12 @@ namespace DryIoc.IssuesTests
                 s1.DoWork());
 
             // should it fail or should it work? (test fails)
-            Assert.Throws<InvalidOperationException>(() =>
+            Assert.Throws<ContainerException>(() =>
                 container.Resolve<ServiceWithNormalImport>());
 
             // should it fail or should it work?
             var s3 = container.Resolve<ServiceWithLazyImport>();
-            Assert.Throws<InvalidOperationException>(() =>
+            Assert.Throws<ContainerException>(() =>
                 s3.DoWork());
         }
 
@@ -62,7 +136,7 @@ namespace DryIoc.IssuesTests
         public class ServiceWithLazyImport
         {
             [Import]
-            private Lazy<IDependency> LazyDependency { get; set; }
+            public Lazy<IDependency> LazyDependency { get; set; }
 
             public void DoWork() => LazyDependency.Value.DoWork();
         }
@@ -71,7 +145,7 @@ namespace DryIoc.IssuesTests
         public class ServiceWithNormalImport
         {
             [Import]
-            private IDependency Dependency { get; set; }
+            public IDependency Dependency { get; set; }
 
             public void DoWork() => Dependency.DoWork();
         }
@@ -81,19 +155,19 @@ namespace DryIoc.IssuesTests
             void DoWork();
         }
 
-        [Export(typeof(IDependency))]
-        public class Dependency : IDependency
+        public class Config
         {
-            static bool firstTime = true;
+            public bool DependencyCtorThrows;
+        }
 
-            public Dependency()
+        [Export(typeof(IDependency))]
+        public class SingletonDependency : IDependency
+        {
+            public SingletonDependency(Config config)
             {
-                if (firstTime)
-                {
-                    firstTime = false;
+                if (config.DependencyCtorThrows)
                     throw new InvalidOperationException("The first initialization failed " +
                         "due to a temporary problem, e.g. database connection timeout.");
-                }
             }
 
             public void DoWork()

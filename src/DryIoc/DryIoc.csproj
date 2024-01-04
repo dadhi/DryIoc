@@ -41,12 +41,16 @@
         <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.7.0" />
     </ItemGroup>
 
+    <Target Name="BeforeCompile">
+        <Message Importance="high" Text="MSBuildNodeCount: $(MSBuildNodeCount)"/>
+    </Target>
+
     <!-- Run compile-time generation only in debug configuration, 
       for the one of target frameworks (highest), 
       when the DryIoc was already build (TargetPath exists) in order to consume its types -->
     <Target Name="CompileTimeGenerate" 
         BeforeTargets="PrepareForBuild"
-        Condition="'$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)') AND '$(TargetFramework)' == 'net6.0'">
+        Condition="'$(TargetFramework)' == 'net8.0' AND '$(SkipCompTimeGen)' != 'true' AND '$(Configuration)' == 'Debug' AND Exists('$(ProjectDir)CompileTimeDI') AND Exists('$(TargetPath)')">
 
         <Message Text="Generating the object graphs from the compile-time registrations for $(TargetFramework)..." Importance="high"/>
         <Message Text="Env:"                       Importance="high"/>
