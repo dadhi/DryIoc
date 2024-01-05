@@ -331,14 +331,13 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> types) =>
             registrator.RegisterExports(types.ThrowIfNull().SelectMany(GetExportedRegistrations));
 
-        /// <summary>Customize your exports while registering the Type (and may be its members).
-        /// Returns the number of registrations. It may be zero. 
+        /// <summary>Register the exports for a single Type and its Exported members if any.
+        /// Optionally customize the exports. Returns the number of registrations - may be zero.
         /// You may skip the registration by returning null from <paramref name="checkAndCustomize"/></summary>
-        public static int RegisterExport(this IRegistrator registrator, Type type,
-            Func<ExportedRegistrationInfo, ExportedRegistrationInfo> checkAndCustomize = null,
-            bool shouldRegisterWithoutExport = false)
+        public static int RegisterExports(this IRegistrator registrator, Type type,
+            Func<ExportedRegistrationInfo, ExportedRegistrationInfo> checkAndCustomize = null)
         {
-            var registrationInfos = type.GetExportedRegistrations(shouldRegisterWithoutExport);
+            var registrationInfos = type.GetExportedRegistrations();
             var registrationCount = 0;
             if (checkAndCustomize == null)
             {
