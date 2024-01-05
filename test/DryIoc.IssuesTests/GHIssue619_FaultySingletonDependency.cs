@@ -11,17 +11,47 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            // Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time_WithoutEagerSingletone_rule();
             Resolve_second_time_Succeeds_for_Lazy_of_Singleton_failed_the_first_time_After_Replacing_the_registration();
             Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time();
             Resolve_second_time_Succeeds_for_Lazy_of_Singleton_failed_the_first_time_After_Adding_new_registration();
-            // Resolve_second_time_the_Lazy_failed_the_first_time_with_Non_Eager_singletons_rule();
-            return 2;
+            return 4;
         }
 
         [Test]
         public void Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time()
         {
             var container = new Container().WithMef();
+            container.RegisterExports(typeof(SingletonDependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
+
+            // controlling the fail in Dependency constructor
+            var config = new Config { DependencyCtorThrows = true };
+            container.Use(config);
+
+            // dependency initialization failed (test passes)
+            var s1 = container.Resolve<ServiceWithLazyImport>();
+            Assert.Throws<InvalidOperationException>(() =>
+                s1.DoWork());
+
+            config.DependencyCtorThrows = false;
+
+            // Still failing because the singleton is saved in the singleton scope
+            Assert.Throws<InvalidOperationException>(() =>
+                container.Resolve<ServiceWithNormalImport>());
+
+            // Still failing because Lazy does not re-evaluate the Value
+            var s3 = container.Resolve<ServiceWithLazyImport>();
+            Assert.Throws<InvalidOperationException>(() =>
+                s3.DoWork());
+        }
+
+        [Test]
+        public void Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time_WithoutEagerSingletone_rule()
+        {
+            var container = new Container(
+                Rules.Default.WithoutEagerCachingSingletonForFasterAccess()
+            ).WithMef();
+
             container.RegisterExports(typeof(SingletonDependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
 
             // controlling the fail in Dependency constructor
@@ -94,7 +124,7 @@ namespace DryIoc.IssuesTests
             config.DependencyCtorThrows = false;
 
             // Add the second registration of the SingletonDependency, and it will be resolved now due to the SelectLastRegisteredFactory rule
-            container.RegisterExport(typeof(SingletonDependency),
+            container.RegisterExports(typeof(SingletonDependency),
                 reg =>
                 {
                     foreach (var export in reg.Exports)
@@ -109,27 +139,6 @@ namespace DryIoc.IssuesTests
             // Success because we are resolving the newly replace Lazy
             var s3 = container.Resolve<ServiceWithLazyImport>();
             Assert.IsInstanceOf<SingletonDependency>(s3.LazyDependency.Value);
-        }
-
-        public void Resolve_second_time_the_Lazy_failed_the_first_time_with_Non_Eager_singletons_rule()
-        {
-            // default MEF reuse is a singleton
-            var container = new Container(Rules.Default.WithoutEagerCachingSingletonForFasterAccess()).WithMef();
-            container.RegisterExports(typeof(SingletonDependency), typeof(ServiceWithLazyImport), typeof(ServiceWithNormalImport));
-
-            // dependency initialization failed (test passes)
-            var s1 = container.Resolve<ServiceWithLazyImport>();
-            Assert.Throws<InvalidOperationException>(() =>
-                s1.DoWork());
-
-            // should it fail or should it work? (test fails)
-            Assert.Throws<ContainerException>(() =>
-                container.Resolve<ServiceWithNormalImport>());
-
-            // should it fail or should it work?
-            var s3 = container.Resolve<ServiceWithLazyImport>();
-            Assert.Throws<ContainerException>(() =>
-                s3.DoWork());
         }
 
         [Export, PartCreationPolicy(CreationPolicy.NonShared)]

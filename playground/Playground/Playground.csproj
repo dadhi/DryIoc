@@ -19,15 +19,15 @@
     <ItemGroup>
         <PackageReference Include="Autofac" Version="7.1.0" />
         <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="8.0.0" />
-        <PackageReference Include="BenchmarkDotNet" Version="0.13.10" />
+        <PackageReference Include="BenchmarkDotNet" Version="0.13.11" />
         <PackageReference Include="Grace" Version="7.2.1" />
         <PackageReference Include="Grace.DependencyInjection.Extensions" Version="7.1.0" />
         <PackageReference Include="LightInject" Version="6.6.4" />
         <PackageReference Include="Microsoft.Experimental.Collections" Version="1.0.6-e190117-3" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
-        <PackageReference Include="SimpleInjector" Version="5.4.1" />
-        <PackageReference Include="Lamar" Version="12.0.2" />
+        <PackageReference Include="SimpleInjector" Version="5.4.4" />
+        <PackageReference Include="Lamar" Version="13.0.0" />
     </ItemGroup>
 
     <ItemGroup>

@@ -93,7 +93,7 @@ namespace DryIoc
         public override string ToString()
         {
             var s = _ownScopeOrContext is IScopeContext scopeContext
-                ? ("container with ambient " + scopeContext) 
+                ? ("container with ambient " + scopeContext)
                 : "container";
 
             var scope = CurrentScope;
@@ -3089,9 +3089,9 @@ namespace DryIoc
             internal virtual void DropFactoryCache(Factory factory, int hash, Type serviceType, object serviceKey = null) { }
         }
 
-        private Container(Rules rules, Ref<ImHashMap<Type, object>> registry, IScope singletonScope, 
+        private Container(Rules rules, Ref<ImHashMap<Type, object>> registry, IScope singletonScope,
             IDisposable ownScopeOrContext = null,
-            int disposed = 0, StackTrace disposeStackTrace = null, 
+            int disposed = 0, StackTrace disposeStackTrace = null,
             IResolverContext parent = null)
         {
             Rules = rules;
@@ -3173,21 +3173,35 @@ namespace DryIoc
             catch (TargetInvocationException tex) when (tex.InnerException != null)
             {
                 var ex = tex.InnerException;
-                // When the exception happened, 
-                // in order to prevent waiting for the empty item entry in the subsequent resolutions, 
-                // see #536 for details. So we may:
 
-                // - assume that the exception happened in the scoped item resolution
-                // - set the exception in the empty item entry for the exceptional dependency, so that exception will be re-thrown on the next resolution
-                // Let's clone the current scope to snapshot the current state and exclude the future service additions.
-                // Then traverse the scope items and find the empty item entry for the exceptional dependency.
-                // If found, then try to set the exception in the entry, if we where interrupted, then lookup for the next empty entry.
-                // If not found in the current scope, go to the parent scope and repeat.
+                // When the exception happened, in order to prevent waiting for the empty item entry in the subsequent resolutions, 
+                // see #536 for details.
+                // So we may:
+                // - Asume that the exception happened in the scoped item resolution.
+                // - Set the exception in the `Scope.NoItem` entry for the exceptional dependency 
+                //   (which is optimistically set before resolving the dependency),
+                //   so that exception will be re-thrown on the next resolution.
+                //
+                // Let's copy the current scope item maps to get the view on the items excluding the future service additions.
+                // (It is fine because MapEntry reference is stable and will not change in the future and won't become stale, 
+                // and we will be operating with its Value only).
+                //
+                // Then traverse the scope items and find the first NoItem entry for the exceptional dependency.
+                // The first NoItem entry will be the one for the exception because Scope (expect for Singletons Scope) is
+                // not supposed to be modified concurrently - so only one NoItem entry is expected. Read on for more the details.
                 // 
-                // In worse case scenario we will set the wrong item reference, but it is not a problem, because it be overriden by the successful resolution.
-                // Or if unsuccessful we may get the wrong exception, but it is even more unlikely case.
+                // If found, then try to set the exception into the entry Value, 
+                // if we were interrupted (by some other thread setting the exception, right?), then lookup for the next NoItem entry.
+                // If not found in the current scope, go to the parent scope and repeat.
+                //
+                // In worse case scenario we will set the wrong item entry, 
+                // but it is not a problem, because it will be overriden by the successful resolution - right?
+                // Or if unsuccessful we may get the wrong exception, but it is even more unlikely the case.
                 // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
                 // Comparing to the singletons where it is expected to be concurrent, but it does not addressed here.
+                //
+                //
+                // todo: @wip address the Singleton Scope and WithoutEagerSingleton rule, see #619 for details
                 TrySetScopedItemException(r, ex);
 
                 // todo: @improve should we try to `(ex as ContainerException)?.TryGetDetails(container)` here and include it into the cex message?
@@ -3195,9 +3209,9 @@ namespace DryIoc
             }
         }
 
-        private static void TrySetScopedItemException(IResolverContext r, Exception ex) // todo: @magic what is this?
+        private static void TrySetScopedItemException(IResolverContext r, Exception ex)
         {
-            ScopedItemException itemEx = null;
+            ScopedItemException sex = null;
             var s = r.CurrentScope as Scope; // todo: @perf do we need this cast even
             while (s != null)
             {
@@ -3205,12 +3219,22 @@ namespace DryIoc
                 foreach (var m in itemMaps)
                 {
                     if (!m.IsEmpty)
-                        foreach (var it in m.Enumerate())
+                        foreach (var entry in m.Enumerate()) // 
                         {
-                            if (it.Value == Scope.NoItem)
+                            if (entry.Value == Scope.NoItem)
                             {
-                                itemEx ??= new ScopedItemException(ex);
-                                if (Interlocked.CompareExchange(ref it.Value, itemEx, Scope.NoItem) == Scope.NoItem)
+                                sex ??= new ScopedItemException(ex);
+
+                                // Here is the parallel thread may set the Value or exception.
+                                // For the Value - it is fine, because the thread knows exact set reference, and we are here just wandering around.
+                                // Therefore the entry is likely not our exception culprit. Let's proceed the search.
+                                // The problem is when we are faster than the parallel thread and set the exception first. 
+                                // The solution to that is slow down before setting the exception and give other thread time to complete 
+                                // (via the timeout or spin wait).
+                                // It is wrong to put the responsiblity on the other thread to check for exception in the entry,
+                                // because the other thread has no way to notify us here of the wrong, because we are done already.
+                                var actualValueWas = Interlocked.CompareExchange(ref entry.Value, sex, Scope.NoItem);
+                                if (actualValueWas == Scope.NoItem)
                                     return; // done
                             }
                         }
@@ -3454,10 +3478,10 @@ namespace DryIoc
                         {
                             var binding = (MemberAssignment)memberInit.GetArgument(i);
                             var bindingExpr = binding.Expression;
-                            object memberValue = null; 
+                            object memberValue = null;
                             if (bindingExpr is ConstantExpression cm)
                             {
-                                memberValue = cm.Value; 
+                                memberValue = cm.Value;
                                 if (memberValue is ScopedItemException ie)
                                     ie.ReThrow();
                             }
@@ -8165,7 +8189,8 @@ namespace DryIoc
         public static void Register<TImplementation>(this IRegistrator registrator,
             IReuse reuse = null, Made made = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null,
             object serviceKey = null) =>
-            registrator.Register<TImplementation, TImplementation>(reuse, made, setup, ifAlreadyRegistered, serviceKey);
+            registrator.Register(ReflectionFactory.Of(typeof(TImplementation), reuse, made, setup),
+                typeof(TImplementation), serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
 
         /// <summary>Registers service type returned by Made expression.</summary>
         public static void Register<TService, TMadeResult>(this IRegistrator registrator,
@@ -10004,7 +10029,7 @@ namespace DryIoc
             internal sealed class RequiredProperty : Property
             {
                 public override ServiceDetails Details => ServiceDetails.Default; // with IfUnresolved.Throw
-                public RequiredProperty(PropertyInfo property) : base(property) {}
+                public RequiredProperty(PropertyInfo property) : base(property) { }
             }
         }
 
@@ -12187,7 +12212,7 @@ namespace DryIoc
         }
 
         [MethodImpl((MethodImplOptions)256)]
-        private static Type ValidateImplementationType(Type type)
+        private static void ValidateImplementationType(Type type)
         {
             if (type == null)
                 Throw.It(Error.RegisteringNullImplementationTypeAndNoFactoryMethod);
@@ -12195,13 +12220,16 @@ namespace DryIoc
                 Throw.It(Error.RegisteringObjectTypeAsImplementationIsNotSupported);
             if (type.IsAbstract)
                 Throw.It(Error.RegisteringAbstractImplementationTypeAndNoFactoryMethod, type);
-            return type;
         }
 
         private static Type ValidateImplementationType(Type implType, Made made)
         {
+            Debug.Assert(made != null, "made != null");
             if (made == Made.Default)
-                return ValidateImplementationType(implType);
+            {
+                ValidateImplementationType(implType);
+                return implType;
+            }
 
             var knownImplType = implType;
 
@@ -12248,14 +12276,14 @@ namespace DryIoc
         /// <summary>Will contain factory ID of generator's factory for generated factory.</summary>
         public override int RegistrationOrder => GeneratorFactory?.FactoryID ?? FactoryID;
 
-        /// <summary>Creates the memory-optimized factory based on arguments</summary>
-        public static ReflectionFactory Of(Type implementationType)
-        {
-            ValidateImplementationType(implementationType);
-            return IsFactoryGenerator(implementationType)
-                ? WithAllDetails.OfOpenGenericType(implementationType, null, Made.Default, Setup.Default)
-                : new ReflectionFactory(implementationType);
-        }
+        [MethodImpl((MethodImplOptions)256)]
+        internal static ReflectionFactory OfReuse(Type implementationType, IReuse reuse) =>
+            reuse == null ? new ReflectionFactory(implementationType)
+            : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(implementationType)
+            : reuse == DryIoc.Reuse.Scoped ? new WithScopedReuse(implementationType)
+            : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(implementationType)
+            : reuse == DryIoc.Reuse.ScopedOrSingleton ? new WithScopedOrSingletonReuse(implementationType)
+            : new WithReuse(implementationType, reuse);
 
         /// <summary>Creates the memory-optimized factory based on arguments</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -12267,20 +12295,25 @@ namespace DryIoc
                 : OfReuse(implementationType, reuse);
         }
 
-        [MethodImpl((MethodImplOptions)256)]
-        internal static ReflectionFactory OfReuse(Type implementationType, IReuse reuse) =>
-            reuse == null ? new ReflectionFactory(implementationType)
-            : reuse == DryIoc.Reuse.Singleton ? new WithSingletonReuse(implementationType)
-            : reuse == DryIoc.Reuse.Scoped ? new WithScopedReuse(implementationType)
-            : reuse == DryIoc.Reuse.Transient ? new WithTransientReuse(implementationType)
-            : reuse == DryIoc.Reuse.ScopedOrSingleton ? new WithScopedOrSingletonReuse(implementationType)
-            : new WithReuse(implementationType, reuse);
+        /// <summary>Creates the memory-optimized factory based on arguments</summary>
+        public static ReflectionFactory Of(Type implementationType) => Of(implementationType, null);
 
         /// <summary>Creates the memory-optimized factory based on arguments</summary>
         public static ReflectionFactory Of(Type implementationType = null, IReuse reuse = null, Made made = null, Setup setup = null)
         {
-            if (made == null) made = Made.Default;
-            if (setup == null) setup = Setup.Default;
+            if (made == null & setup == null)
+                return Of(implementationType, reuse);
+
+            if (made == null) // also means `setup != null` 
+            {
+                ValidateImplementationType(implementationType);
+                return IsFactoryGenerator(implementationType)
+                    ? WithAllDetails.OfOpenGenericType(implementationType, reuse, Made.Default, setup)
+                    : WithAllDetails.OfConcreteType(implementationType, reuse, Made.Default, setup);
+            }
+
+            if (setup == null) // also means `made != null`
+                setup = Setup.Default;
 
             var validatedImplType = ValidateImplementationType(implementationType, made);
             return IsFactoryGenerator(validatedImplType ?? implementationType, made)
@@ -12891,7 +12924,7 @@ namespace DryIoc
                     if (!validateOnly)
                     {
                         var memberAssignment = Bind(member.Member, memberExpr);
-                        memberOrMembers = memberOrMembers == null ? memberAssignment 
+                        memberOrMembers = memberOrMembers == null ? memberAssignment
                             : memberOrMembers is MemberAssignment ma0 ? new MemberAssignment[] { ma0, memberAssignment }
                             : ((MemberAssignment[])memberOrMembers).AppendToNonEmpty(memberAssignment);
                     }
@@ -12900,7 +12933,7 @@ namespace DryIoc
             if (validateOnly)
                 return null;
             return memberOrMembers == null ? newExpr
-                : memberOrMembers is MemberAssignment ma 
+                : memberOrMembers is MemberAssignment ma
                     ? MemberInit(newExpr, ma)
                     : MemberInitMany(newExpr, (MemberAssignment[])memberOrMembers);
         }
@@ -12980,7 +13013,7 @@ namespace DryIoc
             if (implType != null)
             {
                 var factoryMethod = Made.FactoryMethodOrSelector ?? rules.FactoryMethodOrSelector;
-                if (factoryMethod == null || ReferenceEquals(factoryMethod, FactoryMethod.ConstructorWithResolvableArguments)) // optimizing for one of the common cases with the ConstructorWithResolvableArguments
+                if (factoryMethod == null | ReferenceEquals(factoryMethod, FactoryMethod.ConstructorWithResolvableArguments)) // optimizing for one of the common cases with the ConstructorWithResolvableArguments
                 {
                     var ctors = implType.GetConstructors(); // getting all public instance constructors with particular order
                     var ctorCount = ctors.Length;
@@ -13742,7 +13775,7 @@ namespace DryIoc
     public class Scope : IScope
     {
         /// <summary>Parent scope in scope stack. Null for the root scope.</summary>
-        public virtual IScope Parent => null;
+        public virtual IScope Parent => null; // todo: @perf make it non virtual because it is often used
 
         /// <summary>Optional name associated with scope.</summary>
         public virtual object Name => null;
@@ -13908,7 +13941,7 @@ namespace DryIoc
                 if (ellapsed > timeout)
                     Throw.WithDetails(itemRef.Key, Error.WaitForScopedServiceIsCreatedTimeoutExpired, ellapsed);
                 else if (ellapsed < 0)
-                { 
+                {
                     startedAt = currentAt;
                     Debug.WriteLine($"Happened: Robustness for the case of possible overflow, so we are starting a new with new {startedAt}.");
                 }
