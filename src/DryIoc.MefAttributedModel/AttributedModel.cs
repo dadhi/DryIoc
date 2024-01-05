@@ -331,31 +331,6 @@ namespace DryIoc.MefAttributedModel
         public static void RegisterExports(this IRegistrator registrator, IEnumerable<Type> types) =>
             registrator.RegisterExports(types.ThrowIfNull().SelectMany(GetExportedRegistrations));
 
-        /// <summary>Register the exports for a single Type and its Exported members if any.
-        /// Optionally customize the exports. Returns the number of registrations - may be zero.
-        /// You may skip the registration by returning null from <paramref name="checkAndCustomize"/></summary>
-        public static int RegisterExports(this IRegistrator registrator, Type type,
-            Func<ExportedRegistrationInfo, ExportedRegistrationInfo> checkAndCustomize = null)
-        {
-            var registrationInfos = type.GetExportedRegistrations();
-            var registrationCount = 0;
-            if (checkAndCustomize == null)
-            {
-                foreach (var info in registrationInfos)
-                    registrationCount += RegisterInfo(registrator, info);
-            }
-            else
-            {
-                foreach (var info in registrationInfos)
-                {
-                    var customInfo = checkAndCustomize(info);
-                    if (customInfo == null) continue;
-                    registrationCount += RegisterInfo(registrator, customInfo);
-                }
-            }
-            return registrationCount;
-        }
-
         /// <summary>Registers implementation type(s) with provided registrator/container.
         /// Expects the implementation type with or without the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
         public static void RegisterExportsAndTypes(this IRegistrator registrator, IEnumerable<Type> types) =>
@@ -365,6 +340,35 @@ namespace DryIoc.MefAttributedModel
         /// Expects the implementation type with the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
         public static void RegisterExports(this IRegistrator registrator, params Type[] types) =>
             registrator.RegisterExports((IEnumerable<Type>)types);
+
+        /// <summary>Register the exports for a single Type and its Exported members if any.
+        /// Returns the number of registrations - may be zero.</summary>
+        public static int RegisterExports(this IRegistrator registrator, Type type)
+        {
+            var registrationInfos = type.GetExportedRegistrations();
+            var registrationCount = 0;
+            foreach (var info in registrationInfos)
+                registrationCount += RegisterInfo(registrator, info);
+            return registrationCount;
+        }
+
+        /// <summary>Register the exports for a single Type and its Exported members if any.
+        /// Customize the exports. You may skip the registration by returning null from <paramref name="checkAndCustomize"/>.
+        /// Returns the number of registrations - may be zero.</summary>
+        public static int RegisterExports(this IRegistrator registrator, Type type,
+            Func<ExportedRegistrationInfo, ExportedRegistrationInfo> checkAndCustomize)
+        {
+            Debug.Assert(checkAndCustomize != null, "checkAndCustomize != null");
+            var registrationInfos = type.GetExportedRegistrations();
+            var registrationCount = 0;
+            foreach (var info in registrationInfos)
+            {
+                var customInfo = checkAndCustomize(info);
+                if (customInfo == null) continue;
+                registrationCount += RegisterInfo(registrator, customInfo);
+            }
+            return registrationCount;
+        }
 
         /// <summary>Registers implementation type(s) with provided registrator/container.
         /// Expects the implementation type with or without the <see cref="ExportAttribute"/>, <see cref="ExportExAttribute"/> or <see cref="ExportManyAttribute"/>.</summary>
