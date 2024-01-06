@@ -3174,8 +3174,9 @@ namespace DryIoc
             {
                 var ex = tex.InnerException;
 
-                // When the exception happened, in order to prevent waiting for the empty item entry in the subsequent resolutions, 
-                // see #536 for details.
+                // When this SPECIFIC TargetInvocationException exception happened only in this INTERPRETATION PHASE,
+                // in order to prevent waiting for the empty item entry in the subsequent resolutions, see #536, #619 for details.
+                //
                 // So we may:
                 // - Asume that the exception happened in the scoped item resolution.
                 // - Set the exception in the `Scope.NoItem` entry for the exceptional dependency 
@@ -3200,8 +3201,6 @@ namespace DryIoc
                 // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
                 // Comparing to the singletons where it is expected to be concurrent, but it does not addressed here.
                 //
-                //
-                // todo: @wip address the Singleton Scope and WithoutEagerSingleton rule, see #619 for details
                 TrySetScopedItemException(r, ex);
 
                 // todo: @improve should we try to `(ex as ContainerException)?.TryGetDetails(container)` here and include it into the cex message?
@@ -3212,14 +3211,13 @@ namespace DryIoc
         private static void TrySetScopedItemException(IResolverContext r, Exception ex)
         {
             ScopedItemException sex = null;
-            var s = r.CurrentScope as Scope; // todo: @perf do we need this cast even
+            var s = (Scope)r.CurrentScope; // todo: @perf do we need this cast even
             while (s != null)
             {
                 var itemMaps = s.CloneMaps();
                 foreach (var m in itemMaps)
-                {
                     if (!m.IsEmpty)
-                        foreach (var entry in m.Enumerate()) // 
+                        foreach (var entry in m.Enumerate()) // todo: @perf benchmark if ForEach with stopper predicated is faster
                         {
                             if (entry.Value == Scope.NoItem)
                             {
@@ -3238,9 +3236,21 @@ namespace DryIoc
                                     return; // done
                             }
                         }
-                }
-                s = s.Parent as Scope;
+                s = (Scope)s.Parent;
             }
+            s = (Scope)r.SingletonScope;
+            var singletonMaps = s.CloneMaps();
+            foreach (var m in singletonMaps)
+                if (!m.IsEmpty)
+                    foreach (var entry in m.Enumerate())
+                    {
+                        if (entry.Value == Scope.NoItem)
+                        {
+                            sex ??= new ScopedItemException(ex);
+                            if (Interlocked.CompareExchange(ref entry.Value, sex, Scope.NoItem) == Scope.NoItem)
+                                return; // done
+                        }
+                    }
         }
 
         internal static object InterpretOrCompileSingletonAndUnwrapContainerException(this IResolverContext r, Expression expr, ImHashMapEntry<int, object> itemRef)

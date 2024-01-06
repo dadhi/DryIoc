@@ -1,5 +1,4 @@
 using DryIoc.MefAttributedModel;
-using DryIocAttributes;
 using NUnit.Framework;
 using System;
 using System.ComponentModel.Composition;
@@ -11,7 +10,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time_WithoutEagerSingletone_rule();
+            Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time_WithoutEagerSingletone_rule();
             Resolve_second_time_Succeeds_for_Lazy_of_Singleton_failed_the_first_time_After_Replacing_the_registration();
             Resolve_second_time_Fails_for_Lazy_of_singleton_failed_the_first_time();
             Resolve_second_time_Succeeds_for_Lazy_of_Singleton_failed_the_first_time_After_Adding_new_registration();
