@@ -10282,7 +10282,7 @@ namespace DryIoc
         // todo: @simplify use it for checking the can cacheExpression
         internal bool AvoidExpressionCaching =>
             DirectParent != null && DirectParent.DirectParent == null ||// IsResolutionRoot
-            (Flags & RequestFlags.IsDirectlyWrappedInFunc) != 0 || //IsDirectlyWrappedInFunc()
+            (Flags & RequestFlags.IsDirectlyWrappedInFunc) != 0 | //IsDirectlyWrappedInFunc()
             InputArgExprs != null; // IsWrappedInFuncWithArgs()
 
         /// <summary>Returns true if request is First in Resolve call.</summary>
@@ -11637,7 +11637,7 @@ namespace DryIoc
                 // todo: @perf call !request.AvoidExpressionCaching instead
                 !request.IsResolutionRoot &&
                 (requestFlags & RequestFlags.IsDirectlyWrappedInFunc) == 0 &&
-                // !request.IsDirectlyWrappedInFunc() &&
+                // !request.IsDirectlyWrappedInFunc() && // todo: @wip cleanup
                 !request.IsWrappedInFuncWithArgs() &&
 
                 !(reuse.Name is IScopeName) && // avoid caching of scoped services with the custom scope name and possibly the scope name matching rule

@@ -9,6 +9,7 @@ public class Program
 {
     public static void Main()
     {
+        new GHIssue623_Scoped_service_decorator().Run();
         // new GHIssue619_FaultySingletonDependency().Run();
         // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
 
