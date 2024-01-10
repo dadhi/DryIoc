@@ -3201,23 +3201,28 @@ namespace DryIoc
                 // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
                 // Comparing to the singletons where it is expected to be concurrent, but it does not addressed here.
                 //
-                TrySetScopedItemException(r, ex);
+                var exSet = TrySetScopedItemException(r, ex);
+                Debug.Assert(!exSet, $"The exception was not set in the scope item entry, ex message: {ex.Message}");
 
                 // todo: @improve should we try to `(ex as ContainerException)?.TryGetDetails(container)` here and include it into the cex message?
                 throw ex.TryRethrowWithPreservedStackTrace();
             }
         }
 
-        private static void TrySetScopedItemException(IResolverContext r, Exception ex)
+        private static bool TrySetScopedItemException(IResolverContext r, Exception ex)
         {
             ScopedItemException sex = null;
-            var s = (Scope)r.CurrentScope; // todo: @perf do we need this cast even
-            while (s != null)
+            for (var s = r.CurrentScope; s != null; s = s.Parent)
+                if (TryFindNoItemAndStoreWrappedException(s, ex, ref sex))
+                    return true;
+            return TryFindNoItemAndStoreWrappedException(r.SingletonScope, ex, ref sex);
+
+            static bool TryFindNoItemAndStoreWrappedException(IScope scope, Exception ex, ref ScopedItemException sex)
             {
-                var itemMaps = s.CloneMaps();
-                foreach (var m in itemMaps)
+                var clonedMaps = ((Scope)scope).CloneMaps();
+                foreach (var m in clonedMaps)
                     if (!m.IsEmpty)
-                        foreach (var entry in m.Enumerate()) // todo: @perf benchmark if ForEach with stopper predicated is faster
+                        foreach (var entry in m.Enumerate())
                         {
                             if (entry.Value == Scope.NoItem)
                             {
@@ -3231,26 +3236,17 @@ namespace DryIoc
                                 // (via the timeout or spin wait).
                                 // It is wrong to put the responsiblity on the other thread to check for exception in the entry,
                                 // because the other thread has no way to notify us here of the wrong, because we are done already.
+
+                                // So, slowing down and given a chance for the other thread to set the NoItem entry to the value.
+                                Thread.Sleep(1); // per design, because Thead.Sleep(0) or Thread.Yield() are not reliable.
+
                                 var actualValueWas = Interlocked.CompareExchange(ref entry.Value, sex, Scope.NoItem);
                                 if (actualValueWas == Scope.NoItem)
-                                    return; // done
+                                    return true; // set, done
                             }
                         }
-                s = (Scope)s.Parent;
+                return false;
             }
-            s = (Scope)r.SingletonScope;
-            var singletonMaps = s.CloneMaps();
-            foreach (var m in singletonMaps)
-                if (!m.IsEmpty)
-                    foreach (var entry in m.Enumerate())
-                    {
-                        if (entry.Value == Scope.NoItem)
-                        {
-                            sex ??= new ScopedItemException(ex);
-                            if (Interlocked.CompareExchange(ref entry.Value, sex, Scope.NoItem) == Scope.NoItem)
-                                return; // done
-                        }
-                    }
         }
 
         internal static object InterpretOrCompileSingletonAndUnwrapContainerException(this IResolverContext r, Expression expr, ImHashMapEntry<int, object> itemRef)
