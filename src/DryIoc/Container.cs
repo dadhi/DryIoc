@@ -1351,7 +1351,7 @@ namespace DryIoc
             var j = 0;
             for (var k = 0; k < result.Length; ++k)
             {
-                if (i < sourceLength && j < addedLength)
+                if (i < sourceLength & j < addedLength)
                 {
                     var s = source[i];
                     var a = added[j];
@@ -1470,7 +1470,7 @@ namespace DryIoc
                 if (!appliedDecoratorIDs.IsNullOrEmpty())
                 {
                     genericDecorators = genericDecorators.Match(appliedDecoratorIDs,
-                        (appliedDecIds, d) =>
+                        static (appliedDecIds, d) =>
                         {
                             var generatedFactories = d.GeneratedFactories;
                             if (generatedFactories == null)
@@ -1508,7 +1508,7 @@ namespace DryIoc
             {
                 decorator = decorators[0];
                 if (!decorator.CheckCondition(request))
-                    return null;
+                    return null; // disable the cache for the decorated service, see #623
             }
             else
                 foreach (var d in decorators)
