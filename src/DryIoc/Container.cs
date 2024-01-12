@@ -9132,7 +9132,7 @@ namespace DryIoc
         /// <param name="factoryType">(optional) By default is <see cref="FactoryType.Service"/></param>
         public static void RegisterMapping<TService, TRegisteredService>(this IRegistrator registrator,
             object serviceKey = null, object registeredServiceKey = null, FactoryType factoryType = FactoryType.Service) =>
-            registrator.RegisterMapping(typeof(TService), typeof(TRegisteredService), null, serviceKey, registeredServiceKey);
+            registrator.RegisterMapping(typeof(TService), typeof(TRegisteredService), null, serviceKey, registeredServiceKey, factoryType);
 
         /// <summary>Register a service without implementation which can be provided later in terms
         /// of normal registration with `IfAlreadyRegistered.Replace` parameter.
