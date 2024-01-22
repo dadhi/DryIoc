@@ -7445,7 +7445,7 @@ namespace DryIoc
         }
 
         private static FactoryMethod Constructor(Request request, BindingFlags additionalToPublicAndInstance = 0)
-        {   // todo: @perf return ctor or ctors
+        {
             var ctors = ((ReflectionFactory)request.Factory).GetConstructors(request, additionalToPublicAndInstance);
             return ctors.Length == 1 ? new FactoryMethod(ctors[0]) : null;
         }
@@ -12185,14 +12185,13 @@ namespace DryIoc
         {
             get
             {
-                // todo: @perf it may be make sense to split Type and constructors into 2 fields
                 var x = _implementationTypeOrProviderOrPubCtorOrCtors;
                 if (x is Type t)
                     return t;
-                if (x is ConstructorInfo c)
-                    return c.DeclaringType;
-                if (x is ConstructorInfo[] cs)
-                    return cs[0].DeclaringType;
+                if (x is ConstructorInfo singleCtor)
+                    return singleCtor.DeclaringType;
+                if (x is ConstructorInfo[] manyCtors)
+                    return manyCtors[0].DeclaringType;
                 return null;
             }
         }
@@ -12204,10 +12203,10 @@ namespace DryIoc
         {
             var ctorsOrCtorOrType = _implementationTypeOrProviderOrPubCtorOrCtors;
             ConstructorInfo[] ctors = null;
-            if (ctorsOrCtorOrType is ConstructorInfo ci)
-                ctors = ci.DeclaringType.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
-            else if (ctorsOrCtorOrType is ConstructorInfo[] cs)
-                ctors = cs;
+            if (ctorsOrCtorOrType is ConstructorInfo singleCtor) // super rare case, no need to optimize
+                ctors = singleCtor.DeclaringType.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
+            else if (ctorsOrCtorOrType is ConstructorInfo[] manyCtors)
+                ctors = manyCtors;
             else if (ctorsOrCtorOrType is Type t)
                 ctors = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance | additionalToPublicAndInstance);
             else if (ctorsOrCtorOrType is Func<Type> typeProvider && typeProvider() is Type providedType)
