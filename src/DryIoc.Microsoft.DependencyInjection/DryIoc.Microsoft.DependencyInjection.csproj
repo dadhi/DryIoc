@@ -17,10 +17,11 @@
         <PackageTags>DryIoc;Dependency Injection;DI;IoC;Asp;AspNet;vNext;AspNetCore;NetCore</PackageTags>
         <PackageReleaseNotes>
 <![CDATA[
-## v8.0.0
+## v8.0.0 Major feature release
 
 - Depending on Microsoft.Extensions.DependencyInjection.Abstractions to v8.0.0
 - Depending on DryIoc v6
+- Support for the keyed services aka IKeyedServiceProvider, IServiceProviderIsKeyedService, KeyedService.AnyKey, ServiceKeyAttribute, FromKeyedServiceAttribute.
 
 ]]>
         </PackageReleaseNotes>

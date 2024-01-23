@@ -6,7 +6,7 @@
         <Product>DryIoc</Product>
 
         <VersionPrefix>6.0.0</VersionPrefix>
-        <VersionSuffix>preview-05</VersionSuffix>
+        <VersionSuffix>preview-06</VersionSuffix>
 
         <AssemblyName>$(Product)</AssemblyName>
         <AssemblyTitle>$(AssemblyName) $(TargetFramework)</AssemblyTitle>
@@ -22,9 +22,9 @@
 <![CDATA[
 ## v6.0.0 Major feature release
 
-- Compile-time Dependency Injection
 - Decrease memory footprint
 - Remove Obsolete API
+- ?Compile-time Dependency Injection?
 
 ]]>
     </PackageReleaseNotes>
