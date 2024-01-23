@@ -1158,7 +1158,8 @@ namespace DryIoc
         {
             // Hot path - a single factory, no dynamic rules
             var entry = serviceFactories.GetValueOrDefault(serviceType);
-            if (entry is Factory defaultFactory &&
+            var defaultFactory = entry as Factory;
+            if (defaultFactory != null &&
                 (rules.DynamicRegistrationProviders == null ||
                 !rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)))
                 return !request.MatchFactoryConditionAndMetadata(details, defaultFactory)
@@ -1168,15 +1169,15 @@ namespace DryIoc
 
             var openGenericServiceType = serviceType.GetGenericDefinitionOrNull();
             KV<object, Factory>[] factories;
-            if (entry is Factory singleFactory)
+            if (defaultFactory != null)
             {
-                factories = new[] { new KV<object, Factory>(DefaultKey.Value, singleFactory) }; // todo: @perf avoid packing into array
+                factories = new[] { new KV<object, Factory>(DefaultKey.Value, defaultFactory) }; // rare or never happens so no need to optimize
             }
             else if (entry is FactoriesEntry e)
             {
                 factories = e.Factories.Match(static x => x.Value != null); // todo: @perf filter out the Unregistered factories
             }
-            else
+            else // nothing concrete found, so try to find the open-generic
             {
                 object openGenericEntry;
                 factories = Empty<KV<object, Factory>>();
