@@ -124,7 +124,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
         }
 
         protected override IServiceProvider CreateServiceProvider(IServiceCollection services) =>
-            new DryIocServiceProviderFactory().CreateBuilder(services);
+            services.BuildDryIocServiceProvider();
 
         internal class TestServiceCollection : List<ServiceDescriptor>, IServiceCollection
         {
@@ -161,18 +161,18 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             collection.Add(ServiceDescriptor.Describe(typeof(IService), typeof(ServiceA), firstLifetime));
             collection.Add(ServiceDescriptor.Describe(typeof(IService), typeof(ServiceB), secondLifetime));
 
-            IServiceProvider msProvider = collection.BuildServiceProvider();
-            IServiceProvider dryiocProvider = CreateServiceProvider(collection);
+            IServiceProvider msProvider = ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(collection);
+            IServiceProvider diProvider = collection.BuildDryIocServiceProvider();
 
             if (usingScope)
             {
                 msProvider = msProvider.CreateScope().ServiceProvider;
-                dryiocProvider = dryiocProvider.CreateScope().ServiceProvider;
+                diProvider = diProvider.CreateScope().ServiceProvider;
             }
 
             // act
             var msService = msProvider.GetRequiredService<IService>();
-            var dryiocService = dryiocProvider.GetRequiredService<IService>();
+            var dryiocService = diProvider.GetRequiredService<IService>();
 
             // assert
             Assert.IsInstanceOf(expectedResolveType, msService, "Microsoft changed the implementation");

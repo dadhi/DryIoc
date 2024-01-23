@@ -16,6 +16,7 @@ public sealed class GHIssue623_Scoped_service_decorator : ITest
     public void Test_not_working()
     {
         var c = new Container();
+
         c.Register<GlobalService>(Reuse.Singleton);
         c.Register<ITest, TestGlobal>(Reuse.Transient);
 

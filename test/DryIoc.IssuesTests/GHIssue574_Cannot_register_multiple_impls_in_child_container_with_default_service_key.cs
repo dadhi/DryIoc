@@ -30,8 +30,7 @@ namespace DryIoc.IssuesTests
             services.AddScoped<IPrinter, PrinterB>();
             services.AddScoped<IPrinter, NeighborPrinter>();
 
-            var spf = new DryIocServiceProviderFactory();
-            var rootContainer = spf.CreateBuilder(new ServiceCollection()).Container;
+            var rootContainer = new ServiceCollection().BuildDryIocServiceProvider().Container;
             var childContainer = rootContainer.CreateChild(RegistrySharing.Share, "child-stamp", IfAlreadyRegistered.AppendNewImplementation);
 
             foreach (var service in services)

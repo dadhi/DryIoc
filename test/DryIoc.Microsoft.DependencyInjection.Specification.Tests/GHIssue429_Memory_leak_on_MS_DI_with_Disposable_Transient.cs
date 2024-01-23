@@ -19,7 +19,8 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
         {
             DisposableViewModel[] xs = null;
             using (var container = new Container()
-                .WithDependencyInjectionAdapter(new ServiceCollection()))
+                .WithDependencyInjectionAdapter(new ServiceCollection())
+                .Container)
             {
                 container.Register<DisposableViewModel>(Reuse.Transient);
 
@@ -36,6 +37,7 @@ namespace DryIoc.Microsoft.DependencyInjection.Specification.Tests
             DisposableViewModel[] xs = null;
             using (var container = new Container()
                 .WithDependencyInjectionAdapter(new ServiceCollection())
+                .Container
                 .With(rules => rules.WithoutTrackingDisposableTransients()))
             {
                 container.Register<DisposableViewModel>(Reuse.Transient);

@@ -361,7 +361,7 @@ namespace PerformanceTests
 
         public static IServiceProvider PrepareMsDi()
         {
-            var serviceProvider = AddServices().BuildServiceProvider();
+            var serviceProvider = ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(AddServices());
             ResolveDummyPopulation(serviceProvider);
             return serviceProvider;
         }
@@ -428,7 +428,7 @@ namespace PerformanceTests
 
         public static IServiceProvider PrepareDryIocMsDi()
         {
-            var serviceProvider = DryIocAdapter.CreateServiceProvider(AddServices());
+            var serviceProvider = DryIocAdapter.BuildDryIocServiceProvider(AddServices());
             ResolveDummyPopulation(serviceProvider);
             return serviceProvider;
         }

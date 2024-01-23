@@ -78,7 +78,7 @@ namespace DryIoc.Microsoft.DependencyInjection
         public DryIocServiceProviderFactory(
             IContainer container = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null)
-        { 
+        {
             InitialContainer = container;
             _registerDescriptor = registerDescriptor;
             _registrySharing = RegistrySharing.CloneAndDropCache;
@@ -98,34 +98,37 @@ namespace DryIoc.Microsoft.DependencyInjection
         }
 
         /// <summary>Creates the builder with the initial container or creates the new container if initial is null.
-        /// Return the result <seealso cref="DryIocServiceProvider"/> which stores the conforming container as
-        /// <seealso cref="DryIocServiceProvider.Container"/>.</summary>
+        /// Returns the result <seealso cref="DryIocServiceProvider"/> which stores the conforming container in the
+        /// <seealso cref="DryIocServiceProvider.Container"/> field.</summary>
         public virtual DryIocServiceProvider CreateBuilder(IServiceCollection services)
         {
             if (InitialContainer == null)
                 return new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
-                    .WithDependencyInjectionAdapter(AdaptingExistingContainer.AvoidCheckNoAdapting, 
-                        services, _registerDescriptor, RegistrySharing.Share); // we use share because new container does not have any registrations or cache yet
+                    .WithDependencyInjectionAdapter(services, _registerDescriptor,
+                        RegistrySharing.Share, // using Share because the new container does not have any registrations or cache yet
+                        CheckExistingContainerIsConforming.SkipIsConformingCheck);
+
             return InitialContainer.WithDependencyInjectionAdapter(
-                    AdaptingExistingContainer.CheckAndAdaptIfNeeded, services, _registerDescriptor, _registrySharing); // use the user-provided registry sharing
+                services, _registerDescriptor, _registrySharing,
+                CheckExistingContainerIsConforming.CheckAndConformIfNeeded);
         }
 
         /// <inheritdoc />
         public virtual IServiceProvider CreateServiceProvider(DryIocServiceProvider provider) => provider;
     }
 
-    /// <summary>Specifies the behavior of the <see cref="DryIocServiceProviderFactory"/> when adapting the existing container.
-    /// Based on this settings thr factory may create a new container from the initial one with the conforming rules,
-    /// or keep the initial container intact, if it is fully conformed. 
-    /// Being conformed means it passes the check <see cref="DryIocAdapter.HasMicrosoftDependencyInjectionRules(Rules)"/>
-    /// but may include additional orthogonal rules as well.</summary>
-    public enum AdaptingExistingContainer
+    /// <summary>Specifies the behavior when adapting the existing container.
+    /// Based on this setting, the new container may be created from the initial one with the "conforming" rules,
+    /// or the initial container may be kept intact (if it is already fully conforming). 
+    /// Being "conforming" means the container Rules pass the check of <see cref="DryIocAdapter.HasMicrosoftDependencyInjectionRules(Rules)"/>,
+    /// though it may include the additional orthogonal rules not related to MS.DI.</summary>
+    public enum CheckExistingContainerIsConforming
     {
         /// <summary>Check the container rules, and adapt them if needed (add the missing rules and removing the non-compatible rules)
         /// and producing the new container with the adapted rules</summary>
-        CheckAndAdaptIfNeeded = 0,
+        CheckAndConformIfNeeded = 0,
         /// <summary>Does not check the container rules and use them as-is, keep the existing container intact</summary>
-        AvoidCheckNoAdapting,
+        SkipIsConformingCheck,
     }
 
     /// <summary>Adapts DryIoc container to be used as MS.DI service provider, plus provides the helpers
@@ -184,50 +187,49 @@ namespace DryIoc.Microsoft.DependencyInjection
             rules.HasBaseMicrosoftDependencyInjectionRules(MicrosoftDependencyInjectionRules) &&
             rules.Parameters == SelectServiceKeyForParameterWithServiceKeyAttribute;
 
-        /// <summary>Adapts passed <paramref name="container"/> to Microsoft.DependencyInjection conventions,
-        /// registers DryIoc implementations of <see cref="IServiceProvider"/> and <see cref="IServiceScopeFactory"/>,
-        /// and returns the unchanged container (if its Rules where already conformed to MS.DI) or the new adapted container.
+        /// <summary>Adapts the <paramref name="container"/> to Microsoft.DependencyInjection conventions,
+        /// builds and retunrs the <see cref="DryIocServiceProvider"/> implementation of <see cref="IServiceProvider"/>
+        /// populated with the registered <paramref name="descriptors" />.
+        /// 
+        /// <b>NOTE:</b>The adapted container is available via <see cref="DryIocServiceProvider.Container"/> and actually 
+        /// may be different from the source <paramref name="container"/>.
+        /// 
         /// </summary>
         /// <param name="container">Source container to adapt.</param>
         /// <param name="descriptors">(optional) Specify service descriptors or use <see cref="Populate"/> later.</param>
         /// <param name="registerDescriptor">(optional) Custom registration action, should return true to skip normal registration.</param>
         /// <param name="registrySharing">(optional) Use DryIoc <see cref="RegistrySharing"/> capability.</param>
+        /// <param name="checkContainerIsConforming">(optional) <see cref="CheckExistingContainerIsConforming"/> for details.</param>
         /// <example>
         /// <code><![CDATA[
         /// 
-        ///     var container = new Container();
+        ///     IContainer container = new Container();
         ///
-        ///     // you may register the services here:
+        ///     // register services with DryIoc container
         ///     container.Register<IMyService, MyService>(Reuse.Scoped)
         /// 
-        ///     // applies the MS.DI rules and registers the infrastructure helpers and service collection to the container
-        ///     var adaptedContainer = container.WithDependencyInjectionAdapter(services);
+        ///     // apply the MS.DI rules (if needed), build the DryIocServiceProvider and register the service collection
+        ///     DryIocServiceProvider serviceProvider = container.WithDependencyInjectionAdapter(serviceCollection);
         ///
-        ///     var serviceProvider = adaptedContainer.GetServiceProvider();
+        ///     // optionally access the adapted "conforming" container which or may not be the same as the source container
+        ///     IContainer adaptedContainer = serviceProvider.Container;
         ///
         ///]]></code>
         /// </example>
         /// <remarks>You still need to Dispose adapted container at the end / application shutdown.</remarks>
-        public static IContainer WithDependencyInjectionAdapter(this IContainer container, // todo: @wip can we return the ServiceProvider instead, because the service provider implemented in the Container is not compatible with the MS.DI, so returning the DryIocServiceProvider and breaking the client will indicate the problem to the user. Moreover the provider has the latest container stored in a field! 
+        public static DryIocServiceProvider WithDependencyInjectionAdapter(this IContainer container,
             IEnumerable<ServiceDescriptor> descriptors = null,
             Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
-            RegistrySharing registrySharing = RegistrySharing.Share) =>
-            container.WithDependencyInjectionAdapter(AdaptingExistingContainer.CheckAndAdaptIfNeeded, 
-                descriptors, registerDescriptor, registrySharing).Container;
-
-        internal static DryIocServiceProvider WithDependencyInjectionAdapter(
-            this IContainer container, AdaptingExistingContainer adaptingExistingContainer,
-            IEnumerable<ServiceDescriptor> descriptors = null,
-            Func<IRegistrator, ServiceDescriptor, bool> registerDescriptor = null,
-            RegistrySharing registrySharing = RegistrySharing.Share)
+            RegistrySharing registrySharing = RegistrySharing.Share,
+            CheckExistingContainerIsConforming checkContainerIsConforming = CheckExistingContainerIsConforming.CheckAndConformIfNeeded)
         {
-            switch (adaptingExistingContainer)
+            switch (checkContainerIsConforming)
             {
-                case AdaptingExistingContainer.AvoidCheckNoAdapting: 
+                case CheckExistingContainerIsConforming.SkipIsConformingCheck:
                     if (registrySharing != RegistrySharing.Share)
                         container = container.With(container.Rules, container.ScopeContext, registrySharing, container.SingletonScope);
                     break;
-                case AdaptingExistingContainer.CheckAndAdaptIfNeeded:
+                case CheckExistingContainerIsConforming.CheckAndConformIfNeeded:
                     var rules = container.Rules;
                     if (!HasMicrosoftDependencyInjectionRules(rules))
                     {
@@ -257,8 +259,9 @@ namespace DryIoc.Microsoft.DependencyInjection
             return serviceProvider;
         }
 
-        /// <summary>Sugar to create the DryIoc container and adapter populated with services</summary>
-        public static IServiceProvider CreateServiceProvider(this IServiceCollection services) =>
+        /// <summary>Sugar to create the DryIoc container and populate it with services and 
+        /// return it wrapped in <see cref="DryIocServiceProvider"/></summary>
+        public static DryIocServiceProvider BuildDryIocServiceProvider(this IServiceCollection services) =>
             new DryIocServiceProviderFactory().CreateBuilder(services);
 
         /// <summary>Adds services registered in <paramref name="compositionRootType"/> to container</summary>
