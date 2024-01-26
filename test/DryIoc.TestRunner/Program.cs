@@ -9,14 +9,13 @@ public class Program
 {
     public static void Main()
     {
-        new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run();
+        RunAllTests();
+
+        // new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run();
         // new GHIssue574_Cannot_register_multiple_impls_in_child_container_with_default_service_key().Run();
         // new GHIssue623_Scoped_service_decorator().Run();
         // new GHIssue619_FaultySingletonDependency().Run();
         // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
-
-        RunAllTests();
-
         // ObjectLayoutInspector.TypeLayout.PrintLayout<Request>();
     }
 

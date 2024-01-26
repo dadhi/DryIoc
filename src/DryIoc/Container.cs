@@ -1025,7 +1025,7 @@ namespace DryIoc
             {
                 if (entry == null ||
                     serviceKey != null && (
-                    entry is Factory && !DefaultKey.Value.Equals(serviceKey) || // todo: @wip check for AnyServiceKey
+                    entry is Factory && !DefaultKey.Value.Equals(serviceKey) ||
                     entry is FactoriesEntry factoriesEntry && factoriesEntry.GetFirstKeyedOrDefault(serviceKey) == null))
                     entry = serviceFactories.GetValueOrDefault(openGenericServiceType) ?? entry;
 
@@ -1062,7 +1062,7 @@ namespace DryIoc
             if (entry is Factory defaultFactory &&
                 (rules.DynamicRegistrationProviders == null ||
                 !rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)))
-                return (serviceKey == null || serviceKey == DefaultKey.Value)
+                return (serviceKey == null | serviceKey == DefaultKey.Value)
                     && request.MatchFactoryConditionAndMetadata(details, defaultFactory)
                     ? defaultFactory : null;
 
@@ -3039,7 +3039,7 @@ namespace DryIoc
 
                         if (entry is Factory defaultFac)
                         {
-                            if ((serviceKey != null && !DefaultKey.Value.Equals(serviceKey)) || // todo: @wip check for AnyKey scenario
+                            if ((serviceKey != null && !DefaultKey.Value.Equals(serviceKey)) ||
                                 (condition != null && !condition(defaultFac)))
                                 return entry; // keep entry
                             removed = entry; // otherwise remove it (the only case if serviceKey == DefaultKey.Value)
@@ -15813,6 +15813,7 @@ namespace DryIoc
         public static Type GetArrayElementTypeOrNull(this Type type) => type.IsArray ? type.GetElementType() : null;
 
         /// <summary>Checks if type is public or nested public in public type.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static bool IsPublicOrNestedPublic(this Type type) =>
             type.IsPublic || type.IsNestedPublic && type.DeclaringType.IsPublicOrNestedPublic();
 
@@ -15821,38 +15822,31 @@ namespace DryIoc
         public static bool IsStatic(this Type type) => type.IsAbstract && type.IsSealed;
 
         /// <summary>Returns true if type can be casted with conversion operators.</summary>
+        [MethodImpl((MethodImplOptions)256)]
         public static bool HasConversionOperatorTo(this Type sourceType, Type targetType) =>
             sourceType.GetConversionOperatorOrNull(targetType) != null;
 
         /// <summary>Finds the conversion operator or returns null</summary>
-        public static MethodInfo GetConversionOperatorOrNull(this Type sourceType, Type targetType) =>
+        [MethodImpl((MethodImplOptions)256)]
+         public static MethodInfo GetConversionOperatorOrNull(this Type sourceType, Type targetType) =>
             sourceType.FindConvertOperator(sourceType, targetType) ??
-            targetType.FindConvertOperator(sourceType, targetType);
-
-        /// Returns `target source.op_(Explicit|Implicit)(source)` or null if not found
-        public static MethodInfo GetSourceConversionOperatorToTarget(this Type sourceType, Type targetType) =>
-            sourceType.FindConvertOperator(sourceType, targetType);
-
-        /// Returns `target target.op_(Explicit|Implicit)(source)` or null if not found
-        public static MethodInfo GetTargetConversionOperatorFromSource(this Type sourceType, Type targetType) =>
             targetType.FindConvertOperator(sourceType, targetType);
 
         internal static MethodInfo FindConvertOperator(this Type type, Type sourceType, Type targetType)
         {
-            var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Static);
-            for (var i = 0; i < methods.Length; ++i)
-            {
-                var m = methods[i];
+            if (sourceType == typeof(object) | targetType == typeof(object))
+                return null;
+
+            // conversion operators should be declared as static and public 
+            var methods = type.GetMethods(BindingFlags.Static | BindingFlags.Public);
+            foreach (var m in methods)
                 if (m.IsSpecialName && m.ReturnType == targetType)
                 {
                     var n = m.Name;
-                    // n == "op_Implicit" || n == "op_Explicit"
-                    if (n.Length == 11 &&
-                        n[2] == '_' && n[5] == 'p' && n[6] == 'l' && n[7] == 'i' && n[8] == 'c' && n[9] == 'i' && n[10] == 't' &&
+                    if ((n == "op_Implicit" || n == "op_Explicit") &&
                         m.GetParameters()[0].ParameterType == sourceType)
                         return m;
                 }
-            }
 
             return null;
         }
