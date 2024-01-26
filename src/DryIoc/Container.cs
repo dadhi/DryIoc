@@ -379,7 +379,7 @@ namespace DryIoc
             var factory = ResolveFactory(request); // note: ResolveFactory may mutate request, but it should be safe because it is not shared between threads.
 
             // Delegate to full blown Resolve aware of service key, open scope, etc.
-            var serviceKey = request.ServiceKey;
+            var serviceKey = request.GetServiceDetails().ServiceKey;
             var scopeName = scope?.Name;
             if (serviceKey != null | scopeName != null)
                 // todo: @perf optimize the call, path the created request/stack, found scope, use this.TryGetUsedInstance, etc.
@@ -492,9 +492,10 @@ namespace DryIoc
 
             // Request service key may be changed when resolving the factory,
             // so we need to look into Default cache again for the new key
-            if (cacheKey != null & serviceKey == null && request.ServiceKey != null)
+            var changedServiceKey = request.GetServiceDetails().ServiceKey;
+            if (cacheKey != null & serviceKey == null & changedServiceKey != null)
             {
-                cacheKey = scopeName == null ? request.ServiceKey : KV.Of(scopeName, request.ServiceKey);
+                cacheKey = scopeName == null ? changedServiceKey : KV.Of(scopeName, changedServiceKey);
                 if (Registry.GetCachedKeyedFactoryOrDefault(_registry.Value, serviceTypeHash, serviceType, cacheKey, out var cacheEntry))
                 {
                     if (cacheEntry.Factory is Func<IResolverContext, object> cachedDelegate)
@@ -956,7 +957,7 @@ namespace DryIoc
                 factory = factory.GetGeneratedFactoryOrDefault(request);
 
             return factory != null ? factory
-                : !request.IsResolutionCall && request.Container.Rules.GenerateResolutionCallForMissingDependency ? null
+                : !request.IsResolutionCall && Rules.GenerateResolutionCallForMissingDependency ? null
                 : ThrowUnableToResolveOrGetDefault(request, factory);
         }
 
@@ -8104,7 +8105,7 @@ namespace DryIoc
         /// <summary>Wrap the resolution key</summary>
         public static object AnyKeyOf(object key) => new AnyServiceKey(key);
 
-        /// <summary>Represents the key that you may resolve with any resolution service key</summary>
+        /// <summary>Represents the **registered** key that you may resolve with any resolution service key</summary>
         public class AnyServiceKey
         {
             /// <summary>The resolution key supplied in the Resolve</summary>
@@ -10345,7 +10346,7 @@ namespace DryIoc
         public Type ServiceType => ServiceTypeOrInfo is ServiceInfo i ? i.ServiceType : ActualServiceType;
 
         /// <summary>The required service type when assignable to service type, or service type otherwise.</summary>
-        public Type ActualServiceType;
+        public Type ActualServiceType { get; private set; }
 
         /// <summary>Get the details</summary>
         public ServiceDetails GetServiceDetails() =>
