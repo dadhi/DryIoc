@@ -9,7 +9,7 @@ public class Program
 {
     public static void Main()
     {
-        new GHIssue623_Scoped_service_decorator().Run();
+        // new GHIssue623_Scoped_service_decorator().Run();
         // new GHIssue619_FaultySingletonDependency().Run();
         // new GHIssue536_DryIoc_Exception_in_a_Constructor_of_a_Dependency_does_tunnel_through_Resolve_call().Run();
 
@@ -416,6 +416,7 @@ public class Program
             new GHIssue608_Multiple_same_type_same_keyed(),
             new GHIssue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments(),
             new GHIssue619_FaultySingletonDependency(),
+            new GHIssue623_Scoped_service_decorator(),
         };
 
         var totalPassed = 0;

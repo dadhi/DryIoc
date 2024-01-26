@@ -388,11 +388,13 @@ namespace DryIoc
             if (factory == null)
                 return null;
 
+            bool requestCanCache;
             Func<IResolverContext, object> factoryDelegate;
             var rules = Rules;
             if (rules.UseInterpretationForTheFirstResolution)
             {
                 var expr = factory.GetExpressionOrDefault(request);
+                requestCanCache = request.CanCache();
                 request.ReturnToPool();
                 if (expr == null)
                     return null;
@@ -402,7 +404,7 @@ namespace DryIoc
                     var value = constExpr.Value;
                     if (value is ScopedItemException ex)
                         ex.ReThrow();
-                    if (factory.CanCache)
+                    if (factory.CanCache & requestCanCache)
                         TryCacheDefaultFactoryDelegateOrExprOrResult(serviceTypeHash, serviceType, value.ToCachedResult());
                     return value;
                 }
@@ -411,7 +413,7 @@ namespace DryIoc
                 if (Interpreter.TryInterpretAndUnwrapContainerException(this, expr, out var instance))
                 {
                     // todo: @check ...but what if exception is thrown, isn't it better to avoid caching the bad expression?
-                    if (factory.CanCache)
+                    if (factory.CanCache & requestCanCache)
                         TryCacheDefaultFactoryDelegateOrExprOrResult(serviceTypeHash, serviceType, expr);
                     return instance;
                 }
@@ -422,12 +424,13 @@ namespace DryIoc
             else
             {
                 factoryDelegate = factory.GetDelegateOrDefault(request);
+                requestCanCache = request.CanCache();
                 request.ReturnToPool();
                 if (factoryDelegate == null)
                     return null;
             }
 
-            if (factory.CanCache)
+            if (factory.CanCache & requestCanCache)
                 TryCacheDefaultFactoryDelegateOrExprOrResult(serviceTypeHash, serviceType, factoryDelegate);
 
             return factoryDelegate(this);
@@ -1501,26 +1504,29 @@ namespace DryIoc
             if (!decorators.IsNullOrEmpty())
                 decorators = decorators.Match(request, static (r, d) => !r.HasRecursiveParent(d.FactoryID));
 
-            // Return earlier if no decorators found, or we have filtered out everything
+            // Return earlier if no decorators or every decorator was filtered out
             if (decorators.IsNullOrEmpty())
                 return null;
 
-            Factory decorator = null;
-            if (decorators.Length == 1)
+            // Select the first decorator without condition or the one which matches the condition
+            Factory nextDecorator = null;
+            foreach (var d in decorators)
             {
-                decorator = decorators[0];
-                if (!decorator.CheckCondition(request))
-                    return null; // disable the cache for the decorated service, see #623
+                var cond = d.Setup.Condition;
+                if (cond == null)
+                {
+                    nextDecorator = d;
+                    break;
+                }
+                request.Flags |= RequestFlags.DoNotCacheExpression;
+                if (cond(request.Isolate()))
+                {
+                    nextDecorator = d;
+                    break;
+                }
             }
-            else
-                foreach (var d in decorators)
-                    if (d.CheckCondition(request))
-                    {
-                        decorator = d;
-                        break;
-                    }
 
-            var decoratorExpr = decorator?.GetExpressionOrDefault(request);
+            var decoratorExpr = nextDecorator?.GetExpressionOrDefault(request);
             if (decoratorExpr == null)
                 return null;
 
@@ -10088,8 +10094,10 @@ namespace DryIoc
         IsGeneratedResolutionDependencyExpression = 1 << 6,
         /// <summary>Non inherited. Indicates the root service inside the function.</summary>
         IsDirectlyWrappedInFunc = 1 << 7,
-        /// means the request is pooled
+        /// <summary>Request is isolated/copied and should no be re-used via pooling</summary>
         DoNotPoolRequest = 1 << 8,
+        /// <summary>Can be set by the container to indicate that the expression cannot be cached</summary>
+        DoNotCacheExpression = 1 << 9
     }
 
     /// <summary>Helper extension methods to use on the bunch of factories instead of lambdas to minimize allocations</summary>
@@ -10957,6 +10965,10 @@ namespace DryIoc
             return this;
         }
 
+        [MethodImpl((MethodImplOptions)256)]
+        internal bool CanCache() =>
+            (Flags & RequestFlags.DoNotCacheExpression) == 0;
+
         /// Severe the connection with the request pool up to the parent so that no one can change the Request state
         internal Request IsolateRequestChain()
         {
@@ -11637,9 +11649,9 @@ namespace DryIoc
                 CanCache & FactoryType == FactoryType.Service &&
 
                 // todo: @perf call !request.AvoidExpressionCaching instead
+                // see #623 for the HasDecoratorCondition
+                (requestFlags & (RequestFlags.IsDirectlyWrappedInFunc | RequestFlags.DoNotCacheExpression)) == 0 &&
                 !request.IsResolutionRoot &&
-                (requestFlags & RequestFlags.IsDirectlyWrappedInFunc) == 0 &&
-                // !request.IsDirectlyWrappedInFunc() && // todo: @wip cleanup
                 !request.IsWrappedInFuncWithArgs() &&
 
                 !(reuse.Name is IScopeName) && // avoid caching of scoped services with the custom scope name and possibly the scope name matching rule

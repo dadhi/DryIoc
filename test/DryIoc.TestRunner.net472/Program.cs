@@ -416,6 +416,7 @@ namespace DryIoc.UnitTests
                 new GHIssue608_Multiple_same_type_same_keyed(),
                 new GHIssue610_CustomDynamicRegistrationProvider_ConstructorWithResolvableArguments(),
                 new GHIssue619_FaultySingletonDependency(),
+                new GHIssue623_Scoped_service_decorator()
             };
 
             var totalPassed = 0;
