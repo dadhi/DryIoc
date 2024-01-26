@@ -12,7 +12,7 @@ namespace DryIoc.IssuesTests
             return 2;
         }
 
-        // [Test] // todo: @fixme
+        [Test]
         public void Test_scope_inside_the_transient_dependency_of_the_scoped_service()
         {
             var container = new Container();
@@ -28,7 +28,7 @@ namespace DryIoc.IssuesTests
             transient.Do();
         }
 
-        // [Test] // todo: @fixme
+        [Test]
         public void Test_scope_inside_the_transient_dependency_of_the_scoped_service_But_injected_first_in_singleton()
         {
             var container = new Container();
@@ -39,7 +39,7 @@ namespace DryIoc.IssuesTests
             container.Register<ServiceScoped>(reuse: Reuse.Scoped);
 
             // resolving singleton first breaks the resolution in the Do below
-            var singleton = container.Resolve<ServiceSingleton>();
+            _ = container.Resolve<ServiceSingleton>();
 
             using var scope = container.OpenScope();
 
