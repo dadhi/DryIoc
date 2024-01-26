@@ -15,12 +15,12 @@ namespace DryIoc.IssuesTests
         public int Run()
         {
             ResolveEnumerableFromChild();
-            // ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys();
-            // ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys_2();
-            return 1;
+            ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys();
+            ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys_2();
+            return 3;
         }
 
-        //[Ignore("@fixme")]
+        [Test]
         public void ResolveEnumerableFromChild()
         {
             var services = new ServiceCollection();
@@ -49,11 +49,11 @@ namespace DryIoc.IssuesTests
                 Is.EqualTo(4));
         }
 
-        // [Test]
+        [Test]
         public void ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys()
         {
-            var container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
-                .WithMef(); // <-- this is the key, LOL ;-)
+            // now with MS.DI keyed services it works fine
+            var container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules);
 
             var spf = new DryIocServiceProviderFactory(container);
             var rootContainer = spf.CreateBuilder(new ServiceCollection()).Container;
@@ -79,11 +79,11 @@ namespace DryIoc.IssuesTests
                 Is.EqualTo(4));
         }
 
-        // [Test] // todo: @wip @fixme
+        [Test]
         public void ResolveEnumerableFromChild_MefAttributedModel_SupportsMultipleServiceKeys_2()
         {
-            var container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules)
-                .WithMef(); // <-- this is the key, LOL ;-)
+            // now with MS.DI keyed services it works fine
+            var container = new Container(DryIocAdapter.MicrosoftDependencyInjectionRules);
 
             // here use RegisterExport instead of the RegisterDescriptor
             container.RegisterExports(

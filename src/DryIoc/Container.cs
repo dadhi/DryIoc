@@ -10591,7 +10591,6 @@ namespace DryIoc
                 _factoryOrImplType, FactoryID, FactoryType, Reuse, DecoratedFactoryID);
         }
 
-        // todo: @perf @mem use in place mutation - a huge thing?
         /// <summary>Updates the flags</summary>
         public Request WithFlags(RequestFlags newFlags) =>
             new Request(Container, DirectParent, DependencyDepth, DependencyCount,
@@ -10760,13 +10759,13 @@ namespace DryIoc
             return this;
         }
 
-        /// <summary>Check for the parents.</summary>
+        /// <summary>Check for the first recursive parent in the up-chain.</summary>
         public bool HasRecursiveParent(int factoryID)
         {
             for (var p = DirectParent; !p.IsEmpty; p = p.DirectParent)
             {
                 if ((p.Flags & RequestFlags.StopRecursiveDependencyCheck) != 0)
-                    break; // stops further upward checking
+                    break; // stops the further upward checking
                 if (p.FactoryID == factoryID)
                     return true;
             }
@@ -10826,7 +10825,7 @@ namespace DryIoc
         /// <summary>Prints current request info only (no parents printed) to provided builder.</summary>
         public StringBuilder PrintCurrent(StringBuilder s = null)
         {
-            s = s ?? new StringBuilder();
+            s ??= new StringBuilder();
 
             if (IsEmpty)
                 return s.Append("<empty request>");
