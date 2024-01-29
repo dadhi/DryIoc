@@ -9,6 +9,8 @@ public class Program
 {
     public static void Main()
     {
+        new GHIssue228_Updated_DryIoc_from_4_to_4_1_in_Unity_Engine_project_keyed_register_resolve_wont_work_anymore().Run();
+
         RunAllTests();
 
         // new GHIssue580_Scope_is_lost_in_IResolver_inside_scope_because_of_singleton().Run();
@@ -24,8 +26,11 @@ public class Program
         // note: @important to remember to do the Tread.Sleep in tests less that this setting, 
         // if you don't intentionally want the Error.WaitForScopedServiceIsCreatedTimeoutExpired exception, 
         // e.g. see GHIssue337_Singleton_is_created_twice, GHIssue391_Deadlock_during_Resolve, Issue157_ContainerResolveFactoryIsNotThreadSafe
+#if DEBUG
+        Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 1500;
+#else
         Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 150;
-
+#endif
         var perfMemoryTests = new ITest[]
         {
             new Issue152_ExponentialMemoryPerformanceWithRegardsToTheObjectGraphSize(),
@@ -465,19 +470,19 @@ public class Program
         int RunTests(ITest[] tests, string name)
         {
             var somePassed = 0;
-            var someFailed = false;
+            var someFailed = 0;
             var sw = Stopwatch.StartNew();
             foreach (var x in tests)
             {
                 var passed = Run(x.Run);
                 if (passed > 0) somePassed += passed;
-                else someFailed = true;
+                else ++someFailed;
             }
-            if (!someFailed)
+            if (someFailed == 0)
                 Console.WriteLine($"\n{name}: {somePassed} tests are passing in {sw.ElapsedMilliseconds} ms.");
             else
             {
-                Console.WriteLine($"\n{name}: Some tests are FAILED! Remaining {somePassed} tests are passing in {sw.ElapsedMilliseconds} ms.");
+                Console.WriteLine($"\n{name}: {someFailed} of tests FAILED! Remaining {somePassed} tests are passing in {sw.ElapsedMilliseconds} ms.");
                 Environment.ExitCode = 1; // error exit code
             }
             return somePassed;

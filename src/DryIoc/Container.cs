@@ -1083,6 +1083,15 @@ namespace DryIoc
             // correct factory for the ResolveMany.
             if (serviceKey != null)
             {
+                // simplified selection if we know that serviceKey is a default key
+                if (serviceKey is DefaultKey || serviceKey is DefaultDynamicKey)
+                {
+                    foreach (var f in factories)
+                        if (f.Key.Equals(serviceKey))
+                            return f.Value.CheckCondition(request) ? f.Value : null;
+                    return null;
+                }
+
                 foreach (var f in factories)
                     if (serviceKey.MatchWithRegisteredKey(f.Key) && f.Value.CheckCondition(request))
                         return f.Value;
@@ -8580,11 +8589,10 @@ namespace DryIoc
                 if (!serviceTypes.IsNullOrEmpty())
                 {
                     var factory = getImplFactory(implType);
-                    for (var i = 0; i < serviceTypes.Length; i++)
+                    foreach (var st in serviceTypes)
                     {
-                        var t = serviceTypes[i];
                         // todo: @wip do we need to validate the registration?
-                        registrator.Register(t, factory, ifAlreadyRegistered, getServiceKey?.Invoke(implType, t));
+                        registrator.Register(st, factory, ifAlreadyRegistered, getServiceKey?.Invoke(implType, st));
                     }
                 }
             }
@@ -12935,7 +12943,7 @@ namespace DryIoc
                     if (memberExpr == null)
                     {
                         if (request.IfUnresolved == IfUnresolved.ReturnDefault)
-                            return null; // todo: @wip add two properties to check that indicate that we have failed to get the member
+                            return null; // todo: @wip add two properties to indicate that we have failed to get the member
                         continue;
                     }
 
@@ -13064,14 +13072,15 @@ namespace DryIoc
                 if (implType.IsGenericType && implType.ContainsGenericParameters)
                     return Throw.When(throwIfInvalid, Error.RegisteringNotAGenericTypedefImplType, implType, implType.GetGenericDefinitionOrNull());
 
-                if (implType != serviceType || serviceType != typeof(object))
+                if (implType != serviceType | serviceType != typeof(object))
                 {
                     if (!serviceType.IsGenericTypeDefinition)
                     {
                         if (!serviceType.IsAssignableFrom(implType))
                             return Throw.When(throwIfInvalid, Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
                     }
-                    else if (implType.GetImplementedTypes().IndexOf(serviceType, (st, t) => t == st || t.GetGenericDefinitionOrNull() == st) == -1)
+                    else if (implType.GetImplementedTypes().IndexOf(serviceType,
+                        static (st, t) => t == st || t.GetGenericDefinitionOrNull() == st) == -1)
                         return Throw.When(throwIfInvalid, Error.RegisteringImplementationNotAssignableToServiceType, implType, serviceType);
                 }
             }
@@ -13217,7 +13226,7 @@ namespace DryIoc
                     var factoryServiceType = factoryInfo.ServiceType;
                     if (factoryServiceType != factoryImplType)
                         factoryServiceType = factoryImplType.GetImplementedTypes()
-                            .FindFirst(factoryServiceType, (fServiceType, t) => t.IsGenericType && t.GetGenericTypeDefinition() == fServiceType)
+                            .FindFirst(factoryServiceType, static (fServiceType, t) => t.IsGenericType && t.GetGenericTypeDefinition() == fServiceType)
                             .ThrowIfNull();
 
                     var factoryServiceTypeParams = factoryServiceType.GetGenericArguments();
@@ -13230,7 +13239,8 @@ namespace DryIoc
                     if (isFactoryServiceTypeClosed)
                     {
                         factoryServiceType = factoryServiceType.GetGenericTypeDefinition().ThrowIfNull();
-                        var closedFactoryServiceType = factoryServiceType.TryCloseGenericTypeOrMethod(resultFactoryServiceTypeArgs, (t, a) => t.MakeGenericType(a),
+                        var closedFactoryServiceType = factoryServiceType.TryCloseGenericTypeOrMethod(
+                            resultFactoryServiceTypeArgs, static (t, a) => t.MakeGenericType(a),
                             !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw, Error.NoMatchedGenericParamConstraints, request);
 
                         if (closedFactoryServiceType == null)
@@ -13245,7 +13255,8 @@ namespace DryIoc
 
                 // Close the factory type implementation
                 // and get factory member to use from it.
-                var closedFactoryImplType = factoryImplType.TryCloseGenericTypeOrMethod(resultFactoryImplTypeArgs, (t, a) => t.MakeGenericType(a),
+                var closedFactoryImplType = factoryImplType.TryCloseGenericTypeOrMethod(
+                    resultFactoryImplTypeArgs, static (t, a) => t.MakeGenericType(a),
                     !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw, Error.NoMatchedGenericParamConstraints, request);
 
                 if (closedFactoryImplType == null)
@@ -13256,7 +13267,8 @@ namespace DryIoc
                 if (factoryMethodBase != null)
                 {
                     var targetMethods = closedFactoryImplType.GetMethods()
-                        .Match(factoryMember, factoryMethodBase.GetParameters(), (fm, fp, m) => m.Name == fm.Name && m.GetParameters().Length == fp.Length);
+                        .Match(factoryMember, factoryMethodBase.GetParameters(), 
+                            static (fm, fp, m) => m.Name == fm.Name && m.GetParameters().Length == fp.Length);
 
                     if (targetMethods.Length == 1)
                         factoryMember = targetMethods[0];
@@ -13294,7 +13306,8 @@ namespace DryIoc
 
                 MatchOpenGenericConstraints(methodTypeParams, resultMethodTypeArgs);
 
-                factoryMember = openFactoryMethod.TryCloseGenericTypeOrMethod(resultMethodTypeArgs, (m, a) => m.MakeGenericMethod(a),
+                factoryMember = openFactoryMethod.TryCloseGenericTypeOrMethod(
+                    resultMethodTypeArgs, static (m, a) => m.MakeGenericMethod(a),
                     !ifErrorReturnDefault && request.IfUnresolved == IfUnresolved.Throw, Error.NoMatchedGenericParamConstraints, request);
 
                 if (factoryMember == null)
