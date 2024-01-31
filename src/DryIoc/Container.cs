@@ -677,7 +677,7 @@ namespace DryIoc
                 : openGenericItems == null ? items.Append(variantGenericItems)
                 : items.Append(openGenericItems).Append(variantGenericItems); // todo: @perf combine into one append
 
-            // Resolve in registration order
+            // Resolve in the registration order
             foreach (var item in allItems.OrderBy(static x => x.FactoryRegistrationOrder))
             {
                 var itemServiceKey = item.OptionalServiceKey;
@@ -685,7 +685,8 @@ namespace DryIoc
                     itemServiceKey = Registrator.AnyKeyOf(serviceKey);
 
                 var service = Resolve(serviceType, itemServiceKey,
-                    IfUnresolved.ReturnDefaultIfNotRegistered, item.ServiceType, preResolveParent, args);
+                    IfUnresolved.ReturnDefaultIfNotRegistered, // mark the resolution to return null if failed instead of throwing, so we can filter out the nulls later
+                    item.ServiceType, preResolveParent, args);
                 if (service != null) // skip unresolved items
                     yield return service;
             }
@@ -1001,11 +1002,11 @@ namespace DryIoc
 
                 // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServiceType, ServiceKey }
                 // presumes that required service type is closed generic
-                if (serviceKey != null && serviceKey is ResolutionKeyAndRequiredOpenGenericType openGenericTypeKey && serviceType.IsClosedGeneric() &&
-                    openGenericTypeKey.RequiredServiceType == serviceType.GetGenericTypeDefinition())
+                if (serviceKey != null && serviceKey is ResolutionKeyAndRequiredOpenGenericType keyAndType &&
+                    serviceType.IsClosedGeneric() && keyAndType.RequiredServiceType == serviceType.GetGenericTypeDefinition())
                 {
-                    serviceType = openGenericTypeKey.RequiredServiceType;
-                    serviceKey = openGenericTypeKey.ServiceKey;
+                    serviceType = keyAndType.RequiredServiceType;
+                    serviceKey = keyAndType.ServiceKey;
                 }
             }
 
@@ -1058,7 +1059,7 @@ namespace DryIoc
                 }
             }
 
-            // Hot path - when we have a single default factory and no dynamic rules to always apply
+            // Hot path - when we have a single default factory and no dynamic rules to apply
             if (entry is Factory defaultFactory &&
                 (rules.DynamicRegistrationProviders == null ||
                 !rules.HasDynamicRegistrationProvider(DynamicRegistrationFlags.Service, withoutFlags: DynamicRegistrationFlags.AsFallback)))
@@ -1843,7 +1844,7 @@ namespace DryIoc
             var withFlags = DynamicRegistrationFlags.Service;
             var withoutFlags = factories.Length != 0 ? DynamicRegistrationFlags.AsFallback : DynamicRegistrationFlags.NoFlags;
 
-            // Assign unique continuous keys across all of dynamic providers,
+            // Assign unique continuous keys across all of the dynamic providers,
             // to prevent duplicate keys and peeking the wrong factory by collection wrappers
             // NOTE: Given that dynamic registration always return the same implementation types in the same order
             // then the dynamic key will be assigned deterministically, so that even if `CombineRegisteredWithDynamicFactories`
@@ -3163,12 +3164,14 @@ namespace DryIoc
         public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
             New(_ctor, ConstantOf<Type>(RequiredServiceType), fallbackConverter(ServiceKey));
 
+        // todo: @perf use UnsafeAccessAttribute to avoid reflection
         private static readonly ConstructorInfo _ctor = typeof(ResolutionKeyAndRequiredOpenGenericType).GetConstructors()[0];
     }
 
     ///<summary>Hides/wraps object with disposable interface.</summary> 
     public sealed class HiddenDisposable
     {
+        // todo: @perf use UnsafeAccessAttribute to avoid reflection
         internal static ConstructorInfo Ctor = typeof(HiddenDisposable).GetConstructors()[0];
         internal static FieldInfo ValueField = typeof(HiddenDisposable).GetField(nameof(Value));
         /// <summary>Wrapped value</summary>
@@ -5859,7 +5862,8 @@ namespace DryIoc
             Ref.Swap(ref index, ref serviceTypeOrName, ref serviceKey, UpdateMap);
             return serviceKey;
 
-            static ImHashMap<object, object> UpdateMap(ImHashMap<object, object> m, ref object t, ref object k) => m.AddOrUpdate(k, t, ref k, UpdateTypes);
+            static ImHashMap<object, object> UpdateMap(ImHashMap<object, object> m, ref object t, ref object k) =>
+                m.AddOrUpdate(k, t, ref k, UpdateTypes);
 
             static object UpdateTypes(object originalKey, object oldTypeOrTypes, object newTypeOrName, ref object uniqueKey)
             {
@@ -5887,9 +5891,9 @@ namespace DryIoc
                     var types = (object[])oldTypeOrTypes;
                     Debug.Assert(types.Length > 1, "we use array only for 2 and more types/pairs with count");
 
-                    var foundTypeIndex = types.IndexOf(newTypeOrName, static (nt, t) =>
-                        ReferenceEquals(t, nt) || Equals(t, nt) ||
-                        (t is KV<object, int> kv && (ReferenceEquals(kv.Key, nt) || Equals(kv.Key, nt))));
+                    var foundTypeIndex = types.IndexOf(newTypeOrName,
+                        static (nt, t) => ReferenceEquals(t, nt) || Equals(t, nt) ||
+                            (t is KV<object, int> kv && (ReferenceEquals(kv.Key, nt) || Equals(kv.Key, nt))));
 
                     if (foundTypeIndex != -1)
                     {
@@ -5920,7 +5924,6 @@ namespace DryIoc
         public object GetServiceTypesOrDefault(object serviceKey) =>
             _index.GetValueOrDefault(serviceKey);
     }
-
 
     /// <summary> Defines resolution/registration rules associated with Container instance. They may be different for different containers.</summary>
     public sealed class Rules
@@ -8137,7 +8140,7 @@ namespace DryIoc
 
         internal static bool MatchWithRegisteredKey(this object resolutionKey, object registeredKey)
         {
-            // a very special case just in case of the this case...
+            // a very special case:
             // because usually the registered key (unless it is got from the ServiceRegistrationInfo) is the non-null thingly
             if (registeredKey == null)
             {
@@ -8150,7 +8153,7 @@ namespace DryIoc
             {
                 if (registeredKey is UniqueRegisteredServiceKey regKey)
                     registeredKey = regKey.Key;
-                return registeredKey == null || registeredKey is DefaultKey || registeredKey is DefaultDynamicKey;
+                return registeredKey is DefaultKey | registeredKey is DefaultDynamicKey;
             }
 
             if (resolutionKey is ResolutionKeyAndRequiredOpenGenericType resolutionKeyWithOGType)
@@ -9863,7 +9866,7 @@ namespace DryIoc
             if (serviceType == requiredServiceType)
                 requiredServiceType = null;
 
-            return serviceKey == null && requiredServiceType == null && metadataKey == null && metadata == null
+            return serviceKey == null & requiredServiceType == null & metadataKey == null & metadata == null
                 ? (ifUnresolved == IfUnresolved.Throw ? new Typed(serviceType)
                 : ifUnresolved == IfUnresolved.ReturnDefault
                 ? new TypedIfUnresolvedReturnDefault(serviceType)
