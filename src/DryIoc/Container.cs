@@ -1094,7 +1094,7 @@ namespace DryIoc
                 }
 
                 foreach (var f in factories)
-                    if (serviceKey.MatchWithRegisteredKey(f.Key) && f.Value.CheckCondition(request))
+                    if (serviceKey.MatchNotNullWithNotNullRegisteredKey(f.Key) && f.Value.CheckCondition(request))
                         return f.Value;
                 return null;
             }
@@ -5834,10 +5834,14 @@ namespace DryIoc
         public override string ToString() =>
             Print(new StringBuilder(), PrintTools.Print).ToString();
 
+        /// <summary>Faster comparison all the way - no virtual calls</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool Equals(UniqueRegisteredServiceKey key, object obj) =>
+            obj is UniqueRegisteredServiceKey other && other.Index == key.Index &&
+            (ReferenceEquals(other.Key, key.Key) || Equals(other.Key, key.Key));
+
         /// <summary>Returns true if both key and the index are equal.</summary>
-        public override bool Equals(object obj) =>
-            obj is UniqueRegisteredServiceKey other && other.Index == Index &&
-            (ReferenceEquals(other.Key, Key) || Equals(other.Key, Key));
+        public override bool Equals(object obj) => Equals(this, obj);
 
         /// <summary>Combines key and index</summary>
         public override int GetHashCode() => Hasher.Combine(Key, Index);
@@ -8138,6 +8142,28 @@ namespace DryIoc
             public override string ToString() => ResolutionKey == null ? "AnyKey(*)" : $"AnyKey(resolutionKey: {ResolutionKey})";
         }
 
+        internal static bool MatchNotNullWithNotNullRegisteredKey(this object resolutionKey, object registeredKey)
+        {
+            if (resolutionKey is ResolutionKeyAndRequiredOpenGenericType resolutionKeyWithOGType)
+                resolutionKey = resolutionKeyWithOGType.ServiceKey;
+
+            if (resolutionKey is UniqueRegisteredServiceKey resolutionUniqueKey)
+                return UniqueRegisteredServiceKey.Equals(resolutionUniqueKey, registeredKey);
+
+            if (registeredKey is UniqueRegisteredServiceKey registeredUniqueKey)
+                registeredKey = registeredUniqueKey.Key;
+
+            if (resolutionKey is Registrator.AnyServiceKey anyResolutionKey)
+            {
+                // The another case for ResolveMany or for the fallback Resolve when we were unable to find the not Any ServiceKey
+                if (anyResolutionKey.ResolutionKey != null)
+                    return registeredKey is Registrator.AnyServiceKey;
+                return anyResolutionKey.Equals(registeredKey);
+            }
+
+            return registeredKey.Equals(resolutionKey);
+        }
+
         internal static bool MatchWithRegisteredKey(this object resolutionKey, object registeredKey)
         {
             // a very special case:
@@ -8156,25 +8182,7 @@ namespace DryIoc
                 return registeredKey is DefaultKey | registeredKey is DefaultDynamicKey;
             }
 
-            if (resolutionKey is ResolutionKeyAndRequiredOpenGenericType resolutionKeyWithOGType)
-                resolutionKey = resolutionKeyWithOGType.ServiceKey;
-
-            // The case is from the ResolveMany
-            if (resolutionKey is UniqueRegisteredServiceKey resolutionUniqueKey)
-                return resolutionUniqueKey.Equals(registeredKey);
-
-            if (registeredKey is UniqueRegisteredServiceKey registeredUniqueKey)
-                registeredKey = registeredUniqueKey.Key;
-
-            if (resolutionKey is Registrator.AnyServiceKey anyResolutionKey)
-            {
-                // The another case for ResolveMany or for the fallback Resolve when we were unable to find the not Any ServiceKey
-                if (anyResolutionKey.ResolutionKey != null)
-                    return registeredKey is Registrator.AnyServiceKey;
-                return anyResolutionKey.Equals(registeredKey);
-            }
-
-            return registeredKey.Equals(resolutionKey);
+            return resolutionKey.MatchNotNullWithNotNullRegisteredKey(registeredKey);
         }
 
         /// <summary>The base method for registering service with its implementation factory. Allows to specify all possible options.</summary>
