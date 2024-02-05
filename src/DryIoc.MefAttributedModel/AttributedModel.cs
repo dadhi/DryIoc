@@ -174,14 +174,13 @@ namespace DryIoc.MefAttributedModel
             }
             else // todo: @simplify factor this section both here and in the Container into the standalone method
             {
-                // todo: @perf use the GetServiceRegisteredAndDynamicFactories
-                var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true);
+                var factories = container.GetAllServiceFactoriesPlusForOpenGeneric(requiredServiceType);
                 if (factories.Length == 0)
                     return null;
 
                 if (serviceKey != null)
                 {
-                    factories = factories.Match(serviceKey, static (key, f) => key.Equals(f.Key));
+                    factories = factories.Match(serviceKey, static (key, f) => key.Equals(f.Key)); // todo: @wip check for UniqueServiceKey?
                     if (factories.Length == 0)
                         return null;
                 }

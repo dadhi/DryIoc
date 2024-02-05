@@ -607,14 +607,14 @@ namespace DryIoc
             if (unwrappedType != null & unwrappedType != typeof(void)) // accounting for the resolved action GH#114
                 requiredItemType = unwrappedType;
 
-            var items = GetServiceRegisteredAndDynamicFactories(requiredItemType)
+            var items = GetAllServiceFactories(requiredItemType)
                 .Map(requiredServiceType, static (t, f) => new ServiceRegistrationInfo(f.Value, t, f.Key));
 
             ServiceRegistrationInfo[] openGenericItems = null;
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
-                openGenericItems = GetServiceRegisteredAndDynamicFactories(requiredItemOpenGenericType)
+                openGenericItems = GetAllServiceFactories(requiredItemOpenGenericType)
                     .Map(requiredItemOpenGenericType, requiredServiceType,
                         static (gt, t, x) => new ServiceRegistrationInfo(x.Value, t, new ServiceKeyAndRequiredOpenGenericType(gt, x.Key)));
             }
@@ -980,7 +980,7 @@ namespace DryIoc
             {
                 var str = new StringBuilder();
                 str = request.Container
-                    .GetAllServiceFactories(request.ServiceType, bothClosedAndOpenGenerics: true)
+                    .GetAllServiceFactoriesPlusForOpenGeneric(request.ServiceType)
                     .Aggregate(str, (s, x) => s
                         .Append((x.Value.Reuse?.CanApply(request) ?? true) ? "  " : "  without matching scope ")
                         .Print(x));
@@ -1321,7 +1321,7 @@ namespace DryIoc
         }
 
         ///  <inheritdoc />
-        public KV<object, Factory>[] GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics = false) // todo: @perf add the version with the serviceTypeHash parameter
+        public KV<object, Factory>[] GetAllServiceFactoriesPlusForOpenGeneric(Type serviceType) // todo: @perf add the version with the serviceTypeHash parameter
         {
             var serviceFactories = Registry.GetServiceFactories(_registry.Value);
             var entry = serviceFactories.GetValueOrDefault(serviceType);
@@ -1329,7 +1329,7 @@ namespace DryIoc
             var factories = FactoriesEntry.ToNotNullKeyedFactories(entry);
 
             Type openGenericServiceType = null;
-            if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
+            if (serviceType.IsClosedGeneric())
             {
                 openGenericServiceType = serviceType.GetGenericTypeDefinition();
                 var openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
@@ -1404,7 +1404,7 @@ namespace DryIoc
         private static int _objectTypeHash = RuntimeHelpers.GetHashCode(typeof(object));
 
         /// <inheritdoc />
-        public KV<object, Factory>[] GetServiceRegisteredAndDynamicFactories(Type serviceType) // todo @perf pass the serviceTypeHash
+        public KV<object, Factory>[] GetAllServiceFactories(Type serviceType) // todo @perf pass the serviceTypeHash
         {
             var serviceFactories = Registry.GetServiceFactories(_registry.Value);
             var entry = serviceFactories.GetValueOrDefault(serviceType);
@@ -5389,13 +5389,13 @@ namespace DryIoc
             var details = request.GetServiceDetails();
             var requiredItemType = container.GetWrappedType(itemType, details.RequiredServiceType);
 
-            var items = container.GetServiceRegisteredAndDynamicFactories(requiredItemType)
+            var items = container.GetAllServiceFactories(requiredItemType)
                 .Map(requiredItemType, static (t, x) => new ServiceRegistrationInfo(x.Value, t, x.Key));
 
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
-                var openGenericItems = container.GetServiceRegisteredAndDynamicFactories(requiredItemOpenGenericType)
+                var openGenericItems = container.GetAllServiceFactories(requiredItemOpenGenericType)
                     .Map(requiredItemOpenGenericType, requiredItemType,
                         static (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new ServiceKeyAndRequiredOpenGenericType(gt, f.Key)));
                 items = items.Append(openGenericItems);
@@ -5722,8 +5722,7 @@ namespace DryIoc
             }
             else
             {
-                // todo: @perf use the GetServiceRegisteredAndDynamicFactories
-                var factories = container.GetAllServiceFactories(requiredServiceType, bothClosedAndOpenGenerics: true);
+                var factories = container.GetAllServiceFactoriesPlusForOpenGeneric(requiredServiceType);
                 if (factories.Length == 0)
                     return null;
 
@@ -6200,6 +6199,7 @@ namespace DryIoc
             SelectFactoryWithTheMinReuseLifespan(request, factory, factories) ??
             SelectLastRegisteredFactory(request, factory, factories);
 
+        // todo: @wip check for the UniqueRegisteredServiceKey
         /// <summary>Prefer specified service key (if found) over default key.
         /// Help to override default registrations in Open Scope scenarios:
         /// I may register service with key and resolve it as default in current scope.</summary>
@@ -6220,7 +6220,7 @@ namespace DryIoc
             foreach (var factory in orManyDefaultAndKeyedFactories)
             {
                 var reuse = factory.Value.Reuse;
-                var lifespan = reuse == null || reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
+                var lifespan = reuse == null | reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
                 if (lifespan == minLifespan)
                     multipleFactories = true;
                 else if (lifespan < minLifespan)
@@ -6231,7 +6231,7 @@ namespace DryIoc
                 }
             }
 
-            return !multipleFactories && minLifespanFactory != null ? minLifespanFactory : null;
+            return !multipleFactories & minLifespanFactory != null ? minLifespanFactory : null;
         }
 
         /// <summary>Specify the method signature for returning multiple keyed factories.
@@ -14969,18 +14969,13 @@ namespace DryIoc
         /// <returns>Found factory or null.</returns>
         Factory GetServiceFactoryOrDefault(Request request);
 
-        /// <summary>Finds all registered default and keyed service factories and returns them.
-        /// It skips decorators and wrappers.</summary>
-        /// <param name="serviceType">Service type to look for, may be open-generic type too.</param>
-        /// <param name="bothClosedAndOpenGenerics">(optional) For generic serviceType instructs to look for
-        /// both closed and open-generic registrations.</param>
-        /// <returns>Enumerable of found pairs.</returns>
+        /// <summary>Finds all registered default and keyed service factories and returns them. Skips decorators and wrappers.
+        /// If the service type is closed-generic, the method will find and append the open-generic factories to the result.</summary>
         /// <remarks>Returned Key item should not be null - it should be <see cref="DefaultKey.Value"/>.</remarks>
-        KV<object, Factory>[] GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics = false); // todo: @perf try replace KV with ImHashMapEntry to avoid conversion cost
+        KV<object, Factory>[] GetAllServiceFactoriesPlusForOpenGeneric(Type serviceType); // todo: @perf try replace KV with ImHashMapEntry to avoid conversion cost
 
-        /// <summary>The method will get all service factories registered and from the dynamic registration providers (if any) for the passed `serviceType`.
-        /// The method does not try to cache the dynamic provider factories and will be calling them every time.</summary>
-        KV<object, Factory>[] GetServiceRegisteredAndDynamicFactories(Type serviceType);
+        /// <summary>Finds all registered default and keyed service factories and returns them. Skips decorators and wrappers.</summary>
+        KV<object, Factory>[] GetAllServiceFactories(Type serviceType);
 
         /// <summary>Searches for registered wrapper factory and returns it, or null if not found.</summary>
         /// <param name="serviceType">Service type to look for.</param> <returns>Found wrapper factory or null.</returns>
