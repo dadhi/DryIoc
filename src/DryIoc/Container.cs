@@ -613,12 +613,10 @@ namespace DryIoc
             ServiceRegistrationInfo[] openGenericItems = null;
             if (requiredItemType.IsClosedGeneric())
             {
-                var requiredItemOpenGenericType = requiredItemType.GetGenericDefinitionOrNull();
-                openGenericItems = GetAllServiceFactories(requiredItemOpenGenericType)
-                    .Match(requiredItemOpenGenericType, requiredServiceType,
-                        static (_, __, x) => x.Value != null,
-                        static (gt, t, x) => new ServiceRegistrationInfo(x.Value, t,
-                            new ServiceKeyAndRequiredOpenGenericType(gt, x.Key)));
+                var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
+                openGenericItems = GetServiceRegisteredAndDynamicFactories(requiredItemOpenGenericType)
+                    .Map(requiredItemOpenGenericType, requiredServiceType,
+                        static (gt, t, x) => new ServiceRegistrationInfo(x.Value, t, new ServiceKeyAndRequiredOpenGenericType(gt, x.Key)));
             }
 
             // Append registered generic types with compatible variance,
@@ -1322,26 +1320,21 @@ namespace DryIoc
             return !multipleFactories && minLifespanFactory != null ? minLifespanFactory : null;
         }
 
-        // todo: @perf add the version with the serviceTypeHash parameter
         ///  <inheritdoc />
-        public KV<object, Factory>[] GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics = false)
+        public KV<object, Factory>[] GetAllServiceFactories(Type serviceType, bool bothClosedAndOpenGenerics = false) // todo: @perf add the version with the serviceTypeHash parameter
         {
-            var serviceFactories = _registry.Value;
-            if (serviceFactories is Registry r)
-                serviceFactories = r.Services;
-
+            var serviceFactories = Registry.GetServiceFactories(_registry.Value);
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             var factories = FactoriesEntry.ToNotNullKeyedFactories(entry);
 
-            var openGenericServiceType = bothClosedAndOpenGenerics && serviceType.IsClosedGeneric() ? serviceType.GetGenericTypeDefinition() : null;
-            if (openGenericServiceType != null)
+            Type openGenericServiceType = null;
+            if (bothClosedAndOpenGenerics && serviceType.IsClosedGeneric())
             {
+                openGenericServiceType = serviceType.GetGenericTypeDefinition();
                 var openGenericEntry = serviceFactories.GetValueOrDefault(openGenericServiceType);
-                if (openGenericEntry != null)
-                    factories = openGenericEntry is Factory gf
-                        ? factories.Append(new KV<object, Factory>(DefaultKey.Value, gf))
-                        : factories.Append(((FactoriesEntry)openGenericEntry).Factories.Match(static x => x.Value != null)); // filter out the Unregistered factories
+                var openGenericFactories = FactoriesEntry.ToNotNullKeyedFactories(openGenericEntry);
+                factories = factories.Append(openGenericFactories);
             }
 
             if (Rules.DynamicRegistrationProviders != null &&
@@ -5396,20 +5389,17 @@ namespace DryIoc
             var details = request.GetServiceDetails();
             var requiredItemType = container.GetWrappedType(itemType, details.RequiredServiceType);
 
-
-            var items = container.GetServiceRegisteredAndDynamicFactories(requiredItemType) // todo: @bug check for the unregistered values 
+            var items = container.GetServiceRegisteredAndDynamicFactories(requiredItemType)
                 .Map(requiredItemType, static (t, x) => new ServiceRegistrationInfo(x.Value, t, x.Key));
 
             if (requiredItemType.IsClosedGeneric())
             {
                 var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
-                var openGenericItems = container.GetServiceRegisteredAndDynamicFactories(requiredItemOpenGenericType) // todo: @bug check for the unregistered values
+                var openGenericItems = container.GetServiceRegisteredAndDynamicFactories(requiredItemOpenGenericType)
                     .Map(requiredItemOpenGenericType, requiredItemType,
                         static (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new ServiceKeyAndRequiredOpenGenericType(gt, f.Key)));
                 items = items.Append(openGenericItems);
             }
-
-
 
             // Append registered generic types with compatible variance,
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
