@@ -27,7 +27,7 @@ public class Program
         // if you don't intentionally want the Error.WaitForScopedServiceIsCreatedTimeoutExpired exception, 
         // e.g. see GHIssue337_Singleton_is_created_twice, GHIssue391_Deadlock_during_Resolve, Issue157_ContainerResolveFactoryIsNotThreadSafe
 #if DEBUG
-        Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 1500;
+        Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 2_000;
 #else
         Scope.WaitForScopedServiceIsCreatedTimeoutMilliseconds = 150;
 #endif

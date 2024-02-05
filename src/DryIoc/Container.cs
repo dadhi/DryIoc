@@ -625,9 +625,9 @@ namespace DryIoc
             if (requiredItemType.IsGenericType && Rules.VariantGenericTypesInResolvedCollection)
             {
                 variantGenericItems = GetServiceRegistrations()
-                    .Match(requiredItemType, static (rit, x) => x.ServiceType.IsGenericType
+                    .Match(requiredItemType, static (rit, x) =>
+                        x.ServiceType.IsGenericType && x.ServiceType != rit
                         && x.ServiceType.GetGenericTypeDefinition() == rit.GetGenericTypeDefinition()
-                        && x.ServiceType != rit
                         && rit.IsAssignableFrom(x.ServiceType))
                     .ToArrayOrSelf();
             }
@@ -672,14 +672,18 @@ namespace DryIoc
             var allItems = openGenericItems == null & variantGenericItems == null ? items
                 : variantGenericItems == null ? items.Append(openGenericItems)
                 : openGenericItems == null ? items.Append(variantGenericItems)
-                : items.Append(openGenericItems).Append(variantGenericItems); // todo: @perf combine into one append
+                : items.Append(openGenericItems).Append(variantGenericItems);
 
             var multipleSameServiceKeySupport = Rules.HasMultipleSameServiceKeyForTheServiceType;
+            var isSpecificResolutionKey = serviceKey != null && serviceKey is not Registrator.AnyServiceKey;
 
             // Resolve in the registration order
             foreach (var item in allItems.OrderBy(static x => x.FactoryRegistrationOrder))
             {
                 var itemServiceKey = item.OptionalServiceKey;
+                if (isSpecificResolutionKey && itemServiceKey is Registrator.AnyServiceKey)
+                    itemServiceKey = Registrator.AnyKeyOf(serviceKey);
+
                 if (multipleSameServiceKeySupport && itemServiceKey is ServiceKeyAndRequiredOpenGenericType st)
                 {
 
@@ -689,9 +693,6 @@ namespace DryIoc
                 // if (multipleSameServiceKeySupport &&
                 //     itemServiceKey is not DefaultKey && itemServiceKey is not DefaultDynamicKey)
                 //     itemServiceKey = new UniqueRegisteredServiceKey(itemServiceKey);
-
-                if (serviceKey != null && serviceKey is not Registrator.AnyServiceKey && itemServiceKey is Registrator.AnyServiceKey)
-                    itemServiceKey = Registrator.AnyKeyOf(serviceKey);
 
                 var service = Resolve(serviceType, itemServiceKey,
                     IfUnresolved.ReturnDefaultIfNotRegistered, // mark the resolution to return null if failed instead of throwing, so we can filter out the nulls later
@@ -5376,18 +5377,18 @@ namespace DryIoc
             var container = request.Container;
             var rules = container.Rules;
 
-            var itemType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericArguments()[0];
+            var serviceType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericArguments()[0];
 
             if (rules.ResolveIEnumerableAsLazyEnumerable)
             {
-                var lazyEnumerableExpr = GetLazyEnumerableExpressionOrDefault(request, itemType);
+                var lazyEnumerableExpr = GetLazyEnumerableExpressionOrDefault(request, serviceType);
                 return collectionType.GetGenericDefinitionOrNull() != typeof(IEnumerable<>)
-                    ? Call(ToArrayMethod.MakeGenericMethod(itemType), lazyEnumerableExpr)
+                    ? Call(ToArrayMethod.MakeGenericMethod(serviceType), lazyEnumerableExpr)
                     : lazyEnumerableExpr;
             }
 
             var details = request.GetServiceDetails();
-            var requiredItemType = container.GetWrappedType(itemType, details.RequiredServiceType);
+            var requiredItemType = container.GetWrappedType(serviceType, details.RequiredServiceType);
 
             var items = container.GetAllServiceFactories(requiredItemType)
                 .Map(requiredItemType, static (t, x) => new ServiceRegistrationInfo(x.Value, t, x.Key));
@@ -5405,7 +5406,7 @@ namespace DryIoc
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
             if (requiredItemType.IsGenericType && rules.VariantGenericTypesInResolvedCollection)
             {
-                var variantGenericItems = container.GetServiceRegistrations().ToArrayOrSelf()
+                var variantGenericItems = container.GetServiceRegistrations()
                     .Match(requiredItemType, static (t, x) => t.IsAssignableVariantGenericTypeFrom(x.ServiceType));
                 items = items.Append(variantGenericItems);
             }
@@ -5436,19 +5437,21 @@ namespace DryIoc
                 items = items.Match(metadataKey, metadata, static (mk, m, x) => x.Factory.Setup.MatchesMetadata(mk, m));
 
             if (items.IsNullOrEmpty())
-                return NewArrayInit(itemType, Empty<Expression>());
+                return NewArrayInit(serviceType, Empty<Expression>());
 
             // todo: @perf replace explicit Sort with the insertion of the resolved expressions (which may be less than items) in the right position
             Array.Sort(items); // to resolve the items in order of registration
 
             var itemExprs = new Expression[items.Length];
             var itemExprIndex = 0;
+
+            var isSpecificResolutionKey = serviceKey != null && serviceKey is not Registrator.AnyServiceKey;
             var multipleSameServiceKeySupport = rules.HasMultipleSameServiceKeyForTheServiceType;
-            for (var i = 0; i < items.Length; i++)
+            foreach (var item in items)
             {
-                var item = items[i];
-                requiredItemType = item.ServiceType;
                 var itemServiceKey = item.OptionalServiceKey;
+                if (isSpecificResolutionKey && itemServiceKey is Registrator.AnyServiceKey)
+                    itemServiceKey = Registrator.AnyKeyOf(serviceKey);
 
                 if (multipleSameServiceKeySupport && itemServiceKey is ServiceKeyAndRequiredOpenGenericType st)
                 {
@@ -5460,12 +5463,13 @@ namespace DryIoc
                 //     itemServiceKey is not DefaultKey && itemServiceKey is not DefaultDynamicKey)
                 //     itemServiceKey = new UniqueRegisteredServiceKey(itemServiceKey);
 
-                var itemInfo = ServiceInfo.Of(itemType, requiredItemType, IfUnresolved.ReturnDefaultIfNotRegistered, itemServiceKey);
+                requiredItemType = item.ServiceType;
+                var itemInfo = ServiceInfo.Of(serviceType, requiredItemType, IfUnresolved.ReturnDefaultIfNotRegistered, itemServiceKey);
                 var itemRequest = request.Push(itemInfo);
 
                 // For the required service type (not a wrapper) we at least looking at the unwrapped type, so we may check that type factory condition,
                 // or going to resolve the nested wrapper and Store the unwrapped factory in the request but did not check it until we down the wrappers chain with all available information
-                var factory = requiredItemType == itemType
+                var factory = requiredItemType == serviceType
                     ? itemRequest.MatchGeneratedFactoryByReuseAndConditionOrNull(item.Factory)
                     : container.ResolveFactory(itemRequest.WithWrappedServiceFactory(item.Factory));
 
@@ -5476,7 +5480,8 @@ namespace DryIoc
 
             if (itemExprIndex < itemExprs.Length)
                 Array.Resize(ref itemExprs, itemExprIndex);
-            return NewArrayInit(itemType, itemExprs);
+
+            return NewArrayInit(serviceType, itemExprs);
         }
 
         private static Expression GetLazyEnumerableExpressionOrDefault(Request request, Type itemType = null)
