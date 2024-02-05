@@ -669,7 +669,7 @@ namespace DryIoc
                         static (pfid, x) => x.Factory.FactoryID != pfid);
             }
 
-            var allItems = openGenericItems == null && variantGenericItems == null ? items
+            var allItems = openGenericItems == null & variantGenericItems == null ? items
                 : variantGenericItems == null ? items.Append(openGenericItems)
                 : openGenericItems == null ? items.Append(variantGenericItems)
                 : items.Append(openGenericItems).Append(variantGenericItems); // todo: @perf combine into one append
@@ -1949,7 +1949,7 @@ namespace DryIoc
             for (var i = 0; i < dynamicFlags.Length; ++i)
             {
                 var flag = dynamicFlags[i];
-                if ((flag & withFlags) != withFlags || (flag & withoutFlags) != 0)
+                if ((flag & withFlags) != withFlags | (flag & withoutFlags) != 0)
                     continue;
 
                 var dynamicRegistrationProvider = Rules.DynamicRegistrationProviders[i];
@@ -2013,7 +2013,7 @@ namespace DryIoc
                     }
                 }
 
-                if (openGenericServiceType != null) // todo: @bug check if we need todo that for  AsFallback
+                if (openGenericServiceType != null) // todo: @bug check if we need todo that for AsFallback
                 {
                     dynamicRegistrations = dynamicRegistrationProvider(openGenericServiceType, null).ToArrayOrSelf();
                     openGenericServiceType = null; // prevent the infinite loop
