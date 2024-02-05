@@ -15,7 +15,7 @@ namespace DryIoc.IssuesTests
         [Test]
         public void Test()
         {
-            var key = new ResolutionKeyAndRequiredOpenGenericType(GetType(), "the-key");
+            var key = new ServiceKeyAndRequiredOpenGenericType(GetType(), "the-key");
 
             var expr = key.ToExpression(k => Expression.Constant(k));
 

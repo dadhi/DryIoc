@@ -589,7 +589,7 @@ namespace DryIoc
 
             var requiredItemType = requiredServiceType ?? serviceType;
             if (serviceKey != null)
-                generatedFactories = generatedFactories.Match(serviceKey, static (sk, x) => sk.MatchWithRegisteredKey(x.ServiceKey));
+                generatedFactories = generatedFactories.Match(serviceKey, static (sk, x) => sk.MatchToNotNullRegisteredKey(x.ServiceKey));
             if (requiredServiceType != null)
                 generatedFactories = generatedFactories.Match(requiredServiceType, static (rst, x) => rst == x.RequiredServiceType);
 
@@ -608,9 +608,7 @@ namespace DryIoc
                 requiredItemType = unwrappedType;
 
             var items = GetServiceRegisteredAndDynamicFactories(requiredItemType)
-                .Match(requiredServiceType,
-                    static (_, x) => x.Value != null, // filter out unregistered services
-                    static (t, f) => new ServiceRegistrationInfo(f.Value, t, f.Key));
+                .Map(requiredServiceType, static (t, f) => new ServiceRegistrationInfo(f.Value, t, f.Key));
 
             ServiceRegistrationInfo[] openGenericItems = null;
             if (requiredItemType.IsClosedGeneric())
@@ -619,7 +617,8 @@ namespace DryIoc
                 openGenericItems = GetAllServiceFactories(requiredItemOpenGenericType)
                     .Match(requiredItemOpenGenericType, requiredServiceType,
                         static (_, __, x) => x.Value != null,
-                        static (gt, t, x) => new ServiceRegistrationInfo(x.Value, t, new ResolutionKeyAndRequiredOpenGenericType(gt, x.Key)));
+                        static (gt, t, x) => new ServiceRegistrationInfo(x.Value, t,
+                            new ServiceKeyAndRequiredOpenGenericType(gt, x.Key)));
             }
 
             // Append registered generic types with compatible variance,
@@ -631,17 +630,17 @@ namespace DryIoc
                     .Match(requiredItemType, static (rit, x) => x.ServiceType.IsGenericType
                         && x.ServiceType.GetGenericTypeDefinition() == rit.GetGenericTypeDefinition()
                         && x.ServiceType != rit
-                        && x.ServiceType.IsAssignableTo(rit))
+                        && rit.IsAssignableFrom(x.ServiceType))
                     .ToArrayOrSelf();
             }
 
             if (serviceKey != null)
             {
-                items = items.Match(serviceKey, static (k, x) => k.MatchWithRegisteredKey(x.OptionalServiceKey));
+                items = items.Match(serviceKey, static (k, x) => k.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
                 if (openGenericItems != null && openGenericItems.Length != 0)
-                    openGenericItems = openGenericItems.Match(serviceKey, static (k, x) => k.MatchWithRegisteredKey(x.OptionalServiceKey));
+                    openGenericItems = openGenericItems.Match(serviceKey, static (k, x) => k.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
                 if (variantGenericItems != null && variantGenericItems.Length != 0)
-                    variantGenericItems = variantGenericItems.Match(serviceKey, static (k, x) => k.MatchWithRegisteredKey(x.OptionalServiceKey));
+                    variantGenericItems = variantGenericItems.Match(serviceKey, static (k, x) => k.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
             }
 
             var d = preResolveParent.GetServiceDetails();
@@ -677,10 +676,22 @@ namespace DryIoc
                 : openGenericItems == null ? items.Append(variantGenericItems)
                 : items.Append(openGenericItems).Append(variantGenericItems); // todo: @perf combine into one append
 
+            var multipleSameServiceKeySupport = Rules.HasMultipleSameServiceKeyForTheServiceType;
+
             // Resolve in the registration order
             foreach (var item in allItems.OrderBy(static x => x.FactoryRegistrationOrder))
             {
                 var itemServiceKey = item.OptionalServiceKey;
+                if (multipleSameServiceKeySupport && itemServiceKey is ServiceKeyAndRequiredOpenGenericType st)
+                {
+
+                }
+                // todo: @wip
+                // wrapping into the special key to indicate that the key is resolved from the collection wrapper
+                // if (multipleSameServiceKeySupport &&
+                //     itemServiceKey is not DefaultKey && itemServiceKey is not DefaultDynamicKey)
+                //     itemServiceKey = new UniqueRegisteredServiceKey(itemServiceKey);
+
                 if (serviceKey != null && serviceKey is not Registrator.AnyServiceKey && itemServiceKey is Registrator.AnyServiceKey)
                     itemServiceKey = Registrator.AnyKeyOf(serviceKey);
 
@@ -1000,9 +1011,9 @@ namespace DryIoc
             {
                 serviceType = request.ActualServiceType;
 
-                // Special case when open-generic required service type is encoded in ServiceKey as array of { ReqOpenGenServiceType, ServiceKey }
+                // Special case when open-generic required service type is encoded in ServiceKey as a pair of { RequiredOpenGenericServiceType, ServiceKey }
                 // presumes that required service type is closed generic
-                if (serviceKey != null && serviceKey is ResolutionKeyAndRequiredOpenGenericType keyAndType &&
+                if (serviceKey != null && serviceKey is ServiceKeyAndRequiredOpenGenericType keyAndType &&
                     serviceType.IsClosedGeneric() && keyAndType.RequiredServiceType == serviceType.GetGenericTypeDefinition())
                 {
                     serviceType = keyAndType.RequiredServiceType;
@@ -1021,9 +1032,10 @@ namespace DryIoc
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
             // For closed-generic type, when the entry is not found or the key in entry is not found go for the open-generic services
-            var openGenericServiceType = serviceType.IsClosedGeneric() ? serviceType.GetGenericTypeDefinition() : null;
-            if (openGenericServiceType != null)
+            Type openGenericServiceType = null;
+            if (serviceType.IsClosedGeneric())
             {
+                openGenericServiceType = serviceType.GetGenericTypeDefinition();
                 if (entry == null ||
                     serviceKey != null && (
                     entry is Factory && !DefaultKey.Value.Equals(serviceKey) ||
@@ -1067,7 +1079,7 @@ namespace DryIoc
                     && request.MatchFactoryConditionAndMetadata(details, defaultFactory)
                     ? defaultFactory : null;
 
-            var factories = FactoriesEntry.ToServiceKeyFactory(entry);
+            var factories = FactoriesEntry.ToNotNullKeyedFactories(entry);
 
             if (rules.DynamicRegistrationProviders != null &&
                 !serviceType.IsExcludedGeneralPurposeServiceType() && !IsWrapper(serviceType, openGenericServiceType))
@@ -1094,7 +1106,7 @@ namespace DryIoc
                 }
 
                 foreach (var f in factories)
-                    if (serviceKey.MatchNotNullWithNotNullRegisteredKey(f.Key) && f.Value.CheckCondition(request))
+                    if (serviceKey.MatchToNotNullRegisteredKey(f.Key) && f.Value.CheckCondition(request))
                         return f.Value;
                 return null;
             }
@@ -1320,7 +1332,7 @@ namespace DryIoc
 
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-            var factories = FactoriesEntry.ToServiceKeyFactory(entry);
+            var factories = FactoriesEntry.ToNotNullKeyedFactories(entry);
 
             var openGenericServiceType = bothClosedAndOpenGenerics && serviceType.IsClosedGeneric() ? serviceType.GetGenericTypeDefinition() : null;
             if (openGenericServiceType != null)
@@ -1401,12 +1413,10 @@ namespace DryIoc
         /// <inheritdoc />
         public KV<object, Factory>[] GetServiceRegisteredAndDynamicFactories(Type serviceType) // todo @perf pass the serviceTypeHash
         {
-            var registryOrServices = _registry.Value;
-            var r = registryOrServices as Registry;
-            var serviceFactories = r == null ? registryOrServices : r.Services;
+            var serviceFactories = Registry.GetServiceFactories(_registry.Value);
             var entry = serviceFactories.GetValueOrDefault(serviceType);
 
-            var factories = FactoriesEntry.ToServiceKeyFactory(entry);
+            var factories = FactoriesEntry.ToNotNullKeyedFactories(entry);
 
             if (Rules.DynamicRegistrationProviders != null &&
                 !serviceType.IsExcludedGeneralPurposeServiceType())
@@ -1687,7 +1697,7 @@ namespace DryIoc
 
         internal sealed class FactoriesEntry
         {
-            public static KV<object, Factory>[] ToServiceKeyFactory(object factoryOrFactoryEntry)
+            public static KV<object, Factory>[] ToNotNullKeyedFactories(object factoryOrFactoryEntry)
             {
                 return factoryOrFactoryEntry == null ? Empty<KV<object, Factory>>()
                     : factoryOrFactoryEntry is Factory factory ? new[] { new KV<object, Factory>(DefaultKey.Value, factory) }
@@ -2579,10 +2589,15 @@ namespace DryIoc
             public virtual Registry WithIsChangePermitted(IsRegistryChangePermitted isChangePermitted) =>
                 isChangePermitted == default ? this : new AndCache(Services, null, null, null, isChangePermitted);
 
+            // where object value is Factory or FactoriesEntry
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static ImHashMap<Type, object> GetServiceFactories(ImHashMap<Type, object> registryOrServices) =>
+                registryOrServices is Registry r ? r.Services : registryOrServices;
+
+            /// <summary>Returns the constructed registrations filtering out the unregistered services.</summary>
             public static IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations(ImHashMap<Type, object> registryOrServices)
             {
-                var r = registryOrServices as Registry;
-                var services = r == null ? registryOrServices : r.Services;
+                var services = GetServiceFactories(registryOrServices);
                 foreach (var entry in services.Enumerate())
                 {
                     if (entry.Value is Factory factory)
@@ -2596,11 +2611,13 @@ namespace DryIoc
                 }
             }
 
-            // todo: @perf use instead of GetServiceRegistrations above optimized for allocations
-            public IEnumerable<R> GetServiceRegistrations<R>(Func<Type, object, Factory, R> match) where R : class
+            // todo: @wip @perf use instead of GetServiceRegistrations above optimized for allocations
+            public IEnumerable<R> GetServiceRegistrations<R>(ImHashMap<Type, object> registryOrServices,
+                Func<Type, object, Factory, R> match) where R : class
             {
                 R result = null;
-                foreach (var entry in Services.Enumerate())
+                var services = GetServiceFactories(registryOrServices);
+                foreach (var entry in services.Enumerate())
                 {
                     if (entry.Value is Factory factory)
                     {
@@ -2692,8 +2709,7 @@ namespace DryIoc
                         }
                     default:
                         {
-                            var r = registryOrServices as Registry;
-                            var services = r == null ? registryOrServices : r.Services;
+                            var services = Registry.GetServiceFactories(registryOrServices);
                             var entry = services.GetValueOrDefault(serviceType);
                             if (entry == null)
                                 return null;
@@ -2762,7 +2778,7 @@ namespace DryIoc
                         {
                             // We are not checking the open-generic for the closed-generic service type
                             // to be able to explicitly understand what registration is available - open or the closed-generic
-                            var services = registryOrServices is Registry r ? r.Services : registryOrServices;
+                            var services = Registry.GetServiceFactories(registryOrServices);
                             var entry = services.GetValueOrDefault(serviceType);
                             if (entry == null)
                                 return false;
@@ -3131,7 +3147,7 @@ namespace DryIoc
 
     /// <summary>Special service key with the info about the required open-generic service type.
     /// It is applied only to resolution keys and not to the registered keys.</summary>
-    public sealed class ResolutionKeyAndRequiredOpenGenericType : IConvertibleToExpression
+    public sealed class ServiceKeyAndRequiredOpenGenericType : IConvertibleToExpression
     {
         /// <summary>Open-generic required service-type</summary>
         public readonly Type RequiredServiceType;
@@ -3140,7 +3156,7 @@ namespace DryIoc
         public readonly object ServiceKey;
 
         /// <summary>Constructs the thing</summary>
-        public ResolutionKeyAndRequiredOpenGenericType(Type requiredServiceType, object serviceKey)
+        public ServiceKeyAndRequiredOpenGenericType(Type requiredServiceType, object serviceKey)
         {
             RequiredServiceType = requiredServiceType.ThrowIfNull();
             ServiceKey = serviceKey;
@@ -3148,12 +3164,12 @@ namespace DryIoc
 
         /// <inheritdoc />
         public override string ToString() =>
-            new StringBuilder(nameof(ResolutionKeyAndRequiredOpenGenericType)).Append('(')
+            new StringBuilder(nameof(ServiceKeyAndRequiredOpenGenericType)).Append('(')
                 .Print(RequiredServiceType).Append(", ").Print(ServiceKey)
                 .Append(')').ToString();
 
         /// <inheritdoc />
-        public override bool Equals(object obj) => obj is ResolutionKeyAndRequiredOpenGenericType other &&
+        public override bool Equals(object obj) => obj is ServiceKeyAndRequiredOpenGenericType other &&
             other.RequiredServiceType == RequiredServiceType &&
             Equals(other.ServiceKey, ServiceKey);
 
@@ -3165,7 +3181,7 @@ namespace DryIoc
             New(_ctor, ConstantOf<Type>(RequiredServiceType), fallbackConverter(ServiceKey));
 
         // todo: @perf use UnsafeAccessAttribute to avoid reflection
-        private static readonly ConstructorInfo _ctor = typeof(ResolutionKeyAndRequiredOpenGenericType).GetConstructors()[0];
+        private static readonly ConstructorInfo _ctor = typeof(ServiceKeyAndRequiredOpenGenericType).GetConstructors()[0];
     }
 
     ///<summary>Hides/wraps object with disposable interface.</summary> 
@@ -5380,6 +5396,7 @@ namespace DryIoc
             var details = request.GetServiceDetails();
             var requiredItemType = container.GetWrappedType(itemType, details.RequiredServiceType);
 
+
             var items = container.GetServiceRegisteredAndDynamicFactories(requiredItemType) // todo: @bug check for the unregistered values 
                 .Map(requiredItemType, static (t, x) => new ServiceRegistrationInfo(x.Value, t, x.Key));
 
@@ -5388,9 +5405,11 @@ namespace DryIoc
                 var requiredItemOpenGenericType = requiredItemType.GetGenericTypeDefinition();
                 var openGenericItems = container.GetServiceRegisteredAndDynamicFactories(requiredItemOpenGenericType) // todo: @bug check for the unregistered values
                     .Map(requiredItemOpenGenericType, requiredItemType,
-                        static (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new ResolutionKeyAndRequiredOpenGenericType(gt, f.Key)));
+                        static (gt, t, f) => new ServiceRegistrationInfo(f.Value, t, new ServiceKeyAndRequiredOpenGenericType(gt, f.Key)));
                 items = items.Append(openGenericItems);
             }
+
+
 
             // Append registered generic types with compatible variance,
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
@@ -5419,7 +5438,7 @@ namespace DryIoc
             // Return collection of items matched the specified key.
             var serviceKey = details.ServiceKey;
             if (serviceKey != null)
-                items = items.Match(serviceKey, static (key, x) => key.MatchWithRegisteredKey(x.OptionalServiceKey));
+                items = items.Match(serviceKey, static (key, x) => key.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
 
             var metadataKey = details.MetadataKey;
             var metadata = details.Metadata;
@@ -5434,11 +5453,24 @@ namespace DryIoc
 
             var itemExprs = new Expression[items.Length];
             var itemExprIndex = 0;
+            var multipleSameServiceKeySupport = rules.HasMultipleSameServiceKeyForTheServiceType;
             for (var i = 0; i < items.Length; i++)
             {
                 var item = items[i];
                 requiredItemType = item.ServiceType;
-                var itemInfo = ServiceInfo.Of(itemType, requiredItemType, IfUnresolved.ReturnDefaultIfNotRegistered, item.OptionalServiceKey);
+                var itemServiceKey = item.OptionalServiceKey;
+
+                if (multipleSameServiceKeySupport && itemServiceKey is ServiceKeyAndRequiredOpenGenericType st)
+                {
+
+                }
+                // todo: @wip
+                // wrapping into the special key to indicate that the key is resolved from the collection wrapper
+                // if (multipleSameServiceKeySupport &&
+                //     itemServiceKey is not DefaultKey && itemServiceKey is not DefaultDynamicKey)
+                //     itemServiceKey = new UniqueRegisteredServiceKey(itemServiceKey);
+
+                var itemInfo = ServiceInfo.Of(itemType, requiredItemType, IfUnresolved.ReturnDefaultIfNotRegistered, itemServiceKey);
                 var itemRequest = request.Push(itemInfo);
 
                 // For the required service type (not a wrapper) we at least looking at the unwrapped type, so we may check that type factory condition,
@@ -5820,6 +5852,9 @@ namespace DryIoc
     {
         public readonly int Index;
         public readonly object Key;
+
+        // the special constructor for the key resolved from the collection wrapper or ResolveMany, check the usages of it
+        internal UniqueRegisteredServiceKey(object serviceKey) => Key = serviceKey;
         public UniqueRegisteredServiceKey(object serviceKey, int index)
         {
             Key = serviceKey;
@@ -6683,23 +6718,14 @@ namespace DryIoc
         public bool HasMultipleSameServiceKeyForTheServiceType =>
             _serviceKeyToTypeIndex != null;
 
-        /// <summary>Adding support for the multiple same keys for the same type</summary>
+        /// <summary>Adding support for the multiple same keys for the same type.
+        /// It is not sensible to remove this setting, because the registry will be populated with the wrapped keys.</summary>
         public Rules WithMultipleSameServiceKeyForTheServiceType()
         {
             if (_serviceKeyToTypeIndex != null)
                 return this;
             var newRules = Clone();
             newRules._serviceKeyToTypeIndex = ImHashMap<object, object>.Empty;
-            return newRules;
-        }
-
-        /// <summary>Removing support for the multiple same keys for the same type, so basically returning the uniqness of service key</summary>
-        public Rules WithoutMultipleSameServiceKeyForTheServiceType()
-        {
-            if (_serviceKeyToTypeIndex == null)
-                return this;
-            var newRules = Clone();
-            newRules._serviceKeyToTypeIndex = null;
             return newRules;
         }
 
@@ -8142,13 +8168,26 @@ namespace DryIoc
             public override string ToString() => ResolutionKey == null ? "AnyKey(*)" : $"AnyKey(resolutionKey: {ResolutionKey})";
         }
 
-        internal static bool MatchNotNullWithNotNullRegisteredKey(this object resolutionKey, object registeredKey)
+        internal static bool MatchToNotNullRegisteredKey(this object resolutionKey, object registeredKey)
         {
-            if (resolutionKey is ResolutionKeyAndRequiredOpenGenericType resolutionKeyWithOGType)
-                resolutionKey = resolutionKeyWithOGType.ServiceKey;
+            if (resolutionKey is ServiceKeyAndRequiredOpenGenericType keyAndType)
+                resolutionKey = keyAndType.ServiceKey;
+
+            if (resolutionKey == null)
+            {
+                if (registeredKey is UniqueRegisteredServiceKey regKey)
+                    registeredKey = regKey.Key;
+                return registeredKey is DefaultKey | registeredKey is DefaultDynamicKey;
+            }
 
             if (resolutionKey is UniqueRegisteredServiceKey resolutionUniqueKey)
-                return UniqueRegisteredServiceKey.Equals(resolutionUniqueKey, registeredKey);
+            {
+                if (resolutionUniqueKey.Index != 0)
+                    return UniqueRegisteredServiceKey.Equals(resolutionUniqueKey, registeredKey);
+
+                // the Index == 0 is the special case for the collection wrapper and the ResolveMany 
+                resolutionKey = resolutionUniqueKey.Key;
+            }
 
             if (registeredKey is UniqueRegisteredServiceKey registeredUniqueKey)
                 registeredKey = registeredUniqueKey.Key;
@@ -8162,27 +8201,6 @@ namespace DryIoc
             }
 
             return registeredKey.Equals(resolutionKey);
-        }
-
-        internal static bool MatchWithRegisteredKey(this object resolutionKey, object registeredKey)
-        {
-            // a very special case:
-            // because usually the registered key (unless it is got from the ServiceRegistrationInfo) is the non-null thingly
-            if (registeredKey == null)
-            {
-                if (resolutionKey is ResolutionKeyAndRequiredOpenGenericType keyType)
-                    resolutionKey = keyType.ServiceKey;
-                return resolutionKey == null | resolutionKey == DefaultKey.Value;
-            }
-
-            if (resolutionKey == null)
-            {
-                if (registeredKey is UniqueRegisteredServiceKey regKey)
-                    registeredKey = regKey.Key;
-                return registeredKey is DefaultKey | registeredKey is DefaultDynamicKey;
-            }
-
-            return resolutionKey.MatchNotNullWithNotNullRegisteredKey(registeredKey);
         }
 
         /// <summary>The base method for registering service with its implementation factory. Allows to specify all possible options.</summary>
@@ -10138,20 +10156,20 @@ namespace DryIoc
         public static bool MatchGeneratedFactory(this Request r, Factory f) =>
             f.GeneratedFactories == null || f.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true) != null;
 
-        /// <summary>Matching things</summary>
-        public static Factory MatchGeneratedFactoryByReuseAndConditionOrNull(this Request r, Factory f)
+        /// <summary>Matching the factory condition, reuse, and close-generic constraints</summary>
+        public static Factory MatchGeneratedFactoryByReuseAndConditionOrNull(this Request req, Factory fac)
         {
-            var reuse = f.Reuse;
-            if (!f.Setup.OpenResolutionScope && !r.MatchFactoryReuse(f))
+            var reuse = fac.Reuse;
+            if (!fac.Setup.OpenResolutionScope && !req.MatchFactoryReuse(fac))
                 return null;
 
-            var condition = f.Setup.Condition;
-            if (condition != null && !condition(r.Isolate()))
+            var condition = fac.Setup.Condition;
+            if (condition != null && !condition(req.Isolate()))
                 return null;
 
             // make the closing of the open-generic as the last check because it is a perf hog and some items may be already filtered out by predecessor checks.
-            return f.GeneratedFactories == null ? f
-                : f.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true);
+            return fac.GeneratedFactories == null ? fac
+                : fac.GetGeneratedFactoryOrDefault(req, ifErrorReturnDefault: true);
         }
     }
 
@@ -12518,7 +12536,7 @@ namespace DryIoc
 
                 var knownImplOrServiceType = implType ?? made.FactoryMethodKnownResultType ?? serviceType;
                 var serviceKey = details.ServiceKey;
-                serviceKey = (serviceKey as ResolutionKeyAndRequiredOpenGenericType)?.ServiceKey ?? serviceKey ?? DefaultKey.Value;
+                serviceKey = (serviceKey as ServiceKeyAndRequiredOpenGenericType)?.ServiceKey ?? serviceKey ?? DefaultKey.Value;
                 var generatedFactoryKey = KV.Of(knownImplOrServiceType, serviceKey);
 
                 var generatedFactories = GeneratedFactories;
