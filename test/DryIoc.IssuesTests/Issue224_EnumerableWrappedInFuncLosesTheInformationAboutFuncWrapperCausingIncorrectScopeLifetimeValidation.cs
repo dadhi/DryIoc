@@ -51,8 +51,8 @@ namespace DryIoc.IssuesTests
 
             public bool CanApply(Request request) => true;
 
-            public Expression ToExpression(Func<object, Expression> fallbackConverter) => 
-                fallbackConverter("SpecialScopeName");
+            public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) => 
+                fallbackConverter(state, "SpecialScopeName");
         }
     }
 }

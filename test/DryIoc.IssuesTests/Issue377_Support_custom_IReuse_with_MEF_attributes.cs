@@ -53,7 +53,7 @@ namespace DryIoc.IssuesTests
             }
 
             private static Expression _valueExpr = Field(null, typeof(CustomReuse).Field(nameof(Value)));
-            public Expression ToExpression(Func<object, Expression> fallbackConverter) => _valueExpr;
+            public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) => _valueExpr;
         }
     }
 }

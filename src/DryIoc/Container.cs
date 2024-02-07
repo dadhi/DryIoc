@@ -675,13 +675,13 @@ namespace DryIoc
                 : items.Append(openGenericItems).Append(variantGenericItems);
 
             var multipleSameServiceKeySupport = Rules.HasMultipleSameServiceKeyForTheServiceType;
-            var isSpecificResolutionKey = serviceKey != null && serviceKey is not Registrator.AnyServiceKey;
+            var isNotAnyKey = serviceKey != null && serviceKey is not Registrator.AnyServiceKey;
 
             // Resolve in the registration order
             foreach (var item in allItems.OrderBy(static x => x.FactoryRegistrationOrder))
             {
                 var itemServiceKey = item.OptionalServiceKey;
-                if (isSpecificResolutionKey && itemServiceKey is Registrator.AnyServiceKey)
+                if (isNotAnyKey && itemServiceKey is Registrator.AnyServiceKey)
                     itemServiceKey = Registrator.AnyKeyOf(serviceKey);
 
                 if (multipleSameServiceKeySupport && itemServiceKey is ServiceKeyAndRequiredOpenGenericType st)
@@ -1680,8 +1680,8 @@ namespace DryIoc
 
         private Expression ConvertConstantToExpression(IConvertibleToExpression convertible, bool throwIfStateRequired) =>
             throwIfStateRequired
-                ? convertible.ToExpression(it => GetConstantExpression(it, null, true))
-                : convertible.ToExpression(it => GetConstantExpression(it, null, false));
+                ? convertible.ToExpression(this, static (c, it) => c.GetConstantExpression(it, null, true))
+                : convertible.ToExpression(this, static (c, it) => c.GetConstantExpression(it, null, false));
 
         private static readonly MethodInfo _kvOfMethod = typeof(KV).GetMethod(nameof(KV.Of));
 
@@ -2615,7 +2615,7 @@ namespace DryIoc
                 {
                     if (entry.Value is Factory factory)
                     {
-                        if ((result = match(entry.Key, null, factory)) != null)
+                        if ((result = match(entry.Key, DefaultKey.Value, factory)) != null)
                             yield return result;
                     }
                     else
@@ -3171,8 +3171,8 @@ namespace DryIoc
         public override int GetHashCode() => Hasher.Combine(RequiredServiceType, ServiceKey);
 
         /// <inheritdoc />
-        public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
-            New(_ctor, ConstantOf<Type>(RequiredServiceType), fallbackConverter(ServiceKey));
+        public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) =>
+            New(_ctor, ConstantOf<Type>(RequiredServiceType), fallbackConverter(state, ServiceKey));
 
         // todo: @perf use UnsafeAccessAttribute to avoid reflection
         private static readonly ConstructorInfo _ctor = typeof(ServiceKeyAndRequiredOpenGenericType).GetConstructors()[0];
@@ -4834,8 +4834,7 @@ namespace DryIoc
             var serviceTypeExpr = Constant(serviceType);
             var factoryIdExpr = ConstantInt(factoryID);
             var implTypeExpr = implementationType.ToConstant();
-            // todo: @mem @perf avoid closure
-            var reuseExpr = r.Reuse == null ? ConstantNull<IReuse>() : r.Reuse.ToExpression(it => container.GetConstantExpression(it));
+            var reuseExpr = r.Reuse == null ? ConstantNull<IReuse>() : r.Reuse.ToExpression(container, static (c, it) => c.GetConstantExpression(it));
 
             if (d.IfUnresolved == IfUnresolved.Throw && d.RequiredServiceType == null && d.ServiceKey == null && d.MetadataKey == null && d.Metadata == null &&
                 factoryType == FactoryType.Service && decoratedFactoryID == 0)
@@ -4926,7 +4925,7 @@ namespace DryIoc
     {
         /// <summary>Returns expression representation without closure.
         /// Use <paramref name="fallbackConverter"/> to converting the sub-items, constants to container.</summary>
-        Expression ToExpression(Func<object, Expression> fallbackConverter);
+        Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter);
     }
 
     /// <summary>Used to represent multiple default service keys.
@@ -4946,8 +4945,8 @@ namespace DryIoc
         private static readonly MethodInfo _ofMethod = typeof(DefaultKey).GetMethod(nameof(Of));
 
         /// <summary>Converts to expression</summary>
-        public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
-            Call(_ofMethod, Constant(RegistrationOrder)); // todo: @perf remove boxing
+        public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) =>
+            Call(_ofMethod, ConstantInt(RegistrationOrder));
 
         /// <summary>Returns next default key with increased <see cref="RegistrationOrder"/>.</summary>
         public DefaultKey Next() => Of(RegistrationOrder + 1);
@@ -4981,8 +4980,8 @@ namespace DryIoc
         private static readonly MethodInfo _ofMethod = typeof(DefaultDynamicKey).GetMethod(nameof(Of));
 
         /// <summary>Converts to expression</summary>
-        public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
-            Call(_ofMethod, Constant(RegistrationOrder));// todo: @perf remove boxing
+        public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) =>
+            Call(_ofMethod, ConstantInt(RegistrationOrder));
 
         /// <summary>Returns next dynamic key with increased <see cref="RegistrationOrder"/>.</summary> 
         public DefaultDynamicKey Next() => Of(RegistrationOrder + 1);
@@ -5445,12 +5444,12 @@ namespace DryIoc
             var itemExprs = new Expression[items.Length];
             var itemExprIndex = 0;
 
-            var isSpecificResolutionKey = serviceKey != null && serviceKey is not Registrator.AnyServiceKey;
+            var isNotAnyKey = serviceKey != null && serviceKey is not Registrator.AnyServiceKey;
             var multipleSameServiceKeySupport = rules.HasMultipleSameServiceKeyForTheServiceType;
             foreach (var item in items)
             {
                 var itemServiceKey = item.OptionalServiceKey;
-                if (isSpecificResolutionKey && itemServiceKey is Registrator.AnyServiceKey)
+                if (isNotAnyKey && itemServiceKey is Registrator.AnyServiceKey)
                     itemServiceKey = Registrator.AnyKeyOf(serviceKey);
 
                 if (multipleSameServiceKeySupport && itemServiceKey is ServiceKeyAndRequiredOpenGenericType st)
@@ -14329,7 +14328,7 @@ namespace DryIoc
             Field(typeof(Reuse).GetField(nameof(Reuse.Singleton))));
 
         /// <inheritdoc />
-        public Expression ToExpression(Func<object, Expression> fallbackConverter) => _singletonReuseExpr.Value;
+        public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) => _singletonReuseExpr.Value;
 
         /// <summary>Pretty prints reuse name and lifespan</summary>
         public override string ToString() => "Singleton {Lifespan=" + Lifespan + "}";
@@ -14397,12 +14396,12 @@ namespace DryIoc
         }
 
         /// <inheritdoc />
-        public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
+        public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) =>
             Name == null && !ScopedOrSingleton
                 ? Field(null, typeof(Reuse).GetField(nameof(Reuse.Scoped)))
                 : ScopedOrSingleton
                     ? Field(null, typeof(Reuse).GetField(nameof(Reuse.ScopedOrSingleton)))
-                    : Call(typeof(Reuse).Method(nameof(Reuse.ScopedTo), typeof(object)), fallbackConverter(Name));
+                    : Call(typeof(Reuse).Method(nameof(Reuse.ScopedTo), typeof(object)), fallbackConverter(state, Name));
 
         /// <summary>Pretty prints reuse to string.</summary> <returns>Reuse string.</returns>
         public override string ToString()
@@ -14731,7 +14730,7 @@ namespace DryIoc
             private readonly Lazy<Expression> _transientReuseExpr = Lazy.Of<Expression>(() =>
                 Field(null, typeof(Reuse).GetField(nameof(Transient))));
 
-            public Expression ToExpression(Func<object, Expression> fallbackConverter) =>
+            public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter) =>
                 _transientReuseExpr.Value;
 
             public override string ToString() => "TransientReuse";

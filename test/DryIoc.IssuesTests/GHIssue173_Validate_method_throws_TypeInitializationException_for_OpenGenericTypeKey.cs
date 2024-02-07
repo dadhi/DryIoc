@@ -17,7 +17,7 @@ namespace DryIoc.IssuesTests
         {
             var key = new ServiceKeyAndRequiredOpenGenericType(GetType(), "the-key");
 
-            var expr = key.ToExpression(k => Expression.Constant(k));
+            var expr = key.ToExpression(0, static (_, k) => Expression.Constant(k));
 
             Assert.IsNotNull(expr);
         }

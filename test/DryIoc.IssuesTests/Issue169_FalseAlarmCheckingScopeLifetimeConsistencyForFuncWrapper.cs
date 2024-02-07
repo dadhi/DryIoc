@@ -63,7 +63,7 @@ namespace DryIoc.IssuesTests
             return true;
         }
 
-        public Expression ToExpression(Func<object, Expression> fallbackConverter)
+        public Expression ToExpression<S>(S state, Func<S, object, Expression> fallbackConverter)
         {
             return New(GetType().GetConstructors()[0], ArrayTools.Empty<Expression>());
         }
