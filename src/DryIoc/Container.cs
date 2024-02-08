@@ -5491,14 +5491,14 @@ namespace DryIoc
                 itemType = collectionType.GetArrayElementTypeOrNull() ?? collectionType.GetGenericArguments()[0];
             }
             var container = request.Container;
-            var requiredItemType = container.GetWrappedType(itemType, request.RequiredServiceType);
+            var details = request.GetServiceDetails();
+            var requiredItemType = container.GetWrappedType(itemType, details.RequiredServiceType);
             var resolverExpr = ResolverContext.GetRootOrSelfExpr(request);
             var preResolveParentExpr = container.GetRequestExpression(request);
 
-            // todo: @perf @mem separated expression same as for Resolve
             var resolveManyExpr = Call(resolverExpr, Resolver.ResolveManyMethod,
                 ConstantOf<Type>(itemType),
-                container.GetConstantExpression(request.ServiceKey),
+                container.GetConstantExpression(details.ServiceKey),
                 ConstantOf<Type>(requiredItemType),
                 preResolveParentExpr,
                 request.GetInputArgsExpr());
@@ -10347,8 +10347,8 @@ namespace DryIoc
         /// <summary>Returns expression for func arguments.</summary>
         public Expression GetInputArgsExpr() =>
             InputArgExprs == null
-                ? ConstantNull(typeof(object[]))
-                : NewArrayInit(typeof(object), InputArgExprs.Map(x => x.Type.IsValueType ? Convert<object>(x) : x)); // todo: @perf optimize Convert to object
+                ? Constantull(typeof(object[]))
+                : NewArrayInit(typeof(object), InputArgExprs.Map(static x => x.Type.IsValueType ? Convert<object>(x) : x)); // todo: @perf optimize Convert to object
 
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
         public bool TracksTransientDisposable => (Flags & RequestFlags.TracksTransientDisposable) != 0;
