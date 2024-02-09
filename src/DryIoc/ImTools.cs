@@ -36,6 +36,9 @@ namespace DryIoc.ImTools
     using System.Diagnostics;
     using System.Runtime.CompilerServices; // For [MethodImpl(AggressiveInlining)]
 
+    /// <summary>General purpose Match operator</summary>
+    public delegate bool Match<S, T, R>(ref S state, ref T it, out R result);
+
     /// <summary>Helpers for functional composition</summary>
     public static class Fun
     {

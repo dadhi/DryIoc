@@ -231,6 +231,10 @@ namespace DryIoc
              Registry.GetServiceRegistrations(_registry.Value);
 
         /// <inheritdoc />
+        public IEnumerable<R> GetServiceRegistrations<S, R>(S state, Match<S, ServiceRegistrationInfo, R> match) =>
+             Registry.GetServiceRegistrations(_registry.Value, state, match);
+
+        /// <inheritdoc />
         public IEnumerable<DecoratorRegistrationInfo> GetDecoratorRegistrations() =>
              Registry.GetDecoratorRegistrations(_registry.Value);
 
@@ -624,11 +628,16 @@ namespace DryIoc
             ServiceRegistrationInfo[] variantGenericItems = null;
             if (requiredItemType.IsGenericType && Rules.VariantGenericTypesInResolvedCollection)
             {
-                variantGenericItems = GetServiceRegistrations()
-                    .Match(requiredItemType, static (rit, x) =>
-                        x.ServiceType.IsGenericType && x.ServiceType != rit
-                        && x.ServiceType.GetGenericTypeDefinition() == rit.GetGenericTypeDefinition()
-                        && rit.IsAssignableFrom(x.ServiceType))
+                variantGenericItems = GetServiceRegistrations(requiredItemType, 
+                    static (ref Type reqItType, ref ServiceRegistrationInfo src, out ServiceRegistrationInfo res) =>
+                    {
+                        res = src;
+                        if (!reqItType.IsAssignableVariantGenericTypeFrom(src.ServiceType))
+                            return false;
+                        if (res.OptionalServiceKey == null)
+                            res.OptionalServiceKey = DefaultKey.Value;
+                        return true;
+                    })
                     .ToArrayOrSelf();
             }
 
@@ -2600,30 +2609,36 @@ namespace DryIoc
                     {
                         var factories = ((FactoriesEntry)entry.Value).Factories;
                         foreach (var f in factories)
-                            yield return new ServiceRegistrationInfo(f.Value, entry.Key, f.Key);
+                            if (f.Value != null) // maybe `null` for the unregistered service, see #412
+                                yield return new ServiceRegistrationInfo(f.Value, entry.Key, f.Key);
                     }
                 }
             }
 
-            // todo: @wip @perf use instead of GetServiceRegistrations above optimized for allocations
-            public IEnumerable<R> GetServiceRegistrations<R>(ImHashMap<Type, object> registryOrServices,
-                Func<Type, object, Factory, R> match) where R : class
+            /// <summary>Returns the matched result registrations filtering out the unregistered services.</summary>
+            public static IEnumerable<R> GetServiceRegistrations<S, R>(
+                ImHashMap<Type, object> registryOrServices, S state, Match<S, ServiceRegistrationInfo, R> match)
             {
-                R result = null;
                 var services = GetServiceFactories(registryOrServices);
                 foreach (var entry in services.Enumerate())
                 {
                     if (entry.Value is Factory factory)
                     {
-                        if ((result = match(entry.Key, DefaultKey.Value, factory)) != null)
+                        var info = new ServiceRegistrationInfo(factory, entry.Key, null);
+                        if (match(ref state, ref info, out var result))
                             yield return result;
                     }
-                    else
+                    else if (entry.Value != null) // maybe `null` for the unregistered service, see #412
                     {
                         var factories = ((FactoriesEntry)entry.Value).Factories;
                         foreach (var f in factories)
-                            if ((result = match(entry.Key, f.Key, f.Value)) != null)
+                        {
+                            if (f.Value == null)
+                                continue; // maybe `null` for the unregistered service, see #412
+                            var info = new ServiceRegistrationInfo(f.Value, entry.Key, f.Key);
+                            if (match(ref state, ref info, out var result))
                                 yield return result;
+                        }
                     }
                 }
             }
@@ -5405,8 +5420,15 @@ namespace DryIoc
             // e.g. for IHandler<in E> - IHandler<A> is compatible with IHandler<B> if B : A.
             if (requiredItemType.IsGenericType && rules.VariantGenericTypesInResolvedCollection)
             {
-                var variantGenericItems = container.GetServiceRegistrations()
-                    .Match(requiredItemType, static (t, x) => t.IsAssignableVariantGenericTypeFrom(x.ServiceType));
+                var variantGenericItems = container.GetServiceRegistrations(requiredItemType,
+                    static (ref Type reqItType, ref ServiceRegistrationInfo src, out ServiceRegistrationInfo res) => {
+                        res = src;
+                        if (!reqItType.IsAssignableVariantGenericTypeFrom(src.ServiceType))
+                            return false;
+                        if (res.OptionalServiceKey == null)
+                            res.OptionalServiceKey = DefaultKey.Value;
+                        return true;
+                    });
                 items = items.Append(variantGenericItems);
             }
 
@@ -5427,7 +5449,7 @@ namespace DryIoc
 
             // Return collection of items matched the specified key.
             var serviceKey = details.ServiceKey;
-            if (serviceKey != null)
+            if (serviceKey != null) // todo: @wip it may be the null in the Variance collection
                 items = items.Match(serviceKey, static (key, x) => key.MatchToNotNullRegisteredKey(x.OptionalServiceKey));
 
             var metadataKey = details.MetadataKey;
@@ -10347,7 +10369,7 @@ namespace DryIoc
         /// <summary>Returns expression for func arguments.</summary>
         public Expression GetInputArgsExpr() =>
             InputArgExprs == null
-                ? Constantull(typeof(object[]))
+                ? ConstantNull(typeof(object[]))
                 : NewArrayInit(typeof(object), InputArgExprs.Map(static x => x.Type.IsValueType ? Convert<object>(x) : x)); // todo: @perf optimize Convert to object
 
         /// <summary>Indicates that requested service is transient disposable that should be tracked.</summary>
@@ -14912,9 +14934,11 @@ namespace DryIoc
         /// The cache of consuming services may also hold on the unregistered service. Use `IContainer.ClearCache` to clear all cache.</summary>
         void Unregister(Type serviceType, object serviceKey, FactoryType factoryType, Func<Factory, bool> condition);
 
-        /// <summary>Returns all registered service factories with their Type and optional Key.
-        /// Decorator and Wrapper types are not included.</summary>
+        /// <summary>Returns registrations with their Type and optional Key. Decorators and Wrappers excluded.</summary>
         IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations();
+
+        /// <summary>Returns matched result of registrations with their Type and optional Key. Decorators and Wrappers excluded.</summary>
+        IEnumerable<R> GetServiceRegistrations<S, R>(S state, Match<S, ServiceRegistrationInfo, R> match);
 
         /// <summary>Returns the curretnly registered decorators. There maybe multiple entries for a specific DecoratorRegistrationInfo.DecoratorTy`pe`</summary>
         IEnumerable<DecoratorRegistrationInfo> GetDecoratorRegistrations();
@@ -15891,6 +15915,7 @@ namespace DryIoc
             type != null && typeof(T).IsAssignableFrom(type);
 
         /// <summary>`to` should be the closed-generic type</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsAssignableVariantGenericTypeFrom(this Type to, Type from) =>
             from != to && from.IsGenericType && from.GetGenericTypeDefinition() == to.GetGenericTypeDefinition() && to.IsAssignableFrom(from);
 
