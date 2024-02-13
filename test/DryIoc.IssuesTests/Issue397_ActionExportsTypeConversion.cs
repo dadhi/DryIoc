@@ -14,9 +14,9 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy();
             Exported_actions_can_be_resolved_as_array();
             Exported_actions_can_be_resolved_as_IEnumerable();
-            Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy();
             Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_with_metadata();
             Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_within_scope();
             Exported_actions_can_be_resolved_as_IEnumerable_of_Lazy_with_metadata_within_scope();

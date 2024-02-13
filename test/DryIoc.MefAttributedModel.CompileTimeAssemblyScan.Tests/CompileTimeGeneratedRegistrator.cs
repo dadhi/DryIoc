@@ -947,7 +947,7 @@ namespace DryIoc.MefAttributedModel.CompileTimeAssemblyScan.Tests
         Exports = new[] {
             new ExportInfo(typeof(DryIoc.MefAttributedModel.UnitTests.CUT.IAllOpts), "a", DryIoc.IfAlreadyRegistered.Keep),
         },
-        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.Scoped },
+        Reuse = new ReuseInfo { ReuseType = DryIocAttributes.ReuseType.Singleton },
         OpenResolutionScope = false,
         AsResolutionCall = false,
         AsResolutionRoot = true,

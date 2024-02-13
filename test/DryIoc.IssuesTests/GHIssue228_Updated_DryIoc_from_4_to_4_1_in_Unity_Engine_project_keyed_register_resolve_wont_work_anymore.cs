@@ -9,7 +9,7 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
-            // For_multiple_same_key_registrations_all_should_be_returned();
+            For_multiple_same_key_registrations_all_should_be_returned();
             Should_be_able_to_get_two_keyed_registrations();
             return 2;
         }
@@ -65,8 +65,7 @@ namespace DryIoc.IssuesTests
 
             var ex = Assert.Throws<ContainerException>(() =>
                 container.Resolve<Iface>(Keys.A));
-
-            Assert.AreEqual(Error.NameOf(Error.UnableToResolveUnknownService), Error.NameOf(ex.Error));
+            Assert.AreEqual(Error.NameOf(Error.ExpectedSingleDefaultFactory), ex.ErrorName);
 
             var rs = container.GetServiceRegistrations().Where(x => x.ServiceType == typeof(Iface)).ToArray();
             Assert.AreEqual(2, rs.Length);

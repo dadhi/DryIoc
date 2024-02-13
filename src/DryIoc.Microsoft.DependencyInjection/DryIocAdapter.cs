@@ -506,7 +506,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             var keyedService = Container.Resolve(serviceType, serviceKey, IfUnresolved.ReturnDefaultIfNotRegistered);
             if (keyedService != null)
                 return keyedService;
-            return Container.Resolve(serviceType, Registrator.AnyKeyOf(serviceKey), ifUnresolved);
+            return Container.Resolve(serviceType, Registrator.AnyKeyOfResolutionKey(serviceKey), ifUnresolved);
         }
 
         /// <inheritdoc />
@@ -521,7 +521,7 @@ namespace DryIoc.Microsoft.DependencyInjection
             var keyedService = Container.Resolve(serviceType, serviceKey, IfUnresolved.ReturnDefaultIfNotRegistered);
             if (keyedService != null)
                 return keyedService;
-            return Container.Resolve(serviceType, Registrator.AnyKeyOf(serviceKey), IfUnresolved.Throw);
+            return Container.Resolve(serviceType, Registrator.AnyKeyOfResolutionKey(serviceKey), IfUnresolved.Throw);
         }
 
         /// <inheritdoc />

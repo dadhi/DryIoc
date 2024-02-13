@@ -508,20 +508,16 @@ namespace DryIoc.MefAttributedModel.UnitTests.CUT
         IfAlreadyExported = IfAlreadyExported.Keep),
         CurrentScopeReuse,
         AsResolutionRoot]
-    public class AllOpts : IAllOpts, IDisposable
+    public sealed class AllOpts : IAllOpts, IDisposable
     {
         public bool IsDisposed;
-
-        public void Dispose()
-        {
-            IsDisposed = true;
-        }
+        public void Dispose() => IsDisposed = true;
     }
 
     [ExportEx(typeof(IAllOpts),
         ContractKey = "a",
         IfAlreadyExported = IfAlreadyExported.Keep),
-        CurrentScopeReuse,
+        SingletonReuse,
         AsResolutionRoot]
     public class AllOpts2 : IAllOpts
     {
