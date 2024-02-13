@@ -9,9 +9,10 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            Test_the_metadata_and_the_same_keys();
             For_multiple_same_key_registrations_all_should_be_returned();
             Should_be_able_to_get_two_keyed_registrations();
-            return 2;
+            return 3;
         }
 
         [Test]
@@ -74,11 +75,29 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(2, fs.Length);
         }
 
+        [Test]
+        public void Test_the_metadata_and_the_same_keys()
+        {
+            var container = new Container(Rules.Default.WithMultipleSameServiceKeyForTheServiceType());
+
+            container.Register<Iface, A>(serviceKey: Keys.A, setup: Setup.With(metadataOrFuncOfMetadata: "a"));
+            container.Register<Iface, B>(serviceKey: Keys.A, setup: Setup.With(metadataOrFuncOfMetadata: "b"));
+            container.Register<Iface, C>(serviceKey: Keys.C, setup: Setup.With(metadataOrFuncOfMetadata: "c"));
+
+            var ab = container.Resolve<Meta<Iface, string>[]>(serviceKey: Keys.A);
+            Assert.AreEqual(2, ab.Length);
+            Assert.IsInstanceOf<A>(ab[0].Value);
+            Assert.AreEqual("a", ab[0].Metadata);
+            Assert.IsInstanceOf<B>(ab[1].Value);
+            Assert.AreEqual("b", ab[1].Metadata);
+        }
+
         public interface Iface {}
 
         public class A : Iface {}
         public class B : Iface {}
+        public class C : Iface {}
 
-        public enum Keys { A, B }
+        public enum Keys { A, B, C }
     }
 }
