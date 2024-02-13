@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using DryIoc.ImTools;
 using NUnit.Framework;
@@ -9,11 +10,13 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            Test_the_Lazy_metadata_and_the_same_keys_But_only_one_key_matches_the_metadata_When_resolving_single_thing();
+            Test_the_metadata_and_the_same_keys_But_only_one_key_matches_the_metadata_When_resolving_single_thing();
             Test_the_metadata_and_the_same_keys_But_only_one_key_matches_the_metadata();
             Test_the_metadata_and_the_same_keys();
             For_multiple_same_key_registrations_all_should_be_returned();
             Should_be_able_to_get_two_keyed_registrations();
-            return 3;
+            return 6;
         }
 
         [Test]
@@ -106,6 +109,34 @@ namespace DryIoc.IssuesTests
             Assert.AreEqual(1, ab.Length);
             Assert.IsInstanceOf<A>(ab[0].Value);
             Assert.AreEqual("a", ab[0].Metadata);
+        }
+
+        [Test]
+        public void Test_the_metadata_and_the_same_keys_But_only_one_key_matches_the_metadata_When_resolving_single_thing()
+        {
+            var container = new Container(Rules.Default.WithMultipleSameServiceKeyForTheServiceType());
+
+            container.Register<Iface, A>(serviceKey: Keys.A, setup: Setup.With(metadataOrFuncOfMetadata: "a"));
+            container.Register<Iface, B>(serviceKey: Keys.A, setup: Setup.With(metadataOrFuncOfMetadata: 42));
+            container.Register<Iface, C>(serviceKey: Keys.C, setup: Setup.With(metadataOrFuncOfMetadata: "c"));
+
+            var a = container.Resolve<Meta<Iface, string>>(serviceKey: Keys.A);
+            Assert.IsInstanceOf<A>(a.Value);
+            Assert.AreEqual("a", a.Metadata);
+        }
+
+        [Test]
+        public void Test_the_Lazy_metadata_and_the_same_keys_But_only_one_key_matches_the_metadata_When_resolving_single_thing()
+        {
+            var container = new Container(Rules.Default.WithMultipleSameServiceKeyForTheServiceType());
+
+            container.Register<Iface, A>(serviceKey: Keys.A, setup: Setup.With(metadataOrFuncOfMetadata: "a"));
+            container.Register<Iface, B>(serviceKey: Keys.A, setup: Setup.With(metadataOrFuncOfMetadata: 42));
+            container.Register<Iface, C>(serviceKey: Keys.C, setup: Setup.With(metadataOrFuncOfMetadata: "c"));
+
+            var a = container.Resolve<Lazy<Meta<Iface, string>>>(serviceKey: Keys.A);
+            Assert.IsInstanceOf<A>(a.Value.Value);
+            Assert.AreEqual("a", a.Value.Metadata);
         }
 
         public interface Iface {}
