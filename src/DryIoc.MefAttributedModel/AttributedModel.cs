@@ -180,7 +180,7 @@ namespace DryIoc.MefAttributedModel
 
                 if (serviceKey != null)
                 {
-                    factories = factories.Match(serviceKey, static (key, f) => key.Equals(f.Key)); // todo: @wip check for UniqueServiceKey?
+                    factories = factories.Match(serviceKey, static (key, f) => key.MatchToNotNullRegisteredKey(f.Key));
                     if (factories.Length == 0)
                         return null;
                 }

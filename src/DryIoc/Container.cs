@@ -231,7 +231,7 @@ namespace DryIoc
              Registry.GetServiceRegistrations(_registry.Value);
 
         /// <inheritdoc />
-        public IEnumerable<R> GetServiceRegistrations<S, R>(S state, Match<S, ServiceRegistrationInfo, R> match) =>
+        public IEnumerable<R> GetServiceRegistrations<S, R>(S state, MatchOp<S, ServiceRegistrationInfo, R> match) =>
              Registry.GetServiceRegistrations(_registry.Value, state, match);
 
         /// <inheritdoc />
@@ -1086,7 +1086,7 @@ namespace DryIoc
             if (serviceKey != null)
             {
                 // simplified selection if we know that serviceKey is a default key
-                if (serviceKey is DefaultKey || serviceKey is DefaultDynamicKey)
+                if (serviceKey is DefaultKey | serviceKey is DefaultDynamicKey)
                 {
                     foreach (var f in factories)
                         if (f.Key.Equals(serviceKey))
@@ -1098,9 +1098,9 @@ namespace DryIoc
                 var multipleSameServiceKeySupport = Rules.HasMultipleSameServiceKeyForTheServiceType;
                 if (multipleSameServiceKeySupport && serviceKey is not UniqueRegisteredServiceKey)
                 {
-                    // todo: @wip match against the metadata too
-                    factories = factories.Match(serviceKey, request,
-                        static (k, r, x) => k.MatchToNotNullRegisteredKey(x.Key) && x.Value.CheckCondition(r));
+                    factories = factories.Match(details, request, static (d, r, x) =>
+                        d.ServiceKey.MatchToNotNullRegisteredKey(x.Key) &&
+                        r.MatchFactoryConditionAndMetadata(d, x.Value));
                     if (factories.Length == 1)
                         return factories[0].Value;
                 }
@@ -1116,7 +1116,7 @@ namespace DryIoc
             else // serviceKey == null
             { 
                 factories = factories.Match(details, request, 
-                    static (d, r, f) => (f.Key is DefaultKey || f.Key is DefaultDynamicKey) &&
+                    static (d, r, f) => (f.Key is DefaultKey | f.Key is DefaultDynamicKey) &&
                         r.MatchFactoryConditionAndMetadata(d, f.Value));
             }
 
@@ -2612,7 +2612,7 @@ namespace DryIoc
 
             /// <summary>Returns the matched result registrations filtering out the unregistered services.</summary>
             public static IEnumerable<R> GetServiceRegistrations<S, R>(
-                ImHashMap<Type, object> registryOrServices, S state, Match<S, ServiceRegistrationInfo, R> match)
+                ImHashMap<Type, object> registryOrServices, S state, MatchOp<S, ServiceRegistrationInfo, R> match)
             {
                 var services = GetServiceFactories(registryOrServices);
                 foreach (var entry in services.Enumerate())
@@ -5596,7 +5596,7 @@ namespace DryIoc
             var serviceType = isAction ? typeof(void) : argTypes[argCount];
 
             // special case for the Factory delegate of Func<IResolverContext, ?>, so we may avoid using the InputArgs and use the result expression directly
-            if (!isAction && argCount == 1 && argTypes[0] == typeof(IResolverContext))
+            if (!isAction & argCount == 1 && argTypes[0] == typeof(IResolverContext))
             {
                 serviceType = wrapperType == typeof(Func<IResolverContext, object>)
                     ? request.RequiredServiceType.ThrowIfNull(Error.ResolutionNeedsRequiredServiceType, request)
@@ -5758,7 +5758,7 @@ namespace DryIoc
 
                 if (serviceKey != null)
                 {
-                    factories = factories.Match(serviceKey, static (key, f) => key.Equals(f.Key));
+                    factories = factories.Match(serviceKey, static (key, f) => key.MatchToNotNullRegisteredKey(f.Key));
                     if (factories.Length == 0)
                         return null;
                 }
@@ -6237,13 +6237,12 @@ namespace DryIoc
             SelectFactoryWithTheMinReuseLifespan(request, factory, factories) ??
             SelectLastRegisteredFactory(request, factory, factories);
 
-        // todo: @wip check for the UniqueRegisteredServiceKey
         /// <summary>Prefer specified service key (if found) over default key.
         /// Help to override default registrations in Open Scope scenarios:
         /// I may register service with key and resolve it as default in current scope.</summary>
         public static FactorySelectorRule SelectKeyedOverDefaultFactory(object serviceKey) =>
             (r, singleFac, keyedFacs) => singleFac // select a single default factory if it is the only one registered
-                ?? keyedFacs.FindFirst(serviceKey, static (key, f) => Equals(f.Key, key))?.Value // or try to find the factory with equal key
+                ?? keyedFacs.FindFirst(serviceKey, static (key, f) => key.MatchToNotNullRegisteredKey(f.Key))?.Value // or try to find the factory with equal key
                 ?? keyedFacs.FindFirst(static f => f.Key == null || f.Key.Equals(null))?.Value;  // or try to find the factory with null/default key
 
         private static Factory SelectFactoryWithTheMinReuseLifespan(Request request, Factory singleDefaultFactory, KV<object, Factory>[] orManyDefaultAndKeyedFactories)
@@ -7321,7 +7320,7 @@ namespace DryIoc
         private static FactoryMethod MostResolvableConstructor(Request request,
             BindingFlags additionalToPublicAndInstance = 0, Func<Type, ParameterInfo[], bool> condition = null)
         {
-            var ctors = ((ReflectionFactory)request.Factory).GetConstructors(request, additionalToPublicAndInstance); // todo: @wip what with condition here in GetConstructors 
+            var ctors = ((ReflectionFactory)request.Factory).GetConstructors(request, additionalToPublicAndInstance);
             if (ctors.Length != 0 & condition != null)
                 ctors = ctors.Match(condition, static (cond, c) => cond(c.DeclaringType, c.GetParameters()));
 
@@ -7872,7 +7871,7 @@ namespace DryIoc
                     ? (FactoryMethodSelector)(_ => DryIoc.FactoryMethod.Of(ctorOrMethodOrMember))
                     : (FactoryMethodSelector)(r => DryIoc.FactoryMethod.Of(ctorOrMethodOrMember, orGetFactoryInfo(r)));
 
-            if (!hasCustomValue && parameterSelector == null && propertiesAndFieldsSelector == null)
+            if (!hasCustomValue & parameterSelector == null & propertiesAndFieldsSelector == null)
                 return new TypedMade<TService>(factoryMethodSelector);
             return new WithDetails<TService>(factoryMethodSelector,
                 parameterSelector, propertiesAndFieldsSelector, hasCustomValue);
@@ -8196,7 +8195,8 @@ namespace DryIoc
             public override string ToString() => ResolutionKey == null ? "AnyKey(*)" : $"AnyKey(resolutionKey: {ResolutionKey})";
         }
 
-        internal static bool MatchToNotNullRegisteredKey(this object resolutionKey, object registeredKey)
+        /// <summary>Matches all combinations of the key wrappers.</summary>
+        public static bool MatchToNotNullRegisteredKey(this object resolutionKey, object registeredKey)
         {
             Debug.Assert(registeredKey != null);
 
@@ -10182,7 +10182,8 @@ namespace DryIoc
         {
             var setup = factory.Setup;
             return (setup.Condition == null || setup.Condition(request.Isolate()))
-                && (details.MetadataKey == null && details.Metadata == null || setup.MatchesMetadata(details.MetadataKey, details.Metadata));
+                && (details.MetadataKey == null && details.Metadata == null ||
+                    setup.MatchesMetadata(details.MetadataKey, details.Metadata));
         }
 
         /// <summary>Matching things</summary>
@@ -14958,7 +14959,7 @@ namespace DryIoc
         IEnumerable<ServiceRegistrationInfo> GetServiceRegistrations();
 
         /// <summary>Returns matched result of registrations with their Type and optional Key. Decorators and Wrappers excluded.</summary>
-        IEnumerable<R> GetServiceRegistrations<S, R>(S state, Match<S, ServiceRegistrationInfo, R> match);
+        IEnumerable<R> GetServiceRegistrations<S, R>(S state, MatchOp<S, ServiceRegistrationInfo, R> match);
 
         /// <summary>Returns the curretnly registered decorators. There maybe multiple entries for a specific DecoratorRegistrationInfo.DecoratorTy`pe`</summary>
         IEnumerable<DecoratorRegistrationInfo> GetDecoratorRegistrations();
