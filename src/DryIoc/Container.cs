@@ -628,7 +628,7 @@ namespace DryIoc
             ServiceRegistrationInfo[] variantGenericItems = null;
             if (requiredItemType.IsGenericType && Rules.VariantGenericTypesInResolvedCollection)
             {
-                variantGenericItems = GetServiceRegistrations(requiredItemType, 
+                variantGenericItems = GetServiceRegistrations(requiredItemType,
                     static (ref Type reqItType, ref ServiceRegistrationInfo src, out ServiceRegistrationInfo res) =>
                     {
                         res = src;
@@ -1021,7 +1021,7 @@ namespace DryIoc
                 serviceFactories = r.Services;
 
             var rules = Rules;
-            if (rules.FactorySelector != null && serviceKey == null)
+            if (rules.FactorySelector != null & serviceKey == null)
                 return GetRuleSelectedServiceFactoryOrDefault(rules, serviceFactories, request, details, serviceType);
 
             var entry = serviceFactories.GetValueOrDefault(serviceType);
@@ -1043,7 +1043,7 @@ namespace DryIoc
                     {
                         if (e.Value is Factory f)
                         {
-                            if ((serviceKey == null || serviceKey == DefaultKey.Value) &&
+                            if ((serviceKey == null | serviceKey == DefaultKey.Value) &&
                                 serviceType.IsAssignableVariantGenericTypeFrom(e.Key) &&
                                 request.MatchFactoryConditionAndMetadata(details, f))
                             {
@@ -1054,7 +1054,7 @@ namespace DryIoc
                         else
                         {
                             foreach (var kf in ((FactoriesEntry)e.Value).Factories)
-                                if (kf.Key.Equals(serviceKey) && // todo: @wip take AnyKey into account?
+                                if (serviceKey.MatchToNotNullRegisteredKey(kf.Key) &&
                                     serviceType.IsAssignableVariantGenericTypeFrom(e.Key) &&
                                     request.MatchFactoryConditionAndMetadata(details, kf.Value))
                                 {
@@ -1114,8 +1114,8 @@ namespace DryIoc
                 }
             }
             else // serviceKey == null
-            { 
-                factories = factories.Match(details, request, 
+            {
+                factories = factories.Match(details, request,
                     static (d, r, f) => (f.Key is DefaultKey | f.Key is DefaultDynamicKey) &&
                         r.MatchFactoryConditionAndMetadata(d, f.Value));
             }
@@ -1313,7 +1313,9 @@ namespace DryIoc
                 var reuse = factory.Value.Reuse;
                 var lifespan = reuse == null | reuse == Reuse.Transient ? int.MaxValue : reuse.Lifespan;
                 if (lifespan == minLifespan)
+                {
                     multipleFactories = true;
+                }
                 else if (lifespan < minLifespan)
                 {
                     minLifespan = lifespan;
@@ -1322,7 +1324,7 @@ namespace DryIoc
                 }
             }
 
-            return !multipleFactories && minLifespanFactory != null ? minLifespanFactory : null;
+            return !multipleFactories & minLifespanFactory != null ? minLifespanFactory : null;
         }
 
         ///  <inheritdoc />
@@ -5416,7 +5418,8 @@ namespace DryIoc
             if (requiredItemType.IsGenericType && rules.VariantGenericTypesInResolvedCollection)
             {
                 var variantGenericItems = container.GetServiceRegistrations(requiredItemType,
-                    static (ref Type reqItType, ref ServiceRegistrationInfo src, out ServiceRegistrationInfo res) => {
+                    static (ref Type reqItType, ref ServiceRegistrationInfo src, out ServiceRegistrationInfo res) =>
+                    {
                         res = src;
                         if (!reqItType.IsAssignableVariantGenericTypeFrom(src.ServiceType))
                             return false;
@@ -8173,13 +8176,13 @@ namespace DryIoc
     /// <summary>Contains <see cref="IRegistrator"/> extension methods to simplify general use cases.</summary>
     public static class Registrator
     {
-        // todo: @wip We are not supporting the AnyKey outside of the MS.DI, so that's confusing
         // todo: @feature We may need the paired DefaultKey to request/filter collections by default key, because AnyKey does not include DefaultKey
         /// <summary>When registered with it, the the service can be resolved any service key provided</summary>
         public static readonly object AnyKey = new AnyServiceKey();
         /// <summary>Wrap the resolution key</summary>
         public static object AnyKeyOfResolutionKey(object key) => new AnyServiceKey(key);
 
+        // todo: @wip add IConvertibleToExpression impl
         /// <summary>Represents the **registered** key that you may resolve with any resolution service key</summary>
         public class AnyServiceKey
         {
@@ -10190,6 +10193,7 @@ namespace DryIoc
         public static bool MatchFactoryReuse(this Request r, Factory f) => f.Reuse?.CanApply(r) ?? true;
 
         /// <summary>Matching things</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool MatchGeneratedFactory(this Request r, Factory f) =>
             f.GeneratedFactories == null || f.GetGeneratedFactoryOrDefault(r, ifErrorReturnDefault: true) != null;
 
@@ -13333,7 +13337,7 @@ namespace DryIoc
                 if (factoryMethodBase != null)
                 {
                     var targetMethods = closedFactoryImplType.GetMethods()
-                        .Match(factoryMember, factoryMethodBase.GetParameters(), 
+                        .Match(factoryMember, factoryMethodBase.GetParameters(),
                             static (fm, fp, m) => m.Name == fm.Name && m.GetParameters().Length == fp.Length);
 
                     if (targetMethods.Length == 1)
@@ -15904,7 +15908,7 @@ namespace DryIoc
 
         /// <summary>Finds the conversion operator or returns null</summary>
         [MethodImpl((MethodImplOptions)256)]
-         public static MethodInfo GetConversionOperatorOrNull(this Type sourceType, Type targetType) =>
+        public static MethodInfo GetConversionOperatorOrNull(this Type sourceType, Type targetType) =>
             sourceType.FindConvertOperator(sourceType, targetType) ??
             targetType.FindConvertOperator(sourceType, targetType);
 

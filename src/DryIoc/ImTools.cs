@@ -37,7 +37,13 @@ namespace DryIoc.ImTools
     using System.Runtime.CompilerServices; // For [MethodImpl(AggressiveInlining)]
 
     /// <summary>General purpose Match operator</summary>
-    public delegate bool Match<S, T, R>(ref S state, ref T it, out R result);
+    public delegate bool MatchOp<S, T, R>(ref S state, ref T it, out R result);
+
+    /// <summary>General purpose Is operator</summary>
+    public delegate bool IsOp<S, T>(ref S state, ref T it);
+
+    /// <summary>General purpose Map operator</summary>
+    public delegate R MapOp<S, T, R>(ref S state, ref T it);
 
     /// <summary>Helpers for functional composition</summary>
     public static class Fun
@@ -662,6 +668,17 @@ namespace DryIoc.ImTools
             return results;
         }
 
+        private static R[] Copy<S, T, R>(this T[] source, ref S state, int sourcePos, int count, MapOp<S, T, R> map)
+        {
+            var results = new R[count];
+            if (count == 1)
+                results[0] = map(ref state, ref source[sourcePos]);
+            else
+                for (int i = 0, j = sourcePos; i < count; ++i, ++j)
+                    results[i] = map(ref state, ref source[j]);
+            return results;
+        }
+
         private static R[] Copy<A, B, T, R>(this T[] source, A a, B b, int sourcePos, int count, Func<A, B, T, R> map)
         {
             var results = new R[count];
@@ -706,6 +723,18 @@ namespace DryIoc.ImTools
             else
                 for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
                     results[i] = map(state, source[j]);
+            return results;
+        }
+
+        private static R[] AppendTo<S, T, R>(this T[] source, ref S state, R[] results, int sourcePos, int count, MapOp<S, T, R> map)
+        {
+            var oldResultsCount = results.Length;
+            Array.Resize(ref results, oldResultsCount + count);
+            if (count == 1)
+                results[oldResultsCount] = map(ref state, ref source[sourcePos]);
+            else
+                for (int i = oldResultsCount, j = sourcePos; i < results.Length; ++i, ++j)
+                    results[i] = map(ref state, ref source[j]);
             return results;
         }
 
@@ -995,6 +1024,71 @@ namespace DryIoc.ImTools
 
         /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
         /// to minimize the allocations in <paramref name="condition"/> lambda closure </summary>
+        public static R[] Match<S, T, R>(this T[] source, ref S state, IsOp<S, T> condition, MapOp<S, T, R> map)
+        {
+            if (source == null)
+                return null;
+            if (source.Length == 0)
+                return Empty<R>();
+
+            if (source.Length == 1)
+            {
+                var item = source[0];
+                return condition(ref state, ref item) ? new[] { map(ref state, ref item) } : Empty<R>();
+            }
+
+            if (source.Length == 2)
+            {
+                var c0 = condition(ref state, ref source[0]);
+                var c1 = condition(ref state, ref source[1]);
+                return c0 & c1 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) }
+                    : c0 ? new[] { map(ref state, ref source[0]) }
+                    : c1 ? new[] { map(ref state, ref source[1]) }
+                    : Empty<R>();
+            }
+
+            if (source.Length == 3)
+            {
+                var c0 = condition(ref state, ref source[0]);
+                var c1 = condition(ref state, ref source[1]);
+                var c2 = condition(ref state, ref source[2]);
+                return c0 & c1 & c2 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]), map(ref state, ref source[2]) }
+                    : c0 ? (c1 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) } 
+                        : c2 ? new[] { map(ref state, ref source[0]), map(ref state, ref source[2]) } 
+                        : new[] { map(ref state, ref source[0]) })
+                    : c1 ? (c2 ? new[] { map(ref state, ref source[1]), map(ref state, ref source[2]) } 
+                        : new[] { map(ref state, ref source[1]) })
+                    : c2 ? new[] { map(ref state, ref source[2]) }
+                    : Empty<R>();
+            }
+
+            var matchStart = 0;
+            R[] matches = null;
+            var matchFound = false;
+
+            var i = 0;
+            for (; i < source.Length; ++i)
+                if (!(matchFound = condition(ref state, ref source[i])))
+                {
+                    // for accumulated matched items
+                    if (i != 0 && i > matchStart)
+                        matches = matches == null 
+                            ? source.Copy(ref state, matchStart, i - matchStart, map)
+                            : source.AppendTo(ref state, matches, matchStart, i - matchStart, map);
+                    matchStart = i + 1; // guess the next match start will be after the non-matched item
+                }
+
+            // when last match was found but not all items are matched (hence matchStart != 0)
+            if (matchFound && matchStart != 0)
+                return matches == null
+                    ? source.Copy(ref state, matchStart, i - matchStart, map) 
+                    : source.AppendTo(ref state, matches, matchStart, i - matchStart, map);
+
+            return matches ?? (matchStart == 0 ? source.Copy(ref state, 0, source.Length, map) : Empty<R>());
+        }
+
+        /// <summary>Match with the additional state to use in <paramref name="condition"/> and <paramref name="map"/> 
+        /// to minimize the allocations in <paramref name="condition"/> lambda closure </summary>
         public static R[] Match<A, B, T, R>(this T[] source, A a, B b, Func<A, B, T, bool> condition, Func<A, B, T, R> map)
         {
             if (source == null)
@@ -1088,6 +1182,28 @@ namespace DryIoc.ImTools
             var results = new R[sourceCount];
             for (var i = 0; i < source.Length; i++)
                 results[i] = map(state, source[i]);
+            return results;
+        }
+
+        /// Map with additional state to use in <paramref name="map"/> to minimize allocations in <paramref name="map"/> lambda closure 
+        public static R[] Map<T, S, R>(this T[] source, ref S state, MapOp<S, T, R> map)
+        {
+            if (source == null)
+                return null;
+
+            var sourceCount = source.Length;
+            if (sourceCount == 0)
+                return Empty<R>();
+
+            if (sourceCount == 1)
+                return new[] { map(ref state, ref source[0]) };
+
+            if (sourceCount == 2)
+                return new[] { map(ref state, ref source[0]), map(ref state, ref source[1]) };
+
+            var results = new R[sourceCount];
+            for (var i = 0; i < source.Length; i++)
+                results[i] = map(ref state, ref source[i]);
             return results;
         }
 
