@@ -1037,6 +1037,7 @@ namespace DryIoc
                     entry is FactoriesEntry factoriesEntry && factoriesEntry.GetFirstKeyedOrDefault(serviceKey) == null))
                     entry = serviceFactories.GetValueOrDefault(openGenericServiceType) ?? entry;
 
+                // todo: @wip wrap into the method as it is rarely used
                 if (entry == null && rules.VariantGenericTypesInResolve)
                 {
                     foreach (var e in serviceFactories.Enumerate())
@@ -1077,7 +1078,8 @@ namespace DryIoc
             var factories = FactoriesEntry.ToNotNullKeyedFactories(entry);
 
             if (rules.DynamicRegistrationProviders != null &&
-                !serviceType.IsExcludedGeneralPurposeServiceType() && !IsWrapper(serviceType, openGenericServiceType))
+                !serviceType.IsExcludedGeneralPurposeServiceType() &&
+                !IsWrapper(serviceType, openGenericServiceType))
                 factories = CombineRegisteredServiceWithDynamicFactories(factories, serviceType, openGenericServiceType, serviceKey);
 
             if (factories.Length == 0)
@@ -1108,16 +1110,17 @@ namespace DryIoc
                 {
                     // find first matching factory with the unique key (in absence of multiple keys rule)
                     foreach (var f in factories)
-                        if (serviceKey.MatchToNotNullRegisteredKey(f.Key) && f.Value.CheckCondition(request))
+                        if (serviceKey.MatchToNotNullRegisteredKey(f.Key) &&
+                            f.Value.CheckCondition(request))
                             return f.Value;
                     return null;
                 }
             }
             else // serviceKey == null
             {
-                factories = factories.Match(details, request,
-                    static (d, r, f) => (f.Key is DefaultKey | f.Key is DefaultDynamicKey) &&
-                        r.MatchFactoryConditionAndMetadata(d, f.Value));
+                factories = factories.Match(details, request, static (d, r, f) =>
+                    (f.Key is DefaultKey | f.Key is DefaultDynamicKey) &&
+                    r.MatchFactoryConditionAndMetadata(d, f.Value));
             }
 
             var initialMatchCount = factories.Length;
@@ -1128,6 +1131,8 @@ namespace DryIoc
             if (factories.Length > 1 && rules.ImplicitCheckForReuseMatchingScope)
             {
                 KV<object, Factory> singleMatchedFactory = null;
+
+                // todo: @wip split the MatchFactoryReuse and the FindFactoryWithTheMinReuseLifespanOrDefault checks, because first lead to the errors and second is not
                 var reuseMatchedFactories = factories.Match(request, static (r, x) => r.MatchFactoryReuse(x.Value));
                 if (reuseMatchedFactories.Length == 1)
                     singleMatchedFactory = reuseMatchedFactories[0];
@@ -6691,8 +6696,7 @@ namespace DryIoc
                       & ~Settings.ImplicitCheckForReuseMatchingScope
                       | Settings.UsedForValidation;
 
-        /// <summary>Specifies to generate ResolutionCall dependency creation expression and stores the result 
-        /// in the-per rules collection.</summary>
+        /// <summary>Set of the rules used for the Validating container.</summary>
         public Rules ForValidate()
         {
             var newRules = Clone();
@@ -6702,12 +6706,11 @@ namespace DryIoc
             return newRules;
         }
 
-        /// <summary><see cref="ImplicitCheckForReuseMatchingScope"/></summary>
+        /// <summary>The Rule filters out the factory without matching scope.</summary>
         public bool ImplicitCheckForReuseMatchingScope =>
             (_settings & Settings.ImplicitCheckForReuseMatchingScope) != 0;
 
-        /// <summary>Removes implicit Factory <see cref="Setup.Condition"/> for non-transient service.
-        /// The Condition filters out factory without matching scope.</summary>
+        /// <summary>Removes <see cref="ImplicitCheckForReuseMatchingScope"/> rule and returns the new rules.</summary>
         public Rules WithoutImplicitCheckForReuseMatchingScope() =>
             WithSettings(_settings & ~Settings.ImplicitCheckForReuseMatchingScope);
 
