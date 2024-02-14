@@ -137,16 +137,13 @@ namespace DryIoc.MefAttributedModel
                 made: _createExportFactoryMethod,
                 setup: Setup.Wrapper);
 
-            // todo: @perf optimize to use unwrapped factory
+            // todo: @perf optimize to use unwrapped factory the same as GetLazyMetadataExpressionOrDefault
             container.Register(typeof(ExportFactory<,>),
                 made: _createExportFactoryWithMetadataMethod,
                 setup: Setup.WrapperWith(0));
 
             container.Register(typeof(Lazy<,>),
                 WrapperExpressionFactory.Of(GetLazyMetadataExpressionOrDefault, Setup.WrapperWith(0)));
-
-            container.Register(typeof(Lazy<>),
-                WrapperExpressionFactory.Of(WrappersSupport.GetLazyExpressionOrDefault), IfAlreadyRegistered.Replace);
 
             return container;
         }

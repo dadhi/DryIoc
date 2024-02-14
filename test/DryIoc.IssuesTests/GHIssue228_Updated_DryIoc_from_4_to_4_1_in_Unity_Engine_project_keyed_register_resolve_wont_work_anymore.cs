@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using DryIoc.ImTools;
+using DryIoc.MefAttributedModel;
 using NUnit.Framework;
 
 namespace DryIoc.IssuesTests
@@ -10,6 +11,9 @@ namespace DryIoc.IssuesTests
     {
         public int Run()
         {
+            // Mef Lazy<T, M> wrapper
+            Test_the_metadata_with_LazyMeta_and_the_same_keys_But_only_one_key_matches_the_metadata();
+
             Test_the_Func_metadata_and_the_Diff_keys_But_only_one_key_matches_the_metadata();
             Test_the_Func_metadata_and_the_same_keys_But_only_one_key_matches_the_metadata();
             Test_the_Lazy_metadata_and_the_Diff_keys_But_only_one_key_matches_the_metadata();
@@ -21,7 +25,8 @@ namespace DryIoc.IssuesTests
             Test_the_metadata_and_the_same_keys();
             For_multiple_same_key_registrations_all_should_be_returned();
             Should_be_able_to_get_two_keyed_registrations();
-            return 11;
+
+            return 12;
         }
 
         [Test]
@@ -187,6 +192,21 @@ namespace DryIoc.IssuesTests
             var ab = container.Resolve<Meta<Lazy<Iface>, int>[]>(serviceKey: Keys.A);
             Assert.AreEqual(1, ab.Length);
             Assert.IsInstanceOf<B>(ab[0].Value.Value);
+            Assert.AreEqual(42, ab[0].Metadata);
+        }
+
+        [Test]
+        public void Test_the_metadata_with_LazyMeta_and_the_same_keys_But_only_one_key_matches_the_metadata()
+        {
+            var container = new Container().WithMef();
+
+            container.Register<Iface, A>(serviceKey: Keys.A, setup: Setup.With(metadataOrFuncOfMetadata: "a"));
+            container.Register<Iface, B>(serviceKey: Keys.A, setup: Setup.With(metadataOrFuncOfMetadata: 42));
+            container.Register<Iface, C>(serviceKey: Keys.C, setup: Setup.With(metadataOrFuncOfMetadata: "c"));
+
+            var ab = container.Resolve<Lazy<Iface, int>[]>(serviceKey: Keys.A);
+            Assert.AreEqual(1, ab.Length);
+            Assert.IsInstanceOf<B>(ab[0].Value);
             Assert.AreEqual(42, ab[0].Metadata);
         }
 
