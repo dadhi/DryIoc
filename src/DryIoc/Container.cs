@@ -6696,7 +6696,7 @@ namespace DryIoc
                       & ~Settings.ImplicitCheckForReuseMatchingScope
                       | Settings.UsedForValidation;
 
-        /// <summary>Set of the rules used for the Validating container.</summary>
+        /// <summary>Set all the settings and rules required for the Validating container.</summary>
         public Rules ForValidate()
         {
             var newRules = Clone();
