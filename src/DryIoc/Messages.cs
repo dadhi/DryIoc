@@ -43,6 +43,9 @@ namespace DryIoc.Messages
     /// <summary>Base message handler for message with empty response</summary>
     public interface IMessageHandler<in M> : IMessageHandler<M, EmptyResponse> where M : IMessage<EmptyResponse> { }
 
+    /// <summary>Message handler middleware for message with empty response</summary>
+    public interface IMessageMiddleware<in M> : IMessageMiddleware<M, EmptyResponse> { }
+
     /// <summary>Message handler middleware to handle the message and pass the result to the next middleware</summary>
     public interface IMessageMiddleware<in M, R>
     {
