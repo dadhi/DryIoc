@@ -9,7 +9,7 @@ public class Program
 {
     public static void Main()
     {
-        new GHIssue631_Conditional_registrations().Run();
+        // new GHIssue631_Conditional_registrations().Run();
 
         RunAllTests();
 

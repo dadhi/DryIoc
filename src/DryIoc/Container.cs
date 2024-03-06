@@ -488,7 +488,7 @@ namespace DryIoc
             // Cache is missed, so get the factory and put it into cache:
             ThrowIfRootContainerDisposed();
 
-            var request = Request.Create(this, serviceType, serviceKey, ifUnresolved, requiredServiceType, preResolveParent, default, args);
+            var request = Request.Create(this, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey), preResolveParent, default, args);
             var factory = ResolveFactory(request);
             if (factory == null)
                 return null;
@@ -4827,7 +4827,7 @@ namespace DryIoc
         {
             if (request.IsEmpty)
                 return (requestParentFlags & RequestFlags.OpensResolutionScope) != 0
-                    ? Field(typeof(Request).GetField(nameof(Request.EmptyOpensResolutionScope))) // we mat not refactor it to readonly field because it is rarely used
+                    ? Field(typeof(Request).GetField(nameof(Request.EmptyOpensResolutionScope))) // we may not refactor it to readonly field because it is rarely used
                     : Request.EmptyRequestExpr;
 
             var flags = request.Flags | requestParentFlags;
@@ -10229,7 +10229,7 @@ namespace DryIoc
             new Request(null, null, 0, 0, null, default, null, null, null);
 
         internal static readonly Expression EmptyRequestExpr =
-            Field(typeof(Request).GetField(nameof(Empty)));
+            Field(typeof(Request).GetField(nameof(Empty))); // todo: @perf UnsafeAccessAttribute, wrap this thing into a util method
 
         /// <summary>Empty request which opens resolution scope.</summary>
         public static readonly Request EmptyOpensResolutionScope =
@@ -10259,7 +10259,7 @@ namespace DryIoc
             {
                 var parentServiceType = preResolveParent.ActualServiceType;
                 var parentDetails = preResolveParent.GetServiceDetails();
-                if (parentDetails != null && parentDetails != ServiceDetails.Default)
+                if (parentDetails != null & parentDetails != ServiceDetails.Default)
                     serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(parentServiceType, parentDetails, container, preResolveParent.FactoryType);
 
                 flags |= preResolveParent.Flags & InheritedFlags;
@@ -10267,14 +10267,33 @@ namespace DryIoc
             else
                 flags |= preResolveParent.Flags; //inherits the OpensResolutionScope flag
 
-            var inputArgExprs = inputArgs?.Map(a => Constant(a)); // todo: @check what happens if `a == null`, does the `object` type for is fine
+            var inputArgExprs = inputArgs?.Map(static a => Constant(a));
 
             // we are re-starting the dependency depth count from `1`
             return new Request(container, preResolveParent, 1, 0, null, flags, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs);
         }
 
-        /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
-        public static Request CreateResolutionRoot(Container container, Type serviceType, IfUnresolved ifUnresolved = IfUnresolved.Throw)
+        /// <summary>Creates the Resolve request for the resolution root service.</summary>
+        public static Request CreateResolutionRoot(Container container, ServiceInfo serviceInfo,
+            object[] inputArgs = null)
+        {
+            Debug.Assert(serviceInfo != null);
+
+            var serviceType = serviceInfo.ServiceType;
+            if (serviceType != null && serviceType.IsOpenGeneric())
+                Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
+
+            var inputArgExprs = inputArgs?.Map(a => Constant(a));
+
+            var req = RentRequestOrNull();
+            return req == null
+                ? new Request(container, Empty, 1, 0, null, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs)
+                : req.SetServiceInfo(container, Empty, 1, 0, null, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs);
+        }
+
+        /// <summary>Creates the Resolve request for the resolution root service.</summary>
+        public static Request CreateResolutionRoot(Container container, Type serviceType,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw)
         {
             if (serviceType != null && serviceType.IsOpenGeneric())
                 Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
