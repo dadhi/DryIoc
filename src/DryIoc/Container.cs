@@ -488,7 +488,8 @@ namespace DryIoc
             // Cache is missed, so get the factory and put it into cache:
             ThrowIfRootContainerDisposed();
 
-            var request = Request.Create(this, ServiceInfo.Of(serviceType, requiredServiceType, ifUnresolved, serviceKey), preResolveParent, default, args);
+            var serviceTypeOrInfo = ServiceInfo.OrServiceType(serviceType, requiredServiceType, ifUnresolved, serviceKey);
+            var request = Request.CreateFromServiceTypeOrInfo(this, serviceTypeOrInfo, preResolveParent, default, args);
             var factory = ResolveFactory(request);
             if (factory == null)
                 return null;
@@ -9745,7 +9746,7 @@ namespace DryIoc
             }
 
             var ownerRequiredServiceType = ownerDetails.RequiredServiceType;
-            if (ownerType != FactoryType.Service && ownerRequiredServiceType != null &&
+            if (ownerType != FactoryType.Service & ownerRequiredServiceType != null &
                 requiredServiceType == null) // if only dependency does not have its own
                 requiredServiceType = ownerRequiredServiceType;
 
@@ -9788,16 +9789,13 @@ namespace DryIoc
 
             Type requiredServiceType = null;
             var ownerRequiredServiceType = ownerDetails.RequiredServiceType;
-            if (ownerType != FactoryType.Service && ownerRequiredServiceType != null) // if only dependency does not have its own
+            if (ownerType != FactoryType.Service & ownerRequiredServiceType != null) // if only dependency does not have its own
                 requiredServiceType = ownerRequiredServiceType;
 
             if (serviceType == requiredServiceType)
                 requiredServiceType = null;
 
-            if (serviceKey == null &
-                metadataKey == null &
-                metadata == null &
-                ifUnresolved == IfUnresolved.Throw &
+            if (serviceKey == null & metadataKey == null & metadata == null & ifUnresolved == IfUnresolved.Throw &
                 requiredServiceType == null)
                 return serviceType;
 
@@ -9810,7 +9808,7 @@ namespace DryIoc
             ServiceInfo owner, IContainer container, FactoryType ownerFactoryType = FactoryType.Service)
         {
             var ownerDetails = owner.Details;
-            if (ownerDetails == null || ownerDetails == ServiceDetails.Default)
+            if (ownerDetails == null | ownerDetails == ServiceDetails.Default)
                 return ServiceInfo.Of(serviceType);
 
             var ifUnresolved = IfUnresolved.Throw;
@@ -9836,10 +9834,10 @@ namespace DryIoc
                 metadata = ownerDetails.Metadata;
             }
 
-            if (ownerFactoryType != FactoryType.Service && ownerRequiredServiceType != null && ownerRequiredServiceType != serviceType) // if only dependency does not have its own
+            if (ownerFactoryType != FactoryType.Service & ownerRequiredServiceType != null & ownerRequiredServiceType != serviceType) // if only dependency does not have its own
                 return ServiceInfo.OfServiceAndRequiredType(serviceType, ownerRequiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata);
 
-            if (serviceKey == null && metadataKey == null && metadata == null && ifUnresolved == IfUnresolved.Throw)
+            if (serviceKey == null & metadataKey == null & metadata == null & ifUnresolved == IfUnresolved.Throw)
                 return ServiceInfo.Of(serviceType);
 
             return ServiceInfo.Of(serviceType, null, ifUnresolved, serviceKey, metadataKey, metadata);
@@ -9926,6 +9924,11 @@ namespace DryIoc
         // todo: @perf @mem optimize for the `serviceType` and `requiredServiceType` only
         /// <summary>Creates info out of provided settings</summary>
         public static ServiceInfo Of(Type serviceType, Type requiredServiceType,
+            IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null, string metadataKey = null, object metadata = null) =>
+            OrServiceType(serviceType, requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata) as ServiceInfo
+                ?? new Typed(serviceType);
+
+        internal static object OrServiceType(Type serviceType, Type requiredServiceType,
             IfUnresolved ifUnresolved = IfUnresolved.Throw, object serviceKey = null, string metadataKey = null, object metadata = null)
         {
             (serviceType ?? requiredServiceType).ThrowIfNull();
@@ -9934,12 +9937,17 @@ namespace DryIoc
             if (serviceType == requiredServiceType)
                 requiredServiceType = null;
 
-            return serviceKey == null & requiredServiceType == null & metadataKey == null & metadata == null
-                ? (ifUnresolved == IfUnresolved.Throw ? new Typed(serviceType)
-                : ifUnresolved == IfUnresolved.ReturnDefault
-                ? new TypedIfUnresolvedReturnDefault(serviceType)
-                : new TypedIfUnresolvedReturnDefaultIfNotRegistered(serviceType))
-                : new WithDetails(serviceType, ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
+            if (serviceKey == null & requiredServiceType == null & metadataKey == null & metadata == null)
+            {
+                if (ifUnresolved == IfUnresolved.Throw)
+                    return serviceType;
+                return ifUnresolved == IfUnresolved.ReturnDefault
+                    ? new TypedIfUnresolvedReturnDefault(serviceType)
+                    : new TypedIfUnresolvedReturnDefaultIfNotRegistered(serviceType);
+            }
+
+            return new WithDetails(serviceType,
+                ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
         }
 
         /// <summary>Typed service info</summary>
@@ -10243,6 +10251,42 @@ namespace DryIoc
                 : req.SetServiceInfo(container, Empty, 1, 0, depRequestStack, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), null);
         }
 
+        internal static Request CreateFromServiceTypeOrInfo(Container container, object serviceTypeOrInfo,
+            Request preResolveParent = null, RequestFlags flags = default, object[] inputArgs = null)
+        {
+            var serviceType = serviceTypeOrInfo as Type;
+            var serviceInfo = serviceTypeOrInfo as ServiceInfo;
+            if ((serviceType ?? serviceInfo.ServiceType).IsOpenGeneric())
+                Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType ?? serviceInfo.ServiceType);
+
+            flags |= RequestFlags.IsResolutionCall;
+
+            preResolveParent ??= Empty;
+            if (preResolveParent.IsEmpty)
+                flags |= preResolveParent.Flags; // inherits the OpensResolutionScope flag
+            else
+            {
+                var parentDetails = preResolveParent.GetServiceDetails();
+                if (parentDetails != null & parentDetails != ServiceDetails.Default)
+                {
+                    var parentServiceType = preResolveParent.ActualServiceType;
+                    var parentFactoryType = preResolveParent.FactoryType;
+                    serviceTypeOrInfo = serviceType != null
+                        ? serviceType.InheritInfoFromDependencyOwner(parentServiceType, parentDetails, container, parentFactoryType)
+                        : serviceInfo.InheritInfoFromDependencyOwner(parentServiceType, parentDetails, container, parentFactoryType);
+                }
+                flags |= (preResolveParent.Flags & InheritedFlags); // keep parent flags that should be inherited
+            }
+
+            var actualServiceType = serviceTypeOrInfo as Type ?? ((ServiceInfo)serviceTypeOrInfo).GetActualServiceType();
+            var inputArgExprs = inputArgs?.Map(static a => Constant(a));
+            
+            var req = RentRequestOrNull();
+            return req == null
+                ? new Request(container, preResolveParent, 1, 0, null, flags, serviceTypeOrInfo, actualServiceType, inputArgExprs)
+                : req.SetServiceInfo(container, preResolveParent, 1, 0, null, flags, serviceTypeOrInfo, actualServiceType, inputArgExprs);
+        }
+
         /// <summary>Creates the Resolve request. The container initiated the Resolve is stored within request.</summary>
         public static Request Create(Container container, ServiceInfo serviceInfo,
             Request preResolveParent = null, RequestFlags flags = default, object[] inputArgs = null)
@@ -10253,42 +10297,25 @@ namespace DryIoc
 
             flags |= RequestFlags.IsResolutionCall;
 
-            // inherit some flags and service details from parent (if any)
-            preResolveParent = preResolveParent ?? Empty;
-            if (!preResolveParent.IsEmpty)
+            preResolveParent ??= Empty;
+            if (preResolveParent.IsEmpty)
+                flags |= preResolveParent.Flags; // inherits the OpensResolutionScope flag
+            else
             {
-                var parentServiceType = preResolveParent.ActualServiceType;
                 var parentDetails = preResolveParent.GetServiceDetails();
                 if (parentDetails != null & parentDetails != ServiceDetails.Default)
-                    serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(parentServiceType, parentDetails, container, preResolveParent.FactoryType);
+                    serviceInfo = serviceInfo.InheritInfoFromDependencyOwner(
+                        preResolveParent.ActualServiceType, parentDetails, container, preResolveParent.FactoryType);
 
-                flags |= preResolveParent.Flags & InheritedFlags;
+                flags |= (preResolveParent.Flags & InheritedFlags); // keep parent flags that should be inherited
             }
-            else
-                flags |= preResolveParent.Flags; //inherits the OpensResolutionScope flag
 
             var inputArgExprs = inputArgs?.Map(static a => Constant(a));
 
-            // we are re-starting the dependency depth count from `1`
-            return new Request(container, preResolveParent, 1, 0, null, flags, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs);
-        }
-
-        /// <summary>Creates the Resolve request for the resolution root service.</summary>
-        public static Request CreateResolutionRoot(Container container, ServiceInfo serviceInfo,
-            object[] inputArgs = null)
-        {
-            Debug.Assert(serviceInfo != null);
-
-            var serviceType = serviceInfo.ServiceType;
-            if (serviceType != null && serviceType.IsOpenGeneric())
-                Throw.It(Error.ResolvingOpenGenericServiceTypeIsNotPossible, serviceType);
-
-            var inputArgExprs = inputArgs?.Map(a => Constant(a));
-
             var req = RentRequestOrNull();
             return req == null
-                ? new Request(container, Empty, 1, 0, null, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs)
-                : req.SetServiceInfo(container, Empty, 1, 0, null, RequestFlags.IsResolutionCall, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs);
+                ? new Request(container, preResolveParent, 1, 0, null, flags, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs)
+                : req.SetServiceInfo(container, preResolveParent, 1, 0, null, flags, serviceInfo, serviceInfo.GetActualServiceType(), inputArgExprs);
         }
 
         /// <summary>Creates the Resolve request for the resolution root service.</summary>
