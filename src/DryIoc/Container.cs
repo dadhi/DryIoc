@@ -3211,7 +3211,7 @@ namespace DryIoc
     /// <summary>Interpreter of expression - where possible uses knowledge of DryIoc internals to avoid reflection</summary>
     public static class Interpreter
     {
-        /// <summary>Calls `TryInterpret` inside try-catch and unwraps/re-throws `ContainerException` from the reflection `TargetInvocationException`</summary>
+        /// <summary>Calls `TryInterpret` inside the try-catch and unwraps and rethrows the InnerException from the reflection `TargetInvocationException`</summary>
         public static bool TryInterpretAndUnwrapContainerException(IResolverContext r, Expression expr, out object result)
         {
             try
@@ -3222,7 +3222,7 @@ namespace DryIoc
             {
                 var ex = tex.InnerException;
 
-                // When this SPECIFIC TargetInvocationException exception happened only in this INTERPRETATION PHASE,
+                // When this SPECIFIC TargetInvocationException exception is raised only in this INTERPRETATION PHASE,
                 // in order to prevent waiting for the empty item entry in the subsequent resolutions, see #536, #619 for details.
                 //
                 // So we may:
@@ -3236,8 +3236,8 @@ namespace DryIoc
                 // and we will be operating with its Value only).
                 //
                 // Then traverse the scope items and find the first NoItem entry for the exceptional dependency.
-                // The first NoItem entry will be the one for the exception because Scope (expect for Singletons Scope) is
-                // not supposed to be modified concurrently - so only one NoItem entry is expected. Read on for more the details.
+                // The first NoItem entry will be the one for the exception because Scope (except for the Singletons Scope) is
+                // not supposed to be modified concurrently - so only one NoItem entry is expected. Read-on for more the details.
                 // 
                 // If found, then try to set the exception into the entry Value, 
                 // if we were interrupted (by some other thread setting the exception, right?), then lookup for the next NoItem entry.
@@ -3245,7 +3245,7 @@ namespace DryIoc
                 //
                 // In worse case scenario we will set the wrong item entry, 
                 // but it is not a problem, because it will be overriden by the successful resolution - right?
-                // Or if unsuccessful we may get the wrong exception, but it is even more unlikely the case.
+                // Or if unsuccessful, we may get the wrong exception, but it is even more unlikely the case.
                 // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
                 // Comparing to the singletons where it is expected to be concurrent, but it does not addressed here.
                 //
