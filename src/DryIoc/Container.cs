@@ -9569,8 +9569,7 @@ namespace DryIoc
         /// <summary>Sets the service key as a detials of the service resolution.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ServiceDetails OfServiceKey(object serviceKey) =>
-            new ServiceDetails(null, IfUnresolved.Throw, serviceKey, null, null, null, 
-                hasCustomValue: false);
+            new ServiceDetails(null, IfUnresolved.Throw, serviceKey, null, null, null, hasCustomValue: false);
 
         /// <summary>Creates new details out of provided settings and not null `serviceKey`.</summary>
         [MethodImpl((MethodImplOptions)256)]
@@ -9794,10 +9793,11 @@ namespace DryIoc
             if (serviceType == requiredServiceType)
                 requiredServiceType = null;
 
-            if (serviceKey == null & requiredServiceType == null & metadataKey == null & metadata == null & ifUnresolved == IfUnresolved.Throw)
+            if (requiredServiceType == null & serviceKey == null & metadataKey == null & metadata == null & ifUnresolved == IfUnresolved.Throw)
                 return serviceType;
 
-            return ServiceInfo.Of(serviceType, ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
+            var details = new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata, null, hasCustomValue: false);
+            return ServiceInfo.Of(serviceType, details);
         }
 
         /// <summary>Returns required service type if it is specified and assignable to service type,
