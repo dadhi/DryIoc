@@ -3199,7 +3199,6 @@ namespace DryIoc
     ///<summary>Hides/wraps object with disposable interface.</summary> 
     public sealed class HiddenDisposable
     {
-        // todo: @perf use UnsafeAccessAttribute to avoid reflection
         internal static ConstructorInfo Ctor = typeof(HiddenDisposable).GetConstructors()[0];
         internal static FieldInfo ValueField = typeof(HiddenDisposable).GetField(nameof(Value));
         /// <summary>Wrapped value</summary>
@@ -3236,7 +3235,7 @@ namespace DryIoc
                 // and we will be operating with its Value only).
                 //
                 // Then traverse the scope items and find the first NoItem entry for the exceptional dependency.
-                // The first NoItem entry will be the one for the exception because Scope (except for the Singletons Scope) is
+                // The first NoItem entry will be the one for the exception because Scope is
                 // not supposed to be modified concurrently - so only one NoItem entry is expected. Read-on for more the details.
                 // 
                 // If found, then try to set the exception into the entry Value, 
@@ -3247,9 +3246,8 @@ namespace DryIoc
                 // but it is not a problem, because it will be overriden by the successful resolution - right?
                 // Or if unsuccessful, we may get the wrong exception, but it is even more unlikely the case.
                 // It is unlikely in the first place because the majority of cases the scope access is not concurrent.
-                // Comparing to the singletons where it is expected to be concurrent, but it does not addressed here.
                 //
-                var exSet = TrySetScopedItemException(r, ex);
+                var exSet = TrySetScopedOrSingletonItemException(r, ex);
                 Debug.Assert(!exSet, $"The exception was not set in the scope item entry, ex message: {ex.Message}");
 
                 // todo: @improve should we try to `(ex as ContainerException)?.TryGetDetails(container)` here and include it into the cex message?
@@ -3257,7 +3255,7 @@ namespace DryIoc
             }
         }
 
-        private static bool TrySetScopedItemException(IResolverContext r, Exception ex)
+        private static bool TrySetScopedOrSingletonItemException(IResolverContext r, Exception ex)
         {
             ScopedItemException sex = null;
             for (var s = r.CurrentScope; s != null; s = s.Parent)
@@ -3286,7 +3284,7 @@ namespace DryIoc
                                 // because the other thread has no way to notify us here of the wrong, because we are done already.
 
                                 // So, slowing down and given a chance for the other thread to set the NoItem entry to the value.
-                                Thread.Sleep(1); // per design, because Thead.Sleep(0) or Thread.Yield() are not reliable.
+                                Thread.Sleep(1); // per design, because Thead.Sleep(0) or Thread.Yield() are not reliable enough.
 
                                 var actualValueWas = Interlocked.CompareExchange(ref entry.Value, sex, Scope.NoItem);
                                 if (actualValueWas == Scope.NoItem)
