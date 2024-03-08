@@ -9538,11 +9538,6 @@ namespace DryIoc
             ifUnresolved == IfUnresolved.ReturnDefault ? IfUnresolvedReturnDefault :
                 IfUnresolvedReturnDefaultIfNotRegistered;
 
-        /// <summary>Creates new details out of provided settings and not null `serviceKey`.</summary>
-        [MethodImpl((MethodImplOptions)256)]
-        public static ServiceDetails OfServiceKey(ServiceDetails d, object serviceKey) =>
-            new ServiceDetails(d.RequiredServiceType, d.IfUnresolved, serviceKey, d.MetadataKey, d.Metadata, d.DefaultValue, hasCustomValue: false);
-
         /// <summary>Creates new details out of provided settings, or returns default if all settings have default value.</summary>
         public static ServiceDetails Of(Type requiredServiceType = null,
             object serviceKey = null, IfUnresolved ifUnresolved = IfUnresolved.Throw,
@@ -9574,7 +9569,14 @@ namespace DryIoc
         /// <summary>Sets the service key as a detials of the service resolution.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ServiceDetails OfServiceKey(object serviceKey) =>
-            new ServiceDetails(null, IfUnresolved.Throw, serviceKey, null, null, null, false);
+            new ServiceDetails(null, IfUnresolved.Throw, serviceKey, null, null, null, 
+                hasCustomValue: false);
+
+        /// <summary>Creates new details out of provided settings and not null `serviceKey`.</summary>
+        [MethodImpl((MethodImplOptions)256)]
+        public static ServiceDetails WithServiceKey(ServiceDetails d, object serviceKey) =>
+            new ServiceDetails(d.RequiredServiceType, d.IfUnresolved, serviceKey, d.MetadataKey, d.Metadata, d.DefaultValue,
+                hasCustomValue: false);
 
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
         public readonly Type RequiredServiceType;
@@ -9892,17 +9894,14 @@ namespace DryIoc
             if (serviceType == requiredServiceType)
                 requiredServiceType = null;
 
-            if (serviceKey == null & requiredServiceType == null & metadataKey == null & metadata == null)
-            {
-                if (ifUnresolved == IfUnresolved.Throw)
-                    return serviceType; // todo: @wip
-                return ifUnresolved == IfUnresolved.ReturnDefault
-                    ? new TypedIfUnresolvedReturnDefault(serviceType)
-                    : new TypedIfUnresolvedReturnDefaultIfNotRegistered(serviceType);
-            }
+            if (requiredServiceType == null & serviceKey == null & metadataKey == null & metadata == null)
+                return ifUnresolved == IfUnresolved.Throw ? serviceType 
+                    : ifUnresolved == IfUnresolved.ReturnDefault
+                        ? new TypedIfUnresolvedReturnDefault(serviceType)
+                        : new TypedIfUnresolvedReturnDefaultIfNotRegistered(serviceType);
 
-            return new WithDetails(serviceType,
-                ServiceDetails.Of(requiredServiceType, serviceKey, ifUnresolved, null, metadataKey, metadata));
+            var details = new ServiceDetails(requiredServiceType, ifUnresolved, serviceKey, metadataKey, metadata, null, hasCustomValue: false);
+            return new WithDetails(serviceType, details);
         }
 
         /// <summary>Typed service info</summary>
@@ -10666,9 +10665,9 @@ namespace DryIoc
         public void ChangeServiceKey(object serviceKey) =>
             ServiceTypeOrInfo
             = ServiceTypeOrInfo is ServiceInfo i
-                ? i.Create(i.ServiceType, ServiceDetails.OfServiceKey(i.Details, serviceKey)) // todo: @unclear check for the custom value
+                ? i.Create(i.ServiceType, ServiceDetails.WithServiceKey(i.Details, serviceKey)) // todo: @unclear check for the custom value
             : ServiceTypeOrInfo is ParameterInfo pi
-                ? ParameterServiceInfo.Of(pi, ActualServiceType, ServiceDetails.OfServiceKey(ServiceDetails.Default, serviceKey))
+                ? ParameterServiceInfo.Of(pi, ActualServiceType, ServiceDetails.WithServiceKey(ServiceDetails.Default, serviceKey))
             : ServiceInfo.Of(ActualServiceType, serviceKey);
 
         /// <summary>Prepends input arguments to existing arguments in request. It is done because the
