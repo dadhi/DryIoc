@@ -177,10 +177,9 @@ namespace DryIoc.IssuesTests
         public override Expression CreateExpressionOrDefault(Request request)
         {
             var originalFactoryType = GetOriginalFactoryType();
-            var originalFactoryRequest = Request.Create(request.Container, originalFactoryType, request.ServiceKey);
-            var originalFactory = originalFactoryRequest.Container.ResolveFactory(originalFactoryRequest);
 
-            var originalFactoryExpression = (LambdaExpression)originalFactory.GetExpressionOrDefault(originalFactoryRequest);
+            var originalFactoryExpression = 
+                (LambdaExpression)request.Container.ResolveExpression(ServiceInfo.Of(originalFactoryType, request.ServiceKey));
 
             var convertedFactoryExpression = Expression.Lambda<TDelegate>(originalFactoryExpression.Body, originalFactoryExpression.Parameters);
 

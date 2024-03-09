@@ -972,6 +972,17 @@ namespace DryIoc
                 : ThrowUnableToResolveOrGetDefault(request, factory);
         }
 
+        /// <inheritdoc />
+        public Factory ResolveFactory(ServiceInfo serviceInfo) =>
+            ResolveFactory(Request.Create(this, serviceInfo));
+
+        /// <inheritdoc />
+        public Expression ResolveExpression(ServiceInfo serviceInfo)
+        {
+            var request = Request.Create(this, serviceInfo);
+            return ResolveFactory(request)?.GetExpressionOrDefault(request);
+        }
+
         internal static T ThrowUnableToResolveOrGetDefault<T>(Request request, T defaultResult)
         {
             if (request.IfUnresolved == IfUnresolved.Throw)
@@ -9574,8 +9585,7 @@ namespace DryIoc
         /// <summary>Creates new details out of provided settings and not null `serviceKey`.</summary>
         [MethodImpl((MethodImplOptions)256)]
         public static ServiceDetails WithServiceKey(ServiceDetails d, object serviceKey) =>
-            new ServiceDetails(d.RequiredServiceType, d.IfUnresolved, serviceKey, d.MetadataKey, d.Metadata, d.DefaultValue,
-                hasCustomValue: false);
+            new ServiceDetails(d.RequiredServiceType, d.IfUnresolved, serviceKey, d.MetadataKey, d.Metadata, d.DefaultValue, hasCustomValue: false);
 
         /// <summary>Service type to search in registry. Should be assignable to user requested service type.</summary>
         public readonly Type RequiredServiceType;
@@ -14995,10 +15005,19 @@ namespace DryIoc
         /// You may use Factory <see cref="Setup.AsResolutionRoot"/>.</summary>
         GeneratedExpressions GenerateResolutionExpressions(Func<IEnumerable<ServiceRegistrationInfo>, IEnumerable<ServiceInfo>> getRoots = null, bool allowRuntimeState = false);
 
-        /// <summary>Searches for requested factory in registry, and then using <see cref="DryIoc.Rules.UnknownServiceResolvers"/>.</summary>
-        /// <param name="request">Factory request.</param>
-        /// <returns>Found factory, otherwise null if <see cref="Request.IfUnresolved"/> is set to <see cref="IfUnresolved.ReturnDefault"/>.</returns>
+        /// <summary>Searches for the requested factory in registry or in the Dynamic registrations.
+        /// Plus generates the closed-generic factory for the found open-generic one.</summary>
+        /// <returns>Resolved factory, otherwise null if <see cref="Request.IfUnresolved"/> is set to <see cref="IfUnresolved.ReturnDefault"/>.</returns>
         Factory ResolveFactory(Request request);
+
+        /// <summary>Searches for the requested factory specified by the `ServiceInfo` in registry or in the Dynamic registrations.
+        /// Plus generates the closed-generic factory for the found open-generic one.</summary>
+        /// <returns>Resolved factory, otherwise null if <see cref="Request.IfUnresolved"/> is set to <see cref="IfUnresolved.ReturnDefault"/>.</returns>
+        Factory ResolveFactory(ServiceInfo serviceInfo);
+
+        /// <summary>Resolves the factory and then gets the result expression</summary>
+        /// <returns>Resolved expression, otherwise null if <see cref="Request.IfUnresolved"/> is set to <see cref="IfUnresolved.ReturnDefault"/>.</returns>
+        Expression ResolveExpression(ServiceInfo serviceInfo);
 
         /// <summary>Searches for registered service factory and returns it, or null if not found.
         /// Will use <see cref="DryIoc.Rules.FactorySelector"/> if specified.</summary>
