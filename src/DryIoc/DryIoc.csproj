@@ -24,7 +24,7 @@
 
 - Decrease memory footprint
 - Remove Obsolete API
-- ?Compile-time Dependency Injection?
+- @WIP Compile-time Dependency Injection
 
 ]]>
     </PackageReleaseNotes>
