@@ -9,6 +9,7 @@ public class Program
 {
     public static void Main()
     {
+        new GHIssue636_ServiceKey_in_RegisterDelegate_parameters().Run();
         // new GHIssue631_Conditional_registrations().Run();
 
         RunAllTests();

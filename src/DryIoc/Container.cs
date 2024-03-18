@@ -7215,6 +7215,7 @@ namespace DryIoc
     {
         /// <summary>Constructor or method to use for service creation.</summary>
         public readonly MemberInfo ConstructorOrMethodOrMember;
+
         /// <summary>Identifies factory service if factory method is instance member.</summary>
         public virtual ServiceInfo FactoryServiceInfo => null;
 
@@ -8781,12 +8782,21 @@ namespace DryIoc
             object d1, object d2, object d3, object d4, object d5, object d6) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6);
         private static object ToFuncWithObjParams<D1, D2, D3, D4, D5, D6, D7, TService>(this Func<D1, D2, D3, D4, D5, D6, D7, TService> f,
             object d1, object d2, object d3, object d4, object d5, object d6, object d7) => f((D1)d1, (D2)d2, (D3)d3, (D4)d4, (D5)d5, (D6)d6, (D7)d7);
-
+        // todo: @wip remove when #636 is fixed
         private static void RegisterFunc(this IRegistrator r,
             Type serviceType, Type sourceFuncType, Delegate funcWithObjParams,
             IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
         {
             var made = new Made(FactoryMethod.OfFunc(sourceFuncType.GetMethod(InvokeMethodName), funcWithObjParams));
+            var factory = ReflectionFactory.OfConcreteTypeAndMadeNoValidation(serviceType, made, reuse, setup);
+            r.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
+        }
+
+        private static void RegisterFunc(this IRegistrator r,
+            Type serviceType, MethodInfo sourceFuncMethod, Delegate funcWithObjParams,
+            IReuse reuse, Setup setup, IfAlreadyRegistered? ifAlreadyRegistered, object serviceKey)
+        {
+            var made = new Made(FactoryMethod.OfFunc(sourceFuncMethod, funcWithObjParams));
             var factory = ReflectionFactory.OfConcreteTypeAndMadeNoValidation(serviceType, made, reuse, setup);
             r.Register(factory, serviceType, serviceKey, ifAlreadyRegistered, isStaticallyChecked: true);
         }
@@ -8824,7 +8834,7 @@ namespace DryIoc
         public static void RegisterDelegate<TDep1, TDep2, TService>(
             this IRegistrator r, Func<TDep1, TDep2, TService> factory,
             IReuse reuse = null, Setup setup = null, IfAlreadyRegistered? ifAlreadyRegistered = null, object serviceKey = null) =>
-            r.RegisterFunc(typeof(TService), typeof(Func<TDep1, TDep2, TService>), (Func<object, object, object>)factory.ToFuncWithObjParams,
+            r.RegisterFunc(typeof(TService), factory.Method, (Func<object, object, object>)factory.ToFuncWithObjParams,
                 reuse, setup, ifAlreadyRegistered, serviceKey);
 
         /// <summary>Registers delegate with the explicit arguments to be injected by container avoiding and with object return type known at runtime</summary>
