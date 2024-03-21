@@ -1552,7 +1552,7 @@ namespace DryIoc
             foreach (var d in decorators)
             {
                 var cond = d.Setup.Condition;
-                if (cond != null || ((Setup.DecoratorSetup)d.Setup).UseDecorateeReuse)
+                if (cond != null || d.Setup.UseDecorateeReuse)
                     request.Flags |= RequestFlags.DoNotCacheExpression;
 
                 if (firstMatchingDecorator == null && 
@@ -10727,8 +10727,7 @@ namespace DryIoc
                 InputArgExprs != null && Rules.IgnoringReuseForFuncWithArgs ? DryIoc.Reuse.Transient :
                 factory.Reuse != null ? factory.Reuse :
                 setup.UseParentReuse ? (DirectParent.IsEmpty ? Rules.DefaultReuse : null) : // the `null` here signals to find the parent reuse
-                factory.FactoryType == FactoryType.Decorator &&
-                (setup.To<Setup.DecoratorSetup>().UseDecorateeReuse || Rules.UseDecorateeReuseForDecorators) ? Reuse : // already resolved decoratee reuse
+                factory.FactoryType == FactoryType.Decorator && (setup.UseDecorateeReuse | Rules.UseDecorateeReuseForDecorators) ? Reuse : // already resolved decoratee reuse
                 factory.FactoryType == FactoryType.Wrapper ? DryIoc.Reuse.Transient :
                 Rules.DefaultReuse;
 
@@ -11253,6 +11252,11 @@ namespace DryIoc
         /// preventing possibly unwanted holding of the scope (and its services) for the lifespan of the container.</summary>
         public bool AvoidResolutionScopeTracking => (_settings & Settings.AvoidResolutionScopeTracking) != 0;
 
+        /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.
+        /// Note: It does not consider the keys of decorated services, therefore it will be shared between all services in collection.
+        /// Note: Setting is valid only for DecoratorSetup, for other setups it is always `false`.</summary>
+        public bool UseDecorateeReuse => (_settings & Settings.UseDecorateeReuse) != 0;
+
         private Setup() { }
 
         private Setup(Func<Request, bool> condition,
@@ -11310,6 +11314,7 @@ namespace DryIoc
             PreferInSingleServiceResolve = 1 << 9,
             AsResolutionCallForExpressionGeneration = 1 << 10,
             AvoidResolutionScopeTracking = 1 << 11,
+            UseDecorateeReuse = 1 << 12,
         }
 #pragma warning restore CS1591
 
@@ -11559,11 +11564,6 @@ namespace DryIoc
             /// - first registered are closer decoratee.</summary>
             public readonly int Order;
 
-            // todo: It does not consider the keys of decorated services,
-            // therefore it will be shared between all services in collection
-            /// <summary>Instructs to use decorated service reuse. Decorated service may be decorator itself.</summary>
-            public readonly bool UseDecorateeReuse;
-
             /// <summary>Default setup.</summary>
             public DecoratorSetup() { }
 
@@ -11582,7 +11582,8 @@ namespace DryIoc
                     avoidResolutionScopeTracking: avoidResolutionScopeTracking)
             {
                 Order = order;
-                UseDecorateeReuse = useDecorateeReuse;
+                if (useDecorateeReuse)
+                    _settings |= Settings.UseDecorateeReuse;
             }
         }
     }
@@ -11922,7 +11923,7 @@ namespace DryIoc
 
                 var reuse = Reuse ?? rules.DefaultReuse;
                 if (reuse != DryIoc.Reuse.Transient || setup.AllowDisposableTransient || !rules.ThrowOnRegisteringDisposableTransient ||
-                    ((Setup.DecoratorSetup)setup).UseDecorateeReuse)
+                    setup.UseDecorateeReuse)
                     return true;
 
                 var knownImplOrServiceType = CanAccessImplementationType ? ImplementationType : serviceType;
