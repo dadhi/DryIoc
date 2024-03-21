@@ -11337,10 +11337,9 @@ namespace DryIoc
             bool useParentReuse = false, int disposalOrder = 0, bool preferInSingleServiceResolve = false,
             bool avoidResolutionScopeTracking = false)
         {
-            if (metadataOrFuncOfMetadata == null && condition == null &&
-                !openResolutionScope && !asResolutionRoot &&
-                !preventDisposal && !weaklyReferenced && !allowDisposableTransient && !trackDisposableTransient &&
-                !useParentReuse && disposalOrder == 0 && !preferInSingleServiceResolve && !avoidResolutionScopeTracking)
+            if (metadataOrFuncOfMetadata == null & condition == null & !openResolutionScope & !asResolutionRoot &
+                !preventDisposal & !weaklyReferenced & !allowDisposableTransient & !trackDisposableTransient &
+                !useParentReuse & disposalOrder == 0 & !preferInSingleServiceResolve & !avoidResolutionScopeTracking)
                 return !asResolutionCall ? Default : AsResolutionCallSetup;
 
             return new ServiceSetup(condition,
@@ -11398,40 +11397,43 @@ namespace DryIoc
             bool preventDisposal = false, bool weaklyReferenced = false,
             bool allowDisposableTransient = false, bool trackDisposableTransient = false,
             int disposalOrder = 0, bool avoidResolutionScopeTracking = false) =>
-            condition == null && order == 0 && !useDecorateeReuse &&
-            !openResolutionScope && !asResolutionCall &&
-            !preventDisposal && !weaklyReferenced && !allowDisposableTransient && !trackDisposableTransient &&
-            disposalOrder == 0 && !avoidResolutionScopeTracking
+            condition == null & order == 0 & !useDecorateeReuse & !openResolutionScope & !asResolutionCall &&
+            !preventDisposal & !weaklyReferenced & !allowDisposableTransient & !trackDisposableTransient &
+            disposalOrder == 0 & !avoidResolutionScopeTracking
                 ? Decorator
                 : new DecoratorSetup(condition, order, useDecorateeReuse, openResolutionScope, asResolutionCall,
                     preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient, disposalOrder,
                     avoidResolutionScopeTracking);
 
-        /// Creates a condition for both <paramref name="decorateeType"/>, <paramref name="decorateeServiceKey"/> and additional condition
-        public static Func<Request, bool> GetDecorateeCondition(Type decorateeType,
-            object decorateeServiceKey = null, Func<Request, bool> condition = null)
-        {
-            if (decorateeType == null && decorateeServiceKey == null)
-                return condition;
+        ///<summary>Creates a condition for <paramref name="decorateeType"/></summary>
+        public static Func<Request, bool> GetDecorateeCondition(Type decorateeType) =>
+            r => r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
 
-            Func<Request, bool> decorateeCondition;
-            if (decorateeServiceKey == null)
-                decorateeCondition = r => r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
-            else if (decorateeType == null)
-                decorateeCondition = r => decorateeServiceKey.Equals(r.ServiceKey);
-            else
-                decorateeCondition = r => decorateeServiceKey.Equals(r.ServiceKey) &&
-                                     r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType);
-            return condition == null ? decorateeCondition : r => decorateeCondition(r) && condition(r);
-        }
+        ///<summary>Creates a condition for <paramref name="decorateeServiceKey"/></summary>
+        public static Func<Request, bool> GetDecorateeCondition(object decorateeServiceKey) =>
+            r => decorateeServiceKey.Equals(r.ServiceKey);
+
+        ///<summary>Creates a condition for <paramref name="decorateeServiceKey"/></summary>
+        public static Func<Request, bool> GetDecorateeCondition(Type decorateeType, object decorateeServiceKey) =>
+            r => r.GetKnownImplementationOrServiceType().IsAssignableTo(decorateeType)
+                && decorateeServiceKey.Equals(r.ServiceKey);
 
         /// <summary>Setup for decorator of type <paramref name="decorateeType"/>.</summary>
         public static Setup DecoratorOf(Type decorateeType = null,
             int order = 0, bool useDecorateeReuse = false, bool openResolutionScope = false, bool asResolutionCall = false,
             bool preventDisposal = false, bool weaklyReferenced = false, bool allowDisposableTransient = false,
-            bool trackDisposableTransient = false, int disposalOrder = 0, object decorateeServiceKey = null) =>
-            DecoratorWith(GetDecorateeCondition(decorateeType, decorateeServiceKey), order, useDecorateeReuse, openResolutionScope, asResolutionCall,
+            bool trackDisposableTransient = false, int disposalOrder = 0, object decorateeServiceKey = null)
+        {
+            Func<Request, bool> cond = decorateeType == null & decorateeServiceKey == null
+                ? null
+                : decorateeType != null & decorateeServiceKey != null
+                    ? GetDecorateeCondition(decorateeType, decorateeServiceKey)
+                : decorateeType != null 
+                    ? GetDecorateeCondition(decorateeType) 
+                    : GetDecorateeCondition(decorateeServiceKey);
+            return DecoratorWith(cond, order, useDecorateeReuse, openResolutionScope, asResolutionCall,
                 preventDisposal, weaklyReferenced, allowDisposableTransient, trackDisposableTransient, disposalOrder);
+        }
 
         /// <summary>Setup for decorator of type <typeparamref name="TDecoratee"/>.</summary>
         public static Setup DecoratorOf<TDecoratee>(
