@@ -12,6 +12,9 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            // todo: @fixme (also #638) - this test is failing with FEC error
+            // Delegate_decorator_consumer_with_the_runtime_service_types_RegisterDelegate_compiling_the_delegate();
+
             Should_resolve_decorator();
             Should_resolve_decorator_of_decorator();
             Should_resolve_decorator_for_named_service();
@@ -68,7 +71,8 @@ namespace DryIoc.UnitTests
             Can_decorate_array_and_alter_the_service_key_filtering();
             Can_use_different_reuses_for_decorators_based_on_different_decoratee_reuse_in_collection();
             Using_decorator_to_implement_IsResolved();
-            return 56;
+
+            return 57;
         }
 
         [Test]
@@ -460,6 +464,34 @@ namespace DryIoc.UnitTests
             Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(operation);
             var op = container.Resolve<IOperation>();
             Assert.AreSame(operation, op);
+        }
+
+        [Test]
+        public void Delegate_decorator_consumer_with_the_runtime_service_types_RegisterDelegate_compiling_the_delegate()
+        {
+            var container = new Container();
+
+            container.Register<OperationConsumer>();
+            container.Register<IOperation, SomeOperation>();
+
+            container.RegisterDelegate(typeof(IOperation), typeof(IOperation),
+                op => new MeasureExecutionTimeOperationDecorator((IOperation)op), 
+                setup: Setup.DecoratorWith(useDecorateeReuse: true));
+
+            var opConsumer1 = container.Resolve<OperationConsumer>();
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(opConsumer1.Operation);
+
+            var opConsumer2 = container.Resolve<OperationConsumer>();
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(opConsumer2.Operation);
+
+            var opConsumer3 = container.Resolve<OperationConsumer>();
+            Assert.IsInstanceOf<MeasureExecutionTimeOperationDecorator>(opConsumer3.Operation);
+        }
+
+        sealed class OperationConsumer
+        {
+            public IOperation Operation { get; }
+            public OperationConsumer(IOperation operation) => Operation = operation;
         }
 
         [Test]
