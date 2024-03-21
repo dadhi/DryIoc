@@ -10,6 +10,10 @@ namespace DryIoc.UnitTests
     {
         public int Run()
         {
+            Issue_466_with_decorator();
+            Issue_466_with_decorator_with_condition();
+            Issue_466_with_initializer();
+
             Can_register_initializer_as_decorator_delegate();
             Can_register_initializer_as_decorator_delegate_of_generic_impl();
             Can_register_initializer_as_decorator_delegate_with_dedicated_method();
@@ -21,11 +25,8 @@ namespace DryIoc.UnitTests
             Can_register_initializer_for_object_For_example_to_log_all_resolutions_for_keyed_service();
             Can_track_disposable_transient_in_scope_via_initializer();
             Can_track_injected_disposable_transient_in_scope_via_initializer();
-            
-            Issue_466_with_initializer();
-            Issue_466_with_decorator_with_condition();
-            // Issue_466_with_decorator(); // todo: @wipt @fixme
-            return 13;
+
+            return 14;
         }
 
         [Test]
@@ -311,7 +312,6 @@ namespace DryIoc.UnitTests
             Assert.AreEqual(2, initCount); // should not change
         }
 
-        // todo: @wip @fixme for #636 to work, problem is seemingly in the `Setup.DecoratorWith` method and that UseDecorateeReuse is now suddenly being cached
         [Test] 
         public void Issue_466_with_decorator()
         {

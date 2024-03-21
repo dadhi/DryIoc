@@ -1546,24 +1546,21 @@ namespace DryIoc
                 return null;
 
             // Select the first decorator without condition or the one which matches the condition
-            Factory nextDecorator = null;
+            // Iterate over all decorators and prevent caching if any of them has the condition,
+            // because no matter if condition is true or false, we need a gresh chain of decorators
+            Factory firstMatchingDecorator = null;
             foreach (var d in decorators)
             {
                 var cond = d.Setup.Condition;
-                if (cond == null)
-                {
-                    nextDecorator = d;
-                    break;
-                }
-                request.Flags |= RequestFlags.DoNotCacheExpression;
-                if (cond(request.Isolate()))
-                {
-                    nextDecorator = d;
-                    break;
-                }
+                if (cond != null || ((Setup.DecoratorSetup)d.Setup).UseDecorateeReuse)
+                    request.Flags |= RequestFlags.DoNotCacheExpression;
+
+                if (firstMatchingDecorator == null && 
+                    (cond == null || cond(request.Isolate())))
+                    firstMatchingDecorator = d;
             }
 
-            var decoratorExpr = nextDecorator?.GetExpressionOrDefault(request);
+            var decoratorExpr = firstMatchingDecorator?.GetExpressionOrDefault(request);
             if (decoratorExpr == null)
                 return null;
 

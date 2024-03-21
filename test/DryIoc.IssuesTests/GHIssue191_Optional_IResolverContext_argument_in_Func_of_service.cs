@@ -120,7 +120,8 @@ namespace DryIoc.IssuesTests
                     var scopeEntry = _scopes.GetEntryOrDefault(address);
                     if (scopeEntry == null)
                     {
-                        Ref.Swap(ref _scopes, address, (x, a) => x.AddOrKeepEntry(ImHashMap.EntryWithDefaultValue<string, IResolverContext>(a.GetHashCode(), a)));
+                        Ref.Swap(ref _scopes, address, static (x, a) =>
+                            x.AddOrKeepEntry(ImHashMap.EntryWithDefaultValue<string, IResolverContext>(a.GetHashCode(), a)));
                         scopeEntry = _scopes.GetEntryOrDefault(address);
                     }
 
